@@ -125,7 +125,7 @@ export function ActivityHub() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/search" className="ui-button-secondary inline-flex items-center px-4 text-sm">
+            <Link href="/explore" className="ui-button-secondary inline-flex items-center px-4 text-sm">
               {t('searchCta')}
             </Link>
             <Link href="/create?mode=quick" className="ui-button-primary inline-flex items-center px-4 text-sm">
@@ -185,7 +185,7 @@ export function ActivityHub() {
           </div>
 
           <div className="mt-4 space-y-3">
-            <Link href="/search" className="ui-panel-muted ui-card-hover flex items-start justify-between rounded-2xl p-4">
+            <Link href="/explore" className="ui-panel-muted ui-card-hover flex items-start justify-between rounded-2xl p-4">
               <div>
                 <p className="text-sm font-bold text-[color:var(--app-text)]">{t('nextSearchTitle')}</p>
                 <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">{t('nextSearchDesc')}</p>

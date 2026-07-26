@@ -330,6 +330,7 @@ test('transaction lifecycle enforces role rules and listing type lock', async ({
       data: {
         rating: 5,
         comment: 'Flow validated by automation.',
+        attestationAccepted: true,
       },
     },
   );

@@ -1,20 +1,34 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import React, { Suspense, useEffect, useState } from 'react';
 import { AuthProvider } from '@/context/AuthContext';
 import { ChatInboxProvider } from '@/context/ChatInboxContext';
 import { NotificationInboxProvider } from '@/context/NotificationInboxContext';
-import { SectorProvider } from '@/context/SectorContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { UISettingsProvider } from '@/context/UISettingsContext';
 import { PageMetaProviderWrapper } from '@/components/providers/PageMetaProviderWrapper';
 import { DialogProvider } from '@/components/system/feedback/DialogProvider';
-import { BrowserNotificationBridge } from '@/components/system/feedback/BrowserNotificationBridge';
 import { ToastProvider } from '@/components/system/feedback/ToastProvider';
-import { ClientSecurityGuards } from '@/components/common/ClientSecurityGuards';
 import { GlobalImageFallback } from '@/components/common/GlobalImageFallback';
-import { LajukanEventBridge } from '@/components/analytics/LajukanEventBridge';
+import { ViewportHeightManager } from '@/components/common/ViewportHeightManager';
 import { WebVitalsReporter } from '@/components/analytics/WebVitalsReporter';
+
+const BrowserNotificationBridge = dynamic(
+  () =>
+    import('@/components/system/feedback/BrowserNotificationBridge').then(
+      module => module.BrowserNotificationBridge,
+    ),
+  { ssr: false },
+);
+
+const LajukanEventBridge = dynamic(
+  () =>
+    import('@/components/analytics/LajukanEventBridge').then(
+      module => module.LajukanEventBridge,
+    ),
+  { ssr: false },
+);
 
 type Props = {
   children: React.ReactNode;
@@ -87,7 +101,7 @@ export function Providers({ children }: Props) {
 
   return (
     <ThemeProvider>
-      <ClientSecurityGuards />
+      <ViewportHeightManager />
       <GlobalImageFallback />
       <UISettingsProvider>
         <ToastProvider>
@@ -95,19 +109,16 @@ export function Providers({ children }: Props) {
             <AuthProvider>
               <ChatInboxProvider>
                 <NotificationInboxProvider>
-                  <SectorProvider>
-                    <PageMetaProviderWrapper>
-                      <WebVitalsReporter />
-                      <Suspense fallback={null}>
-                        {deferredBridgesReady ? <LajukanEventBridge /> : null}
-                      </Suspense>
-                      {deferredBridgesReady ? <GlobalImageFallback /> : null}
-                      {deferredBridgesReady ? (
-                        <BrowserNotificationBridge />
-                      ) : null}
-                      {children}
-                    </PageMetaProviderWrapper>
-                  </SectorProvider>
+                  <PageMetaProviderWrapper>
+                    <WebVitalsReporter />
+                    <Suspense fallback={null}>
+                      {deferredBridgesReady ? <LajukanEventBridge /> : null}
+                    </Suspense>
+                    {deferredBridgesReady ? (
+                      <BrowserNotificationBridge />
+                    ) : null}
+                    {children}
+                  </PageMetaProviderWrapper>
                 </NotificationInboxProvider>
               </ChatInboxProvider>
             </AuthProvider>

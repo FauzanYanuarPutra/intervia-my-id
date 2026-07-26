@@ -333,7 +333,7 @@ function buildSearchHref(type: string, query: string): string {
     params.set('q', query.trim());
   }
   const queryString = params.toString();
-  return queryString ? `/search?${queryString}` : '/search';
+  return queryString ? `/explore?${queryString}` : '/explore';
 }
 
 function formatLaunchTeamRole(

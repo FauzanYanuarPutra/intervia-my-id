@@ -4,11 +4,11 @@ import { notFound } from 'next/navigation';
 
 const METADATA_BY_LOCALE: Record<string, Metadata> = {
   id: {
-    title: 'Cari di Lajukan UMKM | Supplier, Jasa, dan Peluang Usaha',
+    title: 'Jelajahi Lajukan UMKM | Supplier, Jasa, dan Peluang Usaha',
     description:
       'Cari supplier, jasa, talent, alat, dan lokasi usaha di Lajukan UMKM tanpa ribet.',
     keywords: [
-      'lajukan search',
+      'jelajahi lajukan',
       'supplier umkm',
       'distributor',
       'bahan baku',
@@ -22,19 +22,19 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
       'sewa kios',
     ],
     alternates: {
-      canonical: 'https://www.lajukan.com/id/search',
+      canonical: 'https://www.lajukan.com/id/explore',
       languages: {
-        'id-ID': 'https://www.lajukan.com/id/search',
-        'en-US': 'https://www.lajukan.com/en/search',
-        'x-default': 'https://www.lajukan.com/id/search',
+        'id-ID': 'https://www.lajukan.com/id/explore',
+        'en-US': 'https://www.lajukan.com/en/explore',
+        'x-default': 'https://www.lajukan.com/id/explore',
       },
     },
-    robots: { index: true, follow: true },
+    robots: { index: false, follow: true },
     openGraph: {
-      title: 'Cari di Lajukan UMKM | Supplier, Jasa, dan Peluang Usaha',
+      title: 'Jelajahi Lajukan UMKM | Supplier, Jasa, dan Peluang Usaha',
       description:
         'Cari supplier, jasa, talent, alat, dan lokasi usaha di Lajukan UMKM.',
-      url: 'https://www.lajukan.com/id/search',
+      url: 'https://www.lajukan.com/id/explore',
       type: 'website',
       siteName: 'Lajukan',
       locale: 'id_ID',
@@ -42,18 +42,18 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
     },
     twitter: {
       card: 'summary_large_image',
-      title: 'Cari di Lajukan UMKM | Supplier, Jasa, dan Peluang Usaha',
+      title: 'Jelajahi Lajukan UMKM | Supplier, Jasa, dan Peluang Usaha',
       description:
         'Cari supplier, jasa, talent, alat, dan lokasi usaha di Lajukan UMKM.',
       images: ['https://www.lajukan.com/og-image-search.png'],
     },
   },
   en: {
-    title: 'Lajukan Search | Suppliers, Distributors, Ops Services, and Business Locations',
+    title: 'Explore Lajukan | Suppliers, Services, and Business Places',
     description:
       'Search suppliers, distributors, raw materials, resale stock, operational services, freelancers, tool rental, and business locations on Lajukan.',
     keywords: [
-      'lajukan search',
+      'explore lajukan',
       'msme suppliers',
       'distributors',
       'raw materials',
@@ -66,19 +66,19 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
       'business location',
     ],
     alternates: {
-      canonical: 'https://www.lajukan.com/en/search',
+      canonical: 'https://www.lajukan.com/en/explore',
       languages: {
-        'id-ID': 'https://www.lajukan.com/id/search',
-        'en-US': 'https://www.lajukan.com/en/search',
-        'x-default': 'https://www.lajukan.com/en/search',
+        'id-ID': 'https://www.lajukan.com/id/explore',
+        'en-US': 'https://www.lajukan.com/en/explore',
+        'x-default': 'https://www.lajukan.com/en/explore',
       },
     },
-    robots: { index: true, follow: true },
+    robots: { index: false, follow: true },
     openGraph: {
-      title: 'Lajukan Search | Suppliers, Distributors, Ops Services, and Business Locations',
+      title: 'Explore Lajukan | Suppliers, Services, and Business Places',
       description:
         'Search across business needs on Lajukan for supply, operations, rental tools, and business locations.',
-      url: 'https://www.lajukan.com/en/search',
+      url: 'https://www.lajukan.com/en/explore',
       type: 'website',
       siteName: 'Lajukan',
       locale: 'en_US',
@@ -86,7 +86,7 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
     },
     twitter: {
       card: 'summary_large_image',
-      title: 'Lajukan Search | Suppliers, Distributors, Ops Services, and Business Locations',
+      title: 'Explore Lajukan | Suppliers, Services, and Business Places',
       description:
         'Search across business needs on Lajukan for supply, operations, rental tools, and business locations.',
       images: ['https://www.lajukan.com/og-image-search.png'],

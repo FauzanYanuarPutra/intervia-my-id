@@ -11,8 +11,9 @@ import {
   buildBlogIndexJsonLd,
   buildBlogPath,
   buildBlogUrl,
-  getBlogArticles,
 } from '@/lib/seo/blog';
+import { getPublishedBlogArticles } from '@/lib/seo/blogContent';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -69,14 +70,14 @@ export async function generateMetadata({
 export default async function BlogIndexPage({ params }: PageProps) {
   const { locale } = await params;
   const isId = locale === 'id';
-  const articles = getBlogArticles(locale);
+  const articles = await getPublishedBlogArticles(locale);
   const featured = articles[0];
   const rest = articles.slice(1);
   const jsonLd = buildBlogIndexJsonLd(locale);
 
   const topicLinks = [
     {
-      href: '/search?type=product&side=supply&q=supplier',
+      href: '/explore?type=product&side=supply&q=supplier',
       label: isId ? 'Cari supplier' : 'Find suppliers',
       icon: Search,
     },
@@ -96,7 +97,7 @@ export default async function BlogIndexPage({ params }: PageProps) {
     <main className="page-shell page-rhythm pb-12 pt-6">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
 
       <section className="overflow-hidden rounded-[32px] border border-emerald-100 bg-[linear-gradient(135deg,#fffdf6_0%,#effdf5_48%,#fff7ed_100%)] p-5 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8">

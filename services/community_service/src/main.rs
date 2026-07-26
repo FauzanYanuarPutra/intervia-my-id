@@ -1,6 +1,6 @@
 use axum::{
-    body::Bytes,
-    extract::Multipart,
+    body::{Body, Bytes},
+    extract::{DefaultBodyLimit, Multipart},
     extract::{Path, Query, State},
     http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
@@ -8,7 +8,16 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
+use futures_util::StreamExt;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use lapin::{
+    options::{
+        BasicAckOptions, BasicConsumeOptions, BasicNackOptions, ExchangeDeclareOptions,
+        QueueBindOptions, QueueDeclareOptions,
+    },
+    types::FieldTable,
+    ExchangeKind,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres, Row, Transaction};
@@ -17,7 +26,12 @@ use std::{
     env,
     sync::Arc,
 };
-use tokio::{net::TcpListener, sync::Mutex};
+use tokio::{
+    io::{AsyncReadExt, AsyncSeekExt},
+    net::TcpListener,
+    sync::Mutex,
+    time::{sleep, Duration},
+};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
@@ -30,6 +44,7 @@ const MAX_TAGS: usize = 6;
 const MAX_IMAGES: usize = 6;
 const MAX_FILE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_VIDEO_FILE_BYTES: usize = 80 * 1024 * 1024;
+const MAX_MEDIA_RANGE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_GROUP_RULES: usize = 8;
 const MAX_REEL_TITLE_LEN: usize = 120;
 const MAX_REEL_CAPTION_LEN: usize = 700;
@@ -47,7 +62,7 @@ type ApiResult<T> = Result<T, ApiError>;
 struct AppState {
     db: PgPool,
     jwt_secret: String,
-    rate_limits: Mutex<HashMap<String, RateEntry>>,
+    rate_limits: Mutex<RateLimitStore>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +70,14 @@ struct RateEntry {
     count: u32,
     reset_at: DateTime<Utc>,
 }
+
+struct RateLimitStore {
+    entries: HashMap<String, RateEntry>,
+    last_cleanup: DateTime<Utc>,
+}
+
+const MAX_RATE_LIMIT_ENTRIES: usize = 100_000;
+const RATE_LIMIT_CLEANUP_SECONDS: i64 = 60;
 
 #[derive(Debug)]
 struct ApiError {
@@ -274,6 +297,7 @@ struct ListThreadQuery {
     sort: Option<String>,
     status: Option<String>,
     q: Option<String>,
+    mine: Option<String>,
     page: Option<i64>,
     page_size: Option<i64>,
 }
@@ -319,10 +343,16 @@ struct ListGroupMembersQuery {
 }
 
 #[derive(Debug, Deserialize, Default)]
+struct ProfileSocialQuery {
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
 struct ReelsQuery {
     q: Option<String>,
     tag: Option<String>,
     creator: Option<String>,
+    mine: Option<String>,
     cursor: Option<i64>,
     limit: Option<i64>,
 }
@@ -350,6 +380,7 @@ struct CreateGroupRequest {
     privacy: Option<String>,
     posting_permission: Option<String>,
     membership_permission: Option<String>,
+    avatar_url: Option<String>,
     cover_url: Option<String>,
     #[serde(default)]
     rules: Vec<String>,
@@ -358,10 +389,12 @@ struct CreateGroupRequest {
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct UpdateGroupPermissionsRequest {
+    name: Option<String>,
     description: Option<String>,
     privacy: Option<String>,
     posting_permission: Option<String>,
     membership_permission: Option<String>,
+    avatar_url: Option<String>,
     cover_url: Option<String>,
     rules: Option<Vec<String>>,
 }
@@ -371,6 +404,7 @@ struct UpdateGroupPermissionsRequest {
 struct UpdateGroupMemberRequest {
     role: Option<String>,
     status: Option<String>,
+    reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -476,6 +510,12 @@ struct ReelEventRequest {
 #[serde(rename_all = "camelCase")]
 struct ReelActionRequest {
     action: Option<String>,
+    active: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct ProfileFollowRequest {
     active: Option<bool>,
 }
 
@@ -602,6 +642,7 @@ struct ForumGroup {
     privacy: String,
     posting_permission: String,
     membership_permission: String,
+    avatar_url: Option<String>,
     cover_url: Option<String>,
     rules: Vec<String>,
     member_count: i32,
@@ -731,6 +772,29 @@ struct GroupsResponse {
     joined: Vec<ForumGroup>,
 }
 
+#[derive(Debug, Serialize, FromRow, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProfileSocialUser {
+    id: String,
+    username: String,
+    name: String,
+    avatar_url: Option<String>,
+    title: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProfileSocialResponse {
+    user_id: String,
+    forum_user_id: String,
+    viewer_following: bool,
+    followers_count: i64,
+    following_count: i64,
+    reels_count: i64,
+    followers: Vec<ProfileSocialUser>,
+    following: Vec<ProfileSocialUser>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct GroupMembersResponse {
@@ -773,6 +837,10 @@ struct ReelRow {
     store_city: String,
     store_phone: Option<String>,
     storefront_path: String,
+    creator_avatar_url: Option<String>,
+    followers_count: i64,
+    following_count: i64,
+    creator_reels_count: i64,
 }
 
 #[derive(Debug, FromRow, Clone)]
@@ -902,7 +970,8 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let database_url = env::var("COMMUNITY_DATABASE_URL").expect("COMMUNITY_DATABASE_URL must be set");
+    let database_url =
+        env::var("COMMUNITY_DATABASE_URL").expect("COMMUNITY_DATABASE_URL must be set");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let port = env::var("APP_PORT").unwrap_or_else(|_| "8082".to_string());
     let addr = format!("0.0.0.0:{port}");
@@ -922,6 +991,18 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
+    let strict_secrets =
+        app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
+    let normalized_secret = jwt_secret.trim().to_ascii_lowercase();
+    if strict_secrets
+        && (jwt_secret.trim().len() < 32
+            || matches!(
+                normalized_secret.as_str(),
+                "change_me" | "changeme" | "secret" | "your_secret_here"
+            ))
+    {
+        anyhow::bail!("JWT_SECRET must be at least 32 characters and not a placeholder");
+    }
     ensure_base_schema(&db).await?;
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
@@ -931,10 +1012,9 @@ async fn main() -> anyhow::Result<()> {
     }
     if let Err(error) = migrator.run(&db).await {
         let message = error.to_string();
-        let checksum_mismatch =
-            message.contains("was previously applied but has been modified");
-        let missing_migration = message
-            .contains("was previously applied but is missing in the resolved migrations");
+        let checksum_mismatch = message.contains("was previously applied but has been modified");
+        let missing_migration =
+            message.contains("was previously applied but is missing in the resolved migrations");
 
         if !strict_migrations && (checksum_mismatch || missing_migration) {
             tracing::warn!(
@@ -953,8 +1033,28 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         db,
         jwt_secret,
-        rate_limits: Mutex::new(HashMap::new()),
+        rate_limits: Mutex::new(RateLimitStore {
+            entries: HashMap::new(),
+            last_cleanup: Utc::now(),
+        }),
     });
+
+    if let Ok(rabbitmq_url) = env::var("RABBITMQ_URL") {
+        let consumer_db = state.db.clone();
+        let exchange =
+            env::var("IDENTITY_OUTBOX_EXCHANGE").unwrap_or_else(|_| "identity.outbox".to_string());
+        let queue = env::var("COMMUNITY_IDENTITY_QUEUE")
+            .unwrap_or_else(|_| "community.identity.profile".to_string());
+        tokio::spawn(run_identity_profile_consumer(
+            consumer_db.clone(),
+            rabbitmq_url,
+            exchange,
+            queue,
+        ));
+        tokio::spawn(run_identity_inbox_processor(consumer_db));
+    } else {
+        tracing::warn!("RABBITMQ_URL not set. Identity profile event consumer is disabled.");
+    }
 
     let mut cors = CorsLayer::new()
         .allow_methods([
@@ -977,10 +1077,10 @@ async fn main() -> anyhow::Result<()> {
     if !configured_origins.is_empty() {
         cors = cors.allow_origin(configured_origins);
     } else if app_env.eq_ignore_ascii_case("production") {
-        if let Ok(frontend_url) = env::var("FRONTEND_URL") {
-            if let Ok(value) = frontend_url.parse::<HeaderValue>() {
-                cors = cors.allow_origin(value);
-            }
+        let frontend_url =
+            env::var("FRONTEND_URL").unwrap_or_else(|_| "https://www.lajukan.com".to_string());
+        if let Ok(value) = frontend_url.parse::<HeaderValue>() {
+            cors = cors.allow_origin(value);
         }
     } else {
         cors = cors.allow_origin([
@@ -994,6 +1094,15 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(root))
         .route("/health", get(health))
+        .route("/v1/community/profile/sync", post(sync_current_profile))
+        .route(
+            "/v1/community/users/{user_id}/social",
+            get(get_profile_social),
+        )
+        .route(
+            "/v1/community/users/{user_id}/follow",
+            post(set_profile_follow),
+        )
         .route("/v1/community/feed", get(get_community_feed))
         .route("/v1/community/search", get(search_community))
         .route("/v1/community/groups", get(list_groups).post(create_group))
@@ -1028,8 +1137,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/forum/overview", get(get_overview))
         .route("/v1/forum/search", get(search_forum))
         .route("/v1/forum/tags", get(list_tags))
-        .route("/v1/forum/upload-images", post(upload_images))
-        .route("/v1/forum/upload-media", post(upload_media))
+        .route(
+            "/v1/forum/upload-images",
+            post(upload_images).layer(DefaultBodyLimit::max(MAX_FILE_BYTES + 1024 * 1024)),
+        )
+        .route(
+            "/v1/forum/upload-media",
+            post(upload_media).layer(DefaultBodyLimit::max(
+                MAX_VIDEO_FILE_BYTES + 2 * 1024 * 1024,
+            )),
+        )
         .route("/v1/forum/media/{filename}", get(get_media))
         .route(
             "/v1/forum/categories",
@@ -1242,6 +1359,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
           privacy text NOT NULL DEFAULT 'public',
           posting_permission text NOT NULL DEFAULT 'member',
           membership_permission text NOT NULL DEFAULT 'open',
+          avatar_url text NULL,
           cover_url text NULL,
           rules text [] NOT NULL DEFAULT '{}',
           created_by_user_id text NULL REFERENCES forum.lajukan_forum_users(id) ON DELETE SET NULL,
@@ -1430,13 +1548,22 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         r#"
         CREATE TABLE IF NOT EXISTS lajukan_reel_user_actions (
           id text PRIMARY KEY,
-          reel_id text NOT NULL REFERENCES reel.lajukan_reels(id) ON DELETE CASCADE,
+          reel_id text NULL REFERENCES reel.lajukan_reels(id) ON DELETE CASCADE,
           actor_user_id text NOT NULL REFERENCES forum.lajukan_forum_users(id) ON DELETE CASCADE,
           target_user_id text NULL,
           action text NOT NULL CHECK (action IN ('like', 'save', 'follow')),
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now()
         )
+        "#,
+    )
+    .execute(db)
+    .await?;
+
+    sqlx::query(
+        r#"
+        ALTER TABLE lajukan_reel_user_actions
+          ALTER COLUMN reel_id DROP NOT NULL
         "#,
     )
     .execute(db)
@@ -1555,10 +1682,20 @@ async fn enforce_rate_limit(
     window_seconds: i64,
 ) -> ApiResult<()> {
     let now = Utc::now();
-    let mut limits = state.rate_limits.lock().await;
-    limits.retain(|_, entry| entry.reset_at > now);
+    let mut store = state.rate_limits.lock().await;
+    if now.signed_duration_since(store.last_cleanup).num_seconds() >= RATE_LIMIT_CLEANUP_SECONDS {
+        store.entries.retain(|_, entry| entry.reset_at > now);
+        store.last_cleanup = now;
+    }
 
-    let entry = limits.entry(key).or_insert_with(|| RateEntry {
+    if !store.entries.contains_key(&key) && store.entries.len() >= MAX_RATE_LIMIT_ENTRIES {
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Rate limit capacity reached",
+        ));
+    }
+
+    let entry = store.entries.entry(key).or_insert_with(|| RateEntry {
         count: 0,
         reset_at: now + chrono::Duration::seconds(window_seconds),
     });
@@ -2017,43 +2154,31 @@ fn safe_file_name(name: &str) -> String {
 }
 
 fn extension_for(file_name: Option<&str>, content_type: &str) -> &'static str {
-    if let Some(name) = file_name {
-        let lower = name.to_ascii_lowercase();
-        if lower.ends_with(".mp4") {
-            return ".mp4";
-        }
-        if lower.ends_with(".webm") {
-            return ".webm";
-        }
-        if lower.ends_with(".mov") {
-            return ".mov";
-        }
-        if lower.ends_with(".m4v") {
-            return ".m4v";
-        }
-        if lower.ends_with(".png") {
-            return ".png";
-        }
-        if lower.ends_with(".webp") {
-            return ".webp";
-        }
-        if lower.ends_with(".gif") {
-            return ".gif";
-        }
-        if lower.ends_with(".jpeg") || lower.ends_with(".jpg") {
-            return ".jpg";
-        }
-    }
-
-    match content_type {
+    match content_type.to_ascii_lowercase().as_str() {
         "video/mp4" => ".mp4",
         "video/webm" => ".webm",
         "video/quicktime" => ".mov",
         "video/x-m4v" => ".m4v",
+        "image/jpeg" | "image/jpg" => ".jpg",
         "image/png" => ".png",
         "image/webp" => ".webp",
         "image/gif" => ".gif",
-        _ => ".jpg",
+        "image/bmp" => ".bmp",
+        "image/avif" => ".avif",
+        "image/heic" => ".heic",
+        "image/heif" => ".heif",
+        _ => file_name
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+            .map(|name| {
+                if name.ends_with(".jpeg") || name.ends_with(".jpg") {
+                    ".jpg"
+                } else {
+                    ""
+                }
+            })
+            .filter(|extension| !extension.is_empty())
+            .unwrap_or(".bin"),
     }
 }
 
@@ -2073,60 +2198,63 @@ fn content_type_for_filename(name: &str) -> &'static str {
         "image/webp"
     } else if lower.ends_with(".gif") {
         "image/gif"
+    } else if lower.ends_with(".bmp") {
+        "image/bmp"
+    } else if lower.ends_with(".avif") {
+        "image/avif"
+    } else if lower.ends_with(".heic") {
+        "image/heic"
+    } else if lower.ends_with(".heif") {
+        "image/heif"
     } else {
-        "image/jpeg"
+        "application/octet-stream"
     }
 }
 
 fn is_allowed_image_type(content_type: &str, file_name: Option<&str>) -> bool {
-    let ct = content_type.to_ascii_lowercase();
-
-    if ct.starts_with("image/") {
-        return true;
-    }
-
-    if let Some(name) = file_name {
-        let lower = name.to_ascii_lowercase();
-
-        return lower.ends_with(".jpg")
-            || lower.ends_with(".jpeg")
-            || lower.ends_with(".png")
-            || lower.ends_with(".gif")
-            || lower.ends_with(".webp")
-            || lower.ends_with(".bmp")
-            || lower.ends_with(".heic")
-            || lower.ends_with(".heif")
-            || lower.ends_with(".avif");
-    }
-
-    false
+    let _ = file_name;
+    matches!(
+        content_type.to_ascii_lowercase().as_str(),
+        "image/jpeg"
+            | "image/jpg"
+            | "image/png"
+            | "image/gif"
+            | "image/webp"
+            | "image/bmp"
+            | "image/heic"
+            | "image/heif"
+            | "image/avif"
+    )
 }
 
 fn is_allowed_video_type(content_type: &str, file_name: Option<&str>) -> bool {
-    let ct = content_type.to_ascii_lowercase();
-
-    if ct.starts_with("video/") {
-        return true;
-    }
-
-    if let Some(name) = file_name {
-        let lower = name.to_ascii_lowercase();
-
-        return lower.ends_with(".mp4")
-            || lower.ends_with(".mov")
-            || lower.ends_with(".m4v")
-            || lower.ends_with(".webm")
-            || lower.ends_with(".avi")
-            || lower.ends_with(".mkv")
-            || lower.ends_with(".3gp");
-    }
-
-    false
+    let _ = file_name;
+    matches!(
+        content_type.to_ascii_lowercase().as_str(),
+        "video/mp4" | "video/webm" | "video/quicktime" | "video/x-m4v"
+    )
 }
 
 fn is_allowed_media_type(content_type: &str, allow_video: bool, file_name: Option<&str>) -> bool {
     is_allowed_image_type(content_type, file_name)
         || (allow_video && is_allowed_video_type(content_type, file_name))
+}
+
+fn has_ftyp_signature(bytes: &[u8]) -> bool {
+    bytes.windows(4).take(32).any(|window| window == b"ftyp")
+}
+
+fn has_valid_media_signature(bytes: &[u8], extension: &str) -> bool {
+    match extension {
+        ".jpg" => bytes.starts_with(&[0xff, 0xd8, 0xff]),
+        ".png" => bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
+        ".gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        ".webp" => bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP",
+        ".bmp" => bytes.starts_with(b"BM"),
+        ".avif" | ".heic" | ".heif" | ".mp4" | ".mov" | ".m4v" => has_ftyp_signature(bytes),
+        ".webm" => bytes.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]),
+        _ => false,
+    }
 }
 
 fn is_video_url(value: &str) -> bool {
@@ -2214,18 +2342,16 @@ fn clean_profile_text(value: Option<String>) -> Option<String> {
 }
 
 fn clean_profile_avatar(value: Option<String>) -> Option<String> {
-    value
-        .map(|item| item.trim().to_string())
-        .filter(|item| {
-            !item.is_empty()
-                && item != "/default-avatar.svg"
-                && item.len() <= MAX_REEL_URL_LEN
-                && !item.chars().any(|ch| ch.is_control())
-                && (item.starts_with('/')
-                    || item.starts_with("http://")
-                    || item.starts_with("https://")
-                    || item.starts_with("data:image/svg+xml"))
-        })
+    value.map(|item| item.trim().to_string()).filter(|item| {
+        !item.is_empty()
+            && item != "/default-avatar.svg"
+            && item.len() <= MAX_REEL_URL_LEN
+            && !item.chars().any(|ch| ch.is_control())
+            && (item.starts_with('/')
+                || item.starts_with("http://")
+                || item.starts_with("https://")
+                || item.starts_with("data:image/svg+xml"))
+    })
 }
 
 async fn fetch_identity_public_profile(identity_user_id: &str) -> ForumIdentityProfile {
@@ -2235,11 +2361,7 @@ async fn fetch_identity_public_profile(identity_user_id: &str) -> ForumIdentityP
         .unwrap_or_else(|| "http://identity_service:8080".to_string())
         .trim_end_matches('/')
         .to_string();
-    let url = format!(
-        "{}/users/public/{}",
-        base_url,
-        identity_user_id
-    );
+    let url = format!("{}/users/public/{}", base_url, identity_user_id);
 
     let client = match reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_millis(600))
@@ -2341,7 +2463,11 @@ async fn sync_forum_users_from_identity(db: &PgPool) {
         .execute(db)
         .await
         {
-            tracing::warn!("forum identity sync update failed for {}: {:?}", forum_id, error);
+            tracing::warn!(
+                "forum identity sync update failed for {}: {:?}",
+                forum_id,
+                error
+            );
         }
     }
 }
@@ -2349,14 +2475,16 @@ async fn sync_forum_users_from_identity(db: &PgPool) {
 async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUser> {
     let id = forum_user_id(actor);
     let identity_profile = fetch_identity_forum_profile(actor).await;
-    let name = identity_profile.name.or_else(|| {
-        actor
-            .name
-            .clone()
-            .or_else(|| actor.username.clone())
-            .or_else(|| actor.email.clone())
-    })
-    .unwrap_or_else(|| format!("User {}", actor.user_id));
+    let name = identity_profile
+        .name
+        .or_else(|| {
+            actor
+                .name
+                .clone()
+                .or_else(|| actor.username.clone())
+                .or_else(|| actor.email.clone())
+        })
+        .unwrap_or_else(|| format!("User {}", actor.user_id));
     let username = identity_profile
         .username
         .unwrap_or_else(|| forum_username(actor, &name));
@@ -2387,6 +2515,401 @@ async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUse
         tracing::error!("ensure_forum_user error: {:?}", error);
         ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Failed to ensure forum user")
     })
+}
+
+async fn sync_current_profile(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> ApiResult<Json<ForumUser>> {
+    let actor = require_actor(&headers, &state)?;
+    let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    Ok(Json(forum_user))
+}
+
+fn read_json_string(value: &Value, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn read_nested_json_string(value: &Value, path: &[&str]) -> Option<String> {
+    let mut current = value;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn identity_event_type(payload: &Value) -> Option<String> {
+    read_json_string(payload, &["event_type"])
+}
+
+fn identity_event_user_id(payload: &Value) -> Option<String> {
+    read_json_string(payload, &["aggregate_id", "user_id"])
+        .or_else(|| read_nested_json_string(payload, &["data", "user_id"]))
+        .or_else(|| read_nested_json_string(payload, &["data", "id"]))
+}
+
+fn identity_profile_from_payload(payload: &Value) -> ForumIdentityProfile {
+    let data = payload.get("data").unwrap_or(payload);
+    let metadata = data.get("metadata");
+    ForumIdentityProfile {
+        username: clean_profile_text(read_json_string(data, &["username"])),
+        name: clean_profile_text(read_json_string(
+            data,
+            &["full_name", "name", "display_name"],
+        )),
+        avatar_url: clean_profile_avatar(
+            read_json_string(data, &["avatar_url", "avatarUrl", "picture"]).or_else(|| {
+                metadata
+                    .and_then(|value| read_json_string(value, &["avatar_url", "avatarUrl"]))
+                    .or_else(|| {
+                        metadata.and_then(|value| {
+                            read_nested_json_string(value, &["media", "avatar_url"])
+                        })
+                    })
+            }),
+        ),
+    }
+}
+
+fn merge_identity_profiles(
+    current: ForumIdentityProfile,
+    fallback: ForumIdentityProfile,
+) -> ForumIdentityProfile {
+    ForumIdentityProfile {
+        username: current.username.or(fallback.username),
+        name: current.name.or(fallback.name),
+        avatar_url: current.avatar_url.or(fallback.avatar_url),
+    }
+}
+
+fn fallback_forum_username(identity_user_id: &str) -> String {
+    let clean = clean_auth_id(identity_user_id);
+    let suffix = clean.chars().take(24).collect::<String>();
+    if suffix.is_empty() {
+        format!("user_{}", Uuid::new_v4().simple())
+    } else {
+        format!("user_{suffix}")
+    }
+}
+
+async fn apply_identity_profile_event(db: &PgPool, payload: &Value) -> anyhow::Result<()> {
+    let event_type = identity_event_type(payload).unwrap_or_default();
+    if !event_type.starts_with("identity.user") {
+        return Ok(());
+    }
+
+    let identity_user_id = identity_event_user_id(payload)
+        .ok_or_else(|| anyhow::anyhow!("identity event missing user_id"))?;
+    let forum_id = format!("auth-{}", clean_auth_id(&identity_user_id));
+
+    if event_type == "identity.user.deleted" {
+        sqlx::query(
+            r#"
+            UPDATE forum.lajukan_forum_users
+            SET deleted_at = now(), updated_at = now(), identity_synced_at = now()
+            WHERE id = $1
+            "#,
+        )
+        .bind(forum_id)
+        .execute(db)
+        .await?;
+        return Ok(());
+    }
+
+    let payload_profile = identity_profile_from_payload(payload);
+    let current_profile = fetch_identity_public_profile(&identity_user_id).await;
+    let profile = merge_identity_profiles(current_profile, payload_profile);
+    let username = profile
+        .username
+        .unwrap_or_else(|| fallback_forum_username(&identity_user_id));
+    let name = profile.name.unwrap_or_else(|| {
+        format!(
+            "User {}",
+            identity_user_id.chars().take(8).collect::<String>()
+        )
+    });
+    let avatar_url = profile
+        .avatar_url
+        .unwrap_or_else(|| "/default-avatar.svg".to_string());
+
+    sqlx::query_as::<_, ForumUser>(
+        r#"
+        INSERT INTO forum.lajukan_forum_users
+          (id, username, name, avatar_url, title, reputation, base_reputation, badges, identity_synced_at, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, 'Community Member', 0, 0, '{}', now(), now(), now())
+        ON CONFLICT (id) DO UPDATE
+        SET
+          username = EXCLUDED.username,
+          name = EXCLUDED.name,
+          avatar_url = EXCLUDED.avatar_url,
+          identity_synced_at = now(),
+          deleted_at = NULL,
+          updated_at = now()
+        RETURNING id, username, name, avatar_url, title, reputation, base_reputation, badges, created_at, updated_at
+        "#,
+    )
+    .bind(forum_id)
+    .bind(username)
+    .bind(name)
+    .bind(avatar_url)
+    .fetch_one(db)
+    .await?;
+
+    Ok(())
+}
+
+async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::Result<usize> {
+    let rows = sqlx::query(
+        r#"
+        SELECT id, payload
+        FROM events.event_inbox
+        WHERE source = 'identity_service'
+          AND status IN ('pending', 'failed')
+          AND available_at <= now()
+        ORDER BY received_at ASC
+        LIMIT $1
+        "#,
+    )
+    .bind(batch_size)
+    .fetch_all(db)
+    .await?;
+
+    if rows.is_empty() {
+        return Ok(0);
+    }
+
+    for row in rows.iter() {
+        let id = row.get::<Uuid, _>("id");
+        let payload = row.get::<Value, _>("payload");
+        let claimed = sqlx::query(
+            r#"
+            UPDATE events.event_inbox
+            SET status = 'processing'
+            WHERE id = $1 AND status IN ('pending', 'failed')
+            "#,
+        )
+        .bind(id)
+        .execute(db)
+        .await?;
+
+        if claimed.rows_affected() == 0 {
+            continue;
+        }
+
+        match apply_identity_profile_event(db, &payload).await {
+            Ok(()) => {
+                sqlx::query(
+                    r#"
+                    UPDATE events.event_inbox
+                    SET status = 'processed', processed_at = now(), error_message = NULL
+                    WHERE id = $1
+                    "#,
+                )
+                .bind(id)
+                .execute(db)
+                .await?;
+            }
+            Err(error) => {
+                let error_message = format!("{error:?}");
+                let _ = sqlx::query(
+                    r#"
+                    UPDATE events.event_inbox
+                    SET
+                      status = 'failed',
+                      retry_count = retry_count + 1,
+                      available_at = now() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
+                      error_message = $2
+                    WHERE id = $1
+                    "#,
+                )
+                .bind(id)
+                .bind(error_message)
+                .execute(db)
+                .await;
+            }
+        }
+    }
+
+    Ok(rows.len())
+}
+
+async fn run_identity_inbox_processor(db: PgPool) {
+    loop {
+        match process_identity_inbox_batch(&db, 50).await {
+            Ok(0) => sleep(Duration::from_millis(1_000)).await,
+            Ok(count) => tracing::info!("processed {count} identity profile inbox events"),
+            Err(error) => {
+                tracing::warn!("identity inbox processor error: {error:?}");
+                sleep(Duration::from_secs(2)).await;
+            }
+        }
+    }
+}
+
+async fn run_identity_profile_consumer(
+    db: PgPool,
+    rabbitmq_url: String,
+    exchange: String,
+    queue: String,
+) {
+    loop {
+        match lapin::Connection::connect(&rabbitmq_url, lapin::ConnectionProperties::default())
+            .await
+        {
+            Ok(connection) => match connection.create_channel().await {
+                Ok(channel) => {
+                    if let Err(error) =
+                        configure_identity_profile_consumer(&channel, &exchange, &queue).await
+                    {
+                        tracing::warn!("identity profile consumer setup error: {error:?}");
+                        sleep(Duration::from_secs(3)).await;
+                        continue;
+                    }
+
+                    match channel
+                        .basic_consume(
+                            &queue,
+                            "community.identity.profile",
+                            BasicConsumeOptions::default(),
+                            FieldTable::default(),
+                        )
+                        .await
+                    {
+                        Ok(mut consumer) => {
+                            while let Some(delivery_result) = consumer.next().await {
+                                match delivery_result {
+                                    Ok(delivery) => {
+                                        let payload = match serde_json::from_slice::<Value>(
+                                            &delivery.data,
+                                        ) {
+                                            Ok(value) => value,
+                                            Err(error) => {
+                                                tracing::warn!("identity profile event decode error: {error:?}");
+                                                let _ = delivery
+                                                    .nack(BasicNackOptions {
+                                                        requeue: false,
+                                                        ..Default::default()
+                                                    })
+                                                    .await;
+                                                continue;
+                                            }
+                                        };
+                                        let event_id = delivery
+                                            .properties
+                                            .message_id()
+                                            .as_ref()
+                                            .map(ToString::to_string)
+                                            .or_else(|| read_json_string(&payload, &["event_id"]))
+                                            .unwrap_or_else(|| Uuid::new_v4().to_string());
+                                        let event_type = delivery
+                                            .properties
+                                            .kind()
+                                            .as_ref()
+                                            .map(ToString::to_string)
+                                            .or_else(|| identity_event_type(&payload))
+                                            .unwrap_or_else(|| "identity.user.updated".to_string());
+                                        let aggregate_id = identity_event_user_id(&payload)
+                                            .unwrap_or_else(|| "unknown".to_string());
+
+                                        let insert_result = sqlx::query(
+                                            r#"
+                                            INSERT INTO events.event_inbox
+                                              (source, event_id, event_type, aggregate_type, aggregate_id, payload, status, received_at)
+                                            VALUES ('identity_service', $1, $2, 'identity.user', $3, $4, 'pending', now())
+                                            ON CONFLICT (source, event_id) DO NOTHING
+                                            "#,
+                                        )
+                                        .bind(event_id)
+                                        .bind(event_type)
+                                        .bind(aggregate_id)
+                                        .bind(payload)
+                                        .execute(&db)
+                                        .await;
+
+                                        match insert_result {
+                                            Ok(_) => {
+                                                let _ = process_identity_inbox_batch(&db, 25).await;
+                                                let _ =
+                                                    delivery.ack(BasicAckOptions::default()).await;
+                                            }
+                                            Err(error) => {
+                                                tracing::warn!("identity profile inbox insert error: {error:?}");
+                                                let _ = delivery
+                                                    .nack(BasicNackOptions {
+                                                        requeue: true,
+                                                        ..Default::default()
+                                                    })
+                                                    .await;
+                                            }
+                                        }
+                                    }
+                                    Err(error) => {
+                                        tracing::warn!(
+                                            "identity profile delivery error: {error:?}"
+                                        );
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!("identity profile consume error: {error:?}");
+                        }
+                    }
+                }
+                Err(error) => tracing::warn!("identity profile channel error: {error:?}"),
+            },
+            Err(error) => tracing::warn!("identity profile RabbitMQ connection error: {error:?}"),
+        }
+
+        sleep(Duration::from_secs(3)).await;
+    }
+}
+
+async fn configure_identity_profile_consumer(
+    channel: &lapin::Channel,
+    exchange: &str,
+    queue: &str,
+) -> anyhow::Result<()> {
+    channel
+        .exchange_declare(
+            exchange,
+            ExchangeKind::Topic,
+            ExchangeDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await?;
+    channel
+        .queue_declare(
+            queue,
+            QueueDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await?;
+    channel
+        .queue_bind(
+            queue,
+            exchange,
+            "identity.user.#",
+            QueueBindOptions::default(),
+            FieldTable::default(),
+        )
+        .await?;
+    Ok(())
 }
 
 async fn record_audit(
@@ -2677,6 +3200,7 @@ async fn fetch_groups(
           g.privacy,
           g.posting_permission,
           g.membership_permission,
+          g.avatar_url,
           g.cover_url,
           g.rules,
           COUNT(DISTINCT active_members.user_id)::int AS member_count,
@@ -2747,6 +3271,7 @@ async fn fetch_group(
           g.privacy,
           g.posting_permission,
           g.membership_permission,
+          g.avatar_url,
           g.cover_url,
           g.rules,
           COUNT(DISTINCT active_members.user_id)::int AS member_count,
@@ -2873,6 +3398,203 @@ async fn get_group(
         ));
     }
     Ok(Json(DataResponse { data: group }))
+}
+
+fn profile_forum_user_id(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.starts_with("auth-") {
+        format!(
+            "auth-{}",
+            clean_auth_id(trimmed.trim_start_matches("auth-"))
+        )
+    } else {
+        format!("auth-{}", clean_auth_id(trimmed))
+    }
+}
+
+async fn get_profile_social(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Query(query): Query<ProfileSocialQuery>,
+) -> ApiResult<Json<ProfileSocialResponse>> {
+    let target_forum_user_id = profile_forum_user_id(&user_id);
+    let limit = query.limit.unwrap_or(36).clamp(1, 80);
+    let viewer_id = optional_actor(&headers, &state).map(|actor| forum_user_id(&actor));
+
+    let followers_count = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(DISTINCT actor_user_id)::bigint
+        FROM lajukan_reel_user_actions
+        WHERE action = 'follow' AND target_user_id = $1
+        "#,
+    )
+    .bind(&target_forum_user_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    let following_count = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(DISTINCT target_user_id)::bigint
+        FROM lajukan_reel_user_actions
+        WHERE action = 'follow' AND actor_user_id = $1 AND target_user_id IS NOT NULL
+        "#,
+    )
+    .bind(&target_forum_user_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    let reels_count = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM reel.lajukan_reels
+        WHERE status = 'published' AND creator_user_id = $1
+        "#,
+    )
+    .bind(&target_forum_user_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    let followers = sqlx::query_as::<_, ProfileSocialUser>(
+        r#"
+        SELECT DISTINCT ON (u.id)
+          u.id,
+          u.username,
+          u.name,
+          u.avatar_url,
+          u.title
+        FROM lajukan_reel_user_actions a
+        JOIN forum.lajukan_forum_users u ON u.id = a.actor_user_id
+        WHERE a.action = 'follow' AND a.target_user_id = $1
+        ORDER BY u.id, a.updated_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(&target_forum_user_id)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    let following = sqlx::query_as::<_, ProfileSocialUser>(
+        r#"
+        SELECT DISTINCT ON (u.id)
+          u.id,
+          u.username,
+          u.name,
+          u.avatar_url,
+          u.title
+        FROM lajukan_reel_user_actions a
+        JOIN forum.lajukan_forum_users u ON u.id = a.target_user_id
+        WHERE a.action = 'follow' AND a.actor_user_id = $1 AND a.target_user_id IS NOT NULL
+        ORDER BY u.id, a.updated_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(&target_forum_user_id)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await
+    .map_err(internal_error)?;
+
+    let viewer_following = if let Some(viewer_id) = viewer_id.as_deref() {
+        if viewer_id == target_forum_user_id {
+            false
+        } else {
+            sqlx::query_scalar::<_, bool>(
+                r#"
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM lajukan_reel_user_actions
+                  WHERE action = 'follow'
+                    AND actor_user_id = $1
+                    AND target_user_id = $2
+                  LIMIT 1
+                )
+                "#,
+            )
+            .bind(viewer_id)
+            .bind(&target_forum_user_id)
+            .fetch_one(&state.db)
+            .await
+            .map_err(internal_error)?
+        }
+    } else {
+        false
+    };
+
+    Ok(Json(ProfileSocialResponse {
+        user_id,
+        forum_user_id: target_forum_user_id,
+        viewer_following,
+        followers_count,
+        following_count,
+        reels_count,
+        followers,
+        following,
+    }))
+}
+
+async fn set_profile_follow(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Json(payload): Json<ProfileFollowRequest>,
+) -> ApiResult<Json<ProfileSocialResponse>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "profile:follow", 300, 120).await?;
+    let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    let target_user_id = profile_forum_user_id(&user_id);
+    let active = payload.active.unwrap_or(true);
+
+    if target_user_id == forum_user.id {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Tidak perlu follow akun sendiri",
+        ));
+    }
+
+    if active {
+        sqlx::query(
+            r#"
+            INSERT INTO lajukan_reel_user_actions
+              (id, reel_id, actor_user_id, target_user_id, action, created_at, updated_at)
+            VALUES ($1, NULL, $2, $3, 'follow', now(), now())
+            ON CONFLICT (actor_user_id, target_user_id, action)
+              WHERE action = 'follow' AND target_user_id IS NOT NULL
+              DO UPDATE SET updated_at = now()
+            "#,
+        )
+        .bind(create_id("pf"))
+        .bind(&forum_user.id)
+        .bind(&target_user_id)
+        .execute(&state.db)
+        .await
+        .map_err(internal_error)?;
+    } else {
+        sqlx::query(
+            r#"
+            DELETE FROM lajukan_reel_user_actions
+            WHERE actor_user_id = $1 AND action = 'follow' AND target_user_id = $2
+            "#,
+        )
+        .bind(&forum_user.id)
+        .bind(&target_user_id)
+        .execute(&state.db)
+        .await
+        .map_err(internal_error)?;
+    }
+
+    get_profile_social(
+        State(state),
+        headers,
+        Path(user_id),
+        Query(ProfileSocialQuery { limit: Some(48) }),
+    )
+    .await
 }
 
 async fn fetch_group_member(
@@ -3079,6 +3801,7 @@ async fn update_group_member(
         .status
         .map(|value| normalize_group_member_status(Some(value)))
         .unwrap_or_else(|| current.status.clone());
+    let reason = sanitize_body(payload.reason, 500);
 
     if current.role == "owner" && !is_moderator(&actor) && next_role != "owner" {
         return Err(ApiError::new(
@@ -3099,6 +3822,12 @@ async fn update_group_member(
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "You cannot block or remove your own access",
+        ));
+    }
+    if next_status == "blocked" && reason.is_empty() {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Reason is required when removing or blocking a member",
         ));
     }
 
@@ -3127,8 +3856,11 @@ async fn update_group_member(
         &group.id,
         json!({
             "targetUserId": current.user_id,
+            "previousRole": current.role,
+            "previousStatus": current.status,
             "role": next_role,
             "status": next_status,
+            "reason": reason,
         }),
     )
     .await?;
@@ -3160,6 +3892,7 @@ async fn create_group(
     let privacy = normalize_group_privacy(payload.privacy);
     let posting_permission = normalize_posting_permission(payload.posting_permission);
     let membership_permission = normalize_membership_permission(payload.membership_permission);
+    let avatar_url = sanitize_public_url(payload.avatar_url, true);
     let cover_url = sanitize_public_url(payload.cover_url, true);
     let rules = {
         let clean = sanitize_group_rules(payload.rules);
@@ -3203,10 +3936,10 @@ async fn create_group(
         INSERT INTO lajukan_groups
           (
             id, category_id, name, slug, description, privacy,
-            posting_permission, membership_permission, cover_url, rules,
+            posting_permission, membership_permission, avatar_url, cover_url, rules,
             created_by_user_id, status, created_at, updated_at
           )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', now(), now())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', now(), now())
         "#,
     )
     .bind(&group_id)
@@ -3217,6 +3950,7 @@ async fn create_group(
     .bind(&privacy)
     .bind(&posting_permission)
     .bind(&membership_permission)
+    .bind(&avatar_url)
     .bind(&cover_url)
     .bind(&rules)
     .bind(&forum_user.id)
@@ -3244,7 +3978,13 @@ async fn create_group(
         "group.create",
         "group",
         &group_id,
-        json!({"slug": slug, "privacy": privacy, "postingPermission": posting_permission}),
+        json!({
+            "slug": slug,
+            "privacy": privacy,
+            "postingPermission": posting_permission,
+            "hasAvatar": avatar_url.is_some(),
+            "hasCover": cover_url.is_some()
+        }),
     )
     .await?;
     tx.commit().await.map_err(internal_error)?;
@@ -3337,10 +4077,16 @@ async fn update_group_permissions(
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
 
+    let name = payload
+        .name
+        .map(|value| sanitize_title(Some(value), MAX_CATEGORY_TITLE_LEN))
+        .filter(|value| !value.is_empty())
+        .unwrap_or(group.name.clone());
     let description = payload
         .description
         .map(|value| sanitize_body(Some(value), MAX_DESCRIPTION_LEN))
         .unwrap_or(group.description.clone());
+    safety_check(&format!("{name}\n{description}"), false)?;
     let privacy = normalize_group_privacy(payload.privacy.or(Some(group.privacy.clone())));
     let posting_permission = normalize_posting_permission(
         payload
@@ -3352,6 +4098,10 @@ async fn update_group_permissions(
             .membership_permission
             .or(Some(group.membership_permission)),
     );
+    let avatar_url = payload
+        .avatar_url
+        .and_then(|value| sanitize_public_url(Some(value), true))
+        .or(group.avatar_url);
     let cover_url = payload
         .cover_url
         .and_then(|value| sanitize_public_url(Some(value), true))
@@ -3362,29 +4112,68 @@ async fn update_group_permissions(
         .filter(|items| !items.is_empty())
         .unwrap_or(group.rules);
 
+    let mut tx = state.db.begin().await.map_err(internal_error)?;
     sqlx::query(
         r#"
         UPDATE lajukan_groups
-        SET description = $2,
-            privacy = $3,
-            posting_permission = $4,
-            membership_permission = $5,
-            cover_url = $6,
-            rules = $7,
+        SET name = $2,
+            description = $3,
+            privacy = $4,
+            posting_permission = $5,
+            membership_permission = $6,
+            avatar_url = $7,
+            cover_url = $8,
+            rules = $9,
             updated_at = now()
         WHERE id = $1
         "#,
     )
     .bind(&group.id)
+    .bind(&name)
     .bind(&description)
     .bind(&privacy)
     .bind(&posting_permission)
     .bind(&membership_permission)
+    .bind(&avatar_url)
     .bind(&cover_url)
     .bind(&rules)
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await
     .map_err(internal_error)?;
+
+    sqlx::query(
+        r#"
+        UPDATE lajukan_forum_categories
+        SET name = $2,
+            description = $3,
+            updated_at = now()
+        WHERE id = $1
+        "#,
+    )
+    .bind(&group.category_id)
+    .bind(&name)
+    .bind(&description)
+    .execute(&mut *tx)
+    .await
+    .map_err(internal_error)?;
+
+    record_audit(
+        &mut tx,
+        &forum_user.id,
+        "group.update",
+        "group",
+        &group.id,
+        json!({
+            "nameChanged": name != group.name,
+            "privacy": privacy,
+            "postingPermission": posting_permission,
+            "membershipPermission": membership_permission,
+            "hasAvatar": avatar_url.is_some(),
+            "hasCover": cover_url.is_some()
+        }),
+    )
+    .await?;
+    tx.commit().await.map_err(internal_error)?;
 
     let group = fetch_group(&state.db, Some(&forum_user.id), &group.id).await?;
     Ok(Json(DataResponse { data: group }))
@@ -3433,6 +4222,7 @@ async fn list_threads(
     let tag = clean_optional(query.tag).map(|value| normalize_tag_slug(&value));
     let status = clean_optional(query.status);
     let q = clean_optional(query.q);
+    let mine = parse_query_bool(query.mine.as_deref());
     let sort = query
         .sort
         .unwrap_or_else(|| "hot".to_string())
@@ -3466,6 +4256,7 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
+          AND ($7::boolean = false OR ($5::text IS NOT NULL AND t.author_id = $5))
           AND (
             t.group_id IS NULL OR
             (
@@ -3485,6 +4276,7 @@ async fn list_threads(
     .bind(q.as_deref())
     .bind(viewer_id.as_deref())
     .bind(actor.as_ref().is_some_and(is_moderator))
+    .bind(mine)
     .fetch_one(&state.db)
     .await
     .map_err(internal_error)?;
@@ -3526,6 +4318,7 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
+          AND ($7::boolean = false OR ($5::text IS NOT NULL AND t.author_id = $5))
           AND (
             t.group_id IS NULL OR
             (
@@ -3540,12 +4333,12 @@ async fn list_threads(
         GROUP BY t.id
         ORDER BY
           t.is_pinned DESC,
-          CASE WHEN $7 = 'top' THEN (t.reply_count * 2 + t.views + t.like_count * 8) END DESC NULLS LAST,
-          CASE WHEN $7 IN ('new', 'latest') THEN t.created_at END DESC NULLS LAST,
-          CASE WHEN $7 = 'active' THEN t.last_activity_at END DESC NULLS LAST,
+          CASE WHEN $8 = 'top' THEN (t.reply_count * 2 + t.views + t.like_count * 8) END DESC NULLS LAST,
+          CASE WHEN $8 IN ('new', 'latest') THEN t.created_at END DESC NULLS LAST,
+          CASE WHEN $8 = 'active' THEN t.last_activity_at END DESC NULLS LAST,
           (t.reply_count * 2 + t.views + t.like_count * 8) DESC,
           t.last_activity_at DESC
-        LIMIT $8 OFFSET $9
+        LIMIT $9 OFFSET $10
         "#,
     )
     .bind(category.as_deref())
@@ -3554,6 +4347,7 @@ async fn list_threads(
     .bind(q.as_deref())
     .bind(viewer_id.as_deref())
     .bind(actor.as_ref().is_some_and(is_moderator))
+    .bind(mine)
     .bind(sort)
     .bind(page_size)
     .bind(offset)
@@ -3721,20 +4515,36 @@ async fn find_default_feed_category(db: &PgPool) -> ApiResult<ForumCategory> {
 
     sqlx::query_as::<_, ForumCategory>(
         r#"
-        SELECT id, name, slug, description, icon, color, parent_id,
-               position AS "order", thread_count, post_count
-        FROM lajukan_forum_categories
+        SELECT
+          id,
+          name,
+          slug,
+          description,
+          icon,
+          color,
+          parent_id,
+          position AS "order",
+          thread_count,
+          post_count
+        FROM forum.lajukan_forum_categories c
         WHERE NOT EXISTS (
-          SELECT 1 FROM lajukan_groups g WHERE g.category_id = lajukan_forum_categories.id
+          SELECT 1
+          FROM lajukan_groups g
+          WHERE g.category_id = c.id
         )
-        ORDER BY position ASC, name ASC
+        ORDER BY c.position ASC, c.name ASC
         LIMIT 1
         "#,
     )
     .fetch_optional(db)
     .await
     .map_err(internal_error)?
-    .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid category"))
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Default feed category is not configured",
+        )
+    })
 }
 
 fn normalize_tags(tags: Vec<String>) -> Vec<String> {
@@ -4036,11 +4846,13 @@ async fn delete_thread(
         json!({}),
     )
     .await?;
-    sqlx::query("DELETE FROM forum.lajukan_forum_votes WHERE target_type = 'thread' AND target_id = $1")
-        .bind(&thread_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(internal_error)?;
+    sqlx::query(
+        "DELETE FROM forum.lajukan_forum_votes WHERE target_type = 'thread' AND target_id = $1",
+    )
+    .bind(&thread_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(internal_error)?;
     sqlx::query(
         r#"
         DELETE FROM lajukan_forum_votes
@@ -4089,12 +4901,13 @@ async fn list_posts(
         return Err(ApiError::new(StatusCode::NOT_FOUND, "Thread not found"));
     }
 
-    let total: i64 =
-        sqlx::query_scalar("SELECT COUNT(*)::bigint FROM forum.lajukan_forum_posts WHERE thread_id = $1")
-            .bind(&thread_id)
-            .fetch_one(&state.db)
-            .await
-            .map_err(internal_error)?;
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::bigint FROM forum.lajukan_forum_posts WHERE thread_id = $1",
+    )
+    .bind(&thread_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(internal_error)?;
 
     let rows = sqlx::query_as::<_, PostRow>(
         r#"
@@ -4782,12 +5595,14 @@ async fn set_solution(
         .execute(&mut *tx)
         .await
         .map_err(internal_error)?;
-        sqlx::query("UPDATE forum.lajukan_forum_posts SET is_answer = (id = $2) WHERE thread_id = $1")
-            .bind(&thread_id)
-            .bind(post_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal_error)?;
+        sqlx::query(
+            "UPDATE forum.lajukan_forum_posts SET is_answer = (id = $2) WHERE thread_id = $1",
+        )
+        .bind(&thread_id)
+        .bind(post_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(internal_error)?;
         record_audit(
             &mut tx,
             &forum_user.id,
@@ -5014,6 +5829,9 @@ async fn handle_media_upload(
         }
 
         let ext = extension_for(file_name.as_deref(), &content_type);
+        if !has_valid_media_signature(bytes.as_ref(), ext) {
+            continue;
+        }
         let safe_original = safe_file_name(file_name.as_deref().unwrap_or("image"));
         let generated = format!(
             "forum-{}-{}-{}{}",
@@ -5051,17 +5869,94 @@ async fn handle_media_upload(
     })))
 }
 
-async fn get_media(Path(filename): Path<String>) -> ApiResult<Response> {
+fn parse_media_range(value: &str, total_bytes: u64) -> Option<(u64, u64)> {
+    let raw = value.trim().strip_prefix("bytes=")?;
+    if raw.contains(',') || total_bytes == 0 {
+        return None;
+    }
+    let (start_raw, end_raw) = raw.split_once('-')?;
+
+    let (start, requested_end) = if start_raw.is_empty() {
+        let suffix = end_raw.parse::<u64>().ok()?.clamp(1, total_bytes);
+        (total_bytes - suffix, total_bytes - 1)
+    } else {
+        let start = start_raw.parse::<u64>().ok()?;
+        if start >= total_bytes {
+            return None;
+        }
+        let end = if end_raw.is_empty() {
+            total_bytes - 1
+        } else {
+            end_raw.parse::<u64>().ok()?.min(total_bytes - 1)
+        };
+        if end < start {
+            return None;
+        }
+        (start, end)
+    };
+
+    let capped_end = requested_end.min(start + MAX_MEDIA_RANGE_BYTES - 1);
+    Some((start, capped_end))
+}
+
+async fn get_media(Path(filename): Path<String>, headers: HeaderMap) -> ApiResult<Response> {
     let safe = safe_file_name(&filename);
     if safe != filename || safe.is_empty() {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid media path"));
     }
 
     let path = std::path::Path::new(&upload_dir()).join(&safe);
-    let data = tokio::fs::read(path)
+    let metadata = tokio::fs::metadata(&path)
         .await
         .map_err(|_| ApiError::new(StatusCode::NOT_FOUND, "Media not found"))?;
-    let mut response = Bytes::from(data).into_response();
+    let total_bytes = metadata.len();
+    let requested_range = headers
+        .get(header::RANGE)
+        .and_then(|value| value.to_str().ok());
+
+    let mut response = if let Some(raw_range) = requested_range {
+        let Some((start, end)) = parse_media_range(raw_range, total_bytes) else {
+            let mut invalid = StatusCode::RANGE_NOT_SATISFIABLE.into_response();
+            invalid.headers_mut().insert(
+                header::CONTENT_RANGE,
+                HeaderValue::from_str(&format!("bytes */{total_bytes}"))
+                    .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Media error"))?,
+            );
+            return Ok(invalid);
+        };
+
+        let mut file = tokio::fs::File::open(&path)
+            .await
+            .map_err(|_| ApiError::new(StatusCode::NOT_FOUND, "Media not found"))?;
+        file.seek(std::io::SeekFrom::Start(start))
+            .await
+            .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Media error"))?;
+        let length = end - start + 1;
+        let mut data = vec![0_u8; length as usize];
+        file.read_exact(&mut data)
+            .await
+            .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Media error"))?;
+
+        let mut partial = Response::new(Body::from(data));
+        *partial.status_mut() = StatusCode::PARTIAL_CONTENT;
+        partial.headers_mut().insert(
+            header::CONTENT_RANGE,
+            HeaderValue::from_str(&format!("bytes {start}-{end}/{total_bytes}"))
+                .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Media error"))?,
+        );
+        partial.headers_mut().insert(
+            header::CONTENT_LENGTH,
+            HeaderValue::from_str(&length.to_string())
+                .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Media error"))?,
+        );
+        partial
+    } else {
+        let data = tokio::fs::read(&path)
+            .await
+            .map_err(|_| ApiError::new(StatusCode::NOT_FOUND, "Media not found"))?;
+        Bytes::from(data).into_response()
+    };
+
     response.headers_mut().insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static(content_type_for_filename(&safe)),
@@ -5070,54 +5965,103 @@ async fn get_media(Path(filename): Path<String>) -> ApiResult<Response> {
         header::CACHE_CONTROL,
         HeaderValue::from_static("public, max-age=31536000, immutable"),
     );
+    response.headers_mut().insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    response.headers_mut().insert(
+        HeaderName::from_static("cross-origin-resource-policy"),
+        HeaderValue::from_static("same-site"),
+    );
+    response
+        .headers_mut()
+        .insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     Ok(response)
 }
 
 async fn list_reels(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<ReelsQuery>,
 ) -> ApiResult<Json<ReelsPageResponse>> {
+    let actor = optional_actor(&headers, &state);
     let cursor = query.cursor.unwrap_or(0).max(0);
     let limit = query.limit.unwrap_or(8).clamp(1, MAX_REEL_LIMIT);
     let q = clean_optional(query.q);
     let tag = clean_optional(query.tag);
     let creator = clean_optional(query.creator);
+    let mine = parse_query_bool(query.mine.as_deref());
+    let actor_user_id = actor.as_ref().map(|item| item.user_id.as_str());
+    let actor_forum_user_id = actor.as_ref().map(forum_user_id);
 
     let mut rows = sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          id, creator_user_id, creator, title, caption, tag,
-          product_name, product_price, product_href,
-          video_src, source_url, likes_count, comments_count, shares_count,
-          tone, icon_key, media_url, media_type, hook,
-          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-          store_id, store_slug, store_name, store_city, store_phone, storefront_path,
-          published_at
-        FROM reel.lajukan_reels
-        WHERE status = 'published'
+          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.product_name, r.product_price, r.product_href,
+          r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
+          r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
+          r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          p.avatar_url AS creator_avatar_url,
+          COALESCE(followers.followers_count, 0)::bigint AS followers_count,
+          COALESCE(following.following_count, 0)::bigint AS following_count,
+          COALESCE(creator_reels.creator_reels_count, 0)::bigint AS creator_reels_count,
+          r.published_at
+        FROM reel.lajukan_reels r
+        LEFT JOIN forum.lajukan_forum_users p
+          ON p.id = r.creator_user_id OR p.id = 'auth-' || r.creator_user_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+        ) followers ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.actor_user_id = COALESCE(p.id, r.creator_user_id)
+        ) following ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::bigint AS creator_reels_count
+          FROM reel.lajukan_reels cr
+          WHERE cr.status = 'published'
+            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+        ) creator_reels ON true
+        WHERE r.status = 'published'
           AND (
             $1::text IS NULL OR
-            lower(title) LIKE '%' || lower($1) || '%' OR
-            lower(caption) LIKE '%' || lower($1) || '%' OR
-            lower(creator) LIKE '%' || lower($1) || '%' OR
-            lower(tag) LIKE '%' || lower($1) || '%' OR
-            lower(coalesce(product_name, '')) LIKE '%' || lower($1) || '%' OR
-            lower(store_name) LIKE '%' || lower($1) || '%' OR
-            lower(store_city) LIKE '%' || lower($1) || '%'
+            lower(r.title) LIKE '%' || lower($1) || '%' OR
+            lower(r.caption) LIKE '%' || lower($1) || '%' OR
+            lower(r.creator) LIKE '%' || lower($1) || '%' OR
+            lower(r.tag) LIKE '%' || lower($1) || '%' OR
+            lower(coalesce(r.product_name, '')) LIKE '%' || lower($1) || '%' OR
+            lower(r.store_name) LIKE '%' || lower($1) || '%' OR
+            lower(r.store_city) LIKE '%' || lower($1) || '%'
           )
           AND (
             $2::text IS NULL OR
-            lower(tag) = lower($2) OR
-            lower(icon_key) = lower($2)
+            lower(r.tag) = lower($2) OR
+            lower(r.icon_key) = lower($2)
           )
-          AND ($3::text IS NULL OR lower(creator) LIKE '%' || lower($3) || '%')
-        ORDER BY published_at DESC, id ASC
-        LIMIT $4 OFFSET $5
+          AND ($3::text IS NULL OR lower(r.creator) LIKE '%' || lower($3) || '%')
+          AND (
+            $4::boolean = false OR (
+              r.creator_user_id IS NOT NULL AND (
+                ($5::text IS NOT NULL AND r.creator_user_id = $5) OR
+                ($6::text IS NOT NULL AND r.creator_user_id = $6)
+              )
+            )
+          )
+        ORDER BY r.published_at DESC, r.id ASC
+        LIMIT $7 OFFSET $8
         "#,
     )
     .bind(q.as_deref())
     .bind(tag.as_deref())
     .bind(creator.as_deref())
+    .bind(mine)
+    .bind(actor_user_id)
+    .bind(actor_forum_user_id.as_deref())
     .bind(limit + 1)
     .bind(cursor)
     .fetch_all(&state.db)
@@ -5154,32 +6098,54 @@ async fn list_reels_feed(
     let rows = sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          id, creator_user_id, creator, title, caption, tag,
-          product_name, product_price, product_href,
-          video_src, source_url, likes_count, comments_count, shares_count,
-          tone, icon_key, media_url, media_type, hook,
-          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-          store_id, store_slug, store_name, store_city, store_phone, storefront_path,
-          published_at
-        FROM reel.lajukan_reels
-        WHERE status = 'published'
+          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.product_name, r.product_price, r.product_href,
+          r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
+          r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
+          r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          p.avatar_url AS creator_avatar_url,
+          COALESCE(followers.followers_count, 0)::bigint AS followers_count,
+          COALESCE(following.following_count, 0)::bigint AS following_count,
+          COALESCE(creator_reels.creator_reels_count, 0)::bigint AS creator_reels_count,
+          r.published_at
+        FROM reel.lajukan_reels r
+        LEFT JOIN forum.lajukan_forum_users p
+          ON p.id = r.creator_user_id OR p.id = 'auth-' || r.creator_user_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+        ) followers ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.actor_user_id = COALESCE(p.id, r.creator_user_id)
+        ) following ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::bigint AS creator_reels_count
+          FROM reel.lajukan_reels cr
+          WHERE cr.status = 'published'
+            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+        ) creator_reels ON true
+        WHERE r.status = 'published'
           AND (
             $1::text IS NULL OR
-            lower(title) LIKE '%' || lower($1) || '%' OR
-            lower(caption) LIKE '%' || lower($1) || '%' OR
-            lower(tag) LIKE '%' || lower($1) || '%' OR
-            lower(coalesce(product_name, '')) LIKE '%' || lower($1) || '%' OR
-            lower(store_name) LIKE '%' || lower($1) || '%' OR
-            lower(store_city) LIKE '%' || lower($1) || '%'
+            lower(r.title) LIKE '%' || lower($1) || '%' OR
+            lower(r.caption) LIKE '%' || lower($1) || '%' OR
+            lower(r.tag) LIKE '%' || lower($1) || '%' OR
+            lower(coalesce(r.product_name, '')) LIKE '%' || lower($1) || '%' OR
+            lower(r.store_name) LIKE '%' || lower($1) || '%' OR
+            lower(r.store_city) LIKE '%' || lower($1) || '%'
           )
           AND (
             $2::text IS NULL OR
-            lower(store_id) = lower($2) OR
-            lower(store_slug) = lower($2) OR
-            lower(store_name) LIKE '%' || lower($2) || '%'
+            lower(r.store_id) = lower($2) OR
+            lower(r.store_slug) = lower($2) OR
+            lower(r.store_name) LIKE '%' || lower($2) || '%'
           )
-          AND ($3::text IS NULL OR lower(store_city) LIKE '%' || lower($3) || '%')
-        ORDER BY published_at DESC, id ASC
+          AND ($3::text IS NULL OR lower(r.store_city) LIKE '%' || lower($3) || '%')
+        ORDER BY r.published_at DESC, r.id ASC
         LIMIT $4
         "#,
     )
@@ -5348,11 +6314,15 @@ async fn create_reel(
           tone, icon_key, media_url, media_type, hook,
           filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+          $29::text AS creator_avatar_url,
+          0::bigint AS followers_count,
+          0::bigint AS following_count,
+          1::bigint AS creator_reels_count,
           published_at
         "#,
     )
     .bind(&reel_id)
-    .bind(&actor.user_id)
+    .bind(&forum_user.id)
     .bind(&creator)
     .bind(&title)
     .bind(&caption)
@@ -5379,6 +6349,7 @@ async fn create_reel(
     .bind(&store_city)
     .bind(&store_phone)
     .bind(&storefront_path)
+    .bind(&forum_user.avatar_url)
     .fetch_one(&mut *tx)
     .await
     .map_err(internal_error)?;
@@ -5413,7 +6384,10 @@ async fn update_reel(
     mutation_rate_limit(&state, &headers, &actor, "reel:update", 180, 60).await?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
     let existing = get_reel_row(&state.db, &reel_id).await?;
-    if existing.creator_user_id.as_deref() != Some(actor.user_id.as_str()) && !is_moderator(&actor)
+    if !matches!(
+        existing.creator_user_id.as_deref(),
+        Some(owner_id) if owner_id == actor.user_id || owner_id == forum_user.id
+    ) && !is_moderator(&actor)
     {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
@@ -5582,6 +6556,10 @@ async fn update_reel(
           tone, icon_key, media_url, media_type, hook,
           filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+          NULL::text AS creator_avatar_url,
+          0::bigint AS followers_count,
+          0::bigint AS following_count,
+          0::bigint AS creator_reels_count,
           published_at
         "#,
     )
@@ -5639,7 +6617,10 @@ async fn delete_reel(
     mutation_rate_limit(&state, &headers, &actor, "reel:delete", 120, 40).await?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
     let existing = get_reel_row(&state.db, &reel_id).await?;
-    if existing.creator_user_id.as_deref() != Some(actor.user_id.as_str()) && !is_moderator(&actor)
+    if !matches!(
+        existing.creator_user_id.as_deref(),
+        Some(owner_id) if owner_id == actor.user_id || owner_id == forum_user.id
+    ) && !is_moderator(&actor)
     {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
@@ -5927,16 +6908,23 @@ async fn list_reel_comments(
     let mut rows = sqlx::query_as::<_, ReelCommentRow>(
         r#"
         SELECT
-          id, reel_id, author_user_id, author_name,
-          COALESCE(author_avatar_url, author_avatar) AS author_avatar_url,
-          parent_comment_id, body, reply_count, created_at
-        FROM reel.lajukan_reel_comments
-        WHERE reel_id = $1 AND status = 'published'
+          c.id, c.reel_id, c.author_user_id,
+          COALESCE(NULLIF(u.name, ''), c.author_name) AS author_name,
+          COALESCE(
+            NULLIF(u.avatar_url, ''),
+            c.author_avatar_url,
+            c.author_avatar,
+            '/default-avatar.svg'
+          ) AS author_avatar_url,
+          c.parent_comment_id, c.body, c.reply_count, c.created_at
+        FROM reel.lajukan_reel_comments c
+        LEFT JOIN forum.lajukan_forum_users u ON u.id = c.author_user_id
+        WHERE c.reel_id = $1 AND c.status = 'published'
         ORDER BY
-          COALESCE(parent_comment_id, id) DESC,
-          parent_comment_id NULLS FIRST,
-          created_at ASC,
-          id ASC
+          COALESCE(c.parent_comment_id, c.id) DESC,
+          c.parent_comment_id NULLS FIRST,
+          c.created_at ASC,
+          c.id ASC
         LIMIT $2 OFFSET $3
         "#,
     )
@@ -6045,6 +7033,10 @@ async fn create_reel_comment(
           tone, icon_key, media_url, media_type, hook,
           filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+          NULL::text AS creator_avatar_url,
+          0::bigint AS followers_count,
+          0::bigint AS following_count,
+          0::bigint AS creator_reels_count,
           published_at
         "#,
     )
@@ -6114,15 +7106,37 @@ async fn get_reel_row(db: &PgPool, reel_id: &str) -> ApiResult<ReelRow> {
     sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          id, creator_user_id, creator, title, caption, tag,
-          product_name, product_price, product_href,
-          video_src, source_url, likes_count, comments_count, shares_count,
-          tone, icon_key, media_url, media_type, hook,
-          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-          store_id, store_slug, store_name, store_city, store_phone, storefront_path,
-          published_at
-        FROM reel.lajukan_reels
-        WHERE id = $1 AND status = 'published'
+          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.product_name, r.product_price, r.product_href,
+          r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
+          r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
+          r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          p.avatar_url AS creator_avatar_url,
+          COALESCE(followers.followers_count, 0)::bigint AS followers_count,
+          COALESCE(following.following_count, 0)::bigint AS following_count,
+          COALESCE(creator_reels.creator_reels_count, 0)::bigint AS creator_reels_count,
+          r.published_at
+        FROM reel.lajukan_reels r
+        LEFT JOIN forum.lajukan_forum_users p
+          ON p.id = r.creator_user_id OR p.id = 'auth-' || r.creator_user_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+        ) followers ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.actor_user_id = COALESCE(p.id, r.creator_user_id)
+        ) following ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::bigint AS creator_reels_count
+          FROM reel.lajukan_reels cr
+          WHERE cr.status = 'published'
+            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+        ) creator_reels ON true
+        WHERE r.id = $1 AND r.status = 'published'
         "#,
     )
     .bind(reel_id)
@@ -6179,13 +7193,60 @@ async fn fetch_reel_viewer_state(
     })
 }
 
+fn enrich_reel_metadata(mut metadata: Value, row: &ReelRow) -> Value {
+    let object = if let Value::Object(object) = &mut metadata {
+        object
+    } else {
+        metadata = json!({});
+        match &mut metadata {
+            Value::Object(object) => object,
+            _ => return metadata,
+        }
+    };
+
+    if let Some(avatar_url) = row
+        .creator_avatar_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && *value != "/default-avatar.svg")
+    {
+        object.insert(
+            "creator_avatar_url".to_string(),
+            Value::String(avatar_url.to_string()),
+        );
+        object.insert(
+            "author_avatar_url".to_string(),
+            Value::String(avatar_url.to_string()),
+        );
+    }
+
+    object.insert(
+        "creator_followers_count".to_string(),
+        json!(row.followers_count.max(0)),
+    );
+    object.insert(
+        "creator_following_count".to_string(),
+        json!(row.following_count.max(0)),
+    );
+    object.insert(
+        "creator_reels_count".to_string(),
+        json!(row.creator_reels_count.max(0)),
+    );
+    object.insert("creator_profile_synced".to_string(), Value::Bool(true));
+
+    metadata
+}
+
 fn map_reel(row: ReelRow) -> LajukanReel {
+    let creator_user_id = public_identity_user_id(row.creator_user_id.clone());
+    let metadata = enrich_reel_metadata(row.metadata.clone(), &row);
+
     LajukanReel {
         id: row.id,
         base_id: None,
         title: row.title,
         creator: row.creator,
-        creator_user_id: public_identity_user_id(row.creator_user_id),
+        creator_user_id,
         caption: row.caption,
         tag: row.tag,
         product_name: row.product_name,
@@ -6207,7 +7268,7 @@ fn map_reel(row: ReelRow) -> LajukanReel {
         live_status: row.live_status,
         live_title: row.live_title,
         live_scheduled_at: row.live_scheduled_at,
-        metadata: row.metadata,
+        metadata,
     }
 }
 
@@ -6375,7 +7436,11 @@ async fn get_community_feed(
     .bind(category.as_deref())
     .bind(tag.as_deref())
     .bind(q.as_deref())
-    .bind(if tab == "community" { Some("community") } else { None })
+    .bind(if tab == "community" {
+        Some("community")
+    } else {
+        None
+    })
     .bind(viewer_id.as_deref())
     .bind(actor.as_ref().is_some_and(is_moderator))
     .bind(requested_thread.as_deref())
@@ -6571,24 +7636,46 @@ async fn build_reel_community_items(
     let rows = sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          id, creator_user_id, creator, title, caption, tag,
-          product_name, product_price, product_href,
-          video_src, source_url, likes_count, comments_count, shares_count,
-          tone, icon_key, media_url, media_type, hook,
-          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-          store_id, store_slug, store_name, store_city, store_phone, storefront_path
-        FROM reel.lajukan_reels
-        WHERE status = 'published'
+          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.product_name, r.product_price, r.product_href,
+          r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
+          r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
+          r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          p.avatar_url AS creator_avatar_url,
+          COALESCE(followers.followers_count, 0)::bigint AS followers_count,
+          COALESCE(following.following_count, 0)::bigint AS following_count,
+          COALESCE(creator_reels.creator_reels_count, 0)::bigint AS creator_reels_count
+        FROM reel.lajukan_reels r
+        LEFT JOIN forum.lajukan_forum_users p
+          ON p.id = r.creator_user_id OR p.id = 'auth-' || r.creator_user_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+        ) followers ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
+          FROM lajukan_reel_user_actions a
+          WHERE a.action = 'follow' AND a.actor_user_id = COALESCE(p.id, r.creator_user_id)
+        ) following ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::bigint AS creator_reels_count
+          FROM reel.lajukan_reels cr
+          WHERE cr.status = 'published'
+            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+        ) creator_reels ON true
+        WHERE r.status = 'published'
           AND (
             $1::text IS NULL OR
-            lower(title) LIKE '%' || lower($1) || '%' OR
-            lower(caption) LIKE '%' || lower($1) || '%' OR
-            lower(creator) LIKE '%' || lower($1) || '%' OR
-            lower(tag) LIKE '%' || lower($1) || '%' OR
-            lower(coalesce(product_name, '')) LIKE '%' || lower($1) || '%' OR
-            lower(store_name) LIKE '%' || lower($1) || '%'
+            lower(r.title) LIKE '%' || lower($1) || '%' OR
+            lower(r.caption) LIKE '%' || lower($1) || '%' OR
+            lower(r.creator) LIKE '%' || lower($1) || '%' OR
+            lower(r.tag) LIKE '%' || lower($1) || '%' OR
+            lower(coalesce(r.product_name, '')) LIKE '%' || lower($1) || '%' OR
+            lower(r.store_name) LIKE '%' || lower($1) || '%'
           )
-        ORDER BY published_at DESC, id ASC
+        ORDER BY r.published_at DESC, r.id ASC
         LIMIT $2 OFFSET $3
         "#,
     )
@@ -6612,10 +7699,14 @@ async fn build_reel_community_items(
             community_name: "Reels Usaha".to_string(),
             created_at: Utc::now(),
             author: CommunityFeedAuthor {
-                id: row.store_id.clone(),
+                id: public_identity_user_id(row.creator_user_id.clone())
+                    .unwrap_or_else(|| row.creator_user_id.clone().unwrap_or(row.store_id.clone())),
                 name: row.creator.clone(),
                 title: row.tag.clone(),
-                avatar_url: Some("/default-avatar.svg".to_string()),
+                avatar_url: row
+                    .creator_avatar_url
+                    .clone()
+                    .or_else(|| Some("/default-avatar.svg".to_string())),
                 reputation: 0,
             },
             category: None,
@@ -6722,10 +7813,11 @@ async fn build_overview(db: &PgPool, viewer_id: Option<&str>) -> ApiResult<Commu
         .fetch_one(db)
         .await
         .map_err(internal_error)?;
-    let total_users: i64 = sqlx::query_scalar("SELECT COUNT(*)::bigint FROM forum.lajukan_forum_users")
-        .fetch_one(db)
-        .await
-        .map_err(internal_error)?;
+    let total_users: i64 =
+        sqlx::query_scalar("SELECT COUNT(*)::bigint FROM forum.lajukan_forum_users")
+            .fetch_one(db)
+            .await
+            .map_err(internal_error)?;
 
     let categories = fetch_categories(db)
         .await?
@@ -6790,11 +7882,12 @@ async fn build_overview(db: &PgPool, viewer_id: Option<&str>) -> ApiResult<Commu
 }
 
 async fn fetch_top_contributor_ids(db: &PgPool) -> ApiResult<HashSet<String>> {
-    let rows: Vec<(String,)> =
-        sqlx::query_as("SELECT id FROM forum.lajukan_forum_users ORDER BY reputation DESC LIMIT 50")
-            .fetch_all(db)
-            .await
-            .map_err(internal_error)?;
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT id FROM forum.lajukan_forum_users ORDER BY reputation DESC LIMIT 50",
+    )
+    .fetch_all(db)
+    .await
+    .map_err(internal_error)?;
     Ok(rows.into_iter().map(|row| row.0).collect())
 }
 
@@ -7012,6 +8105,7 @@ async fn fetch_groups_for_ids(
           g.privacy,
           g.posting_permission,
           g.membership_permission,
+          g.avatar_url,
           g.cover_url,
           g.rules,
           COUNT(DISTINCT active_members.user_id)::int AS member_count,
@@ -7153,6 +8247,17 @@ fn clean_optional(value: Option<String>) -> Option<String> {
         .filter(|item| !item.is_empty())
 }
 
+fn parse_query_bool(value: Option<&str>) -> bool {
+    value
+        .map(|item| {
+            matches!(
+                item.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "y" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
 fn normalize_community_search_kind(value: Option<&str>) -> String {
     match value.unwrap_or("all").trim().to_ascii_lowercase().as_str() {
         "post" | "posts" | "posting" | "postingan" | "diskusi" | "thread" | "threads" => {
@@ -7196,7 +8301,11 @@ fn map_feed_author(user: &ForumUser) -> CommunityFeedAuthor {
         id: user.id.clone(),
         name: user.name.clone(),
         title: user.title.clone(),
-        avatar_url: Some(user.avatar_url.clone().unwrap_or_else(|| "/default-avatar.svg".to_string())),
+        avatar_url: Some(
+            user.avatar_url
+                .clone()
+                .unwrap_or_else(|| "/default-avatar.svg".to_string()),
+        ),
         reputation: user.reputation,
     }
 }
@@ -7225,4 +8334,32 @@ fn map_feed_tag(tag: ForumTag) -> CommunityFeedTag {
 fn internal_error(error: sqlx::Error) -> ApiError {
     tracing::error!("database error: {:?}", error);
     ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Service unavailable")
+}
+
+#[cfg(test)]
+mod security_tests {
+    use super::{has_valid_media_signature, parse_media_range, MAX_MEDIA_RANGE_BYTES};
+
+    #[test]
+    fn media_signatures_reject_active_content_disguised_as_an_image() {
+        assert!(has_valid_media_signature(
+            &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a],
+            ".png"
+        ));
+        assert!(!has_valid_media_signature(
+            b"<svg><script>alert(1)</script></svg>",
+            ".png"
+        ));
+    }
+
+    #[test]
+    fn media_ranges_are_bounded_and_invalid_ranges_are_rejected() {
+        let total = MAX_MEDIA_RANGE_BYTES * 3;
+        assert_eq!(
+            parse_media_range("bytes=0-", total),
+            Some((0, MAX_MEDIA_RANGE_BYTES - 1))
+        );
+        assert_eq!(parse_media_range("bytes=99-100", 20), None);
+        assert_eq!(parse_media_range("bytes=0-1,4-5", total), None);
+    }
 }

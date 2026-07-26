@@ -59,7 +59,7 @@ export const UMKM_JOURNEY_STEPS: UmkmJourneyStep[] = [
     titleEn: 'Find suppliers and raw materials',
     bodyId: 'Barang, MOQ, harga, dan kirim.',
     bodyEn: 'Suppliers, MOQs, pricing, and delivery reach.',
-    searchHref: '/search?type=product&q=distributor',
+    searchHref: '/explore?type=product&q=distributor',
     createHref: '/create/butuh/produk',
     searchLabelId: 'Cari supplier',
     searchLabelEn: 'Find suppliers',
@@ -77,7 +77,7 @@ export const UMKM_JOURNEY_STEPS: UmkmJourneyStep[] = [
     titleEn: 'Find selling locations',
     bodyId: 'Ruko, kios, booth.',
     bodyEn: 'Shophouses, kiosks, booths, or distribution spots.',
-    searchHref: '/search?type=property&q=lokasi%20jualan',
+    searchHref: '/explore?type=property&q=lokasi%20jualan',
     createHref: '/create/butuh/properti',
     searchLabelId: 'Cari lokasi',
     searchLabelEn: 'Find locations',
@@ -95,7 +95,7 @@ export const UMKM_JOURNEY_STEPS: UmkmJourneyStep[] = [
     titleEn: 'Find operations support',
     bodyId: 'Kemasan, foto, ads, admin.',
     bodyEn: 'Packaging, photos, ads, permits, or store admin.',
-    searchHref: '/search?type=service&q=operasional%20umkm',
+    searchHref: '/explore?type=service&q=operasional%20umkm',
     createHref: '/create/butuh/jasa',
     searchLabelId: 'Cari jasa',
     searchLabelEn: 'Find services',
@@ -113,7 +113,7 @@ export const UMKM_JOURNEY_STEPS: UmkmJourneyStep[] = [
     titleEn: 'Transfer a running business',
     bodyId: 'Aset, rating, biaya, risiko.',
     bodyEn: 'Assets, ratings, costs, and risks.',
-    searchHref: '/search?type=business_transfer&q=oper%20usaha',
+    searchHref: '/explore?type=business_transfer&q=oper%20usaha',
     createHref: '/create/jual/oper-usaha',
     searchLabelId: 'Lihat oper usaha',
     searchLabelEn: 'Browse transfers',
@@ -132,7 +132,7 @@ export const UMKM_JOURNEY_STEPS: UmkmJourneyStep[] = [
     bodyId: 'Admin, host, creator, ops.',
     bodyEn:
       'Once supply is covered, move into marketplace admins, content creators, live hosts, or other operational talent.',
-    searchHref: '/search?type=freelancer&q=admin%20marketplace',
+    searchHref: '/explore?type=freelancer&q=admin%20marketplace',
     createHref: '/create/butuh/lowongan',
     searchLabelId: 'Cari talent',
     searchLabelEn: 'Find talent',
@@ -151,7 +151,7 @@ export const UMKM_PLAYBOOKS: UmkmPlaybook[] = [
     titleEn: 'Coffee business',
     hintId: 'Distributor kopi, gelas, grinder, booth',
     hintEn: 'Coffee suppliers, cups, grinders, booth',
-    href: '/search?type=product&q=kopi',
+    href: '/explore?type=product&q=kopi',
   },
   {
     id: 'beauty',
@@ -159,7 +159,7 @@ export const UMKM_PLAYBOOKS: UmkmPlaybook[] = [
     titleEn: 'Beauty and skincare',
     hintId: 'Distributor skincare, kemasan, foto, live host',
     hintEn: 'Skincare distributors, packaging, photos, live host',
-    href: '/search?type=product&q=skincare',
+    href: '/explore?type=product&q=skincare',
   },
   {
     id: 'fashion',
@@ -167,7 +167,7 @@ export const UMKM_PLAYBOOKS: UmkmPlaybook[] = [
     titleEn: 'Fashion reseller',
     hintId: 'Supplier fashion, konveksi, katalog, admin toko',
     hintEn: 'Fashion suppliers, production, catalog, store admin',
-    href: '/search?type=product&q=fashion',
+    href: '/explore?type=product&q=fashion',
   },
   {
     id: 'frozen-food',
@@ -175,7 +175,7 @@ export const UMKM_PLAYBOOKS: UmkmPlaybook[] = [
     titleEn: 'Frozen food',
     hintId: 'Bahan baku, freezer, kemasan, lokasi jual',
     hintEn: 'Raw materials, freezer, packaging, selling spots',
-    href: '/search?type=product&q=frozen%20food',
+    href: '/explore?type=product&q=frozen%20food',
   },
 ];
 
@@ -216,7 +216,7 @@ export function resolveMarketplaceSearchHrefForType(
   }
 
   const queryString = params.toString();
-  return queryString ? `/search?${queryString}` : '/search';
+  return queryString ? `/explore?${queryString}` : '/explore';
 }
 
 export function resolveMarketplaceCreateHref(

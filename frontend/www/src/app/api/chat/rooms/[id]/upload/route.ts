@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   collectUploadFiles,
-  readUploadToken,
   storeValidatedUploads,
 } from '@/lib/server/uploadFiles';
 import { MEDIA_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
+import { guardUploadRequest } from '@/lib/server/uploadGuard';
 
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
@@ -45,11 +45,9 @@ export async function POST(
   const { id: rawId } = await context.params;
   const id = safeDecodeRoomId(rawId);
   try {
-    const token = readUploadToken(req);
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await guardUploadRequest(req, 'chat:media');
+    if (!guard.ok) return guard.response;
+    const token = guard.auth.token;
 
     const allowed = await canAccessRoom(token, id);
     if (!allowed) {

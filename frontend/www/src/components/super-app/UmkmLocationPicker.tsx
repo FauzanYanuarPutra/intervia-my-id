@@ -2,6 +2,12 @@
 
 import dynamic from 'next/dynamic';
 import type { LatLng } from '@/lib/super-app/maps';
+import type {
+  LocationSuggestion,
+  SelectedLocation,
+} from '@/lib/location/location.types';
+
+export type LocationPickerSuggestion = LocationSuggestion;
 
 type UmkmLocationPickerProps = {
   value: LatLng | null;
@@ -9,6 +15,9 @@ type UmkmLocationPickerProps = {
   className?: string;
   isId?: boolean;
   markerLabel?: string;
+  localSuggestions?: LocationPickerSuggestion[];
+  selectedLocation?: SelectedLocation | null;
+  onLocationChange?: (location: SelectedLocation | null) => void;
 };
 
 const UmkmLocationPickerClient = dynamic(

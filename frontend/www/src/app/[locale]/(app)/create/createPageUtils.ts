@@ -36,9 +36,11 @@ export interface ContentItem {
   price_unit?: string | null;
   tags?: string[] | null;
   cover_image?: string | null;
+  category?: string | null;
   metadata?: Record<string, unknown> | null;
   content_status?: string;
   status?: string;
+  current_step?: number | null;
 }
 
 export type ListingTypeId =

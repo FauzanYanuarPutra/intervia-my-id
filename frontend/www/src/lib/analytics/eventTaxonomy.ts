@@ -19,10 +19,10 @@ const ROUTE_VIEW_EVENTS: Array<{
     surface: 'home',
   },
   {
-    prefix: '/search',
-    eventName: 'search.viewed',
-    module: 'search',
-    surface: 'search',
+    prefix: '/explore',
+    eventName: 'explore.viewed',
+    module: 'explore',
+    surface: 'explore',
   },
   {
     prefix: '/umkm',

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { contentApi, sectorApi, bannerApi } from '@/lib/api';
 import { Button, Card, Input } from '@/ui';
@@ -198,13 +198,22 @@ function fromInputDate(value: string): string | undefined {
   return date.toISOString();
 }
 
-function extractItems<T>(payload: any): T[] {
+function readRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function readBooleanField(payload: unknown, key: string): boolean | null {
+  const record = readRecord(payload);
+  return typeof record[key] === 'boolean' ? record[key] : null;
+}
+
+function extractItems<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) return payload as T[];
-  if (payload && typeof payload === 'object') {
-    if (Array.isArray(payload.items)) return payload.items as T[];
-    if (Array.isArray(payload.data)) return payload.data as T[];
-    if (Array.isArray(payload.results)) return payload.results as T[];
-  }
+  const record = readRecord(payload);
+  if (Array.isArray(record.items)) return record.items as T[];
+  if (Array.isArray(record.data)) return record.data as T[];
+  if (Array.isArray(record.results)) return record.results as T[];
   return [];
 }
 
@@ -286,7 +295,7 @@ export default function CmsDashboard() {
   );
 
   const contentTypeOptions = useMemo(() => CONTENT_TYPES, []);
-  const loadContent = async (opts: { append?: boolean; offset?: number } = {}) => {
+  const loadContent = useCallback(async (opts: { append?: boolean; offset?: number } = {}) => {
     if (!accessToken) return;
     setContentLoading(true);
     setContentError('');
@@ -304,7 +313,7 @@ export default function CmsDashboard() {
 
       const res = await contentApi.list(accessToken, params);
       const items = extractItems<ContentItem>(res);
-      const hasMore = typeof res?.has_more === 'boolean' ? res.has_more : items.length >= limit;
+      const hasMore = readBooleanField(res, 'has_more') ?? items.length >= limit;
 
       setContentItems((prev) => (opts.append ? [...prev, ...items] : items));
       setContentOffset(offset);
@@ -314,9 +323,15 @@ export default function CmsDashboard() {
     } finally {
       setContentLoading(false);
     }
-  };
+  }, [
+    accessToken,
+    contentFilters.q,
+    contentFilters.sector,
+    contentFilters.status,
+    contentFilters.type,
+  ]);
 
-  const loadSectors = async () => {
+  const loadSectors = useCallback(async () => {
     if (!accessToken) return;
     setSectorLoading(true);
     setSectorError('');
@@ -328,9 +343,9 @@ export default function CmsDashboard() {
     } finally {
       setSectorLoading(false);
     }
-  };
+  }, [accessToken]);
 
-  const loadBanners = async () => {
+  const loadBanners = useCallback(async () => {
     if (!accessToken) return;
     setBannerLoading(true);
     setBannerError('');
@@ -342,14 +357,14 @@ export default function CmsDashboard() {
     } finally {
       setBannerLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
     loadContent({ offset: 0 });
     loadSectors();
     loadBanners();
-  }, [accessToken]);
+  }, [accessToken, loadBanners, loadContent, loadSectors]);
 
   const resetContentForm = () => {
     setContentForm(emptyContentForm);
@@ -424,7 +439,7 @@ export default function CmsDashboard() {
       if (contentForm.metadata.trim()) {
         try {
           metadata = JSON.parse(contentForm.metadata.trim());
-        } catch (err) {
+        } catch {
           throw new Error('Format metadata JSON tidak valid');
         }
       }
@@ -439,7 +454,7 @@ export default function CmsDashboard() {
         .map((tag) => tag.trim())
         .filter(Boolean);
 
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         type: contentForm.type,
         title: contentForm.title.trim(),
         summary: contentForm.summary.trim() || undefined,
@@ -528,7 +543,7 @@ export default function CmsDashboard() {
     setSectorFormError('');
 
     try {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         id: sectorForm.id.trim(),
         name_id: sectorForm.name_id.trim(),
         name_en: sectorForm.name_en.trim() || sectorForm.name_id.trim(),
@@ -541,8 +556,9 @@ export default function CmsDashboard() {
       };
 
       if (sectors.some((s) => s.id === sectorForm.id)) {
-        const { id, ...rest } = payload;
-        await sectorApi.update(accessToken, sectorForm.id, rest);
+        const sectorUpdatePayload = { ...payload };
+        delete sectorUpdatePayload.id;
+        await sectorApi.update(accessToken, sectorForm.id, sectorUpdatePayload);
       } else {
         await sectorApi.create(accessToken, payload);
       }
@@ -621,12 +637,12 @@ export default function CmsDashboard() {
       if (bannerForm.metadata.trim()) {
         try {
           metadata = JSON.parse(bannerForm.metadata.trim());
-        } catch (err) {
+        } catch {
           throw new Error('Format metadata JSON tidak valid');
         }
       }
 
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         name: bannerForm.name.trim(),
         location: bannerForm.location.trim(),
         status: bannerForm.status,

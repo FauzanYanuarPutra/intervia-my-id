@@ -6,9 +6,11 @@ import {
   getWhatsAppMetaConfigured,
   sendOtpViaWhatsAppMeta,
 } from '@/lib/whatsappMeta';
-
-const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
-const IS_DEV = APP_ENV === 'development';
+import {
+  allowSensitiveDevelopmentLogs,
+  maskPhone,
+  safeErrorCode,
+} from '@/lib/server/safeLog';
 
 export type PhoneOtpDeliveryResult = {
   ok: boolean;
@@ -47,8 +49,7 @@ async function sendOtpViaTwilio(
   );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    console.error('Twilio OTP delivery failed:', error);
+    console.error('Twilio OTP delivery failed', { status: response.status });
     return false;
   }
 
@@ -70,9 +71,9 @@ export async function sendPhoneOTP(
       if (sent) return { ok: true, delivery: 'whatsapp_fonnte' };
     }
 
-    if (IS_DEV) {
+    if (allowSensitiveDevelopmentLogs()) {
       console.log('\n========== PHONE OTP ==========');
-      console.log(`To: ${phone}`);
+      console.log(`To: ${maskPhone(phone)}`);
       console.log(`OTP Code: ${otp}`);
       console.log('================================\n');
       return { ok: true, delivery: 'console' };
@@ -86,7 +87,9 @@ export async function sendPhoneOTP(
     console.error('No phone OTP provider configured');
     return { ok: false, delivery: 'unconfigured' };
   } catch (error) {
-    console.error('Failed to send phone OTP:', error);
+    console.error('Failed to send phone OTP', {
+      error: safeErrorCode(error),
+    });
     return { ok: false, delivery: 'unconfigured' };
   }
 }

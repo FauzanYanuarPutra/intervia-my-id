@@ -110,7 +110,7 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     summary: 'Shipment planning and route orchestration.',
     valueStatement:
       'Lower delivery cost with better route and carrier planning.',
-    primaryPath: '/search?type=service&q=jasa%20pengiriman%20usaha',
+    primaryPath: '/explore?type=service&q=jasa%20pengiriman%20usaha',
     integrations: ['SCM', 'ERP', 'Support notifications'],
     securityFocus: ['Carrier identity validation', 'Delivery event signing'],
     kpis: [
@@ -155,7 +155,7 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     status: 'partial',
     summary: 'Talent pipeline and team profile foundation.',
     valueStatement: 'Recruit and operate teams with structured people data.',
-    primaryPath: '/search?type=job&q=lowongan',
+    primaryPath: '/explore?type=job&q=lowongan',
     integrations: ['LMS', 'PMS', 'KMS'],
     securityFocus: [
       'Sensitive data separation',
@@ -273,7 +273,7 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     summary: 'Asset lifecycle tracking for high-value equipment and property.',
     valueStatement:
       'Reduce downtime and asset leakage with stronger governance.',
-    primaryPath: '/search?type=property&q=lokasi%20jualan',
+    primaryPath: '/explore?type=property&q=lokasi%20jualan',
     integrations: ['ERP', 'FMS', 'BI'],
     securityFocus: [
       'Asset ownership traceability',
@@ -304,7 +304,7 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     summary: 'Audience campaigns and lifecycle engagement automation.',
     valueStatement:
       'Run targeted campaigns using behavior and transaction context.',
-    primaryPath: '/search',
+    primaryPath: '/explore',
     integrations: ['CDP', 'CRM', 'BI'],
     securityFocus: [
       'Consent-aware campaign triggers',

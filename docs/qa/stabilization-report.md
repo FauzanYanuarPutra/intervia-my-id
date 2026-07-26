@@ -41,7 +41,7 @@ Result:
 | Route | Viewport | Scenario | Result | Issue | Severity | Fix | Test |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `/id/home` | all required | Render route and check document width | Passed | None in smoke | - | Existing UI retained | Playwright |
-| `/id/search?q=supplier%20kemasan` | all required | Render route and check document width | Passed | Previous risk: horizontal overflow | Medium | Search/main layout constrained earlier; regression test added | Playwright |
+| `/id/explore?q=supplier%20kemasan` | all required | Render route and check document width | Passed | Previous risk: horizontal overflow | Medium | Explore results layout constrained earlier; regression test added | Playwright |
 | `/id/umkm` | all required | Render route and check document width | Passed | Previous risk: controls hidden by map/immersive layer | High | Existing map layer fix retained; regression test added | Playwright |
 | `/id/create` | all required | Render public route and check document width | Passed | Auth/publish not covered | Medium | Not changed | Playwright |
 | `/id/community` | all required | Render route and check document width | Passed | Deep community-to-contact flow not covered | Medium | Not changed | Playwright |
@@ -50,7 +50,7 @@ Result:
 | `/id/register` | all required | Render route and check document width | Passed | OTP/backend register not covered | Medium | Not changed | Playwright |
 | `/id/support` | all required | Render route and check document width | Passed | Ticket submit not covered | Low | Not changed | Playwright |
 | `/id/content/e2e-kemasan-001` | all required | Render detail route with fixture data and check document width | Passed | Real backend detail not covered | Medium | Not changed | Playwright |
-| `/id/search` | `390x844` | Fill search, press Enter, verify URL and width | Passed | Hidden desktop input was selected on first run | Low | Locator now targets visible search input | Playwright |
+| `/id/explore` | `390x844` | Fill search, press Enter, verify URL and width | Passed | Hidden desktop input was selected on first run | Low | Locator now targets visible search input | Playwright |
 | `/id/umkm` | `390x844` | Click search/map control trial above map layer | Passed | None after current fixes | - | Regression test added | Playwright |
 | `/id/umkm` | `390x844` | Verify `320 m` is hidden before viewer location exists | Passed | Previous risk: misleading hardcoded distance | High | Distance now hidden until viewer/backend distance exists | Playwright |
 

@@ -1,45 +1,45 @@
 {
-    "updated_at":  "2026-07-12T12:46:33.6128814+07:00",
+    "updated_at":  "2026-07-26T22:47:53.8726966+07:00",
     "services":  {
                      "chat_service":  {
                                           "input_paths":  "docker-compose.yml|services/chat_service",
-                                          "input_ticks":  639194316576485133,
-                                          "built_at":  "2026-07-12T12:46:33.6068102+07:00"
+                                          "input_ticks":  639206771877824309,
+                                          "built_at":  "2026-07-26T22:47:53.8716245+07:00"
                                       },
                      "identity_service":  {
                                               "input_paths":  "docker-compose.yml|services/identity_service",
-                                              "input_ticks":  639194307094046136,
-                                              "built_at":  "2026-07-12T12:46:33.6093427+07:00"
+                                              "input_ticks":  639206477170613517,
+                                              "built_at":  "2026-07-26T14:40:26.9958813+07:00"
                                           },
                      "www":  {
                                  "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/shared|frontend/www",
-                                 "input_ticks":  639194309492896172,
-                                 "built_at":  "2026-07-12T12:46:33.6099906+07:00"
+                                 "input_ticks":  639206753505044972,
+                                 "built_at":  "2026-07-26T22:38:56.1860374+07:00"
                              },
                      "marketplace_service":  {
                                                  "input_paths":  "docker-compose.yml|services/marketplace_service",
-                                                 "input_ticks":  639194307094046136,
-                                                 "built_at":  "2026-07-12T12:46:33.6099906+07:00"
+                                                 "input_ticks":  639206745102170282,
+                                                 "built_at":  "2026-07-26T22:38:56.1865920+07:00"
                                              },
                      "usaha":  {
                                    "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/shared|frontend/usaha",
-                                   "input_ticks":  639194307094046136,
-                                   "built_at":  "2026-07-12T12:46:33.6107777+07:00"
+                                   "input_ticks":  639206471924928576,
+                                   "built_at":  "2026-07-26T14:40:26.9958813+07:00"
                                },
                      "community_service":  {
                                                "input_paths":  "docker-compose.yml|services/community_service",
-                                               "input_ticks":  639194307094046136,
-                                               "built_at":  "2026-07-12T12:46:33.6107777+07:00"
+                                               "input_ticks":  639206540011953789,
+                                               "built_at":  "2026-07-26T16:23:45.1957834+07:00"
                                            },
                      "crm":  {
                                  "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/crm|frontend/shared",
-                                 "input_ticks":  639194307094046136,
-                                 "built_at":  "2026-07-12T12:46:33.6107777+07:00"
+                                 "input_ticks":  639206471924928576,
+                                 "built_at":  "2026-07-26T14:40:26.9958813+07:00"
                              },
                      "cms":  {
                                  "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/cms|frontend/shared",
-                                 "input_ticks":  639194307094046136,
-                                 "built_at":  "2026-07-12T12:46:33.6093427+07:00"
+                                 "input_ticks":  639206471924928576,
+                                 "built_at":  "2026-07-26T14:40:26.9958813+07:00"
                              }
                  }
 }

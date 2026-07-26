@@ -13,13 +13,13 @@ import {
   BadgePercent,
   Building2,
   Briefcase,
-  Calendar,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   Clock3,
   Coins,
+  ExternalLink,
   FileText,
   Gift,
   Heart,
@@ -27,14 +27,15 @@ import {
   ListChecks,
   MapPin,
   MessageCircle,
+  Navigation,
   Package,
   Share2,
   ShieldCheck,
-  Star,
   Target,
   Trophy,
   User,
   Wrench,
+  type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getSectorLabel, useSectors } from '@/context/SectorContext';
@@ -125,31 +126,6 @@ type SellerStats = {
   cancel_rate?: number | null;
 };
 
-type ReviewItem = {
-  id: string;
-  transaction_id?: string | null;
-  content_id?: string | null;
-  reviewer_id?: string | null;
-  reviewee_id?: string | null;
-  rating: number;
-  comment?: string | null;
-  created_at?: string | null;
-};
-
-type ContentLikerItem = {
-  userId?: string;
-  user_id?: string;
-  username?: string | null;
-  fullName?: string | null;
-  full_name?: string | null;
-  avatarUrl?: string | null;
-  avatar_url?: string | null;
-  likedAt?: string | null;
-  liked_at?: string | null;
-  isViewer?: boolean;
-  is_viewer?: boolean;
-};
-
 type QuickApplyData = {
   full_name: string;
   email: string;
@@ -201,7 +177,7 @@ type RelatedTransaction = {
 type CreatedDealHandoff = {
   transactionId: string;
   roomId: string;
-  amountCents: number;
+  amountCents: number | null;
   currency: string;
   status: string;
   protectionStatus: string;
@@ -843,8 +819,8 @@ function resolveListingLikeCount(item: ContentItem | null): number {
   if (!item) return 0;
   const meta =
     item.metadata &&
-      typeof item.metadata === 'object' &&
-      !Array.isArray(item.metadata)
+    typeof item.metadata === 'object' &&
+    !Array.isArray(item.metadata)
       ? (item.metadata as Record<string, unknown>)
       : {};
   const candidates = [
@@ -869,7 +845,7 @@ type PageProps = {
 
 export default function ContentDetailPage({ params }: PageProps) {
   const router = useRouter();
-  const handleBack = useAppBack(router, '/search');
+  const handleBack = useAppBack(router, '/explore');
   const locale = useLocale() || 'id';
   const { user, authFetch } = useAuth();
   const { viewerLocation } = useViewerLocation({
@@ -916,15 +892,8 @@ export default function ContentDetailPage({ params }: PageProps) {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareSubmitting, setShareSubmitting] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [reviews, setReviews] = useState<ReviewItem[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [contentLiked, setContentLiked] = useState(false);
   const [contentLikeCount, setContentLikeCount] = useState<number | null>(null);
-  const [showLikesModal, setShowLikesModal] = useState(false);
-  const [likers, setLikers] = useState<ContentLikerItem[]>([]);
-  const [likersTotal, setLikersTotal] = useState(0);
-  const [likersLoading, setLikersLoading] = useState(false);
-  const [likersError, setLikersError] = useState<string | null>(null);
   const [relatedTx, setRelatedTx] = useState<RelatedTransaction | null>(null);
   const [relatedTxLoading, setRelatedTxLoading] = useState(false);
   const [nowTs, setNowTs] = useState<number>(Date.now());
@@ -1032,9 +1001,9 @@ export default function ContentDetailPage({ params }: PageProps) {
     const priceLabel =
       typeof item.price_cents === 'number' && item.price_cents > 0
         ? formatPriceWithUnit(
-          formatCurrency(item.price_cents, item.currency || 'IDR'),
-          resolveContentPriceUnitLabel(catalogItem, locale as 'id' | 'en'),
-        )
+            formatCurrency(item.price_cents, item.currency || 'IDR'),
+            resolveContentPriceUnitLabel(catalogItem, locale as 'id' | 'en'),
+          )
         : locale === 'id'
           ? 'Negosiasi'
           : 'Contact';
@@ -1061,7 +1030,7 @@ export default function ContentDetailPage({ params }: PageProps) {
       priceLabel,
       priceCents:
         typeof item.price_cents === 'number' &&
-          Number.isFinite(item.price_cents)
+        Number.isFinite(item.price_cents)
           ? item.price_cents
           : null,
       storeName: item.owner_profile?.full_name || null,
@@ -1190,95 +1159,6 @@ export default function ContentDetailPage({ params }: PageProps) {
   }, [contentLiked, resolvedContentId]);
 
   useEffect(() => {
-    if (!showLikesModal || !resolvedContentId) return;
-    let active = true;
-
-    const loadLikers = async () => {
-      setLikersLoading(true);
-      setLikersError(null);
-      try {
-        const res = await authFetch(
-          `/api/content/${encodeURIComponent(resolvedContentId)}/likes?limit=80`,
-          {
-            cache: 'no-store',
-            headers: { Accept: 'application/json' },
-          },
-        );
-        const payload = (await res.json().catch(() => ({}))) as {
-          items?: unknown;
-          total?: unknown;
-          error?: string;
-        };
-        if (!active) return;
-        if (!res.ok) {
-          throw new Error(payload.error || 'Failed to load likes');
-        }
-        setLikers(
-          Array.isArray(payload.items)
-            ? (payload.items as ContentLikerItem[])
-            : [],
-        );
-        setLikersTotal(readPositiveInteger(payload.total));
-      } catch (error) {
-        if (!active) return;
-        setLikers([]);
-        setLikersError(
-          error instanceof Error && error.message
-            ? error.message
-            : locale === 'id'
-              ? 'Gagal memuat daftar like.'
-              : 'Failed to load likes.',
-        );
-      } finally {
-        if (active) setLikersLoading(false);
-      }
-    };
-
-    void loadLikers();
-    return () => {
-      active = false;
-    };
-  }, [authFetch, locale, resolvedContentId, showLikesModal]);
-
-  useEffect(() => {
-    if (PROMO_ONLY_MODE) {
-      setReviews([]);
-      setReviewsLoading(false);
-      return;
-    }
-    if (!resolvedContentId) return;
-    let active = true;
-    const loadReviews = async () => {
-      setReviewsLoading(true);
-      try {
-        const res = await fetch(`/api/content/${resolvedContentId}/reviews`);
-        if (!res.ok) {
-          if (active) setReviews([]);
-          return;
-        }
-        const data = await res.json().catch(() => []);
-        if (!active) return;
-        if (Array.isArray(data)) {
-          setReviews(data as ReviewItem[]);
-        } else if (Array.isArray((data as { data?: unknown }).data)) {
-          setReviews((data as { data: ReviewItem[] }).data);
-        } else {
-          setReviews([]);
-        }
-      } catch (error) {
-        console.error(error);
-        if (active) setReviews([]);
-      } finally {
-        if (active) setReviewsLoading(false);
-      }
-    };
-    loadReviews();
-    return () => {
-      active = false;
-    };
-  }, [resolvedContentId]);
-
-  useEffect(() => {
     const timer = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -1298,7 +1178,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         if (!res.ok)
           throw new Error(
             (payload as { error?: string }).error ||
-            'Failed to load transactions',
+              'Failed to load transactions',
           );
         const rawList = Array.isArray(payload)
           ? payload
@@ -1350,7 +1230,7 @@ export default function ContentDetailPage({ params }: PageProps) {
       return;
     }
     if (isDemandListing) {
-      await startDealFlow('offer');
+      setShowDealChoiceModal(true);
       return;
     }
     await startDealFlow(pricingMode === 'fixed' ? 'direct' : 'offer');
@@ -1422,11 +1302,20 @@ export default function ContentDetailPage({ params }: PageProps) {
           ? fallbackDirectAmount
           : 0;
 
-    if (!finalAmount) {
+    const canRespondWithoutAmount =
+      isDemandListing &&
+      offerFlowMode === 'offer' &&
+      offerMessage.trim().length > 0;
+
+    if (!finalAmount && !canRespondWithoutAmount) {
       setOfferError(
-        locale === 'id'
-          ? 'Masukkan nominal terlebih dulu.'
-          : 'Please enter an amount.',
+        isDemandListing
+          ? locale === 'id'
+            ? 'Isi nominal atau tulis scope respons terlebih dulu.'
+            : 'Enter an amount or describe your response scope first.'
+          : locale === 'id'
+            ? 'Masukkan nominal terlebih dulu.'
+            : 'Please enter an amount.',
       );
       return;
     }
@@ -1434,7 +1323,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     setOfferError(null);
     setSubmitting(true);
     try {
-      const amountCents = finalAmount * 100;
+      const amountCents = finalAmount > 0 ? finalAmount * 100 : undefined;
       const createdAt = new Date().toISOString();
       const interactionReference = buildInteractionReference(
         offerFlowMode === 'direct' ? 'TRX' : 'OFF',
@@ -1525,7 +1414,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         const resolvedAmount =
           typeof data?.amount_cents === 'number'
             ? data.amount_cents
-            : amountCents;
+            : (amountCents ?? null);
         const resolvedCurrency =
           typeof data?.currency === 'string' ? data.currency : baseCurrency;
         const resolvedStatus =
@@ -1566,12 +1455,12 @@ export default function ContentDetailPage({ params }: PageProps) {
             typeof data?.snapshot_listing === 'object'
               ? data.snapshot_listing
               : {
-                title: item?.title,
-                cover_image: item?.cover_image,
-                pricing_mode: pricingMode,
-                market_side: toMarketSideValue(listingSide),
-                content_url: listingHref,
-              },
+                  title: item?.title,
+                  cover_image: item?.cover_image,
+                  pricing_mode: pricingMode,
+                  market_side: toMarketSideValue(listingSide),
+                  content_url: listingHref,
+                },
           safety_checklist: safetyChecklist,
           risk_flags: riskFlags,
           status: resolvedStatus,
@@ -1598,7 +1487,7 @@ export default function ContentDetailPage({ params }: PageProps) {
             Boolean(user?.id) &&
             Boolean(sellerPeerId) &&
             (user?.id || '').trim().toLowerCase() ===
-            sellerPeerId.toLowerCase();
+              sellerPeerId.toLowerCase();
           if (sellerPeerId) {
             if (isSelfSeller) {
               throw new Error(
@@ -1616,7 +1505,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                   source: 'offer',
                   name: item?.title || 'Listing',
                   sector: sectorId,
-                  value_cents: resolvedAmount,
+                  value_cents: resolvedAmount ?? undefined,
                   currency: resolvedCurrency,
                   content_id: resolvedContentId,
                   metadata: {
@@ -1638,12 +1527,18 @@ export default function ContentDetailPage({ params }: PageProps) {
             roomId = chatPayload?.room_id || chatPayload?.data?.room_id || '';
 
             if (roomId) {
+              const amountSummary =
+                resolvedAmount != null
+                  ? formatCurrency(resolvedAmount, resolvedCurrency)
+                  : locale === 'id'
+                    ? 'nominal menyusul'
+                    : 'amount to follow';
               const summary =
                 offerFlowMode === 'direct'
-                  ? `${locale === 'id' ? 'Deal langsung' : 'Direct deal'}: ${formatCurrency(resolvedAmount, resolvedCurrency)}`
+                  ? `${locale === 'id' ? 'Deal langsung' : 'Direct deal'}: ${amountSummary}`
                   : isDemandListing
-                    ? `${locale === 'id' ? 'Respons kebutuhan' : 'Need response'}: ${formatCurrency(resolvedAmount, resolvedCurrency)}`
-                    : `Offer: ${formatCurrency(resolvedAmount, resolvedCurrency)}`;
+                    ? `${locale === 'id' ? 'Respons kebutuhan' : 'Need response'}: ${amountSummary}`
+                    : `Offer: ${amountSummary}`;
               await authFetch(
                 `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
                 {
@@ -1683,8 +1578,8 @@ export default function ContentDetailPage({ params }: PageProps) {
             typeof data?.transaction_meta === 'object'
               ? (data.transaction_meta as Record<string, unknown>)
               : {
-                ticket: offerPayload.ticket,
-              },
+                  ticket: offerPayload.ticket,
+                },
         });
         setShowOfferModal(false);
         setOfferAmount('');
@@ -1832,14 +1727,14 @@ export default function ContentDetailPage({ params }: PageProps) {
           pricing_mode: PROMO_ONLY_MODE ? 'request' : pricingMode,
           price_cents:
             !PROMO_ONLY_MODE &&
-              typeof item.price_cents === 'number' &&
-              Number.isFinite(item.price_cents)
+            typeof item.price_cents === 'number' &&
+            Number.isFinite(item.price_cents)
               ? item.price_cents
               : 0,
           original_price_cents:
             !PROMO_ONLY_MODE &&
-              typeof displayOriginalPriceCents === 'number' &&
-              Number.isFinite(displayOriginalPriceCents)
+            typeof displayOriginalPriceCents === 'number' &&
+            Number.isFinite(displayOriginalPriceCents)
               ? displayOriginalPriceCents
               : undefined,
           promo_label:
@@ -1920,26 +1815,26 @@ export default function ContentDetailPage({ params }: PageProps) {
       }
       const rooms = Array.isArray(payload.data)
         ? payload.data
-          .map(room => ({
-            id:
-              (typeof room.id === 'string' && room.id) ||
-              (typeof room.room_id === 'string' ? room.room_id : ''),
-            room_name:
-              typeof room.room_name === 'string' ? room.room_name : null,
-            room_type:
-              typeof room.room_type === 'string' ? room.room_type : null,
-            room_avatar:
-              typeof room.room_avatar === 'string' ? room.room_avatar : null,
-            last_message:
-              typeof room.last_message === 'string'
-                ? room.last_message
-                : null,
-            last_message_at:
-              typeof room.last_message_at === 'string'
-                ? room.last_message_at
-                : null,
-          }))
-          .filter((room): room is InboxRoomItem => Boolean(room.id))
+            .map(room => ({
+              id:
+                (typeof room.id === 'string' && room.id) ||
+                (typeof room.room_id === 'string' ? room.room_id : ''),
+              room_name:
+                typeof room.room_name === 'string' ? room.room_name : null,
+              room_type:
+                typeof room.room_type === 'string' ? room.room_type : null,
+              room_avatar:
+                typeof room.room_avatar === 'string' ? room.room_avatar : null,
+              last_message:
+                typeof room.last_message === 'string'
+                  ? room.last_message
+                  : null,
+              last_message_at:
+                typeof room.last_message_at === 'string'
+                  ? room.last_message_at
+                  : null,
+            }))
+            .filter((room): room is InboxRoomItem => Boolean(room.id))
         : [];
 
       setShareRooms(rooms);
@@ -2009,14 +1904,14 @@ export default function ContentDetailPage({ params }: PageProps) {
         pricing_mode: PROMO_ONLY_MODE ? 'request' : pricingMode,
         price_cents:
           !PROMO_ONLY_MODE &&
-            typeof item.price_cents === 'number' &&
-            Number.isFinite(item.price_cents)
+          typeof item.price_cents === 'number' &&
+          Number.isFinite(item.price_cents)
             ? item.price_cents
             : 0,
         original_price_cents:
           !PROMO_ONLY_MODE &&
-            typeof displayOriginalPriceCents === 'number' &&
-            Number.isFinite(displayOriginalPriceCents)
+          typeof displayOriginalPriceCents === 'number' &&
+          Number.isFinite(displayOriginalPriceCents)
             ? displayOriginalPriceCents
             : undefined,
         promo_label:
@@ -2095,7 +1990,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     }
     const url =
       Array.isArray((data as { files?: Array<{ url?: string }> }).files) &&
-        (data as { files: Array<{ url?: string }> }).files[0]?.url
+      (data as { files: Array<{ url?: string }> }).files[0]?.url
         ? (data as { files: Array<{ url?: string }> }).files[0]?.url
         : Array.isArray((data as { urls?: string[] }).urls)
           ? (data as { urls: string[] }).urls[0]
@@ -2328,8 +2223,8 @@ export default function ContentDetailPage({ params }: PageProps) {
             : rawType.includes('product')
               ? 'product'
               : rawType.includes('profile') ||
-                rawType.includes('user') ||
-                rawType.includes('talent')
+                  rawType.includes('user') ||
+                  rawType.includes('talent')
                 ? 'profile'
                 : 'product';
   const dealKind: DealKind =
@@ -2372,23 +2267,23 @@ export default function ContentDetailPage({ params }: PageProps) {
   const ListingSideIcon = isDemandListing ? Target : Package;
   const listingSideVisual = isDemandListing
     ? {
-      chip: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/12 dark:text-blue-200 dark:ring-blue-400/20',
-      badge:
-        'bg-blue-600 text-white shadow-[0_14px_30px_-18px_rgba(37,99,235,0.82)]',
-      panel:
-        'border-blue-100 bg-blue-50/86 text-blue-900 ring-blue-100/80 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100 dark:ring-blue-400/15',
-      icon: 'bg-white text-blue-600 dark:bg-blue-950 dark:text-blue-200',
-      price: 'text-blue-600 dark:text-blue-300',
-    }
+        chip: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/12 dark:text-blue-200 dark:ring-blue-400/20',
+        badge:
+          'bg-blue-600 text-white shadow-[0_14px_30px_-18px_rgba(37,99,235,0.82)]',
+        panel:
+          'border-blue-100 bg-blue-50/86 text-blue-900 ring-blue-100/80 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100 dark:ring-blue-400/15',
+        icon: 'bg-white text-blue-600 dark:bg-blue-950 dark:text-blue-200',
+        price: 'text-blue-600 dark:text-blue-300',
+      }
     : {
-      chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
-      badge:
-        'bg-emerald-600 text-white shadow-[0_14px_30px_-18px_rgba(5,150,105,0.82)]',
-      panel:
-        'border-emerald-100 bg-emerald-50/86 text-emerald-900 ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-400/15',
-      icon: 'bg-white text-emerald-600 dark:bg-emerald-950 dark:text-emerald-200',
-      price: 'text-emerald-600 dark:text-emerald-300',
-    };
+        chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
+        badge:
+          'bg-emerald-600 text-white shadow-[0_14px_30px_-18px_rgba(5,150,105,0.82)]',
+        panel:
+          'border-emerald-100 bg-emerald-50/86 text-emerald-900 ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-400/15',
+        icon: 'bg-white text-emerald-600 dark:bg-emerald-950 dark:text-emerald-200',
+        price: 'text-emerald-600 dark:text-emerald-300',
+      };
   const listingSideDescription = isDemandListing
     ? locale === 'id'
       ? 'Pemilik listing sedang mencari pemasok, jasa, lokasi, atau partner yang bisa memenuhi kebutuhan ini.'
@@ -2422,9 +2317,9 @@ export default function ContentDetailPage({ params }: PageProps) {
   const pricingMode =
     String(
       item.pricing_mode ||
-      (typeof item.price_cents === 'number' && item.price_cents > 0
-        ? 'fixed'
-        : 'request'),
+        (typeof item.price_cents === 'number' && item.price_cents > 0
+          ? 'fixed'
+          : 'request'),
     ).toLowerCase() === 'request'
       ? 'request'
       : 'fixed';
@@ -2450,10 +2345,10 @@ export default function ContentDetailPage({ params }: PageProps) {
     displayOriginalPriceCents > (item.price_cents || 0);
   const discountPercent = hasOriginalPrice
     ? Math.round(
-      ((displayOriginalPriceCents - (item.price_cents as number)) /
-        displayOriginalPriceCents) *
-      100,
-    )
+        ((displayOriginalPriceCents - (item.price_cents as number)) /
+          displayOriginalPriceCents) *
+          100,
+      )
     : 0;
   const PromotionIcon =
     promotionSnapshot?.offerType === 'discount'
@@ -2471,15 +2366,26 @@ export default function ContentDetailPage({ params }: PageProps) {
     },
     localeCode,
   );
+  const demandBudgetCents = readPositiveInteger(meta.budget_cents);
+  const demandBudgetLabel = isDemandListing
+    ? readMetaText(meta, 'budget_label', 'budget', 'capital_range') ||
+      (demandBudgetCents > 0
+        ? formatCurrency(demandBudgetCents, item.currency || 'IDR')
+        : '')
+    : '';
+  const flexibleBudgetLabel =
+    locale === 'id' ? 'Budget fleksibel' : 'Flexible budget';
   const priceLabel = PROMO_ONLY_MODE
     ? locale === 'id'
       ? 'Tanya detail'
       : 'Ask details'
     : hasPrice
       ? formatCurrency(item.price_cents as number, item.currency || 'IDR')
-      : locale === 'id'
-        ? 'Harga menyesuaikan'
-        : 'Price on request';
+      : isDemandListing
+        ? demandBudgetLabel || flexibleBudgetLabel
+        : locale === 'id'
+          ? 'Harga menyesuaikan'
+          : 'Price on request';
   const priceLabelWithUnit = hasPrice
     ? formatPriceWithUnit(priceLabel, priceUnitLabel)
     : priceLabel;
@@ -2493,7 +2399,7 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Kompensasi'
         : 'Compensation'
-      : displayType === 'tool_rental'
+      : !isDemandListing && displayType === 'tool_rental'
         ? locale === 'id'
           ? 'Tarif sewa'
           : 'Rental rate'
@@ -2522,27 +2428,29 @@ export default function ContentDetailPage({ params }: PageProps) {
       : 'Ask details'
     : displayType === 'job'
       ? salaryRange ||
-      (hasPrice
-        ? priceLabelWithUnit
-        : locale === 'id'
-          ? 'Nego'
-          : 'Negotiable')
-      : displayType === 'tool_rental'
-        ? hasPrice
+        (hasPrice
           ? priceLabelWithUnit
           : locale === 'id'
-            ? 'Tarif menyesuaikan'
-            : 'Rate on request'
-        : displayType === 'company'
-          ? (typeof meta.industry_focus === 'string' && meta.industry_focus) ||
+            ? 'Nego'
+            : 'Negotiable')
+      : displayType === 'company'
+        ? (typeof meta.industry_focus === 'string' && meta.industry_focus) ||
           (typeof meta.company_size === 'string' && meta.company_size) ||
           (locale === 'id' ? 'Profil publik' : 'Public profile')
-          : priceLabelWithUnit;
+        : isDemandListing
+          ? demandBudgetLabel || flexibleBudgetLabel
+          : displayType === 'tool_rental'
+            ? hasPrice
+              ? priceLabelWithUnit
+              : locale === 'id'
+                ? 'Tarif menyesuaikan'
+                : 'Rate on request'
+            : priceLabelWithUnit;
   const displayPriceHeading = PROMO_ONLY_MODE
     ? locale === 'id'
       ? 'Mulai dari chat'
       : 'Start with chat'
-    : displayType === 'service' && priceUnitLabel
+    : !isDemandListing && displayType === 'service' && priceUnitLabel
       ? `${locale === 'id' ? 'Harga per' : 'Price per'} ${priceUnitLabel}`
       : priceHeading;
   const baseCurrency = item.currency || 'IDR';
@@ -2578,22 +2486,22 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Negosiasi gaji'
         : 'Negotiate salary'
-      : displayType === 'tool_rental'
+      : displayType === 'company'
         ? locale === 'id'
-          ? 'Ajukan booking / negosiasi sewa'
-          : 'Request booking / negotiate rental'
-        : displayType === 'company'
+          ? 'Minta intro'
+          : 'Request intro'
+        : isDemandListing
           ? locale === 'id'
-            ? 'Minta intro'
-            : 'Request intro'
-          : isDemandListing
+            ? displayType === 'service'
+              ? 'Kirim proposal'
+              : 'Kirim respons'
+            : displayType === 'service'
+              ? 'Send proposal'
+              : 'Send response'
+          : displayType === 'tool_rental'
             ? locale === 'id'
-              ? displayType === 'service'
-                ? 'Kirim proposal'
-                : 'Kirim respons'
-              : displayType === 'service'
-                ? 'Send proposal'
-                : 'Send response'
+              ? 'Ajukan booking / negosiasi sewa'
+              : 'Request booking / negotiate rental'
             : displayType === 'service'
               ? locale === 'id'
                 ? 'Minta penawaran'
@@ -2614,18 +2522,18 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Lamar / Chat'
         : 'Apply / Chat'
-      : displayType === 'tool_rental'
+      : displayType === 'company'
         ? locale === 'id'
-          ? 'Chat pemilik alat'
-          : 'Chat asset owner'
-        : displayType === 'company'
+          ? 'Chat perusahaan'
+          : 'Chat company'
+        : isDemandListing
           ? locale === 'id'
-            ? 'Chat perusahaan'
-            : 'Chat company'
-          : isDemandListing
+            ? 'Tanya detail kebutuhan'
+            : 'Ask for details'
+          : displayType === 'tool_rental'
             ? locale === 'id'
-              ? 'Tanya detail kebutuhan'
-              : 'Ask for details'
+              ? 'Chat pemilik alat'
+              : 'Chat asset owner'
             : displayType === 'service'
               ? locale === 'id'
                 ? 'Chat penyedia'
@@ -2646,18 +2554,18 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Kirim negosiasi'
         : 'Send negotiation'
-      : displayType === 'tool_rental'
+      : displayType === 'company'
         ? locale === 'id'
-          ? 'Kirim permintaan sewa'
-          : 'Send rental request'
-        : displayType === 'company'
+          ? 'Kirim intro'
+          : 'Send intro'
+        : isDemandListing
           ? locale === 'id'
-            ? 'Kirim intro'
-            : 'Send intro'
-          : isDemandListing
+            ? 'Kirim respons'
+            : 'Send response'
+          : displayType === 'tool_rental'
             ? locale === 'id'
-              ? 'Kirim respons'
-              : 'Send response'
+              ? 'Kirim permintaan sewa'
+              : 'Send rental request'
             : displayType === 'service'
               ? locale === 'id'
                 ? 'Kirim permintaan'
@@ -2670,18 +2578,18 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Kirim detail kompensasi yang Anda ajukan.'
         : 'Send the compensation you propose.'
-      : displayType === 'tool_rental'
+      : displayType === 'company'
         ? locale === 'id'
-          ? 'Tulis tanggal, durasi, kebutuhan alat.'
-          : 'Share your rental date, duration, and asset needs.'
-        : displayType === 'company'
+          ? 'Tulis konteks intro atau kemitraan.'
+          : 'Explain the intro context, partnership angle, or what you want to discuss.'
+        : isDemandListing
           ? locale === 'id'
-            ? 'Tulis konteks intro atau kemitraan.'
-            : 'Explain the intro context, partnership angle, or what you want to discuss.'
-          : isDemandListing
+            ? 'Tulis cara Anda memenuhi kebutuhan ini.'
+            : 'Explain how you can fulfill this listing need.'
+          : displayType === 'tool_rental'
             ? locale === 'id'
-              ? 'Tulis cara Anda memenuhi kebutuhan ini.'
-              : 'Explain how you can fulfill this listing need.'
+              ? 'Tulis tanggal, durasi, kebutuhan alat.'
+              : 'Share your rental date, duration, and asset needs.'
             : displayType === 'service'
               ? locale === 'id'
                 ? 'Tulis layanan dan budget.'
@@ -2698,18 +2606,18 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Gaji yang diajukan (IDR) *'
         : 'Proposed salary (IDR) *'
-      : displayType === 'tool_rental'
+      : displayType === 'company'
         ? locale === 'id'
-          ? 'Budget sewa / rate yang Anda ajukan (IDR) *'
-          : 'Proposed rental budget / rate (IDR) *'
-        : displayType === 'company'
+          ? 'Budget / nilai peluang (IDR) *'
+          : 'Budget / opportunity value (IDR) *'
+        : isDemandListing
           ? locale === 'id'
-            ? 'Budget / nilai peluang (IDR) *'
-            : 'Budget / opportunity value (IDR) *'
-          : isDemandListing
+            ? 'Nominal respons Anda (IDR) *'
+            : 'Your response amount (IDR) *'
+          : displayType === 'tool_rental'
             ? locale === 'id'
-              ? 'Nominal respons Anda (IDR) *'
-              : 'Your response amount (IDR) *'
+              ? 'Budget sewa / rate yang Anda ajukan (IDR) *'
+              : 'Proposed rental budget / rate (IDR) *'
             : displayType === 'service'
               ? locale === 'id'
                 ? 'Budget (IDR) *'
@@ -2726,18 +2634,18 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'contoh: 12000000'
         : 'e.g. 12000000'
-      : displayType === 'tool_rental'
+      : displayType === 'company'
         ? locale === 'id'
-          ? 'contoh: 450000'
-          : 'e.g. 450000'
-        : displayType === 'company'
+          ? 'contoh: 10000000'
+          : 'e.g. 10000000'
+        : isDemandListing
           ? locale === 'id'
-            ? 'contoh: 10000000'
-            : 'e.g. 10000000'
-          : isDemandListing
+            ? 'contoh: 3500000'
+            : 'e.g. 3500000'
+          : displayType === 'tool_rental'
             ? locale === 'id'
-              ? 'contoh: 3500000'
-              : 'e.g. 3500000'
+              ? 'contoh: 450000'
+              : 'e.g. 450000'
             : displayType === 'service'
               ? locale === 'id'
                 ? 'contoh: 2500000'
@@ -2871,7 +2779,6 @@ export default function ContentDetailPage({ params }: PageProps) {
   const updatedLabel = formatDate(item.updated_at);
   const createdLabel = formatDate(item.created_at);
   const listingLikeCount = contentLikeCount ?? resolveListingLikeCount(item);
-  const listingCommentCount = Math.max(item.review_count || 0, reviews.length);
   const sellerStats = item.seller_stats || null;
   const sellerRating =
     !PROMO_ONLY_MODE && typeof sellerStats?.rating === 'number'
@@ -2898,13 +2805,13 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? sellerStats.acceptance_rate
       : sellerTotalTransactions > 0
         ? (sellerCompletedTransactions + sellerAcceptedTransactions) /
-        sellerTotalTransactions
+          sellerTotalTransactions
         : 0;
   const showSellerStats = sellerReviewCount > 0 || sellerTotalTransactions > 0;
   const metadataOwnerProfile =
     meta.owner_profile &&
-      typeof meta.owner_profile === 'object' &&
-      !Array.isArray(meta.owner_profile)
+    typeof meta.owner_profile === 'object' &&
+    !Array.isArray(meta.owner_profile)
       ? (meta.owner_profile as ContentOwnerProfile)
       : null;
   const ownerProfile = item.owner_profile || metadataOwnerProfile;
@@ -2921,21 +2828,21 @@ export default function ContentDetailPage({ params }: PageProps) {
   const ownerProfileHref =
     ownerProfile && (ownerProfile.id || peerUserId)
       ? buildPublicProfileHref({
-        id: ownerProfile.id || peerUserId,
-        username: ownerProfile.username || undefined,
-        full_name: ownerProfile.full_name || ownerDisplayName || item.title,
-        title: ownerDisplayName || item.title,
-      })
-      : peerUserId
-        ? buildPublicProfileHref({
-          id: peerUserId,
-          full_name: ownerDisplayName || item.title,
+          id: ownerProfile.id || peerUserId,
+          username: ownerProfile.username || undefined,
+          full_name: ownerProfile.full_name || ownerDisplayName || item.title,
           title: ownerDisplayName || item.title,
         })
+      : peerUserId
+        ? buildPublicProfileHref({
+            id: peerUserId,
+            full_name: ownerDisplayName || item.title,
+            title: ownerDisplayName || item.title,
+          })
         : null;
   const ownerAvatarUrl = normalizeContentMediaUrl(
     ownerProfile?.avatar_url ||
-    (typeof meta.avatar_url === 'string' ? meta.avatar_url : ''),
+      (typeof meta.avatar_url === 'string' ? meta.avatar_url : ''),
   );
   const workModeValue =
     typeof meta.work_mode === 'string' ? meta.work_mode : '';
@@ -3244,9 +3151,10 @@ export default function ContentDetailPage({ params }: PageProps) {
       const depositCents = Number(meta.deposit_amount_cents);
       const complaintWindowValue =
         meta.complaint_window_hours != null &&
-          String(meta.complaint_window_hours).trim()
-          ? `${meta.complaint_window_hours} ${locale === 'id' ? 'jam' : 'hours'
-          }`
+        String(meta.complaint_window_hours).trim()
+          ? `${meta.complaint_window_hours} ${
+              locale === 'id' ? 'jam' : 'hours'
+            }`
           : '';
       return [
         {
@@ -3277,8 +3185,9 @@ export default function ContentDetailPage({ params }: PageProps) {
           label: locale === 'id' ? 'Durasi minimum' : 'Minimum duration',
           value:
             meta.minimum_rental_days != null
-              ? `${meta.minimum_rental_days} ${locale === 'id' ? 'hari' : 'days'
-              }`
+              ? `${meta.minimum_rental_days} ${
+                  locale === 'id' ? 'hari' : 'days'
+                }`
               : '',
         },
         {
@@ -3488,14 +3397,14 @@ export default function ContentDetailPage({ params }: PageProps) {
             ? 'Profil perusahaan'
             : 'Company profile'
           : (typeof meta.availability === 'string' &&
-            meta.availability.trim()) ||
-          (isDemandListing
-            ? locale === 'id'
-              ? 'Sedang dibuka'
-              : 'Open'
-            : locale === 'id'
-              ? 'Tersedia'
-              : 'Available'),
+              meta.availability.trim()) ||
+            (isDemandListing
+              ? locale === 'id'
+                ? 'Sedang dibuka'
+                : 'Open'
+              : locale === 'id'
+                ? 'Tersedia'
+                : 'Available'),
     },
     {
       key: 'delivery',
@@ -3515,19 +3424,19 @@ export default function ContentDetailPage({ params }: PageProps) {
       value:
         displayType === 'company'
           ? (typeof meta.hiring_focus === 'string' &&
-            meta.hiring_focus.trim()) ||
-          (typeof meta.about_company === 'string' &&
-            meta.about_company.trim()) ||
-          (locale === 'id' ? 'Terbuka untuk intro' : 'Open for introductions')
+              meta.hiring_focus.trim()) ||
+            (typeof meta.about_company === 'string' &&
+              meta.about_company.trim()) ||
+            (locale === 'id' ? 'Terbuka untuk intro' : 'Open for introductions')
           : readMetaText(
-            meta,
-            'delivery_time',
-            'delivery_estimate',
-            'deadline',
-            'preferred_period',
-          ) ||
-          formatDate(String(meta.available_from || '')) ||
-          (locale === 'id' ? 'Sesuai kesepakatan' : 'By agreement'),
+              meta,
+              'delivery_time',
+              'delivery_estimate',
+              'deadline',
+              'preferred_period',
+            ) ||
+            formatDate(String(meta.available_from || '')) ||
+            (locale === 'id' ? 'Sesuai kesepakatan' : 'By agreement'),
     },
     {
       key: 'location',
@@ -3582,8 +3491,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'MOQ yang masih masuk' : 'Acceptable MOQ',
       value:
         isDemandListing &&
-          displayType === 'product' &&
-          !detailFieldKeys.has('min_order_qty')
+        displayType === 'product' &&
+        !detailFieldKeys.has('min_order_qty')
           ? readMetaText(meta, 'moq')
           : '',
     },
@@ -3592,8 +3501,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Catatan budget' : 'Budget notes',
       value:
         !highlightKeys.has('budget_note') &&
-          !detailFieldKeys.has('specs') &&
-          !detailFieldKeys.has('client_requirements')
+        !detailFieldKeys.has('specs') &&
+        !detailFieldKeys.has('client_requirements')
           ? readMetaText(meta, 'budget_note')
           : '',
     },
@@ -3602,8 +3511,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Deadline' : 'Deadline',
       value:
         !detailFieldKeys.has('delivery_time') &&
-          !detailFieldKeys.has('delivery_estimate') &&
-          !detailFieldKeys.has('available_from')
+        !detailFieldKeys.has('delivery_estimate') &&
+        !detailFieldKeys.has('available_from')
           ? readMetaText(meta, 'deadline')
           : '',
     },
@@ -3612,9 +3521,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Output yang diharapkan' : 'Expected output',
       value:
         isDemandListing &&
-          displayType === 'service' &&
-          !highlightKeys.has('output_needed') &&
-          !detailFieldKeys.has('deliverables')
+        displayType === 'service' &&
+        !highlightKeys.has('output_needed') &&
+        !detailFieldKeys.has('deliverables')
           ? formatMetaList(meta.output_needed)
           : '',
     },
@@ -3623,20 +3532,20 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Periode target' : 'Preferred period',
       value:
         isDemandListing &&
-          (displayType === 'property' || displayType === 'tool_rental') &&
-          !highlightKeys.has('preferred_period') &&
-          !detailFieldKeys.has('available_from')
+        (displayType === 'property' || displayType === 'tool_rental') &&
+        !highlightKeys.has('preferred_period') &&
+        !detailFieldKeys.has('available_from')
           ? readMetaText(meta, 'preferred_period')
           : '',
     },
     {
       key: 'traffic_note',
-      label: locale === 'id' ? 'Traffic yang dicari' : 'Target traffic',
+      label: locale === 'id' ? 'Target pengunjung' : 'Target traffic',
       value:
         isDemandListing &&
-          displayType === 'property' &&
-          !highlightKeys.has('traffic_note') &&
-          !detailFieldKeys.has('amenities')
+        displayType === 'property' &&
+        !highlightKeys.has('traffic_note') &&
+        !detailFieldKeys.has('amenities')
           ? readMetaText(meta, 'traffic_note')
           : '',
     },
@@ -3645,9 +3554,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Support dibutuhkan' : 'Support needed',
       value:
         isDemandListing &&
-          displayType === 'tool_rental' &&
-          !highlightKeys.has('support_needed') &&
-          !detailFieldKeys.has('usage_restrictions')
+        displayType === 'tool_rental' &&
+        !highlightKeys.has('support_needed') &&
+        !detailFieldKeys.has('usage_restrictions')
           ? formatMetaList(meta.support_needed)
           : '',
     },
@@ -3681,19 +3590,12 @@ export default function ContentDetailPage({ params }: PageProps) {
   const visibleExpandedDetailItems = PROMO_ONLY_MODE
     ? expandedDetailItems.slice(0, 6)
     : expandedDetailItems;
-  const hiddenExpandedDetailCount = Math.max(
-    0,
-    expandedDetailItems.length - visibleExpandedDetailItems.length,
-  );
   const previewTags = tags.slice(0, heroTagLimit);
   const extraTagCount = Math.max(0, tags.length - previewTags.length);
-  const detailTags = PROMO_ONLY_MODE ? tags.slice(0, 8) : tags;
-  const hiddenDetailTagCount = Math.max(0, tags.length - detailTags.length);
   const normalizeText = (text?: string) =>
     (text || '')
       .replace(/\u00A0/g, ' ')
-      .replace(/┬á/g, ' ')
-      .replace(/Â/g, '')
+      .replace(/\u00C2/g, '')
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -3725,11 +3627,6 @@ export default function ContentDetailPage({ params }: PageProps) {
   );
   const bodyDisplayText =
     cleanListingCopyText(item.body, item.title) || item.body || '';
-  const deliveryDaysLabel =
-    meta.delivery_days != null && String(meta.delivery_days).trim()
-      ? `${meta.delivery_days} ${locale === 'id' ? 'hari kerja' : 'business days'}`
-      : '';
-  const nextAvailableLabel = formatDate(String(meta.next_available || ''));
   const getDetailEntryIcon = (key: string, label: string) => {
     const text = `${key} ${label}`.toLowerCase();
     if (
@@ -3767,244 +3664,6 @@ export default function ContentDetailPage({ params }: PageProps) {
     }
     return FileText;
   };
-  const serviceSummaryDescription =
-    bodyPreview && bodyPreview !== summaryPreview ? bodyPreview : '';
-  const serviceTimelineValue = [
-    readMetaText(meta, 'availability'),
-    readMetaText(meta, 'delivery_time') || deliveryDaysLabel,
-    nextAvailableLabel
-      ? `${locale === 'id' ? 'Mulai' : 'Starts'} ${nextAvailableLabel}`
-      : '',
-  ]
-    .filter(Boolean)
-    .join(' - ');
-  const serviceGuideSections =
-    displayType === 'service'
-      ? [
-        {
-          key: 'service_summary',
-          icon: FileText,
-          eyebrow: locale === 'id' ? 'Mulai dari sini' : 'Start here',
-          title: locale === 'id' ? 'Info Layanan' : 'Service info',
-          value:
-            summaryPreview ||
-            (locale === 'id'
-              ? 'Layanan profesional yang bisa dibahas dulu sebelum pekerjaan dimulai.'
-              : 'A professional service that can be aligned before the work starts.'),
-          description: serviceSummaryDescription,
-        },
-        {
-          key: 'service_scope',
-          icon: ListChecks,
-          eyebrow: locale === 'id' ? 'Scope kerja' : 'Work scope',
-          title: locale === 'id' ? 'Ruang lingkup layanan' : 'Service scope',
-          value:
-            readMetaText(meta, 'service_scope') ||
-            (locale === 'id'
-              ? 'Scope mencakup briefing, eksekusi inti, revisi seperlunya, dan handoff yang siap dipakai buyer.'
-              : 'Scope includes briefing, core execution, necessary revisions, and a usable handoff.'),
-        },
-        {
-          key: 'deliverables',
-          icon: Package,
-          eyebrow: locale === 'id' ? 'Hasil akhir' : 'Final output',
-          title: locale === 'id' ? 'Output yang diterima' : 'Deliverables',
-          value:
-            readMetaText(meta, 'deliverables') ||
-            (locale === 'id'
-              ? 'Buyer menerima output kerja utama, ringkasan tindak lanjut, serta file akhir atau checklist eksekusi.'
-              : 'Buyer receives the main work output, follow-up notes, and final files or execution checklist.'),
-        },
-        {
-          key: 'client_requirements',
-          icon: ClipboardCheck,
-          eyebrow: locale === 'id' ? 'Sebelum mulai' : 'Before starting',
-          title:
-            locale === 'id'
-              ? 'Data yang dibutuhkan dari klien'
-              : 'Client requirements',
-          value:
-            readMetaText(meta, 'client_requirements') ||
-            (locale === 'id'
-              ? 'Siapkan brief, referensi, target audience, dan akses dasar yang memang diperlukan untuk eksekusi.'
-              : 'Prepare a brief, references, target audience, and the basic access needed for execution.'),
-        },
-        {
-          key: 'availability_window',
-          icon: Clock3,
-          eyebrow: locale === 'id' ? 'Jadwal' : 'Schedule',
-          title: locale === 'id' ? 'Slot & timeline' : 'Slot & timeline',
-          value:
-            serviceTimelineValue ||
-            (locale === 'id'
-              ? 'Timeline dan slot kerja dikonfirmasi setelah kebutuhan jelas.'
-              : 'Timeline and work slots are confirmed once the requirements are clear.'),
-        },
-      ].filter(section => section.value || section.description)
-      : [];
-  const flowSteps = (() => {
-    if (PROMO_ONLY_MODE) {
-      if (isOwner) {
-        return locale === 'id'
-          ? [
-            'Pastikan data promosi jelas',
-            'Balas chat calon pembeli',
-            'Kirim katalog atau detail tambahan',
-            'Update posting saat stok berubah',
-          ]
-          : [
-            'Keep the promo details clear',
-            'Reply to interested chats',
-            'Share catalog or extra details',
-            'Update the post when stock changes',
-          ];
-      }
-
-      return locale === 'id'
-        ? [
-          'Baca ringkasan dan foto',
-          'Chat untuk tanya stok/detail',
-          'Minta katalog atau kontak lanjutan',
-          'Simpan posting kalau cocok',
-        ]
-        : [
-          'Review summary and photos',
-          'Chat to ask stock or details',
-          'Ask for catalog or follow-up contact',
-          'Save the post if it fits',
-        ];
-    }
-
-    if (isOwner) {
-      return locale === 'id'
-        ? [
-          'Bagikan ke room terkait',
-          'Terima apply atau offer',
-          'Lanjut negosiasi',
-          'Pantau sampai selesai',
-        ]
-        : [
-          'Share to relevant rooms',
-          'Receive applications or offers',
-          'Continue the negotiation',
-          'Track it to completion',
-        ];
-    }
-
-    if (displayType === 'job') {
-      return locale === 'id'
-        ? [
-          'Cek role dan syarat',
-          'Kirim lamaran',
-          'Chat recruiter',
-          'Lanjut offer',
-        ]
-        : [
-          'Review the role and requirements',
-          'Send your application',
-          'Chat with the recruiter',
-          'Continue the offer flow',
-        ];
-    }
-
-    if (displayType === 'company') {
-      return locale === 'id'
-        ? [
-          'Lihat profil perusahaan',
-          'Buka profil owner atau chat',
-          'Bahas hiring atau partnership',
-          'Lanjut ke listing spesifik bila perlu',
-        ]
-        : [
-          'Review the company profile',
-          'Open the owner profile or chat',
-          'Discuss hiring or partnerships',
-          'Move to a specific listing if needed',
-        ];
-    }
-
-    if (displayType === 'tool_rental') {
-      return locale === 'id'
-        ? [
-          'Cek rate dan deposit',
-          'Validasi jadwal dan kondisi',
-          'Kirim request sewa',
-          'Catat pickup dan return',
-        ]
-        : [
-          'Review the rate and deposit',
-          'Confirm schedule and condition',
-          'Send the rental request',
-          'Document pickup and return',
-        ];
-    }
-
-    if (isDemandListing) {
-      return locale === 'id'
-        ? [
-          'Pahami kebutuhan utamanya',
-          'Kirim proposal atau offer',
-          'Samakan scope dan harga',
-          'Lanjut kalau sudah cocok',
-        ]
-        : [
-          'Understand the core need',
-          'Send a proposal or offer',
-          'Align scope and price',
-          'Proceed when both sides agree',
-        ];
-    }
-
-    if (displayType === 'service' || displayType === 'profile') {
-      return locale === 'id'
-        ? [
-          'Mulai dari chat brief',
-          'Kirim offer atau counter',
-          'Mulai kerja saat deal',
-          'Tandai selesai',
-        ]
-        : [
-          'Start with the project brief chat',
-          'Send an offer or counter',
-          'Start once the deal is set',
-          'Mark it completed',
-        ];
-    }
-
-    if (displayType === 'property') {
-      return locale === 'id'
-        ? [
-          'Atur survey atau viewing',
-          'Kirim penawaran',
-          'Sepakati syarat deal',
-          'Finalisasi transaksi',
-        ]
-        : [
-          'Schedule the viewing',
-          'Submit the offer',
-          'Agree on the terms',
-          'Finalize the transaction',
-        ];
-    }
-
-    return locale === 'id'
-      ? [
-        'Chat untuk cek detail',
-        'Kirim offer atau counter',
-        'Lanjutkan transaksi',
-        'Konfirmasi saat diterima',
-      ]
-      : [
-        'Chat to confirm the details',
-        'Send an offer or counter',
-        'Continue the transaction',
-        'Confirm after delivery',
-      ];
-  })();
-  const flowOverviewDescription =
-    locale === 'id'
-      ? `${flowSteps.length} langkah cepat`
-      : `${flowSteps.length} quick steps`;
   const primaryActionLabel = PROMO_ONLY_MODE
     ? chatLabel
     : displayType === 'job'
@@ -4042,26 +3701,26 @@ export default function ContentDetailPage({ params }: PageProps) {
         ? locale === 'id'
           ? 'Chat dulu. Lanjut profil/listing.'
           : 'Start with chat or the owner profile.'
-        : displayType === 'tool_rental'
+        : isDemandListing
           ? locale === 'id'
-            ? 'Chat jadwal. Lanjut sewa.'
-            : 'Check schedule and rate, then send a rental request.'
-          : displayType === 'property'
+            ? 'Chat dulu. Baru kirim respons yang sesuai.'
+            : 'Start with a short chat, then send a response or offer.'
+          : displayType === 'tool_rental'
             ? locale === 'id'
-              ? 'Chat survey. Lanjut deal.'
-              : 'Start by chatting about the viewing first, then continue the deal.'
-            : displayType === 'service' || displayType === 'profile'
+              ? 'Chat jadwal. Lanjut sewa.'
+              : 'Check schedule and rate, then send a rental request.'
+            : displayType === 'property'
               ? locale === 'id'
-                ? 'Scope, timeline, dan harga bisa dikunci setelah chat.'
-                : 'Align scope, timeline, and price in chat before continuing.'
-              : displayType === 'product'
+                ? 'Chat survey. Lanjut deal.'
+                : 'Start by chatting about the viewing first, then continue the deal.'
+              : displayType === 'service' || displayType === 'profile'
                 ? locale === 'id'
-                  ? 'Chat stok. Lanjut bayar.'
-                  : 'Start by confirming stock in chat, then continue to offers or safe payment.'
-                : isDemandListing
+                  ? 'Scope, timeline, dan harga bisa dikunci setelah chat.'
+                  : 'Align scope, timeline, and price in chat before continuing.'
+                : displayType === 'product'
                   ? locale === 'id'
-                    ? 'Chat dulu. Baru kirim offer.'
-                    : 'Start with a short chat, then send a response or offer.'
+                    ? 'Chat stok. Lanjut bayar.'
+                    : 'Start by confirming stock in chat, then continue to offers or safe payment.'
                   : locale === 'id'
                     ? 'Chat dulu. Deal kalau cocok.'
                     : 'Start with chat first, then continue the deal when ready.';
@@ -4099,6 +3758,12 @@ export default function ContentDetailPage({ params }: PageProps) {
         : `Hi, I saw ${title}. I want to ask more about the business and the opportunity.`;
     }
 
+    if (isDemandListing) {
+      return locale === 'id'
+        ? `Halo kak, saya bisa bantu ${title}. Detail intinya apa?`
+        : `Hi, I saw the need for ${title}. I may be able to help. Can you share the key details first?`;
+    }
+
     if (displayType === 'tool_rental') {
       return locale === 'id'
         ? `Halo kak, ${title} masih ready? Jadwal dan depositnya?`
@@ -4117,12 +3782,6 @@ export default function ContentDetailPage({ params }: PageProps) {
         : `Hi, I am interested in ${title}. Can you share the scope, timeline, and how to start?`;
     }
 
-    if (isDemandListing) {
-      return locale === 'id'
-        ? `Halo kak, saya bisa bantu ${title}. Detail intinya apa?`
-        : `Hi, I saw the need for ${title}. I may be able to help. Can you share the key details first?`;
-    }
-
     return locale === 'id'
       ? `Halo kak, ${title} masih ada? Stok dan harganya berapa?`
       : `Hi, I saw ${title}. Is it still available? I want to check stock, price, and how to order.`;
@@ -4135,21 +3794,25 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Chat recruiter dulu'
         : 'Chat recruiter first'
-      : displayType === 'tool_rental'
+      : isDemandListing
         ? locale === 'id'
-          ? 'Chat jadwal dulu'
-          : 'Chat about schedule first'
-        : displayType === 'property'
+          ? 'Tanya kebutuhan dulu'
+          : 'Ask about the need first'
+        : displayType === 'tool_rental'
           ? locale === 'id'
-            ? 'Chat survey dulu'
-            : 'Chat about viewing first'
-          : displayType === 'product'
+            ? 'Chat jadwal dulu'
+            : 'Chat about schedule first'
+          : displayType === 'property'
             ? locale === 'id'
-              ? 'Chat stok dulu'
-              : 'Confirm stock in chat'
-            : locale === 'id'
-              ? 'Chat dulu'
-              : 'Chat first';
+              ? 'Chat survey dulu'
+              : 'Chat about viewing first'
+            : displayType === 'product'
+              ? locale === 'id'
+                ? 'Chat stok dulu'
+                : 'Confirm stock in chat'
+              : locale === 'id'
+                ? 'Chat dulu'
+                : 'Chat first';
   const chatFirstBody = PROMO_ONLY_MODE
     ? locale === 'id'
       ? 'Cek stok, katalog, MOQ, area kirim, atau detail kebutuhan lewat chat.'
@@ -4158,22 +3821,22 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? locale === 'id'
         ? 'Masuk chat dulu biar lanjutnya gampang.'
         : 'Open chat first so the next step feels more natural.'
-      : displayType === 'tool_rental'
+      : isDemandListing
         ? locale === 'id'
-          ? 'Cek jadwal, deposit, cara ambil.'
-          : 'Confirm schedule, deposit, and pickup before sending the request.'
-        : displayType === 'property'
+          ? 'Tanya detail inti dulu supaya respons Anda lebih pas.'
+          : 'Ask for the core details first so your response is more precise.'
+        : displayType === 'tool_rental'
           ? locale === 'id'
-            ? 'Cek survey, harga, syarat deal.'
-            : 'Confirm viewing, price, and terms before continuing.'
-          : displayType === 'product'
+            ? 'Cek jadwal, deposit, cara ambil.'
+            : 'Confirm schedule, deposit, and pickup before sending the request.'
+          : displayType === 'property'
             ? locale === 'id'
-              ? 'Cek stok, ongkir, cara order.'
-              : 'Confirm stock, delivery, and ordering first so the chat stays simple.'
-            : isDemandListing
+              ? 'Cek survey, harga, syarat deal.'
+              : 'Confirm viewing, price, and terms before continuing.'
+            : displayType === 'product'
               ? locale === 'id'
-                ? 'Tanya detail inti dulu.'
-                : 'Ask for the core details first so your response is more precise.'
+                ? 'Cek stok, ongkir, cara order.'
+                : 'Confirm stock, delivery, and ordering first so the chat stays simple.'
               : locale === 'id'
                 ? 'Chat dulu. Deal kalau cocok.'
                 : 'Start with a short WhatsApp-like chat first, then continue the deal when ready.';
@@ -4251,12 +3914,12 @@ export default function ContentDetailPage({ params }: PageProps) {
   const explicitDeadlineIso = extractDeadlineIso(relatedTx);
   const fallbackDeadlineIso =
     !explicitDeadlineIso &&
-      relatedTx &&
-      (relatedTxStatus === 'pending' || relatedTxStatus === 'accepted') &&
-      typeof relatedTx.created_at === 'string'
+    relatedTx &&
+    (relatedTxStatus === 'pending' || relatedTxStatus === 'accepted') &&
+    typeof relatedTx.created_at === 'string'
       ? new Date(
-        new Date(relatedTx.created_at).getTime() + 24 * 60 * 60 * 1000,
-      ).toISOString()
+          new Date(relatedTx.created_at).getTime() + 24 * 60 * 60 * 1000,
+        ).toISOString()
       : '';
   const activeDeadlineIso = explicitDeadlineIso || fallbackDeadlineIso;
   const deadlineTs = activeDeadlineIso
@@ -4271,8 +3934,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       relatedTxStatus === 'in_progress');
   const relatedTxUpdatedLabel = relatedTx
     ? new Date(
-      relatedTx.updated_at || relatedTx.created_at || Date.now(),
-    ).toLocaleString()
+        relatedTx.updated_at || relatedTx.created_at || Date.now(),
+      ).toLocaleString()
     : '';
   const relatedTxWorkspaceHref = relatedTx
     ? `/transactions?focus_transaction_id=${encodeURIComponent(relatedTx.id)}`
@@ -4280,61 +3943,61 @@ export default function ContentDetailPage({ params }: PageProps) {
   const detailTone =
     displayType === 'job'
       ? {
-        page: 'bg-[linear-gradient(180deg,#fffdf5_0%,#ffffff_34%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#1c1002_0%,#020617_42%,#04110d_100%)]',
-        surface:
-          'border-emerald-200/80 bg-[linear-gradient(135deg,#fffdf5_0%,#ffffff_54%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.22))] dark:ring-emerald-400/15',
-        inset:
-          'bg-amber-50/72 ring-amber-100/80 dark:bg-amber-400/10 dark:ring-amber-300/15',
-        compact:
-          'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
-        row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
-      }
+          page: 'bg-[linear-gradient(180deg,#fffdf5_0%,#ffffff_34%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#1c1002_0%,#020617_42%,#04110d_100%)]',
+          surface:
+            'border-emerald-200/80 bg-[linear-gradient(135deg,#fffdf5_0%,#ffffff_54%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.22))] dark:ring-emerald-400/15',
+          inset:
+            'bg-amber-50/72 ring-amber-100/80 dark:bg-amber-400/10 dark:ring-amber-300/15',
+          compact:
+            'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
+          row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
+        }
       : displayType === 'service' || displayType === 'profile'
         ? {
-          page: 'bg-[linear-gradient(180deg,#f0fdfa_0%,#ffffff_36%,#f0f9ff_100%)] dark:bg-[linear-gradient(180deg,#042f2e_0%,#020617_44%,#082f49_100%)]',
-          surface:
-            'border-teal-200/80 bg-[linear-gradient(135deg,#f0fdfa_0%,#ffffff_54%,#ecfeff_100%)] ring-teal-100/80 dark:border-teal-400/20 dark:bg-[linear-gradient(135deg,rgba(19,78,74,0.28),rgba(2,6,23,0.96)_56%,rgba(8,47,73,0.24))] dark:ring-teal-400/15',
-          inset:
-            'bg-teal-50/72 ring-teal-100/80 dark:bg-teal-400/10 dark:ring-teal-300/15',
-          compact:
-            'bg-white/76 ring-teal-100/80 dark:bg-white/[0.06] dark:ring-teal-300/12',
-          row: 'bg-white/74 ring-teal-100/80 hover:bg-teal-50 dark:bg-white/[0.06] dark:ring-teal-300/12 dark:hover:bg-teal-400/12',
-        }
+            page: 'bg-[linear-gradient(180deg,#f0fdfa_0%,#ffffff_36%,#f0f9ff_100%)] dark:bg-[linear-gradient(180deg,#042f2e_0%,#020617_44%,#082f49_100%)]',
+            surface:
+              'border-teal-200/80 bg-[linear-gradient(135deg,#f0fdfa_0%,#ffffff_54%,#ecfeff_100%)] ring-teal-100/80 dark:border-teal-400/20 dark:bg-[linear-gradient(135deg,rgba(19,78,74,0.28),rgba(2,6,23,0.96)_56%,rgba(8,47,73,0.24))] dark:ring-teal-400/15',
+            inset:
+              'bg-teal-50/72 ring-teal-100/80 dark:bg-teal-400/10 dark:ring-teal-300/15',
+            compact:
+              'bg-white/76 ring-teal-100/80 dark:bg-white/[0.06] dark:ring-teal-300/12',
+            row: 'bg-white/74 ring-teal-100/80 hover:bg-teal-50 dark:bg-white/[0.06] dark:ring-teal-300/12 dark:hover:bg-teal-400/12',
+          }
         : displayType === 'property'
           ? {
-            page: 'bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_36%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#431407_0%,#020617_44%,#04110d_100%)]',
-            surface:
-              'border-orange-200/80 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_54%,#ecfdf5_100%)] ring-orange-100/80 dark:border-orange-400/20 dark:bg-[linear-gradient(135deg,rgba(67,20,7,0.3),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-orange-400/15',
-            inset:
-              'bg-orange-50/72 ring-orange-100/80 dark:bg-orange-400/10 dark:ring-orange-300/15',
-            compact:
-              'bg-white/76 ring-orange-100/80 dark:bg-white/[0.06] dark:ring-orange-300/12',
-            row: 'bg-white/74 ring-orange-100/80 hover:bg-orange-50 dark:bg-white/[0.06] dark:ring-orange-300/12 dark:hover:bg-orange-400/12',
-          }
+              page: 'bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_36%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#431407_0%,#020617_44%,#04110d_100%)]',
+              surface:
+                'border-orange-200/80 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_54%,#ecfdf5_100%)] ring-orange-100/80 dark:border-orange-400/20 dark:bg-[linear-gradient(135deg,rgba(67,20,7,0.3),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-orange-400/15',
+              inset:
+                'bg-orange-50/72 ring-orange-100/80 dark:bg-orange-400/10 dark:ring-orange-300/15',
+              compact:
+                'bg-white/76 ring-orange-100/80 dark:bg-white/[0.06] dark:ring-orange-300/12',
+              row: 'bg-white/74 ring-orange-100/80 hover:bg-orange-50 dark:bg-white/[0.06] dark:ring-orange-300/12 dark:hover:bg-orange-400/12',
+            }
           : displayType === 'tool_rental'
             ? {
-              page: 'bg-[linear-gradient(180deg,#f7fee7_0%,#ffffff_36%,#ecfdf5_100%)] dark:bg-[linear-gradient(180deg,#1a2e05_0%,#020617_44%,#04110d_100%)]',
-              surface:
-                'border-lime-200/80 bg-[linear-gradient(135deg,#f7fee7_0%,#ffffff_54%,#ecfdf5_100%)] ring-lime-100/80 dark:border-lime-400/20 dark:bg-[linear-gradient(135deg,rgba(54,83,20,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-lime-400/15',
-              inset:
-                'bg-lime-50/72 ring-lime-100/80 dark:bg-lime-400/10 dark:ring-lime-300/15',
-              compact:
-                'bg-white/76 ring-lime-100/80 dark:bg-white/[0.06] dark:ring-lime-300/12',
-              row: 'bg-white/74 ring-lime-100/80 hover:bg-lime-50 dark:bg-white/[0.06] dark:ring-lime-300/12 dark:hover:bg-lime-400/12',
-            }
+                page: 'bg-[linear-gradient(180deg,#f7fee7_0%,#ffffff_36%,#ecfdf5_100%)] dark:bg-[linear-gradient(180deg,#1a2e05_0%,#020617_44%,#04110d_100%)]',
+                surface:
+                  'border-lime-200/80 bg-[linear-gradient(135deg,#f7fee7_0%,#ffffff_54%,#ecfdf5_100%)] ring-lime-100/80 dark:border-lime-400/20 dark:bg-[linear-gradient(135deg,rgba(54,83,20,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-lime-400/15',
+                inset:
+                  'bg-lime-50/72 ring-lime-100/80 dark:bg-lime-400/10 dark:ring-lime-300/15',
+                compact:
+                  'bg-white/76 ring-lime-100/80 dark:bg-white/[0.06] dark:ring-lime-300/12',
+                row: 'bg-white/74 ring-lime-100/80 hover:bg-lime-50 dark:bg-white/[0.06] dark:ring-lime-300/12 dark:hover:bg-lime-400/12',
+              }
             : {
-              page: 'bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_34%,#f0fdfa_100%)] dark:bg-[linear-gradient(180deg,#04110d_0%,#020617_42%,#042f2e_100%)]',
-              surface:
-                'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_56%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_56%,rgba(20,83,45,0.22))] dark:ring-emerald-400/15',
-              inset:
-                'bg-emerald-50/72 ring-emerald-100/80 dark:bg-emerald-400/10 dark:ring-emerald-300/15',
-              compact:
-                'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
-              row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
-            };
+                page: 'bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_34%,#f0fdfa_100%)] dark:bg-[linear-gradient(180deg,#04110d_0%,#020617_42%,#042f2e_100%)]',
+                surface:
+                  'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_56%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_56%,rgba(20,83,45,0.22))] dark:ring-emerald-400/15',
+                inset:
+                  'bg-emerald-50/72 ring-emerald-100/80 dark:bg-emerald-400/10 dark:ring-emerald-300/15',
+                compact:
+                  'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
+                row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
+              };
   const detailPageShellClass = `lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden py-0 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:py-1.5 lg:pb-7 ${detailTone.page}`;
   const detailShellStackClass =
-    'mx-auto w-full max-w-[1360px] px-3 md:px-4 xl:px-6 flex flex-col gap-3';
+    'mx-auto w-full max-w-[1700px] px-3 md:px-4 xl:px-6 flex flex-col gap-3';
   const detailSectionClass = `relative overflow-hidden rounded-[16px] border px-3 py-3 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.16)] ring-1 sm:rounded-[20px] sm:p-3.5 ${detailTone.surface}`;
   const detailInsetClass = `rounded-[16px] px-2.5 py-2.5 ring-1 sm:px-3 sm:py-3 ${detailTone.inset}`;
   const detailInsetCompactClass = `rounded-[14px] px-2.5 py-2 ring-1 sm:rounded-[16px] sm:px-3 sm:py-2.5 ${detailTone.compact}`;
@@ -4344,15 +4007,14 @@ export default function ContentDetailPage({ params }: PageProps) {
   const detailSecondaryButtonClass =
     'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-white px-5 py-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]';
 
-  const detailDangerButtonClass =
-    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-bold text-white shadow-[0_18px_34px_-24px_rgba(225,29,72,0.55)] transition hover:bg-rose-500';
-
   const detailTextLinkClass =
     'text-sm font-bold text-[color:var(--app-accent)] transition hover:underline';
   const actionCardClass = isDemandListing
     ? `${detailSectionClass} border-blue-200/80 bg-[linear-gradient(180deg,rgba(239,246,255,0.98),rgba(255,255,255,0.98))] dark:border-blue-400/20 dark:bg-[linear-gradient(180deg,rgba(23,37,84,0.36),rgba(2,6,23,0.96))]`
     : `${detailSectionClass} border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(255,255,255,0.98))] dark:border-emerald-400/20 dark:bg-[linear-gradient(180deg,rgba(4,20,13,0.36),rgba(2,6,23,0.96))]`;
-  const priceValueClass = `text-4xl font-bold leading-none tracking-tight sm:text-5xl ${listingSideVisual.price}`;
+  const priceValueClass = isDemandListing
+    ? `break-words text-2xl font-bold leading-tight tracking-normal sm:text-3xl ${listingSideVisual.price}`
+    : `text-4xl font-bold leading-none tracking-tight sm:text-5xl ${listingSideVisual.price}`;
   const detailChatButtonClass =
     '!inline-flex !min-h-[44px] !items-center !justify-center !gap-2 !rounded-full !bg-emerald-800 !px-4 !text-sm !font-bold !text-white !shadow-[0_18px_34px_-24px_rgba(16,185,129,0.6)] !ring-1 !ring-transparent !transition !duration-200 hover:!-translate-y-0.5 hover:!bg-emerald-700 active:!translate-y-0 active:!scale-[0.98] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-emerald-500 focus-visible:!ring-offset-2 disabled:!cursor-not-allowed disabled:!opacity-60';
   const heroSummaryCard =
@@ -4364,16 +4026,16 @@ export default function ContentDetailPage({ params }: PageProps) {
         {summaryPreview ? (
           <p className="mt-1.5 line-clamp-3 font-medium">{summaryPreview}</p>
         ) : null}
-        {/* {bodyPreview ? (
-          <p
-            className={`line-clamp-2 ${summaryPreview ? 'mt-1.5 sm:mt-2' : 'mt-1.5'} ${PROMO_ONLY_MODE ? 'hidden sm:block' : ''}`}
-          >
-            {bodyPreview}
-          </p>
-        ) : null} */}
       </div>
     ) : null;
   const canStartChat = !isOwner && Boolean(peerUserId);
+  const chatOwnerActionLabel = isDemandListing
+    ? locale === 'id'
+      ? 'Chat pembeli'
+      : 'Chat buyer'
+    : locale === 'id'
+      ? 'Chat penyedia'
+      : 'Chat provider';
 
   const actionButtons = (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(118px,1fr))] gap-1.5 sm:gap-2 lg:grid-cols-1">
@@ -4382,7 +4044,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           href={`/create?draft=${item.id}`}
           className={detailPrimaryButtonClass}
         >
-          {locale === 'id' ? 'Edit Listing' : 'Edit Listing'}
+          {locale === 'id' ? 'Edit listing' : 'Edit listing'}
         </Link>
       )}
       {isOwner && (
@@ -4408,7 +4070,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           onClick={openReportListingModal}
           className={detailSecondaryButtonClass}
         >
-          {locale === 'id' ? 'Report listing' : 'Report listing'}
+          {locale === 'id' ? 'Laporkan' : 'Report'}
         </button>
       )}
       {!isOwner && PROMO_ONLY_MODE && canStartChat && (
@@ -4423,9 +4085,7 @@ export default function ContentDetailPage({ params }: PageProps) {
             ? locale === 'id'
               ? 'Membuka chat...'
               : 'Opening chat...'
-            : locale === 'id'
-              ? 'Chat pemilik'
-              : 'Chat owner'}
+            : chatOwnerActionLabel}
         </button>
       )}
       {!isOwner && !PROMO_ONLY_MODE && canStartChat && (
@@ -4449,9 +4109,7 @@ export default function ContentDetailPage({ params }: PageProps) {
               ? locale === 'id'
                 ? 'Membuka chat...'
                 : 'Opening chat...'
-              : locale === 'id'
-                ? 'Chat pemilik'
-                : 'Chat owner'}
+              : chatOwnerActionLabel}
           </button>
         </>
       )}
@@ -4566,10 +4224,10 @@ export default function ContentDetailPage({ params }: PageProps) {
           {(promotionSnapshot?.promoLabel ||
             (typeof item.promo_label === 'string' &&
               item.promo_label.trim())) && (
-              <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_52%,_white)] px-2 py-0.5 font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_24%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
-                {promotionSnapshot?.promoLabel || item.promo_label}
-              </span>
-            )}
+            <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_52%,_white)] px-2 py-0.5 font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_24%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
+              {promotionSnapshot?.promoLabel || item.promo_label}
+            </span>
+          )}
         </div>
       )}
 
@@ -4590,12 +4248,13 @@ export default function ContentDetailPage({ params }: PageProps) {
               </div>
             </div>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${promotionSnapshot.status === 'safe'
+              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                promotionSnapshot.status === 'safe'
                   ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_56%,white)] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))]'
                   : promotionSnapshot.status === 'unsafe'
                     ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
                     : 'bg-white text-[color:var(--app-text)] dark:bg-slate-950'
-                }`}
+              }`}
             >
               {promotionSnapshot.status === 'safe'
                 ? locale === 'id'
@@ -4615,22 +4274,15 @@ export default function ContentDetailPage({ params }: PageProps) {
           </p>
         </div>
       )}
-      {/* {!isOwner && (
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          <MessageCircle className="h-3.5 w-3.5" />
-          {listingSideLabel}
-        </div>
-      )} */}
-      {/* <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"> */}
-
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
         <button
           type="button"
           onClick={() => void toggleListingLike()}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-2 font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] ${contentLiked
+          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-2 font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] ${
+            contentLiked
               ? 'bg-rose-500 text-white ring-rose-300'
               : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-900'
-            }`}
+          }`}
         >
           <Heart
             className={`h-3.5 w-3.5 ${contentLiked ? 'fill-current' : ''}`}
@@ -4642,28 +4294,15 @@ export default function ContentDetailPage({ params }: PageProps) {
             : locale === 'id'
               ? 'Suka'
               : 'Like'}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setShowLikesModal(true)}
-          className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800"
-        >
-          {listingLikeCount} {locale === 'id' ? 'like' : 'likes'}
+          <span className="opacity-80">&middot; {listingLikeCount}</span>
         </button>
       </div>
 
-      {/* Comment count */}
-      {/* <span className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800">
-          {listingCommentCount} {locale === "id" ? "komentar" : "comments"}
-        </span> */}
-
-      {/* </div> */}
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {actionButtons}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[color:var(--app-text-soft)]">
-        <Link href="/search" className={detailTextLinkClass}>
+        <Link href="/explore" className={detailTextLinkClass}>
           {locale === 'id' ? 'Kembali ke search' : 'Back to search'}
         </Link>
         {isOwner && (
@@ -4806,30 +4445,6 @@ export default function ContentDetailPage({ params }: PageProps) {
           )}
         </div>
       )}
-      {/* <div className="mt-4">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-            {locale === 'id' ? 'Langkah cepat' : 'Quick steps'}
-          </p>
-          <span className="text-[11px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-            {flowOverviewDescription}
-          </span>
-        </div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {flowSteps.map((step, index) => (
-            <div key={`${step}-${index}`} className={detailInsetCompactClass}>
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[10px] font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_40%,_transparent)] dark:text-[color:var(--app-accent)]">
-                  {index + 1}
-                </span>
-                <p className="text-[11px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {step}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div> */}
     </section>
   );
 
@@ -4854,10 +4469,10 @@ export default function ContentDetailPage({ params }: PageProps) {
   const contentDistanceLabel = formatContentDistanceLabel(contentDistanceKm);
   const contentGoogleMapsUrl = contentLocationPoint
     ? buildContentGoogleMapsSearchUrl(
-      contentLocationPoint,
-      item.title,
-      contentLocationAddress,
-    )
+        contentLocationPoint,
+        item.title,
+        contentLocationAddress,
+      )
     : '';
   const contentDirectionsUrl = contentLocationPoint
     ? buildContentGoogleMapsDirectionsUrl(contentLocationPoint)
@@ -4971,58 +4586,70 @@ export default function ContentDetailPage({ params }: PageProps) {
   const detailVisual =
     displayType === 'property'
       ? {
-        chip: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/12 dark:text-rose-200 dark:ring-rose-400/20',
-        icon: 'bg-rose-50 text-rose-600 dark:bg-rose-500/12 dark:text-rose-300',
-        line: 'from-rose-500 via-orange-400 to-emerald-500',
-        wash: 'bg-[linear-gradient(135deg,rgba(255,241,242,0.86),rgba(255,255,255,0.96)_48%,rgba(240,253,244,0.72))] dark:bg-[linear-gradient(135deg,rgba(76,5,25,0.28),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-        eyebrow: locale === 'id' ? 'Detail properti' : 'Property detail',
-      }
+          chip: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/12 dark:text-rose-200 dark:ring-rose-400/20',
+          icon: 'bg-rose-50 text-rose-600 dark:bg-rose-500/12 dark:text-rose-300',
+          line: 'from-rose-500 via-orange-400 to-emerald-500',
+          wash: 'bg-[linear-gradient(135deg,rgba(255,241,242,0.86),rgba(255,255,255,0.96)_48%,rgba(240,253,244,0.72))] dark:bg-[linear-gradient(135deg,rgba(76,5,25,0.28),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+          eyebrow: locale === 'id' ? 'Detail properti' : 'Property detail',
+        }
       : displayType === 'service' || displayType === 'profile'
         ? {
-          chip: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-500/12 dark:text-teal-200 dark:ring-teal-400/20',
-          icon: 'bg-teal-50 text-teal-700 dark:bg-teal-500/12 dark:text-teal-300',
-          line: 'from-teal-500 via-emerald-400 to-emerald-500',
-          wash: 'bg-[linear-gradient(135deg,rgba(240,249,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.76))] dark:bg-[linear-gradient(135deg,rgba(8,47,73,0.34),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-          eyebrow:
-            displayType === 'profile'
-              ? locale === 'id'
-                ? 'Detail profil'
-                : 'Profile detail'
-              : locale === 'id'
-                ? 'Detail layanan'
-                : 'Service detail',
-        }
+            chip: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-500/12 dark:text-teal-200 dark:ring-teal-400/20',
+            icon: 'bg-teal-50 text-teal-700 dark:bg-teal-500/12 dark:text-teal-300',
+            line: 'from-teal-500 via-emerald-400 to-emerald-500',
+            wash: 'bg-[linear-gradient(135deg,rgba(240,249,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.76))] dark:bg-[linear-gradient(135deg,rgba(8,47,73,0.34),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+            eyebrow:
+              displayType === 'profile'
+                ? locale === 'id'
+                  ? 'Detail profil'
+                  : 'Profile detail'
+                : locale === 'id'
+                  ? 'Detail layanan'
+                  : 'Service detail',
+          }
         : displayType === 'job'
           ? {
-            chip: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/12 dark:text-amber-200 dark:ring-amber-400/20',
-            icon: 'bg-amber-50 text-amber-600 dark:bg-amber-500/12 dark:text-amber-300',
-            line: 'from-amber-500 via-orange-400 to-emerald-500',
-            wash: 'bg-[linear-gradient(135deg,rgba(255,251,235,0.9),rgba(255,255,255,0.97)_48%,rgba(240,253,244,0.74))] dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.3),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-            eyebrow: locale === 'id' ? 'Detail lowongan' : 'Job detail',
-          }
+              chip: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/12 dark:text-amber-200 dark:ring-amber-400/20',
+              icon: 'bg-amber-50 text-amber-600 dark:bg-amber-500/12 dark:text-amber-300',
+              line: 'from-amber-500 via-orange-400 to-emerald-500',
+              wash: 'bg-[linear-gradient(135deg,rgba(255,251,235,0.9),rgba(255,255,255,0.97)_48%,rgba(240,253,244,0.74))] dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.3),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+              eyebrow: locale === 'id' ? 'Detail lowongan' : 'Job detail',
+            }
           : displayType === 'tool_rental'
             ? {
-              chip: 'bg-lime-50 text-lime-800 ring-lime-100 dark:bg-lime-500/12 dark:text-lime-200 dark:ring-lime-400/20',
-              icon: 'bg-lime-50 text-lime-700 dark:bg-lime-500/12 dark:text-lime-300',
-              line: 'from-lime-500 via-emerald-400 to-emerald-500',
-              wash: 'bg-[linear-gradient(135deg,rgba(238,242,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.74))] dark:bg-[linear-gradient(135deg,rgba(49,46,129,0.32),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-              eyebrow: locale === 'id' ? 'Detail sewa alat' : 'Rental detail',
-            }
+                chip: 'bg-lime-50 text-lime-800 ring-lime-100 dark:bg-lime-500/12 dark:text-lime-200 dark:ring-lime-400/20',
+                icon: 'bg-lime-50 text-lime-700 dark:bg-lime-500/12 dark:text-lime-300',
+                line: 'from-lime-500 via-emerald-400 to-emerald-500',
+                wash: 'bg-[linear-gradient(135deg,rgba(238,242,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.74))] dark:bg-[linear-gradient(135deg,rgba(49,46,129,0.32),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+                eyebrow: locale === 'id' ? 'Detail sewa alat' : 'Rental detail',
+              }
             : {
-              chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
-              icon: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/12 dark:text-emerald-300',
-              line: 'from-emerald-500 via-teal-400 to-lime-500',
-              wash: 'bg-[linear-gradient(135deg,rgba(236,253,245,0.9),rgba(255,255,255,0.97)_48%,rgba(240,249,255,0.74))] dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_54%,rgba(8,47,73,0.2))]',
-              eyebrow:
-                displayType === 'company'
-                  ? locale === 'id'
-                    ? 'Detail perusahaan'
-                    : 'Company detail'
-                  : locale === 'id'
-                    ? 'Detail item'
-                    : 'Item detail',
-            };
+                chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
+                icon: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/12 dark:text-emerald-300',
+                line: 'from-emerald-500 via-teal-400 to-lime-500',
+                wash: 'bg-[linear-gradient(135deg,rgba(236,253,245,0.9),rgba(255,255,255,0.97)_48%,rgba(240,249,255,0.74))] dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_54%,rgba(8,47,73,0.2))]',
+                eyebrow:
+                  displayType === 'company'
+                    ? locale === 'id'
+                      ? 'Detail perusahaan'
+                      : 'Company detail'
+                    : locale === 'id'
+                      ? 'Detail item'
+                      : 'Item detail',
+              };
   const detailSurfaceClass = `overflow-hidden rounded-[18px] border shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] ring-1 sm:rounded-[22px] ${detailTone.surface}`;
+  const mediaAspectClassName =
+    images.length > 0
+      ? 'aspect-[4/3] w-full min-[480px]:aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/3] xl:aspect-[16/10]'
+      : 'h-[280px] w-full sm:h-[340px] lg:h-[360px]';
+  const shouldShowNeedBriefMediaFallback =
+    isDemandListing && images.length === 0;
+  const needBriefPreviewItems: Array<{
+    key: string;
+    label: string;
+    value: string;
+    icon?: LucideIcon;
+  }> = [...previewHighlightItems, ...quickSpecs].slice(0, 4);
 
   return (
     <div className={detailPageShellClass}>
@@ -5047,7 +4674,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <Link
-                  href="/search"
+                  href="/explore"
                   className="flex items-center justify-center font-semibold text-[color:var(--app-text)]"
                 >
                   {locale === 'id' ? 'Search' : 'Search'}
@@ -5075,49 +4702,290 @@ export default function ContentDetailPage({ params }: PageProps) {
 
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1.85fr)_minmax(300px,332px)] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1.95fr)_minmax(312px,348px)]">
               <div className="min-w-0 space-y-3">
-                <section className={detailSurfaceClass + ' p-1'}>
-                  <div className="relative overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-900 sm:rounded-[18px]">
-                    <MediaPreviewCarousel
-                      items={images}
-                      alt={item.title}
-                      aspectClassName="aspect-[4/3] w-full min-[480px]:aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/3] xl:aspect-[16/10]"
-                      sizes="(min-width: 1280px) 820px, (min-width: 1024px) 58vw, 100vw"
-                      priority
-                      controls
-                      lightbox
-                      overlay={
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-slate-950/68 via-slate-950/12 to-transparent p-2.5 text-white sm:p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[11px] font-semibold">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              {PROMO_ONLY_MODE
-                                ? locale === 'id'
-                                  ? 'Siap ditanya'
-                                  : 'Ready to ask'
-                                : locale === 'id'
-                                  ? 'Terverifikasi'
-                                  : 'Verified'}
-                            </span>
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold  ${listingSideVisual.badge}`}
-                            >
-                              <ListingSideIcon className="h-3.5 w-3.5" />
-                              {listingSideLabel}
-                            </span>
-                            <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold ">
-                              {listingSideContextLabel}
-                            </span>
-                          </div>
+                {shouldShowNeedBriefMediaFallback ? (
+                  <section className={`${detailSurfaceClass} p-3 sm:p-4`}>
+                    <div
+                      className={`relative overflow-hidden rounded-[16px] p-4 sm:rounded-[18px] sm:p-5 ${detailVisual.wash}`}
+                    >
+                      <div
+                        className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${detailVisual.line}`}
+                      />
+                      <div className="flex items-start gap-3">
+                        <span
+                          className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] ${listingSideVisual.icon}`}
+                        >
+                          <FileText className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                            {locale === 'id' ? 'Brief kebutuhan' : 'Need brief'}
+                          </p>
+                          <h2 className="mt-2 text-xl font-bold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
+                            {item.title}
+                          </h2>
+                          {summaryPreview ? (
+                            <p className="mt-2 line-clamp-3 text-sm font-medium leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                              {summaryPreview}
+                            </p>
+                          ) : null}
                         </div>
-                      }
-                    />
+                      </div>
+                      {needBriefPreviewItems.length > 0 ? (
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                          {needBriefPreviewItems.map(entry => {
+                            const DetailIcon: LucideIcon =
+                              entry.icon ||
+                              getDetailEntryIcon(entry.key, entry.label);
+                            return (
+                              <div
+                                key={`need-brief-${entry.key}`}
+                                className="rounded-[14px] bg-white/72 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800"
+                              >
+                                <div className="flex items-start gap-2">
+                                  <span
+                                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] ${detailVisual.icon}`}
+                                  >
+                                    <DetailIcon className="h-3.5 w-3.5" />
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                                      {entry.label}
+                                    </span>
+                                    <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                      {entry.value}
+                                    </span>
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                      <div className="mt-4 rounded-[16px] bg-white/72 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800">
+                        {locale === 'id'
+                          ? 'Brief teks sudah cukup untuk mulai ditanggapi. Foto, dokumen, dan detail tambahan bisa menyusul saat percakapan.'
+                          : 'The text brief is enough to start responding. Photos, documents, and extra details can follow in conversation.'}
+                      </div>
+                    </div>
+                  </section>
+                ) : (
+                  <section className={detailSurfaceClass + ' p-1'}>
+                    <div className="relative overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-900 sm:rounded-[18px]">
+                      <MediaPreviewCarousel
+                        items={images}
+                        alt={item.title}
+                        aspectClassName={mediaAspectClassName}
+                        sizes="(min-width: 1280px) 820px, (min-width: 1024px) 58vw, 100vw"
+                        priority
+                        controls
+                        lightbox
+                        overlay={
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-slate-950/68 via-slate-950/12 to-transparent p-2.5 text-white sm:p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[11px] font-semibold">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {PROMO_ONLY_MODE
+                                  ? locale === 'id'
+                                    ? 'Siap ditanya'
+                                    : 'Ready to ask'
+                                  : locale === 'id'
+                                    ? 'Terverifikasi'
+                                    : 'Verified'}
+                              </span>
+                              <span
+                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold  ${listingSideVisual.badge}`}
+                              >
+                                <ListingSideIcon className="h-3.5 w-3.5" />
+                                {listingSideLabel}
+                              </span>
+                              <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold ">
+                                {listingSideContextLabel}
+                              </span>
+                            </div>
+                          </div>
+                        }
+                      />
+                    </div>
+                  </section>
+                )}
+
+                <section className={`${detailSurfaceClass} p-3 sm:p-4`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${detailVisual.chip}`}
+                        >
+                          <TypeIcon className="h-3.5 w-3.5" />
+                          {typeLabel}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${listingSideVisual.chip}`}
+                        >
+                          <ListingSideIcon className="h-3.5 w-3.5" />
+                          {listingSideLabel}
+                        </span>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusBadgeClass}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <h1 className="mt-3 text-2xl font-bold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl lg:text-4xl">
+                        {item.title}
+                      </h1>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        {quickSpecs.map(spec => {
+                          const SpecIcon = spec.icon;
+                          return (
+                            <div
+                              key={spec.key}
+                              className="rounded-[14px] bg-white/70 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800"
+                            >
+                              <div className="flex items-start gap-2">
+                                <span
+                                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] ${detailVisual.icon}`}
+                                >
+                                  <SpecIcon className="h-3.5 w-3.5" />
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                                    {spec.label}
+                                  </span>
+                                  <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                    {spec.value}
+                                  </span>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {previewTags.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {previewTags.map(tag => (
+                            <span
+                              key={tag}
+                              className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {extraTagCount > 0 ? (
+                            <span
+                              className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
+                            >
+                              +{extraTagCount}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </section>
 
                 {heroSummaryCard}
 
+                {bodyDisplayText || visibleExpandedDetailItems.length > 0 ? (
+                  <section className={`${detailSurfaceClass} p-3 sm:p-4`}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                          {detailHeading}
+                        </p>
+                        <h2 className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
+                          {locale === 'id'
+                            ? 'Informasi penting'
+                            : 'Key information'}
+                        </h2>
+                      </div>
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}
+                      >
+                        {highlightHeading}
+                      </span>
+                    </div>
+
+                    {bodyDisplayText ? (
+                      <div className="mt-3 rounded-[16px] bg-white/68 p-3 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800">
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                              {locale === 'id' ? 'Deskripsi' : 'Description'}
+                            </p>
+                            <p className="mt-1 line-clamp-4 whitespace-pre-line text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                              {bodyDisplayText}
+                            </p>
+                            {bodyDisplayText.length > 260 ? (
+                              <details className="group mt-2">
+                                <summary className="cursor-pointer list-none text-xs font-bold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]">
+                                  {locale === 'id'
+                                    ? 'Baca lengkap'
+                                    : 'Read full description'}
+                                </summary>
+                                <div className="mt-2 whitespace-pre-line text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                  {bodyDisplayText}
+                                </div>
+                              </details>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {visibleExpandedDetailItems.length > 0 ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {visibleExpandedDetailItems
+                          .slice(0, PROMO_ONLY_MODE ? 6 : 8)
+                          .map(entry => {
+                            const DetailIcon = getDetailEntryIcon(
+                              entry.key,
+                              entry.label,
+                            );
+                            return (
+                              <div
+                                key={entry.key}
+                                className={detailInsetCompactClass}
+                              >
+                                <div className="flex items-start gap-2.5">
+                                  <span
+                                    className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px] ${detailVisual.icon}`}
+                                  >
+                                    <DetailIcon className="h-3.5 w-3.5" />
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                                      {entry.label}
+                                    </p>
+                                    <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                      {entry.value}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    ) : null}
+                    {expandedDetailItems.length > (PROMO_ONLY_MODE ? 6 : 8) ? (
+                      <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                        {locale === 'id'
+                          ? `+${expandedDetailItems.length - (PROMO_ONLY_MODE ? 6 : 8)} info lain bisa ditanyakan lewat chat.`
+                          : `+${expandedDetailItems.length - (PROMO_ONLY_MODE ? 6 : 8)} more details can be asked in chat.`}
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
+
                 {contentLocationPoint ? (
-                  <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
+                  <section
+                    className={`${detailSurfaceClass} isolate p-3 sm:p-3.5`}
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
@@ -5142,10 +5010,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${detailVisual.chip}`}
                       >
                         <MapPin className="h-3.5 w-3.5" />
-                        {locale === 'id' ? 'Ada peta' : 'Map ready'}
+                        {locale === 'id' ? 'Titik lokasi' : 'Location point'}
                       </span>
                     </div>
-                    <div className="mt-3 h-[236px] overflow-hidden rounded-[18px] bg-emerald-50 ring-1 ring-emerald-100 dark:bg-slate-950 dark:ring-slate-800 sm:h-[280px]">
+                    <div className="relative z-0 mt-3 h-[224px] isolate overflow-hidden rounded-[18px] bg-emerald-50 ring-1 ring-emerald-100 dark:bg-slate-950 dark:ring-slate-800 sm:h-[276px]">
                       <ContentLocationMap
                         point={contentLocationPoint}
                         title={item.title}
@@ -5157,16 +5025,18 @@ export default function ContentDetailPage({ params }: PageProps) {
                         href={contentDirectionsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-[40px] items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white shadow-[0_14px_28px_-20px_rgba(5,150,105,0.8)] transition hover:bg-emerald-800"
+                        className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white shadow-[0_14px_28px_-20px_rgba(5,150,105,0.8)] transition hover:bg-emerald-800"
                       >
-                        {locale === 'id' ? 'Rute' : 'Directions'}
+                        <Navigation className="h-4 w-4" />
+                        {locale === 'id' ? 'Lihat rute' : 'Directions'}
                       </a>
                       <a
                         href={contentGoogleMapsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-[40px] items-center justify-center rounded-full bg-white px-4 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50 dark:bg-slate-950 dark:text-emerald-300 dark:ring-slate-800"
+                        className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50 dark:bg-slate-950 dark:text-emerald-300 dark:ring-slate-800"
                       >
+                        <ExternalLink className="h-4 w-4" />
                         {locale === 'id'
                           ? 'Buka Google Maps'
                           : 'Open Google Maps'}
@@ -5176,239 +5046,6 @@ export default function ContentDetailPage({ params }: PageProps) {
                 ) : null}
 
                 <div className="min-w-0 space-y-3">
-                  {/* 
-
- <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                          {detailHeading}
-                        </p>
-                        <h2 className="mt-1 text-lg font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
-                          {PROMO_ONLY_MODE
-                            ? locale === 'id'
-                              ? 'Info promosi'
-                              : 'Promo highlights'
-                            : locale === 'id'
-                              ? 'Informasi utama'
-                              : 'Full information'}
-                        </h2>
-                      </div>
-                      <span
-                        className={`flex justify-center items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}
-                      >
-                        {highlightHeading}
-                      </span>
-                    </div>
-
-                    {item.body ? (
-                      <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800 sm:p-3">
-                        <div className="flex items-start gap-2.5 sm:gap-3">
-                          <span
-                            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                              {locale === 'id' ? 'Deskripsi' : 'Description'}
-                            </p>
-                            <h3 className="mt-0.5 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                              {displayType === 'service'
-                                ? locale === 'id'
-                                  ? 'Info Layanan'
-                                  : 'Service info'
-                                : highlightHeading}
-                            </h3>
-                            {PROMO_ONLY_MODE ? (
-                              <>
-                                <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                  {summaryPreview || bodyPreview || bodyDisplayText}
-                                </p>
-                              <details className="group mt-2">
-                                  <summary className="cursor-pointer list-none text-xs font-bold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]">
-                                    {locale === 'id'
-                                      ? 'Lihat detail'
-                                      : 'View full details'}
-                                  </summary>
-                                  <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
-                                    {bodyDisplayText}
-                                  </div>
-                                </details> 
-                              </>
-                            ) : (
-                              <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
-                                {bodyDisplayText}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {visibleExpandedDetailItems.length > 0 ? (
-                      displayType === 'service' ? (
-                        <div className="mt-3 overflow-hidden rounded-[16px] bg-white/66 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800">
-                          {visibleExpandedDetailItems.map((entry, index) => {
-                            const DetailIcon = getDetailEntryIcon(
-                              entry.key,
-                              entry.label,
-                            );
-                            return (
-                              <div
-                                key={entry.key}
-                                className={`flex items-start gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${index > 0
-                                  ? 'border-t border-slate-200/70 dark:border-slate-800'
-                                  : ''
-                                  }`}
-                              >
-                                <span
-                                  className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
-                                >
-                                  <DetailIcon className="h-4 w-4" />
-                                </span>
-                                <div className="min-w-0">
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                                    {entry.label}
-                                  </p>
-                                  <p className="mt-1 text-sm font-semibold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                    {entry.value}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="mt-3 grid grid-cols-1 gap-1.5 min-[560px]:grid-cols-2 sm:gap-2.5 xl:grid-cols-2">
-                          {visibleExpandedDetailItems.map(entry => {
-                            const DetailIcon = getDetailEntryIcon(
-                              entry.key,
-                              entry.label,
-                            );
-                            return (
-                              <div
-                                key={entry.key}
-                                className={detailInsetCompactClass}
-                              >
-                                <div className="flex items-start gap-2.5">
-                                  <span
-                                    className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px] ${detailVisual.icon}`}
-                                  >
-                                    <DetailIcon className="h-3.5 w-3.5" />
-                                  </span>
-                                  <div className="min-w-0">
-                                    <p className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.18em]">
-                                      {entry.label}
-                                    </p>
-                                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
-                                      {entry.value}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )
-                    ) : null}
-                    {hiddenExpandedDetailCount > 0 ? (
-                      <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? `+${hiddenExpandedDetailCount} info lain bisa ditanyakan lewat chat.`
-                          : `+${hiddenExpandedDetailCount} more details can be asked in chat.`}
-                      </p>
-                    ) : null}
-
-                    {detailTags.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {detailTags.map(tag => (
-                          <span
-                            key={tag}
-                            className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {hiddenDetailTagCount > 0 ? (
-                          <span
-                            className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
-                          >
-                            +{hiddenDetailTagCount}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </section>
-*/}
-                  {/* {reviewsLoading ||
-                  reviews.length > 0 ||
-                  listingLikeCount > 0 ? (
-                    <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
-                      <div className="grid gap-3 md:grid-cols-[170px_minmax(0,1fr)]">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                            {locale === 'id'
-                              ? 'Komentar & like'
-                              : 'Comments & likes'}
-                          </p>
-                          <div className="mt-3 grid gap-2">
-                            <div className="rounded-[16px] bg-white/70 p-3 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                                {locale === 'id' ? 'Disukai' : 'Likes'}
-                              </p>
-                              <p className="mt-1 text-2xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                                {listingLikeCount}
-                              </p>
-                            </div>
-                            <div className="rounded-[16px] bg-white/70 p-3 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                                {locale === 'id' ? 'Komentar' : 'Comments'}
-                              </p>
-                              <p className="mt-1 text-2xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                                {listingCommentCount}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          {reviewsLoading ? (
-                            <div
-                              className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                            >
-                              {locale === 'id'
-                                ? 'Memuat ulasan...'
-                                : 'Loading reviews...'}
-                            </div>
-                          ) : (
-                            reviews.slice(0, 4).map(review => (
-                              <div
-                                key={review.id}
-                                className={`rounded-[18px] p-3 text-sm text-[color:var(--app-text)] ring-1 dark:text-[color:var(--app-text-soft)] ${detailTone.row}`}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="inline-flex items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-accent)]">
-                                    {locale === 'id' ? 'Komentar' : 'Comment'}
-                                  </span>
-                                  <span className="text-[11px] text-[color:var(--app-text-soft)]">
-                                    {formatDate(review.created_at || '')}
-                                  </span>
-                                </div>
-                                <p className="mt-2 leading-6">
-                                  {review.comment ||
-                                    (locale === 'id'
-                                      ? 'Tanpa komentar.'
-                                      : 'No comment provided.')}
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </section>
-                  ) : null} */}
-
                   {!PROMO_ONLY_MODE && showSellerStats ? (
                     <section
                       className={`${detailSurfaceClass} p-3.5 sm:p-4 lg:hidden`}
@@ -5440,7 +5077,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                           {
                             label:
                               locale === 'id'
-                                ? 'Acceptance rate'
+                                ? 'Tingkat diterima'
                                 : 'Acceptance rate',
                             value: formatPercent(sellerAcceptanceRate),
                           },
@@ -5561,236 +5198,6 @@ export default function ContentDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {showLikesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-hidden rounded-[28px] bg-white/98 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
-            <div className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)] p-5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-500">
-                  {locale === 'id' ? 'Disukai oleh' : 'Liked by'}
-                </p>
-                <h2 className="mt-1 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {(likersTotal || listingLikeCount).toLocaleString(
-                    locale === 'id' ? 'id-ID' : 'en-US',
-                  )}{' '}
-                  {locale === 'id' ? 'like' : 'likes'}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowLikesModal(false)}
-                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
-                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
-              >
-                X
-              </button>
-            </div>
-
-            <div className="max-h-[min(calc(var(--app-viewport-height)-12rem),520px)] overflow-y-auto p-3">
-              {likersLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <div
-                      key={`liker-skeleton-${index}`}
-                      className="h-14 rounded-2xl bg-slate-100 dark:bg-slate-900"
-                    />
-                  ))}
-                </div>
-              ) : likersError ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  {likersError}
-                </div>
-              ) : likers.length > 0 ? (
-                <div className="space-y-2">
-                  {likers.map(liker => {
-                    const likerId = liker.userId || liker.user_id || '';
-                    const isViewer = Boolean(liker.isViewer || liker.is_viewer);
-                    const rawName =
-                      liker.fullName ||
-                      liker.full_name ||
-                      liker.username ||
-                      (locale === 'id' ? 'Pengguna Lajukan' : 'Lajukan user');
-                    const displayName = isViewer
-                      ? locale === 'id'
-                        ? 'Anda'
-                        : 'You'
-                      : rawName;
-                    const avatar = profileAvatarSrc(
-                      liker.avatarUrl || liker.avatar_url || '',
-                      undefined,
-                      rawName,
-                    );
-                    const handle = liker.username ? `@${liker.username}` : '';
-                    const likerHref = isViewer
-                      ? '/profile'
-                      : buildPublicProfileHref({
-                        id: likerId,
-                        username: liker.username || undefined,
-                        full_name: rawName,
-                      });
-
-                    return (
-                      <Link
-                        key={`${likerId}-${liker.likedAt || liker.liked_at || ''}`}
-                        href={likerHref}
-                        className="flex items-center gap-3 rounded-2xl px-2.5 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-900"
-                      >
-                        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
-                          <NextImage
-                            src={avatar}
-                            alt={displayName}
-                            fill
-                            sizes="44px"
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {displayName}
-                          </p>
-                          <p className="truncate text-xs text-[color:var(--app-text-soft)]">
-                            {handle ||
-                              (locale === 'id'
-                                ? 'Profil Lajukan'
-                                : 'Lajukan profile')}
-                          </p>
-                        </div>
-                        <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-[color:var(--app-text-soft)]">
-                  {locale === 'id' ? 'Belum ada yang like.' : 'No likes yet.'}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-warning)]">
-                  {locale === 'id' ? 'Report listing' : 'Report listing'}
-                </p>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {item.title}
-                </h2>
-                <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {locale === 'id'
-                    ? 'Laporan ini akan masuk ke CRM moderation queue dan bisa ditinjau oleh tim.'
-                    : 'This report will enter the CRM moderation queue for review by the team.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowReportModal(false)}
-                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
-                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
-              >
-                X
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-[color:var(--app-text)]">
-                  {locale === 'id' ? 'Alasan' : 'Reason'}
-                </label>
-                <select
-                  value={reportReason}
-                  onChange={e => setReportReason(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-warning-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-warning)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)]"
-                >
-                  <option value="spam">
-                    {locale === 'id' ? 'Spam / promosi' : 'Spam / promotion'}
-                  </option>
-                  <option value="fake">
-                    {locale === 'id'
-                      ? 'Palsu / tidak asli'
-                      : 'Fake / not genuine'}
-                  </option>
-                  <option value="scam">
-                    {locale === 'id' ? 'Penipuan' : 'Scam'}
-                  </option>
-                  <option value="harassment">
-                    {locale === 'id' ? 'Pelecehan' : 'Harassment'}
-                  </option>
-                  <option value="illegal">
-                    {locale === 'id' ? 'Konten ilegal' : 'Illegal content'}
-                  </option>
-                  <option value="inaccurate">
-                    {locale === 'id'
-                      ? 'Informasi tidak akurat'
-                      : 'Inaccurate info'}
-                  </option>
-                  <option value="other">
-                    {locale === 'id' ? 'Lainnya' : 'Other'}
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-[color:var(--app-text)]">
-                  {locale === 'id' ? 'Detail tambahan' : 'Extra details'}
-                </label>
-                <textarea
-                  rows={4}
-                  value={reportDetails}
-                  onChange={e => setReportDetails(e.target.value)}
-                  placeholder={
-                    locale === 'id'
-                      ? 'Contoh: foto bukan milik listing, jam salah, nomor tidak aktif.'
-                      : 'Example: unrelated photo, wrong hours, inactive number.'
-                  }
-                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-warning-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-warning)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)]"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-[color:color-mix(in_srgb,_var(--app-warning-soft)_35%,_white)] px-3 py-2 text-[11px] leading-5 text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,_var(--app-warning)_12%,_rgba(2,6,23,0.94))] dark:text-[color:var(--app-text-soft)]">
-              {locale === 'id'
-                ? 'Setelah terkirim, laporan masuk ke queue CRM moderation. Tim bisa lihat alasan, detail, siapa yang report, lalu pilih warn, flag, restrict, atau ban bila berulang.'
-                : 'After submission, the report enters the CRM moderation queue. The team can review reasons, details, reporters, then choose warn, flag, restrict, or ban if abuse repeats.'}
-            </div>
-
-            {reportError ? (
-              <p className="mt-3 text-xs font-semibold text-[color:var(--app-danger)]">
-                {reportError}
-              </p>
-            ) : null}
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setShowReportModal(false)}
-                className="rounded-full border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
-              >
-                {locale === 'id' ? 'Batal' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={() => void submitListingReport()}
-                disabled={reportSubmitting}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-warning)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-warning)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {reportSubmitting
-                  ? locale === 'id'
-                    ? 'Mengirim...'
-                    : 'Sending...'
-                  : locale === 'id'
-                    ? 'Kirim report'
-                    : 'Submit report'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showShareModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
           <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
@@ -5884,6 +5291,108 @@ export default function ContentDetailPage({ params }: PageProps) {
                   : locale === 'id'
                     ? 'Kirim bubble listing'
                     : 'Share listing bubble'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
+          <div className="w-full max-w-md rounded-[24px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-danger)]">
+                  {locale === 'id' ? 'Laporkan listing' : 'Report listing'}
+                </p>
+                <h2 className="mt-1 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {item.title}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Pilih alasan singkat. Tim Lajukan bisa meninjau dari riwayat ini.'
+                    : 'Choose a short reason. Lajukan can review it from this record.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)]"
+                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
+              >
+                X
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <label className="block text-xs font-semibold text-[color:var(--app-text)]">
+                {locale === 'id' ? 'Alasan' : 'Reason'}
+                <select
+                  value={reportReason}
+                  onChange={event => setReportReason(event.target.value)}
+                  className="mt-1 h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm"
+                >
+                  <option value="spam">Spam</option>
+                  <option value="fraud">
+                    {locale === 'id' ? 'Dugaan penipuan' : 'Suspected fraud'}
+                  </option>
+                  <option value="illegal">
+                    {locale === 'id'
+                      ? 'Barang/jasa dilarang'
+                      : 'Prohibited goods/services'}
+                  </option>
+                  <option value="misleading">
+                    {locale === 'id'
+                      ? 'Informasi menyesatkan'
+                      : 'Misleading information'}
+                  </option>
+                </select>
+              </label>
+
+              <label className="block text-xs font-semibold text-[color:var(--app-text)]">
+                {locale === 'id' ? 'Catatan' : 'Note'} (
+                {locale === 'id' ? 'opsional' : 'optional'})
+                <textarea
+                  value={reportDetails}
+                  onChange={event => setReportDetails(event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm"
+                  placeholder={
+                    locale === 'id'
+                      ? 'Tambahkan detail singkat jika perlu.'
+                      : 'Add short details if needed.'
+                  }
+                />
+              </label>
+            </div>
+
+            {reportError ? (
+              <p className="mt-3 text-xs font-semibold text-[color:var(--app-danger)]">
+                {reportError}
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="min-h-10 rounded-full border border-[color:var(--app-border)] px-4 text-xs font-semibold text-[color:var(--app-text)]"
+              >
+                {locale === 'id' ? 'Batal' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitListingReport()}
+                disabled={reportSubmitting}
+                className="min-h-10 flex-1 rounded-full bg-[color:var(--app-danger)] px-4 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {reportSubmitting
+                  ? locale === 'id'
+                    ? 'Mengirim...'
+                    : 'Sending...'
+                  : locale === 'id'
+                    ? 'Kirim laporan'
+                    : 'Submit report'}
               </button>
             </div>
           </div>
@@ -6303,7 +5812,7 @@ export default function ContentDetailPage({ params }: PageProps) {
       <Modal
         open={Boolean(createdDealHandoff)}
         title={
-          locale === 'id' ? 'Order siap dilanjutkan' : 'Your order is ready'
+          locale === 'id' ? 'Pesanan siap dilanjutkan' : 'Your order is ready'
         }
         onClose={() => setCreatedDealHandoff(null)}
         footer={
@@ -6315,11 +5824,11 @@ export default function ContentDetailPage({ params }: PageProps) {
                   router.push(
                     createdDealHandoff.flowMode === 'direct'
                       ? `/transactions?transaction_id=${encodeURIComponent(
-                        createdDealHandoff.transactionId,
-                      )}&open_payment=1`
+                          createdDealHandoff.transactionId,
+                        )}&open_payment=1`
                       : `/transactions?focus_transaction_id=${encodeURIComponent(
-                        createdDealHandoff.transactionId,
-                      )}`,
+                          createdDealHandoff.transactionId,
+                        )}`,
                   );
                   setCreatedDealHandoff(null);
                 }}
@@ -6374,10 +5883,14 @@ export default function ContentDetailPage({ params }: PageProps) {
                     {locale === 'id' ? 'Nominal' : 'Amount'}
                   </p>
                   <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {formatCurrency(
-                      createdDealHandoff.amountCents,
-                      createdDealHandoff.currency,
-                    )}
+                    {createdDealHandoff.amountCents != null
+                      ? formatCurrency(
+                          createdDealHandoff.amountCents,
+                          createdDealHandoff.currency,
+                        )
+                      : locale === 'id'
+                        ? 'Nominal menyusul'
+                        : 'Amount to follow'}
                   </p>
                 </div>
                 <div className={detailInsetCompactClass}>
@@ -6428,8 +5941,8 @@ export default function ContentDetailPage({ params }: PageProps) {
             <div className="rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-info-soft)_62%,white)] p-3 text-xs text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,var(--app-info)_18%,rgba(15,23,42,0.96))]">
               {createdDealHandoff.flowMode === 'direct'
                 ? locale === 'id'
-                  ? 'Lanjut ke order biar pembayaran aman.'
-                  : 'For direct purchases, continue to the order workspace so the buyer can pay safely on-platform before work or delivery starts.'
+                  ? 'Lanjut ke order untuk mencatat nominal, status, dan kesepakatan. Ketersediaan pembayaran ditandai jelas di halaman transaksi.'
+                  : 'Continue to the order workspace to record the amount, status, and agreement. Payment availability is shown explicitly on the transaction page.'
                 : locale === 'id'
                   ? 'Pantau status di order. Detail tetap lanjut di chat.'
                   : 'For offer-based deals, use the order workspace to track status, then continue technical discussion in chat without losing the transaction trail.'}
@@ -6515,7 +6028,11 @@ export default function ContentDetailPage({ params }: PageProps) {
                     ? locale === 'id'
                       ? 'Nominal checkout (IDR) *'
                       : 'Checkout amount (IDR) *'
-                    : offerAmountLabel}
+                    : isDemandListing
+                      ? locale === 'id'
+                        ? 'Nominal respons (opsional)'
+                        : 'Response amount (optional)'
+                      : offerAmountLabel}
                 </label>
                 <input
                   type="text"
@@ -6529,7 +6046,13 @@ export default function ContentDetailPage({ params }: PageProps) {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {locale === 'id' ? 'Pesan (Opsional)' : 'Message (Optional)'}
+                  {isDemandListing
+                    ? locale === 'id'
+                      ? 'Scope / catatan respons'
+                      : 'Response scope / notes'
+                    : locale === 'id'
+                      ? 'Pesan (Opsional)'
+                      : 'Message (Optional)'}
                 </label>
                 <textarea
                   value={offerMessage}
@@ -6565,7 +6088,12 @@ export default function ContentDetailPage({ params }: PageProps) {
               </button>
               <button
                 onClick={handleMakeOffer}
-                disabled={submitting || !offerAmount.trim()}
+                disabled={
+                  submitting ||
+                  (isDemandListing
+                    ? !offerAmount.trim() && !offerMessage.trim()
+                    : !offerAmount.trim())
+                }
                 className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting

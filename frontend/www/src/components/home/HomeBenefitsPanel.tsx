@@ -175,7 +175,7 @@ export function HomeBenefitsPanel({ locale }: HomeBenefitsPanelProps) {
           </p>
         </div>
         <Link
-          href="/search"
+          href="/explore"
           className="text-[11px] font-semibold ui-accent-text"
         >
           {isId ? 'Lihat semua listing' : 'Browse all listings'}
@@ -184,19 +184,19 @@ export function HomeBenefitsPanel({ locale }: HomeBenefitsPanelProps) {
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Link
-          href="/search?type=umkm"
+          href="/explore?type=umkm"
           className="ui-inline-meta ui-accent-border ui-accent-text"
         >
           {isId ? 'Voucher usaha' : 'Business vouchers'}
         </Link>
         <Link
-          href="/search?type=product"
+          href="/explore?type=product"
           className="ui-inline-meta ui-info-border ui-info-text"
         >
           {isId ? 'Promo produk' : 'Product promos'}
         </Link>
         <Link
-          href="/search?type=service"
+          href="/explore?type=service"
           className="ui-inline-meta ui-supply-border ui-supply-text"
         >
           {isId ? 'Benefit jasa' : 'Service benefits'}

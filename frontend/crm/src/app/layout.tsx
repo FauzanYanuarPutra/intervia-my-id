@@ -4,6 +4,7 @@ import { AuthProvider } from '@/context/AuthContext';
 export const metadata = {
   title: 'Lajukan CRM',
   description: 'CRM pipeline, support inbox, and agent operations for the ecosystem.',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

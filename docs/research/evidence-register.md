@@ -31,7 +31,7 @@ This file records repository evidence used for the architecture/product docs. It
 | Marketplace service owns content/commerce/ops | `services/marketplace_service/src/main.rs`, marketplace migrations |
 | Community service owns forum/groups/reels | `services/community_service/src/main.rs`, community migrations |
 | Chat service owns room/message API | `services/chat_service/lib/chat_service_web/router.ex`, Scylla schema |
-| Home/search/listing surfaces exist | `frontend/www/src/app/[locale]/(shared)/home`, `/search`, `/content/[id]`, `/api/content` |
+| Home/Explore/listing surfaces exist | `frontend/www/src/app/[locale]/(shared)/home`, `/explore`, `/content/[id]`, `/api/search`, `/api/content` |
 | Create flow exists | `frontend/www/src/app/[locale]/(app)/create` |
 | Personal AI workspace exists | `frontend/www/src/app/[locale]/(app)/profile/ai`, marketplace migration `20260710103000_personal_ai_workspace.up.sql` |
 | Current CRM is internal/ops-oriented | `frontend/crm/src/components/crm/CrmCommandCenter.tsx`, `frontend/crm/src/context/AuthContext.tsx` |

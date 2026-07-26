@@ -39,7 +39,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Mulai isi',
     addLabelEn: 'Start building',
     createHref: '/profile/edit?focus=identity',
-    browseHref: '/search',
+    browseHref: '/explore',
   },
   {
     key: 'job',
@@ -54,7 +54,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Tambah job',
     addLabelEn: 'Add job',
     createHref: '/create/jual/lowongan',
-    browseHref: '/search?type=job',
+    browseHref: '/explore?type=job',
   },
   {
     key: 'freelancer',
@@ -69,7 +69,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Lengkapi freelancer',
     addLabelEn: 'Setup freelancer',
     createHref: '/profile/edit?focus=talent',
-    browseHref: '/search?type=freelancer',
+    browseHref: '/explore?type=freelancer',
   },
   {
     key: 'product',
@@ -84,7 +84,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Tambah produk',
     addLabelEn: 'Add product',
     createHref: '/create/jual/produk',
-    browseHref: '/search?type=product',
+    browseHref: '/explore?type=product',
   },
   {
     key: 'service',
@@ -99,7 +99,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Tambah jasa',
     addLabelEn: 'Add service',
     createHref: '/create/jual/jasa',
-    browseHref: '/search?type=service',
+    browseHref: '/explore?type=service',
   },
   {
     key: 'tool_rental',
@@ -114,7 +114,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Tambah listing pinjam',
     addLabelEn: 'Add rental listing',
     createHref: '/create/jual/sewa-alat',
-    browseHref: '/search?type=tool_rental',
+    browseHref: '/explore?type=tool_rental',
   },
   {
     key: 'business_transfer',
@@ -129,7 +129,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Tambah oper usaha',
     addLabelEn: 'Add business transfer',
     createHref: '/create/jual/oper-usaha',
-    browseHref: '/search?type=business_transfer',
+    browseHref: '/explore?type=business_transfer',
   },
   {
     key: 'property',
@@ -144,7 +144,7 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelId: 'Tambah properti',
     addLabelEn: 'Add property',
     createHref: '/create/jual/properti',
-    browseHref: '/search?type=property',
+    browseHref: '/explore?type=property',
   },
   {
     key: 'umkm',

@@ -49,30 +49,8 @@ export function GlobalImageFallback() {
     window.addEventListener('error', handleImageError, true);
     scanBrokenImages();
 
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach(node => {
-          if (node instanceof HTMLImageElement) {
-            if (node.complete && node.naturalWidth === 0) {
-              applyImageFallback(node);
-            }
-            return;
-          }
-          if (node instanceof Element) {
-            scanBrokenImages(node);
-          }
-        });
-      }
-    });
-
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
-
     return () => {
       window.removeEventListener('error', handleImageError, true);
-      observer.disconnect();
     };
   }, []);
 

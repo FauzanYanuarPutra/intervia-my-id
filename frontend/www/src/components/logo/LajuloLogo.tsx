@@ -84,19 +84,23 @@ const LajukanLogo = ({
   markClassName,
   textClassName,
 }: LajukanLogoProps) => {
+  const defaultMarkClassName = markOnly
+    ? compact
+      ? 'h-8 w-8'
+      : 'h-7 w-7'
+    : compact
+      ? 'h-8 w-8'
+      : 'h-8 w-8 sm:h-9 sm:w-9';
+
   return (
     <div
       className={cn(
         'group inline-flex select-none items-center gap-2.5 whitespace-nowrap',
+        markOnly && 'justify-center gap-0',
         className,
       )}
     >
-      <LajukanLogoMark
-        className={cn(
-          compact ? 'h-8 w-8' : 'h-8 w-8 sm:h-9 sm:w-9',
-          markClassName,
-        )}
-      />
+      <LajukanLogoMark className={cn(defaultMarkClassName, markClassName)} />
       {markOnly ? null : (
         <span
           className={cn(

@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { proxyCommunityBackend } from '@/lib/community/backendProxy';
 import {
   collectUploadFiles,
-  readUploadToken,
   storeValidatedUploads,
   uploadErrorResponse,
   uploadSuccessResponse,
 } from '@/lib/server/uploadFiles';
 import { MEDIA_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
+import { guardUploadRequest } from '@/lib/server/uploadGuard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,6 +27,9 @@ const MEDIA_KEYS = [
 ];
 
 export async function POST(req: NextRequest) {
+  const guard = await guardUploadRequest(req, 'forum:media');
+  if (!guard.ok) return guard.response;
+
   const proxyReq = new NextRequest(req.clone());
   const proxied = await proxyCommunityBackend(
     proxyReq,
@@ -53,9 +56,6 @@ export async function POST(req: NextRequest) {
 
 async function uploadForumMediaLocally(req: NextRequest) {
   try {
-    if (!readUploadToken(req)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     const files = collectUploadFiles(await req.formData(), MEDIA_KEYS);
     if (files.length === 0) {
       return NextResponse.json({ error: 'No media provided' }, { status: 400 });
@@ -73,7 +73,7 @@ async function uploadForumMediaLocally(req: NextRequest) {
       folder: 'forum',
       maxBytes: MEDIA_UPLOAD_RAW_MAX_BYTES,
       minioTarget: 'forum',
-      requireMinio: true,
+      requireMinio: false,
       minioTimeoutMs: 20000,
     });
 

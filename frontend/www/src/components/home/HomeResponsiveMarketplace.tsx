@@ -8,8 +8,19 @@ import {
   MediaPreviewCarousel,
   type MediaPreviewItem,
 } from '@/components/common/MediaPreviewCarousel';
+import { ExploreCardMedia } from '@/components/explore/cards/ExploreCardMedia';
+import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
+import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
+import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -33,6 +44,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Store,
   Target,
   ThumbsUp,
   TrendingUp,
@@ -95,10 +107,10 @@ import { CommunityComposer } from '@/components/community/CommunityFeedClient';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import {
-  HOME_BUSINESS_DISCOVERY_CATEGORY_IDS,
-  getBusinessDiscoveryCategoryById,
-  type BusinessDiscoveryCategoryId,
-} from '@/lib/businessDiscoveryCategories';
+  LAJUKAN_EXPLORE_CATEGORIES,
+  buildExploreCategoryHref,
+  type LajukanExploreCategoryId,
+} from '@/lib/discovery/lajukanCategories';
 import { cn } from '@/lib/utils';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -107,10 +119,13 @@ type HomeContentSimpleProps = {
   locale: string;
 };
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
 const HOME_COMMUNITY_PAGE_SIZE = 6;
 const HOME_COMMUNITY_REQUEST_TIMEOUT_MS = 12000;
-const MARKETPLACE_CARD_FIXED_HEIGHT_CLASS =
-  'h-[300px] min-h-[300px] max-h-[300px] sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
 
 type Tone =
   | 'emerald'
@@ -153,14 +168,7 @@ export interface QuickCategory {
 
 type QuickCategoryUiConfig = Pick<
   QuickCategory,
-  | 'image'
-  | 'tone'
-  | 'flip'
-  | 'scale'
-  | 'rotate'
-  | 'offsetX'
-  | 'offsetY'
-  | 'imageSize'
+  'tone' | 'flip' | 'scale' | 'rotate' | 'offsetX' | 'offsetY' | 'imageSize'
 >;
 
 type TrendingSearchItem = {
@@ -739,8 +747,91 @@ function readContentDistanceKm(
   return direct !== null && direct >= 0 ? direct : null;
 }
 
-function formatRecommendationDistance(distanceKm: number | null): string | null {
+function formatRecommendationDistance(
+  distanceKm: number | null,
+): string | null {
   return formatDistanceKm(distanceKm);
+}
+
+type MobilePlatformSnapshot = {
+  isMobile: boolean;
+  isIos: boolean;
+  isAndroid: boolean;
+  isStandalone: boolean;
+};
+
+const DEFAULT_MOBILE_PLATFORM_SNAPSHOT: MobilePlatformSnapshot = {
+  isMobile: false,
+  isIos: false,
+  isAndroid: false,
+  isStandalone: false,
+};
+
+let cachedMobilePlatformSnapshot = DEFAULT_MOBILE_PLATFORM_SNAPSHOT;
+
+function sameMobilePlatformSnapshot(
+  left: MobilePlatformSnapshot,
+  right: MobilePlatformSnapshot,
+) {
+  return (
+    left.isMobile === right.isMobile &&
+    left.isIos === right.isIos &&
+    left.isAndroid === right.isAndroid &&
+    left.isStandalone === right.isStandalone
+  );
+}
+
+function stableMobilePlatformSnapshot(next: MobilePlatformSnapshot) {
+  if (sameMobilePlatformSnapshot(cachedMobilePlatformSnapshot, next)) {
+    return cachedMobilePlatformSnapshot;
+  }
+  cachedMobilePlatformSnapshot = next;
+  return next;
+}
+
+function detectMobilePlatform(): MobilePlatformSnapshot {
+  if (typeof window === 'undefined') {
+    return DEFAULT_MOBILE_PLATFORM_SNAPSHOT;
+  }
+
+  const ua = window.navigator.userAgent || '';
+  const platform = window.navigator.platform || '';
+  const maxTouchPoints = window.navigator.maxTouchPoints || 0;
+  const isIos =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (platform === 'MacIntel' && maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const isMobile =
+    isIos ||
+    isAndroid ||
+    window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;
+  const standaloneNavigator = window.navigator as Navigator & {
+    standalone?: boolean;
+  };
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    standaloneNavigator.standalone === true;
+
+  return stableMobilePlatformSnapshot({
+    isMobile,
+    isIos,
+    isAndroid,
+    isStandalone,
+  });
+}
+
+function getServerMobilePlatformSnapshot() {
+  return DEFAULT_MOBILE_PLATFORM_SNAPSHOT;
+}
+
+function subscribeMobilePlatform(callback: () => void) {
+  if (typeof window === 'undefined') return () => undefined;
+  window.addEventListener('resize', callback);
+  window.addEventListener('orientationchange', callback);
+  return () => {
+    window.removeEventListener('resize', callback);
+    window.removeEventListener('orientationchange', callback);
+  };
 }
 
 function labelForContentType(isId: boolean, type?: string | null): string {
@@ -859,7 +950,13 @@ function mapCommunityItemToPost(
     community:
       item.group?.name ||
       item.communityName ||
-      (isReel ? 'Reels Usaha' : isId ? 'Komunitas' : 'Community'),
+      (isReel
+        ? isId
+          ? 'Reels Usaha'
+          : 'Business Reels'
+        : isId
+          ? 'Komunitas'
+          : 'Community'),
     author: item.author?.name || (isId ? 'Member Lajukan' : 'Lajukan member'),
     time: formatCommunityTime(item.createdAt, isId),
     title:
@@ -1110,11 +1207,10 @@ function buildGameSnapshot(
 }
 
 const QUICK_CATEGORY_UI: Record<
-  BusinessDiscoveryCategoryId,
+  LajukanExploreCategoryId | 'map',
   QuickCategoryUiConfig
 > = {
   equipment: {
-    image: '/images/hero/menu/mesin-01.png',
     tone: 'emerald',
     flip: true,
     scale: 1,
@@ -1124,7 +1220,6 @@ const QUICK_CATEGORY_UI: Record<
     imageSize: 70,
   },
   supplies: {
-    image: '/images/hero/menu/bahan-01.png',
     tone: 'orange',
     flip: true,
     scale: 1,
@@ -1134,7 +1229,6 @@ const QUICK_CATEGORY_UI: Record<
     imageSize: 70,
   },
   service: {
-    image: '/images/hero/menu/jasa-01.png',
     tone: 'violet',
     flip: true,
     scale: 1,
@@ -1144,7 +1238,6 @@ const QUICK_CATEGORY_UI: Record<
     imageSize: 70,
   },
   property: {
-    image: '/images/hero/menu/lok-01.png',
     tone: 'rose',
     flip: false,
     scale: 1,
@@ -1153,18 +1246,7 @@ const QUICK_CATEGORY_UI: Record<
     offsetY: -16,
     imageSize: 70,
   },
-  nearby: {
-    image: '/images/hero/menu/map-01.png',
-    tone: 'blue',
-    flip: true,
-    scale: 0.88,
-    rotate: -5,
-    offsetX: -24,
-    offsetY: -16,
-    imageSize: 70,
-  },
   opportunity: {
-    image: '/images/hero/menu/peluang-01.png',
     tone: 'cyan',
     flip: false,
     scale: 1,
@@ -1173,59 +1255,65 @@ const QUICK_CATEGORY_UI: Record<
     offsetY: -16,
     imageSize: 70,
   },
+  community: {
+    tone: 'amber',
+    flip: false,
+    scale: 1.2,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  video: {
+    tone: 'lime',
+    flip: false,
+    scale: 1.2,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  map: {
+    tone: 'blue',
+    flip: false,
+    scale: 1.12,
+    rotate: 3,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
 };
 
 export function getQuickCategories(isId: boolean): QuickCategory[] {
-  const businessCategories = HOME_BUSINESS_DISCOVERY_CATEGORY_IDS.map(
-    (id): QuickCategory | null => {
-      const category = getBusinessDiscoveryCategoryById(id);
-      if (!category) return null;
-      return {
-        id: category.id,
-        label: isId ? category.labelId : category.labelEn,
-        description: isId ? category.hintId : category.hintEn,
-        href:
-          category.id === 'nearby' ? UMKM_DISCOVERY_PATH : category.searchHref,
-        badge: isId ? category.badgeId : category.badgeEn,
-        ...QUICK_CATEGORY_UI[category.id],
-      };
-    },
-  ).filter((item): item is QuickCategory => Boolean(item));
+  const categories = LAJUKAN_EXPLORE_CATEGORIES.map(category => ({
+    id: category.id,
+    label: isId ? category.labelId : category.labelEn,
+    description: isId ? category.descriptionId : category.descriptionEn,
+    href:
+      category.id === 'community'
+        ? '/community'
+        : category.id === 'video'
+          ? '/reels'
+          : buildExploreCategoryHref(category),
+    image: category.image,
+    badge: isId ? category.badge.labelId : category.badge.labelEn,
+    ...QUICK_CATEGORY_UI[category.id],
+  }));
 
   return [
-    ...businessCategories,
+    ...categories.slice(0, 4),
     {
-      id: 'community',
-      label: isId ? 'Komunitas' : 'Community',
-      description: '...',
-      href: '/community',
-      image: '/images/hero/menu/komun-01.png',
-      tone: 'amber',
-      badge: isId ? 'Aktif' : 'Active',
-
-      flip: false,
-      scale: 1.2,
-      rotate: 5,
-      offsetX: -24,
-      offsetY: -16,
-      imageSize: 70,
+      id: 'business-map',
+      label: isId ? 'Peta Usaha' : 'Business Map',
+      description: isId
+        ? 'Lihat usaha terdekat berdasarkan lokasi.'
+        : 'Find nearby businesses by location.',
+      href: `${UMKM_DISCOVERY_PATH}?view=map`,
+      image: '/images/hero/menu/map-01.png',
+      badge: isId ? 'Dekat' : 'Nearby',
+      ...QUICK_CATEGORY_UI.map,
     },
-    {
-      id: 'video',
-      label: isId ? 'Video' : 'Videos',
-      description: '...',
-      href: '/reels',
-      image: '/images/hero/menu/reel-01.png',
-      tone: 'lime',
-      badge: isId ? 'Viral' : 'Trending',
-
-      flip: false,
-      scale: 1.2,
-      rotate: 5,
-      offsetX: -24,
-      offsetY: -16,
-      imageSize: 70,
-    },
+    ...categories.slice(4),
   ];
 }
 
@@ -1485,8 +1573,10 @@ function DesktopSidebar({
         className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pr-1"
         data-auto-scrollbar
       >
-        <nav className="shrink-0 rounded-[22px] p-2.5 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)]">
-          <div className="space-y-1">{primaryItems.map(item => renderSidebarItem(item))}</div>
+        <nav className="shrink-0 rounded-[22px] p-2.5">
+          <div className="space-y-1">
+            {primaryItems.map(item => renderSidebarItem(item))}
+          </div>
           {secondaryItems.length > 0 ? (
             <>
               <div className="my-2 h-px bg-[color:var(--app-border)]" />
@@ -1515,12 +1605,152 @@ function DesktopSidebar({
   );
 }
 
+function MobileAppDownloadSection({ isId }: { isId: boolean }) {
+  const platform = useSyncExternalStore(
+    subscribeMobilePlatform,
+    detectMobilePlatform,
+    getServerMobilePlatformSnapshot,
+  );
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleInstalled = () => {
+      setInstalled(true);
+      setInstallPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.removeEventListener(
+        'beforeinstallprompt',
+        handleBeforeInstallPrompt,
+      );
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  if (!platform.isMobile || platform.isStandalone || installed) return null;
+
+  const platformLabel = platform.isIos
+    ? 'iOS'
+    : platform.isAndroid
+      ? 'Android'
+      : 'Mobile';
+  const buttonLabel = installPrompt
+    ? isId
+      ? `Install untuk ${platformLabel}`
+      : `Install for ${platformLabel}`
+    : platform.isIos
+      ? isId
+        ? 'Tambah ke Home Screen'
+        : 'Add to Home Screen'
+      : isId
+        ? `Download aman untuk ${platformLabel}`
+        : `Safe download for ${platformLabel}`;
+  const helpText = platform.isIos
+    ? isId
+      ? 'Di Safari, tekan tombol Share lalu pilih Add to Home Screen. Ini memasang Lajukan dari browser resmi, bukan file APK.'
+      : 'In Safari, tap Share, then Add to Home Screen. This installs Lajukan from the official browser flow, not an APK file.'
+    : installPrompt
+      ? isId
+        ? 'Browser akan menampilkan prompt install resmi. Tidak ada file APK atau file tambahan yang perlu diunduh.'
+        : 'Your browser will show the official install prompt. No APK or extra file is downloaded.'
+      : isId
+        ? 'Kalau prompt belum muncul, buka menu browser lalu pilih Install app atau Add to Home Screen.'
+        : 'If the prompt is not available yet, open the browser menu and choose Install app or Add to Home Screen.';
+
+  async function handleInstall() {
+    void trackLajukanEvent('home.mobile_install.clicked', {
+      properties: {
+        platform: platform.isIos
+          ? 'ios'
+          : platform.isAndroid
+            ? 'android'
+            : 'mobile',
+        prompt_available: Boolean(installPrompt),
+      },
+    });
+
+    if (!installPrompt) {
+      setShowHelp(true);
+      return;
+    }
+
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice.catch(() => null);
+    setInstallPrompt(null);
+    if (choice?.outcome === 'accepted') setInstalled(true);
+  }
+
+  return (
+    <section className="lg:hidden">
+      <article className="overflow-hidden rounded-[22px] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_58%,#eff6ff_100%)] p-3.5 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.2)]">
+        <div className="flex items-start gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
+            <Globe2 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-bold text-slate-950">
+              {isId ? 'Buka Lajukan lebih cepat' : 'Open Lajukan faster'}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-slate-600">
+              {isId
+                ? 'Pasang sebagai aplikasi mobile dari browser resmi. Lebih cepat dibuka, tetap aman.'
+                : 'Install it as a mobile app from your browser. Faster to open, still safe.'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void handleInstall()}
+          className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-600 px-4 text-sm font-bold text-white shadow-[0_16px_28px_-20px_rgba(22,163,74,0.55)]"
+        >
+          {buttonLabel}
+          <ArrowRight className="h-4 w-4" />
+        </button>
+
+        <div className="mt-2 flex items-center gap-2 text-[10.5px] font-semibold leading-4 text-slate-500">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+          <span>
+            {isId
+              ? 'Install resmi via browser. Jangan unduh APK dari sumber tidak dikenal.'
+              : 'Official browser install. Do not download APKs from unknown sources.'}
+          </span>
+        </div>
+
+        {showHelp ? (
+          <p className="mt-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold leading-5 text-slate-600">
+            {helpText}
+          </p>
+        ) : null}
+      </article>
+    </section>
+  );
+}
+
 function HeroVisualStage({
   isId,
   className,
+  query,
+  onQueryChange,
+  onSubmit,
+  onOpenFilters,
 }: {
   isId: boolean;
   className?: string;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onSubmit: (submittedQuery: string) => void;
+  onOpenFilters: () => void;
 }) {
   const { user, isAuthenticated } = useAuth();
 
@@ -1528,7 +1758,9 @@ function HeroVisualStage({
     user?.username || user?.fullName || user?.full_name || 'Sobat Bisnis';
 
   return (
-    <section className={`mx-auto w-full max-w-7xl px-3 py-4 ${className || ''}`}>
+    <section
+      className={`mx-auto w-full max-w-7xl px-3 py-4 ${className || ''}`}
+    >
       <div
         className={`
           relative overflow-hidden rounded-3xl bg-emerald-50/70
@@ -1543,9 +1775,7 @@ function HeroVisualStage({
               <>
                 <h1 className="text-[clamp(1.25rem,3vw,2.25rem)] font-black leading-[0.95] tracking-[-0.05em] text-zinc-950">
                   Halo,{' '}
-                  <span className="text-emerald-600">
-                    {displayName} 👋
-                  </span>
+                  <span className="text-emerald-600">{displayName} 👋</span>
                 </h1>
 
                 <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-600 sm:text-sm sm:leading-6">
@@ -1558,9 +1788,7 @@ function HeroVisualStage({
                 <h1 className="text-[clamp(1.4rem,3.5vw,2.75rem)] font-black leading-[0.95] tracking-[-0.06em] text-zinc-950">
                   Cari Kebutuhan
                   <br />
-                  <span className="text-emerald-600">
-                    Usaha Lokal 🚀
-                  </span>
+                  <span className="text-emerald-600">Usaha Lokal 🚀</span>
                 </h1>
 
                 <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-600 sm:text-sm sm:leading-6">
@@ -1593,10 +1821,23 @@ function HeroVisualStage({
 
       {/* SEARCH */}
       <div className="-mt-5 px-2">
-        <div className="relative z-20 flex h-12 items-center gap-2 rounded-2xl border border-zinc-100 bg-white px-3 shadow-lg shadow-zinc-900/5">
+        <form
+          role="search"
+          aria-label={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
+          onSubmit={event => {
+            event.preventDefault();
+            onSubmit(query);
+          }}
+          className="relative z-20 flex h-12 items-center gap-2 rounded-2xl border border-zinc-100 bg-white px-3 shadow-lg shadow-zinc-900/5"
+        >
           <Search className="h-4 w-4 shrink-0 text-emerald-600" />
 
           <input
+            type="search"
+            name="q"
+            enterKeyHint="search"
+            value={query}
+            onChange={event => onQueryChange(event.target.value)}
             placeholder={
               isAuthenticated
                 ? 'Cari kebutuhan usaha hari ini...'
@@ -1610,12 +1851,13 @@ function HeroVisualStage({
 
           <button
             type="button"
+            onClick={onOpenFilters}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-100"
             aria-label="Filter pencarian"
           >
             <SlidersHorizontal className="h-4 w-4" />
           </button>
-        </div>
+        </form>
       </div>
     </section>
   );
@@ -1829,14 +2071,15 @@ function GameProgressCard({
 
 const FALLBACK_TRENDING_SEARCHES: TrendingSearchItem[] = [
   'Supplier kemasan',
-  'Bahan baku usaha',
-  'Mesin usaha',
-  'Jasa branding',
+  'Supplier bahan baku',
+  'Stok grosir reseller',
+  'Jasa foto produk',
+  'Jasa website UMKM',
   'Lokasi usaha',
-  'Peluang usaha',
+  'Mesin usaha',
 ].map(label => ({
   label,
-  href: `/search?q=${encodeURIComponent(label)}`,
+  href: `/explore?q=${encodeURIComponent(label)}`,
   source: 'fallback',
 }));
 
@@ -1870,7 +2113,8 @@ async function loadTrendingSearches() {
         .map(normalizeTrendingItem)
         .filter((item): item is TrendingSearchItem => Boolean(item))
         .slice(0, 10);
-      trendingSearchCache = items.length > 0 ? items : FALLBACK_TRENDING_SEARCHES;
+      trendingSearchCache =
+        items.length > 0 ? items : FALLBACK_TRENDING_SEARCHES;
       return trendingSearchCache;
     })
     .catch(() => {
@@ -1902,11 +2146,12 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
   }, []);
 
   // Inisialisasi Embla untuk Chip Slider yang fleksibel
-  const [emblaRef] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true, // Membuat efek geser bebas seperti native swipe
   });
+  useEmblaWheelGestures(emblaApi);
 
   return (
     <div className="my-5 w-full">
@@ -1922,26 +2167,34 @@ export function TrendingSearchSection({ isId }: { isId: boolean }) {
           </h2>
         </div>
 
-        <Link
-          href="/search"
-          className="group flex items-center gap-0.5 text-xs font-semibold text-[color:var(--app-accent)] transition-opacity hover:opacity-80"
-          onClick={() => {
-            void trackLajukanEvent('home.trending_search.see_all_clicked', {
-              properties: {
-                source: 'home_trending_searches',
-              },
-            });
-          }}
-        >
-          {isId ? 'Lihat semua' : 'See all'}
-          <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <CompactSeeAllLink
+            href="/explore"
+            isId={isId}
+            onClick={() => {
+              void trackLajukanEvent('home.trending_search.see_all_clicked', {
+                properties: {
+                  source: 'home_trending_searches',
+                },
+              });
+            }}
+            ariaLabel={
+              isId
+                ? 'Lihat semua pencarian populer'
+                : 'View all trending searches'
+            }
+          />
+          <EmblaDesktopControls api={emblaApi} isId={isId} compact />
+        </div>
       </div>
 
       {/* CAROUSEL CHIPS CONTAINER */}
       <div className="w-full">
         {/* Pembungkus utama Embla viewport */}
-        <div className="overflow-hidden contain-paint" ref={emblaRef}>
+        <div
+          className="cursor-grab overflow-hidden contain-paint active:cursor-grabbing"
+          ref={emblaRef}
+        >
           {/* embla__container */}
           {/* 1. Tambah transform-gpu & will-change-transform */}
           {/* 2. Tambah padding kiri-kanan agar chip meluncur seamless ke ujung layar */}
@@ -2077,11 +2330,12 @@ export function RecommendationsSection({
   isId: boolean;
   items: RecommendationItem[];
 }) {
-  const [emblaRef] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true,
   });
+  useEmblaWheelGestures(emblaApi);
 
   return (
     <section
@@ -2106,13 +2360,18 @@ export function RecommendationsSection({
           </p>
         </div>
 
-        <Link
-          href={UMKM_DISCOVERY_PATH}
-          className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors shrink-0"
-        >
-          <span>{isId ? 'Lihat semua' : 'See all'}</span>
-          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <CompactSeeAllLink
+            href={UMKM_DISCOVERY_PATH}
+            isId={isId}
+            ariaLabel={
+              isId
+                ? 'Lihat semua rekomendasi usaha'
+                : 'View all recommendations'
+            }
+          />
+          <EmblaDesktopControls api={emblaApi} isId={isId} compact />
+        </div>
       </div>
 
       {items.length === 0 ? (
@@ -2124,15 +2383,17 @@ export function RecommendationsSection({
       ) : (
         /* FIX HEIGHT DISINI: Gunakan 'overflow-visible' agar kartu tidak terpotong */
         <div className="w-full relative overflow-visible">
-          <div className="overflow-hidden" ref={emblaRef}>
-            {/* Lebar item disesuaikan menjadi 260px sesuai blueprint gambar */}
-            <div className="flex touch-pan-y transform-gpu px-1 sm:px-3 md:px-6 gap-1 md:gap-2 py-1">
+          <div
+            className="cursor-grab overflow-hidden active:cursor-grabbing"
+            ref={emblaRef}
+          >
+            <div className="flex touch-pan-y transform-gpu gap-2 px-1 py-1 sm:px-3 md:gap-3 md:px-6">
               {' '}
               {/* Tambah py-1 agar bayangan hover tidak kepotong */}
               {items.map(item => (
                 <div
                   key={item.id}
-                  className="w-[170px] sm:w-[200px] lg:w-[220px] shrink-0 select-none"
+                  className="w-[82vw] max-w-[330px] shrink-0 select-none sm:w-[320px] lg:w-[340px]"
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <RecommendationCard item={item} isId={isId} />
@@ -2165,7 +2426,6 @@ function RecommendationCard({
   item: RecommendationItem;
   isId: boolean;
 }) {
-  // 1. Logic Badge Dinamis
   const badgeStyle = useMemo(() => {
     const label = item.typeLabel.toLowerCase();
     const categoryKey = Object.keys(CATEGORY_STYLES).find(key =>
@@ -2173,77 +2433,81 @@ function RecommendationCard({
     );
     return categoryKey ? CATEGORY_STYLES[categoryKey] : CATEGORY_STYLES.default;
   }, [item.typeLabel]);
+  const mediaSrc = item.image || item.images?.[0] || null;
+  const priceLabel =
+    item.unit && item.unit !== 'item' ? `${item.price} / ${item.unit}` : item.price;
 
   return (
     <article
       className={cn(
-        'group relative flex w-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition-all duration-200 hover:border-zinc-300 hover:shadow-md',
-        MARKETPLACE_CARD_FIXED_HEIGHT_CLASS,
+        'group relative grid h-full min-h-[176px] cursor-pointer grid-cols-[104px_minmax(0,1fr)] overflow-hidden rounded-lg border border-teal-100 bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)] sm:grid-cols-[116px_minmax(0,1fr)]',
       )}
       data-testid="home-recommendation-card"
     >
-      {/* IMAGE CONTAINER */}
-      <div className="relative h-[132px] w-full shrink-0 overflow-hidden rounded-xl bg-zinc-100 sm:h-[144px]">
-        <Link href={item.href} className="block h-full w-full">
-          {item.images?.[0] ? (
-            <img
-              src={item.images[0]}
-              alt={item.title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-zinc-400">
-              <Package className="h-6 w-6" />
-            </div>
-          )}
-        </Link>
-        {item.badge && (
-          <span className="absolute right-2 top-2 rounded-md bg-amber-100/90 border border-amber-200/50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 ">
-            {item.badge}
-          </span>
-        )}
-      </div>
-
-      {/* CONTENT AREA */}
-      <div className="flex flex-1 flex-col pt-3 min-w-0">
-        <div className="mb-2 flex h-[22px] max-h-[22px] items-center justify-between gap-2 overflow-hidden">
-          <span
-            className={cn(
-              'inline-flex min-w-0 items-center truncate rounded-md border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide',
-              badgeStyle,
-            )}
-          >
-            {item.typeLabel}
-          </span>
-
-          {item.distanceLabel ? (
-            <div className="flex min-w-0 shrink-0 items-center gap-1 text-[10px] font-bold text-sky-700">
-              <MapPinIcon className="h-3 w-3 shrink-0 text-sky-500" />
-
-              <span className="max-w-[80px] truncate">
-                {item.distanceLabel}
-              </span>
-            </div>
+      <Link
+        href={item.href}
+        className="absolute inset-0 z-10 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
+      >
+        <span className="sr-only">{item.title}</span>
+      </Link>
+      <ExploreCardMedia
+        src={mediaSrc}
+        alt={item.title}
+        className="h-full min-h-[176px] w-full"
+      />
+      <div className="flex min-w-0 flex-col p-2.5">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-teal-700">
+            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-50 !p-1 text-teal-700">
+              <Store className="h-3 w-3" />
+            </span>
+            <span className="truncate">{item.typeLabel}</span>
+          </p>
+          {item.badge ? (
+            <span
+              className={cn(
+                'shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-bold',
+                badgeStyle,
+              )}
+            >
+              {item.badge}
+            </span>
           ) : null}
         </div>
 
-        <Link href={item.href} className="block min-w-0">
-          <h3 className="line-clamp-2 h-[36px] text-sm font-bold leading-tight text-zinc-900">
-            {item.title}
-          </h3>
-        </Link>
+        <h3 className="mt-1.5 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)]">
+          {item.title}
+        </h3>
+        <p className="mt-1 line-clamp-1 text-xs leading-4 text-[color:var(--app-text-soft)]">
+          {item.vendor || item.location || (isId ? 'Usaha Lajukan' : 'Lajukan business')}
+        </p>
 
-        <hr className="mt-auto mb-2 border-zinc-100" />
-
-        <div className="flex items-baseline gap-1 min-w-0">
-          <span className="text-sm font-bold text-zinc-950 truncate">
-            {item.price}
-          </span>
-          <span className="text-[10px] font-medium text-zinc-400 truncate">
-            / {item.unit || 'item'}
-          </span>
+        <div
+          className="mt-2 flex flex-wrap gap-1.5 border-t border-[color:var(--app-border)] pt-2 text-[11px]"
+          aria-label={isId ? 'Info utama' : 'Key info'}
+        >
+          {priceLabel ? (
+            <span className="min-w-0 max-w-full truncate rounded-full bg-teal-50 px-2 py-1 font-bold text-teal-700">
+              {priceLabel}
+            </span>
+          ) : null}
+          {item.distanceLabel || item.location ? (
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded-full bg-[color:var(--app-surface-muted)] px-2 py-1 font-semibold text-[color:var(--app-text)]">
+              <MapPinIcon className="h-3 w-3 shrink-0 text-[color:var(--app-text-soft)]" />
+              <span className="truncate">
+                {item.distanceLabel || item.location}
+              </span>
+            </span>
+          ) : null}
         </div>
+
+        <span
+          className="mt-auto inline-flex min-h-8 w-fit items-center justify-center gap-1 rounded-md bg-[color:var(--app-surface-muted)] px-3 text-xs font-bold text-teal-700"
+          aria-hidden="true"
+        >
+          {isId ? 'Lihat usaha' : 'View business'}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </span>
       </div>
     </article>
   );
@@ -2347,14 +2611,15 @@ function CommunityPanel({
     setPostOptionsOpen(false);
   };
 
-  const [emblaTabsRef] = useEmblaCarousel({
+  const [emblaTabsRef, emblaTabsApi] = useEmblaCarousel({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true, // Membuat geseran terasa ringan dan natural di HP
   });
+  useEmblaWheelGestures(emblaTabsApi);
 
   return (
-    <section className="rounded-[24px]">
+    <section className="lajukan-home-community-panel relative z-[1] isolate overflow-hidden rounded-[24px] bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_48%,#f8fafc_100%)] py-2 [backface-visibility:hidden]">
       <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
         <div className="space-y-0.5">
           <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
@@ -2372,99 +2637,74 @@ function CommunityPanel({
           </p>
         </div>
 
-        <Link
-          href={activeTabHref}
-          className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors shrink-0"
-        >
-          <span>{activeTabMeta.actionLabel}</span>
-          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href={activeTabHref}
+            className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+          >
+            <span>{activeTabMeta.actionLabel}</span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+          <EmblaDesktopControls api={emblaTabsApi} isId={isId} compact />
+        </div>
       </div>
       <div
-        className="mt-3 w-full overflow-hidden contain-paint select-none"
+        className="mt-3 w-full cursor-grab overflow-hidden select-none active:cursor-grabbing"
         ref={emblaTabsRef}
       >
-        {/* 
-      Container Embla (flex-row): 
-      Ditambahkan hardware acceleration via Tailwind agar geseran super lancar di HP spek rendah sekalipun.
-    */}
-        <div className="relative">
-          {/* <div className="mb-2 px-1">
-            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
-              Pilih kategori
-            </p>
-          </div> */}
+        <div
+          role="tablist"
+          aria-label="Kategori pencarian"
+          className="flex touch-pan-y gap-2 px-1 pb-2"
+        >
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const tone = toneClassNames(tab.tone);
+            const active = activeTab === tab.id;
 
-          <div
-            role="tablist"
-            aria-label="Kategori pencarian"
-            className="
-      flex gap-2 overflow-x-auto scroll-smooth px-1 pb-2
-      [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-      touch-pan-x
-    "
-          >
-            {tabs.map(tab => {
-              const Icon = tab.icon;
-              const tone = toneClassNames(tab.tone);
-              const active = activeTab === tab.id;
-
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => {
-                    setPostOptionsOpen(false);
-                    setPostOptionsCopied(false);
-                    onTabChange(tab.id);
-                  }}
-                  className={cn(
-                    `
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  setPostOptionsOpen(false);
+                  setPostOptionsCopied(false);
+                  onTabChange(tab.id);
+                }}
+                className={cn(
+                  `
               group flex min-h-11 shrink-0 items-center gap-2 rounded-full
               border px-4 text-sm font-extrabold transition-all duration-200
               active:scale-95
             `,
-                    active
-                      ? cn(
-                        tone.surface,
-                        tone.text,
-                        'border-current shadow-sm',
-                      )
-                      : `
+                  active
+                    ? cn(tone.surface, tone.text, 'border-current shadow-sm')
+                    : `
                   border-zinc-200 bg-white text-zinc-600
                   hover:border-zinc-300 hover:bg-zinc-50
                 `,
-                  )}
-                >
-                  <span
-                    className={cn(
-                      `
+                )}
+              >
+                <span
+                  className={cn(
+                    `
                 flex h-7 w-7 shrink-0 items-center justify-center rounded-full
                 transition
               `,
-                      active
-                        ? 'bg-white/70'
-                        : 'bg-zinc-100 text-zinc-500 group-hover:bg-zinc-200',
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
+                    active
+                      ? 'bg-white/70'
+                      : 'bg-zinc-100 text-zinc-500 group-hover:bg-zinc-200',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
 
-                  <span className="whitespace-nowrap">
-                    {tab.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* {tabs.find(tab => tab.id === activeTab)?.caption && (
-            <p className="mt-1 px-2 text-xs font-semibold text-zinc-500">
-              {tabs.find(tab => tab.id === activeTab)?.caption}
-            </p>
-          )} */}
+                <span className="whitespace-nowrap">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
       <div className="mt-3">
@@ -2786,14 +3026,18 @@ function CommunityPanel({
 
 export function ReelsPanel({ isId, items }: ReelsPanelProps) {
   // Inisialisasi Embla Carousel untuk navigasi swipe super mulus
-  const [emblaRef] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true,
   });
+  useEmblaWheelGestures(emblaApi);
 
   return (
-    <section className="space-y-3 py-2" data-testid="home-reels-section">
+    <section
+      className="lajukan-home-reels-panel relative z-0 isolate space-y-3 overflow-hidden py-2 [backface-visibility:hidden]"
+      data-testid="home-reels-section"
+    >
       {/* HEADER */}
       {/* Jika SectionHeading milik Anda punya padding internal, sesuaikan penempatannya */}
       <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
@@ -2813,13 +3057,14 @@ export function ReelsPanel({ isId, items }: ReelsPanelProps) {
           </p>
         </div>
 
-        <Link
-          href="/reels"
-          className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
-        >
-          <span>{isId ? 'Lihat semua' : 'See all'}</span>
-          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <CompactSeeAllLink
+            href="/reels"
+            isId={isId}
+            ariaLabel={isId ? 'Lihat semua reels' : 'View all reels'}
+          />
+          <EmblaDesktopControls api={emblaApi} isId={isId} compact />
+        </div>
       </div>
 
       {/* EMPTY STATE */}
@@ -2831,7 +3076,7 @@ export function ReelsPanel({ isId, items }: ReelsPanelProps) {
         /* CAROUSEL CONTAINER */
         <div className="w-full">
           <div
-            className="overflow-hidden px-1 sm:px-3 md:px-6 contain-paint"
+            className="relative cursor-grab overflow-hidden px-1 active:cursor-grabbing sm:px-3 md:px-6"
             ref={emblaRef}
           >
             {/* embla__container - Menggunakan touch-pan-y agar gesture scroll atas-bawah layar HP aman */}
@@ -2842,7 +3087,7 @@ export function ReelsPanel({ isId, items }: ReelsPanelProps) {
                   key={item.id}
                   className="w-[140px] sm:w-[156px] shrink-0 select-none"
                 >
-                  <ReelCard item={item} />
+                  <ReelCard item={item} isId={isId} />
                 </div>
               ))}
             </div>
@@ -2853,11 +3098,11 @@ export function ReelsPanel({ isId, items }: ReelsPanelProps) {
   );
 }
 
-function ReelCard({ item }: { item: ReelItem }) {
+function ReelCard({ item, isId }: { item: ReelItem; isId: boolean }) {
   return (
     <Link
       href={item.href}
-      className="group relative block aspect-[9/16] w-full overflow-hidden rounded-[20px] border border-zinc-800 bg-zinc-950 shadow-[0_12px_24px_-16px_rgba(15,23,42,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_28px_-12px_rgba(15,23,42,0.4)]"
+      className="group relative isolate block aspect-[9/16] w-full overflow-hidden rounded-[20px] border border-zinc-800 bg-zinc-950 shadow-[0_12px_24px_-16px_rgba(15,23,42,0.3)] transition-all duration-300 [backface-visibility:hidden] [transform:translateZ(0)] hover:-translate-y-1 hover:shadow-[0_16px_28px_-12px_rgba(15,23,42,0.4)]"
       data-testid="home-reel-card"
       data-lajukan-event="home.card_clicked"
       data-lajukan-surface="home_reels"
@@ -2872,7 +3117,7 @@ function ReelCard({ item }: { item: ReelItem }) {
           muted
           playsInline
           preload="metadata"
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 [backface-visibility:hidden] [transform:translateZ(0)] group-hover:scale-105"
         />
       ) : item.mediaUrl ? (
         <Image
@@ -2880,7 +3125,7 @@ function ReelCard({ item }: { item: ReelItem }) {
           alt={item.title}
           fill
           sizes="(max-width: 640px) 140px, 156px"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-transform duration-500 [backface-visibility:hidden] [transform:translateZ(0)] group-hover:scale-105"
         />
       ) : (
         <span className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,#14532d,#020617)] text-white/40">
@@ -2899,17 +3144,17 @@ function ReelCard({ item }: { item: ReelItem }) {
         {item.category}
       </span>
 
-      {/* DESKRIPSI & INFO VIEWS (Bagian Bawah) */}
+      {/* DESKRIPSI & INFO TAYANGAN (Bagian Bawah) */}
       <div className="absolute inset-x-3 bottom-3 flex flex-col justify-end">
         {/* Judul dengan batasan baris */}
         <p className="line-clamp-2 text-[11px] sm:text-xs font-bold leading-snug text-white tracking-tight drop-shadow-sm">
           {item.title}
         </p>
 
-        {/* Baris data views & icon play */}
+        {/* Baris data tayangan & icon play */}
         <div className="mt-2 flex items-center justify-between text-[10px] font-medium text-zinc-300/90">
           <span className="rounded bg-black/45 px-1 text-white">
-            {item.views} views
+            {item.views} {isId ? 'tayangan' : 'views'}
           </span>
           <PlayCircle className="h-4 w-4 text-white transition-transform group-hover:scale-110" />
         </div>
@@ -3076,6 +3321,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, user, loading: authLoading, authFetch } = useAuth();
+  const userId = typeof user?.id === 'string' ? user.id : null;
   const viewerLocationState = useViewerLocation({
     isId,
     autoRequest: false,
@@ -3154,11 +3400,15 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   useEffect(() => {
     let active = true;
 
+    const resetWalletBalance = () => {
+      setWalletAmountLabel(formatCurrencyFromCents(0, 'IDR'));
+      setWalletModeLabel(null);
+      setWalletLoading(false);
+    };
+
     async function loadWalletBalance() {
-      if (!user) {
-        setWalletAmountLabel(formatCurrencyFromCents(0, 'IDR'));
-        setWalletModeLabel(null);
-        setWalletLoading(false);
+      if (authLoading || !isAuthenticated || !userId) {
+        resetWalletBalance();
         return;
       }
 
@@ -3173,8 +3423,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         if (!active) return;
 
         if (!response.ok) {
-          setWalletAmountLabel(formatCurrencyFromCents(0, 'IDR'));
-          setWalletModeLabel(null);
+          resetWalletBalance();
           return;
         }
 
@@ -3195,8 +3444,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         );
       } catch {
         if (!active) return;
-        setWalletAmountLabel(formatCurrencyFromCents(0, 'IDR'));
-        setWalletModeLabel(null);
+        resetWalletBalance();
       } finally {
         if (active) setWalletLoading(false);
       }
@@ -3207,7 +3455,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     return () => {
       active = false;
     };
-  }, [authFetch, user]);
+  }, [authFetch, authLoading, isAuthenticated, userId]);
 
   useEffect(() => {
     let active = true;
@@ -3309,7 +3557,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             ? payload.nextCursor
             : null;
         const responseItemCount = payload?.items?.length || 0;
-        const fallbackNextCursor = offset + Math.max(responseItemCount, mapped.length);
+        const fallbackNextCursor =
+          offset + Math.max(responseItemCount, mapped.length);
         const nextCursor =
           rawNextCursor !== null && rawNextCursor > offset
             ? rawNextCursor
@@ -3364,7 +3613,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const loadMoreCommunityPosts = useCallback(() => {
     if (communityLoading) return;
     if (communityError) {
-      void loadCommunityPostsPage(communityPosts.length > 0 ? communityOffset : 0);
+      void loadCommunityPostsPage(
+        communityPosts.length > 0 ? communityOffset : 0,
+      );
       return;
     }
     if (!communityHasMore) return;
@@ -3481,10 +3732,23 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     });
     router.push(
       trimmedQuery
-        ? `/search?q=${encodeURIComponent(trimmedQuery)}`
+        ? `/explore?q=${encodeURIComponent(trimmedQuery)}`
         : UMKM_DISCOVERY_PATH,
     );
   };
+  const openSearchFilters = useCallback(() => {
+    const params = new URLSearchParams();
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) params.set('q', trimmedQuery);
+    params.set('filters', '1');
+    void trackLajukanEvent('search.filters_opened', {
+      properties: {
+        query: trimmedQuery,
+        source: 'home_hero',
+      },
+    });
+    router.push(`/explore?${params.toString()}`);
+  }, [query, router]);
 
   const sidebarItems = isAuthenticated
     ? {
@@ -3586,28 +3850,28 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           id: 'supplier',
           label: isId ? 'Supplier' : 'Suppliers',
           caption: isId ? 'Siap respon' : 'Trusted suppliers',
-          href: '/search?type=product&q=supplier',
+          href: '/explore?type=product&q=supplier',
           icon: ShoppingBag,
         },
         {
           id: 'service',
           label: isId ? 'Jasa' : 'Services',
           caption: isId ? 'Operasional' : 'Business services',
-          href: '/search?type=service&q=jasa%20usaha',
+          href: '/explore?type=service&q=jasa%20usaha',
           icon: BriefcaseBusiness,
         },
         {
           id: 'location',
           label: isId ? 'Lokasi' : 'Places',
           caption: isId ? 'Titik jual' : 'Strategic places',
-          href: '/search?type=property&q=lokasi%20usaha',
+          href: '/explore?type=property&q=lokasi%20usaha',
           icon: MapPin,
         },
         {
           id: 'talent',
           label: 'Talent',
           caption: isId ? 'Siap bantu' : 'Qualified talent',
-          href: '/search?type=freelancer&q=talent',
+          href: '/explore?type=freelancer&q=talent',
           icon: UserRound,
         },
         // {
@@ -3663,7 +3927,15 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   return (
     <MarketplacePageFrame>
       <main className="mx-auto w-full max-w-[720px] space-y-3.5 sm:space-y-4 lg:hidden">
-        <HeroVisualStage isId={isId} className="mb-3" />
+        <HeroVisualStage
+          isId={isId}
+          className="mb-3"
+          query={query}
+          onQueryChange={setQuery}
+          onSubmit={handleSearchSubmit}
+          onOpenFilters={openSearchFilters}
+        />
+        {/* <MobileAppDownloadSection isId={isId} /> */}
         <GameProgressCard
           isId={isId}
           isAuthenticated={isAuthenticated}
@@ -3732,7 +4004,14 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 placeholder={text.searchPlaceholder}
                 buttonLabel={text.searchButton}
               /> */}
-              <HeroVisualStage isId={isId} className="mb-3" />
+              <HeroVisualStage
+                isId={isId}
+                className="mb-3"
+                query={query}
+                onQueryChange={setQuery}
+                onSubmit={handleSearchSubmit}
+                onOpenFilters={openSearchFilters}
+              />
               <div className="xl:hidden">
                 <GameProgressCard
                   isId={isId}
@@ -3758,7 +4037,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 locationPromptDismissed={
                   viewerLocationState.locationPromptDismissed
                 }
-                requestViewerLocation={viewerLocationState.requestViewerLocation}
+                requestViewerLocation={
+                  viewerLocationState.requestViewerLocation
+                }
                 dismissLocationPrompt={
                   viewerLocationState.dismissLocationPrompt
                 }

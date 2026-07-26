@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePathname } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Z_INDEX } from './constants/z-index';
 
 type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
@@ -13,7 +12,7 @@ export default function GlobalLoader() {
   const searchParams = useSearchParams();
   const search = searchParams.toString();
 
-  const [showLoader, setShowLoader] = useState(true);
+  const [showLoader, setShowLoader] = useState(false);
 
   const delayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minDisplayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,14 +33,6 @@ export default function GlobalLoader() {
 
   useEffect(() => {
     currentRouteRef.current = window.location.pathname + window.location.search;
-
-    const timeout = setTimeout(() => {
-      setShowLoader(false);
-    }, 500);
-
-    return () => {
-      clearTimeout(timeout);
-    };
   }, []);
 
   useEffect(() => {
@@ -141,20 +132,15 @@ export default function GlobalLoader() {
   }, [pathname, search]);
 
   return (
-    <AnimatePresence>
-      {showLoader && (
-        <motion.div
-          key="global-loader"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          className="fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)]  flex items-center justify-center"
-          style={{ zIndex: Z_INDEX.loading }}
-        >
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[color:var(--app-accent-border)] border-t-transparent" />
-        </motion.div>
-      )}
-    </AnimatePresence>
+    showLoader ? (
+      <div
+        role="status"
+        aria-label="Loading"
+        className="fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)]"
+        style={{ zIndex: Z_INDEX.loading }}
+      >
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[color:var(--app-accent-border)] border-t-transparent motion-reduce:animate-none" />
+      </div>
+    ) : null
   );
 }

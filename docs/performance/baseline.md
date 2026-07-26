@@ -90,14 +90,14 @@ Verified command:
 npx playwright test tests/e2e/lajukan-stabilization.spec.ts --project=chromium
 ```
 
-Coverage: render and horizontal-overflow smoke for home, search, UMKM discovery, create, community, reels, login, register, support, and content detail across `360x800`, `390x844`, `768x1024`, `1024x768`, `1366x768`, and `1440x900`.
+Coverage: render and horizontal-overflow smoke for home, Explore results, UMKM discovery, create, community, reels, login, register, support, and content detail across `360x800`, `390x844`, `768x1024`, `1024x768`, `1366x768`, and `1440x900`.
 
 This is not a Web Vitals baseline. It only verifies layout stability and control visibility for critical public routes.
 
 ## Next Measurements
 
 1. Run `npm run build` for `frontend/www` and capture route/build warnings.
-2. Run targeted Playwright smoke for `/home`, `/search`, `/umkm`, `/content/[id]`, `/chat`, `/reels`.
+2. Run targeted Playwright smoke for `/home`, `/explore`, `/umkm`, `/content/[id]`, `/chat`, `/reels`.
 3. Add bundle analyzer only if needed and documented.
 4. Capture safe DB `EXPLAIN` for hottest search/listing queries in a dev database.
 5. Measure Ollama response times separately from product request time.

@@ -4,6 +4,8 @@ import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurit
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { validatePasswordStrength } from '@/lib/passwordPolicy';
+import { safeErrorCode } from '@/lib/server/safeLog';
+import crypto from 'node:crypto';
 import { SignJWT } from 'jose';
 import { z } from 'zod';
 
@@ -59,8 +61,13 @@ export async function POST(req: NextRequest) {
     const ip = security.ip;
     const rateLimitTarget =
       parsed.data.mode === 'otp' ? parsed.data.email : parsed.data.token;
+    const opaqueRateLimitTarget = crypto
+      .createHash('sha256')
+      .update(rateLimitTarget.trim().toLowerCase())
+      .digest('hex')
+      .slice(0, 24);
     const rl = await enforceRateLimit({
-      key: `auth:reset-password:${ip}:${rateLimitTarget}`,
+      key: `auth:reset-password:${ip}:${opaqueRateLimitTarget}`,
       limit: 10,
       windowSeconds: 3600,
     });
@@ -88,7 +95,7 @@ export async function POST(req: NextRequest) {
       await clearOTPAttempts('email', email);
     } else {
       const redis = getRedis();
-      email = await redis.get(`reset:${parsed.data.token}`);
+      email = await redis.getdel(`reset:${parsed.data.token}`);
       if (!email) {
         return NextResponse.json(
           { error: 'Invalid or expired reset token' },
@@ -123,17 +130,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
       return NextResponse.json(
-        { error: data.error || 'Failed to reset password' },
+        {
+          error:
+            res.status === 400 || res.status === 401
+              ? 'Invalid password reset request'
+              : 'Failed to reset password',
+        },
         { status: res.status }
       );
-    }
-
-    // Delete used link token on link-based reset
-    if (parsed.data.mode === 'link') {
-      const redis = getRedis();
-      await redis.del(`reset:${parsed.data.token}`);
     }
 
     return NextResponse.json({
@@ -141,7 +146,7 @@ export async function POST(req: NextRequest) {
       message: 'Password has been reset successfully',
     });
   } catch (e) {
-    console.error('Reset password error:', e);
+    console.error('Reset password error:', { error: safeErrorCode(e) });
     return NextResponse.json(
       { error: 'Service unavailable' },
       { status: 503 }

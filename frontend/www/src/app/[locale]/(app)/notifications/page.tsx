@@ -4,13 +4,7 @@ import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { LocalizedLink as Link } from '@/components/ui-kit';
-import {
-  Bell,
-  CheckCheck,
-  Loader2,
-  RefreshCcw,
-  Sparkles,
-} from 'lucide-react';
+import { Bell, CheckCheck, Loader2, RefreshCcw, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useNotificationInbox } from '@/context/NotificationInboxContext';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
@@ -41,10 +35,9 @@ function formatRelativeTime(
 
   const diffSeconds = Math.round((parsed - Date.now()) / 1000);
   const abs = Math.abs(diffSeconds);
-  const rtf = new Intl.RelativeTimeFormat(
-    locale === 'id' ? 'id-ID' : 'en-US',
-    { numeric: 'auto' },
-  );
+  const rtf = new Intl.RelativeTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', {
+    numeric: 'auto',
+  });
 
   if (abs < 60) return rtf.format(diffSeconds, 'second');
 
@@ -64,7 +57,9 @@ function formatRelativeTime(
 }
 
 function cleanText(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function pickNotificationEmoji(input: {
@@ -84,21 +79,25 @@ function pickNotificationEmoji(input: {
     .map(cleanText)
     .join(' ');
 
-  if (text.includes('topup') || text.includes('top-up')) return '💚';
-  if (text.includes('refund') || text.includes('dikembalikan')) return '↩️';
+  if (text.includes('topup') || text.includes('top-up')) {
+    return 'Top-up update';
+  }
+  if (text.includes('refund') || text.includes('dikembalikan')) {
+    return 'Refund update';
+  }
   if (
     text.includes('payment') ||
     text.includes('pembayaran') ||
     text.includes('paid')
   ) {
-    return '💳';
+    return 'Payment update';
   }
   if (
     text.includes('wallet') ||
     text.includes('saldo') ||
     text.includes('dana masuk')
   ) {
-    return '💰';
+    return 'Wallet update';
   }
   if (
     text.includes('security') ||
@@ -106,9 +105,11 @@ function pickNotificationEmoji(input: {
     text.includes('login') ||
     text.includes('otp')
   ) {
-    return '🛡️';
+    return 'Security update';
   }
-  if (text.includes('chat') || text.includes('message')) return '💬';
+  if (text.includes('chat') || text.includes('message')) {
+    return 'Chat update';
+  }
   if (
     text.includes('social') ||
     text.includes('profile.viewed') ||
@@ -127,32 +128,38 @@ function pickNotificationEmoji(input: {
     text.includes('comment') ||
     text.includes('reply')
   ) {
-    return '💗';
+    return 'Social update';
   }
-  if (text.includes('offer') || text.includes('tawaran')) return '🤝';
+  if (text.includes('offer') || text.includes('tawaran')) {
+    return 'Offer update';
+  }
   if (
     text.includes('failed') ||
     text.includes('gagal') ||
     text.includes('cancel') ||
     text.includes('dibatalkan')
   ) {
-    return '⚠️';
+    return 'Attention needed';
   }
-  if (text.includes('pending') || text.includes('menunggu')) return '⏳';
+  if (text.includes('pending') || text.includes('menunggu')) {
+    return 'Pending update';
+  }
   if (
     text.includes('delivered') ||
     text.includes('dikirim') ||
     text.includes('pengiriman')
   ) {
-    return '🚚';
+    return 'Delivery update';
   }
-  if (text.includes('support') || text.includes('bantuan')) return '🛟';
+  if (text.includes('support') || text.includes('bantuan')) {
+    return 'Support update';
+  }
   if (
     text.includes('business') ||
     text.includes('usaha') ||
     text.includes('profile')
   ) {
-    return '🏪';
+    return 'Business update';
   }
   if (
     text.includes('success') ||
@@ -160,10 +167,10 @@ function pickNotificationEmoji(input: {
     text.includes('confirmed') ||
     text.includes('terkonfirmasi')
   ) {
-    return '✅';
+    return 'Success update';
   }
 
-  return '🔔';
+  return 'Notification';
 }
 
 export default function NotificationsPage() {
@@ -214,14 +221,14 @@ export default function NotificationsPage() {
       : 'Payment, security, transaction, and key activity updates appear here.';
 
   return (
-    <section className="mx-auto w-full max-w-[920px] px-2 py-3 sm:px-4 sm:py-5">
-      <div className="overflow-hidden rounded-[26px] border border-[color:var(--app-border)] bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_54%,#eff6ff_100%)] p-3 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] sm:p-4">
+    <section className="page-shell max-w-[920px] pb-8 pt-3 lg:pb-10">
+      <div className="ui-panel p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[17px] bg-[linear-gradient(135deg,#0f766e,#16a34a)] text-white shadow-[0_16px_30px_-22px_rgba(21,128,61,0.95)] sm:h-12 sm:w-12">
+            <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] sm:h-12 sm:w-12">
               <Bell className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-amber-400 text-[13px] shadow-sm">
-                ✨
+              <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+                <Sparkles className="h-3 w-3" />
               </span>
             </span>
             <div className="min-w-0">
@@ -241,7 +248,7 @@ export default function NotificationsPage() {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="ui-pressable inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-[15px] border border-[color:var(--app-border)] bg-white/88 px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-white/8"
+              className="ui-button-secondary inline-flex h-10 min-w-10 items-center justify-center gap-1.5 px-3 text-xs font-bold"
               aria-label={isId ? 'Refresh notifikasi' : 'Refresh notifications'}
             >
               <RefreshCcw className="h-3.5 w-3.5" />
@@ -258,7 +265,7 @@ export default function NotificationsPage() {
                   setSubmitting(false);
                 }
               }}
-              className="ui-pressable inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-[15px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="ui-button-primary inline-flex h-10 min-w-10 items-center justify-center gap-1.5 px-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"
               aria-label={
                 isId ? 'Tandai semua dibaca' : 'Mark all notifications read'
               }
@@ -280,7 +287,7 @@ export default function NotificationsPage() {
             {Array.from({ length: 5 }).map((_, index) => (
               <div
                 key={index}
-                className="rounded-[22px] border border-[color:var(--app-border)] bg-white/82 p-3 dark:bg-white/8"
+                className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3"
               >
                 <div className="flex items-start gap-3">
                   <Skeleton className="h-12 w-12 rounded-[18px]" />
@@ -294,7 +301,7 @@ export default function NotificationsPage() {
             ))}
           </div>
         ) : visibleItems.length === 0 ? (
-          <div className="mt-4 rounded-[24px] border border-dashed border-[color:var(--app-border)] bg-white/74 p-8 text-center text-sm font-semibold text-[color:var(--app-text-soft)] dark:bg-white/8">
+          <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-8 text-center text-sm font-semibold text-[color:var(--app-text-soft)]">
             <Sparkles className="mx-auto mb-2 h-6 w-6 text-[color:var(--app-accent)]" />
             {isId
               ? 'Belum ada notifikasi. Nanti update penting akan muncul di sini.'
@@ -322,7 +329,9 @@ export default function NotificationsPage() {
               const summary = notificationSocialSummary(item, locale);
               const actorLabel = summary.actor;
               const actorHandle = summary.handle;
-              const hasSocialActor = Boolean(actorLabel || social.actorAvatarUrl);
+              const hasSocialActor = Boolean(
+                actorLabel || social.actorAvatarUrl,
+              );
               const actorAvatar = profileAvatarSrc(
                 social.actorAvatarUrl,
                 readProfileAvatarStyle(item.data),
@@ -332,6 +341,7 @@ export default function NotificationsPage() {
               );
               const notificationTitle = summary.title;
               const notificationBody = summary.subtitle;
+              const notificationMeta = summary.metaLabel;
 
               return (
                 <Link
@@ -341,10 +351,10 @@ export default function NotificationsPage() {
                     if (!item.is_read) void markRead(item.id);
                   }}
                   className={cn(
-                    'group relative w-full overflow-hidden rounded-[20px] border p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.32)] sm:p-3',
+                    'group relative w-full overflow-hidden rounded-[16px] border p-2.5 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] sm:p-3',
                     item.is_read
-                      ? 'border-[color:var(--app-border)] bg-white/85 opacity-90 dark:bg-white/[0.06]'
-                      : visual.surfaceClassName,
+                      ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface)] opacity-90'
+                      : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)]',
                   )}
                 >
                   <span
@@ -407,6 +417,11 @@ export default function NotificationsPage() {
                           <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]">
                             {notificationBody}
                           </span>
+                          {notificationMeta ? (
+                            <span className="mt-1 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                              {notificationMeta}
+                            </span>
+                          ) : null}
                         </span>
 
                         {!item.is_read ? (
@@ -448,21 +463,6 @@ export default function NotificationsPage() {
                               : 'New'}
                         </span>
                       </span>
-
-                      {(summary.entity || summary.entityTypeLabel) ? (
-                        <span className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
-                          {summary.entity ? (
-                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {summary.entity}
-                            </span>
-                          ) : null}
-                          {summary.entityTypeLabel ? (
-                            <span className="rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {summary.entityTypeLabel}
-                            </span>
-                          ) : null}
-                        </span>
-                      ) : null}
                     </span>
                   </div>
                 </Link>

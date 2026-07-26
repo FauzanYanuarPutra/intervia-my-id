@@ -10,7 +10,9 @@ type NotificationLike = {
 
 type NotificationData = Record<string, unknown>;
 
-function readNotificationData(notification: NotificationLike): NotificationData {
+function readNotificationData(
+  notification: NotificationLike,
+): NotificationData {
   const data = notification.data;
   return data && typeof data === 'object' && !Array.isArray(data)
     ? (data as NotificationData)
@@ -55,7 +57,10 @@ export function notificationTargetHref(notification: NotificationLike): string {
     'entity_type',
     'entityType',
   ]).toLowerCase();
-  const entityId = readNotificationDataText(notification, ['entity_id', 'entityId']);
+  const entityId = readNotificationDataText(notification, [
+    'entity_id',
+    'entityId',
+  ]);
   const entityTitle = readNotificationDataText(notification, [
     'entity_label',
     'content_title',
@@ -64,7 +69,10 @@ export function notificationTargetHref(notification: NotificationLike): string {
     'title',
     'name',
   ]);
-  const entitySlug = readNotificationDataText(notification, ['slug', 'entity_slug']);
+  const entitySlug = readNotificationDataText(notification, [
+    'slug',
+    'entity_slug',
+  ]);
 
   if (entityType === 'profile' && entityId) {
     return `/profile/${encodeURIComponent(entityId)}`;
@@ -73,7 +81,11 @@ export function notificationTargetHref(notification: NotificationLike): string {
     return `/reels?reel=${encodeURIComponent(entityId)}`;
   }
   if (entityType === 'content' && entityId) {
-    return buildContentHref(entityId, entityTitle || undefined, entitySlug || undefined);
+    return buildContentHref(
+      entityId,
+      entityTitle || undefined,
+      entitySlug || undefined,
+    );
   }
   if ((entityType === 'map' || entityType === 'maps') && entityId) {
     return `/umkm?item=${encodeURIComponent(entityId)}`;
@@ -131,7 +143,9 @@ export function notificationSocialContext(notification: NotificationLike) {
     readNotificationDataText(notification, ['entity_type', 'entityType']) || '';
   const action =
     readNotificationDataText(notification, ['action', 'event_name']) ||
-    String(notification.event_type || '').split('.').pop() ||
+    String(notification.event_type || '')
+      .split('.')
+      .pop() ||
     '';
   const actionCopy =
     readNotificationDataText(notification, [
@@ -168,41 +182,48 @@ export function notificationSocialSummary(
         : `@${social.actorHandle}`
       : '');
   const entity = social.entityLabel || '';
-  const entityTypeLabel = notificationTargetLabel(social.entityType);
+  const entityTypeLabel = notificationTargetLabel(social.entityType, locale);
   const fallbackTitle =
     String(notification.title || '').trim() ||
     (locale === 'id' ? 'Notifikasi baru' : 'New notification');
 
-  const verb = (() => {
+  const actionLabel = (() => {
     if (event.includes('liked') || event.includes('like')) {
-      return locale === 'id' ? 'menyukai' : 'liked';
+      return locale === 'id' ? 'Menyukai' : 'Liked';
     }
     if (event.includes('commented') || event.includes('comment')) {
-      return locale === 'id' ? 'mengomentari' : 'commented on';
+      return locale === 'id' ? 'Mengomentari' : 'Commented on';
     }
     if (event.includes('replied') || event.includes('reply')) {
-      return locale === 'id' ? 'membalas' : 'replied to';
+      return locale === 'id' ? 'Membalas' : 'Replied to';
     }
     if (event.includes('viewed') || event.includes('profile_opened')) {
-      return locale === 'id' ? 'melihat' : 'viewed';
+      return locale === 'id' ? 'Melihat' : 'Viewed';
     }
     if (event.includes('route_clicked')) {
-      return locale === 'id' ? 'membuka rute ke' : 'opened directions to';
+      return locale === 'id' ? 'Membuka rute' : 'Opened directions';
     }
     if (event.includes('message')) {
-      return locale === 'id' ? 'mengirim pesan di' : 'sent a message in';
+      return locale === 'id' ? 'Mengirim pesan' : 'Sent a message';
     }
-    return social.actionCopy || (locale === 'id' ? 'memperbarui' : 'updated');
+    const copy = social.actionCopy.trim();
+    if (copy) return copy.charAt(0).toUpperCase() + copy.slice(1);
+    return locale === 'id' ? 'Update baru' : 'New update';
   })();
 
   const target = entity || entityTypeLabel;
+  const actionTitle =
+    target && entityTypeLabel
+      ? `${actionLabel} ${entityTypeLabel.toLowerCase()}`
+      : actionLabel;
   const subtitle = target
-    ? `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${target}.`
+    ? target
     : String(notification.message || '').trim() ||
       (locale === 'id' ? 'Ada update baru.' : 'There is a new update.');
+  const metaParts = [actor, entityTypeLabel].filter(Boolean);
 
   return {
-    title: actor || fallbackTitle,
+    title: target ? actionTitle : actor || fallbackTitle,
     handle:
       social.actorHandle && social.actorName
         ? social.actorHandle.startsWith('@')
@@ -213,17 +234,27 @@ export function notificationSocialSummary(
     actor,
     entity,
     entityTypeLabel,
+    actionLabel,
+    actionTitle,
+    targetTitle: target,
+    metaLabel: metaParts.join(' · '),
     href: social.href,
   };
 }
 
-export function notificationTargetLabel(entityType: string): string {
-  const value = String(entityType || '').trim().toLowerCase();
+export function notificationTargetLabel(
+  entityType: string,
+  locale: 'id' | 'en' = 'id',
+): string {
+  const value = String(entityType || '')
+    .trim()
+    .toLowerCase();
   if (!value) return '';
-  if (value === 'profile') return 'Profile';
+  if (value === 'profile') return locale === 'id' ? 'profil' : 'profile';
   if (value === 'reel' || value === 'reels') return 'Reels';
-  if (value === 'content') return 'Content';
-  if (value === 'map' || value === 'maps') return 'Maps';
+  if (value === 'content') return locale === 'id' ? 'listing' : 'listing';
+  if (value === 'map' || value === 'maps')
+    return locale === 'id' ? 'lokasi' : 'place';
   if (value === 'chat') return 'Chat';
   return value
     .split(/[_-]+/)

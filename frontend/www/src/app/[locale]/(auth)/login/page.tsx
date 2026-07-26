@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import GoogleAuthOnlyClient from '../GoogleAuthOnlyClient';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -53,7 +54,7 @@ export default async function LoginPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <GoogleAuthOnlyClient mode="login" />
     </>

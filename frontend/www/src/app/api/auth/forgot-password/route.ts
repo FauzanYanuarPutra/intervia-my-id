@@ -4,6 +4,8 @@ import { sendOTPEmail, sendPasswordResetEmail } from '@/lib/email';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
+import { resolvePublicOrigin } from '@/lib/auth/oauthRedirects';
+import { safeErrorCode } from '@/lib/server/safeLog';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const ip = security.ip;
     const rl = await enforceRateLimit({
-      key: `auth:forgot-password:${ip}:${email}`,
+      key: `auth:forgot-password:${ip}:${crypto.createHash('sha256').update(email).digest('hex').slice(0, 24)}`,
       limit: 5,
       windowSeconds: 3600,
     });
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otp = crypto.randomInt(100000, 1_000_000).toString();
       await storeOTP('email', email, otp);
       sent = await sendOTPEmail(email, otp);
       if (sent) {
@@ -64,13 +66,12 @@ export async function POST(req: NextRequest) {
       const redis = getRedis();
       await redis.setex(`reset:${resetToken}`, RESET_TOKEN_EXPIRY, email);
 
-      const baseUrl =
-        (
-          process.env.NEXT_PUBLIC_APP_URL ||
-          process.env.NEXT_PUBLIC_WWW_URL ||
-          req.nextUrl.origin ||
-          'https://www.lajukan.com'
-        ).replace(/\/$/, '');
+      const baseUrl = resolvePublicOrigin({
+        configuredOrigin:
+          process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
+        requestOrigin: req.nextUrl.origin,
+        production: process.env.NODE_ENV === 'production',
+      });
       const locale = req.cookies.get('NEXT_LOCALE')?.value || 'id';
       const resetLink = `${baseUrl}/${locale}/reset-password?token=${resetToken}`;
 
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
       ...(process.env.NODE_ENV !== 'production' ? { delivery: sent ? 'ok' : 'failed' } : {}),
     });
   } catch (e) {
-    console.error('Forgot password error:', e);
+    console.error('Forgot password error:', { error: safeErrorCode(e) });
     return NextResponse.json(
       { error: 'Service unavailable' },
       { status: 503 }

@@ -2,6 +2,8 @@
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
+import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
+import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import {
   type CardType,
   type CategoryVisual,
@@ -81,10 +83,16 @@ import { buildPublicProfileHrefFromContent } from '@/lib/profile/publicProfileLi
 import {
   buildBusinessDiscoveryCreateHref,
   RESULT_BUSINESS_DISCOVERY_CATEGORY_IDS,
+  getBusinessDiscoveryCategoryByCreateSlug,
   getBusinessDiscoveryCategoryById,
   isResultBusinessDiscoveryCategoryId,
   type BusinessDiscoveryCategoryId,
 } from '@/lib/businessDiscoveryCategories';
+import {
+  FALLBACK_CREATE_SUBCATEGORIES,
+  mergeCreateTaxonomyItems,
+  type CreateTaxonomyItem,
+} from '@/lib/create/createTaxonomyFallbacks';
 import { compareBusinessServiceability } from '@/lib/businessDiscoveryRanking';
 import {
   getListingSideContextLabel,
@@ -115,18 +123,18 @@ function getListingSideVisual(side: ListingSide) {
   if (side === 'demand') {
     return {
       badgeClass:
-        'bg-emerald-600 text-white shadow-[0_10px_24px_-16px_rgba(5,150,105,0.75)]',
-      chipClass: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
-      priceClass: 'text-emerald-600',
+        'bg-[#2563eb] text-white shadow-[0_10px_24px_-16px_rgba(37,99,235,0.75)]',
+      chipClass: 'bg-[#eff6ff] text-[#1d4ed8] ring-1 ring-[#bfdbfe]',
+      priceClass: 'text-[#2563eb]',
       Icon: Target,
     };
   }
 
   return {
     badgeClass:
-      'bg-rose-600 text-white shadow-[0_10px_24px_-16px_rgba(225,29,72,0.75)]',
-    chipClass: 'bg-rose-50 text-rose-700 ring-1 ring-rose-100',
-    priceClass: 'text-rose-600',
+      'bg-[#059669] text-white shadow-[0_10px_24px_-16px_rgba(5,150,105,0.75)]',
+    chipClass: 'bg-[#ecfdf5] text-[#047857] ring-1 ring-[#a7f3d0]',
+    priceClass: 'text-[#059669]',
     Icon: Store,
   };
 }
@@ -248,7 +256,10 @@ function readDistanceKmFromContent(
   item: ContentItem,
   metadata: Record<string, unknown>,
 ): number | null {
-  const root = item as ContentItem & { distance_km?: unknown; distanceKm?: unknown };
+  const root = item as ContentItem & {
+    distance_km?: unknown;
+    distanceKm?: unknown;
+  };
   const distance =
     readFiniteNumber(root.distance_km) ??
     readFiniteNumber(root.distanceKm) ??
@@ -258,7 +269,9 @@ function readDistanceKmFromContent(
   return distance !== null && distance >= 0 ? distance : null;
 }
 
-function formatSearchDistance(distanceKm: number | null | undefined): string | null {
+function formatSearchDistance(
+  distanceKm: number | null | undefined,
+): string | null {
   return formatDistanceKm(distanceKm);
 }
 
@@ -309,67 +322,67 @@ const SEARCH_FILTER_TABS: Array<{
   badgeEn?: string;
   icon: LucideIcon;
 }> = [
-    { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
-    {
-      value: 'equipment',
-      labelId: 'Mesin & Alat',
-      labelEn: 'Equipment & Tools',
-      badgeId: 'Laris',
-      badgeEn: 'Popular',
-      icon: Briefcase,
-    },
-    {
-      value: 'supplies',
-      labelId: 'Bahan Usaha',
-      labelEn: 'Business Supplies',
-      badgeId: 'Grosir',
-      badgeEn: 'Wholesale',
-      icon: Package,
-    },
-    {
-      value: 'service',
-      labelId: 'Cari Jasa',
-      labelEn: 'Find Services',
-      badgeId: 'Expert',
-      badgeEn: 'Expert',
-      icon: Wrench,
-    },
-    {
-      value: 'property',
-      labelId: 'Tempat Usaha',
-      labelEn: 'Business Places',
-      badgeId: 'Prime',
-      badgeEn: 'Prime',
-      icon: MapPin,
-    },
-    {
-      value: 'opportunity',
-      labelId: 'Peluang Usaha',
-      labelEn: 'Business Opportunities',
-      badgeId: 'Cuan',
-      badgeEn: 'Grow',
-      icon: Handshake,
-    },
-    {
-      value: 'nearby',
-      labelId: 'Usaha Sekitar',
-      labelEn: 'Nearby Businesses',
-      badgeId: 'Dekat',
-      badgeEn: 'Nearby',
-      icon: Store,
-    },
-  ];
+  { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
+  {
+    value: 'supplies',
+    labelId: 'Bahan & Supplier',
+    labelEn: 'Business Supplies',
+    badgeId: 'Utama',
+    badgeEn: 'Wholesale',
+    icon: Package,
+  },
+  {
+    value: 'service',
+    labelId: 'Cari Jasa',
+    labelEn: 'Find Services',
+    badgeId: 'Expert',
+    badgeEn: 'Expert',
+    icon: Wrench,
+  },
+  {
+    value: 'equipment',
+    labelId: 'Mesin & Alat',
+    labelEn: 'Equipment & Tools',
+    badgeId: 'Teknis',
+    badgeEn: 'Technical',
+    icon: Briefcase,
+  },
+  {
+    value: 'property',
+    labelId: 'Tempat Usaha',
+    labelEn: 'Business Places',
+    badgeId: 'Prime',
+    badgeEn: 'Prime',
+    icon: MapPin,
+  },
+  {
+    value: 'opportunity',
+    labelId: 'Peluang Usaha',
+    labelEn: 'Business Opportunities',
+    badgeId: 'Cuan',
+    badgeEn: 'Grow',
+    icon: Handshake,
+  },
+  {
+    value: 'nearby',
+    labelId: 'Usaha Sekitar',
+    labelEn: 'Nearby Businesses',
+    badgeId: 'Dekat',
+    badgeEn: 'Nearby',
+    icon: Store,
+  },
+];
 
 const SORT_OPTIONS: Array<{
   value: SortKey;
   labelId: string;
   labelEn: string;
 }> = [
-    { value: 'relevance', labelId: 'Paling relevan', labelEn: 'Most relevant' },
-    { value: 'newest', labelId: 'Terbaru', labelEn: 'Newest' },
-    { value: 'price_low', labelId: 'Kisaran rendah', labelEn: 'Lower range' },
-    { value: 'price_high', labelId: 'Kisaran tinggi', labelEn: 'Higher range' },
-  ];
+  { value: 'relevance', labelId: 'Paling relevan', labelEn: 'Most relevant' },
+  { value: 'newest', labelId: 'Terbaru', labelEn: 'Newest' },
+  { value: 'price_low', labelId: 'Kisaran rendah', labelEn: 'Lower range' },
+  { value: 'price_high', labelId: 'Kisaran tinggi', labelEn: 'Higher range' },
+];
 
 const CATEGORY_VISUALS: Record<SearchVisualKey, CategoryVisual> = {
   all: {
@@ -573,28 +586,28 @@ const CATEGORY_VISUALS: Record<SearchVisualKey, CategoryVisual> = {
 };
 
 const SIMPLE_SEARCH_VISUAL: Omit<CategoryVisual, 'icon' | 'hintId' | 'hintEn'> =
-{
-  cardClass:
-    'border-[color:var(--app-border)] bg-white dark:bg-[color:var(--app-surface-strong)]',
-  imageClass:
-    'bg-[linear-gradient(145deg,#f8fafc,#ffffff)] dark:bg-[color:var(--app-surface)]',
-  iconBubbleClass:
-    'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]',
-  activeFilterClass:
-    'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
-  inactiveFilterClass:
-    'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]',
-  chipClass:
-    'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] border-[color:var(--app-border)]',
-  ribbonClass: 'bg-slate-950/76 text-white',
-  priceClass: 'text-[color:var(--app-accent)]',
-  outlineButtonClass:
-    'border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]',
-  solidButtonClass:
-    'bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-20px_rgba(22,163,74,0.48)]',
-  sidePanelClass:
-    'bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] dark:bg-[color:var(--app-surface)]',
-};
+  {
+    cardClass:
+      'border-[color:var(--app-border)] bg-white dark:bg-[color:var(--app-surface-strong)]',
+    imageClass:
+      'bg-[linear-gradient(145deg,#f8fafc,#ffffff)] dark:bg-[color:var(--app-surface)]',
+    iconBubbleClass:
+      'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]',
+    activeFilterClass:
+      'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+    inactiveFilterClass:
+      'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]',
+    chipClass:
+      'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] border-[color:var(--app-border)]',
+    ribbonClass: 'bg-slate-950/76 text-white',
+    priceClass: 'text-[color:var(--app-accent)]',
+    outlineButtonClass:
+      'border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]',
+    solidButtonClass:
+      'bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-20px_rgba(22,163,74,0.48)]',
+    sidePanelClass:
+      'bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] dark:bg-[color:var(--app-surface)]',
+  };
 
 function getCategoryVisual(typeKey: SearchVisualKey): CategoryVisual {
   const current = CATEGORY_VISUALS[typeKey] || CATEGORY_VISUALS.other;
@@ -694,18 +707,6 @@ function getSearchTabLabel(value: SearchFilterTabKey, locale: 'id' | 'en') {
   const category = getBusinessDiscoveryCategoryById(value);
   if (category) return locale === 'id' ? category.labelId : category.labelEn;
   return locale === 'id' ? 'Semua' : 'All';
-}
-
-function getSearchTabBadge(value: SearchFilterTabKey, locale: 'id' | 'en') {
-  const tab = getSearchTabConfig(value);
-  if (tab?.badgeId || tab?.badgeEn) {
-    return locale === 'id'
-      ? tab.badgeId || tab.badgeEn
-      : tab.badgeEn || tab.badgeId;
-  }
-  const category = getBusinessDiscoveryCategoryById(value);
-  if (category) return locale === 'id' ? category.badgeId : category.badgeEn;
-  return '';
 }
 
 function getSearchTabHint(value: SearchFilterTabKey, locale: 'id' | 'en') {
@@ -820,8 +821,12 @@ function resolveBusinessCategory(
   const explicit =
     asString(meta.create_category) ||
     asString(meta.discovery_category) ||
-    asString(meta.business_discovery_category);
-  const category = explicit ? getBusinessDiscoveryCategoryById(explicit) : null;
+    asString(meta.business_discovery_category) ||
+    asString(meta.marketplace_category_slug) ||
+    asString(meta.marketplace_category_legacy_key);
+  const category =
+    getBusinessDiscoveryCategoryById(explicit) ||
+    getBusinessDiscoveryCategoryByCreateSlug(explicit);
   return category && isResultCategoryId(category.id) ? category.id : null;
 }
 
@@ -1286,7 +1291,7 @@ function SearchFilterTabs({
             aria-selected={active}
             onClick={() => onSelect(tab.value)}
             className={cn(
-              'inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold transition hover:-translate-y-0.5',
+              'inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold transition hover:-translate-y-0.5',
               active
                 ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_18px_30px_-22px_rgba(22,163,74,0.46)]'
                 : 'border-[color:var(--app-border)] bg-white/92 text-[color:var(--app-text-soft)] shadow-[0_10px_24px_-24px_rgba(15,23,42,0.18)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]',
@@ -1294,21 +1299,90 @@ function SearchFilterTabs({
           >
             <Icon className="h-4 w-4" />
             {isId ? tab.labelId : tab.labelEn}
-            {tab.badgeId || tab.badgeEn ? (
-              <span
-                className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em]',
-                  active
-                    ? 'bg-white/18 text-white'
-                    : 'bg-emerald-50 text-emerald-700',
-                )}
-              >
-                {isId ? tab.badgeId || tab.badgeEn : tab.badgeEn || tab.badgeId}
-              </span>
-            ) : null}
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function getSubcategoryLabel(
+  item: CreateTaxonomyItem,
+  locale: 'id' | 'en',
+): string {
+  return (
+    (locale === 'id'
+      ? item.name_id || item.label_id
+      : item.name_en || item.label_en) || item.slug
+  );
+}
+
+function SearchSubcategoryFilter({
+  items,
+  locale,
+  selected,
+  onSelect,
+  layout = 'wrap',
+  className,
+}: {
+  items: CreateTaxonomyItem[];
+  locale: 'id' | 'en';
+  selected: string;
+  onSelect: (slug: string) => void;
+  layout?: 'rail' | 'stack' | 'wrap';
+  className?: string;
+}) {
+  const isId = locale === 'id';
+  if (items.length === 0) return null;
+
+  const options: Array<{ slug: string; label: string }> = [
+    {
+      slug: '',
+      label: isId ? 'Semua subkategori' : 'All subcategories',
+    },
+    ...items.map(item => ({
+      slug: item.slug,
+      label: getSubcategoryLabel(item, locale),
+    })),
+  ];
+
+  return (
+    <div className={className}>
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+        {isId ? 'Subkategori' : 'Subcategory'}
+      </p>
+      <div
+        className={cn(
+          'mt-2',
+          layout === 'rail' &&
+            'flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          layout === 'stack' && 'grid gap-2',
+          layout === 'wrap' && 'flex flex-wrap gap-2',
+        )}
+      >
+        {options.map(option => {
+          const active = selected === option.slug;
+          return (
+            <button
+              key={option.slug || 'all-subcategories'}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onSelect(option.slug)}
+              className={cn(
+                'inline-flex min-h-[40px] items-center justify-between gap-2 border px-3 text-left text-[12px] font-semibold transition',
+                layout === 'rail' ? 'shrink-0 rounded-full' : 'rounded-[14px]',
+                layout === 'stack' && 'w-full',
+                active
+                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_12px_24px_-20px_color-mix(in_srgb,var(--app-accent)_70%,transparent)]'
+                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]',
+              )}
+            >
+              <span>{option.label}</span>
+              {active ? <BadgeCheck className="h-4 w-4 shrink-0" /> : null}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1330,8 +1404,8 @@ function SearchResultScopeCard({
 }) {
   const iconMap: Record<SideFilter, LucideIcon> = {
     all: Compass,
-    supply: Package,
-    demand: Search,
+    supply: Store,
+    demand: Target,
   };
 
   const Icon = iconMap[value];
@@ -1341,7 +1415,7 @@ function SearchResultScopeCard({
       type="button"
       onClick={() => onSelect(value)}
       className={cn(
-        'group flex items-center gap-3 rounded-2xl border p-3 text-left transition-all',
+        'group flex items-center gap-2.5 rounded-[14px] border p-2.5 text-left transition-all',
         active
           ? 'border-emerald-200 bg-emerald-50'
           : 'border-zinc-200 bg-white hover:border-emerald-100 hover:bg-zinc-50',
@@ -1349,11 +1423,11 @@ function SearchResultScopeCard({
     >
       <div
         className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition',
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition',
           active ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600',
         )}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-4.5 w-4.5" />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -1719,10 +1793,9 @@ function SearchResultListingCard({
     item.images?.length > 0 ? item.images : item.image ? [item.image] : [];
   const sideVisual = getListingSideVisual(item.side);
   const SideIcon = sideVisual.Icon;
-  const detailBadges = [
-    item.sideContextLabel,
-    ...item.supplierBadges,
-  ].filter(Boolean);
+  const detailBadges = [item.sideContextLabel, ...item.supplierBadges].filter(
+    Boolean,
+  );
 
   useEffect(() => {
     setLiked(item.liked);
@@ -1867,11 +1940,6 @@ function SearchResultListingCard({
 
         {/* CONTENT */}
         <div className="flex min-h-0 flex-1 flex-col p-3">
-          {/* LABEL */}
-          {/* <span className="mb-1 w-fit rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-            {item.content_type}
-          </span> */}
-
           {/* TITLE (FIXED 2 LINES HEIGHT) */}
           <h3 className="line-clamp-2 h-[2.25rem] text-sm font-semibold leading-snug text-gray-900">
             {item.title}
@@ -2023,9 +2091,7 @@ function SearchResultRailSection({
     containScroll: 'keepSnaps',
     dragFree: true,
   });
-
-  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
-  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+  useEmblaWheelGestures(emblaApi);
 
   if (section.items.length === 0) return null;
 
@@ -2058,29 +2124,12 @@ function SearchResultRailSection({
             {isId ? 'Lihat semua' : 'See all'}
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
-          <div className="hidden items-center gap-1 md:flex">
-            <button
-              type="button"
-              onClick={scrollPrev}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]"
-              aria-label={isId ? 'Geser sebelumnya' : 'Previous slide'}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={scrollNext}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white"
-              aria-label={isId ? 'Geser berikutnya' : 'Next slide'}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+          <EmblaDesktopControls api={emblaApi} isId={isId} />
         </div>
       </div>
 
       <div
-        className="min-w-0 max-w-full overflow-hidden"
+        className="min-w-0 max-w-full cursor-grab overflow-hidden active:cursor-grabbing"
         ref={emblaRef}
       >
         <div className="flex min-w-0 touch-pan-y gap-2 py-1 md:gap-3">
@@ -2356,7 +2405,7 @@ function SearchCartDock({
             </button>
 
             <Link
-              href={firstItem?.href || '/search'}
+              href={firstItem?.href || '/explore'}
               className="flex-1 rounded-[12px] bg-black py-2 text-center text-[11px] font-bold text-white"
             >
               {isId ? 'Lanjut' : 'Continue'}
@@ -2497,7 +2546,11 @@ function SearchRightRail({
   );
 }
 
-export default function SearchPageClient() {
+export default function SearchPageClient({
+  initialCategorySlug,
+}: {
+  initialCategorySlug?: string;
+} = {}) {
   const router = useRouter();
   const { user, authFetch } = useAuth();
   const pathname = usePathname();
@@ -2508,15 +2561,24 @@ export default function SearchPageClient() {
 
   const initialQuery = (searchParams.get('q') || '').trim();
   const initialLocation = (searchParams.get('location') || '').trim();
-  const normalizedInitialType = normalizeType(searchParams.get('type'));
+  const initialBusinessCategory = getBusinessDiscoveryCategoryByCreateSlug(
+    searchParams.get('category') || initialCategorySlug,
+  );
+  const normalizedInitialType = initialBusinessCategory
+    ? initialBusinessCategory.searchType
+    : normalizeType(searchParams.get('type'));
   const initialSort = normalizeSort(searchParams.get('sort'));
   const initialSideFilter = normalizeSideFilter(searchParams.get('side'));
   const initialNearbyEnabled = searchParams.get('nearby') !== '0';
+  const initialFiltersOpen = searchParams.get('filters') === '1';
   const initialUsedOnly = normalizeUsedGoodsFilter(
     searchParams.get('condition'),
     initialQuery,
   );
   const initialType = initialUsedOnly ? 'product' : normalizedInitialType;
+  const initialSubcategory = initialBusinessCategory
+    ? (searchParams.get('subcategory') || '').trim()
+    : '';
 
   const [queryInput, setQueryInput] = useState(initialQuery);
   const [locationInput, setLocationInput] = useState(initialLocation);
@@ -2529,17 +2591,28 @@ export default function SearchPageClient() {
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [usedOnly, setUsedOnly] = useState(initialUsedOnly);
   const [selectedSearchTab, setSelectedSearchTab] =
-    useState<SearchFilterTabKey>(() =>
-      resolveActiveBusinessSearchTab({
-        query: initialQuery,
-        type: initialType,
-        usedOnly: initialUsedOnly,
-      }),
+    useState<SearchFilterTabKey>(
+      () =>
+        initialBusinessCategory?.id ||
+        resolveActiveBusinessSearchTab({
+          query: initialQuery,
+          type: initialType,
+          usedOnly: initialUsedOnly,
+        }),
     );
+  const [selectedSubcategory, setSelectedSubcategory] =
+    useState(initialSubcategory);
+  const [subcategories, setSubcategories] = useState<CreateTaxonomyItem[]>(
+    () =>
+      initialBusinessCategory
+        ? FALLBACK_CREATE_SUBCATEGORIES[initialBusinessCategory.createSlugId] ||
+          []
+        : [],
+  );
   const [resultsView, setResultsView] = useState<SearchResultsView>(
     initialType === 'umkm' ? 'umkm' : 'results',
   );
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(initialFiltersOpen);
 
   const [items, setItems] = useState<SearchCard[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2558,12 +2631,20 @@ export default function SearchPageClient() {
     EMPTY_SEARCH_CART_SESSION,
   );
   const [cartOpen, setCartOpen] = useState(false);
+  const activeSearchTab = selectedSearchTab;
+  const activeTypeLabel = getSearchTabLabel(activeSearchTab, locale);
+  const activeBusinessCategory =
+    getBusinessDiscoveryCategoryById(activeSearchTab);
+  const activeResultCategory =
+    activeBusinessCategory && isResultCategoryId(activeBusinessCategory.id)
+      ? activeBusinessCategory
+      : null;
+  const activeCategorySlug = activeResultCategory?.createSlugId || '';
   const {
     viewerLocation,
     locating,
     locationError,
     locationEnabled,
-    locationPromptDismissed,
     requestViewerLocation,
     dismissLocationPrompt,
   } = useViewerLocation({
@@ -2581,7 +2662,8 @@ export default function SearchPageClient() {
     onWheel: onMobileActionsWheel,
   } = useHorizontalDragScroll<HTMLDivElement>();
 
-  const canToggleUmkmView = type === 'all' || type === 'umkm';
+  const canToggleUmkmView =
+    !activeResultCategory && (type === 'all' || type === 'umkm');
   const shouldShowUmkmPreview = resultsView === 'umkm' || type === 'umkm';
   const shouldShowResultCards = !shouldShowUmkmPreview;
   const nearbyActive = nearbyEnabled && Boolean(viewerLocation);
@@ -2614,6 +2696,40 @@ export default function SearchPageClient() {
     syncCart();
     return subscribeSearchCartSession(syncCart);
   }, []);
+
+  useEffect(() => {
+    if (!activeCategorySlug) {
+      setSubcategories([]);
+      setSelectedSubcategory('');
+      return;
+    }
+
+    let cancelled = false;
+    const fallback = FALLBACK_CREATE_SUBCATEGORIES[activeCategorySlug] || [];
+    setSubcategories(fallback);
+
+    async function loadSubcategories() {
+      try {
+        const response = await fetch(
+          `/api/categories/${encodeURIComponent(activeCategorySlug)}/subcategories`,
+          { cache: 'no-store' },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          items?: CreateTaxonomyItem[];
+        };
+        if (!response.ok || cancelled) return;
+        const remoteItems = Array.isArray(payload.items) ? payload.items : [];
+        setSubcategories(mergeCreateTaxonomyItems(remoteItems, fallback));
+      } catch {
+        // The shared fallback keeps category filters usable while taxonomy is unavailable.
+      }
+    }
+
+    void loadSubcategories();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategorySlug]);
 
   const cartQuantities = useMemo(() => {
     return Object.fromEntries(
@@ -2711,6 +2827,7 @@ export default function SearchPageClient() {
     setLocation('');
     setType('all');
     setSelectedSearchTab('all');
+    setSelectedSubcategory('');
     setSort('relevance');
     setSideFilter('all');
     setNearbyEnabled(true);
@@ -2724,6 +2841,10 @@ export default function SearchPageClient() {
     if (query) params.set('q', query);
     if (location) params.set('location', location);
     if (type !== 'all') params.set('type', type);
+    if (activeCategorySlug) params.set('category', activeCategorySlug);
+    if (activeCategorySlug && selectedSubcategory) {
+      params.set('subcategory', selectedSubcategory);
+    }
     if (usedOnly) params.set('condition', 'used');
     if (sort !== 'relevance') params.set('sort', sort);
     if (sideFilter !== 'all') params.set('side', sideFilter);
@@ -2733,6 +2854,7 @@ export default function SearchPageClient() {
       scroll: false,
     });
   }, [
+    activeCategorySlug,
     location,
     nearbyEnabled,
     pathname,
@@ -2740,6 +2862,7 @@ export default function SearchPageClient() {
     router,
     sideFilter,
     sort,
+    selectedSubcategory,
     type,
     usedOnly,
   ]);
@@ -2777,7 +2900,15 @@ export default function SearchPageClient() {
         const requestOffset = mode === 'append' ? offsetRef.current : 0;
         if (effectiveQuery) params.set('q', effectiveQuery);
         if (location) params.set('location', location);
-        if (type !== 'all') params.set('type', type);
+        if (activeCategorySlug) {
+          params.set('category', activeCategorySlug);
+          params.set('database_only', '1');
+          if (selectedSubcategory) {
+            params.set('subcategory', selectedSubcategory);
+          }
+        } else if (type !== 'all') {
+          params.set('type', type);
+        }
         if (nearbyEnabled && viewerLocation) {
           params.set('nearby', '1');
           params.set('viewer_lat', String(viewerLocation.lat));
@@ -2796,9 +2927,9 @@ export default function SearchPageClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-            (isId
-              ? 'Gagal memuat hasil pencarian'
-              : 'Failed to load search results'),
+              (isId
+                ? 'Gagal memuat hasil pencarian'
+                : 'Failed to load search results'),
           );
         }
 
@@ -2839,12 +2970,14 @@ export default function SearchPageClient() {
       }
     },
     [
+      activeCategorySlug,
       authFetch,
       isId,
       locale,
       location,
       nearbyEnabled,
       query,
+      selectedSubcategory,
       type,
       usedOnly,
       viewerLocation,
@@ -2854,32 +2987,6 @@ export default function SearchPageClient() {
   useEffect(() => {
     void loadResults('replace');
   }, [loadResults, refreshKey]);
-
-  useEffect(() => {
-    if (
-      !nearbyEnabled ||
-      viewerLocation ||
-      location ||
-      locationEnabled ||
-      locationPromptDismissed ||
-      locating
-    ) {
-      return;
-    }
-    if (typeof window === 'undefined') return;
-
-    const timer = window.setTimeout(() => {
-      setLocationPromptOpen(true);
-    }, 500);
-    return () => window.clearTimeout(timer);
-  }, [
-    location,
-    locationEnabled,
-    locationPromptDismissed,
-    locating,
-    nearbyEnabled,
-    viewerLocation,
-  ]);
 
   useEffect(() => {
     if (!autoLoadEnabled) return;
@@ -2893,7 +3000,7 @@ export default function SearchPageClient() {
   ]);
 
   useEffect(() => {
-    if (type !== 'all' && type !== 'umkm') {
+    if (activeResultCategory || (type !== 'all' && type !== 'umkm')) {
       setUmkmStores([]);
       setUmkmLoading(false);
       setUmkmError(null);
@@ -2926,7 +3033,7 @@ export default function SearchPageClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-            (isId ? 'Gagal memuat usaha' : 'Failed to load businesses'),
+              (isId ? 'Gagal memuat usaha' : 'Failed to load businesses'),
           );
         }
 
@@ -2945,16 +3052,15 @@ export default function SearchPageClient() {
     };
 
     void load();
-  }, [isId, location, nearbyEnabled, query, type, viewerLocation]);
-
-  const activeSearchTab = selectedSearchTab;
-  const activeTypeLabel = getSearchTabLabel(activeSearchTab, locale);
-  const activeBusinessCategory =
-    getBusinessDiscoveryCategoryById(activeSearchTab);
-  const activeResultCategory =
-    activeBusinessCategory && isResultCategoryId(activeBusinessCategory.id)
-      ? activeBusinessCategory
-      : null;
+  }, [
+    activeResultCategory,
+    isId,
+    location,
+    nearbyEnabled,
+    query,
+    type,
+    viewerLocation,
+  ]);
 
   const categoryFilteredItems = useMemo(() => {
     if (!activeResultCategory) return items;
@@ -2998,6 +3104,36 @@ export default function SearchPageClient() {
   ]);
 
   const searchResultSections = useMemo<SearchResultRail[]>(() => {
+    if (sideFilter === 'all') {
+      const sideSectionCandidates: SearchResultRail[] = [
+        {
+          id: 'offers',
+          title: isId ? 'Penawaran' : 'Offers',
+          subtitle: isId
+            ? 'Produk, jasa, alat, tempat, dan peluang.'
+            : 'Products, services, tools, places, and opportunities.',
+          badge: isId ? 'Tersedia' : 'Available',
+          items: visibleItems.filter(item => item.side === 'supply'),
+          typeKey: 'all',
+        },
+        {
+          id: 'needs',
+          title: isId ? 'Kebutuhan' : 'Needs',
+          subtitle: isId
+            ? 'Permintaan dari orang atau usaha.'
+            : 'Requests from people or businesses.',
+          badge: isId ? 'Dicari' : 'Wanted',
+          items: visibleItems.filter(item => item.side === 'demand'),
+          typeKey: 'all',
+        },
+      ];
+      const sideSections = sideSectionCandidates.filter(
+        section => section.items.length > 0,
+      );
+
+      if (sideSections.length > 0) return sideSections;
+    }
+
     const unfilteredSections: SearchResultRail[] =
       RESULT_BUSINESS_DISCOVERY_CATEGORY_IDS.flatMap(id => {
         const category = getBusinessDiscoveryCategoryById(id);
@@ -3014,8 +3150,7 @@ export default function SearchPageClient() {
             typeKey: id,
           },
         ];
-      },
-    );
+      });
     const sections = unfilteredSections.filter(
       section => section.items.length > 0,
     );
@@ -3027,14 +3162,14 @@ export default function SearchPageClient() {
         id: 'other',
         title: isId ? 'Hasil Lainnya' : 'Other Results',
         subtitle: isId
-          ? 'Listing lain yang masih cocok dengan pencarian kamu.'
-          : 'Other listings that still match your search.',
+          ? 'Hasil lain yang masih cocok.'
+          : 'Other matching results.',
         items: visibleItems,
         typeKey: 'all',
       },
     ];
     return fallbackSections;
-  }, [isId, visibleItems]);
+  }, [isId, sideFilter, visibleItems]);
 
   const categoryResultSection = useMemo<SearchResultRail | null>(() => {
     if (!activeResultCategory) return null;
@@ -3049,6 +3184,15 @@ export default function SearchPageClient() {
       typeKey: activeResultCategory.id,
     };
   }, [activeResultCategory, isId, visibleItems]);
+  const selectedSubcategoryLabel = selectedSubcategory
+    ? getSubcategoryLabel(
+        subcategories.find(item => item.slug === selectedSubcategory) || {
+          id: selectedSubcategory,
+          slug: selectedSubcategory,
+        },
+        locale,
+      )
+    : '';
 
   const resultCountLabel = new Intl.NumberFormat(
     isId ? 'id-ID' : 'en-US',
@@ -3086,7 +3230,8 @@ export default function SearchPageClient() {
     Number(Boolean(query)) +
     Number(Boolean(location)) +
     Number(nearbyActive) +
-    Number(type !== 'all') +
+    Number(Boolean(activeResultCategory) || type !== 'all') +
+    Number(Boolean(selectedSubcategory)) +
     Number(usedOnly) +
     Number(sort !== 'relevance') +
     Number(sideFilter !== 'all');
@@ -3095,56 +3240,71 @@ export default function SearchPageClient() {
     ? isId
       ? `Hasil pencarian "${query}"`
       : `Search results for "${query}"`
-    : isId
-      ? 'Cari supplier, jasa, peluang'
-      : 'Find suppliers, services, and business opportunities';
+    : activeResultCategory
+      ? isId
+        ? activeResultCategory.labelId
+        : activeResultCategory.labelEn
+      : isId
+        ? 'Cari penawaran atau kebutuhan'
+        : 'Find offers or needs';
   const resultsSubheading =
     loading && visibleItems.length === 0
       ? isId
         ? 'Memuat hasil...'
         : 'Loading results...'
       : isId
-        ? `${resultCountDisplayLabel} hasil ditemukan`
-        : `${resultCountDisplayLabel} results found`;
+        ? `${sideCounts.supply} penawaran · ${sideCounts.demand} kebutuhan`
+        : `${sideCounts.supply} offers · ${sideCounts.demand} needs`;
   const activeSortLabel =
     SORT_OPTIONS.find(option => option.value === sort)?.[
-    isId ? 'labelId' : 'labelEn'
+      isId ? 'labelId' : 'labelEn'
     ] || (isId ? 'Paling relevan' : 'Most relevant');
   const displaySortLabel = nearbyActive ? nearbyStatusLabel : activeSortLabel;
   const topResult = visibleItems[0];
   const usedGoodsSellHref = `${resolveMarketplaceCreateHref(locale, 'product', 'supply')}?condition=used&q=${encodeURIComponent(isId ? 'barang bekas' : 'used goods')}`;
+  const activeCreateSide: ListingSide =
+    sideFilter === 'supply' ? 'supply' : 'demand';
+  const createType = type === 'all' || type === 'umkm' ? 'product' : type;
   const briefCreateHref = usedOnly
     ? usedGoodsSellHref
     : activeBusinessCategory
       ? buildBusinessDiscoveryCreateHref({
-        locale,
-        side: 'demand',
-        category: activeBusinessCategory,
-      })
-      : resolveUmkmCreateHrefForType(locale, type);
+          locale,
+          side: activeCreateSide,
+          category: activeBusinessCategory,
+        })
+      : sideFilter === 'supply'
+        ? resolveMarketplaceCreateHref(locale, createType, 'supply')
+        : resolveUmkmCreateHrefForType(locale, type);
   const briefCreateLabel = usedOnly
     ? isId
       ? 'Tawarkan barang bekas'
       : 'Sell used goods'
-    : activeBusinessCategory
+    : sideFilter === 'supply'
       ? isId
-        ? `Buat kebutuhan ${activeBusinessCategory.labelId}`
-        : `Post ${activeBusinessCategory.labelEn.toLowerCase()} need`
-      : isId
-        ? type === 'service'
-          ? 'Cari jasa'
-          : type === 'business_transfer'
-            ? 'Tawarkan usaha'
-            : type === 'freelancer' || type === 'job'
-              ? 'Cari talent'
-              : 'Cari supplier'
-        : type === 'service'
-          ? 'Post a service need'
-          : type === 'business_transfer'
-            ? 'List a business transfer'
-            : type === 'freelancer' || type === 'job'
-              ? 'Post a talent need'
-              : 'Post a supplier need';
+        ? 'Tawarkan sesuatu'
+        : 'Create an offer'
+      : activeBusinessCategory
+        ? isId
+          ? `${activeCreateSide === 'supply' ? 'Tawarkan' : 'Buat kebutuhan'} ${activeBusinessCategory.labelId}`
+          : activeCreateSide === 'supply'
+            ? `Create ${activeBusinessCategory.labelEn.toLowerCase()} offer`
+            : `Post ${activeBusinessCategory.labelEn.toLowerCase()} need`
+        : isId
+          ? type === 'service'
+            ? 'Buat kebutuhan jasa'
+            : type === 'business_transfer'
+              ? 'Tawarkan usaha'
+              : type === 'freelancer' || type === 'job'
+                ? 'Cari talent'
+                : 'Buat kebutuhan'
+          : type === 'service'
+            ? 'Post a service need'
+            : type === 'business_transfer'
+              ? 'List a business transfer'
+              : type === 'freelancer' || type === 'job'
+                ? 'Post a talent need'
+                : 'Post a supplier need';
 
   const openUmkmPreview = () => router.push(UMKM_DISCOVERY_PATH);
   const applyCity = (city: string) => {
@@ -3153,9 +3313,15 @@ export default function SearchPageClient() {
     setNearbyEnabled(false);
   };
 
+  const selectSubcategory = useCallback((slug: string) => {
+    setSelectedSubcategory(slug);
+    setResultsView('results');
+  }, []);
+
   const selectSearchTab = useCallback(
     (nextTab: SearchFilterTabKey) => {
       setSelectedSearchTab(nextTab);
+      setSelectedSubcategory('');
 
       if (nextTab === 'used_goods') {
         const nextQuery = getUsedGoodsQuery(queryInput, locale);
@@ -3175,8 +3341,6 @@ export default function SearchPageClient() {
         setUsedOnly(false);
         setType(nextType);
         setSideFilter('all');
-        setQueryInput(category.query);
-        setQuery(category.query);
         setResultsView(category.searchType === 'umkm' ? 'umkm' : 'results');
         return;
       }
@@ -3224,8 +3388,8 @@ export default function SearchPageClient() {
                   onChange={event => setQueryInput(event.target.value)}
                   placeholder={
                     isId
-                      ? 'Cari supplier, jasa, lokasi...'
-                      : 'Search suppliers, places, services...'
+                      ? 'Cari penawaran atau kebutuhan...'
+                      : 'Search offers or needs...'
                   }
                   className="ui-navbar-search-input"
                 />
@@ -3272,8 +3436,7 @@ export default function SearchPageClient() {
                     {query || resultsHeading}
                   </h1>
                   <p className="mt-0.5 text-[12px] font-semibold text-[color:var(--app-text-soft)]">
-                    {resultCountDisplayLabel}{' '}
-                    {isId ? 'hasil' : 'results'} / {displaySortLabel}
+                    {resultsSubheading} / {displaySortLabel}
                   </p>
                 </div>
               </div>
@@ -3282,9 +3445,7 @@ export default function SearchPageClient() {
                 <MapPin className="h-4 w-4 shrink-0 text-emerald-600" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-bold text-[color:var(--app-text)]">
-                    {nearbyActive
-                      ? nearbyStatusLabel
-                      : selectedLocationLabel}
+                    {nearbyActive ? nearbyStatusLabel : selectedLocationLabel}
                   </p>
                   {nearbyActive ? (
                     <p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
@@ -3327,7 +3488,6 @@ export default function SearchPageClient() {
                 {SEARCH_FILTER_TABS.map(option => {
                   const active = activeSearchTab === option.value;
                   const Icon = option.icon;
-                  const badge = getSearchTabBadge(option.value, locale);
                   return (
                     <button
                       key={option.value}
@@ -3342,22 +3502,70 @@ export default function SearchPageClient() {
                     >
                       <Icon className="h-4 w-4" />
                       <span>{isId ? option.labelId : option.labelEn}</span>
-                      {badge ? (
-                        <span
-                          className={cn(
-                            'rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em]',
-                            active
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-emerald-50 text-emerald-700',
-                          )}
-                        >
-                          {badge}
-                        </span>
-                      ) : null}
                     </button>
                   );
                 })}
               </div>
+
+              <div
+                className="grid grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
+                aria-label={isId ? 'Mode hasil' : 'Result mode'}
+              >
+                {[
+                  {
+                    value: 'all' as SideFilter,
+                    label: isId ? 'Semua' : 'All',
+                    count: sideCounts.all,
+                  },
+                  {
+                    value: 'supply' as SideFilter,
+                    label: isId ? 'Penawaran' : 'Offers',
+                    count: sideCounts.supply,
+                  },
+                  {
+                    value: 'demand' as SideFilter,
+                    label: isId ? 'Kebutuhan' : 'Needs',
+                    count: sideCounts.demand,
+                  },
+                ].map(option => {
+                  const active = sideFilter === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSideFilter(option.value)}
+                      className={cn(
+                        'inline-flex min-h-[38px] min-w-0 flex-col items-center justify-center rounded-[12px] px-1.5 text-[11px] font-bold transition',
+                        active
+                          ? 'bg-white text-emerald-700 shadow-sm'
+                          : 'text-[color:var(--app-text-soft)]',
+                      )}
+                    >
+                      <span className="max-w-full truncate">
+                        {option.label}
+                      </span>
+                      <span
+                        className={cn(
+                          'mt-0.5 text-[10px]',
+                          active ? 'text-emerald-700' : 'text-slate-400',
+                        )}
+                      >
+                        {option.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeResultCategory ? (
+                <SearchSubcategoryFilter
+                  items={subcategories}
+                  locale={locale}
+                  selected={selectedSubcategory}
+                  onSelect={selectSubcategory}
+                  layout="rail"
+                />
+              ) : null}
             </div>
           </section>
 
@@ -3406,8 +3614,8 @@ export default function SearchPageClient() {
                 </p>
                 <p className="mx-auto mt-1 max-w-[26rem] text-[13px] leading-5 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Coba longgarkan filter, pakai kata kunci lain, atau pilih kategori bisnis seperti Bahan Usaha dan Cari Jasa.'
-                    : 'Try broader filters, another keyword, or choose a business category like Business Supplies or Find Services.'}
+                    ? 'Ganti kata kunci, pilih kategori lain, atau buat kebutuhan.'
+                    : 'Try another keyword, pick a category, or post a need.'}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                   <AuthCtaLink
@@ -3498,8 +3706,8 @@ export default function SearchPageClient() {
                         {activeFilterCount > 0
                           ? `${activeFilterCount} ${isId ? 'filter aktif' : 'active filters'}`
                           : isId
-                            ? 'Atur hasil biar lebih rapi'
-                            : 'Tune results quickly'}
+                            ? 'Kategori, mode, lokasi'
+                            : 'Category, mode, location'}
                       </p>
                     </div>
                     {canReset ? (
@@ -3527,8 +3735,8 @@ export default function SearchPageClient() {
 
                           <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
                             {isId
-                              ? 'Temukan supplier, jasa, dan peluang usaha terdekat.'
-                              : 'Find suppliers, services, and opportunities nearby.'}
+                              ? 'Hasil dekat lokasimu.'
+                              : 'Results near you.'}
                           </p>
                         </div>
                       </div>
@@ -3587,19 +3795,21 @@ export default function SearchPageClient() {
                       </div>
                     </div>
 
+                    {activeResultCategory ? (
+                      <SearchSubcategoryFilter
+                        items={subcategories}
+                        locale={locale}
+                        selected={selectedSubcategory}
+                        onSelect={selectSubcategory}
+                        layout="stack"
+                      />
+                    ) : null}
+
                     <div>
                       <div className="mb-3">
                         <h3 className="text-[14px] font-bold text-[color:var(--app-text)]">
-                          {isId
-                            ? 'Apa yang ingin kamu cari?'
-                            : 'What are you looking for?'}
+                          {isId ? 'Kategori' : 'Categories'}
                         </h3>
-
-                        <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
-                          {isId
-                            ? 'Pilih kebutuhan bisnis yang ingin kamu temukan.'
-                            : 'Choose the business need you want to discover.'}
-                        </p>
                       </div>
 
                       <div className="grid gap-2">
@@ -3615,7 +3825,7 @@ export default function SearchPageClient() {
                               type="button"
                               onClick={() => selectSearchTab(option.value)}
                               className={cn(
-                                'group flex min-h-[68px] items-center gap-3 rounded-[18px] border px-4 py-3 text-left transition-all',
+                                'group flex min-h-[58px] items-center gap-3 rounded-[16px] border px-3 py-2.5 text-left transition-all',
                                 active
                                   ? 'border-emerald-200 bg-emerald-50 shadow-sm'
                                   : 'border-[color:var(--app-border)] bg-white hover:border-emerald-100 hover:bg-emerald-50/40',
@@ -3623,7 +3833,7 @@ export default function SearchPageClient() {
                             >
                               <div
                                 className={cn(
-                                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl',
+                                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]',
                                   active
                                     ? 'bg-emerald-600 text-white'
                                     : visual.iconBubbleClass,
@@ -3637,7 +3847,7 @@ export default function SearchPageClient() {
                                   {isId ? option.labelId : option.labelEn}
                                 </div>
 
-                                <div className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                                <div className="mt-0.5 line-clamp-1 text-[11px] text-[color:var(--app-text-soft)]">
                                   {getSearchTabHint(option.value, locale)}
                                 </div>
                               </div>
@@ -3660,25 +3870,15 @@ export default function SearchPageClient() {
                     <div>
                       <div className="mb-3">
                         <h3 className="text-[14px] font-bold text-[color:var(--app-text)]">
-                          {isId ? 'Aktivitas Bisnis' : 'Business Activity'}
+                          {isId ? 'Mode hasil' : 'Result mode'}
                         </h3>
-
-                        <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
-                          {isId
-                            ? 'Lihat siapa yang menawarkan dan siapa yang sedang mencari.'
-                            : 'See who is offering and who is looking.'}
-                        </p>
                       </div>
 
                       <div className="grid gap-2">
                         <SearchResultScopeCard
                           value="all"
                           label={isId ? 'Semua' : 'All'}
-                          hint={
-                            isId
-                              ? 'Lihat semua aktivitas bisnis'
-                              : 'See all business activities'
-                          }
+                          hint={isId ? 'Semua hasil' : 'All results'}
                           count={sideCounts.all}
                           active={sideFilter === 'all'}
                           onSelect={setSideFilter}
@@ -3686,12 +3886,8 @@ export default function SearchPageClient() {
 
                         <SearchResultScopeCard
                           value="supply"
-                          label={isId ? 'Menawarkan' : 'Offering'}
-                          hint={
-                            isId
-                              ? 'Supplier, jasa, produk, dan talent'
-                              : 'Suppliers, services, products, and talent'
-                          }
+                          label={isId ? 'Penawaran' : 'Offers'}
+                          hint={isId ? 'Yang tersedia' : 'Available'}
                           count={sideCounts.supply}
                           active={sideFilter === 'supply'}
                           onSelect={setSideFilter}
@@ -3699,12 +3895,8 @@ export default function SearchPageClient() {
 
                         <SearchResultScopeCard
                           value="demand"
-                          label={isId ? 'Mencari' : 'Looking For'}
-                          hint={
-                            isId
-                              ? 'Proyek, kebutuhan, vendor, dan partner'
-                              : 'Projects, needs, vendors, and partners'
-                          }
+                          label={isId ? 'Kebutuhan' : 'Needs'}
+                          hint={isId ? 'Yang sedang dicari' : 'Wanted'}
                           count={sideCounts.demand}
                           active={sideFilter === 'demand'}
                           onSelect={setSideFilter}
@@ -3759,13 +3951,13 @@ export default function SearchPageClient() {
               data-auto-scrollbar
             >
               <div className="min-w-0 max-w-full space-y-3 overflow-x-hidden pb-5">
-                <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white/96 p-4 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.13)] ">
+                <section className="rounded-[22px] border border-[color:var(--app-border)] bg-white/96 p-3 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.13)] ">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h1 className="text-[1.38rem] font-bold text-[color:var(--app-text)]">
+                      <h1 className="text-[1.2rem] font-bold text-[color:var(--app-text)]">
                         {resultsHeading}
                       </h1>
-                      <p className="mt-1 text-[13px] text-[color:var(--app-text-soft)]">
+                      <p className="mt-0.5 text-[13px] text-[color:var(--app-text-soft)]">
                         {resultsSubheading}
                       </p>
                     </div>
@@ -3806,10 +3998,60 @@ export default function SearchPageClient() {
                     locale={locale}
                     activeTab={activeSearchTab}
                     onSelect={selectSearchTab}
-                    className="mt-3"
+                    className="mt-2"
                   />
 
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div
+                    className="mt-2 grid max-w-[520px] grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
+                    aria-label={isId ? 'Mode hasil' : 'Result mode'}
+                  >
+                    {[
+                      {
+                        value: 'all' as SideFilter,
+                        label: isId ? 'Semua' : 'All',
+                        count: sideCounts.all,
+                      },
+                      {
+                        value: 'supply' as SideFilter,
+                        label: isId ? 'Penawaran' : 'Offers',
+                        count: sideCounts.supply,
+                      },
+                      {
+                        value: 'demand' as SideFilter,
+                        label: isId ? 'Kebutuhan' : 'Needs',
+                        count: sideCounts.demand,
+                      },
+                    ].map(option => {
+                      const active = sideFilter === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setSideFilter(option.value)}
+                          className={cn(
+                            'inline-flex min-h-[40px] min-w-0 items-center justify-center gap-2 rounded-[12px] px-2 text-[12px] font-bold transition',
+                            active
+                              ? 'bg-white text-emerald-700 shadow-sm'
+                              : 'text-[color:var(--app-text-soft)] hover:bg-white/70',
+                          )}
+                        >
+                          <span className="truncate">{option.label}</span>
+                          <span
+                            className={cn(
+                              'rounded-full px-1.5 py-0.5 text-[10px]',
+                              active
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-white text-slate-500',
+                            )}
+                          >
+                            {option.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {location ? (
                       <SearchActiveChip
                         icon={MapPin}
@@ -3845,7 +4087,15 @@ export default function SearchPageClient() {
                         onRemove={() => {
                           setType('all');
                           setSelectedSearchTab('all');
+                          setSelectedSubcategory('');
                         }}
+                      />
+                    ) : null}
+                    {selectedSubcategory ? (
+                      <SearchActiveChip
+                        label={selectedSubcategoryLabel}
+                        typeKey={searchTabVisualKey(activeSearchTab)}
+                        onRemove={() => setSelectedSubcategory('')}
                       />
                     ) : null}
                     {sideFilter !== 'all' ? (
@@ -3853,11 +4103,11 @@ export default function SearchPageClient() {
                         label={
                           sideFilter === 'demand'
                             ? isId
-                              ? 'Pencari'
-                              : 'Seekers'
+                              ? 'Kebutuhan'
+                              : 'Needs'
                             : isId
-                              ? 'Penyedia'
-                              : 'Providers'
+                              ? 'Penawaran'
+                              : 'Offers'
                         }
                         onRemove={() => setSideFilter('all')}
                       />
@@ -3920,8 +4170,8 @@ export default function SearchPageClient() {
                       </p>
                       <p className="mx-auto mt-1 max-w-[34rem] text-[14px] leading-6 text-[color:var(--app-text-soft)]">
                         {isId
-                          ? 'Coba longgarkan filter, pilih kategori bisnis lain, atau buat kebutuhan agar penyedia yang cocok datang ke kamu.'
-                          : 'Try broader filters, choose another business category, or post a need so matching providers come to you.'}
+                          ? 'Ganti kata kunci, pilih kategori lain, atau buat kebutuhan.'
+                          : 'Try another keyword, pick a category, or post a need.'}
                       </p>
                       <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                         <AuthCtaLink
@@ -3962,8 +4212,8 @@ export default function SearchPageClient() {
                 ) : null}
 
                 {visibleItems.length > 0 &&
-                  shouldShowResultCards &&
-                  !loading ? (
+                shouldShowResultCards &&
+                !loading ? (
                   <div
                     ref={desktopLoadMoreRef}
                     className="h-2 w-full"
@@ -3972,8 +4222,8 @@ export default function SearchPageClient() {
                 ) : null}
 
                 {visibleItems.length > 0 &&
-                  shouldShowResultCards &&
-                  !loading ? (
+                shouldShowResultCards &&
+                !loading ? (
                   <div className="flex items-center justify-between gap-3 px-1">
                     <p className="text-[13px] text-[color:var(--app-text-soft)]">
                       {isId
@@ -4114,7 +4364,7 @@ export default function SearchPageClient() {
         <div className="space-y-5">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-              {isId ? 'Mau cari apa?' : 'What are you looking for?'}
+              {isId ? 'Kategori' : 'Categories'}
             </p>
             <SearchFilterTabs
               locale={locale}
@@ -4123,6 +4373,16 @@ export default function SearchPageClient() {
               className="mt-2"
             />
           </div>
+
+          {activeResultCategory ? (
+            <SearchSubcategoryFilter
+              items={subcategories}
+              locale={locale}
+              selected={selectedSubcategory}
+              onSelect={selectSubcategory}
+              layout="wrap"
+            />
+          ) : null}
 
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
@@ -4148,8 +4408,8 @@ export default function SearchPageClient() {
                 </p>
                 <p className="mt-0.5 text-[11px] leading-4 text-emerald-700/80">
                   {isId
-                    ? 'Urutkan hasil dari yang paling dekat dengan posisimu.'
-                    : 'Sort results from the closest to your position.'}
+                    ? 'Urutkan dari yang terdekat.'
+                    : 'Sort by nearest first.'}
                 </p>
                 {locationError ? (
                   <p className="mt-1 text-[11px] font-semibold text-rose-600">
@@ -4213,7 +4473,7 @@ export default function SearchPageClient() {
 
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-              {isId ? 'Tampilkan' : 'Show'}
+              {isId ? 'Mode' : 'Mode'}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {[
@@ -4224,12 +4484,12 @@ export default function SearchPageClient() {
                 },
                 {
                   value: 'supply' as SideFilter,
-                  label: isId ? 'Penyedia' : 'Providers',
+                  label: isId ? 'Penawaran' : 'Offers',
                   count: sideCounts.supply,
                 },
                 {
                   value: 'demand' as SideFilter,
-                  label: isId ? 'Pencari' : 'Seekers',
+                  label: isId ? 'Kebutuhan' : 'Needs',
                   count: sideCounts.demand,
                 },
               ].map(option => {

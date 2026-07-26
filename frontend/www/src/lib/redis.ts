@@ -2,7 +2,20 @@ import Redis from 'ioredis';
 import crypto from 'crypto';
 
 const REDIS_URL = (process.env.REDIS_URL || 'redis://localhost:6379').trim();
-const OTP_HASH_SECRET = (process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || 'dev-otp-secret').trim();
+function getOtpHashSecret(): string {
+  const configured = (
+    process.env.OTP_HASH_SECRET ||
+    process.env.JWT_SECRET ||
+    ''
+  ).trim();
+  if (configured) return configured;
+
+  const appEnv = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
+  if (appEnv === 'production') {
+    throw new Error('OTP_HASH_SECRET or JWT_SECRET must be configured');
+  }
+  return 'dev-otp-secret';
+}
 
 type RedisGlobal = typeof globalThis & {
   __lajukanRedis?: Redis;
@@ -12,16 +25,9 @@ const redisGlobal = globalThis as RedisGlobal;
 
 function hashOtp(type: 'email' | 'phone', target: string, otp: string): string {
   return crypto
-    .createHmac('sha256', OTP_HASH_SECRET)
+    .createHmac('sha256', getOtpHashSecret())
     .update(`${type}:${normalizeTarget(type, target)}:${otp.trim()}`)
     .digest('hex');
-}
-
-function safeEqual(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 export function getRedis(): Redis {
@@ -66,47 +72,62 @@ function normalizeTarget(type: 'email' | 'phone', target: string): string {
   return target.replace(/\D/g, '');
 }
 
+function otpTargetKey(type: 'email' | 'phone', target: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(`${type}:${normalizeTarget(type, target)}`)
+    .digest('hex');
+}
+
 export async function storeOTP(type: 'email' | 'phone', target: string, otp: string): Promise<void> {
   const redis = getRedis();
-  const key = `${OTP_PREFIX}${type}:${normalizeTarget(type, target)}`;
+  const key = `${OTP_PREFIX}${type}:${otpTargetKey(type, target)}`;
   await redis.setex(key, OTP_EXPIRY, hashOtp(type, target, otp));
 }
 
 export async function deleteOTP(type: 'email' | 'phone', target: string): Promise<void> {
   const redis = getRedis();
-  const key = `${OTP_PREFIX}${type}:${normalizeTarget(type, target)}`;
+  const key = `${OTP_PREFIX}${type}:${otpTargetKey(type, target)}`;
   await redis.del(key);
 }
 
 export async function verifyOTP(type: 'email' | 'phone', target: string, otp: string): Promise<boolean> {
   const redis = getRedis();
-  const key = `${OTP_PREFIX}${type}:${normalizeTarget(type, target)}`;
-  const stored = await redis.get(key);
-
-  if (stored && safeEqual(stored, hashOtp(type, target, otp))) {
-    await redis.del(key); // Delete after successful verification
-    return true;
-  }
-  return false;
+  const key = `${OTP_PREFIX}${type}:${otpTargetKey(type, target)}`;
+  const candidate = hashOtp(type, target, otp);
+  const consumed = await redis.eval(
+    `
+      local stored = redis.call('GET', KEYS[1])
+      if stored and stored == ARGV[1] then
+        redis.call('DEL', KEYS[1])
+        return 1
+      end
+      return 0
+    `,
+    1,
+    key,
+    candidate,
+  );
+  return Number(consumed) === 1;
 }
 
 export async function getOTPAttempts(type: 'email' | 'phone', target: string): Promise<number> {
   const redis = getRedis();
-  const key = `${OTP_PREFIX}attempts:${type}:${normalizeTarget(type, target)}`;
+  const key = `${OTP_PREFIX}attempts:${type}:${otpTargetKey(type, target)}`;
   const attempts = await redis.get(key);
   return parseInt(attempts || '0', 10);
 }
 
 export async function incrementOTPAttempts(type: 'email' | 'phone', target: string): Promise<void> {
   const redis = getRedis();
-  const key = `${OTP_PREFIX}attempts:${type}:${normalizeTarget(type, target)}`;
+  const key = `${OTP_PREFIX}attempts:${type}:${otpTargetKey(type, target)}`;
   await redis.incr(key);
   await redis.expire(key, 3600); // 1 hour lockout window
 }
 
 export async function clearOTPAttempts(type: 'email' | 'phone', target: string): Promise<void> {
   const redis = getRedis();
-  const key = `${OTP_PREFIX}attempts:${type}:${normalizeTarget(type, target)}`;
+  const key = `${OTP_PREFIX}attempts:${type}:${otpTargetKey(type, target)}`;
   await redis.del(key);
 }
 

@@ -144,6 +144,10 @@ type DashboardData = {
   failures: string[];
 };
 
+type TrustProfileUpdatePayload = Parameters<
+  typeof superAppApi.upsertTrustProfile
+>[2];
+
 type UnknownRecord = Record<string, unknown>;
 
 const NAV_ITEMS: Array<{
@@ -591,6 +595,9 @@ const SAMPLE_USERS: CrmUserRow[] = [
     lastActive: "2026-06-10T03:40:00.000Z",
     risk: "low",
     city: "Bandung",
+    approvalStatus: "approved",
+    manualHold: false,
+    riskStrikes: 0,
   },
   {
     id: "user-sample-2",
@@ -603,6 +610,9 @@ const SAMPLE_USERS: CrmUserRow[] = [
     lastActive: "2026-06-10T05:45:00.000Z",
     risk: "high",
     city: "Bekasi",
+    approvalStatus: "needs_review",
+    manualHold: true,
+    riskStrikes: 2,
   },
   {
     id: "user-sample-3",
@@ -615,6 +625,9 @@ const SAMPLE_USERS: CrmUserRow[] = [
     lastActive: "2026-06-09T12:10:00.000Z",
     risk: "low",
     city: "Surabaya",
+    approvalStatus: "approved",
+    manualHold: false,
+    riskStrikes: 0,
   },
   {
     id: "user-sample-4",
@@ -627,6 +640,9 @@ const SAMPLE_USERS: CrmUserRow[] = [
     lastActive: "2026-06-10T01:05:00.000Z",
     risk: "medium",
     city: "Yogyakarta",
+    approvalStatus: "pending",
+    manualHold: false,
+    riskStrikes: 1,
   },
 ];
 
@@ -1691,7 +1707,10 @@ export default function CrmCommandCenter() {
         action === "warn" || action === "hold" || action === "reject"
           ? targetUser.riskStrikes + 1
           : targetUser.riskStrikes;
-      const payload = {
+      const payloadByAction: Record<
+        "approve" | "reject" | "warn" | "hold" | "release",
+        TrustProfileUpdatePayload
+      > = {
         approve: {
           kyc_status: "full",
           crm_approval_status: "approved",
@@ -1741,7 +1760,8 @@ export default function CrmCommandCenter() {
             last_admin_action_at: now,
           },
         },
-      }[action];
+      };
+      const payload = payloadByAction[action];
 
       try {
         const response = await superAppApi.upsertTrustProfile(

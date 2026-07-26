@@ -168,7 +168,7 @@ export function buildBusinessOperatingSystemSnapshot({
       signal: `${overview.active_leads} lead aktif + ${overview.unread_messages} chat`,
       automation:
         'Jika lead menyebut kategori atau kota, buat shortlist vendor dan draft follow-up.',
-      href: '/search',
+      href: '/explore',
       priority: overview.active_leads > 0 ? 'high' : 'medium',
     },
     ...(PROMO_ONLY_MODE
@@ -318,7 +318,7 @@ export function buildBusinessOperatingSystemSnapshot({
       prompt:
         'Baca request, kategori listing, kota, budget, dan riwayat vendor.',
       output: 'Shortlist supplier/jasa/talent beserta alasan matching.',
-      href: '/search',
+      href: '/explore',
     },
     ...(PROMO_ONLY_MODE
       ? [

@@ -52,7 +52,7 @@ export default function CmsDashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/search"
+            href="/explore"
             className="rounded-full border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
           >
             Preview Search

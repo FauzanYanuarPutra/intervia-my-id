@@ -13,7 +13,6 @@ import {
   ImageIcon,
   Loader2,
   MessageCircle,
-  MapPin,
   Store,
   UploadCloud,
   Trash2,
@@ -27,7 +26,10 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { LajukanImage } from '@/components/common/LajukanImage';
-import { UmkmLocationPicker } from '@/components/super-app/UmkmLocationPicker';
+import {
+  UmkmLocationPicker,
+  type LocationPickerSuggestion,
+} from '@/components/super-app/UmkmLocationPicker';
 import { TextArea, TextInput, SelectInput } from '@/components/super-app/manage/UmkmManagePrimitives';
 import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
@@ -37,6 +39,11 @@ import {
   buildUsahaPath,
 } from '@/lib/umkmSurface';
 import type { LatLng } from '@/lib/super-app/maps';
+import type { SelectedLocation } from '@/lib/location/location.types';
+import {
+  buildBusinessLocationSuggestion,
+  isSelectedLocation,
+} from '@/lib/location/location.utils';
 import {
   getUmkmBusinessCategoryLabel,
   getUmkmBusinessCategoryOptions,
@@ -96,6 +103,7 @@ type StoreDraft = {
   galleryVideos: string[];
   lat: string;
   lng: string;
+  selectedLocation: SelectedLocation | null;
 };
 
 const DEFAULT_POINT: LatLng = { lat: -6.2, lng: 106.816666 };
@@ -140,6 +148,29 @@ function toPoint(lat: string, lng: string): LatLng {
     return DEFAULT_POINT;
   }
   return { lat: parsedLat, lng: parsedLng };
+}
+
+function selectedLocationFromStore(store: StoreRecord | null): SelectedLocation | null {
+  if (!store) return null;
+  const metadataLocation = store.metadata?.selected_location;
+  if (isSelectedLocation(metadataLocation)) return metadataLocation;
+  if (!Number.isFinite(store.lat) || !Number.isFinite(store.lng)) return null;
+  return {
+    placeId:
+      typeof store.metadata?.location_place_id === 'string'
+        ? store.metadata.location_place_id
+        : `business:${store.id}`,
+    name: store.name,
+    formattedAddress: [store.address, store.city].filter(Boolean).join(', ') || store.name,
+    latitude: Number(store.lat.toFixed(6)),
+    longitude: Number(store.lng.toFixed(6)),
+    country: 'Indonesia',
+    countryCode: 'ID',
+    city: store.city || undefined,
+    provider: 'business',
+    types: ['business'],
+    locationType: 'business',
+  };
 }
 
 function createDraftFromStore(store: StoreRecord | null): StoreDraft {
@@ -187,6 +218,7 @@ function createDraftFromStore(store: StoreRecord | null): StoreDraft {
     galleryVideos,
     lat: Number.isFinite(store?.lat) ? String(store?.lat) : String(DEFAULT_POINT.lat),
     lng: Number.isFinite(store?.lng) ? String(store?.lng) : String(DEFAULT_POINT.lng),
+    selectedLocation: selectedLocationFromStore(store),
   };
 }
 
@@ -346,6 +378,36 @@ export function SimpleUsahaHub({
   );
 
   const point = useMemo(() => toPoint(draft.lat, draft.lng), [draft.lat, draft.lng]);
+
+  const storeLocationSuggestions = useMemo<LocationPickerSuggestion[]>(
+    () =>
+      stores
+        .filter(
+          store =>
+            Number.isFinite(store.lat) &&
+            Number.isFinite(store.lng) &&
+            Boolean(store.name.trim()),
+        )
+        .map(store => ({
+          ...buildBusinessLocationSuggestion({
+            id: store.id,
+            name: store.name,
+            address: store.address,
+            city: store.city,
+            lat: store.lat,
+            lng: store.lng,
+          }),
+          id: `business-${store.id}`,
+          label: store.name,
+          subtitle: [store.address, store.city].filter(Boolean).join(' • '),
+          point: {
+            lat: Number(store.lat.toFixed(6)),
+            lng: Number(store.lng.toFixed(6)),
+          },
+          source: 'business',
+        })),
+    [stores],
+  );
 
   const currentWorkspaceLabel = workspaceLabel(workspace, isId);
 
@@ -542,6 +604,14 @@ export function SimpleUsahaHub({
       setError(isId ? 'Alamat belum diisi.' : 'Address is required.');
       return;
     }
+    if (!draft.selectedLocation) {
+      setError(
+        isId
+          ? 'Pilih lokasi usaha dari hasil pencarian.'
+          : 'Pick the business location from the search results.',
+      );
+      return;
+    }
     if (!draft.photoUrl.trim()) {
       setError(isId ? 'Foto usaha wajib diisi.' : 'Business photo is required.');
       return;
@@ -587,6 +657,9 @@ export function SimpleUsahaHub({
             umkm_category: draft.category,
             business_type: draft.category,
             segment: businessCategoryLabel,
+            selected_location: draft.selectedLocation,
+            location_place_id: draft.selectedLocation.placeId,
+            location_provider: draft.selectedLocation.provider || 'osm',
           },
         }),
       });
@@ -623,27 +696,6 @@ export function SimpleUsahaHub({
     } finally {
       setSaving(false);
     }
-  };
-
-  const fillCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setError(isId ? 'Browser belum mendukung lokasi.' : 'Browser geolocation is not available.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      position => {
-        setDraft(current => ({
-          ...current,
-          lat: String(Number(position.coords.latitude.toFixed(6))),
-          lng: String(Number(position.coords.longitude.toFixed(6))),
-        }));
-      },
-      () => {
-        setError(isId ? 'Gagal membaca lokasi sekarang.' : 'Could not read the current location.');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-    );
   };
 
   if (loading && stores.length === 0) {
@@ -1102,17 +1154,11 @@ export function SimpleUsahaHub({
                   {isId ? 'Lokasi usaha' : 'Business location'}
                 </p>
                 <h3 className="mt-1 text-[1rem] font-bold ui-text">
-                  {isId ? 'Klik peta atau pakai lokasi sekarang' : 'Tap the map or use current location'}
+                  {isId
+                    ? 'Cari nama tempat, alamat, atau patokan'
+                    : 'Search place name, address, or landmark'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={fillCurrentLocation}
-                className="ui-button-secondary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-sm font-semibold"
-              >
-                <MapPin className="h-4 w-4" />
-                {isId ? 'Pakai lokasi saya' : 'Use my location'}
-              </button>
             </div>
 
             <div className="mt-4">
@@ -1126,23 +1172,33 @@ export function SimpleUsahaHub({
                   }))
                 }
                 isId={isId}
+                localSuggestions={storeLocationSuggestions}
+                selectedLocation={draft.selectedLocation}
+                onLocationChange={location =>
+                  setDraft(current => ({
+                    ...current,
+                    selectedLocation: location,
+                    lat: location ? String(location.latitude) : current.lat,
+                    lng: location ? String(location.longitude) : current.lng,
+                    city:
+                      location?.city ||
+                      location?.regency ||
+                      location?.district ||
+                      location?.province ||
+                      current.city,
+                    address: location?.formattedAddress || current.address,
+                  }))
+                }
                 markerLabel={isId ? 'Geser pin agar tepat' : 'Drag the pin to the right spot'}
               />
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <TextInput
-                label="Latitude"
-                value={draft.lat}
-                onChange={event => setDraft(current => ({ ...current, lat: event.target.value }))}
-                inputMode="decimal"
-              />
-              <TextInput
-                label="Longitude"
-                value={draft.lng}
-                onChange={event => setDraft(current => ({ ...current, lng: event.target.value }))}
-                inputMode="decimal"
-              />
+            <div className="mt-4 rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-sm leading-6 ui-text-soft">
+              {draft.selectedLocation
+                ? draft.selectedLocation.formattedAddress
+                : isId
+                  ? 'Pilih lokasi dari hasil pencarian agar alamat dan titik peta tersimpan benar.'
+                  : 'Pick a search result so the address and map point are saved correctly.'}
             </div>
           </div>
         </div>

@@ -1,10 +1,10 @@
 'use client';
 
-import { Languages, Moon, Settings2, Sun, X } from 'lucide-react';
+import { Languages, Settings2, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useLanguageModal } from '@/components/modal/LanguageModal/LanguageModalContext';
-import { useTheme } from '@/context/ThemeContext';
+// import { useTheme } from '@/context/ThemeContext';
 import { getPageMeta } from '@/config/pageMeta';
 import { cn } from '@/lib/utils';
 
@@ -15,7 +15,8 @@ function normalizePathname(pathname: string) {
 
 export function GlobalPreferenceDock() {
   const pathname = usePathname();
-  const { isDark, isReady, setColorScheme } = useTheme();
+  // Dark/light switching is paused while Lajukan focuses on light mode.
+  // const { isDark, isReady, setColorScheme } = useTheme();
   const { open, currentLocale } = useLanguageModal();
   const [isOpen, setIsOpen] = useState(false);
   const cleanPath = normalizePathname(pathname || '/');
@@ -25,9 +26,9 @@ export function GlobalPreferenceDock() {
     return null;
   }
 
-  const toggleTheme = () => {
-    setColorScheme(isDark ? 'light' : 'dark');
-  };
+  // const toggleTheme = () => {
+  //   setColorScheme(isDark ? 'light' : 'dark');
+  // };
 
   const openLanguage = () => {
     setIsOpen(false);
@@ -65,6 +66,7 @@ export function GlobalPreferenceDock() {
           </div>
 
           <div className="grid gap-1.5">
+            {/* Dark/light switching is paused while Lajukan focuses on light mode.
             <button
               type="button"
               onClick={toggleTheme}
@@ -81,6 +83,7 @@ export function GlobalPreferenceDock() {
                 {isDark ? 'Light' : 'Dark'}
               </span>
             </button>
+            */}
             <button
               type="button"
               onClick={openLanguage}
@@ -114,7 +117,11 @@ export function GlobalPreferenceDock() {
           aria-label={isOpen ? 'Close preferences' : 'Open preferences'}
           title="Preferences"
         >
-          {isOpen ? <X className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
+          {isOpen ? (
+            <X className="h-4 w-4" />
+          ) : (
+            <Settings2 className="h-4 w-4" />
+          )}
         </button>
       </div>
 

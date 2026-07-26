@@ -106,7 +106,7 @@ export default async function AboutPage({ params }: PageProps) {
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            href="/search?type=product&q=supplier"
+            href="/explore?type=product&q=supplier"
             className="ui-button-primary inline-flex items-center gap-2 px-5 text-sm"
           >
             {isId ? 'Mulai cari supplier' : 'Start sourcing'}
@@ -202,7 +202,7 @@ export default async function AboutPage({ params }: PageProps) {
 
         <div className="mt-6">
           <Link
-            href="/search"
+            href="/explore"
             className="ui-button-primary inline-flex items-center gap-2 px-6 text-sm"
           >
             {isId ? 'Mulai sekarang' : 'Get started'}

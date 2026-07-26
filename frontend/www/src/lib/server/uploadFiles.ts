@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { NextRequest } from 'next/server';
 import { isMinIOConfigured, uploadToMinIO } from '@/lib/minio';
 
 export type UploadAccept = 'image' | 'document' | 'media' | 'any';
@@ -91,12 +90,37 @@ const DOCUMENT_EXT = new Set([
   '.zip',
 ]);
 
-export function readUploadToken(req: NextRequest): string | null {
-  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  return (
-    bearer?.trim() || req.cookies.get('access_token')?.value?.trim() || null
-  );
-}
+const IMAGE_EXT = new Set([
+  '.avif',
+  '.bmp',
+  '.gif',
+  '.heic',
+  '.heif',
+  '.jpeg',
+  '.jpg',
+  '.png',
+  '.webp',
+]);
+
+const VIDEO_EXT = new Set(['.mov', '.mp4', '.webm']);
+const AUDIO_EXT = new Set(['.aac', '.m4a', '.mp3', '.ogg', '.wav']);
+
+const MIME_ALIASES_BY_EXT: Record<string, Set<string>> = {
+  '.aac': new Set(['audio/aac', 'audio/x-aac']),
+  '.csv': new Set(['text/csv', 'application/csv']),
+  '.heic': new Set(['image/heic', 'image/heif']),
+  '.heif': new Set(['image/heif', 'image/heic']),
+  '.jpg': new Set(['image/jpeg', 'image/pjpeg']),
+  '.jpeg': new Set(['image/jpeg', 'image/pjpeg']),
+  '.m4a': new Set(['audio/mp4', 'audio/x-m4a']),
+  '.rar': new Set([
+    'application/x-rar-compressed',
+    'application/vnd.rar',
+  ]),
+  '.rtf': new Set(['application/rtf', 'text/rtf']),
+  '.wav': new Set(['audio/wav', 'audio/x-wav']),
+  '.zip': new Set(['application/zip', 'application/x-zip-compressed']),
+};
 
 export function collectUploadFiles(form: FormData, keys: string[]): File[] {
   const collected: File[] = [];
@@ -181,54 +205,38 @@ function validateUploadFile(file: File, options: ValidateUploadOptions) {
 }
 
 function isAllowedUpload(file: File, accept: UploadAccept): boolean {
-  if (accept === 'any') return true;
   const mime = inferUploadMime(file).toLowerCase();
   const ext = path.extname(file.name || '').toLowerCase();
-  if (accept === 'image') return mime.startsWith('image/') || isImageExt(ext);
-  if (accept === 'document') return isDocumentUpload(mime, ext);
-  return isMediaUpload(mime, ext);
+  if (!ext || !MIME_BY_EXT[ext] || !mimeMatchesExtension(mime, ext)) {
+    return false;
+  }
+  if (accept === 'image') return IMAGE_EXT.has(ext);
+  if (accept === 'document') return DOCUMENT_EXT.has(ext);
+  if (accept === 'media') {
+    return (
+      IMAGE_EXT.has(ext) ||
+      VIDEO_EXT.has(ext) ||
+      AUDIO_EXT.has(ext) ||
+      DOCUMENT_EXT.has(ext)
+    );
+  }
+  return true;
 }
 
-function isMediaUpload(mime: string, ext: string): boolean {
-  return (
-    mime.startsWith('image/') ||
-    mime.startsWith('video/') ||
-    mime.startsWith('audio/') ||
-    isDocumentUpload(mime, ext)
-  );
-}
-
-function isDocumentUpload(mime: string, ext: string): boolean {
-  return (
-    DOCUMENT_EXT.has(ext) ||
-    mime.startsWith('text/') ||
-    (mime === 'application/octet-stream' && DOCUMENT_EXT.has(ext)) ||
-    mime.includes('pdf') ||
-    mime.includes('document') ||
-    mime.includes('spreadsheet') ||
-    mime.includes('presentation') ||
-    mime.includes('zip') ||
-    mime.includes('rar')
-  );
-}
-
-function isImageExt(ext: string): boolean {
-  return [
-    '.avif',
-    '.bmp',
-    '.gif',
-    '.heic',
-    '.heif',
-    '.jpeg',
-    '.jpg',
-    '.png',
-    '.webp',
-  ].includes(ext);
+function mimeMatchesExtension(mime: string, ext: string): boolean {
+  if (mime === 'application/octet-stream') return true;
+  const aliases = MIME_ALIASES_BY_EXT[ext];
+  if (aliases) return aliases.has(mime);
+  return MIME_BY_EXT[ext] === mime;
 }
 
 async function storeUploadFile(file: File, options: StoreUploadOptions) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const mime = inferUploadMime(file);
+  const ext = path.extname(file.name || '').toLowerCase();
+  if (!hasExpectedFileSignature(buffer, ext)) {
+    throw new Error('file content does not match its extension');
+  }
   const filename = buildUploadFilename(file);
   const minioUrl = await tryMinioUpload(file, buffer, mime, filename, options);
   const url = minioUrl || (await writeLocalUpload(buffer, filename, options));
@@ -239,6 +247,33 @@ async function storeUploadFile(file: File, options: StoreUploadOptions) {
     mime,
     type: inferStoredFileType(mime),
   } satisfies StoredUploadFile;
+}
+
+export function hasExpectedFileSignature(buffer: Buffer, ext: string): boolean {
+  if (ext === '.jpg' || ext === '.jpeg') {
+    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (ext === '.png') {
+    return buffer.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+  }
+  if (ext === '.gif') {
+    const header = buffer.subarray(0, 6).toString('ascii');
+    return header === 'GIF87a' || header === 'GIF89a';
+  }
+  if (ext === '.webp') {
+    return (
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    );
+  }
+  if (ext === '.bmp') return buffer.subarray(0, 2).toString('ascii') === 'BM';
+  if (ext === '.pdf') return buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+  if (ext === '.avif' || ext === '.heic' || ext === '.heif') {
+    return buffer.subarray(4, 12).toString('ascii').includes('ftyp');
+  }
+  return true;
 }
 
 async function tryMinioUpload(

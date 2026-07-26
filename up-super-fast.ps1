@@ -20,6 +20,11 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+$StorageEnvScript = Join-Path $PSScriptRoot "scripts\use-d-drive-env.ps1"
+if (Test-Path -LiteralPath $StorageEnvScript) {
+    . $StorageEnvScript -Quiet
+}
+
 if (-not $PSBoundParameters.ContainsKey('SkipCleanup')) {
     $SkipCleanup = $true
 }

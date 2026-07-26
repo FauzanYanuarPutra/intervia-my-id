@@ -182,17 +182,17 @@ function getSideVisual(side: DiscoveryCardSide): {
   if (side === 'demand') {
     return {
       badgeClass:
-        'bg-emerald-600 text-white shadow-[0_10px_24px_-16px_rgba(5,150,105,0.75)]',
+        'bg-[#2563eb] text-white shadow-[0_10px_24px_-16px_rgba(37,99,235,0.75)]',
       chipClass:
-        'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-400/20',
+        'bg-[#eff6ff] text-[#1d4ed8] ring-1 ring-[#bfdbfe] dark:bg-[rgba(37,99,235,0.16)] dark:text-[#bfdbfe] dark:ring-[rgba(96,165,250,0.28)]',
     };
   }
 
   return {
     badgeClass:
-      'bg-rose-600 text-white shadow-[0_10px_24px_-16px_rgba(225,29,72,0.75)]',
+      'bg-[#059669] text-white shadow-[0_10px_24px_-16px_rgba(5,150,105,0.75)]',
     chipClass:
-      'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-400/20',
+      'bg-[#ecfdf5] text-[#047857] ring-1 ring-[#a7f3d0] dark:bg-[rgba(5,150,105,0.16)] dark:text-[#a7f3d0] dark:ring-[rgba(52,211,153,0.28)]',
   };
 }
 
@@ -345,6 +345,7 @@ function useCardActions(
         metadata: {
           content_type: item.typeKey,
           content_url: item.href,
+          market_side: item.side,
         },
       };
 
@@ -392,13 +393,17 @@ function useCardActions(
       ? locale === 'id'
         ? 'Lamar'
         : 'Apply'
-      : profileIsPrimary
+      : item.side === 'demand'
         ? locale === 'id'
-          ? 'Profil'
-          : 'Profile'
-        : locale === 'id'
-          ? 'Buka'
-          : 'Open';
+          ? 'Tanggapi'
+          : 'Respond'
+        : profileIsPrimary
+          ? locale === 'id'
+            ? 'Profil'
+            : 'Profile'
+          : locale === 'id'
+            ? 'Buka'
+            : 'Open';
 
   const primary: CardAction = {
     label: primaryLabel,
@@ -409,26 +414,26 @@ function useCardActions(
   const profileAction: CardAction | null =
     profileHref && profileHref !== item.href
       ? {
-        label: locale === 'id' ? 'Profil' : 'Profile',
-        href: profileHref,
-        tone: 'secondary',
-      }
+          label: locale === 'id' ? 'Profil' : 'Profile',
+          href: profileHref,
+          tone: 'secondary',
+        }
       : null;
 
   const chatAction: CardAction | null = canStartChat
     ? {
-      label: chatLoading
-        ? locale === 'id'
-          ? 'Membuka...'
-          : 'Opening...'
-        : 'Chat',
-      onClick: () => {
-        void openChat();
-      },
-      loading: chatLoading,
-      disabled: chatLoading,
-      tone: 'secondary',
-    }
+        label: chatLoading
+          ? locale === 'id'
+            ? 'Membuka...'
+            : 'Opening...'
+          : 'Chat',
+        onClick: () => {
+          void openChat();
+        },
+        loading: chatLoading,
+        disabled: chatLoading,
+        tone: 'secondary',
+      }
     : null;
 
   return {

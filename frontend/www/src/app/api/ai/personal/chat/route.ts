@@ -3,7 +3,18 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Buffer } from 'node:buffer';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
-import { runPersonalAi, type PersonalAiMediaContext } from '@/lib/personal-ai/runtime';
+import {
+  runPersonalAi,
+  type PersonalAiMediaContext,
+} from '@/lib/personal-ai/runtime';
+import {
+  buildCreationIntakeMessage,
+  buildCreationReadyInstruction,
+  evaluateCreationFlow,
+  readCreationFlowMetadata,
+  type CreationFlowMetadata,
+} from '@/lib/creation-drafts/conversation';
+import { isSupportedCreationTarget } from '@/lib/creation-drafts/types';
 import {
   appendPersonalAiMessages,
   buildThreadTitle,
@@ -40,7 +51,10 @@ let cachedS3Client: S3Client | null = null;
 
 function cleanText(value: unknown, maxLength: number) {
   if (typeof value !== 'string') return '';
-  return value.replace(/\u0000/g, '').trim().slice(0, maxLength);
+  return value
+    .replace(/\u0000/g, '')
+    .trim()
+    .slice(0, maxLength);
 }
 
 function cleanInteger(
@@ -108,7 +122,9 @@ function parsePersonalAiMediaUrl(url: string, userId: string) {
   const [bucket, root, owner, filename] = parts;
   if (bucket !== MINIO_BUCKET || root !== 'personal-ai') return null;
   if (owner !== safeUserKey(userId)) return null;
-  if (![root, owner, filename].every(segment => SAFE_KEY_SEGMENT.test(segment))) {
+  if (
+    ![root, owner, filename].every(segment => SAFE_KEY_SEGMENT.test(segment))
+  ) {
     return null;
   }
 
@@ -148,7 +164,10 @@ async function hydratePrivateImageFromMinio(
   if (contentLength > MAX_SERVER_VISION_IMAGE_BYTES) return item;
 
   const bytes = await res.Body.transformToByteArray();
-  if (bytes.byteLength <= 0 || bytes.byteLength > MAX_SERVER_VISION_IMAGE_BYTES) {
+  if (
+    bytes.byteLength <= 0 ||
+    bytes.byteLength > MAX_SERVER_VISION_IMAGE_BYTES
+  ) {
     return item;
   }
 
@@ -203,14 +222,21 @@ function cleanMediaAttachments(value: unknown): PersonalAiMediaContext[] {
     const kind = cleanMediaKind(record.kind);
     const name = cleanText(record.name, 140) || 'media';
     const mime = cleanText(record.mime, 120);
-    const size = Math.max(0, Math.min(5_000_000, Number(record.size || 0) || 0));
+    const size = Math.max(
+      0,
+      Math.min(5_000_000, Number(record.size || 0) || 0),
+    );
     const rawDataUrl = cleanText(record.data_url || record.dataUrl, 2_200_000);
     const dataUrl =
-      kind === 'image' && /^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(rawDataUrl)
+      kind === 'image' &&
+      /^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(rawDataUrl)
         ? rawDataUrl
         : undefined;
     const text = cleanText(record.text, 1600);
-    const url = cleanText(record.url || record.stored_url || record.storedUrl, 500);
+    const url = cleanText(
+      record.url || record.stored_url || record.storedUrl,
+      500,
+    );
     result.push({
       kind,
       name,
@@ -237,6 +263,19 @@ function mediaStorageMetadata(media: PersonalAiMediaContext[]) {
   }));
 }
 
+function latestCollectingCreationFlow(
+  history: Array<{ metadata?: Record<string, unknown> }>,
+): CreationFlowMetadata | null {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const flow = readCreationFlowMetadata(
+      history[index]?.metadata?.creation_flow,
+    );
+    if (!flow) continue;
+    return flow.status === 'collecting' ? flow : null;
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (!auth.ok) return auth.res;
@@ -258,19 +297,24 @@ export async function POST(req: NextRequest) {
   const message =
     cleanText(body.message, 3500) ||
     (media.length > 0
-      ? localeText(body.locale === 'en' ? 'en' : 'id', 'Tolong analisis media ini.', 'Please analyze this media.')
+      ? localeText(
+          body.locale === 'en' ? 'en' : 'id',
+          'Tolong analisis media ini.',
+          'Please analyze this media.',
+        )
       : '');
   if (!message && media.length === 0) {
-    return NextResponse.json(
-      { error: 'Kirim pesan dulu.' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Kirim pesan dulu.' }, { status: 400 });
   }
 
   const locale = body.locale === 'en' ? 'en' : 'id';
   const actionInstruction = cleanText(
     body.action_instruction || body.actionInstruction,
     1600,
+  );
+  const replyToMessageId = cleanText(
+    body.reply_to_message_id || body.replyToMessageId,
+    160,
   );
   const agentId = cleanText(body.agent_id, 120);
   const shareId = cleanText(body.share_id, 120);
@@ -294,38 +338,107 @@ export async function POST(req: NextRequest) {
 
   const thread =
     threadData?.thread ||
-    (await createPersonalAiThread(auth.ctx.userId, agent.id, buildThreadTitle(message)));
+    (await createPersonalAiThread(
+      auth.ctx.userId,
+      agent.id,
+      buildThreadTitle(message),
+    ));
   const history = threadData?.messages || [];
-  const memory = await getPersonalAiMemory(agent.id, auth.ctx.userId);
-  let ai: Awaited<ReturnType<typeof runPersonalAi>>;
-  try {
-    ai = await runPersonalAi({
-      agent,
-      memory,
-      message,
-      actionInstruction,
-      history,
-      locale,
-      media,
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn('[PERSONAL_AI_CHAT_RUNTIME_ERROR]', {
-      agent_id: agent.id,
-      media_count: media.length,
-      error: errorMessage,
-    });
-    ai = {
-      response:
-        locale === 'id'
-          ? 'Pesanmu sudah diterima, tapi AI sedang gagal memproses respons. Coba kirim ulang sebentar lagi.'
-          : 'Your message was received, but the AI failed to process a response. Please retry shortly.',
-      provider: 'safe-fallback',
-      model: 'personal-ai-fallback',
-      provider_errors: [`runtime: ${errorMessage}`],
-    };
+  const replyTarget = replyToMessageId
+    ? history.find(item => item.id === replyToMessageId)
+    : undefined;
+  if (replyToMessageId && !replyTarget) {
+    return NextResponse.json(
+      { error: 'Pesan yang dibalas tidak ditemukan di chat ini.' },
+      { status: 404 },
+    );
   }
+  const replyMetadata = replyTarget
+    ? {
+        message_id: replyTarget.id,
+        role: replyTarget.role,
+        excerpt: cleanText(replyTarget.content, 500),
+      }
+    : undefined;
+  const replyInstruction = replyTarget
+    ? locale === 'id'
+      ? `User sedang membalas pesan ${replyTarget.role} berikut:\n"${cleanText(replyTarget.content, 900)}"\nJawab dalam konteks kutipan ini tanpa kehilangan konteks percakapan aktif.`
+      : `The user is replying to this ${replyTarget.role} message:\n"${cleanText(replyTarget.content, 900)}"\nRespond in the context of this quote without losing the active conversation context.`
+    : '';
+  const memory = await getPersonalAiMemory(agent.id, auth.ctx.userId);
   const mediaMetadata = mediaStorageMetadata(media);
+  const previousCreationFlow = latestCollectingCreationFlow(history);
+  const requestedCreationTargetValue =
+    body.creation_target || body.creationTarget;
+  const requestedCreationTarget = isSupportedCreationTarget(
+    requestedCreationTargetValue,
+  )
+    ? requestedCreationTargetValue
+    : undefined;
+  const activeCreationTarget =
+    requestedCreationTarget || previousCreationFlow?.target;
+  const creationFlow = activeCreationTarget
+    ? evaluateCreationFlow({
+        target: activeCreationTarget,
+        message,
+        locale,
+        previous:
+          previousCreationFlow?.target === activeCreationTarget
+            ? previousCreationFlow
+            : null,
+        media: mediaMetadata,
+      })
+    : null;
+  let ai: Awaited<ReturnType<typeof runPersonalAi>>;
+  if (creationFlow && creationFlow.status !== 'ready') {
+    ai = {
+      response: buildCreationIntakeMessage(creationFlow, locale),
+      provider: 'guided-creation',
+      model: 'guided-creation-v1',
+      provider_errors: [],
+    };
+  } else {
+    try {
+      ai = await runPersonalAi({
+        agent,
+        memory,
+        message,
+        actionInstruction: [
+          actionInstruction,
+          replyInstruction,
+          creationFlow?.status === 'ready'
+            ? buildCreationReadyInstruction(creationFlow, locale)
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        history,
+        locale,
+        media,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.warn('[PERSONAL_AI_CHAT_RUNTIME_ERROR]', {
+        agent_id: agent.id,
+        media_count: media.length,
+        error: errorMessage,
+      });
+      ai = {
+        response:
+          locale === 'id'
+            ? creationFlow?.status === 'ready'
+              ? 'Informasi inti sudah cukup. Draft sedang disiapkan dan tetap bisa kamu perbaiki sebelum diterbitkan.'
+              : 'Pesanmu sudah diterima, tapi AI sedang gagal memproses respons. Coba kirim ulang sebentar lagi.'
+            : creationFlow?.status === 'ready'
+              ? 'The core information is complete. Your draft is being prepared and can still be edited before publishing.'
+              : 'Your message was received, but the AI failed to process a response. Please retry shortly.',
+        provider: 'safe-fallback',
+        model: 'personal-ai-fallback',
+        provider_errors: [`runtime: ${errorMessage}`],
+      };
+    }
+  }
 
   const saved = await appendPersonalAiMessages({
     userId: auth.ctx.userId,
@@ -333,27 +446,37 @@ export async function POST(req: NextRequest) {
     threadId: thread.id,
     userContent: message,
     assistantContent: ai.response,
-    userMetadata: mediaMetadata.length > 0 ? { media: mediaMetadata } : undefined,
+    userMetadata:
+      mediaMetadata.length > 0 || replyMetadata
+        ? {
+            ...(mediaMetadata.length > 0 ? { media: mediaMetadata } : {}),
+            ...(replyMetadata ? { reply_to: replyMetadata } : {}),
+          }
+        : undefined,
     metadata: {
       provider: ai.provider,
       model: ai.model,
       provider_errors: ai.provider_errors,
       media_count: mediaMetadata.length,
       has_action_instruction: Boolean(actionInstruction),
-      shared_agent_owner_id: agent.owner_id !== auth.ctx.userId ? agent.owner_id : undefined,
+      creation_flow: creationFlow || undefined,
+      shared_agent_owner_id:
+        agent.owner_id !== auth.ctx.userId ? agent.owner_id : undefined,
     },
   });
-  await updatePersonalAiMemory({
-    agent,
-    userId: auth.ctx.userId,
-    userMessage: message,
-    assistantMessage: ai.response,
-  }).catch(error => {
-    console.warn('[PERSONAL_AI_MEMORY_UPDATE_ERROR]', {
-      agent_id: agent.id,
-      error: error instanceof Error ? error.message : String(error),
+  if (!creationFlow || creationFlow.status === 'ready') {
+    await updatePersonalAiMemory({
+      agent,
+      userId: auth.ctx.userId,
+      userMessage: message,
+      assistantMessage: ai.response,
+    }).catch(error => {
+      console.warn('[PERSONAL_AI_MEMORY_UPDATE_ERROR]', {
+        agent_id: agent.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
-  });
+  }
 
   return NextResponse.json({
     data: {
@@ -363,6 +486,7 @@ export async function POST(req: NextRequest) {
       provider: ai.provider,
       model: ai.model,
       provider_errors: ai.provider_errors,
+      creation_flow: creationFlow || undefined,
     },
   });
 }

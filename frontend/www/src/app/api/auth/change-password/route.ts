@@ -3,6 +3,8 @@ import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurit
 import { validatePasswordStrength } from '@/lib/passwordPolicy';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
+import { safeErrorCode } from '@/lib/server/safeLog';
+import { requireAuth } from '@/lib/serverAuth';
 import { z } from 'zod';
 
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
@@ -22,12 +24,8 @@ export async function POST(req: NextRequest) {
     });
     if (!security.ok) return security.response;
 
-    const token = req.headers.get('authorization')?.replace('Bearer ', '') ||
-      req.cookies.get('access_token')?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAuth(req);
+    if (!auth.ok) return auth.res;
 
     const parsed = await parseJsonBodyWithSchema(req, ChangePasswordSchema);
     if (!parsed.ok) return parsed.response;
@@ -40,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const ip = security.ip;
     const rl = await enforceRateLimit({
-      key: `auth:change-password:${ip}`,
+      key: `auth:change-password:${ip}:${auth.ctx.userId}`,
       limit: 5,
       windowSeconds: 3600,
     });
@@ -51,7 +49,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${auth.ctx.token}`,
         ...authSecurityHeaders(security),
       },
       body: JSON.stringify({
@@ -61,9 +59,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
       return NextResponse.json(
-        { error: data.error || 'Failed to change password' },
+        {
+          error:
+            res.status === 400 || res.status === 401
+              ? 'Current password is invalid'
+              : 'Failed to change password',
+        },
         { status: res.status }
       );
     }
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
       message: 'Password changed successfully',
     });
   } catch (e) {
-    console.error('Change password error:', e);
+    console.error('Change password error:', { error: safeErrorCode(e) });
     return NextResponse.json(
       { error: 'Service unavailable' },
       { status: 503 }

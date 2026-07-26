@@ -28,6 +28,12 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "test:e2e:self-heal": "node scripts/self-heal-e2e.mjs",
+    "test:e2e:quality": "playwright test tests/e2e/site-quality.spec.ts tests/e2e/lajukan-stabilization.spec.ts",
+    "quality:source": "node scripts/check-source-health.mjs",
+    "test:foundation": "vitest run src/lib/auth/oauthRedirects.test.ts src/lib/performance/webVitals.test.ts src/lib/reels/performance.test.ts src/lib/reels/preferences.test.ts src/lib/reels/presentation.test.ts src/lib/seo/jsonLd.test.ts src/lib/server/safeLog.test.ts src/lib/server/uploadFiles.test.ts src/lib/viewport/viewportMetrics.test.ts",
+    "quality:foundation": "npm run quality:source && npm run test:foundation && tsc --noEmit --pretty false",
+    "ai:dataset:pull": "node scripts/pull-lajukan-ai-domain-dataset.mjs",
+    "ai:dataset:pull:full": "node scripts/pull-lajukan-ai-domain-dataset.mjs --include-open-food-facts=true",
     "i18n:audit": "node scripts/audit-i18n-copy.mjs",
     "i18n:audit:strict": "node scripts/audit-i18n-copy.mjs --strict"
   },

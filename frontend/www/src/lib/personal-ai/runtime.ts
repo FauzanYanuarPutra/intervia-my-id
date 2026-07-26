@@ -1,3 +1,5 @@
+import { readFile } from 'fs/promises';
+import path from 'path';
 import { LAJUKAN_SYSTEM_PROMPT } from '@/lib/aiSystemPrompt';
 import type {
   PersonalAiAgent,
@@ -5,6 +7,13 @@ import type {
   PersonalAiMessage,
   PersonalAiModelPreference,
 } from './store';
+import {
+  BUILTIN_LAJUKAN_DOMAIN_KNOWLEDGE,
+  buildLajukanDomainKnowledgePrompt,
+  mergeDomainKnowledgeItems,
+  normalizeDomainKnowledgeItems,
+  type LajukanDomainKnowledgeItem,
+} from './domainKnowledge';
 
 const INTERNAL_AI_URL = process.env.INTERNAL_AI_URL || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
@@ -29,6 +38,9 @@ const OLLAMA_VISION_MODELS = prioritizeOllamaVisionModels(
         process.env.OLLAMA_VISION_MODELS ||
         OLLAMA_VISION_MODEL,
       OLLAMA_VISION_MODEL,
+      'qwen3-vl:4b-instruct',
+      'llava:7b',
+      'qwen2.5vl:7b',
       'moondream:latest',
     ].join(','),
   ),
@@ -41,12 +53,22 @@ const OLLAMA_TIMEOUT_MS = cleanInteger(
   180_000,
 );
 const OLLAMA_VISION_TIMEOUT_MS = cleanInteger(
+  process.env.PERSONAL_AI_MIN_VISION_TIMEOUT_MS,
+  180_000,
+  30_000,
+  600_000,
+);
+const RAW_OLLAMA_VISION_TIMEOUT_MS = cleanInteger(
   process.env.OLLAMA_VISION_TIMEOUT_MS ||
     process.env.OLLAMA_CHAT_VISION_TIMEOUT_MS ||
     process.env.OLLAMA_TIMEOUT_MS,
-  240_000,
+  OLLAMA_VISION_TIMEOUT_MS,
   10_000,
   600_000,
+);
+const EFFECTIVE_OLLAMA_VISION_TIMEOUT_MS = Math.max(
+  RAW_OLLAMA_VISION_TIMEOUT_MS,
+  OLLAMA_VISION_TIMEOUT_MS,
 );
 const OLLAMA_NUM_CTX = cleanInteger(
   process.env.OLLAMA_NUM_CTX,
@@ -80,8 +102,14 @@ const OLLAMA_KEEP_ALIVE = cleanOllamaDuration(
 const USE_OLLAMA = process.env.USE_OLLAMA === 'true';
 const PERSONAL_AI_FAST_PROVIDER_FIRST =
   process.env.PERSONAL_AI_FAST_PROVIDER_FIRST !== 'false';
-const PERSONAL_AI_SKIP_SLOW_VISION_FALLBACK =
-  process.env.PERSONAL_AI_SKIP_SLOW_VISION_FALLBACK !== 'false';
+const PERSONAL_AI_DOMAIN_DATASET_FILE =
+  process.env.PERSONAL_AI_DOMAIN_DATASET_FILE ||
+  (process.env.NODE_ENV === 'production'
+    ? '/tmp/lajukan-personal-ai/domain-dataset.json'
+    : path.join(
+        process.cwd(),
+        '../../.runtime/personal-ai/domain-dataset.json',
+      ));
 
 const ALLOWED_INLINE_IMAGE_MIMES = new Set([
   'image/jpeg',
@@ -172,6 +200,11 @@ type VisionCaptionResult = {
   model: string;
 };
 
+let domainKnowledgeCache: {
+  loadedAt: number;
+  items: LajukanDomainKnowledgeItem[];
+} | null = null;
+
 function trimBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, '');
 }
@@ -202,6 +235,44 @@ function cleanOllamaDuration(value: string | undefined, fallback: string) {
   return fallback;
 }
 
+async function loadLajukanDomainKnowledge() {
+  const cacheTtlMs = cleanInteger(
+    process.env.PERSONAL_AI_DOMAIN_DATASET_CACHE_TTL_MS,
+    120_000,
+    10_000,
+    3_600_000,
+  );
+  if (
+    domainKnowledgeCache &&
+    Date.now() - domainKnowledgeCache.loadedAt < cacheTtlMs
+  ) {
+    return domainKnowledgeCache.items;
+  }
+
+  let runtimeItems: LajukanDomainKnowledgeItem[] = [];
+  try {
+    const raw = await readFile(PERSONAL_AI_DOMAIN_DATASET_FILE, 'utf8');
+    runtimeItems = normalizeDomainKnowledgeItems(JSON.parse(raw));
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: unknown }).code)
+        : '';
+    if (code && code !== 'ENOENT') {
+      console.warn('[PERSONAL_AI_DOMAIN_DATASET_LOAD_FAILED]', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const items = mergeDomainKnowledgeItems(
+    runtimeItems,
+    BUILTIN_LAJUKAN_DOMAIN_KNOWLEDGE,
+  ).slice(0, 240);
+  domainKnowledgeCache = { loadedAt: Date.now(), items };
+  return items;
+}
+
 function uniqueModelList(value: string) {
   const models = value
     .split(',')
@@ -218,10 +289,27 @@ function uniqueModelList(value: string) {
 }
 
 function prioritizeOllamaVisionModels(models: string[]) {
-  if (process.env.PERSONAL_AI_FAST_VISION_FIRST === 'false') return models;
-  const fast = models.filter(model => prefersPlainOllamaVision(model));
-  const rest = models.filter(model => !prefersPlainOllamaVision(model));
-  return [...fast, ...rest];
+  if (process.env.PERSONAL_AI_FAST_VISION_FIRST === 'true') {
+    const fast = models.filter(model => prefersPlainOllamaVision(model));
+    const rest = models.filter(model => !prefersPlainOllamaVision(model));
+    return [...fast, ...rest];
+  }
+
+  return [...models].sort(
+    (left, right) =>
+      ollamaVisionReliabilityRank(left) - ollamaVisionReliabilityRank(right),
+  );
+}
+
+function ollamaVisionReliabilityRank(model: string) {
+  const normalized = model.toLowerCase();
+  if (/qwen3[-:]?vl|qwen3-vl/.test(normalized)) return 0;
+  if (/llava/.test(normalized)) return 1;
+  if (/qwen2\.5[-:]?vl|qwen2\.5vl/.test(normalized)) return 2;
+  if (/qwen/.test(normalized)) return 3;
+  if (/minicpm|bakllava|gemma3/.test(normalized)) return 4;
+  if (/moondream/.test(normalized)) return 8;
+  return 5;
 }
 
 function estimatedBase64Bytes(base64: string) {
@@ -414,7 +502,10 @@ function isSuspiciousNonLatinText(value: string) {
 }
 
 function parseJsonObject(text: string): Record<string, unknown> | null {
-  const clean = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+  const clean = text
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .trim();
   const candidates = [
     clean,
     clean.slice(clean.indexOf('{'), clean.lastIndexOf('}') + 1),
@@ -478,7 +569,9 @@ function buildVisionCaptionResult(
     isVisionPlaceholderText(description) ||
     isVisionPlaceholderText(mainSubject)
   ) {
-    throw new Error(`${provider} returned a schema placeholder instead of visual analysis.`);
+    throw new Error(
+      `${provider} returned a schema placeholder instead of visual analysis.`,
+    );
   }
 
   const visibleDetails = cleanVisionTextList(
@@ -489,9 +582,10 @@ function buildVisionCaptionResult(
 
   return {
     description,
-    mainSubject: mainSubject && !isSuspiciousNonLatinText(mainSubject)
-      ? mainSubject
-      : undefined,
+    mainSubject:
+      mainSubject && !isSuspiciousNonLatinText(mainSubject)
+        ? mainSubject
+        : undefined,
     visibleDetails,
     colors: cleanVisionTextList(parsed.colors, 8, 60),
     textSeen: cleanVisionTextList(parsed.text_seen || parsed.textSeen, 8, 120),
@@ -507,9 +601,7 @@ function buildPlainVisionCaptionResult(
   model: string,
 ): VisionCaptionResult {
   const description = cleanText(
-    value
-      .replace(/^\s*(?:\d+[\).:-]\s*|[-*]\s*)/gm, '')
-      .replace(/\s+/g, ' '),
+    value.replace(/^\s*(?:\d+[\).:-]\s*|[-*]\s*)/gm, '').replace(/\s+/g, ' '),
     1_200,
   );
 
@@ -518,7 +610,9 @@ function buildPlainVisionCaptionResult(
     isSuspiciousNonLatinText(description) ||
     isVisionPlaceholderText(description)
   ) {
-    throw new Error(`${provider} returned a low-confidence plain vision response.`);
+    throw new Error(
+      `${provider} returned a low-confidence plain vision response.`,
+    );
   }
 
   return {
@@ -559,8 +653,7 @@ function shouldAnswerVisionDirectly(
     .filter(Boolean)
     .join(' ');
   const englishMatches = combined.match(ENGLISH_RESPONSE_RE)?.length || 0;
-  const indonesianMatches =
-    combined.match(INDONESIAN_RESPONSE_RE)?.length || 0;
+  const indonesianMatches = combined.match(INDONESIAN_RESPONSE_RE)?.length || 0;
 
   return indonesianMatches >= 2 || englishMatches <= indonesianMatches + 1;
 }
@@ -672,8 +765,12 @@ function buildDirectVisionResponse(
           ...details.map(item => `- ${item}`),
         ].join('\n')
       : '',
-    colors ? `**${isId ? 'Warna yang terlihat' : 'Visible colors'}:** ${colors}` : '',
-    textSeen ? `**${isId ? 'Teks yang terbaca' : 'Readable text'}:** ${textSeen}` : '',
+    colors
+      ? `**${isId ? 'Warna yang terlihat' : 'Visible colors'}:** ${colors}`
+      : '',
+    textSeen
+      ? `**${isId ? 'Teks yang terbaca' : 'Readable text'}:** ${textSeen}`
+      : '',
     uncertainties.length
       ? [
           `**${isId ? 'Catatan' : 'Notes'}:**`,
@@ -722,6 +819,7 @@ function buildSystemPrompt(input: {
   agent: PersonalAiAgent;
   memory: PersonalAiMemory | null;
   locale: 'id' | 'en';
+  domainContext?: string;
 }) {
   const isId = input.locale === 'id';
   const memoryText =
@@ -756,15 +854,18 @@ function buildSystemPrompt(input: {
               isId
                 ? 'Output sections yang diharapkan:'
                 : 'Expected output sections:',
-              ...builder.output.sections.map(
-                section =>
-                  [
-                    `- ${section.title}: ${section.type}`,
-                    section.description ? `  Deskripsi: ${section.description}` : '',
-                    section.instruction ? `  Instruksi: ${section.instruction}` : '',
-                  ]
-                    .filter(Boolean)
-                    .join('\n'),
+              ...builder.output.sections.map(section =>
+                [
+                  `- ${section.title}: ${section.type}`,
+                  section.description
+                    ? `  Deskripsi: ${section.description}`
+                    : '',
+                  section.instruction
+                    ? `  Instruksi: ${section.instruction}`
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
               ),
             ].join('\n')
           : '',
@@ -819,6 +920,7 @@ function buildSystemPrompt(input: {
     `Nama AI: ${input.agent.name}`,
     `Gaya jawaban: ${input.agent.tone}`,
     `Instruksi pemilik:\n${input.agent.instructions}`,
+    input.domainContext || '',
     builderText,
     memoryText
       ? `${isId ? 'Memory personal yang boleh dipakai' : 'Allowed personal memory'}:\n${memoryText}`
@@ -836,6 +938,7 @@ function buildMessages(input: {
   history: PersonalAiMessage[];
   locale: 'id' | 'en';
   media?: PersonalAiMediaContext[];
+  domainContext?: string;
 }): ChatMessage[] {
   const system: ChatMessage = {
     role: 'system',
@@ -843,6 +946,7 @@ function buildMessages(input: {
       agent: input.agent,
       memory: input.memory,
       locale: input.locale,
+      domainContext: input.domainContext,
     }),
   };
 
@@ -855,7 +959,7 @@ function buildMessages(input: {
     .slice(-14)
     .map(item => ({
       role: item.role as 'user' | 'assistant',
-      content: cleanText(item.content, 6_000),
+      content: personalAiHistoryContent(item, input.locale),
     }));
 
   return [
@@ -871,6 +975,36 @@ function buildMessages(input: {
       ),
     },
   ];
+}
+
+function personalAiHistoryContent(
+  message: PersonalAiMessage,
+  locale: 'id' | 'en',
+) {
+  const content = cleanText(message.content, 6_000);
+  const reply =
+    message.metadata?.reply_to &&
+    typeof message.metadata.reply_to === 'object' &&
+    !Array.isArray(message.metadata.reply_to)
+      ? (message.metadata.reply_to as Record<string, unknown>)
+      : null;
+  const forwarded =
+    message.metadata?.forwarded_from &&
+    typeof message.metadata.forwarded_from === 'object' &&
+    !Array.isArray(message.metadata.forwarded_from)
+      ? (message.metadata.forwarded_from as Record<string, unknown>)
+      : null;
+  const context = [
+    reply
+      ? `${locale === 'id' ? '[Membalas pesan]' : '[Replying to message]'} ${cleanText(reply.excerpt, 500)}`
+      : '',
+    forwarded
+      ? `${locale === 'id' ? '[Pesan diteruskan]' : '[Forwarded message]'} (${cleanText(forwarded.role, 20) || 'message'})`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return context ? `${context}\n${content}` : content;
 }
 
 function buildUserMessageWithMediaContext(
@@ -955,16 +1089,11 @@ async function callOllamaVisionCaption(
         model,
         error: message,
       });
-
-      if (
-        PERSONAL_AI_SKIP_SLOW_VISION_FALLBACK &&
-        prefersPlainOllamaVision(model)
-      ) {
-        break;
-      }
     }
   }
-  throw new Error(`All Ollama vision models failed. ${errors.slice(0, 3).join(' | ')}`);
+  throw new Error(
+    `All Ollama vision models failed. ${errors.slice(0, 3).join(' | ')}`,
+  );
 }
 
 async function callVisionCaption(
@@ -1000,7 +1129,9 @@ async function callVisionCaption(
     }
   }
 
-  throw new Error(`No working vision provider. ${errors.slice(0, 3).join(' | ')}`);
+  throw new Error(
+    `No working vision provider. ${errors.slice(0, 3).join(' | ')}`,
+  );
 }
 
 async function callOpenAiVisionCaption(
@@ -1010,20 +1141,16 @@ async function callOpenAiVisionCaption(
   const isId = locale === 'id';
   const instruction = isId
     ? [
-        'Analisis pixel gambar yang dilampirkan secara langsung.',
-        'Jangan menjawab berdasarkan nama file, format, ukuran file, atau metadata.',
-        'Jangan menebak identitas orang, lokasi, merek, harga, ukuran pasti, atau fakta yang tidak tampak jelas.',
-        'Jawab hanya JSON valid tanpa markdown.',
-        'Gunakan key: readable, main_subject, description, visible_details, colors, text_seen, uncertainties.',
-        'Isi setiap value dengan hasil analisis visual nyata dari gambar. Jangan menyalin nama key, instruksi, atau placeholder schema.',
+        'Lihat pixel gambar yang dilampirkan secara langsung.',
+        'Jawab dalam Bahasa Indonesia natural, 2-4 kalimat.',
+        'Sebutkan objek utama, warna/bentuk yang terlihat, bahan/tekstur jika tampak, dan teks label yang benar-benar terbaca.',
+        'Jangan menjawab dari nama file, ukuran file, atau metadata. Jangan menebak merek, harga, lokasi, identitas, atau ukuran pasti.',
       ].join('\n')
     : [
-        'Analyze the attached image pixels directly.',
-        'Do not answer from filename, file format, file size, or metadata.',
-        'Do not guess identity, location, brand, price, exact size, or unsupported facts.',
-        'Return valid JSON only.',
-        'Use these keys: readable, main_subject, description, visible_details, colors, text_seen, uncertainties.',
-        'Fill every value with actual visual analysis from the image. Do not copy key names, instructions, or schema placeholders.',
+        'Look at the attached image pixels directly.',
+        'Answer naturally in 2-4 sentences.',
+        'Mention the main object, visible colors/shape, material/texture if visible, and any readable label text.',
+        'Do not answer from filename, file size, or metadata. Do not guess brand, price, location, identity, or exact size.',
       ].join('\n');
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1107,7 +1234,7 @@ async function callOllamaVisionCaptionWithModel(
     body: JSON.stringify({
       model,
       stream: false,
-      format: 'json',
+      think: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
       messages: [
         {
@@ -1118,13 +1245,13 @@ async function callOllamaVisionCaptionWithModel(
       ],
       options: {
         temperature: 0.05,
-        num_ctx: 2048,
-        num_predict: 700,
+        num_ctx: OLLAMA_NUM_CTX,
+        num_predict: 260,
         top_p: 0.8,
         repeat_penalty: 1.05,
       },
     }),
-    signal: AbortSignal.timeout(OLLAMA_VISION_TIMEOUT_MS),
+    signal: AbortSignal.timeout(EFFECTIVE_OLLAMA_VISION_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -1139,7 +1266,7 @@ async function callOllamaVisionCaptionWithModel(
   const raw = cleanText(data.message?.content || data.response, 12_000);
   const parsed = parseJsonObject(raw);
   if (!parsed) {
-    return callOllamaVisionPlainCaptionWithModel(image, locale, model);
+    return buildPlainVisionCaptionResult(raw, 'ollama-vision', model);
   }
 
   try {
@@ -1147,7 +1274,7 @@ async function callOllamaVisionCaptionWithModel(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/placeholder|low-confidence|unsafe/i.test(message)) {
-      return callOllamaVisionPlainCaptionWithModel(image, locale, model);
+      return buildPlainVisionCaptionResult(raw, 'ollama-vision', model);
     }
     throw error;
   }
@@ -1155,6 +1282,13 @@ async function callOllamaVisionCaptionWithModel(
 
 function prefersPlainOllamaVision(model: string) {
   return /(^|[:/\s-])moondream([:/\s-]|$)/i.test(model);
+}
+
+function selectOllamaChatVisionModel() {
+  return (
+    OLLAMA_VISION_MODELS.find(model => !prefersPlainOllamaVision(model)) ||
+    OLLAMA_VISION_MODEL
+  );
 }
 
 async function callOllamaVisionPlainCaptionWithModel(
@@ -1165,17 +1299,14 @@ async function callOllamaVisionPlainCaptionWithModel(
   const prompt =
     locale === 'id'
       ? [
-          'Look at the attached image pixels directly.',
-          'Describe the visible image content in one concise paragraph.',
-          'Mention the main object, visible colors, shape/material if visible, and readable text if any.',
-          'Do not answer from filename, file size, or metadata. Do not guess identity, exact location, brand, price, or unsupported facts.',
-          'If you can answer in Indonesian, use Indonesian. If not, answer in simple English.',
+          'What is in this image? Answer in one short sentence.',
+          'Mention only visible objects and colors.',
+          'Do not mention filename, file size, metadata, identity, price, or location.',
         ].join('\n')
       : [
-          'Look at the attached image pixels directly.',
-          'Describe the visible image content in one concise paragraph.',
-          'Mention the main object, visible colors, shape/material if visible, and readable text if any.',
-          'Do not answer from filename, file size, or metadata. Do not guess identity, exact location, brand, price, or unsupported facts.',
+          'What is in this image? Answer in one short sentence.',
+          'Mention only visible objects and colors.',
+          'Do not mention filename, file size, metadata, identity, price, or location.',
         ].join('\n');
 
   const res = await fetch(`${trimBaseUrl(OLLAMA_URL)}/api/generate`, {
@@ -1189,18 +1320,20 @@ async function callOllamaVisionPlainCaptionWithModel(
       images: [image.base64],
       options: {
         temperature: 0.05,
-        num_ctx: 2048,
-        num_predict: 260,
+        num_ctx: 1024,
+        num_predict: 80,
         top_p: 0.8,
         repeat_penalty: 1.05,
       },
     }),
-    signal: AbortSignal.timeout(OLLAMA_VISION_TIMEOUT_MS),
+    signal: AbortSignal.timeout(EFFECTIVE_OLLAMA_VISION_TIMEOUT_MS),
   });
 
   if (!res.ok) {
     const errorBody = await res.text().catch(() => '');
-    throw new Error(`Ollama plain vision ${res.status}: ${errorBody.slice(0, 500)}`);
+    throw new Error(
+      `Ollama plain vision ${res.status}: ${errorBody.slice(0, 500)}`,
+    );
   }
 
   const data = (await res.json()) as {
@@ -1217,7 +1350,7 @@ async function callOllama(
   locale: 'id' | 'en',
 ): Promise<PersonalAiProviderResult> {
   const hasImages = visionImages.length > 0;
-  const model = hasImages ? OLLAMA_VISION_MODEL : OLLAMA_MODEL;
+  const model = hasImages ? selectOllamaChatVisionModel() : OLLAMA_MODEL;
 
   const ollamaMessages: ChatMessage[] = messages.map((message, index) => {
     const isLastUserMessage =
@@ -1251,7 +1384,7 @@ async function callOllama(
       },
     }),
     signal: AbortSignal.timeout(
-      hasImages ? OLLAMA_VISION_TIMEOUT_MS : OLLAMA_TIMEOUT_MS,
+      hasImages ? EFFECTIVE_OLLAMA_VISION_TIMEOUT_MS : OLLAMA_TIMEOUT_MS,
     ),
   });
 
@@ -1448,6 +1581,7 @@ async function callInternalAi(
 function providerOrder(
   preference: PersonalAiModelPreference,
   hasVisionMedia: boolean,
+  hasAnalyzedVisionContext = false,
 ) {
   if (hasVisionMedia) {
     if (preference === 'openai') {
@@ -1469,6 +1603,10 @@ function providerOrder(
     }
 
     return ['ollama', 'openai'] as const;
+  }
+
+  if (hasAnalyzedVisionContext && preference === 'auto') {
+    return ['ollama', 'internal', 'openai', 'groq'] as const;
   }
 
   if (preference === 'ollama') {
@@ -1517,6 +1655,13 @@ export async function runPersonalAi(input: {
     url: item.url ? cleanText(item.url, 500) : undefined,
   }));
 
+  const domainKnowledge = await loadLajukanDomainKnowledge();
+  const domainContext = buildLajukanDomainKnowledgePrompt({
+    query: sanitizedMessage,
+    media,
+    locale: responseLocale,
+    items: domainKnowledge,
+  });
   const preparedVision = prepareVisionImages(media);
   const baseMessages = buildMessages({
     agent: input.agent,
@@ -1526,6 +1671,7 @@ export async function runPersonalAi(input: {
     history: input.history,
     locale: responseLocale,
     media,
+    domainContext,
   });
 
   const errors: string[] = [...preparedVision.errors];
@@ -1565,13 +1711,19 @@ export async function runPersonalAi(input: {
         visionCaption,
         responseLocale,
       );
+      const visionDomainContext = buildLajukanDomainKnowledgePrompt({
+        query: `${sanitizedMessage}\n${summary}`,
+        media,
+        locale: responseLocale,
+        items: domainKnowledge,
+      });
       const lastMessage = baseMessages[baseMessages.length - 1];
       messages = lastMessage
         ? [
             ...baseMessages.slice(0, -1),
             {
               ...lastMessage,
-              content: `${summary}\n\n${lastMessage.content}`,
+              content: `${summary}\n\n${visionDomainContext}\n\n${lastMessage.content}`,
             },
           ]
         : baseMessages;
@@ -1593,9 +1745,26 @@ export async function runPersonalAi(input: {
   for (const provider of providerOrder(
     input.agent.model_preference,
     visionImages.length > 0,
+    hadVisionMedia && Boolean(visionCaption),
   )) {
     try {
       if (provider === 'ollama' && USE_OLLAMA) {
+        if (
+          hadVisionMedia &&
+          visionImages.length > 0 &&
+          !preparedVision.errors.length
+        ) {
+          return {
+            ...(await callOllama(
+              messages,
+              temperature,
+              visionImages,
+              responseLocale,
+            ).then(result => validateProviderLanguage(result, responseLocale))),
+            provider_errors: errors,
+          };
+        }
+
         if (hadVisionMedia && visionImages.length > 0) {
           errors.push(
             'ollama: skipped generic vision chat after vision preflight failed.',
@@ -1614,6 +1783,22 @@ export async function runPersonalAi(input: {
       }
 
       if (provider === 'openai' && OPENAI_API_KEY) {
+        if (
+          hadVisionMedia &&
+          visionImages.length > 0 &&
+          !preparedVision.errors.length
+        ) {
+          return {
+            ...(await callOpenAI(
+              messages,
+              temperature,
+              visionImages,
+              responseLocale,
+            ).then(result => validateProviderLanguage(result, responseLocale))),
+            provider_errors: errors,
+          };
+        }
+
         if (hadVisionMedia && visionImages.length > 0) {
           errors.push(
             'openai: skipped generic vision chat after vision preflight failed.',
@@ -1669,7 +1854,8 @@ export async function runPersonalAi(input: {
   }
 
   const imageWasSent = media.some(
-    item => item.kind === 'image' && (Boolean(item.dataUrl) || Boolean(item.url)),
+    item =>
+      item.kind === 'image' && (Boolean(item.dataUrl) || Boolean(item.url)),
   );
 
   return {

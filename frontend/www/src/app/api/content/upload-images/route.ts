@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   collectUploadFiles,
-  readUploadToken,
   storeValidatedUploads,
   uploadErrorResponse,
   uploadSuccessResponse,
 } from '@/lib/server/uploadFiles';
 import { IMAGE_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
+import { guardUploadRequest } from '@/lib/server/uploadGuard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,9 +30,8 @@ const IMAGE_KEYS = [
 
 export async function POST(req: NextRequest) {
   try {
-    if (!readUploadToken(req)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await guardUploadRequest(req, 'content:image');
+    if (!guard.ok) return guard.response;
 
     const files = collectUploadFiles(await req.formData(), IMAGE_KEYS);
     if (files.length === 0) {
@@ -72,10 +71,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('[UPLOAD_IMAGES_ERROR]', error);
     return NextResponse.json(
-      {
-        error: 'Upload failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { error: 'Upload failed' },
       { status: 500 },
     );
   }

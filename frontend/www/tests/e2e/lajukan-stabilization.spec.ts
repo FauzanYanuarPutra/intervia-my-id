@@ -13,7 +13,7 @@ const REQUIRED_VIEWPORTS = [
 
 const CORE_ROUTES = [
   '/id/home',
-  '/id/search?q=supplier%20kemasan',
+  '/id/explore?q=supplier%20kemasan',
   '/id/umkm',
   '/id/create',
   '/id/community',
@@ -23,6 +23,9 @@ const CORE_ROUTES = [
   '/id/support',
   '/id/content/e2e-kemasan-001',
 ];
+
+const e2ePackagingImage =
+  'https://images.unsplash.com/photo-1648587456176-4969b0124b12?auto=format&fit=crop&w=1200&q=80';
 
 const e2eContentItem = {
   id: 'e2e-kemasan-001',
@@ -34,8 +37,8 @@ const e2eContentItem = {
   content_status: 'active',
   price_cents: 450000,
   currency: 'IDR',
-  cover_image: 'https://placehold.co/640x480/png?text=Kemasan',
-  image_url: 'https://placehold.co/640x480/png?text=Kemasan',
+  cover_image: e2ePackagingImage,
+  image_url: e2ePackagingImage,
   tags: ['kemasan', 'paper bowl', 'supplier'],
   metadata: {
     city: 'Bandung',
@@ -45,6 +48,10 @@ const e2eContentItem = {
     market_side: 'supply',
     listing_side: 'supply',
     whatsapp_phone: '+6281234567890',
+    image_credit: {
+      provider: 'Unsplash',
+      source_url: 'https://unsplash.com/s/photos/paper-packaging',
+    },
   },
   owner_profile: {
     id: 'seller-e2e-001',
@@ -105,13 +112,14 @@ async function installStabilizationFixtures(page: Page) {
   await page.route('**/api/home/trending-searches?**', route =>
     fulfillJson(route, {
       data: [
-        { label: 'supplier kemasan', href: '/search?q=supplier%20kemasan' },
+        { label: 'supplier kemasan', href: '/explore?q=supplier%20kemasan' },
       ],
     }),
   );
   await page.route('**/api/super-app/umkm/stores?**', route => {
     const url = new URL(route.request().url());
-    const hasViewer = url.searchParams.has('viewer_lat') && url.searchParams.has('viewer_lng');
+    const hasViewer =
+      url.searchParams.has('viewer_lat') && url.searchParams.has('viewer_lng');
     const items = umkmStores.map(store => ({
       ...store,
       distance_km: hasViewer ? 0.32 : null,
@@ -138,10 +146,12 @@ test.describe('Lajukan stabilization regression smoke', () => {
     });
   }
 
-  test('search keeps query in URL and does not overflow after interaction', async ({ page }) => {
+  test('Explore keeps query in URL and does not overflow after interaction', async ({
+    page,
+  }) => {
     await installStabilizationFixtures(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/id/search', { waitUntil: 'domcontentloaded' });
+    await page.goto('/id/explore', { waitUntil: 'domcontentloaded' });
 
     const input = page
       .locator(
@@ -152,24 +162,30 @@ test.describe('Lajukan stabilization regression smoke', () => {
     await input.fill('supplier kemasan');
     await input.press('Enter');
 
-    await expect(page).toHaveURL(/\/id\/search\?q=supplier(\+|%20)kemasan/);
+    await expect(page).toHaveURL(/\/id\/explore\?q=supplier(\+|%20)kemasan/);
     await expectNoHorizontalOverflow(page, 6);
   });
 
-  test('umkm discovery search controls stay clickable above the map layer', async ({ page }) => {
+  test('umkm discovery search controls stay clickable above the map layer', async ({
+    page,
+  }) => {
     await installStabilizationFixtures(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/id/umkm', { waitUntil: 'domcontentloaded' });
 
     const searchControl = page
-      .locator('input[type="search"], input[placeholder*="Cari"], button:has-text("Cari area ini")')
+      .locator(
+        'input[type="search"], input[placeholder*="Cari"], button:has-text("Cari area ini")',
+      )
       .first();
     await expect(searchControl).toBeVisible();
     await searchControl.click({ trial: true });
     await expectNoHorizontalOverflow(page, 6);
   });
 
-  test('distance is hidden until a viewer location is available', async ({ page }) => {
+  test('distance is hidden until a viewer location is available', async ({
+    page,
+  }) => {
     await installStabilizationFixtures(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/id/umkm', { waitUntil: 'domcontentloaded' });

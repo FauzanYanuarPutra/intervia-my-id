@@ -1,6 +1,33 @@
 import { MetadataRoute } from 'next';
 
-const DISALLOW_ROUTES = ['/api/', '/private/', '/admin/', '/tmp/'];
+const PRIVATE_ROUTE_PATHS = [
+  'chat',
+  'create',
+  'dashboard',
+  'login',
+  'register',
+  'forgot-password',
+  'reset-password',
+  'transactions',
+  'payments',
+  'notifications',
+  'settings',
+  'my-projects',
+  'my-listings',
+  'onboarding',
+];
+const DISALLOW_ROUTES = [
+  '/api/',
+  '/private/',
+  '/admin/',
+  '/tmp/',
+  ...['id', 'en'].flatMap(locale => [
+    ...PRIVATE_ROUTE_PATHS.map(path => `/${locale}/${path}`),
+    `/${locale}/profile$`,
+    `/${locale}/profile/edit`,
+    `/${locale}/content/*/edit`,
+  ]),
+];
 
 export default function robots(): MetadataRoute.Robots {
   return {

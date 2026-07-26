@@ -86,7 +86,11 @@ function cleanQuery(value: unknown): string {
 }
 
 function normalizeKey(value: string): string {
-  return value.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s+/g, ' ').trim();
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function normalizeTrendKey(value: string): string {
@@ -104,7 +108,7 @@ function isSafePublicTrend(value: string): boolean {
 }
 
 function buildSearchHref(label: string) {
-  return `/search?q=${encodeURIComponent(label)}`;
+  return `/explore?q=${encodeURIComponent(label)}`;
 }
 
 function titleCaseTerm(value: string): string {
@@ -122,7 +126,10 @@ function displayTrendLabel(value: string): string {
   return BACKEND_TERM_LABELS[key] || titleCaseTerm(value.replace(/_/g, ' '));
 }
 
-function extractMetadataText(metadata: Record<string, unknown> | null, keys: string[]) {
+function extractMetadataText(
+  metadata: Record<string, unknown> | null,
+  keys: string[],
+) {
   if (!metadata) return '';
   for (const key of keys) {
     const value = metadata[key];
@@ -139,6 +146,9 @@ function listingText(row: ListingSignalRow) {
     ...(Array.isArray(row.tags) ? row.tags : []),
     extractMetadataText(row.metadata, [
       'create_category',
+      'business_discovery_category',
+      'marketplace_category_legacy_key',
+      'marketplace_category_slug',
       'umkm_category',
       'business_type',
       'store_type',
@@ -164,12 +174,22 @@ function countDatabaseMatches(query: string, listingTexts: string[]) {
 }
 
 function buildListingFallbacks(rows: ListingSignalRow[], limit: number) {
-  const buckets = new Map<string, { label: string; score: number; count: number }>();
+  const buckets = new Map<
+    string,
+    { label: string; score: number; count: number }
+  >();
 
   for (const row of rows) {
     const candidates = [
       row.category,
-      extractMetadataText(row.metadata, ['create_category', 'umkm_category', 'business_type']),
+      extractMetadataText(row.metadata, [
+        'create_category',
+        'business_discovery_category',
+        'marketplace_category_legacy_key',
+        'marketplace_category_slug',
+        'umkm_category',
+        'business_type',
+      ]),
       ...(Array.isArray(row.tags) ? row.tags.slice(0, 3) : []),
     ];
 
@@ -180,7 +200,12 @@ function buildListingFallbacks(rows: ListingSignalRow[], limit: number) {
       const label = displayTrendLabel(raw);
       if (!isSafePublicTrend(label)) continue;
       const bucketKey = normalizeKey(label);
-      if (!bucketKey || STOPWORDS.has(bucketKey) || GENERIC_TREND_KEYS.has(bucketKey)) continue;
+      if (
+        !bucketKey ||
+        STOPWORDS.has(bucketKey) ||
+        GENERIC_TREND_KEYS.has(bucketKey)
+      )
+        continue;
       const current = buckets.get(bucketKey) || { label, score: 0, count: 0 };
       current.score += 2;
       current.count += 1;
@@ -261,7 +286,14 @@ export async function GET() {
         const count = Number(row.count) || 0;
         const dbMatches = countDatabaseMatches(label, listingTexts);
         const recencyScore = row.last_seen_at
-          ? Math.max(0, 7 - Math.floor((Date.now() - new Date(row.last_seen_at).getTime()) / 86_400_000))
+          ? Math.max(
+              0,
+              7 -
+                Math.floor(
+                  (Date.now() - new Date(row.last_seen_at).getTime()) /
+                    86_400_000,
+                ),
+            )
           : 0;
         const score = count * 8 + dbMatches * 2 + recencyScore;
         return {
@@ -276,7 +308,10 @@ export async function GET() {
       .filter((item): item is SearchTrendItem => Boolean(item));
 
     const seen = new Set<string>();
-    const items = [...eventItems, ...buildListingFallbacks(listingResult.rows, limit)]
+    const items = [
+      ...eventItems,
+      ...buildListingFallbacks(listingResult.rows, limit),
+    ]
       .filter(item => {
         const key = normalizeKey(item.label);
         if (!key || seen.has(key)) return false;
@@ -292,7 +327,8 @@ export async function GET() {
       {
         data: {
           items: finalItems,
-          source: eventItems.length > 0 ? 'search_events' : finalItems[0]?.source,
+          source:
+            eventItems.length > 0 ? 'search_events' : finalItems[0]?.source,
         },
       },
       {

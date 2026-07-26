@@ -44,7 +44,7 @@ Referensi:
   - Card rail `Rekomendasi untuk Usaha` dan `Reels Inspirasi` width-nya konsisten.
   - Search dari home langsung ke hasil.
   - Modal compose community di atas chrome dan center di desktop.
-  - Smoke mobile untuk `/home`, `/search`, `/community`, `/reels`, `/create`, `/super-app/umkm`, `/profile`, `/my-projects`.
+  - Smoke mobile untuk `/home`, `/explore`, `/community`, `/reels`, `/create`, `/super-app/umkm`, `/profile`, `/my-projects`.
 
 ## Command
 
@@ -100,6 +100,6 @@ $env:E2E_BROWSER_CHANNEL="chrome"; npm run test:flow
 - `data-testid` stabil sudah dipasang untuk home rail, community modal, search mobile, create form, reels action, dan bottom nav. Lanjutkan untuk CTA utama profile dan checkout/chat transaksi.
 - Layer CSS global `ui-layer-*` sudah tersedia dan dipakai untuk header, bottom nav, local topbar, drawer, modal, toast, permission gate, dan not-found. Sisa `z-[...]` saat ini mostly local media/map stacking atau decorative positioning.
 - Fixture E2E stabil sudah tersedia. Flow dynamic detail seperti `/content/:id`, `/profile/:slug`, `/super-app/umkm/:slug` masih butuh seed backend agar bisa dites sampai transaksi/chat tanpa skip.
-- Perlu visual regression kecil untuk home/search/community mobile karena targetnya visual scan cepat.
+- Perlu visual regression kecil untuk home/explore/community mobile karena targetnya visual scan cepat.
 - Perlu API seed/reset khusus E2E agar flow register, upload listing, upload reels, chat, dan checkout bisa jalan end-to-end tanpa data manual.
 - Security header Next.js sudah diperketat dengan CSP dasar, HSTS production, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP, dan `poweredByHeader: false`. Jika nanti ada payment/OAuth form external, cek ulang `form-action`.

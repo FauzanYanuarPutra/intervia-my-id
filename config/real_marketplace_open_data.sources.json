@@ -1,0 +1,330 @@
+{
+  "version": 1,
+  "seed_pack": "real_indonesia_bulk_open_data",
+  "description": "Public/open-data source config for bulk real Indonesia provider and buyer seed imports.",
+  "privacy_policy": {
+    "private_phone_numbers": "do_not_import",
+    "transactional_claim": "false_until_verified",
+    "source_required": true,
+    "external_image_required_for_seed": true
+  },
+  "sources": [
+    {
+      "id": "osm-overpass-indonesia-providers",
+      "kind": "osm_overpass",
+      "role": "provider",
+      "enabled_by_default": true,
+      "name": "OpenStreetMap Indonesia provider POIs via Overpass",
+      "source_url": "https://www.openstreetmap.org/",
+      "license": "Open Database License 1.0",
+      "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "attribution": "OpenStreetMap contributors",
+      "endpoint": "https://overpass-api.de/api/interpreter",
+      "endpoints": [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter"
+      ],
+      "timeout_seconds": 90,
+      "per_bbox_limit": 100,
+      "selectors": [
+        {
+          "key": "shop",
+            "values": [
+            "bakery",
+            "butcher",
+            "greengrocer",
+            "seafood",
+            "fabric",
+            "tailor",
+            "hardware",
+            "doityourself",
+            "furniture",
+            "stationery",
+            "copyshop",
+            "chemist",
+            "cosmetics",
+            "paint",
+            "computer",
+            "electronics",
+            "agrarian",
+            "trade",
+            "estate_agent",
+            "mall"
+          ]
+        },
+        {
+          "key": "amenity",
+          "values": [
+            "marketplace",
+            "pharmacy",
+            "bank"
+          ]
+        },
+        {
+          "key": "craft",
+          "values": []
+        },
+        {
+          "key": "office",
+          "values": [
+            "company",
+            "consulting",
+            "it",
+            "lawyer",
+            "accountant",
+            "logistics",
+            "estate_agent"
+          ]
+        },
+        {
+          "key": "tourism",
+          "values": [
+            "hotel",
+            "guest_house",
+            "hostel"
+          ]
+        }
+      ],
+      "bboxes": [
+        { "name": "Jakarta Pusat", "city": "Jakarta", "bbox": [-6.22, 106.8, -6.15, 106.87] },
+        { "name": "Bandung Tengah", "city": "Bandung", "bbox": [-6.94, 107.57, -6.88, 107.65] },
+        { "name": "Surabaya Tengah", "city": "Surabaya", "bbox": [-7.3, 112.7, -7.23, 112.78] },
+        { "name": "Yogyakarta Kota", "city": "Yogyakarta", "bbox": [-7.82, 110.34, -7.77, 110.39] },
+        { "name": "Semarang Tengah", "city": "Semarang", "bbox": [-7.02, 110.39, -6.96, 110.45] },
+        { "name": "Denpasar Tengah", "city": "Denpasar", "bbox": [-8.69, 115.2, -8.63, 115.25] },
+        { "name": "Medan Kota", "city": "Medan", "bbox": [3.55, 98.64, 3.62, 98.7] },
+        { "name": "Makassar Tengah", "city": "Makassar", "bbox": [-5.18, 119.39, -5.12, 119.46] },
+        { "name": "Palembang Tengah", "city": "Palembang", "bbox": [-3.02, 104.72, -2.95, 104.8] },
+        { "name": "Balikpapan Kota", "city": "Balikpapan", "bbox": [-1.28, 116.82, -1.21, 116.88] }
+      ]
+    },
+    {
+      "id": "satrup-tanah-laut-rup-penyedia-2026",
+      "kind": "satrup_rup_penyedia",
+      "role": "buyer",
+      "enabled_by_default": false,
+      "name": "Satrup Tanah Laut RUP penyedia package feed 2026",
+      "source_url": "https://satrup.tanahlautkab.go.id/dokumentasi/isb",
+      "license": "Public open API; response metadata references ISB/LKPP and SiRUP/Inaproc source lineage",
+      "endpoint": "https://satrup.tanahlautkab.go.id/api/open/v1/rup/penyedia",
+      "status_endpoint": "https://satrup.tanahlautkab.go.id/api/open/status-rup/sirup",
+      "year": 2026,
+      "city": "Tanah Laut",
+      "province": "Kalimantan Selatan",
+      "request_sleep_seconds": 0.2,
+      "note": "Package-level buyer demand. Personal PPK fields are intentionally not imported. Disabled by default because these rows generally do not carry a real external image."
+    },
+    {
+      "id": "google-places-photo-enrichment",
+      "kind": "google_places_photo_enrichment",
+      "role": "provider_image_enrichment",
+      "enabled_by_default": false,
+      "name": "Google Places photo enrichment for real provider references",
+      "source_url": "https://developers.google.com/maps/documentation/places/web-service/place-photos",
+      "policy_url": "https://developers.google.com/maps/documentation/places/web-service/policies",
+      "license": "Google Maps Platform Places API; follow Google Maps Platform terms and attribution policy",
+      "api_key_env": "GOOGLE_MAPS_API_KEY",
+      "text_search_endpoint": "https://places.googleapis.com/v1/places:searchText",
+      "photo_proxy_path": "/api/media/google-place-photo",
+      "max_width_px": 800,
+      "max_rows": 50,
+      "location_bias_radius_m": 750,
+      "request_sleep_seconds": 0.15,
+      "note": "Optional and disabled by default. Store place_id/proxy path only; do not persist raw photo names or downloaded Google photos."
+    },
+    {
+      "id": "wikimedia-commons-indonesia-open-media",
+      "kind": "wikimedia_commons_media",
+      "role": "community_reels",
+      "enabled_by_default": true,
+      "name": "Wikimedia Commons Indonesia open media for community and reels",
+      "source_url": "https://commons.wikimedia.org/",
+      "endpoint": "https://commons.wikimedia.org/w/api.php",
+      "license": "Per-file Wikimedia Commons license; importer only accepts free/public license signals",
+      "timeout_seconds": 30,
+      "request_sleep_seconds": 0.15,
+      "note": "Uses the MediaWiki API for file URL, MIME type, author, and license metadata. Files with unclear/non-free licenses are skipped.",
+      "items": [
+        {
+          "file": "File:Ondel-Ondel Betawi Street Performance in Jakarta.webm",
+          "post_title": "Ondel-ondel Betawi di jalan Jakarta",
+          "caption": "Dokumentasi budaya Jakarta dari Wikimedia Commons. Ini referensi event dan ekonomi kreatif, bukan vendor atau kontak pribadi.",
+          "tag": "Budaya Jakarta",
+          "product_name": "Referensi event budaya Betawi",
+          "product_href": "/id/explore/services",
+          "category_slug": "services",
+          "city": "Jakarta",
+          "tone": "rose",
+          "icon_key": "service",
+          "hook": "Pakai sebagai referensi budaya dan event lokal, bukan klaim penyedia jasa."
+        },
+        {
+          "file": "File:Cagar Budaya Indonesia.webm",
+          "post_title": "Cagar budaya Indonesia untuk konteks usaha lokal",
+          "caption": "Video bebas tentang cagar budaya Indonesia. Cocok untuk discovery wisata, tempat usaha, dan jasa kreatif lokal.",
+          "tag": "Tempat Usaha",
+          "product_name": "Referensi wisata dan tempat usaha",
+          "product_href": "/id/explore/business-places",
+          "category_slug": "business-places",
+          "city": "Indonesia",
+          "tone": "emerald",
+          "icon_key": "location",
+          "hook": "Tampilkan sebagai inspirasi lokasi, tanpa menyiratkan stok, harga, atau kontak."
+        },
+        {
+          "file": "File:Sunset in Yogyakarta.webm",
+          "post_title": "Yogyakarta sebagai konteks lokasi wisata dan usaha sore",
+          "caption": "Video Yogyakarta dari Wikimedia Commons. Dipakai sebagai referensi visual lokasi, bukan promosi toko tertentu.",
+          "tag": "Yogyakarta",
+          "product_name": "Referensi lokasi wisata dan usaha",
+          "product_href": "/id/explore/business-places",
+          "category_slug": "business-places",
+          "city": "Yogyakarta",
+          "tone": "amber",
+          "icon_key": "location",
+          "hook": "Gunakan sebagai konteks kota dan jam ramai, bukan klaim sewa tempat."
+        },
+        {
+          "file": "File:Lok Baintan Floating Market, South Kalimantan, Indonesia.ogv",
+          "post_title": "Pasar Terapung Lok Baintan sebagai pasar nyata Indonesia",
+          "caption": "Video pasar terapung Lok Baintan, Kalimantan Selatan. Ini referensi pasar sungai nyata, bukan listing pedagang individual.",
+          "tag": "Pasar Tradisional",
+          "product_name": "Referensi pasar terapung",
+          "product_href": "/id/explore/business-places",
+          "category_slug": "business-places",
+          "city": "Banjar",
+          "tone": "cyan",
+          "icon_key": "location",
+          "hook": "Pisahkan referensi tempat dari penawaran dagang individual."
+        },
+        {
+          "file": "File:Jalan-jalan ke Pasar Beringharjo-12.jpg",
+          "post_title": "Pasar Beringharjo sebagai rujukan lokasi usaha tradisional",
+          "caption": "Foto Pasar Beringharjo dari Wikimedia Commons untuk konteks pasar tradisional, batik, dan perdagangan lokal.",
+          "tag": "Pasar Tradisional",
+          "product_name": "Referensi Pasar Beringharjo",
+          "product_href": "/id/explore/business-places",
+          "category_slug": "business-places",
+          "city": "Yogyakarta",
+          "tone": "emerald",
+          "icon_key": "location",
+          "hook": "Gunakan foto pasar nyata, bukan stok visual generik."
+        },
+        {
+          "file": "File:Coffee beans from Tasikmalaya in a glass container 20170518.jpg",
+          "post_title": "Kopi Indonesia sebagai bahan usaha",
+          "caption": "Foto biji kopi Indonesia dari Wikimedia Commons. Cocok untuk diskusi bahan baku, asal produk, dan kualitas pasokan.",
+          "tag": "Bahan Usaha",
+          "product_name": "Referensi bahan kopi Indonesia",
+          "product_href": "/id/explore/materials-suppliers",
+          "category_slug": "materials-suppliers",
+          "city": "Tasikmalaya",
+          "tone": "emerald",
+          "icon_key": "supplier",
+          "hook": "Bahas asal produk dan kualitas, tanpa menyiratkan stok supplier."
+        },
+        {
+          "file": "File:Batik Khas Pekalongan.jpg",
+          "post_title": "Batik Pekalongan untuk rujukan produk kreatif",
+          "caption": "Foto batik Pekalongan dari Wikimedia Commons sebagai rujukan visual produk kreatif Indonesia.",
+          "tag": "Produk Kreatif",
+          "product_name": "Referensi batik Indonesia",
+          "product_href": "/id/explore/materials-suppliers",
+          "category_slug": "materials-suppliers",
+          "city": "Pekalongan",
+          "tone": "violet",
+          "icon_key": "supplier",
+          "hook": "Rujukan visual produk kreatif, bukan klaim toko atau harga."
+        },
+        {
+          "file": "File:Becak Kampung Batik Laweyan.jpg",
+          "post_title": "Kampung Batik Laweyan sebagai sentra usaha kreatif",
+          "caption": "Foto kawasan Kampung Batik Laweyan dari Wikimedia Commons untuk konteks sentra produksi dan wisata belanja.",
+          "tag": "Sentra Usaha",
+          "product_name": "Referensi sentra batik Laweyan",
+          "product_href": "/id/explore/business-places",
+          "category_slug": "business-places",
+          "city": "Surakarta",
+          "tone": "amber",
+          "icon_key": "location",
+          "hook": "Tampilkan sentra nyata sebagai konteks, bukan klaim tenant aktif."
+        },
+        {
+          "file": "File:Lokbaintan.jpg",
+          "post_title": "Foto Pasar Terapung Lok Baintan",
+          "caption": "Foto pasar terapung dari Wikimedia Commons untuk diskusi pasar lokal, wisata, dan distribusi produk daerah.",
+          "tag": "Pasar Tradisional",
+          "product_name": "Referensi pasar terapung",
+          "product_href": "/id/explore/business-places",
+          "category_slug": "business-places",
+          "city": "Banjar",
+          "tone": "cyan",
+          "icon_key": "location",
+          "hook": "Foto real membantu discovery tanpa membuat kontak dagang palsu."
+        },
+        {
+          "file": "File:Mandi.webm",
+          "post_title": "Bahasa isyarat Yogyakarta untuk layanan yang lebih inklusif",
+          "caption": "Video bahasa isyarat varian Yogyakarta dari Wikimedia Commons. Dipakai sebagai referensi edukasi layanan lokal.",
+          "tag": "Layanan Inklusif",
+          "product_name": "Referensi layanan dan pelatihan",
+          "product_href": "/id/explore/services",
+          "category_slug": "services",
+          "city": "Yogyakarta",
+          "tone": "blue",
+          "icon_key": "service",
+          "hook": "Konten ini membantu contoh layanan inklusif, bukan klaim penyedia pelatihan."
+        }
+      ]
+    },
+    {
+      "id": "satrup-tanah-laut-status-rup-2026",
+      "kind": "satrup_status_rup",
+      "role": "buyer",
+      "enabled_by_default": false,
+      "name": "Satrup Tanah Laut status RUP 2026",
+      "source_url": "https://satrup.tanahlautkab.go.id/dokumentasi/isb",
+      "license": "Public open API; response metadata references official SiRUP/Inaproc source",
+      "endpoint": "https://satrup.tanahlautkab.go.id/api/open/status-rup/sirup",
+      "year": 2026,
+      "city": "Tanah Laut",
+      "province": "Kalimantan Selatan",
+      "note": "Aggregated buyer demand by satker. Use package-level API only when it is responsive and redistribution terms are reviewed."
+    },
+    {
+      "id": "lpse-sirup-rup-penyedia-2026",
+      "kind": "lpse_sirup_api",
+      "role": "buyer",
+      "enabled_by_default": false,
+      "name": "SMEP 3 SiRUP API servicePenyedia 2026",
+      "source_url": "https://api.lpse.or.id/",
+      "license": "Public procurement API reference; direct endpoint access can be LPSE-instance dependent, verify redistribution terms before production publication",
+      "endpoint": "https://api.lpse.or.id//servicePenyedia",
+      "year": 2026,
+      "start_date": "2026-01-01",
+      "end_date": "2026-07-23",
+      "chunk_days": 7
+    },
+    {
+      "id": "lkpp-open-data-pencadangan-paket-umk",
+      "kind": "ckan_package",
+      "role": "buyer_reference",
+      "enabled_by_default": false,
+      "name": "Nilai Pencadangan Paket Usaha Mikro dan Kecil dalam Perencanaan Pengadaan Barang/Jasa",
+      "source_url": "https://data.lkpp.go.id/dataset/nilai-pencadangan-paket-usaha-mikro-dan-kecil-dalam-perencanaan-pengadaan-barang-jasa",
+      "license": "License not specified on data portal; use as source reference only unless terms are confirmed",
+      "package_id": "nilai-pencadangan-paket-usaha-mikro-dan-kecil-dalam-perencanaan-pengadaan-barang-jasa"
+    },
+    {
+      "id": "geofabrik-indonesia-osm-pbf-reference",
+      "kind": "manual_bulk_reference",
+      "role": "provider",
+      "enabled_by_default": false,
+      "name": "Geofabrik Indonesia OpenStreetMap PBF",
+      "source_url": "https://download.geofabrik.de/asia/indonesia.html",
+      "license": "Open Database License 1.0",
+      "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "note": "Use this for 100k+ provider imports with osmium/pyosmium outside the stdlib importer."
+    }
+  ]
+}

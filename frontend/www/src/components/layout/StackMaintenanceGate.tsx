@@ -60,7 +60,7 @@ function MaintenanceScreen({ locale, state }: MaintenanceScreenProps) {
   const services = state?.services?.slice(0, 4) || [];
 
   return (
-    <main className="grid min-h-[var(--app-viewport-height)] place-items-center overflow-hidden bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_38%,#f8fafc_100%)] px-5 py-8 text-[color:var(--app-text)] dark:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16)_0%,#07111d_42%,#020617_100%)]">
+    <main className="grid min-h-[var(--app-document-viewport-height)] place-items-center overflow-hidden bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_38%,#f8fafc_100%)] px-5 py-8 text-[color:var(--app-text)] dark:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16)_0%,#07111d_42%,#020617_100%)]">
       <section className="relative w-full max-w-[560px] overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] p-5 text-center shadow-[0_34px_80px_-48px_rgba(15,23,42,0.42)]  dark:border-[color:var(--app-border-strong)] sm:p-7">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[26px] border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-[0_22px_48px_-34px_rgba(16,185,129,0.5)] dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-300">
           <ServerCog className="h-9 w-9" />
@@ -206,7 +206,7 @@ export function StackMaintenanceGate({
     <div
       className={cn(
         'flex min-h-0 flex-1 flex-col',
-        active && 'min-h-[var(--app-viewport-height)]',
+        active && 'min-h-[var(--app-document-viewport-height)]',
       )}
     >
       {content}

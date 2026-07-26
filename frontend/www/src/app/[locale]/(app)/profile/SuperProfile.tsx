@@ -21,6 +21,7 @@ import {
   CalendarDays,
   Camera,
   Check,
+  Clapperboard,
   Circle,
   ClipboardList,
   Eye,
@@ -37,9 +38,13 @@ import {
   RefreshCw,
   Settings2,
   ShoppingBag,
+  Users,
+  X,
 } from 'lucide-react';
 
 import { ImageCropModal } from '@/components/common/ImageCropModal';
+import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
+import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { ProfileViewSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { LocalizedLink } from '@/components/ui-kit';
 import { useAuth } from '@/context/AuthContext';
@@ -167,11 +172,33 @@ type QuickAction = {
   badge?: number;
 };
 
+type ProfileSocialUser = {
+  id: string;
+  username?: string | null;
+  name?: string | null;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
+  title?: string | null;
+};
+
+type ProfileSocialSummary = {
+  userId?: string;
+  forumUserId?: string;
+  followersCount: number;
+  followingCount: number;
+  reelsCount: number;
+  followers: ProfileSocialUser[];
+  following: ProfileSocialUser[];
+};
+
+type ProfileSocialTab = 'followers' | 'following';
+
 type Copy = ReturnType<typeof buildCopy>;
 
 const ROUTES = {
   create: '/create?mode=quick',
   manage: '/my-listings',
+  manageSocial: '/manage',
   drafts: '/my-listings?status=draft',
   promotion: '/create?mode=promotion',
   insights: '/dashboard',
@@ -199,11 +226,28 @@ function buildCopy(isId: boolean) {
         profileReady: 'Kelengkapan profil',
         profileHint:
           'Lengkapi profil agar orang lebih cepat percaya dan menghubungi kamu.',
+        needAttention: 'Perlu diisi',
+        alreadyNeat: 'Sudah rapi',
+        openTask: 'Isi',
         completeProfile: 'Lengkapi Profil',
+        completeLabel: 'Lengkap',
+        missingLabel: 'Belum lengkap',
+        nextStep: 'Langkah berikutnya',
+        improveNow: 'Perbaiki sekarang',
         publicProfile: 'Lihat Profil Publik',
         editProfile: 'Edit Profil',
         verified: 'Akun Terverifikasi',
         joined: 'Bergabung',
+        followers: 'Pengikut',
+        followersHint: 'Akun yang mengikuti kamu',
+        following: 'Mengikuti',
+        followingHint: 'Akun yang kamu ikuti',
+        reels: 'Reels',
+        reelsHint: 'Video pendek aktif',
+        socialTitle: 'Pengikut & Mengikuti',
+        noFollowers: 'Belum ada pengikut yang terekam.',
+        noFollowing: 'Kamu belum mengikuti akun lain.',
+        openPublicProfile: 'Buka profil publik',
         viewed: 'Dilihat',
         favorites: 'Favorit',
         unreadChats: 'Chat belum dibalas',
@@ -216,6 +260,7 @@ function buildCopy(isId: boolean) {
         quickActions: 'Aksi Cepat',
         createPost: 'Buat Posting',
         managePosts: 'Kelola Posting',
+        manageSocial: 'Kelola Semua',
         drafts: 'Draft',
         promotion: 'Promosi',
         insights: 'Insight',
@@ -268,11 +313,28 @@ function buildCopy(isId: boolean) {
         profileReady: 'Profile completion',
         profileHint:
           'Complete your profile so people can trust and contact you faster.',
+        needAttention: 'Needs input',
+        alreadyNeat: 'Looks good',
+        openTask: 'Fill',
         completeProfile: 'Complete Profile',
+        completeLabel: 'Complete',
+        missingLabel: 'Missing',
+        nextStep: 'Next step',
+        improveNow: 'Improve now',
         publicProfile: 'View Public Profile',
         editProfile: 'Edit Profile',
         verified: 'Verified Account',
         joined: 'Joined',
+        followers: 'Followers',
+        followersHint: 'Accounts following you',
+        following: 'Following',
+        followingHint: 'Accounts you follow',
+        reels: 'Reels',
+        reelsHint: 'Active short videos',
+        socialTitle: 'Followers & Following',
+        noFollowers: 'No recorded followers yet.',
+        noFollowing: 'You are not following anyone yet.',
+        openPublicProfile: 'Open public profile',
         viewed: 'Views',
         favorites: 'Favorites',
         unreadChats: 'Unread chats',
@@ -285,6 +347,7 @@ function buildCopy(isId: boolean) {
         quickActions: 'Quick Actions',
         createPost: 'Create Post',
         managePosts: 'Manage Posts',
+        manageSocial: 'Manage All',
         drafts: 'Drafts',
         promotion: 'Promotion',
         insights: 'Insights',
@@ -425,6 +488,59 @@ function normalizeDashboardStats(payload: unknown): DashboardStats {
         ),
       ),
     ),
+  };
+}
+
+function normalizeProfileSocialUser(value: unknown): ProfileSocialUser | null {
+  const row = asRecord(value);
+  if (!row) return null;
+
+  const id = firstString(row.id, row.user_id, row.userId);
+  if (!id) return null;
+
+  return {
+    id,
+    username: firstString(row.username, row.handle) || null,
+    name: firstString(row.name, row.full_name, row.fullName) || null,
+    avatarUrl: firstString(row.avatarUrl, row.avatar_url, row.avatar) || null,
+    title: firstString(row.title, row.headline, row.bio) || null,
+  };
+}
+
+function normalizeProfileSocialSummary(
+  payload: unknown,
+): ProfileSocialSummary | null {
+  const row = asRecord(payload);
+  if (!row) return null;
+
+  const followers = Array.isArray(row.followers)
+    ? row.followers
+        .map(item => normalizeProfileSocialUser(item))
+        .filter((item): item is ProfileSocialUser => Boolean(item))
+    : [];
+  const following = Array.isArray(row.following)
+    ? row.following
+        .map(item => normalizeProfileSocialUser(item))
+        .filter((item): item is ProfileSocialUser => Boolean(item))
+    : [];
+
+  return {
+    userId: firstString(row.userId, row.user_id) || undefined,
+    forumUserId: firstString(row.forumUserId, row.forum_user_id) || undefined,
+    followersCount: Math.max(
+      followers.length,
+      Math.floor(readNumber(row.followersCount ?? row.followers_count)),
+    ),
+    followingCount: Math.max(
+      following.length,
+      Math.floor(readNumber(row.followingCount ?? row.following_count)),
+    ),
+    reelsCount: Math.max(
+      0,
+      Math.floor(readNumber(row.reelsCount ?? row.reels_count)),
+    ),
+    followers,
+    following,
   };
 }
 
@@ -736,11 +852,16 @@ function EmblaRail({
     containScroll: 'trimSnaps',
     dragFree: true,
   });
+  useEmblaWheelGestures(api);
   const { canPrev, canNext, scrollPrev, scrollNext } = useEmblaControls(api);
 
   return (
-    <div className={cn('relative min-w-0 max-w-full', className)}>
-      <div ref={viewportRef} className="overflow-hidden" aria-label={ariaLabel}>
+    <div className={cn('relative min-w-0 max-w-full pt-4', className)}>
+      <div
+        ref={viewportRef}
+        className="cursor-grab overflow-hidden active:cursor-grabbing"
+        aria-label={ariaLabel}
+      >
         <div className="flex touch-pan-y gap-3">
           {items.map((child, index) => (
             <div key={index} className={cn('min-w-0', itemClassName)}>
@@ -790,6 +911,7 @@ function ProfileTabRail({
     containScroll: 'trimSnaps',
     dragFree: true,
   });
+  useEmblaWheelGestures(api);
 
   useEffect(() => {
     const index = items.findIndex(item => item.key === activeTab);
@@ -797,41 +919,47 @@ function ProfileTabRail({
   }, [activeTab, api, items]);
 
   return (
-    <div className="px-3 pt-3 sm:px-5 sm:pt-5">
-      <div className="rounded-2xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]">
-        <div ref={viewportRef} className="overflow-hidden">
-          <div className="flex touch-pan-y gap-1">
-            {items.map(item => {
-              const active = item.key === activeTab;
+    <div className="px-2.5 pt-2.5 sm:px-4 sm:pt-4">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 flex-1 rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]">
+          <div
+            ref={viewportRef}
+            className="cursor-grab overflow-hidden active:cursor-grabbing"
+          >
+            <div className="flex touch-pan-y gap-1">
+              {items.map(item => {
+                const active = item.key === activeTab;
 
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => onChange(item.key)}
-                  className={cn(
-                    'flex min-h-10 flex-[0_0_auto] items-center gap-2 rounded-xl px-4 text-xs font-black transition sm:text-sm',
-                    active
-                      ? 'bg-[color:var(--app-surface-strong)] text-emerald-700 shadow-sm dark:text-emerald-300'
-                      : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
-                  )}
-                >
-                  <span>{item.label}</span>
-                  <span
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => onChange(item.key)}
                     className={cn(
-                      'rounded-full px-2 py-0.5 text-[10px]',
+                      'flex min-h-9 flex-[0_0_auto] items-center gap-1.5 rounded-lg px-3 text-xs font-black transition',
                       active
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-                        : 'bg-black/5 text-[color:var(--app-text-soft)] dark:bg-white/10',
+                        ? 'bg-[color:var(--app-surface-strong)] text-emerald-700 shadow-sm dark:text-emerald-300'
+                        : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
                     )}
                   >
-                    {item.count}
-                  </span>
-                </button>
-              );
-            })}
+                    <span>{item.label}</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px]',
+                        active
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                          : 'bg-black/5 text-[color:var(--app-text-soft)] dark:bg-white/10',
+                      )}
+                    >
+                      {item.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
+        <EmblaDesktopControls api={api} compact />
       </div>
     </div>
   );
@@ -851,6 +979,7 @@ function FilterRail({
     containScroll: 'trimSnaps',
     dragFree: true,
   });
+  useEmblaWheelGestures(api);
 
   useEffect(() => {
     const index = items.findIndex(item => item.key === activeFilter);
@@ -858,28 +987,34 @@ function FilterRail({
   }, [activeFilter, api, items]);
 
   return (
-    <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden">
-      <div className="flex touch-pan-y gap-2">
-        {items.map(item => {
-          const active = item.key === activeFilter;
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div
+        ref={viewportRef}
+        className="min-w-0 flex-1 cursor-grab overflow-hidden active:cursor-grabbing"
+      >
+        <div className="flex touch-pan-y gap-2">
+          {items.map(item => {
+            const active = item.key === activeFilter;
 
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => onChange(item.key)}
-              className={cn(
-                'min-h-9 flex-[0_0_auto] rounded-full border px-4 text-xs font-bold transition',
-                active
-                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                  : 'border-[color:var(--app-border)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]',
-              )}
-            >
-              {item.label}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => onChange(item.key)}
+                className={cn(
+                  'min-h-9 flex-[0_0_auto] rounded-full border px-4 text-xs font-bold transition',
+                  active
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                    : 'border-[color:var(--app-border)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]',
+                )}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
+      <EmblaDesktopControls api={api} compact />
     </div>
   );
 }
@@ -888,21 +1023,21 @@ function StatCard({ item }: { item: StatItem }) {
   const Icon = item.icon;
 
   return (
-    <div className="h-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4">
+    <div className="h-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 sm:p-3">
       <div className="flex items-start gap-3">
         <div
           className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
             item.iconClassName,
           )}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
           <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
             {item.label}
           </p>
-          <p className="mt-0.5 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <p className="mt-0.5 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {item.value}
           </p>
           <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
@@ -914,23 +1049,256 @@ function StatCard({ item }: { item: StatItem }) {
   );
 }
 
-function CompletionItem({
+function SocialMetricButton({
   label,
-  complete,
+  value,
+  hint,
+  onClick,
 }: {
   label: string;
-  complete: boolean;
+  value: string;
+  hint: string;
+  onClick?: () => void;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-      {complete ? (
-        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+    <button
+      type="button"
+      onClick={onClick}
+      className="group min-w-0 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 sm:p-3"
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600 transition group-hover:bg-white dark:bg-sky-500/15 dark:text-sky-300">
+          <Users className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
+            {label}
+          </p>
+          <p className="mt-0.5 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            {value}
+          </p>
+          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+            {hint}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ProfileSocialModal({
+  open,
+  tab,
+  copy,
+  locale,
+  followers,
+  following,
+  followersCount,
+  followingCount,
+  onTabChange,
+  onClose,
+}: {
+  open: boolean;
+  tab: ProfileSocialTab;
+  copy: Copy;
+  locale: string;
+  followers: ProfileSocialUser[];
+  following: ProfileSocialUser[];
+  followersCount: number;
+  followingCount: number;
+  onTabChange: (tab: ProfileSocialTab) => void;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  const activeUsers = tab === 'followers' ? followers : following;
+  const emptyText = tab === 'followers' ? copy.noFollowers : copy.noFollowing;
+  const tabs: Array<{ key: ProfileSocialTab; label: string; count: number }> = [
+    { key: 'followers', label: copy.followers, count: followersCount },
+    { key: 'following', label: copy.following, count: followingCount },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[1300] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="max-h-[86vh] w-full max-w-lg overflow-hidden rounded-t-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-2xl sm:rounded-[28px]">
+        <div className="flex items-center justify-between border-b border-[color:var(--app-border)] px-4 py-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-600">
+              Social
+            </p>
+            <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {copy.socialTitle}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-b border-[color:var(--app-border)] p-3">
+          {tabs.map(item => {
+            const active = tab === item.key;
+
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => onTabChange(item.key)}
+                className={cn(
+                  'rounded-2xl px-4 py-3 text-left transition',
+                  active
+                    ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200'
+                    : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+                )}
+              >
+                <p className="text-lg font-black">
+                  {formatCompactNumber(item.count, locale)}
+                </p>
+                <p className="text-xs font-bold">{item.label}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="max-h-[52vh] overflow-y-auto p-3">
+          {activeUsers.length > 0 ? (
+            <div className="space-y-2">
+              {activeUsers.map(item => {
+                const name = item.name || item.username || item.id;
+                const avatar = profileAvatarSrc(
+                  item.avatarUrl || item.avatar_url || '',
+                  undefined,
+                  name,
+                );
+                const publicId = item.id.replace(/^auth-/, '');
+                const href = `/profile/${buildPublicProfileSlug({
+                  id: publicId,
+                  username: item.username || undefined,
+                  full_name: name,
+                })}`;
+
+                return (
+                  <LocalizedLink
+                    key={item.id}
+                    href={href}
+                    onClick={onClose}
+                    className="flex min-w-0 items-center gap-3 rounded-2xl border border-transparent p-2 transition hover:border-[color:var(--app-border)] hover:bg-[color:var(--app-surface-muted)]"
+                  >
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                      <NextImage
+                        src={avatar}
+                        alt={name}
+                        fill
+                        unoptimized
+                        sizes="48px"
+                        className="object-contain"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {name}
+                      </p>
+                      <p className="truncate text-xs text-[color:var(--app-text-soft)]">
+                        @{item.username || publicId}
+                      </p>
+                      {item.title ? (
+                        <p className="mt-0.5 line-clamp-1 text-[11px] text-[color:var(--app-text-soft)]">
+                          {item.title}
+                        </p>
+                      ) : null}
+                    </div>
+                  </LocalizedLink>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--app-border)] px-5 text-center">
+              <Users className="h-8 w-8 text-[color:var(--app-text-soft)]" />
+              <p className="mt-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {emptyText}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompletionItem({
+  label,
+  href,
+  complete,
+  completeLabel,
+  missingLabel,
+  actionLabel,
+}: {
+  label: string;
+  href: string;
+  complete: boolean;
+  completeLabel: string;
+  missingLabel: string;
+  actionLabel: string;
+}) {
+  const content = (
+    <>
+      <span
+        className={cn(
+          'flex h-4 w-4 shrink-0 items-center justify-center rounded-full',
+          complete
+            ? 'bg-emerald-600 text-white'
+            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200',
+        )}
+      >
+        {complete ? (
           <Check className="h-3 w-3" strokeWidth={3} />
+        ) : (
+          <Circle className="h-2.5 w-2.5 fill-current" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{label}</span>
+        <span
+          className={cn(
+            'mt-0.5 block truncate text-[10px] font-semibold',
+            complete
+              ? 'text-emerald-700 dark:text-emerald-300'
+              : 'text-amber-700 dark:text-amber-200',
+          )}
+        >
+          {complete ? completeLabel : missingLabel}
         </span>
-      ) : (
-        <Circle className="h-4 w-4 shrink-0 text-slate-400" />
-      )}
-      <span className="truncate">{label}</span>
+      </span>
+      {!complete ? (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-black text-amber-800 shadow-sm dark:bg-white/10 dark:text-amber-100">
+          {actionLabel}
+          <ArrowRight className="h-3 w-3" />
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (!complete) {
+    return (
+      <LocalizedLink
+        href={href}
+        className="group flex min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-100 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-200 dark:border-amber-900/60 dark:bg-amber-500/10 dark:text-amber-100 dark:hover:bg-amber-500/15"
+      >
+        {content}
+      </LocalizedLink>
+    );
+  }
+
+  return (
+    <div
+      className="flex min-w-0 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-500/10 dark:text-emerald-200"
+    >
+      {content}
     </div>
   );
 }
@@ -1001,10 +1369,10 @@ function ListingCard({
   ]);
 
   return (
-    <article className="relative grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 transition hover:border-emerald-200 hover:shadow-sm sm:grid-cols-[132px_minmax(0,1fr)_auto] sm:gap-4 sm:p-4">
+    <article className="relative grid min-w-0 grid-cols-[78px_minmax(0,1fr)] gap-2.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 transition hover:border-emerald-200 sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:gap-3 sm:p-3">
       <LocalizedLink
         href={getListingHref(item)}
-        className="relative h-24 overflow-hidden rounded-xl bg-[color:var(--app-surface-muted)] sm:h-28"
+        className="relative h-20 overflow-hidden rounded-lg bg-[color:var(--app-surface-muted)] sm:h-24"
       >
         {imageUrl ? (
           <NextImage
@@ -1012,7 +1380,7 @@ function ListingCard({
             alt={item.title || ''}
             fill
             unoptimized
-            sizes="132px"
+            sizes="112px"
             className="object-cover transition duration-300 hover:scale-[1.03]"
           />
         ) : (
@@ -1025,7 +1393,7 @@ function ListingCard({
       <div className="min-w-0 self-center pr-8 sm:pr-0">
         <div className="flex min-w-0 flex-wrap items-start gap-2">
           <LocalizedLink href={getListingHref(item)} className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+            <h3 className="line-clamp-2 text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
               {item.title || 'Untitled'}
             </h3>
           </LocalizedLink>
@@ -1051,7 +1419,7 @@ function ListingCard({
           {presentation.label}
         </span>
 
-        <p className="mt-1.5 truncate text-sm font-black text-emerald-700 dark:text-emerald-300">
+        <p className="mt-1 truncate text-xs font-black text-emerald-700 dark:text-emerald-300">
           {formatPrice(item, locale, copy.emptyPrice)}
         </p>
 
@@ -1108,6 +1476,8 @@ export default function SuperProfile() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>(
     EMPTY_DASHBOARD_STATS,
   );
+  const [profileSocial, setProfileSocial] =
+    useState<ProfileSocialSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -1116,6 +1486,8 @@ export default function SuperProfile() {
   const [activeTab, setActiveTab] = useState<OwnerTab>('posts');
   const [activeFilter, setActiveFilter] = useState<ListingFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const [socialModalTab, setSocialModalTab] =
+    useState<ProfileSocialTab | null>(null);
 
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
   const [coverUrlInput, setCoverUrlInput] = useState('');
@@ -1184,7 +1556,13 @@ export default function SuperProfile() {
       setStatsPartial(false);
 
       try {
-        const [detailResult, activeResult, draftResult, statsResult] =
+        const [
+          detailResult,
+          activeResult,
+          draftResult,
+          statsResult,
+          socialResult,
+        ] =
           await Promise.allSettled([
             authFetch(`/api/users/${user.id}`, { cache: 'no-store' }),
             authFetch('/api/my-listings?status=active&limit=50', {
@@ -1194,6 +1572,10 @@ export default function SuperProfile() {
               cache: 'no-store',
             }),
             authFetch('/api/dashboard/stats', { cache: 'no-store' }),
+            authFetch(
+              `/api/community/users/${encodeURIComponent(user.id)}/social?limit=64`,
+              { cache: 'no-store' },
+            ),
           ]);
 
         if (detailResult.status !== 'fulfilled') {
@@ -1278,6 +1660,13 @@ export default function SuperProfile() {
         } else {
           setDashboardStats(EMPTY_DASHBOARD_STATS);
           setStatsPartial(true);
+        }
+
+        if (socialResult.status === 'fulfilled' && socialResult.value.ok) {
+          const payload = await socialResult.value.json().catch(() => null);
+          setProfileSocial(normalizeProfileSocialSummary(payload));
+        } else {
+          setProfileSocial(null);
         }
       } catch (error) {
         setProfileError(
@@ -1425,6 +1814,37 @@ export default function SuperProfile() {
     activeListings.length,
   );
 
+  const followersCount = Math.max(
+    profileSocial?.followersCount ?? 0,
+    Math.floor(
+      readNumber(
+        mergedMetadata.followers_count ??
+          mergedMetadata.follower_count ??
+          mergedMetadata.followers,
+      ),
+    ),
+    profileSocial?.followers.length ?? 0,
+  );
+
+  const followingCount = Math.max(
+    profileSocial?.followingCount ?? 0,
+    Math.floor(
+      readNumber(mergedMetadata.following_count ?? mergedMetadata.following),
+    ),
+    profileSocial?.following.length ?? 0,
+  );
+
+  const reelsCount = Math.max(
+    profileSocial?.reelsCount ?? 0,
+    Math.floor(
+      readNumber(
+        mergedMetadata.reels_count ??
+          mergedMetadata.reel_count ??
+          mergedMetadata.videos_count,
+      ),
+    ),
+  );
+
   const stats = useMemo<StatItem[]>(
     () => [
       {
@@ -1479,6 +1899,7 @@ export default function SuperProfile() {
       {
         key: 'avatar',
         label: copy.photoProfile,
+        href: `${ROUTES.editProfile}?focus=media`,
         complete: Boolean(
           normalizeProfileMediaUrl(avatarUrlInput) ||
           detail?.avatar_url ||
@@ -1489,26 +1910,31 @@ export default function SuperProfile() {
       {
         key: 'bio',
         label: copy.bioBusiness,
+        href: `${ROUTES.editProfile}?focus=identity`,
         complete: Boolean(firstString(detail?.bio, user?.bio)),
       },
       {
         key: 'location',
         label: copy.businessLocation,
+        href: `${ROUTES.editProfile}?focus=identity`,
         complete: Boolean(location),
       },
       {
         key: 'contact',
         label: copy.contact,
+        href: `${ROUTES.editProfile}?focus=identity`,
         complete: Boolean(phone || detail?.email || user?.email),
       },
       {
         key: 'cover',
         label: copy.businessPhoto,
+        href: `${ROUTES.editProfile}?focus=media`,
         complete: Boolean(effectiveCoverUrl),
       },
       {
         key: 'verification',
         label: copy.identityVerification,
+        href: `${ROUTES.editProfile}?focus=identity`,
         complete: verified,
       },
     ],
@@ -1528,6 +1954,12 @@ export default function SuperProfile() {
     const complete = completionItems.filter(item => item.complete).length;
     return Math.round((complete / completionItems.length) * 100);
   }, [completionItems]);
+
+  const incompleteCompletionItems = useMemo(
+    () => completionItems.filter(item => !item.complete),
+    [completionItems],
+  );
+  const nextCompletionItem = incompleteCompletionItems[0] || null;
 
   const sourceListings =
     activeTab === 'drafts' ? draftListings : activeListings;
@@ -1741,6 +2173,12 @@ export default function SuperProfile() {
       icon: ClipboardList,
     },
     {
+      key: 'manage-social',
+      label: copy.manageSocial,
+      href: ROUTES.manageSocial,
+      icon: Clapperboard,
+    },
+    {
       key: 'drafts',
       label: copy.drafts,
       href: ROUTES.drafts,
@@ -1791,10 +2229,10 @@ export default function SuperProfile() {
 
   return (
     <>
-      <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-2 sm:pb-10 sm:pt-6">
-        <div className="page-shell min-w-0 max-w-full space-y-4 overflow-x-clip px-3 sm:px-4 lg:px-6">
-          <section className="min-w-0 max-w-full overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[28px]">
-            <div className="relative h-40 overflow-hidden sm:h-52 lg:h-60">
+      <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-1 sm:pb-8 sm:pt-3">
+        <div className="page-shell min-w-0 max-w-full space-y-3 overflow-x-clip px-2.5 sm:px-3 lg:px-4">
+          <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
+            <div className="relative h-28 overflow-hidden sm:h-36 lg:h-40">
               {effectiveCoverUrl ? (
                 <NextImage
                   src={effectiveCoverUrl}
@@ -1807,10 +2245,10 @@ export default function SuperProfile() {
                 />
               ) : (
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.24),transparent_32%),radial-gradient(circle_at_78%_36%,rgba(52,211,153,0.2),transparent_28%),linear-gradient(135deg,#ecfdf5_0%,#f8fafc_48%,#dcfce7_100%)] dark:bg-[radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.18),transparent_32%),radial-gradient(circle_at_78%_36%,rgba(52,211,153,0.14),transparent_28%),linear-gradient(135deg,#0f172a_0%,#111827_48%,#052e25_100%)]">
-                  <div className="absolute bottom-0 left-[8%] h-16 w-16 rounded-t-[34px] bg-emerald-200/60 dark:bg-emerald-900/40 sm:h-20 sm:w-20" />
-                  <div className="absolute bottom-0 left-[18%] h-24 w-28 rounded-t-[42px] bg-white/70 dark:bg-slate-800/70 sm:h-28 sm:w-32" />
-                  <div className="absolute bottom-0 right-[8%] h-20 w-40 rounded-t-3xl border-x border-t border-emerald-200/80 bg-white/80 dark:border-emerald-900/70 dark:bg-slate-800/80 sm:right-[12%] sm:h-24 sm:w-52" />
-                  <div className="absolute bottom-10 right-[13%] rounded-lg bg-emerald-700 px-5 py-1.5 text-xs font-black tracking-wide text-white shadow-lg sm:bottom-14 sm:right-[17%] sm:px-7 sm:py-2 sm:text-sm">
+                  <div className="absolute bottom-0 left-[8%] h-12 w-12 rounded-t-[26px] bg-emerald-200/60 dark:bg-emerald-900/40 sm:h-14 sm:w-14" />
+                  <div className="absolute bottom-0 left-[18%] h-16 w-20 rounded-t-[30px] bg-white/70 dark:bg-slate-800/70 sm:h-20 sm:w-24" />
+                  <div className="absolute bottom-0 right-[8%] h-14 w-32 rounded-t-2xl border-x border-t border-emerald-200/80 bg-white/80 dark:border-emerald-900/70 dark:bg-slate-800/80 sm:right-[12%] sm:h-16 sm:w-40" />
+                  <div className="absolute bottom-8 right-[13%] rounded-md bg-emerald-700 px-4 py-1 text-[10px] font-black tracking-wide text-white shadow-lg sm:bottom-10 sm:right-[17%] sm:px-5 sm:text-xs">
                     LAJUKAN
                   </div>
                 </div>
@@ -1820,7 +2258,7 @@ export default function SuperProfile() {
 
               <label
                 htmlFor="owner-cover-upload"
-                className="absolute right-3 top-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-white/70 bg-black/45 px-3 text-xs font-bold text-white shadow-sm backdrop-blur-md transition hover:bg-black/60"
+                className="absolute right-2 top-2 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-white/70 bg-black/45 px-2.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md transition hover:bg-black/60"
               >
                 {coverUploading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1840,9 +2278,9 @@ export default function SuperProfile() {
               />
             </div>
 
-            <div className="relative min-w-0 px-4 pb-5 sm:px-7 sm:pb-7">
-              <div className="-mt-12 flex items-end justify-between gap-3 sm:-mt-16">
-                <div className="relative h-24 w-24 shrink-0 rounded-full border-[5px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:h-32 sm:w-32">
+            <div className="relative min-w-0 px-3 pb-4 sm:px-5 sm:pb-5">
+              <div className="-mt-9 flex items-end justify-between gap-3 sm:-mt-11">
+                <div className="relative h-20 w-20 shrink-0 rounded-full border-4 border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-24 sm:w-24">
                   <div className="absolute inset-0 overflow-hidden rounded-full">
                     <NextImage
                       src={effectiveAvatarUrl}
@@ -1851,14 +2289,14 @@ export default function SuperProfile() {
                       priority
                       unoptimized
                       sizes="128px"
-                      className="object-cover"
+                      className="object-contain"
                     />
                   </div>
 
                   <label
                     htmlFor="owner-avatar-upload"
                     aria-label={copy.avatarLabel}
-                    className="absolute -bottom-1 -right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-4 border-[color:var(--app-surface-strong)] bg-white text-slate-900 shadow-md transition hover:scale-105 dark:bg-slate-800 dark:text-white"
+                    className="absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-[3px] border-[color:var(--app-surface-strong)] bg-white text-slate-900 shadow-sm transition hover:scale-105 dark:bg-slate-800 dark:text-white"
                   >
                     {avatarUploading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1882,7 +2320,7 @@ export default function SuperProfile() {
                     type="button"
                     onClick={() => void loadProfile('refresh')}
                     disabled={refreshing}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60 dark:text-[color:var(--app-text-inverse)]"
+                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60 dark:text-[color:var(--app-text-inverse)]"
                   >
                     <RefreshCw
                       className={cn('h-4 w-4', refreshing && 'animate-spin')}
@@ -1892,7 +2330,7 @@ export default function SuperProfile() {
 
                   <LocalizedLink
                     href={publicProfileHref}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
                   >
                     <Eye className="h-4 w-4" />
                     {copy.publicProfile}
@@ -1900,7 +2338,7 @@ export default function SuperProfile() {
 
                   <LocalizedLink
                     href={ROUTES.editProfile}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-600 px-4 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                   >
                     <PencilLine className="h-4 w-4" />
                     {copy.editProfile}
@@ -1908,10 +2346,10 @@ export default function SuperProfile() {
                 </div>
               </div>
 
-              <div className="mt-4 min-w-0">
+              <div className="mt-3 min-w-0">
                 <div className="min-w-0">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <h1 className="min-w-0 max-w-full break-words text-2xl font-black leading-tight tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                    <h1 className="min-w-0 max-w-full break-words text-xl font-black leading-tight tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
                       {displayName}
                     </h1>
 
@@ -1935,11 +2373,11 @@ export default function SuperProfile() {
                     ) : null}
                   </div>
 
-                  <p className="mt-4 max-w-2xl break-words text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  <p className="mt-2 max-w-2xl break-words text-[13px] leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                     {bio}
                   </p>
 
-                  <div className="mt-4 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium text-[color:var(--app-text-soft)]">
+                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-medium text-[color:var(--app-text-soft)]">
                     <span className="inline-flex min-w-0 items-center gap-1.5">
                       <MapPin className="h-4 w-4 shrink-0" />
                       <span className="truncate">
@@ -1954,12 +2392,48 @@ export default function SuperProfile() {
                       </span>
                     ) : null}
                   </div>
+
+                  <div className="mt-3 grid max-w-xl grid-cols-2 gap-1.5 sm:grid-cols-3">
+                    <SocialMetricButton
+                      label={copy.followers}
+                      value={formatCompactNumber(followersCount, numberLocale)}
+                      hint={copy.followersHint}
+                      onClick={() => setSocialModalTab('followers')}
+                    />
+                    <SocialMetricButton
+                      label={copy.following}
+                      value={formatCompactNumber(followingCount, numberLocale)}
+                      hint={copy.followingHint}
+                      onClick={() => setSocialModalTab('following')}
+                    />
+                    <LocalizedLink
+                      href={`/reels?creator=${encodeURIComponent(user.id)}`}
+                      className="col-span-2 min-w-0 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 sm:col-span-1 sm:p-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                          <Clapperboard className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
+                            {copy.reels}
+                          </p>
+                          <p className="mt-0.5 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {formatCompactNumber(reelsCount, numberLocale)}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                            {copy.reelsHint}
+                          </p>
+                        </div>
+                      </div>
+                    </LocalizedLink>
+                  </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 md:hidden">
+                <div className="mt-3 grid grid-cols-2 gap-1.5 md:hidden">
                   <LocalizedLink
                     href={publicProfileHref}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] px-3 text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
+                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] px-2.5 text-[11px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
                   >
                     <Eye className="h-4 w-4" />
                     <span className="truncate">{copy.publicProfile}</span>
@@ -1967,7 +2441,7 @@ export default function SuperProfile() {
 
                   <LocalizedLink
                     href={ROUTES.editProfile}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-600 px-3 text-xs font-bold text-emerald-700 dark:text-emerald-300"
+                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-600 px-2.5 text-[11px] font-black text-white shadow-sm"
                   >
                     <PencilLine className="h-4 w-4" />
                     {copy.editProfile}
@@ -1977,7 +2451,7 @@ export default function SuperProfile() {
                     type="button"
                     onClick={() => void loadProfile('refresh')}
                     disabled={refreshing}
-                    className="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] text-xs font-bold text-[color:var(--app-text-soft)] disabled:opacity-60"
+                    className="col-span-2 inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] text-[11px] font-bold text-[color:var(--app-text-soft)] disabled:opacity-60"
                   >
                     <RefreshCw
                       className={cn('h-4 w-4', refreshing && 'animate-spin')}
@@ -2006,19 +2480,26 @@ export default function SuperProfile() {
                 </div>
               ) : null}
 
-              <section className="mt-6 min-w-0 rounded-2xl border border-[color:var(--app-border)] p-4 sm:p-5">
-                <div className="flex min-w-0 items-start justify-between gap-4">
+              <section className="mt-4 min-w-0 rounded-2xl border border-emerald-200/80 bg-[color:var(--app-surface-muted)] p-3 dark:border-emerald-900/70 sm:p-3.5">
+                <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {copy.profileReady}
-                    </h2>
-                    <div className="mt-2 flex min-w-0 items-center gap-3 sm:gap-4">
-                      <span className="shrink-0 text-2xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {copy.profileReady}
+                      </h2>
+                      <span className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:border-emerald-900/70 dark:bg-white/10 dark:text-emerald-300">
+                        {incompleteCompletionItems.length === 0
+                          ? copy.alreadyNeat
+                          : `${incompleteCompletionItems.length} ${copy.needAttention}`}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex min-w-0 items-center gap-2 sm:gap-3">
+                      <span className="shrink-0 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
                         {profilePercent}%
                       </span>
                       <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
                         <div
-                          className="h-full rounded-full bg-emerald-600 transition-[width] duration-500"
+                          className="h-full rounded-full bg-emerald-600 transition-[width] duration-500 !p-0"
                           style={{ width: `${profilePercent}%` }}
                         />
                       </div>
@@ -2029,32 +2510,50 @@ export default function SuperProfile() {
                   </div>
 
                   <LocalizedLink
-                    href={ROUTES.editProfile}
-                    className="hidden min-h-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--app-border)] px-4 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10 sm:inline-flex"
+                    href={nextCompletionItem?.href || ROUTES.editProfile}
+                    className="hidden min-h-10 shrink-0 items-center justify-center rounded-xl border border-emerald-700 bg-emerald-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 sm:inline-flex"
                   >
-                    {copy.completeProfile}
+                    {nextCompletionItem ? copy.improveNow : copy.editProfile}
                   </LocalizedLink>
                 </div>
 
-                <div className="mt-5 grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                {nextCompletionItem ? (
+                  <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-900/60 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+                    <span>
+                      {copy.nextStep}: {nextCompletionItem.label}
+                    </span>
+                    <LocalizedLink
+                      href={nextCompletionItem.href}
+                      className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-xl bg-white px-3 font-black text-amber-800 shadow-sm transition hover:bg-amber-100 dark:bg-white/10 dark:text-amber-100"
+                    >
+                      {copy.improveNow}
+                    </LocalizedLink>
+                  </div>
+                ) : null}
+
+                <div className="mt-3 grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                   {completionItems.map(item => (
                     <CompletionItem
                       key={item.key}
                       label={item.label}
+                      href={item.href}
                       complete={item.complete}
+                      completeLabel={copy.completeLabel}
+                      missingLabel={copy.missingLabel}
+                      actionLabel={copy.openTask}
                     />
                   ))}
                 </div>
 
                 <LocalizedLink
-                  href={ROUTES.editProfile}
-                  className="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[color:var(--app-border)] text-xs font-bold text-emerald-700 dark:text-emerald-300 sm:hidden"
+                  href={nextCompletionItem?.href || ROUTES.editProfile}
+                  className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-emerald-700 bg-emerald-600 text-xs font-black text-white shadow-sm sm:hidden"
                 >
-                  {copy.completeProfile}
+                  {nextCompletionItem ? copy.improveNow : copy.editProfile}
                 </LocalizedLink>
               </section>
 
-              <section className="mt-4 min-w-0">
+              <section className="min-w-0">
                 <EmblaRail
                   ariaLabel={copy.swipe}
                   itemClassName="flex-[0_0_78%] xs:flex-[0_0_64%] sm:flex-[0_0_46%] lg:flex-[0_0_calc(25%-0.6rem)]"
@@ -2079,7 +2578,7 @@ export default function SuperProfile() {
                 <div className="mt-4">
                   <EmblaRail
                     ariaLabel={copy.quickActions}
-                    itemClassName="flex-[0_0_29%] xs:flex-[0_0_24%] sm:flex-[0_0_18%] lg:flex-[0_0_calc(20%-0.6rem)]"
+                    itemClassName="flex-[0_0_25%] xs:flex-[0_0_21%] sm:flex-[0_0_16%] lg:flex-[0_0_calc(16.666%-0.6rem)]"
                     showControls={false}
                   >
                     {quickActions.map(action => {
@@ -2089,10 +2588,10 @@ export default function SuperProfile() {
                         <LocalizedLink
                           key={action.key}
                           href={action.href}
-                          className="group flex min-w-0 flex-col items-center gap-2 text-center"
+                          className="group flex h-full min-w-0 cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-transparent bg-white/60 p-2 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 dark:bg-white/[0.04] dark:hover:border-emerald-900/70 dark:hover:bg-emerald-500/10"
                         >
-                          <span className="relative flex h-12 w-12 items-center justify-center rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-emerald-700 transition group-hover:-translate-y-0.5 group-hover:border-emerald-300 group-hover:bg-emerald-50 dark:text-emerald-300 dark:group-hover:bg-emerald-500/10 sm:h-14 sm:w-14">
-                            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                          <span className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-emerald-700 transition group-hover:-translate-y-0.5 group-hover:border-emerald-300 group-hover:bg-emerald-50 dark:text-emerald-300 dark:group-hover:bg-emerald-500/10 sm:h-11 sm:w-11">
+                            <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                             {typeof action.badge === 'number' &&
                             action.badge > 0 ? (
                               <span className="absolute -right-2 -top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white">
@@ -2112,7 +2611,7 @@ export default function SuperProfile() {
             </div>
           </section>
 
-          <section className="min-w-0 max-w-full overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[28px]">
+          <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
             <ProfileTabRail
               activeTab={activeTab}
               items={tabItems}
@@ -2122,7 +2621,7 @@ export default function SuperProfile() {
               }}
             />
 
-            <div className="flex min-w-0 items-center gap-2 px-3 py-3 sm:px-5 sm:py-4">
+            <div className="flex min-w-0 items-center gap-2 px-2.5 py-2.5 sm:px-4 sm:py-3">
               <FilterRail
                 activeFilter={activeFilter}
                 items={filterItems}
@@ -2144,7 +2643,7 @@ export default function SuperProfile() {
             </div>
 
             {visibleListings.length > 0 ? (
-              <div className="space-y-3 px-3 pb-3 sm:px-5 sm:pb-5">
+              <div className="space-y-2 px-2.5 pb-2.5 sm:px-4 sm:pb-4">
                 {visibleListings.map(item => (
                   <ListingCard
                     key={item.id}
@@ -2173,10 +2672,10 @@ export default function SuperProfile() {
             )}
 
             {visibleListings.length > 0 ? (
-              <div className="px-3 pb-4 sm:px-5 sm:pb-5">
+              <div className="px-2.5 pb-3 sm:px-4 sm:pb-4">
                 <LocalizedLink
                   href={activeTab === 'drafts' ? ROUTES.drafts : ROUTES.manage}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                  className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
                 >
                   {copy.viewAll}
                   <ArrowRight className="h-4 w-4" />
@@ -2186,6 +2685,19 @@ export default function SuperProfile() {
           </section>
         </div>
       </main>
+
+      <ProfileSocialModal
+        open={Boolean(socialModalTab)}
+        tab={socialModalTab || 'followers'}
+        copy={copy}
+        locale={numberLocale}
+        followers={profileSocial?.followers || []}
+        following={profileSocial?.following || []}
+        followersCount={followersCount}
+        followingCount={followingCount}
+        onTabChange={setSocialModalTab}
+        onClose={() => setSocialModalTab(null)}
+      />
 
       <ImageCropModal
         open={Boolean(cropTarget && cropSource)}

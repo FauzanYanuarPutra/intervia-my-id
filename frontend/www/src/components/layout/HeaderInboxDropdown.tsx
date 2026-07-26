@@ -580,6 +580,7 @@ export function HeaderInboxDropdown({
                 );
                 const notificationTitle = summary.title;
                 const notificationBody = summary.subtitle;
+                const notificationMeta = summary.metaLabel;
 
                 return (
                   <Link
@@ -665,18 +666,9 @@ export function HeaderInboxDropdown({
                       <span className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
                         {notificationBody}
                       </span>
-                      {(summary.entity || summary.entityTypeLabel) ? (
-                        <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
-                          {summary.entity ? (
-                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {summary.entity}
-                            </span>
-                          ) : null}
-                          {summary.entityTypeLabel ? (
-                            <span className="rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {summary.entityTypeLabel}
-                            </span>
-                          ) : null}
+                      {notificationMeta ? (
+                        <span className="mt-1 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                          {notificationMeta}
                         </span>
                       ) : null}
                       <span className="mt-1.5 flex items-center justify-between gap-2">

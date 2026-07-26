@@ -29,18 +29,18 @@ Marketplace AI OS foundation includes:
 - `fraud_cases`
 - `experiment_assignments`
 
-## Events To Preserve
+## Canonical Marketplace Events
 
-Any new product flow should consider:
+Use dotted event names in runtime code. The collector accepts older underscore aliases from legacy UI or specs and normalizes them before storage.
 
-- `home_viewed`, `category_clicked`
-- `search_started`, `search_submitted`, `search_zero_result`
-- `listing_impression`, `listing_clicked`, `listing_viewed`, `listing_saved`
-- `whatsapp_clicked`, `chat_started`
-- `create_started`, `create_step_completed`, `create_abandoned`, `create_completed`
-- `community_opened`, `reel_viewed`
-- `transaction_state_changed`
-- `listing_reported`, `support_ticket_created`
+- Discovery: `home.viewed`, `search.started`, `search.submitted`, `search.result_clicked`, `search.zero_result`, `search.filter_applied`, `location.changed`.
+- Supply: `listing.viewed`, `listing.saved`, `listing.shared`, `offer.create_started`, `offer.published`, `profile.supplier_viewed`.
+- Demand: `need.create_started`, `need.published`, `buyer_request.viewed`, `buyer_request.applied`.
+- RFQ/quote: `rfq.created`, `rfq.supplier_invited`, `quote.create_started`, `quote.submitted`, `quote.viewed`, `quote.shortlisted`, `quote.accepted`.
+- Conversation: `chat.opened`, `sample.requested`.
+- Trust/export: `report.submitted`, `verification.started`, `verification.completed`, `export.assessment_started`, `export.assessment_completed`.
+
+The frontend helper `trackLajukanEvent` and marketplace collector both remove sensitive event properties such as OTPs, tokens, passwords, private message bodies, and raw identity document markers before events are persisted.
 
 ## CRM-Relevant Events
 

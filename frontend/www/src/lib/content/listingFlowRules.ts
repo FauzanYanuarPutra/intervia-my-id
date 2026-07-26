@@ -189,7 +189,9 @@ const UpsertListingSchema = z
     currency: z.string().optional(),
     tags: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
     cover_image: z.string().optional(),
-    image_urls: z.array(z.union([z.string(), z.object({}).passthrough()])).optional(),
+    image_urls: z
+      .array(z.union([z.string(), z.object({}).passthrough()]))
+      .optional(),
     gallery_images: z
       .array(z.union([z.string(), z.object({}).passthrough()]))
       .optional(),
@@ -443,6 +445,50 @@ function hasValue(value: unknown): boolean {
   if (typeof value === 'object')
     return Object.keys(value as Record<string, unknown>).length > 0;
   return false;
+}
+
+function metadataSourceUrl(
+  metadata: Record<string, unknown>,
+): string | undefined {
+  const direct = normalizeText(metadata.source_url, 1200);
+  if (direct) return direct;
+  const source = asObject(metadata.source);
+  return normalizeText(source?.url, 1200);
+}
+
+function isReferenceOnlyMetadata(metadata: Record<string, unknown>): boolean {
+  const recordKind = normalizeText(metadata.record_kind, 120)?.toLowerCase();
+  return (
+    metadata.source_only === true ||
+    metadata.is_transactional === false ||
+    Boolean(recordKind?.includes('reference')) ||
+    normalizeText(metadata.contact_policy, 120)?.toLowerCase() ===
+      'no_private_contact_seeded'
+  );
+}
+
+function validateReferenceOnlyMetadata(
+  metadata: Record<string, unknown>,
+  issues: string[],
+): void {
+  if (!isReferenceOnlyMetadata(metadata)) return;
+  if (!metadataSourceUrl(metadata)) {
+    issues.push(
+      'reference-only listings require metadata.source_url or metadata.source.url',
+    );
+  }
+  if (
+    normalizeText(metadata.contact_policy, 120)?.toLowerCase() !==
+      'no_private_contact_seeded' &&
+    normalizeText(
+      asObject(metadata.contact_snapshot)?.contact_policy,
+      120,
+    )?.toLowerCase() !== 'no_private_contact_seeded'
+  ) {
+    issues.push(
+      'reference-only listings require contact_policy=no_private_contact_seeded',
+    );
+  }
 }
 
 function hasPrimaryImage(
@@ -1064,6 +1110,9 @@ export function validateListingPayload(
     );
   }
   if (metadata) {
+    if (finalStatus === 'active') {
+      validateReferenceOnlyMetadata(metadata, issues);
+    }
     const safetySignals = evaluateSafetySignals(finalType, payload, metadata);
     if (safetySignals.flags.length > 0) {
       metadata.safety_flags = safetySignals.flags;

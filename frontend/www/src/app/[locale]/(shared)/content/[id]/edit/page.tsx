@@ -26,7 +26,7 @@ export default function EditContentPage({ params }: PageProps) {
       if (!mounted) return;
       const id = extractContentId(resolved.id);
       if (!id) {
-        router.push('/search');
+        router.push('/explore');
         return;
       }
       router.replace(`/create?draft=${id}`);

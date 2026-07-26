@@ -1,65 +1,96 @@
 # Product Taxonomy
 
-Status: repo audit 2026-07-11.
+Status: implementation update 2026-07-13.
 
-## Canonical User Language
+## Marketplace Categories
 
-Use Indonesian terms that are direct and familiar:
+Marketplace search and create use five top-level transaction categories:
 
-- `Mencari`: user needs something.
-- `Menawarkan`: user provides/sells something.
-- `Mesin & Alat`
-- `Bahan Usaha`
-- `Jasa`
-- `Tempat Usaha`
-- `Usaha Sekitar`
-- `Peluang Usaha`
+| Slug | ID | Indonesian | English | Badge |
+| --- | --- | --- | --- | --- |
+| `materials-suppliers` | `supplies` | Bahan & Supplier | Materials & Suppliers | Utama |
+| `services` | `service` | Cari Jasa | Services | Expert |
+| `machines-tools` | `equipment` | Mesin & Alat | Machines & Tools | Teknis |
+| `business-places` | `property` | Tempat Usaha | Business Places | Prime |
+| `business-opportunities` | `opportunity` | Peluang Usaha | Business Opportunities | Cuan |
 
-## Layers, Not Categories
+Legacy IDs remain as aliases for backward compatibility. Existing metadata such as `create_category = supplies` maps to the canonical slug `materials-suppliers`.
 
-These are product layers and should not be mixed as transaction categories:
+## Layering Rule
 
-- Search
-- Peta
-- Profil usaha
-- Chat/WhatsApp
-- Trust/safety
-- CMS/CRM/support
+Do not mix these layers:
 
-Location is also a platform capability. `Usaha Sekitar` can be promoted as a destination, but the underlying behavior should apply across Mesin & Alat, Bahan Usaha, Jasa, Tempat Usaha, supplier search, and local communities.
+1. Marketplace category.
+2. Marketplace subcategory.
+3. Industry or business field.
+4. Product/service/tool/place/opportunity type.
+5. Filter or technical attribute.
 
-These are growth and learning layers, not primary transaction categories:
+Example:
 
-- Komunitas
-- Reels/video
-- Peluang Usaha content and inspiration
+- Category: Bahan & Supplier.
+- Subcategory: Kemasan Usaha.
+- Industry: Makanan & Minuman.
+- Type/keyword: Standing pouch.
+- Attributes: ukuran, bahan, MOQ, harga, lokasi.
 
-## Data Fields To Align
+AyamQu-style example:
 
-Create/search/listing should converge on:
+- If AyamQu is a chicken supplier for restaurants, caterers, or UMKM buyers:
+  Category: Bahan & Supplier; Subcategory: Bahan Baku Produksi; Type/keyword: Daging & Unggas / ayam potong / ayam fillet; Seller identity: AyamQu.
+- If AyamQu sells ready-to-eat chicken menus to end consumers:
+  Treat it as a finished product or UMKM culinary profile, not as raw material supplier taxonomy.
+- If AyamQu is primarily a poultry farm:
+  Keep the marketplace need under Bahan & Supplier when selling supply to businesses, and record the provider role as peternakan/supplier in structured fields.
 
-- market side: mencari/menawarkan
-- category
-- subcategory
-- title
-- description/summary
-- price/budget
-- city/address/location text
-- lat/lng when exact enough
-- media
-- seller/store/user profile
-- verification/trust signals
-- WhatsApp/chat availability
-- tags
+## Non-Marketplace Modules
 
-## Known Drift Risks
+Komunitas, Reels/Video, Profil, Chat, WhatsApp, Support, CRM, CMS, and maps are platform modules or capabilities. They must not become top-level marketplace taxonomy categories.
 
-- Home category labels, create templates, DB metadata, and search filters may diverge.
-- Promotional labels can look like categories.
-- English terms such as vendor/supplier/listing may confuse older UMKM users if overused.
+`Usaha Sekitar` remains a location/UMKM capability and may be promoted from navigation, but it is not one of the five marketplace transaction categories.
 
-## Recommendation
+## Data Model
 
-Maintain one taxonomy registry in code and docs, then map legacy labels to it rather than creating new labels in every component.
+Marketplace taxonomy now has additive database tables:
 
-For cluster launches, do not add many new top-level categories. Add structured subcategories and business-type templates inside the core categories.
+- `marketplace_categories`
+- `marketplace_subcategories`
+- `industries`
+- `listing_industries`
+- `listing_tags`
+- `listing_attributes`
+- `listing_attribute_values`
+- `marketplace_search_synonyms`
+
+`content_items` keeps legacy fields for compatibility and adds nullable references:
+
+- `marketplace_category_id`
+- `marketplace_subcategory_id`
+
+New writes should populate canonical metadata:
+
+- `marketplace_category_slug`
+- `marketplace_subcategory_slug`
+- `industry_slug`
+- `create_category` only as a legacy compatibility key.
+
+## API Surfaces
+
+Marketplace service exposes:
+
+- `GET /v1/categories`
+- `GET /v1/categories/:slug`
+- `GET /v1/categories/:slug/subcategories`
+- `GET /v1/industries`
+- `GET /v1/filters/:categorySlug`
+- `GET /v1/listings`
+- `GET /v1/search/suggestions`
+
+WWW proxies expose matching public BFF routes under `/api/categories`, `/api/industries`, `/api/filters/:categorySlug`, and `/api/search/suggestions`.
+
+## Known Compatibility Notes
+
+- Old `/search?type=product&q=...` links remain valid through a permanent redirect to `/explore` with the same parameters.
+- New category landing links use `/explore/:categorySlug`.
+- Existing listing detail URLs and `/content/:id` stay canonical.
+- Listing records that cannot be mapped should keep their original metadata and can be assigned to `Lainnya` industry until reviewed.

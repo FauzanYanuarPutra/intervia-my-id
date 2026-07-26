@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeErrorCode } from '@/lib/server/safeLog';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -69,7 +70,6 @@ export async function POST(req: NextRequest) {
     if (isUpstreamFailure(response.status)) {
       console.warn('[EVENT_COLLECTOR_UPSTREAM_UNAVAILABLE]', {
         status: response.status,
-        payload,
       });
       return NextResponse.json(
         { accepted: 0, deferred: true, source: 'event-proxy-soft-fail' },
@@ -79,7 +79,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(payload, { status: response.status });
   } catch (error) {
-    console.error('[EVENT_COLLECTOR_PROXY_ERROR]', error);
+    console.error('[EVENT_COLLECTOR_PROXY_ERROR]', {
+      error: safeErrorCode(error),
+    });
     return NextResponse.json(
       { accepted: 0, deferred: true, source: 'event-proxy-soft-fail' },
       { status: 202 },

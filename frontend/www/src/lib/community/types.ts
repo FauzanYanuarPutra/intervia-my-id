@@ -42,6 +42,7 @@ export type CommunityGroup = {
   privacy: 'public' | 'private' | 'hidden';
   postingPermission: 'public' | 'member' | 'moderator';
   membershipPermission: 'open' | 'approval' | 'invite';
+  avatarUrl?: string | null;
   coverUrl?: string | null;
   rules: string[];
   memberCount: number;

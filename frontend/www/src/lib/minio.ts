@@ -4,6 +4,7 @@
  */
 import {
   CreateBucketCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
@@ -133,4 +134,64 @@ export async function uploadToMinIO(
       : `/api/chat/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`;
 
   return { url, key };
+}
+
+export async function promotePersonalAiMedia(input: {
+  url: string;
+  ownerId: string;
+  maxBytes?: number;
+}): Promise<{ url: string; key: string }> {
+  const pathname = input.url.startsWith('/')
+    ? input.url
+    : (() => {
+        try {
+          return new URL(input.url).pathname;
+        } catch {
+          return '';
+        }
+      })();
+  const prefix = '/api/ai/personal/media/';
+  const parts = pathname
+    .slice(prefix.length)
+    .split('/')
+    .map(part => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return '';
+      }
+    })
+    .filter(Boolean);
+  const safeOwner = safeRoomKey(input.ownerId);
+  if (
+    !pathname.startsWith(prefix) ||
+    parts.length !== 4 ||
+    parts[0] !== bucket ||
+    parts[1] !== 'personal-ai' ||
+    parts[2] !== safeOwner ||
+    parts.some(part => !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,180}$/.test(part))
+  ) {
+    throw new Error('Media is not owned by the authenticated user');
+  }
+
+  const client = getMinioClient();
+  const sourceKey = parts.slice(1).join('/');
+  const object = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: sourceKey }),
+  );
+  if (!object.Body) throw new Error('Media object was not found');
+  const maxBytes = input.maxBytes ?? 15 * 1024 * 1024;
+  if (Number(object.ContentLength || 0) > maxBytes) {
+    throw new Error('Media is too large to reuse');
+  }
+  const bytes = await object.Body.transformToByteArray();
+  if (bytes.byteLength === 0 || bytes.byteLength > maxBytes) {
+    throw new Error('Media is too large to reuse');
+  }
+  return uploadToMinIO(
+    'content',
+    Buffer.from(bytes),
+    object.ContentType || 'application/octet-stream',
+    parts[3],
+  );
 }

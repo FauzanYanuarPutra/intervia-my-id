@@ -1,6 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from 'react';
 
 const STORAGE_KEY = 'lajukan_theme';
 const DARK_CLASS = 'dark';
@@ -16,7 +22,7 @@ export interface ThemeSettings {
 }
 
 const DEFAULT: ThemeSettings = {
-  colorScheme: 'system',
+  colorScheme: 'light',
   themePreset: 'default',
   colorVision: 'none',
 };
@@ -49,12 +55,20 @@ function loadTheme(): ThemeSettings {
       >;
 
       const legacyColorVision =
-        parsed.colorblindMode && parsed.colorblindMode !== 'none' ? 'colorblind' : undefined;
+        parsed.colorblindMode && parsed.colorblindMode !== 'none'
+          ? 'colorblind'
+          : undefined;
 
       return {
-        colorScheme: parsed.colorScheme ?? DEFAULT.colorScheme,
-        themePreset: normalizeThemePreset(parsed.themePreset ?? parsed.lightVariant ?? parsed.darkVariant),
-        colorVision: normalizeColorVision(parsed.colorVision ?? legacyColorVision),
+        // Dark/light switching is paused for now. Keep saved palette/accessibility,
+        // but force the app scheme to light while the visual system is cleaned up.
+        colorScheme: 'light',
+        themePreset: normalizeThemePreset(
+          parsed.themePreset ?? parsed.lightVariant ?? parsed.darkVariant,
+        ),
+        colorVision: normalizeColorVision(
+          parsed.colorVision ?? legacyColorVision,
+        ),
       };
     }
 
@@ -63,7 +77,7 @@ function loadTheme(): ThemeSettings {
     if (legacy === 'dark' || legacy === 'light') {
       const migrated: ThemeSettings = {
         ...DEFAULT,
-        colorScheme: legacy,
+        colorScheme: 'light',
       };
       saveTheme(migrated);
       return migrated;
@@ -77,8 +91,9 @@ function loadTheme(): ThemeSettings {
 
 function saveTheme(s: ThemeSettings) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-    localStorage.setItem('theme', s.colorScheme === 'system' ? '' : s.colorScheme);
+    const lightOnly: ThemeSettings = { ...s, colorScheme: 'light' };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(lightOnly));
+    localStorage.setItem('theme', 'light');
   } catch {}
 }
 
@@ -96,72 +111,79 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<ThemeSettings>(DEFAULT);
-  const [isDark, setIsDark] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
+  // const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
   useEffect(() => {
-    setSettings(loadTheme());
-    setIsReady(true);
+    const timer = window.setTimeout(() => {
+      setSettings(loadTheme());
+      setIsReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const sync = () => setSystemPrefersDark(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
+  // Dark/light switching is intentionally commented for now.
+  // useEffect(() => {
+  //   if (typeof window === 'undefined') return;
+  //   const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  //   const sync = () => setSystemPrefersDark(mq.matches);
+  //   sync();
+  //   mq.addEventListener('change', sync);
+  //   return () => mq.removeEventListener('change', sync);
+  // }, []);
 
-  const resolvedDark =
-    settings.colorScheme === 'system'
-      ? systemPrefersDark
-      : settings.colorScheme === 'dark';
+  // const resolvedDark =
+  //   settings.colorScheme === 'system'
+  //     ? systemPrefersDark
+  //     : settings.colorScheme === 'dark';
+  const resolvedDark = false;
 
   useEffect(() => {
     if (!isReady || typeof document === 'undefined') return;
 
     const html = document.documentElement;
 
-    html.classList.toggle(DARK_CLASS, resolvedDark);
+    html.classList.remove(DARK_CLASS);
     html.setAttribute('data-theme', settings.themePreset);
     html.setAttribute('data-color-vision', settings.colorVision);
-    setIsDark(resolvedDark);
   }, [isReady, resolvedDark, settings.themePreset, settings.colorVision]);
 
   const updateTheme = useCallback((partial: Partial<ThemeSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...partial };
+    setSettings(prev => {
+      const next: ThemeSettings = {
+        ...prev,
+        ...partial,
+        colorScheme: 'light',
+      };
       saveTheme(next);
       return next;
     });
   }, []);
 
   const toggleDarkMode = useCallback(() => {
-    setSettings((prev) => {
-      const newScheme: ColorScheme = resolvedDark ? 'light' : 'dark';
-      const next = { ...prev, colorScheme: newScheme };
+    // Dark/light switching is paused. Keep this function for callers,
+    // but make it a no-op so the product stays in light mode.
+    setSettings(prev => {
+      const next = { ...prev, colorScheme: 'light' as ColorScheme };
       saveTheme(next);
       return next;
     });
-  }, [resolvedDark]);
+  }, []);
 
   const value: ThemeContextValue = {
     ...settings,
-    isDark,
+    colorScheme: 'light',
+    isDark: false,
     isReady,
-    setColorScheme: (v) => updateTheme({ colorScheme: v }),
-    setThemePreset: (v) => updateTheme({ themePreset: v }),
-    setColorVision: (v) => updateTheme({ colorVision: v }),
+    setColorScheme: () => updateTheme({ colorScheme: 'light' }),
+    setThemePreset: v => updateTheme({ themePreset: v }),
+    setColorVision: v => updateTheme({ colorVision: v }),
     toggleDarkMode,
     updateTheme,
   };
 
   return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
 }
 

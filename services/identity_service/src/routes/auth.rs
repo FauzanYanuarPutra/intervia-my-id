@@ -501,7 +501,11 @@ async fn generate_google_username(
         let candidate = if attempt == 0 {
             base.clone()
         } else {
-            format!("{}{}", base.chars().take(20).collect::<String>(), attempt + 1)
+            format!(
+                "{}{}",
+                base.chars().take(20).collect::<String>(),
+                attempt + 1
+            )
         };
         let exists = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS (SELECT 1 FROM core.user_profiles WHERE lower(username::text) = lower($1) LIMIT 1)",
@@ -514,7 +518,10 @@ async fn generate_google_username(
             return candidate;
         }
     }
-    format!("user{}", Uuid::new_v4().simple().to_string()[..10].to_string())
+    format!(
+        "user{}",
+        Uuid::new_v4().simple().to_string()[..10].to_string()
+    )
 }
 
 fn verify_reset_proof(secret: &str, proof: &str, email: &str) -> bool {
@@ -2011,8 +2018,7 @@ pub async fn oauth_google(
             .into_response();
     }
 
-    let generated_username =
-        generate_google_username(&state, &email, full_name.as_deref()).await;
+    let generated_username = generate_google_username(&state, &email, full_name.as_deref()).await;
     let profile_metadata = json!({
         "avatar_url": avatar_url.clone(),
         "auth_provider": "google",

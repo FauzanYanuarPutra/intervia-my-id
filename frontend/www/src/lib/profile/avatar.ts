@@ -101,6 +101,14 @@ export function isDefaultProfileAvatar(value?: string | null): boolean {
   );
 }
 
+function normalizeExternalAvatarUrl(value: string): string {
+  if (!/^https:\/\/[^/]*googleusercontent\.com\//i.test(value)) {
+    return value;
+  }
+
+  return value.replace(/(=s\d+)-c(?=($|[-?&]))/i, '$1');
+}
+
 export function profileAvatarSrc(
   value?: string | null,
   avatarStyle?: unknown,
@@ -114,13 +122,14 @@ export function profileAvatarSrc(
 
   const mediaUrl = normalizeContentMediaUrl(clean);
   if (isDefaultProfileAvatar(mediaUrl)) return fallback();
+  const avatarUrl = normalizeExternalAvatarUrl(mediaUrl);
 
   if (
-    mediaUrl.startsWith('/') ||
-    mediaUrl.startsWith('https://') ||
-    mediaUrl.startsWith('data:image/')
+    avatarUrl.startsWith('/') ||
+    avatarUrl.startsWith('https://') ||
+    avatarUrl.startsWith('data:image/')
   ) {
-    return mediaUrl;
+    return avatarUrl;
   }
 
   return fallback();

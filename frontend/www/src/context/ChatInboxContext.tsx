@@ -11,8 +11,6 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ensureSocketConnected } from '@/lib/socket';
-import { joinUserChannel } from '@/lib/chat';
 import { readProfileAvatarStyle } from '@/lib/profile/avatar';
 import type { Channel } from 'phoenix';
 
@@ -279,16 +277,6 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
     [userId, authFetch, applyInbox],
   );
 
-  // Inisialisasi WebSocket begitu user login agar koneksi tampil di Network tab
-  useEffect(() => {
-    if (!accessToken) return;
-    try {
-      ensureSocketConnected(accessToken);
-    } catch (err) {
-      console.warn('[ChatInbox] Socket init failed', err);
-    }
-  }, [accessToken]);
-
   // Initial fetch + join user channel untuk inbox_updated
   useEffect(() => {
     if (!userId || !accessToken) {
@@ -323,6 +311,7 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
 
     const setupChannel = async () => {
       try {
+        const { joinUserChannel } = await import('@/lib/chat');
         const joinedChannel = await joinUserChannel(userId, accessToken);
         if (!isMounted) {
           try {

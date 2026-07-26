@@ -26,6 +26,9 @@ services:
       RABBITMQ_USER: ${RABBIT_USER}
       RABBITMQ_PASSWORD: ${RABBIT_PASS}
       RABBITMQ_URL: amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672/%2f
+      IDENTITY_OUTBOX_EXCHANGE: ${IDENTITY_OUTBOX_EXCHANGE:-identity.outbox}
+      IDENTITY_OUTBOX_BATCH_SIZE: ${IDENTITY_OUTBOX_BATCH_SIZE:-50}
+      IDENTITY_OUTBOX_POLL_MS: ${IDENTITY_OUTBOX_POLL_MS:-750}
 
       # --- Auth & Security (Sinkron dengan Rust Config) ---
       JWT_SECRET: ${JWT_SECRET}
@@ -40,6 +43,8 @@ services:
       MAX_LOGIN_ATTEMPTS: "5"
       LOCKOUT_DURATION_MIN: "15"
       FAILED_LOGIN_DELAY_MS: "1000"
+      DEV_SEED_OPS_USER: ${DEV_SEED_OPS_USER:-true}
+      DEV_SEED_OPS_PASSWORD: ${DEV_SEED_OPS_PASSWORD:-}
 
       # --- Domain & CORS ---
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
@@ -358,6 +363,8 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBIT_USER}
       RABBITMQ_PASSWORD: ${RABBIT_PASS}
+      IDENTITY_OUTBOX_EXCHANGE: ${IDENTITY_OUTBOX_EXCHANGE:-identity.outbox}
+      COMMUNITY_IDENTITY_QUEUE: ${COMMUNITY_IDENTITY_QUEUE:-community.identity.profile}
       JWT_SECRET: ${JWT_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum

@@ -16,9 +16,34 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
+    "baseUrl": ".",
     "paths": {
       "@/*": [
         "src/*"
+      ],
+      "lajukan-ui": [
+        "node_modules/lajukan-ui/index.ts"
+      ],
+      "react": [
+        "node_modules/@types/react"
+      ],
+      "react/jsx-runtime": [
+        "node_modules/@types/react/jsx-runtime"
+      ],
+      "react/jsx-dev-runtime": [
+        "node_modules/@types/react/jsx-dev-runtime"
+      ],
+      "react-dom": [
+        "node_modules/@types/react-dom"
+      ],
+      "class-variance-authority": [
+        "node_modules/class-variance-authority"
+      ],
+      "clsx": [
+        "node_modules/clsx"
+      ],
+      "tailwind-merge": [
+        "node_modules/tailwind-merge"
       ]
     },
     "esModuleInterop": true,

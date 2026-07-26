@@ -6,7 +6,7 @@ import {
 
 describe('eventTaxonomy', () => {
   it('strips supported locale prefixes', () => {
-    expect(stripLocaleFromPathname('/id/search')).toBe('/search');
+    expect(stripLocaleFromPathname('/id/explore')).toBe('/explore');
     expect(stripLocaleFromPathname('/en/community/groups/reseller')).toBe(
       '/community/groups/reseller',
     );

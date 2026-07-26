@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { buildContentHref, extractContentId } from '@/lib/content/routes';
+import { SectorProvider } from '@/context/SectorContext';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.lajukan.com';
 const SITE_NAME = 'Lajukan';
@@ -221,7 +223,7 @@ function buildJsonLd(content: ContentSeoItem, locale: string, id: string) {
           '@type': 'ListItem',
           position: 2,
           name: locale === 'id' ? 'Cari' : 'Search',
-          item: `${SITE_URL}/${locale}/search`,
+          item: `${SITE_URL}/${locale}/explore`,
         },
         {
           '@type': 'ListItem',
@@ -245,11 +247,11 @@ export default async function ContentIdLayout({ children, params }: Props) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+            __html: serializeJsonLd(jsonLd),
           }}
         />
       ) : null}
-      {children}
+      <SectorProvider>{children}</SectorProvider>
     </>
   );
 }

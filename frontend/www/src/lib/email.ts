@@ -1,11 +1,16 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type SendMailOptions, type Transporter } from 'nodemailer';
+import {
+  allowSensitiveDevelopmentLogs,
+  maskEmail,
+  safeErrorCode,
+} from '@/lib/server/safeLog';
 
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const IS_DEV = APP_ENV === 'development';
 const DEV_EMAIL_FALLBACK_TO_CONSOLE =
-  process.env.DEV_EMAIL_FALLBACK_TO_CONSOLE !== 'false';
+  process.env.DEV_EMAIL_FALLBACK_TO_CONSOLE === 'true';
 
-function createTransport() {
+function createTransport(): Transporter | null {
   const forced = process.env.EMAIL_TRANSPORT;
   const smtpUser = process.env.SMTP_USER || '';
   const smtpPass = process.env.SMTP_PASS || '';
@@ -15,12 +20,13 @@ function createTransport() {
   const isMailHog = smtpHost === 'mailhog' || smtpPort === 1025;
 
   if (forced === 'console') {
-    return nodemailer.createTransport({ jsonTransport: true });
+    return IS_DEV && DEV_EMAIL_FALLBACK_TO_CONSOLE
+      ? createConsoleTransport()
+      : null;
   }
 
   if (!smtpHost) {
-    console.warn('No SMTP_HOST configured, using console-only email');
-    return nodemailer.createTransport({ jsonTransport: true });
+    return null;
   }
 
   if (isMailHog || (smtpUser === '' && smtpPass === '')) {
@@ -49,30 +55,49 @@ function createConsoleTransport() {
   return nodemailer.createTransport({ jsonTransport: true });
 }
 
-const transporter = createTransport();
+let transporter: Transporter | null | undefined;
+
+function getTransporter(): Transporter | null {
+  if (transporter === undefined) transporter = createTransport();
+  return transporter;
+}
 
 async function sendMailWithDevFallback(
-  options: Parameters<typeof transporter.sendMail>[0],
+  options: SendMailOptions,
 ): Promise<boolean> {
+  const primaryTransport = getTransporter();
+  if (!primaryTransport) {
+    if (IS_DEV && DEV_EMAIL_FALLBACK_TO_CONSOLE) {
+      await createConsoleTransport().sendMail(options);
+      return true;
+    }
+    console.error('Email delivery is unavailable', {
+      error: 'EMAIL_TRANSPORT_NOT_CONFIGURED',
+    });
+    return false;
+  }
+
   try {
-    await transporter.sendMail(options);
+    await primaryTransport.sendMail(options);
     return true;
   } catch (error) {
     if (!IS_DEV || !DEV_EMAIL_FALLBACK_TO_CONSOLE) {
-      console.error('Failed to send email:', error);
+      console.error('Failed to send email', { error: safeErrorCode(error) });
       return false;
     }
 
     console.warn(
       'Primary email transport failed in development, falling back to console transport.',
-      error,
+      { error: safeErrorCode(error) },
     );
 
     try {
       await createConsoleTransport().sendMail(options);
       return true;
     } catch (fallbackError) {
-      console.error('Failed to send email with console fallback:', fallbackError);
+      console.error('Failed to send email with console fallback', {
+        error: safeErrorCode(fallbackError),
+      });
       return false;
     }
   }
@@ -109,9 +134,9 @@ export async function sendOTPEmail(email: string, otp: string): Promise<boolean>
     return false;
   }
 
-  if (IS_DEV) {
+  if (allowSensitiveDevelopmentLogs()) {
     console.log('\n========== EMAIL OTP ==========');
-    console.log(`To: ${email}`);
+    console.log(`To: ${maskEmail(email)}`);
     console.log(`OTP Code: ${otp}`);
     console.log('==================================\n');
   }
@@ -139,9 +164,9 @@ export async function sendPasswordResetEmail(email: string, resetLink: string): 
     return false;
   }
 
-  if (IS_DEV) {
+  if (allowSensitiveDevelopmentLogs()) {
     console.log('\n========== PASSWORD RESET EMAIL ==========');
-    console.log(`To: ${email}`);
+    console.log(`To: ${maskEmail(email)}`);
     console.log(`Reset Link: ${resetLink}`);
     console.log('=============================================\n');
   }
@@ -167,7 +192,7 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<boo
   }
 
   if (IS_DEV) {
-    console.log(`\nWelcome email sent to ${email}\n`);
+    console.log(`\nWelcome email sent to ${maskEmail(email)}\n`);
   }
 
   return true;

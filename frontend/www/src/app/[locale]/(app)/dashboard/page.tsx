@@ -12,6 +12,7 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
+  Clapperboard,
   Clock3,
   Eye,
   FileText,
@@ -363,7 +364,7 @@ function buildPriorities(
 
   priorities.push({
     id: 'discover',
-    href: '/search',
+    href: '/explore',
     title: isId ? 'Cek peluang sekitar' : 'Check nearby opportunities',
     description: isId
       ? 'Lihat supplier, jasa, talent, dan komunitas yang relevan.'
@@ -707,7 +708,7 @@ export default function DashboardPage() {
       icon: MessageCircle,
     },
     {
-      href: '/search',
+      href: '/explore',
       title: isId ? 'Cari peluang' : 'Find leads',
       description: isId
         ? 'Temukan supplier, jasa, talent, lokasi, dan komunitas.'
@@ -721,6 +722,14 @@ export default function DashboardPage() {
         ? 'Update foto, judul, lokasi, dan status ketersediaan.'
         : 'Update photos, titles, location, and availability.',
       icon: FileText,
+    },
+    {
+      href: '/manage',
+      title: isId ? 'Kelola semua' : 'Manage everything',
+      description: isId
+        ? 'Edit listing, draft, postingan komunitas, reels, dan profil usaha.'
+        : 'Edit listings, drafts, community posts, reels, and business profile.',
+      icon: Clapperboard,
     },
     {
       href: '/usaha/dashboard',

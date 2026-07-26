@@ -101,7 +101,7 @@ export function HorizontalRail({
     });
 
     resizeObserver.observe(rail);
-    Array.from(rail.children).forEach((child) => resizeObserver.observe(child));
+    Array.from(rail.children).forEach(child => resizeObserver.observe(child));
 
     return () => {
       cancelAnimationFrame(frame);
@@ -111,36 +111,43 @@ export function HorizontalRail({
     };
   }, [syncRailState, childCount, railRef]);
 
-  const scrollToIndex = useCallback((index: number) => {
-    const rail = railRef.current;
-    if (!rail) return;
+  const scrollToIndex = useCallback(
+    (index: number) => {
+      const rail = railRef.current;
+      if (!rail) return;
 
-    const nodes = Array.from(rail.children) as HTMLElement[];
-    if (!nodes.length) return;
+      const nodes = Array.from(rail.children) as HTMLElement[];
+      if (!nodes.length) return;
 
-    const safeIndex = Math.max(0, Math.min(nodes.length - 1, index));
-    const target = nodes[safeIndex];
+      const safeIndex = Math.max(0, Math.min(nodes.length - 1, index));
+      const target = nodes[safeIndex];
 
-    const left =
-      target.offsetLeft - Math.max(16, (rail.clientWidth - target.offsetWidth) / 2);
+      const left =
+        target.offsetLeft -
+        Math.max(16, (rail.clientWidth - target.offsetWidth) / 2);
 
-    rail.scrollTo({
-      left: Math.max(0, left),
-      behavior: 'smooth',
-    });
-  }, [railRef]);
+      rail.scrollTo({
+        left: Math.max(0, left),
+        behavior: 'smooth',
+      });
+    },
+    [railRef],
+  );
 
-  const scrollByViewport = useCallback((direction: 'prev' | 'next') => {
-    const rail = railRef.current;
-    if (!rail) return;
+  const scrollByViewport = useCallback(
+    (direction: 'prev' | 'next') => {
+      const rail = railRef.current;
+      if (!rail) return;
 
-    const delta = Math.max(rail.clientWidth * 0.9, 280);
+      const delta = Math.max(rail.clientWidth * 0.9, 280);
 
-    rail.scrollBy({
-      left: direction === 'next' ? delta : -delta,
-      behavior: 'smooth',
-    });
-  }, [railRef]);
+      rail.scrollBy({
+        left: direction === 'next' ? delta : -delta,
+        behavior: 'smooth',
+      });
+    },
+    [railRef],
+  );
 
   return (
     <div className="group relative w-full min-w-0 max-w-full">
@@ -156,7 +163,9 @@ export function HorizontalRail({
         </>
       ) : null}
 
-      <div className={minimal ? 'overflow-visible' : '-mx-3 px-3 sm:mx-0 sm:px-0'}>
+      <div
+        className={minimal ? 'overflow-visible' : '-mx-3 px-3 sm:mx-0 sm:px-0'}
+      >
         <div
           ref={railRef}
           onClickCapture={onClickCapture}
@@ -184,20 +193,20 @@ export function HorizontalRail({
                 minimal
                   ? 'basis-auto'
                   : [
-                    // Mobile
-                    'w-[46vw] min-w-[46vw] max-w-[46vw]',
+                      // Mobile
+                      'w-[46vw] min-w-[46vw] max-w-[46vw]',
 
-                    // HP besar
-                    'xs:w-[42vw] xs:min-w-[42vw] xs:max-w-[42vw]',
+                      // HP besar
+                      'xs:w-[42vw] xs:min-w-[42vw] xs:max-w-[42vw]',
 
-                    // Tablet
-                    'sm:w-[180px] sm:min-w-[180px] sm:max-w-[180px]',
+                      // Tablet
+                      'sm:w-[180px] sm:min-w-[180px] sm:max-w-[180px]',
 
-                    // Desktop
-                    'md:w-[190px] md:min-w-[190px] md:max-w-[190px]',
-                    'lg:w-[210px] lg:min-w-[210px] lg:max-w-[210px]',
-                    'xl:w-[220px] xl:min-w-[220px] xl:max-w-[220px]',
-                  ].join(' ')
+                      // Desktop
+                      'md:w-[190px] md:min-w-[190px] md:max-w-[190px]',
+                      'lg:w-[210px] lg:min-w-[210px] lg:max-w-[210px]',
+                      'xl:w-[220px] xl:min-w-[220px] xl:max-w-[220px]',
+                    ].join(' '),
               ].join(' ')}
             >
               <div className="h-full w-full min-w-0">{child}</div>
@@ -207,12 +216,12 @@ export function HorizontalRail({
       </div>
 
       {showMobileControls && !minimal && childCount > 1 && hasOverflow ? (
-        <div className="mt-2 flex items-center justify-between gap-2 sm:hidden">
-          <span className="text-[10px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+        <div className="mt-1.5 flex items-center justify-between gap-1.5 sm:hidden">
+          <span className="line-clamp-1 text-[9px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
             {hintLabel}
           </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => {
@@ -223,13 +232,13 @@ export function HorizontalRail({
                 }
               }}
               disabled={!canGoPrev}
-              className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               aria-label="Scroll previous card"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <ArrowLeft className="h-3 w-3" />
             </button>
 
-            <span className="min-w-[38px] text-center text-[10px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+            <span className="min-w-[32px] text-center text-[9px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {activeIndex + 1}/{childCount}
             </span>
 
@@ -243,10 +252,10 @@ export function HorizontalRail({
                 }
               }}
               disabled={!canGoNext}
-              className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-[color:color-mix(in_srgb,var(--app-accent-strong)_32%,transparent)] dark:text-[color:var(--app-accent)]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-sm disabled:cursor-not-allowed disabled:opacity-40 dark:bg-[color:color-mix(in_srgb,var(--app-accent-strong)_32%,transparent)] dark:text-[color:var(--app-accent)]"
               aria-label="Scroll next card"
             >
-              <ArrowRight className="h-3.5 w-3.5" />
+              <ArrowRight className="h-3 w-3" />
             </button>
           </div>
         </div>

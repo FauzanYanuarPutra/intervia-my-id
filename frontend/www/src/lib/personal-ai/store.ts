@@ -155,7 +155,8 @@ function canUseAgent(row: Record<string, unknown>, userId: string) {
 }
 
 function cleanModelPreference(value: unknown): PersonalAiModelPreference {
-  if (value === 'ollama' || value === 'groq' || value === 'openai') return value;
+  if (value === 'ollama' || value === 'groq' || value === 'openai')
+    return value;
   return 'auto';
 }
 
@@ -165,7 +166,11 @@ function cleanTemperature(value: unknown): number {
   return Math.max(0, Math.min(1, Number(parsed.toFixed(2))));
 }
 
-function cleanStringList(value: unknown, limit: number, itemMax = 220): string[] {
+function cleanStringList(
+  value: unknown,
+  limit: number,
+  itemMax = 220,
+): string[] {
   if (!Array.isArray(value)) return [];
   const result: string[] = [];
   const seen = new Set<string>();
@@ -212,7 +217,10 @@ function cleanButtons(value: unknown): PersonalAiQuickButton[] {
   return buttons.length > 0 ? buttons : DEFAULT_BUTTONS;
 }
 
-function normalizeAgent(row: Record<string, unknown>, canEdit = false): PersonalAiAgent {
+function normalizeAgent(
+  row: Record<string, unknown>,
+  canEdit = false,
+): PersonalAiAgent {
   return {
     id: String(row.id),
     owner_id: String(row.owner_id),
@@ -248,7 +256,9 @@ function normalizeThread(row: Record<string, unknown>): PersonalAiThread {
 
 function normalizeMessage(row: Record<string, unknown>): PersonalAiMessage {
   const metadata =
-    row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+    row.metadata &&
+    typeof row.metadata === 'object' &&
+    !Array.isArray(row.metadata)
       ? (row.metadata as Record<string, unknown>)
       : {};
   return {
@@ -269,7 +279,8 @@ function createDefaultAgent(userId: string): PersonalAiAgent {
     id: id('agent'),
     owner_id: userId,
     name: 'AI Usaha Saya',
-    description: 'Asisten pribadi untuk rencana usaha, supplier, modal, risiko, dan langkah harian.',
+    description:
+      'Asisten pribadi untuk rencana usaha, supplier, modal, risiko, dan langkah harian.',
     visibility: 'private',
     instructions: DEFAULT_INSTRUCTIONS,
     tone: 'ramah, praktis, lokal Indonesia, to the point',
@@ -363,10 +374,24 @@ async function readFileState(): Promise<FileState> {
     const parsed = JSON.parse(raw) as Partial<FileState>;
     return {
       version: 1,
-      agents: Array.isArray(parsed.agents) ? parsed.agents.map(item => normalizeAgent(item as Record<string, unknown>, false)) : [],
-      threads: Array.isArray(parsed.threads) ? parsed.threads.map(item => normalizeThread(item as Record<string, unknown>)) : [],
-      messages: Array.isArray(parsed.messages) ? parsed.messages.map(item => normalizeMessage(item as Record<string, unknown>)) : [],
-      memories: Array.isArray(parsed.memories) ? (parsed.memories as PersonalAiMemory[]) : [],
+      agents: Array.isArray(parsed.agents)
+        ? parsed.agents.map(item =>
+            normalizeAgent(item as Record<string, unknown>, false),
+          )
+        : [],
+      threads: Array.isArray(parsed.threads)
+        ? parsed.threads.map(item =>
+            normalizeThread(item as Record<string, unknown>),
+          )
+        : [],
+      messages: Array.isArray(parsed.messages)
+        ? parsed.messages.map(item =>
+            normalizeMessage(item as Record<string, unknown>),
+          )
+        : [],
+      memories: Array.isArray(parsed.memories)
+        ? (parsed.memories as PersonalAiMemory[])
+        : [],
     };
   } catch {
     return {
@@ -389,7 +414,10 @@ async function getStorageMode(): Promise<PersonalAiStorageMode> {
     const pool = await ensureSchema();
     return pool ? 'postgres' : 'file';
   } catch (error) {
-    console.warn('[PERSONAL_AI_POSTGRES_FALLBACK]', error instanceof Error ? error.message : error);
+    console.warn(
+      '[PERSONAL_AI_POSTGRES_FALLBACK]',
+      error instanceof Error ? error.message : error,
+    );
     return 'file';
   }
 }
@@ -462,7 +490,10 @@ export async function listPersonalAiAgents(userId: string, share?: string) {
           [share],
         );
         if (shared.rows[0]) {
-          sharedAgent = normalizeAgent(shared.rows[0], shared.rows[0].owner_id === userId);
+          sharedAgent = normalizeAgent(
+            shared.rows[0],
+            shared.rows[0].owner_id === userId,
+          );
         }
       }
       return { agents, shared_agent: sharedAgent, storage: mode };
@@ -475,11 +506,15 @@ export async function listPersonalAiAgents(userId: string, share?: string) {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .map(agent => ({ ...agent, can_edit: true }));
   const shared = share
-    ? state.agents.find(agent => agent.share_id === share && agent.visibility !== 'private') || null
+    ? state.agents.find(
+        agent => agent.share_id === share && agent.visibility !== 'private',
+      ) || null
     : null;
   return {
     agents,
-    shared_agent: shared ? { ...shared, can_edit: shared.owner_id === userId } : null,
+    shared_agent: shared
+      ? { ...shared, can_edit: shared.owner_id === userId }
+      : null,
     storage: mode,
   };
 }
@@ -555,7 +590,10 @@ export async function createPersonalAiAgent(
   }
 
   const state = await readFileState();
-  if (state.agents.filter(item => item.owner_id === userId).length >= MAX_AGENTS_PER_USER) {
+  if (
+    state.agents.filter(item => item.owner_id === userId).length >=
+    MAX_AGENTS_PER_USER
+  ) {
     throw new Error('Batas AI pribadi tercapai.');
   }
   state.agents.push(agent);
@@ -591,7 +629,10 @@ export async function getPersonalAiAgentForUse(input: {
 
   const state = await readFileState();
   const agent = input.shareId
-    ? state.agents.find(item => item.share_id === input.shareId && item.visibility !== 'private')
+    ? state.agents.find(
+        item =>
+          item.share_id === input.shareId && item.visibility !== 'private',
+      )
     : state.agents.find(
         item =>
           item.id === input.agentId &&
@@ -672,21 +713,24 @@ export async function deletePersonalAiAgent(userId: string, agentId: string) {
         [userId],
       );
       if (Number(count.rows[0]?.count || 0) <= 1) return false;
-      await pool.query('DELETE FROM personal_ai_agents WHERE id = $1 AND owner_id = $2', [
-        agentId,
-        userId,
-      ]);
+      await pool.query(
+        'DELETE FROM personal_ai_agents WHERE id = $1 AND owner_id = $2',
+        [agentId, userId],
+      );
       return true;
     }
   }
 
   const state = await readFileState();
-  if (state.agents.filter(agent => agent.owner_id === userId).length <= 1) return false;
+  if (state.agents.filter(agent => agent.owner_id === userId).length <= 1)
+    return false;
   state.agents = state.agents.filter(
     agent => !(agent.id === agentId && agent.owner_id === userId),
   );
   state.threads = state.threads.filter(thread => thread.agent_id !== agentId);
-  state.messages = state.messages.filter(message => message.agent_id !== agentId);
+  state.messages = state.messages.filter(
+    message => message.agent_id !== agentId,
+  );
   state.memories = state.memories.filter(memory => memory.agent_id !== agentId);
   await writeFileState(state);
   return true;
@@ -712,7 +756,10 @@ export async function listPersonalAiThreads(userId: string, agentId?: string) {
 
   const state = await readFileState();
   return state.threads
-    .filter(thread => thread.owner_id === userId && (!agentId || thread.agent_id === agentId))
+    .filter(
+      thread =>
+        thread.owner_id === userId && (!agentId || thread.agent_id === agentId),
+    )
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .slice(0, 80);
 }
@@ -755,7 +802,14 @@ export async function createPersonalAiThread(
       await pool.query(
         `INSERT INTO personal_ai_threads (id, agent_id, owner_id, title, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [thread.id, thread.agent_id, thread.owner_id, thread.title, thread.created_at, thread.updated_at],
+        [
+          thread.id,
+          thread.agent_id,
+          thread.owner_id,
+          thread.title,
+          thread.created_at,
+          thread.updated_at,
+        ],
       );
       return thread;
     }
@@ -771,14 +825,19 @@ export async function createPersonalAiThread(
         .map(item => item.id),
     );
     state.threads = state.threads.filter(item => !removeIds.has(item.id));
-    state.messages = state.messages.filter(item => !removeIds.has(item.thread_id));
+    state.messages = state.messages.filter(
+      item => !removeIds.has(item.thread_id),
+    );
   }
   state.threads.push(thread);
   await writeFileState(state);
   return thread;
 }
 
-export async function getPersonalAiThreadWithMessages(userId: string, threadId: string) {
+export async function getPersonalAiThreadWithMessages(
+  userId: string,
+  threadId: string,
+) {
   const mode = await getStorageMode();
   if (mode === 'postgres') {
     const pool = await ensureSchema();
@@ -800,7 +859,9 @@ export async function getPersonalAiThreadWithMessages(userId: string, threadId: 
   }
 
   const state = await readFileState();
-  const thread = state.threads.find(item => item.id === threadId && item.owner_id === userId);
+  const thread = state.threads.find(
+    item => item.id === threadId && item.owner_id === userId,
+  );
   if (!thread) return null;
   return {
     thread,
@@ -810,7 +871,11 @@ export async function getPersonalAiThreadWithMessages(userId: string, threadId: 
   };
 }
 
-export async function renamePersonalAiThread(userId: string, threadId: string, title: string) {
+export async function renamePersonalAiThread(
+  userId: string,
+  threadId: string,
+  title: string,
+) {
   const cleanTitle = cleanText(title, 90) || 'Chat baru';
   const at = nowIso();
   const mode = await getStorageMode();
@@ -844,10 +909,10 @@ export async function deletePersonalAiThread(userId: string, threadId: string) {
   if (mode === 'postgres') {
     const pool = await ensureSchema();
     if (pool) {
-      await pool.query('DELETE FROM personal_ai_threads WHERE id = $1 AND owner_id = $2', [
-        threadId,
-        userId,
-      ]);
+      await pool.query(
+        'DELETE FROM personal_ai_threads WHERE id = $1 AND owner_id = $2',
+        [threadId, userId],
+      );
       return true;
     }
   }
@@ -946,11 +1011,19 @@ export async function appendPersonalAiMessages(input: {
   const state = await readFileState();
   state.messages.push(userMessage, assistantMessage);
   state.messages = state.messages.filter((message, _, all) => {
-    if (message.thread_id !== input.threadId || message.owner_id !== input.userId) return true;
+    if (
+      message.thread_id !== input.threadId ||
+      message.owner_id !== input.userId
+    )
+      return true;
     const threadMessages = all.filter(
-      item => item.thread_id === input.threadId && item.owner_id === input.userId,
+      item =>
+        item.thread_id === input.threadId && item.owner_id === input.userId,
     );
-    return threadMessages.indexOf(message) >= threadMessages.length - MAX_MESSAGES_PER_THREAD;
+    return (
+      threadMessages.indexOf(message) >=
+      threadMessages.length - MAX_MESSAGES_PER_THREAD
+    );
   });
   state.threads = state.threads.map(thread =>
     thread.id === input.threadId && thread.owner_id === input.userId
@@ -964,6 +1037,224 @@ export async function appendPersonalAiMessages(input: {
   );
   await writeFileState(state);
   return { userMessage, assistantMessage };
+}
+
+export async function setPersonalAiMessageReaction(input: {
+  userId: string;
+  messageId: string;
+  reaction: string;
+}) {
+  const reaction = cleanText(input.reaction, 12);
+  const mode = await getStorageMode();
+  if (mode === 'postgres') {
+    const pool = await ensureSchema();
+    if (pool) {
+      const result = await pool.query(
+        `UPDATE personal_ai_messages
+         SET metadata = CASE
+           WHEN $3 = '' THEN COALESCE(metadata, '{}'::jsonb) - 'user_reaction'
+           ELSE jsonb_set(
+             COALESCE(metadata, '{}'::jsonb),
+             '{user_reaction}',
+             to_jsonb($3::text),
+             true
+           )
+         END
+         WHERE id = $1 AND owner_id = $2
+         RETURNING *`,
+        [input.messageId, input.userId, reaction],
+      );
+      return result.rows[0]
+        ? normalizeMessage(result.rows[0] as Record<string, unknown>)
+        : null;
+    }
+  }
+
+  const state = await readFileState();
+  let updated: PersonalAiMessage | null = null;
+  state.messages = state.messages.map(message => {
+    if (message.id !== input.messageId || message.owner_id !== input.userId) {
+      return message;
+    }
+    const metadata = { ...message.metadata };
+    if (reaction) metadata.user_reaction = reaction;
+    else delete metadata.user_reaction;
+    updated = { ...message, metadata };
+    return updated;
+  });
+  await writeFileState(state);
+  return updated;
+}
+
+function forwardedMessageMetadata(source: PersonalAiMessage) {
+  return {
+    ...(Array.isArray(source.metadata.media)
+      ? { media: source.metadata.media.slice(0, 10) }
+      : {}),
+    forwarded_from: {
+      message_id: source.id,
+      thread_id: source.thread_id,
+      role: source.role,
+    },
+  };
+}
+
+export async function forwardPersonalAiMessage(input: {
+  userId: string;
+  messageId: string;
+  targetThreadId: string;
+}) {
+  const mode = await getStorageMode();
+  if (mode === 'postgres') {
+    const pool = await ensureSchema();
+    if (pool) {
+      const sourceResult = await pool.query(
+        'SELECT * FROM personal_ai_messages WHERE id = $1 AND owner_id = $2 LIMIT 1',
+        [input.messageId, input.userId],
+      );
+      const targetResult = await pool.query(
+        'SELECT * FROM personal_ai_threads WHERE id = $1 AND owner_id = $2 LIMIT 1',
+        [input.targetThreadId, input.userId],
+      );
+      if (!sourceResult.rows[0] || !targetResult.rows[0]) return null;
+
+      const source = normalizeMessage(sourceResult.rows[0]);
+      const target = normalizeThread(targetResult.rows[0]);
+      const message = normalizeMessage({
+        id: id('msg'),
+        thread_id: target.id,
+        agent_id: target.agent_id,
+        owner_id: input.userId,
+        role: 'user',
+        content: source.content,
+        metadata: forwardedMessageMetadata(source),
+        created_at: nowIso(),
+      });
+      await pool.query(
+        `INSERT INTO personal_ai_messages
+         (id, thread_id, agent_id, owner_id, role, content, metadata, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+        [
+          message.id,
+          message.thread_id,
+          message.agent_id,
+          message.owner_id,
+          message.role,
+          message.content,
+          JSON.stringify(message.metadata),
+          message.created_at,
+        ],
+      );
+      const updatedThreadResult = await pool.query(
+        `UPDATE personal_ai_threads
+         SET updated_at = NOW()
+         WHERE id = $1 AND owner_id = $2
+         RETURNING *`,
+        [target.id, input.userId],
+      );
+      await pool.query(
+        `DELETE FROM personal_ai_messages
+         WHERE id IN (
+           SELECT id FROM personal_ai_messages
+           WHERE thread_id = $1 AND owner_id = $2
+           ORDER BY created_at ASC
+           OFFSET $3
+         )`,
+        [target.id, input.userId, MAX_MESSAGES_PER_THREAD],
+      );
+      return {
+        message,
+        thread: updatedThreadResult.rows[0]
+          ? normalizeThread(updatedThreadResult.rows[0])
+          : target,
+      };
+    }
+  }
+
+  const state = await readFileState();
+  const source = state.messages.find(
+    message =>
+      message.id === input.messageId && message.owner_id === input.userId,
+  );
+  const target = state.threads.find(
+    thread =>
+      thread.id === input.targetThreadId && thread.owner_id === input.userId,
+  );
+  if (!source || !target) return null;
+  const message = normalizeMessage({
+    id: id('msg'),
+    thread_id: target.id,
+    agent_id: target.agent_id,
+    owner_id: input.userId,
+    role: 'user',
+    content: source.content,
+    metadata: forwardedMessageMetadata(source),
+    created_at: nowIso(),
+  });
+  state.messages.push(message);
+  const targetMessages = state.messages
+    .filter(
+      item => item.thread_id === target.id && item.owner_id === input.userId,
+    )
+    .sort((left, right) => left.created_at.localeCompare(right.created_at));
+  const removeIds = new Set(
+    targetMessages
+      .slice(0, Math.max(0, targetMessages.length - MAX_MESSAGES_PER_THREAD))
+      .map(item => item.id),
+  );
+  state.messages = state.messages.filter(item => !removeIds.has(item.id));
+  const updatedThread = { ...target, updated_at: nowIso() };
+  state.threads = state.threads.map(thread =>
+    thread.id === target.id ? updatedThread : thread,
+  );
+  await writeFileState(state);
+  return { message, thread: updatedThread };
+}
+
+export async function attachCreationDraftToPersonalAiMessage(input: {
+  userId: string;
+  messageId: string;
+  draft: Record<string, unknown>;
+}) {
+  const mode = await getStorageMode();
+  if (mode === 'postgres') {
+    const pool = await ensureSchema();
+    if (pool) {
+      const result = await pool.query(
+        `UPDATE personal_ai_messages
+         SET metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
+         WHERE id = $1 AND owner_id = $2 AND role = 'assistant'
+         RETURNING *`,
+        [
+          input.messageId,
+          input.userId,
+          JSON.stringify({ creation_draft: input.draft }),
+        ],
+      );
+      return result.rows[0]
+        ? normalizeMessage(result.rows[0] as Record<string, unknown>)
+        : null;
+    }
+  }
+
+  const state = await readFileState();
+  let updated: PersonalAiMessage | null = null;
+  state.messages = state.messages.map(message => {
+    if (
+      message.id !== input.messageId ||
+      message.owner_id !== input.userId ||
+      message.role !== 'assistant'
+    ) {
+      return message;
+    }
+    updated = {
+      ...message,
+      metadata: { ...message.metadata, creation_draft: input.draft },
+    };
+    return updated;
+  });
+  await writeFileState(state);
+  return updated;
 }
 
 export async function getPersonalAiMemory(agentId: string, userId: string) {
@@ -982,7 +1273,9 @@ export async function getPersonalAiMemory(agentId: string, userId: string) {
         owner_id: String(row.owner_id),
         summary: cleanText(row.summary, 1800),
         facts:
-          row.facts && typeof row.facts === 'object' && !Array.isArray(row.facts)
+          row.facts &&
+          typeof row.facts === 'object' &&
+          !Array.isArray(row.facts)
             ? (row.facts as PersonalAiMemory['facts'])
             : { topics: [], user_terms: [], last_messages: [] },
         updated_at: cleanText(row.updated_at, 40) || nowIso(),
@@ -991,14 +1284,24 @@ export async function getPersonalAiMemory(agentId: string, userId: string) {
   }
 
   const state = await readFileState();
-  return state.memories.find(item => item.agent_id === agentId && item.owner_id === userId) || null;
+  return (
+    state.memories.find(
+      item => item.agent_id === agentId && item.owner_id === userId,
+    ) || null
+  );
 }
 
 function extractKeywords(text: string) {
   return cleanText(text, 1200)
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
-    .filter(word => word.length >= 4 && !/^(yang|untuk|dengan|atau|saya|kamu|tolong|bantu|usaha|bisnis)$/i.test(word))
+    .filter(
+      word =>
+        word.length >= 4 &&
+        !/^(yang|untuk|dengan|atau|saya|kamu|tolong|bantu|usaha|bisnis)$/i.test(
+          word,
+        ),
+    )
     .slice(0, 12);
 }
 
@@ -1037,7 +1340,9 @@ export async function updatePersonalAiMemory(input: {
     6,
   );
   const summary = [
-    topics.length ? `Topik sering muncul: ${topics.slice(0, 8).join(', ')}.` : '',
+    topics.length
+      ? `Topik sering muncul: ${topics.slice(0, 8).join(', ')}.`
+      : '',
     lastMessages[0] ? `Kebutuhan terbaru user: ${lastMessages[0]}` : '',
   ]
     .filter(Boolean)
@@ -1065,7 +1370,12 @@ export async function updatePersonalAiMemory(input: {
          VALUES ($1,$2,$3,$4::jsonb,NOW())
          ON CONFLICT (agent_id, owner_id)
          DO UPDATE SET summary = EXCLUDED.summary, facts = EXCLUDED.facts, updated_at = NOW()`,
-        [memory.agent_id, memory.owner_id, memory.summary, JSON.stringify(memory.facts)],
+        [
+          memory.agent_id,
+          memory.owner_id,
+          memory.summary,
+          JSON.stringify(memory.facts),
+        ],
       );
       return memory;
     }
@@ -1073,7 +1383,8 @@ export async function updatePersonalAiMemory(input: {
 
   const state = await readFileState();
   state.memories = state.memories.filter(
-    item => !(item.agent_id === memory.agent_id && item.owner_id === memory.owner_id),
+    item =>
+      !(item.agent_id === memory.agent_id && item.owner_id === memory.owner_id),
   );
   state.memories.push(memory);
   await writeFileState(state);

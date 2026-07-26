@@ -1,8 +1,6 @@
 // Path: frontend/www/src/components/onboarding/NewUserGuide.tsx
 'use client';
 
-import { useMemo } from 'react';
-import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
@@ -22,18 +20,12 @@ const STEPS: Step[] = [
   },
   {
     title: 'Start your first deal',
-    desc: 'Post a listing or request and move to secure escrow.',
+    desc: 'Post a listing or request, compare responses, and keep the agreement documented.',
   },
 ];
 
 export default function NewUserGuide() {
   const { user } = useAuth();
-  const pathname = usePathname();
-
-  const locale = useMemo(() => {
-    const seg = pathname.split('/');
-    return seg[1] && seg[1].length === 2 ? seg[1] : 'id';
-  }, [pathname]);
 
   const primaryHref = user ? '/dashboard' : '/register';
   const secondaryHref = user ? '/profile' : '/login';

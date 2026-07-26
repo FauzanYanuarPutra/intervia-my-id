@@ -64,152 +64,8 @@
 }
 
 /* ==============================
-   Self-host WOFF2 Font Inter
+   Self-hosted variable font
    ============================== */
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-Thin.woff2') format('woff2');
-  font-weight: 100;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-ThinItalic.woff2') format('woff2');
-  font-weight: 100;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-ExtraLight.woff2') format('woff2');
-  font-weight: 200;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-ExtraLightItalic.woff2') format('woff2');
-  font-weight: 200;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-Light.woff2') format('woff2');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-LightItalic.woff2') format('woff2');
-  font-weight: 300;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-Italic.woff2') format('woff2');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-MediumItalic.woff2') format('woff2');
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-SemiBold.woff2') format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-SemiBoldItalic.woff2') format('woff2');
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-BoldItalic.woff2') format('woff2');
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-ExtraBold.woff2') format('woff2');
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-ExtraBoldItalic.woff2') format('woff2');
-  font-weight: 800;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-Black.woff2') format('woff2');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-4.1/web/Inter-BlackItalic.woff2') format('woff2');
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
-}
-
 @font-face {
   font-family: 'Inter Variable';
   src: url('/fonts/Inter-4.1/web/InterVariable.woff2') format('woff2');
@@ -231,7 +87,6 @@
 @tailwind utilities;
 
 @layer base {
-
   html,
   body {
     margin: 0;
@@ -255,7 +110,7 @@
 
   body {
     min-height: 100vh;
-    min-height: var(--app-viewport-height, 100svh);
+    min-height: var(--app-document-viewport-height, 100svh);
     overflow-x: hidden;
     overflow-y: auto;
     position: relative;
@@ -302,7 +157,6 @@
 }
 
 @media (hover: none) and (pointer: coarse) {
-
   button,
   [type='button'],
   [type='submit'],
@@ -315,8 +169,11 @@
   }
 
   @supports (-webkit-touch-callout: none) {
-
-    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']),
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='color']):not([type='button']):not([type='submit']):not(
+        [type='reset']
+      ),
     textarea,
     select {
       font-size: 16px !important;
@@ -377,7 +234,8 @@
 }
 
 html {
-  scrollbar-color: color-mix(in srgb, var(--color-text-soft) 60%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-text-soft) 60%, transparent)
+    transparent;
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -449,6 +307,114 @@ html {
   max-width: 100%;
 }
 
+.leaflet-location-picker-map {
+  isolation: isolate;
+  position: relative;
+  z-index: 0;
+}
+
+.leaflet-location-picker-map .leaflet-pane {
+  z-index: 1;
+}
+
+.leaflet-location-picker-map .leaflet-tile-pane {
+  z-index: 1;
+}
+
+.leaflet-location-picker-map .leaflet-overlay-pane {
+  z-index: 2;
+}
+
+.leaflet-location-picker-map .leaflet-shadow-pane {
+  z-index: 3;
+}
+
+.leaflet-location-picker-map .leaflet-marker-pane {
+  z-index: 4;
+}
+
+.leaflet-location-picker-map .leaflet-tooltip-pane,
+.leaflet-location-picker-map .leaflet-popup-pane,
+.leaflet-location-picker-map .leaflet-control-container,
+.leaflet-location-picker-map .leaflet-top,
+.leaflet-location-picker-map .leaflet-bottom {
+  z-index: 5;
+}
+
+.leaflet-content-location-map {
+  isolation: isolate;
+  position: relative;
+  z-index: 0;
+}
+
+.leaflet-content-location-map .leaflet-pane {
+  z-index: 1;
+}
+
+.leaflet-content-location-map .leaflet-tile-pane {
+  z-index: 1;
+}
+
+.leaflet-content-location-map .leaflet-overlay-pane {
+  z-index: 2;
+}
+
+.leaflet-content-location-map .leaflet-shadow-pane {
+  z-index: 3;
+}
+
+.leaflet-content-location-map .leaflet-marker-pane {
+  z-index: 4;
+}
+
+.leaflet-content-location-map .leaflet-tooltip-pane {
+  z-index: 5;
+}
+
+.leaflet-content-location-map .leaflet-popup-pane {
+  z-index: 6;
+}
+
+.leaflet-content-location-map .leaflet-control-container,
+.leaflet-content-location-map .leaflet-top,
+.leaflet-content-location-map .leaflet-bottom {
+  z-index: 7;
+}
+
+.leaflet-content-location-marker-host {
+  background: transparent;
+  border: 0;
+}
+
+.leaflet-content-location-map .leaflet-control-attribution {
+  border-top-right-radius: 10px;
+  max-width: calc(100% - 76px);
+  padding: 2px 7px;
+  color: rgb(71 85 105 / 0.86);
+  font-size: 10px;
+}
+
+.leaflet-content-location-map .leaflet-control-zoom {
+  overflow: hidden;
+  border: 1px solid rgb(226 232 240 / 0.92);
+  border-radius: 12px;
+  box-shadow: 0 12px 24px -20px rgb(15 23 42 / 0.42);
+}
+
+.leaflet-content-location-map .leaflet-control-zoom a {
+  border: 0;
+  color: #047857;
+}
+
+.leaflet-content-location-map .leaflet-popup-content-wrapper {
+  max-width: min(280px, calc(100vw - 48px));
+  border-radius: 14px;
+}
+
+.leaflet-content-location-map .leaflet-popup-content {
+  margin: 12px;
+}
+
 .umkm-store-map-popup .leaflet-popup-content-wrapper {
   max-width: min(320px, calc(100vw - 32px));
 }
@@ -490,7 +456,6 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   *,
   *::before,
   *::after {
@@ -514,7 +479,8 @@ html,
 body {
   scrollbar-gutter: auto;
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-text-soft) 38%, transparent)
+    transparent;
   -ms-overflow-style: auto;
 }
 
@@ -552,19 +518,21 @@ body::-webkit-scrollbar-thumb,
   background-color: transparent;
 }
 
-html.is-scrolling,
-html.is-scrolling body,
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-text-soft) 38%, transparent);
+}
+
 [data-auto-scrollbar].is-scrolling,
 .sidebar-scroll.is-scrolling,
 [data-auto-scrollbar]:hover,
 [data-auto-scrollbar]:focus-within,
 .sidebar-scroll:hover,
 .sidebar-scroll:focus-within {
-  scrollbar-color: color-mix(in srgb, var(--color-text-soft) 52%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-text-soft) 52%, transparent)
+    transparent;
 }
 
-html.is-scrolling::-webkit-scrollbar-thumb,
-html.is-scrolling body::-webkit-scrollbar-thumb,
 [data-auto-scrollbar].is-scrolling::-webkit-scrollbar-thumb,
 .sidebar-scroll.is-scrolling::-webkit-scrollbar-thumb,
 [data-auto-scrollbar]:hover::-webkit-scrollbar-thumb,
@@ -574,8 +542,6 @@ html.is-scrolling body::-webkit-scrollbar-thumb,
   background-color: color-mix(in srgb, var(--color-text-soft) 52%, transparent);
 }
 
-html.is-scrolling::-webkit-scrollbar-thumb:hover,
-html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 [data-auto-scrollbar].is-scrolling::-webkit-scrollbar-thumb:hover,
 .sidebar-scroll.is-scrolling::-webkit-scrollbar-thumb:hover,
 [data-auto-scrollbar]:hover::-webkit-scrollbar-thumb:hover,
@@ -595,43 +561,55 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 
 .dark .lajukan-home-compact {
   background:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       rgba(94, 226, 138, 0.14),
-      transparent 30%),
-    radial-gradient(circle at top right,
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at top right,
       rgba(52, 197, 106, 0.1),
-      transparent 26%),
+      transparent 26%
+    ),
     linear-gradient(180deg, #000000 0%, #050505 46%, #000000 100%) !important;
 }
 
 .dark .lajukan-home-compact [class*='bg-white'],
 .dark .lajukan-home-compact [class*='bg-slate-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-surface-strong) 92%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-strong) 92%,
+    transparent
+  ) !important;
 }
 
 .dark .lajukan-home-compact [class*='bg-emerald-50'],
 .dark .lajukan-home-compact [class*='bg-emerald-100'] {
-  background-color: color-mix(in srgb,
-      var(--app-accent) 16%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-accent) 16%,
+    transparent
+  ) !important;
 }
 
 .dark .lajukan-home-compact [class*='bg-rose-50'],
 .dark .lajukan-home-compact [class*='bg-amber-50'],
 .dark .lajukan-home-compact [class*='bg-blue-50'],
 .dark .lajukan-home-compact [class*='bg-violet-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-surface) 84%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface) 84%,
+    transparent
+  ) !important;
 }
 
 .dark .lajukan-home-compact [class*='bg-[linear-gradient'] {
-  background: linear-gradient(145deg,
-      color-mix(in srgb, var(--app-surface-strong) 96%, transparent) 0%,
-      color-mix(in srgb, var(--app-surface) 96%, transparent) 58%,
-      color-mix(in srgb, var(--app-accent) 13%, var(--app-surface-strong)) 100%) !important;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--app-surface-strong) 96%, transparent) 0%,
+    color-mix(in srgb, var(--app-surface) 96%, transparent) 58%,
+    color-mix(in srgb, var(--app-accent) 13%, var(--app-surface-strong)) 100%
+  ) !important;
 }
 
 .dark .lajukan-home-compact [class*='bg-[radial-gradient'] {
@@ -640,10 +618,14 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
     color-mix(in srgb, var(--app-surface-strong) 92%, transparent) !important;
 }
 
-.dark .lajukan-home-compact [class*='bg-[linear-gradient'][class*='var(--app-accent)'] {
-  background: linear-gradient(135deg,
-      var(--app-accent),
-      var(--app-accent-strong)) !important;
+.dark
+  .lajukan-home-compact
+  [class*='bg-[linear-gradient'][class*='var(--app-accent)'] {
+  background: linear-gradient(
+    135deg,
+    var(--app-accent),
+    var(--app-accent-strong)
+  ) !important;
 }
 
 .dark .lajukan-home-compact [class*='text-slate-'] {
@@ -661,6 +643,94 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 
 .dark .lajukan-home-compact img {
   filter: saturate(0.96) brightness(0.92);
+}
+
+[data-app-viewport-shell],
+.lajukan-visual-viewport-shell {
+  --app-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+  height: var(--app-visual-viewport-height, var(--app-viewport-height, 100svh));
+  max-height: var(
+    --app-visual-viewport-height,
+    var(--app-viewport-height, 100svh)
+  );
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+}
+
+html[data-keyboard-open='true'] [data-app-viewport-shell],
+html[data-keyboard-open='true'] .lajukan-visual-viewport-shell {
+  --app-shell-safe-bottom: 0px;
+}
+
+@media (max-width: 1023.98px) {
+  [data-app-viewport-shell],
+  .lajukan-visual-viewport-shell {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--app-viewport-offset-top, 0px);
+    bottom: auto;
+    height: var(
+      --app-visual-viewport-height,
+      var(--app-viewport-height, 100svh)
+    );
+    max-height: var(
+      --app-visual-viewport-height,
+      var(--app-viewport-height, 100svh)
+    );
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+}
+
+.lajukan-chat-composer {
+  --chat-composer-bottom-pad: max(
+    0.5rem,
+    var(--app-shell-safe-bottom, env(safe-area-inset-bottom))
+  );
+}
+
+html[data-keyboard-open='true'] .lajukan-chat-composer {
+  --chat-composer-bottom-pad: 0.375rem;
+}
+
+.ui-layer-modal.fixed,
+.ui-layer-modal-backdrop.fixed {
+  top: var(--app-viewport-offset-top, 0px);
+  bottom: auto;
+  height: var(--app-visual-viewport-height, var(--app-viewport-height, 100svh));
+  max-height: var(
+    --app-visual-viewport-height,
+    var(--app-viewport-height, 100svh)
+  );
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.ui-layer-modal {
+  --app-modal-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html[data-keyboard-open='true'] .ui-layer-modal {
+  --app-modal-safe-bottom: 0px;
+}
+
+.app-document-min-screen {
+  min-height: 100vh;
+  min-height: var(--app-document-viewport-height, 100svh);
+}
+
+.app-visual-viewport-height {
+  height: var(--app-visual-viewport-height, var(--app-viewport-height, 100svh));
+  max-height: var(
+    --app-visual-viewport-height,
+    var(--app-viewport-height, 100svh)
+  );
 }
 
 .lajukan-home-right-rail,
@@ -682,7 +752,7 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   min-width: 0;
 }
 
-.lajukan-home-right-rail-scroll>* {
+.lajukan-home-right-rail-scroll > * {
   flex-shrink: 0;
   width: 100%;
   max-width: 100%;
@@ -763,8 +833,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
     padding: 0.65rem !important;
   }
 
-  .lajukan-home-pulse-list> :not([hidden])~ :not([hidden]),
-  .lajukan-home-pulse-benefits> :not([hidden])~ :not([hidden]) {
+  .lajukan-home-pulse-list > :not([hidden]) ~ :not([hidden]),
+  .lajukan-home-pulse-benefits > :not([hidden]) ~ :not([hidden]) {
     margin-top: 0.45rem !important;
   }
 
@@ -788,7 +858,7 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
     line-height: 1.3 !important;
   }
 
-  .lajukan-home-pulse-benefit>span {
+  .lajukan-home-pulse-benefit > span {
     height: 1rem !important;
     width: 1rem !important;
   }
@@ -878,7 +948,6 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 }
 
 @media (min-width: 1024px) {
-
   .lajukan-route-surface:has(> .lajukan-home-compact),
   .lajukan-route-surface:has(> .lajukan-home-loading) {
     height: var(--app-viewport-height, 100svh);
@@ -1017,24 +1086,32 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   padding: 0;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       rgba(18, 138, 69, 0.09),
-      transparent 28%),
-    radial-gradient(circle at top right,
-      rgba(255, 122, 26, 0.07),
-      transparent 24%),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(15, 118, 110, 0.055),
+      transparent 24%
+    ),
     var(--app-surface-muted);
   color: var(--app-text);
 }
 
 .dark .app-cohesive-theme {
   background:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       rgba(94, 226, 138, 0.07),
-      transparent 28%),
-    radial-gradient(circle at top right,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
       rgba(52, 197, 106, 0.04),
-      transparent 24%),
+      transparent 24%
+    ),
     linear-gradient(180deg, #000000 0%, #090909 48%, #000000 100%);
   color: var(--app-text);
 }
@@ -1043,23 +1120,33 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   --route-accent: var(--app-accent);
   --route-accent-2: var(--app-brand-info);
   --route-accent-soft: color-mix(in srgb, var(--route-accent) 12%, transparent);
-  --route-accent-border: color-mix(in srgb,
-      var(--route-accent) 24%,
-      transparent);
-  --route-panel-bg: linear-gradient(135deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, white 2%) 0%,
-      color-mix(in srgb, var(--route-accent) 3%, var(--app-surface-strong)) 62%,
-      color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-strong)) 100%);
-  --route-panel-muted-bg: linear-gradient(135deg,
-      color-mix(in srgb, var(--app-surface-muted) 98%, white 2%) 0%,
-      color-mix(in srgb, var(--route-accent) 4%, var(--app-surface-muted)) 68%,
-      color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-muted)) 100%);
-  --route-panel-border: color-mix(in srgb,
-      var(--route-accent) 16%,
-      var(--app-border));
-  --route-panel-border-strong: color-mix(in srgb,
-      var(--route-accent) 24%,
-      var(--app-border-strong));
+  --route-accent-border: color-mix(
+    in srgb,
+    var(--route-accent) 24%,
+    transparent
+  );
+  --route-panel-bg: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, white 2%) 0%,
+    color-mix(in srgb, var(--route-accent) 3%, var(--app-surface-strong)) 62%,
+    color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-strong)) 100%
+  );
+  --route-panel-muted-bg: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--app-surface-muted) 98%, white 2%) 0%,
+    color-mix(in srgb, var(--route-accent) 4%, var(--app-surface-muted)) 68%,
+    color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-muted)) 100%
+  );
+  --route-panel-border: color-mix(
+    in srgb,
+    var(--route-accent) 16%,
+    var(--app-border)
+  );
+  --route-panel-border-strong: color-mix(
+    in srgb,
+    var(--route-accent) 24%,
+    var(--app-border-strong)
+  );
   --route-panel-shadow: 0 14px 28px -28px rgba(15, 23, 42, 0.24);
   --route-panel-radius: 20px;
   width: 100%;
@@ -1068,33 +1155,45 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   min-height: var(--app-viewport-height, 100svh);
   overflow-x: hidden;
   background:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       color-mix(in srgb, var(--route-accent) 6%, transparent),
-      transparent 28%),
-    radial-gradient(circle at top right,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
       color-mix(in srgb, var(--route-accent-2) 5%, transparent),
-      transparent 24%),
+      transparent 24%
+    ),
     var(--app-surface-muted);
   color: var(--app-text);
   isolation: isolate;
 }
 
 .dark .lajukan-route-surface {
-  --route-panel-bg: linear-gradient(135deg,
-      color-mix(in srgb, var(--app-surface-strong) 94%, black 6%) 0%,
-      color-mix(in srgb, var(--route-accent) 5%, var(--app-surface-strong)) 62%,
-      color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-strong)) 100%);
-  --route-panel-muted-bg: linear-gradient(135deg,
-      color-mix(in srgb, var(--app-surface-muted) 92%, black 8%) 0%,
-      color-mix(in srgb, var(--route-accent) 5%, var(--app-surface-muted)) 68%,
-      color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-muted)) 100%);
+  --route-panel-bg: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--app-surface-strong) 94%, black 6%) 0%,
+    color-mix(in srgb, var(--route-accent) 5%, var(--app-surface-strong)) 62%,
+    color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-strong)) 100%
+  );
+  --route-panel-muted-bg: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--app-surface-muted) 92%, black 8%) 0%,
+    color-mix(in srgb, var(--route-accent) 5%, var(--app-surface-muted)) 68%,
+    color-mix(in srgb, var(--route-accent-2) 4%, var(--app-surface-muted)) 100%
+  );
   background:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       color-mix(in srgb, var(--route-accent) 5%, transparent),
-      transparent 28%),
-    radial-gradient(circle at top right,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
       color-mix(in srgb, var(--route-accent-2) 4%, transparent),
-      transparent 24%),
+      transparent 24%
+    ),
     linear-gradient(180deg, #000000 0%, #090909 48%, #000000 100%);
 }
 
@@ -1112,7 +1211,11 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   --route-accent-2: var(--app-brand-info);
 }
 
-.lajukan-route-surface[data-route-intent='create'],
+.lajukan-route-surface[data-route-intent='create'] {
+  --route-accent: var(--app-accent);
+  --route-accent-2: var(--app-brand-info);
+}
+
 .lajukan-route-surface[data-route-intent='activity'],
 .lajukan-route-surface[data-route-intent='auth'] {
   --route-accent: var(--app-brand-action-strong);
@@ -1125,8 +1228,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 }
 
 .lajukan-route-surface[data-route-intent='notifications'] {
-  --route-accent: var(--app-brand-social);
-  --route-accent-2: var(--app-warning);
+  --route-accent: var(--app-accent);
+  --route-accent-2: var(--app-brand-info);
 }
 
 .lajukan-route-surface[data-route-intent='dashboard'] {
@@ -1150,8 +1253,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 }
 
 .lajukan-route-surface[data-route-intent='settings'] {
-  --route-accent: var(--app-brand-info);
-  --route-accent-2: var(--app-accent);
+  --route-accent: var(--app-accent);
+  --route-accent-2: var(--app-brand-info);
 }
 
 .lajukan-route-surface[data-route-intent='trust'] {
@@ -1164,285 +1267,496 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   background: transparent;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']) {
   font-size: 0.875rem;
   text-wrap: pretty;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(h1,
-  [class*='text-7xl'],
-  [class*='text-6xl'],
-  [class*='text-5xl'],
-  [class*='text-4xl'],
-  [class*='text-3xl'],
-  [class*='text-2xl']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    h1,
+    [class*='text-7xl'],
+    [class*='text-6xl'],
+    [class*='text-5xl'],
+    [class*='text-4xl'],
+    [class*='text-3xl'],
+    [class*='text-2xl']
+  ) {
   font-size: clamp(1.18rem, 1.55vw, 1.6rem) !important;
   line-height: 1.12 !important;
   letter-spacing: -0.025em !important;
   text-wrap: balance;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(h2, [class*='text-xl']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(h2, [class*='text-xl']) {
   font-size: clamp(1rem, 1.08vw, 1.18rem) !important;
   line-height: 1.2 !important;
   letter-spacing: -0.018em !important;
   text-wrap: balance;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(h3, [class*='text-lg']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(h3, [class*='text-lg']) {
   font-size: clamp(0.9rem, 0.98vw, 1.02rem) !important;
   line-height: 1.25 !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(p, li, label, input, textarea, select, button, a) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(p, li, label, input, textarea, select, button, a) {
   line-height: 1.45;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.container,
-  [class*='max-w-7xl'],
-  [class*='max-w-6xl'],
-  [class*='max-w-5xl']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .container,
+    [class*='max-w-7xl'],
+    [class*='max-w-6xl'],
+    [class*='max-w-5xl']
+  ) {
   width: min(100%, 1180px);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section, article, aside, nav, form)[class*='bg-white'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section, article, aside, nav, form)[class*='bg-slate-50'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section,
-  article,
-  aside,
-  nav,
-  form)[class*='bg-[color:var(--app-surface'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(div)[class*='rounded'][class*='border'][class*='bg-white'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(div)[class*='rounded'][class*='border'][class*='bg-[color:var(--app-surface'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(div)[class*='rounded-3xl'][class*='shadow'][class*='bg-white'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(div)[class*='rounded-[32px]'][class*='shadow'][class*='bg-white'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(div)[class*='rounded-[28px]'][class*='shadow'][class*='bg-white'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(section, article, aside, nav, form)[class*='bg-white'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(section, article, aside, nav, form)[class*='bg-slate-50'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    section,
+    article,
+    aside,
+    nav,
+    form
+  )[class*='bg-[color:var(--app-surface'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(div)[class*='rounded'][class*='border'][class*='bg-white'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    div
+  )[class*='rounded'][class*='border'][class*='bg-[color:var(--app-surface'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(div)[class*='rounded-3xl'][class*='shadow'][class*='bg-white'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(div)[class*='rounded-[32px]'][class*='shadow'][class*='bg-white'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(div)[class*='rounded-[28px]'][class*='shadow'][class*='bg-white'] {
   border-color: var(--route-panel-border) !important;
   background: var(--route-panel-bg) !important;
   box-shadow: var(--route-panel-shadow);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section, article, aside, nav, form)[class*='border'][class*='bg-'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel,
-  .ui-panel-strong,
-  .ui-sheet,
-  .ui-hero-panel,
-  .ui-feed-section,
-  .ui-page-section,
-  .ui-section-shell-content) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(section, article, aside, nav, form)[class*='border'][class*='bg-'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-panel,
+    .ui-panel-strong,
+    .ui-sheet,
+    .ui-hero-panel,
+    .ui-feed-section,
+    .ui-page-section,
+    .ui-section-shell-content
+  ) {
   border-color: var(--route-panel-border) !important;
   background: var(--route-panel-bg) !important;
   box-shadow: var(--route-panel-shadow);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel-muted,
-  .ui-card-hover,
-  .ui-feed-tile,
-  .ui-feed-row,
-  .ui-data-card,
-  .ui-stat-card) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-panel-muted,
+    .ui-card-hover,
+    .ui-feed-tile,
+    .ui-feed-row,
+    .ui-data-card,
+    .ui-stat-card
+  ) {
   border-color: var(--route-panel-border) !important;
   background: var(--route-panel-muted-bg) !important;
 }
 
-.dark .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section, article, aside, nav, form)[class*='border'][class*='bg-'],
-.dark .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel,
-  .ui-panel-strong,
-  .ui-sheet,
-  .ui-hero-panel,
-  .ui-feed-section,
-  .ui-page-section,
-  .ui-section-shell-content) {
+.dark
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(section, article, aside, nav, form)[class*='border'][class*='bg-'],
+.dark
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-panel,
+    .ui-panel-strong,
+    .ui-sheet,
+    .ui-hero-panel,
+    .ui-feed-section,
+    .ui-page-section,
+    .ui-section-shell-content
+  ) {
   border-color: var(--route-panel-border-strong) !important;
   background: var(--route-panel-bg) !important;
   box-shadow: var(--route-panel-shadow);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel .ui-panel,
-  .ui-panel .ui-panel-muted,
-  .ui-panel .ui-card-hover,
-  .ui-sheet .ui-panel,
-  .ui-sheet .ui-panel-muted,
-  .ui-feed-section .ui-panel,
-  .ui-feed-section .ui-panel-muted,
-  section[class*='border'] section[class*='border'],
-  section[class*='border'] article[class*='border'],
-  article[class*='border'] article[class*='border'],
-  div[class*='rounded'][class*='border'] div[class*='rounded'][class*='border']) {
-  border-color: color-mix(in srgb,
-      var(--route-accent) 10%,
-      var(--app-border)) !important;
-  background: color-mix(in srgb,
-      var(--app-surface-strong) 92%,
-      transparent) !important;
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-panel .ui-panel,
+    .ui-panel .ui-panel-muted,
+    .ui-panel .ui-card-hover,
+    .ui-sheet .ui-panel,
+    .ui-sheet .ui-panel-muted,
+    .ui-feed-section .ui-panel,
+    .ui-feed-section .ui-panel-muted,
+    section[class*='border'] section[class*='border'],
+    section[class*='border'] article[class*='border'],
+    article[class*='border'] article[class*='border'],
+    div[class*='rounded'][class*='border']
+      div[class*='rounded'][class*='border']
+  ) {
+  border-color: color-mix(
+    in srgb,
+    var(--route-accent) 10%,
+    var(--app-border)
+  ) !important;
+  background: color-mix(
+    in srgb,
+    var(--app-surface-strong) 92%,
+    transparent
+  ) !important;
   box-shadow: none !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='shadow-2xl'],
-  [class*='shadow-xl'],
-  [class*='shadow-lg'],
-  [class*='shadow-[']):not(.ui-layer-drawer):not(.ui-layer-modal):not(.ui-layer-popover) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='shadow-2xl'],
+    [class*='shadow-xl'],
+    [class*='shadow-lg'],
+    [class*='shadow-[']
+  ):not(.ui-layer-drawer):not(.ui-layer-modal):not(.ui-layer-popover) {
   box-shadow: var(--route-panel-shadow) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']):not([data-route-intent='trust']) :where(.ui-page-copy,
-  .ui-page-link-card p:not(:first-child),
-  .ui-feed-tile p[class*='text-[color:var(--app-text-soft)]'],
-  .ui-feed-row p[class*='text-[color:var(--app-text-soft)]'],
-  section[class*='border'] p[class*='text-[color:var(--app-text-soft)]'],
-  article[class*='border'] p[class*='text-[color:var(--app-text-soft)]'],
-  div[class*='rounded'][class*='border'] p[class*='text-[color:var(--app-text-soft)]']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']):not([data-route-intent='trust'])
+  :where(
+    .ui-page-copy,
+    .ui-page-link-card p:not(:first-child),
+    .ui-feed-tile p[class*='text-[color:var(--app-text-soft)]'],
+    .ui-feed-row p[class*='text-[color:var(--app-text-soft)]'],
+    section[class*='border'] p[class*='text-[color:var(--app-text-soft)]'],
+    article[class*='border'] p[class*='text-[color:var(--app-text-soft)]'],
+    div[class*='rounded'][class*='border']
+      p[class*='text-[color:var(--app-text-soft)]']
+  ) {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='rounded-full'][class*='border'],
-  [class*='rounded-full'][class*='bg-']):not(input):not(textarea):not(select):not(.ui-layer-drawer *) {
-  min-height: 24px;
-  padding-block: 0.2rem;
-  padding-inline: 0.5rem;
-  font-size: 10px;
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='rounded-full'][class*='border'],
+    [class*='rounded-full'][class*='bg-']
+  ):not(input):not(textarea):not(select):not(.ui-layer-drawer *):not(
+    [data-lajukan-mobile-nav] *
+  ):not(:has(img)) {
   line-height: 1.15;
   box-shadow: none !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='min-h-[74px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='min-h-[96px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='min-h-[106px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='min-h-[124px]'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='min-h-[74px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='min-h-[96px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='min-h-[106px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='min-h-[124px]'] {
   min-height: clamp(4.25rem, 7vw, 5.25rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section,
-  article,
-  aside,
-  nav,
-  form,
-  header,
-  main)[class*='rounded-[40px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section,
-  article,
-  aside,
-  nav,
-  form,
-  header,
-  main)[class*='rounded-[36px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section,
-  article,
-  aside,
-  nav,
-  form,
-  header,
-  main)[class*='rounded-[32px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section,
-  article,
-  aside,
-  nav,
-  form,
-  header,
-  main)[class*='rounded-[30px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section,
-  article,
-  aside,
-  nav,
-  form,
-  header,
-  main)[class*='rounded-[28px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section,
-  article,
-  aside,
-  nav,
-  form,
-  header,
-  main)[class*='rounded-3xl'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    section,
+    article,
+    aside,
+    nav,
+    form,
+    header,
+    main
+  )[class*='rounded-[40px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    section,
+    article,
+    aside,
+    nav,
+    form,
+    header,
+    main
+  )[class*='rounded-[36px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    section,
+    article,
+    aside,
+    nav,
+    form,
+    header,
+    main
+  )[class*='rounded-[32px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    section,
+    article,
+    aside,
+    nav,
+    form,
+    header,
+    main
+  )[class*='rounded-[30px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    section,
+    article,
+    aside,
+    nav,
+    form,
+    header,
+    main
+  )[class*='rounded-[28px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    section,
+    article,
+    aside,
+    nav,
+    form,
+    header,
+    main
+  )[class*='rounded-3xl'] {
   border-radius: var(--route-panel-radius) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='rounded-[24px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='rounded-[22px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='rounded-[20px]'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='rounded-2xl'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='rounded-[24px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='rounded-[22px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='rounded-[20px]'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='rounded-2xl'] {
   border-radius: 14px !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='bg-emerald-'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='bg-green-'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'])[class*='bg-[linear-gradient'] {
-  border-color: color-mix(in srgb,
-      var(--route-accent) 46%,
-      transparent) !important;
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='bg-emerald-'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='bg-green-'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'])[class*='bg-[linear-gradient'] {
+  border-color: color-mix(
+    in srgb,
+    var(--route-accent) 46%,
+    transparent
+  ) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='py-24'],
-  [class*='py-20'],
-  [class*='py-16'],
-  [class*='py-14'],
-  [class*='py-12']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='py-24'],
+    [class*='py-20'],
+    [class*='py-16'],
+    [class*='py-14'],
+    [class*='py-12']
+  ) {
   padding-top: clamp(1rem, 2vw, 1.75rem) !important;
   padding-bottom: clamp(1rem, 2vw, 1.75rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section, article, aside, nav, form)[class~='p-8'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section, article, aside, nav, form)[class~='p-7'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(section, article, aside, nav, form)[class~='p-6'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(section, article, aside, nav, form)[class~='p-8'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(section, article, aside, nav, form)[class~='p-7'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(section, article, aside, nav, form)[class~='p-6'] {
   padding: clamp(0.875rem, 1.45vw, 1.25rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(input:not([type='checkbox']):not([type='radio']):not([type='range']),
-  textarea,
-  select) {
-  border: 1px solid color-mix(in srgb, var(--app-text) 20%, var(--app-border-strong)) !important;
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select
+  ) {
+  border: 1px solid
+    color-mix(in srgb, var(--app-text) 20%, var(--app-border-strong)) !important;
   border-radius: 14px !important;
-  background-color: color-mix(in srgb,
-      var(--app-surface-strong) 92%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-strong) 92%,
+    transparent
+  ) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     0 1px 0 rgba(15, 23, 42, 0.04) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(input:not([type='checkbox']):not([type='radio']):not([type='range']),
-  textarea,
-  select):hover {
-  border-color: color-mix(in srgb,
-      var(--app-text) 30%,
-      var(--app-border-strong)) !important;
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select
+  ):hover {
+  border-color: color-mix(
+    in srgb,
+    var(--app-text) 30%,
+    var(--app-border-strong)
+  ) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(input:not([type='checkbox']):not([type='radio']):not([type='range']),
-  textarea,
-  select):focus {
-  border-color: color-mix(in srgb,
-      var(--route-accent) 72%,
-      var(--app-border-strong)) !important;
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select
+  ):focus {
+  border-color: color-mix(
+    in srgb,
+    var(--route-accent) 72%,
+    var(--app-border-strong)
+  ) !important;
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--route-accent) 52%, transparent),
     0 0 0 3px color-mix(in srgb, var(--route-accent) 14%, transparent) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-data-control, .ui-control, .ui-form-control) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-data-control, .ui-control, .ui-form-control) {
   border-width: 1.5px !important;
-  border-color: color-mix(in srgb,
-      var(--app-text) 22%,
-      var(--app-border-strong)) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--app-text) 22%,
+    var(--app-border-strong)
+  ) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-data-control[data-filled='true']) {
-  border-color: color-mix(in srgb,
-      var(--route-accent) 52%,
-      var(--app-border-strong)) !important;
-  background-color: color-mix(in srgb,
-      var(--route-accent) 7%,
-      var(--app-surface-strong)) !important;
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-data-control[data-filled='true']) {
+  border-color: color-mix(
+    in srgb,
+    var(--route-accent) 52%,
+    var(--app-border-strong)
+  ) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--route-accent) 7%,
+    var(--app-surface-strong)
+  ) !important;
 }
 
 .app-cohesive-theme :is(input, textarea, select) {
   border-color: var(--app-border);
-  background-color: color-mix(in srgb,
-      var(--app-surface-strong) 94%,
-      transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-strong) 94%,
+    transparent
+  );
   color: var(--app-text);
 }
 
@@ -1505,9 +1819,11 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .app-cohesive-theme [class*='border-green-'],
 .app-cohesive-theme [class*='border-teal-'],
 .app-cohesive-theme [class*='border-lime-'] {
-  border-color: color-mix(in srgb,
-      var(--app-accent) 26%,
-      transparent) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--app-accent) 26%,
+    transparent
+  ) !important;
 }
 
 .app-cohesive-theme [class*='text-emerald-'],
@@ -1520,7 +1836,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .app-cohesive-theme [class*='from-green-'],
 .app-cohesive-theme [class*='from-teal-'] {
   --tw-gradient-from: var(--app-accent) var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: color-mix(in srgb, var(--app-accent) 0%, transparent) var(--tw-gradient-to-position) !important;
+  --tw-gradient-to: color-mix(in srgb, var(--app-accent) 0%, transparent)
+    var(--tw-gradient-to-position) !important;
   --tw-gradient-stops:
     var(--tw-gradient-from), var(--tw-gradient-to) !important;
 }
@@ -1555,12 +1872,16 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .app-cohesive-theme [class*='ring-violet-'],
 .app-cohesive-theme [class*='ring-purple-'],
 .app-cohesive-theme [class*='ring-fuchsia-'] {
-  border-color: color-mix(in srgb,
-      var(--app-accent) 28%,
-      transparent) !important;
-  --tw-ring-color: color-mix(in srgb,
-      var(--app-accent) 28%,
-      transparent) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--app-accent) 28%,
+    transparent
+  ) !important;
+  --tw-ring-color: color-mix(
+    in srgb,
+    var(--app-accent) 28%,
+    transparent
+  ) !important;
 }
 
 .app-cohesive-theme [class*='text-blue-'],
@@ -1581,7 +1902,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .app-cohesive-theme [class*='from-purple-'],
 .app-cohesive-theme [class*='from-fuchsia-'] {
   --tw-gradient-from: var(--app-accent) var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: color-mix(in srgb, var(--app-accent) 0%, transparent) var(--tw-gradient-to-position) !important;
+  --tw-gradient-to: color-mix(in srgb, var(--app-accent) 0%, transparent)
+    var(--tw-gradient-to-position) !important;
   --tw-gradient-stops:
     var(--tw-gradient-from), var(--tw-gradient-to) !important;
 }
@@ -1593,9 +1915,12 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .app-cohesive-theme [class*='via-violet-'],
 .app-cohesive-theme [class*='via-purple-'],
 .app-cohesive-theme [class*='via-fuchsia-'] {
-  --tw-gradient-via: color-mix(in srgb,
+  --tw-gradient-via: color-mix(
+      in srgb,
       var(--app-accent) 10%,
-      var(--app-surface-strong)) var(--tw-gradient-via-position) !important;
+      var(--app-surface-strong)
+    )
+    var(--tw-gradient-via-position) !important;
 }
 
 .app-cohesive-theme [class*='to-blue-'],
@@ -1605,9 +1930,12 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .app-cohesive-theme [class*='to-violet-'],
 .app-cohesive-theme [class*='to-purple-'],
 .app-cohesive-theme [class*='to-fuchsia-'] {
-  --tw-gradient-to: color-mix(in srgb,
+  --tw-gradient-to: color-mix(
+      in srgb,
       var(--app-accent) 15%,
-      var(--app-surface-strong)) var(--tw-gradient-to-position) !important;
+      var(--app-surface-strong)
+    )
+    var(--tw-gradient-to-position) !important;
 }
 
 .dark .app-cohesive-theme [class*='bg-white'],
@@ -1615,59 +1943,73 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .dark .app-cohesive-theme [class*='bg-gray-50'],
 .dark .app-cohesive-theme [class*='bg-neutral-50'],
 .dark .app-cohesive-theme [class*='bg-zinc-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-surface-strong) 94%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-strong) 94%,
+    transparent
+  ) !important;
 }
 
 .dark .app-cohesive-theme [class*='bg-slate-100'],
 .dark .app-cohesive-theme [class*='bg-gray-100'],
 .dark .app-cohesive-theme [class*='bg-neutral-100'],
 .dark .app-cohesive-theme [class*='bg-zinc-100'] {
-  background-color: color-mix(in srgb,
-      var(--app-surface) 88%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface) 88%,
+    transparent
+  ) !important;
 }
 
 .dark .app-cohesive-theme [class*='bg-emerald-50'],
 .dark .app-cohesive-theme [class*='bg-green-50'],
 .dark .app-cohesive-theme [class*='bg-teal-50'],
 .dark .app-cohesive-theme [class*='bg-lime-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-accent) 14%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-accent) 14%,
+    transparent
+  ) !important;
 }
 
 .dark .app-cohesive-theme [class*='bg-blue-50'],
 .dark .app-cohesive-theme [class*='bg-sky-50'],
 .dark .app-cohesive-theme [class*='bg-cyan-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-accent) 13%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-accent) 13%,
+    transparent
+  ) !important;
 }
 
 .dark .app-cohesive-theme [class*='bg-amber-50'],
 .dark .app-cohesive-theme [class*='bg-orange-50'],
 .dark .app-cohesive-theme [class*='bg-yellow-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-warning) 14%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-warning) 14%,
+    transparent
+  ) !important;
 }
 
 .dark .app-cohesive-theme [class*='bg-rose-50'],
 .dark .app-cohesive-theme [class*='bg-red-50'],
 .dark .app-cohesive-theme [class*='bg-pink-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-danger) 13%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-danger) 13%,
+    transparent
+  ) !important;
 }
 
 .dark .app-cohesive-theme [class*='bg-violet-50'],
 .dark .app-cohesive-theme [class*='bg-purple-50'],
 .dark .app-cohesive-theme [class*='bg-fuchsia-50'] {
-  background-color: color-mix(in srgb,
-      var(--app-accent) 10%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-accent) 10%,
+    transparent
+  ) !important;
 }
 
 .dark .app-cohesive-theme [class*='border-slate-'],
@@ -1723,16 +2065,24 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .dark .app-cohesive-theme [class*='from-white'],
 .dark .app-cohesive-theme [class*='to-white'],
 .dark .app-cohesive-theme [class*='via-white'] {
-  --tw-gradient-from: color-mix(in srgb,
+  --tw-gradient-from: color-mix(
+      in srgb,
       var(--app-surface-strong) 96%,
-      transparent) var(--tw-gradient-from-position) !important;
-  --tw-gradient-via: color-mix(in srgb, var(--app-surface) 94%, transparent) var(--tw-gradient-via-position) !important;
-  --tw-gradient-to: color-mix(in srgb,
+      transparent
+    )
+    var(--tw-gradient-from-position) !important;
+  --tw-gradient-via: color-mix(in srgb, var(--app-surface) 94%, transparent)
+    var(--tw-gradient-via-position) !important;
+  --tw-gradient-to: color-mix(
+      in srgb,
       var(--app-surface-strong) 90%,
-      transparent) var(--tw-gradient-to-position) !important;
+      transparent
+    )
+    var(--tw-gradient-to-position) !important;
 }
 
-:where([multiple],
+:where(
+  [multiple],
   [type='date'],
   [type='datetime-local'],
   [type='email'],
@@ -1747,7 +2097,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   [type='week'],
   input:where(:not([type])),
   select,
-  textarea) {
+  textarea
+) {
   border: 0 !important;
   border-color: transparent !important;
   border-width: 0 !important;
@@ -1758,14 +2109,26 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 /* Final form-control guard.
    Keep deliberate transparent composer/search inputs untouched, but make real
    form fields read as fields even after Tailwind/base resets. */
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select):not([class*='border-0']):not([class*='border-none']):not([class*='bg-transparent']):not([class*='rounded-none']):not([class*='p-0']):not(.ui-navbar-search-input) {
-  border: 1.5px solid color-mix(in srgb, var(--app-text) 20%, var(--app-border-strong)) !important;
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ):not([class*='border-0']):not([class*='border-none']):not(
+    [class*='bg-transparent']
+  ):not([class*='rounded-none']):not([class*='p-0']):not(
+    .ui-navbar-search-input
+  ) {
+  border: 1.5px solid
+    color-mix(in srgb, var(--app-text) 20%, var(--app-border-strong)) !important;
   border-radius: 14px !important;
-  background-color: color-mix(in srgb,
-      var(--app-surface-strong) 94%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-strong) 94%,
+    transparent
+  ) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.56),
     0 1px 0 rgba(15, 23, 42, 0.04) !important;
@@ -1773,59 +2136,110 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 
 .lajukan-route-surface :where(.ui-control, .ui-data-control, .ui-form-control) {
   min-height: 38px;
-  border: 1.5px solid color-mix(in srgb, var(--app-text) 24%, var(--app-border-strong)) !important;
+  border: 1.5px solid
+    color-mix(in srgb, var(--app-text) 24%, var(--app-border-strong)) !important;
   border-radius: 12px !important;
-  background-color: color-mix(in srgb,
-      var(--app-surface-strong) 96%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-strong) 96%,
+    transparent
+  ) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.58),
     0 1px 0 rgba(15, 23, 42, 0.05) !important;
 }
 
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select):not([class*='border-0']):not([class*='border-none']):not([class*='bg-transparent']):not([class*='rounded-none']):not([class*='p-0']):not(.ui-navbar-search-input):hover,
-.lajukan-route-surface :where(.ui-control, .ui-data-control, .ui-form-control):hover {
-  border-color: color-mix(in srgb,
-      var(--app-text) 34%,
-      var(--app-border-strong)) !important;
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ):not([class*='border-0']):not([class*='border-none']):not(
+    [class*='bg-transparent']
+  ):not([class*='rounded-none']):not([class*='p-0']):not(
+    .ui-navbar-search-input
+  ):hover,
+.lajukan-route-surface
+  :where(.ui-control, .ui-data-control, .ui-form-control):hover {
+  border-color: color-mix(
+    in srgb,
+    var(--app-text) 34%,
+    var(--app-border-strong)
+  ) !important;
 }
 
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select):not([class*='border-0']):not([class*='border-none']):not([class*='bg-transparent']):not([class*='rounded-none']):not([class*='p-0']):not(.ui-navbar-search-input):focus,
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select):not([class*='border-0']):not([class*='border-none']):not([class*='bg-transparent']):not([class*='rounded-none']):not([class*='p-0']):not(.ui-navbar-search-input):focus-visible,
-.lajukan-route-surface :where(.ui-control, .ui-data-control, .ui-form-control):focus,
-.lajukan-route-surface :where(.ui-control, .ui-data-control, .ui-form-control):focus-visible {
-  border-color: color-mix(in srgb,
-      var(--route-accent, var(--app-accent)) 72%,
-      var(--app-border-strong)) !important;
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ):not([class*='border-0']):not([class*='border-none']):not(
+    [class*='bg-transparent']
+  ):not([class*='rounded-none']):not([class*='p-0']):not(
+    .ui-navbar-search-input
+  ):focus,
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ):not([class*='border-0']):not([class*='border-none']):not(
+    [class*='bg-transparent']
+  ):not([class*='rounded-none']):not([class*='p-0']):not(
+    .ui-navbar-search-input
+  ):focus-visible,
+.lajukan-route-surface
+  :where(.ui-control, .ui-data-control, .ui-form-control):focus,
+.lajukan-route-surface
+  :where(.ui-control, .ui-data-control, .ui-form-control):focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--route-accent, var(--app-accent)) 72%,
+    var(--app-border-strong)
+  ) !important;
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb,
-      var(--route-accent, var(--app-accent)) 48%,
-      transparent),
-    0 0 0 3px color-mix(in srgb,
-      var(--route-accent, var(--app-accent)) 14%,
-      transparent) !important;
+    inset 0 0 0 1px
+      color-mix(
+        in srgb,
+        var(--route-accent, var(--app-accent)) 48%,
+        transparent
+      ),
+    0 0 0 3px
+      color-mix(
+        in srgb,
+        var(--route-accent, var(--app-accent)) 14%,
+        transparent
+      ) !important;
   outline: none !important;
 }
 
 .lajukan-route-surface :where(.ui-data-control[data-filled='true']) {
-  border-color: color-mix(in srgb,
-      var(--route-accent, var(--app-accent)) 54%,
-      var(--app-border-strong)) !important;
-  background-color: color-mix(in srgb,
-      var(--route-accent, var(--app-accent)) 7%,
-      var(--app-surface-strong)) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--route-accent, var(--app-accent)) 54%,
+    var(--app-border-strong)
+  ) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--route-accent, var(--app-accent)) 7%,
+    var(--app-surface-strong)
+  ) !important;
 }
 
-.dark .lajukan-route-surface :where(.ui-control, .ui-data-control, .ui-form-control) {
-  border-color: color-mix(in srgb,
-      var(--app-text-inverse) 24%,
-      var(--app-border-strong)) !important;
+.dark
+  .lajukan-route-surface
+  :where(.ui-control, .ui-data-control, .ui-form-control) {
+  border-color: color-mix(
+    in srgb,
+    var(--app-text-inverse) 24%,
+    var(--app-border-strong)
+  ) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 1px 0 rgba(0, 0, 0, 0.22) !important;
@@ -1833,19 +2247,27 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 
 .lajukan-market-page {
   --market-page-bg:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       rgba(18, 138, 69, 0.1),
-      transparent 26%),
-    radial-gradient(circle at top right,
-      rgba(255, 122, 26, 0.08),
-      transparent 24%),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(15, 118, 110, 0.06),
+      transparent 24%
+    ),
     var(--app-surface-muted);
-  --market-panel-bg: color-mix(in srgb,
-      var(--app-surface-strong) 96%,
-      transparent);
-  --market-muted-bg: color-mix(in srgb,
-      var(--app-surface-muted) 88%,
-      transparent);
+  --market-panel-bg: color-mix(
+    in srgb,
+    var(--app-surface-strong) 96%,
+    transparent
+  );
+  --market-muted-bg: color-mix(
+    in srgb,
+    var(--app-surface-muted) 88%,
+    transparent
+  );
   --market-border: color-mix(in srgb, var(--app-border) 88%, transparent);
   --market-rail: var(--app-accent);
   --market-shadow: 0 18px 38px -32px rgba(15, 23, 42, 0.22);
@@ -1859,24 +2281,36 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 
 .dark .lajukan-market-page {
   --market-page-bg:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       rgba(94, 226, 138, 0.12),
-      transparent 28%),
-    radial-gradient(circle at top right,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
       rgba(52, 197, 106, 0.08),
-      transparent 24%),
+      transparent 24%
+    ),
     linear-gradient(180deg, #000000 0%, #050505 46%, #000000 100%);
-  --market-panel-bg: color-mix(in srgb,
-      var(--app-surface-strong) 94%,
-      transparent);
+  --market-panel-bg: color-mix(
+    in srgb,
+    var(--app-surface-strong) 94%,
+    transparent
+  );
   --market-muted-bg: color-mix(in srgb, var(--app-surface) 84%, transparent);
-  --market-border: color-mix(in srgb,
-      var(--app-border-strong) 88%,
-      transparent);
+  --market-border: color-mix(
+    in srgb,
+    var(--app-border-strong) 88%,
+    transparent
+  );
   background: var(--market-page-bg);
 }
 
-.lajukan-market-create,
+.lajukan-market-create {
+  --market-page-bg: transparent;
+  --market-rail: var(--app-accent);
+}
+
 .lajukan-market-category {
   --market-rail: var(--app-brand-action);
 }
@@ -1924,18 +2358,27 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   line-height: 1.25 !important;
 }
 
-.lajukan-market-page :is(p, li, label, span, input, textarea, select, button, a) {
+.lajukan-market-page
+  :is(p, li, label, span, input, textarea, select, button, a) {
   line-height: 1.45;
 }
 
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-[36px]'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-[30px]'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-[28px]'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-[26px]'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-[24px]'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-[22px]'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-3xl'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='rounded-2xl'] {
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-[36px]'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-[30px]'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-[28px]'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-[26px]'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-[24px]'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-[22px]'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-3xl'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='rounded-2xl'] {
   border-radius: 1.25rem !important;
 }
 
@@ -1947,23 +2390,31 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   border-radius: 0.875rem !important;
 }
 
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='bg-white'],
-.lajukan-market-page :is(section,
-  article,
-  aside,
-  nav,
-  form,
-  div)[class*='bg-[color:var(--app-surface-strong)]'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='bg-white'],
+.lajukan-market-page
+  :is(
+    section,
+    article,
+    aside,
+    nav,
+    form,
+    div
+  )[class*='bg-[color:var(--app-surface-strong)]'],
 .lajukan-market-panel {
   background-color: var(--market-panel-bg) !important;
   border-color: var(--market-border) !important;
   box-shadow: var(--market-shadow) !important;
 }
 
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='bg-slate-50'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='bg-slate-100'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='bg-gray-50'],
-.lajukan-market-page :is(section, article, aside, nav, form, div)[class*='bg-neutral-50'] {
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='bg-slate-50'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='bg-slate-100'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='bg-gray-50'],
+.lajukan-market-page
+  :is(section, article, aside, nav, form, div)[class*='bg-neutral-50'] {
   background-color: var(--market-muted-bg) !important;
 }
 
@@ -1985,9 +2436,11 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .lajukan-market-page :is(input, textarea, select) {
   min-height: 2.35rem;
   border: 0 !important;
-  background-color: color-mix(in srgb,
-      var(--app-surface-muted) 86%,
-      transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-muted) 86%,
+    transparent
+  ) !important;
   box-shadow: none !important;
 }
 
@@ -2015,9 +2468,9 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   padding-right: clamp(0.875rem, 1.4vw, 1.15rem) !important;
 }
 
-.lajukan-market-page [class*='space-y-7']> :not([hidden])~ :not([hidden]),
-.lajukan-market-page [class*='space-y-6']> :not([hidden])~ :not([hidden]),
-.lajukan-market-page [class*='space-y-5']> :not([hidden])~ :not([hidden]) {
+.lajukan-market-page [class*='space-y-7'] > :not([hidden]) ~ :not([hidden]),
+.lajukan-market-page [class*='space-y-6'] > :not([hidden]) ~ :not([hidden]),
+.lajukan-market-page [class*='space-y-5'] > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
   margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse))) !important;
   margin-bottom: calc(1rem * var(--tw-space-y-reverse)) !important;
@@ -2053,14 +2506,18 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
 .lajukan-market-page [data-auto-scrollbar]:hover,
 .lajukan-market-page [data-auto-scrollbar]:focus-within,
 .lajukan-market-page [data-auto-scrollbar].is-scrolling {
-  scrollbar-color: color-mix(in srgb, var(--app-text-soft) 52%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--app-text-soft) 52%, transparent)
+    transparent;
 }
 
 .lajukan-market-page [class*='overflow-y-auto']:hover::-webkit-scrollbar-thumb,
-.lajukan-market-page [class*='overflow-y-auto']:focus-within::-webkit-scrollbar-thumb,
+.lajukan-market-page
+  [class*='overflow-y-auto']:focus-within::-webkit-scrollbar-thumb,
 .lajukan-market-page [data-auto-scrollbar]:hover::-webkit-scrollbar-thumb,
-.lajukan-market-page [data-auto-scrollbar]:focus-within::-webkit-scrollbar-thumb,
-.lajukan-market-page [data-auto-scrollbar].is-scrolling::-webkit-scrollbar-thumb {
+.lajukan-market-page
+  [data-auto-scrollbar]:focus-within::-webkit-scrollbar-thumb,
+.lajukan-market-page
+  [data-auto-scrollbar].is-scrolling::-webkit-scrollbar-thumb {
   background-color: color-mix(in srgb, var(--app-text-soft) 52%, transparent);
 }
 
@@ -2090,7 +2547,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   }
 }
 
-:where([multiple],
+:where(
+  [multiple],
   [type='date'],
   [type='datetime-local'],
   [type='email'],
@@ -2105,7 +2563,8 @@ html.is-scrolling body::-webkit-scrollbar-thumb:hover,
   [type='week'],
   input:where(:not([type])),
   select,
-  textarea):focus {
+  textarea
+):focus {
   border: 0 !important;
   border-color: transparent !important;
   border-width: 0 !important;

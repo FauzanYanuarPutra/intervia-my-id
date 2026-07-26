@@ -82,7 +82,7 @@ export const CORE_LAJUKAN_FLOWS: LajukanFlow[] = [
       },
       {
         id: 'search-results',
-        route: '/search?q=supplier%20kemasan',
+        route: '/explore?q=supplier%20kemasan',
         labelId: 'Lihat hasil',
         primaryActionId: 'open-result',
         expectedSignals: ['filters', 'result-cards', 'back-home', 'no-horizontal-overflow'],

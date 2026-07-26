@@ -634,7 +634,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
 
   if (!user) {
     return (
-      <div className="h-[var(--app-viewport-height)] min-h-0 overflow-hidden bg-gradient-to-br from-[color:var(--app-accent-soft)] via-[color:var(--app-surface-strong)] to-[color:var(--app-info-soft)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)]">
+      <div className="lajukan-visual-viewport-shell min-h-0 overflow-hidden bg-gradient-to-br from-[color:var(--app-accent-soft)] via-[color:var(--app-surface-strong)] to-[color:var(--app-info-soft)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)]">
         <div className="flex h-full min-h-0 items-center justify-center px-0 sm:px-4">
           <div className="w-full max-w-sm rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-6 text-center shadow-sm  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] sm:rounded-3xl sm:border-x">
             <MessageCircle className="mx-auto mb-4 h-14 w-14 text-[color:var(--app-accent)]" />
@@ -656,7 +656,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] min-h-0 overflow-hidden overscroll-none bg-[#d9dbd5] dark:bg-[#0b141a]">
+    <div className="lajukan-visual-viewport-shell min-h-0 overflow-hidden overscroll-none bg-[#d9dbd5] dark:bg-[#0b141a]">
       <div className="mx-auto flex h-full max-h-full min-h-0 w-full min-w-0 max-w-[1600px] overflow-hidden lg:px-4 lg:py-4">
         <div className="flex h-full w-full min-w-0 overflow-hidden bg-[#f7f5f3] shadow-none dark:bg-[#111b21] lg:rounded-[18px] lg:border lg:border-black/5 lg:shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)] dark:lg:border-white/10">
           <section

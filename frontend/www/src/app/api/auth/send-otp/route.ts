@@ -10,6 +10,8 @@ import { sendOTPEmail } from '@/lib/email';
 import { sendPhoneOTP } from '@/lib/sms';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
+import { createHash, randomInt } from 'node:crypto';
+import { maskEmail, maskPhone, safeErrorCode } from '@/lib/server/safeLog';
 import { z } from 'zod';
 
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
@@ -26,12 +28,12 @@ const OTP_AUTH_ENABLED = process.env.ENABLE_OTP_AUTH !== 'false';
 
 const SendOtpSchema = z.object({
   type: z.enum(['email', 'phone']),
-  target: z.string().min(1),
+  target: z.string().trim().min(1).max(320),
   purpose: z.enum(['register', 'login', 'reset', 'profile']).default('register'),
 });
 
 function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1_000_000).toString();
 }
 
 function normalizeTarget(type: 'email' | 'phone', target: string): string {
@@ -40,17 +42,7 @@ function normalizeTarget(type: 'email' | 'phone', target: string): string {
 }
 
 function maskTarget(type: 'email' | 'phone', target: string): string {
-  if (type === 'email') {
-    const [name, domain] = target.split('@');
-    if (!name || !domain) return target;
-    const maskedName =
-      name.length <= 2 ? `${name[0]}*` : `${name.slice(0, 2)}***`;
-    return `${maskedName}@${domain}`;
-  }
-
-  const digits = target.replace(/\D/g, '');
-  if (digits.length <= 4) return `****${digits}`;
-  return `****${digits.slice(-4)}`;
+  return type === 'email' ? maskEmail(target) : maskPhone(target);
 }
 
 function validateTarget(type: 'email' | 'phone', target: string): boolean {
@@ -99,7 +91,7 @@ export async function POST(req: NextRequest) {
     if (!rlByIp.ok) return rlByIp.response;
 
     const rlByTarget = await enforceRateLimit({
-      key: `auth:send-otp:target:${type}:${normalizedTarget}:${purpose}`,
+      key: `auth:send-otp:target:${type}:${createHash('sha256').update(normalizedTarget).digest('hex').slice(0, 24)}:${purpose}`,
       limit: OTP_LIMIT_PER_TARGET_PER_HOUR,
       windowSeconds: 3600,
     });
@@ -139,7 +131,12 @@ export async function POST(req: NextRequest) {
     await incrementOTPAttempts(type, normalizedTarget);
 
     const emailTransport =
-      process.env.EMAIL_TRANSPORT || (IS_DEV ? 'console' : 'smtp');
+      process.env.EMAIL_TRANSPORT ||
+      (process.env.SMTP_HOST
+        ? 'smtp'
+        : IS_DEV && process.env.DEV_EMAIL_FALLBACK_TO_CONSOLE === 'true'
+          ? 'console'
+          : 'unavailable');
     const delivery =
       type === 'email' ? emailTransport : phoneDelivery?.delivery || 'phone';
 
@@ -150,7 +147,7 @@ export async function POST(req: NextRequest) {
       delivery,
     });
   } catch (e) {
-    console.error('Send OTP error:', e);
+    console.error('Send OTP error:', { error: safeErrorCode(e) });
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

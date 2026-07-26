@@ -39,7 +39,6 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
       title: 'Lajukan UMKM | Pasokan Lokal, Substitusi Impor, dan Ekspor',
       description:
         'Cari supplier lokal, bahan baku Indonesia, jasa operasional, sertifikasi, dan jalur ekspor di Lajukan.',
-      url: `${SITE_URL}/id/home`,
       siteName: 'Lajukan',
       type: 'website',
       locale: 'id_ID',
@@ -83,7 +82,6 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
       title: 'Lajukan Global | Local Supply, Import Replacement, and Export',
       description:
         'Find Indonesian suppliers, local inputs, import-replacement options, operational services, and export paths on Lajukan.',
-      url: `${SITE_URL}/en/home`,
       siteName: 'Lajukan',
       type: 'website',
       locale: 'en_US',

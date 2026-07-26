@@ -102,15 +102,8 @@ type UmkmRiskProfile = {
   description: string;
 };
 
-function shouldUseDesktopMapPanel() {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia('(min-width: 1024px)').matches
-  );
-}
-
 function getOpenLabel(isOpen: boolean, isId: boolean) {
-  if (isOpen) return isId ? 'Buka sekarang' : 'Open now';
+  if (isOpen) return isId ? 'Buka' : 'Open';
   return isId ? 'Tutup' : 'Closed';
 }
 
@@ -165,7 +158,10 @@ function readMetaBoolean(
 }
 
 function normalizeTrustTier(value: string): UmkmTrustTier | null {
-  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
   if (!normalized) return null;
   if (
     [
@@ -328,7 +324,10 @@ function getUmkmTrustProfile(
 }
 
 function getUmkmRiskProfile(
-  place: { store: DiscoveryStore; ui: ReturnType<typeof buildUmkmPlacePresentation> },
+  place: {
+    store: DiscoveryStore;
+    ui: ReturnType<typeof buildUmkmPlacePresentation>;
+  },
   isId: boolean,
 ): UmkmRiskProfile {
   const metadata = place.store.metadata || {};
@@ -426,7 +425,7 @@ function getSafetyTips(isId: boolean, highRisk: boolean) {
     ...baseTips,
     isId
       ? 'Untuk peluang usaha, franchise, mesin bekas, atau sewa tempat, minta dokumen dan skema tertulis.'
-    : 'For opportunities, franchises, used machines, or rentals, ask for documents and written terms.',
+      : 'For opportunities, franchises, used machines, or rentals, ask for documents and written terms.',
   ];
 }
 
@@ -580,15 +579,23 @@ export function UmkmDiscoveryPanel({
   const [mapFocusNonce, setMapFocusNonce] = useState(0);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [mapOnly, setMapOnly] = useState(false);
+  const [canUseDesktopMapPanel, setCanUseDesktopMapPanel] = useState(false);
+  const requestLimit = Math.max(1, Math.min(limit, 160));
 
   useEffect(() => {
     let active = true;
+    let requestInFlight = false;
+    let hasLoadedOnce = false;
+    const controller = new AbortController();
 
-    const load = async () => {
+    const load = async (options?: { silent?: boolean }) => {
       await Promise.resolve();
-      if (!active) return;
-      setLoading(true);
-      setError(null);
+      if (!active || requestInFlight) return;
+      requestInFlight = true;
+      if (!options?.silent) {
+        setLoading(true);
+        setError(null);
+      }
 
       try {
         const params = new URLSearchParams();
@@ -598,13 +605,14 @@ export function UmkmDiscoveryPanel({
           params.set('viewer_lat', String(viewerLocation.lat));
           params.set('viewer_lng', String(viewerLocation.lng));
         }
-        params.set('limit', String(limit));
+        params.set('limit', String(requestLimit));
 
         const res = await fetch(
           `/api/super-app/umkm/stores?${params.toString()}`,
           {
             cache: 'no-store',
             credentials: 'include',
+            signal: controller.signal,
           },
         );
         const payload = (await res.json().catch(() => ({}))) as StoresResponse;
@@ -615,6 +623,8 @@ export function UmkmDiscoveryPanel({
         const items = payload.data.items || [];
         setStores(items);
         setTotalCount(payload.data.count ?? items.length);
+        setError(null);
+        hasLoadedOnce = true;
         setSelectedStoreId(current => {
           if (current && items.some(item => item.id === current)) {
             return current;
@@ -634,34 +644,53 @@ export function UmkmDiscoveryPanel({
           return null;
         });
       } catch (err: unknown) {
-        if (!active) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : isId
-              ? 'Gagal memuat daftar usaha.'
-              : 'Failed to load business discovery.',
-        );
+        if (!active || controller.signal.aborted) return;
+        if (!options?.silent || !hasLoadedOnce) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : isId
+                ? 'Gagal memuat daftar usaha.'
+                : 'Failed to load business discovery.',
+          );
+        }
       } finally {
+        requestInFlight = false;
         if (!active) return;
         setLoading(false);
       }
     };
 
     void load();
+
+    const refreshIfVisible = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'hidden'
+      ) {
+        return;
+      }
+      void load({ silent: true });
+    };
     const intervalId = window.setInterval(() => {
-      void load();
+      refreshIfVisible();
     }, DISCOVERY_REFRESH_INTERVAL_MS);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshIfVisible();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       active = false;
+      controller.abort();
       window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [
     city,
     isId,
-    limit,
     query,
+    requestLimit,
     selectedSlug,
     selectedStoreIdInitial,
     viewerLocation,
@@ -687,13 +716,21 @@ export function UmkmDiscoveryPanel({
     setSelectedStoreId(null);
   }, [selectedStoreId, visibleStores]);
 
-  const selectedPlace =
-    visibleStores.find(item => item.store.id === selectedStoreId) || null;
+  const mapStores = useMemo(
+    () => visibleStores.map(item => item.store),
+    [visibleStores],
+  );
+  const selectedPlace = useMemo(
+    () => visibleStores.find(item => item.store.id === selectedStoreId) || null,
+    [selectedStoreId, visibleStores],
+  );
   const selectedPlaceId = selectedPlace?.store.id || null;
   const selectedContactHref =
     selectedPlace?.ui.whatsappHref || selectedPlace?.ui.telHref || null;
   const selectedContactLabel = selectedPlace?.ui.whatsappHref
-    ? 'Chat'
+    ? isId
+      ? 'WhatsApp'
+      : 'Chat'
     : selectedPlace?.ui.telHref
       ? isId
         ? 'Telepon'
@@ -718,12 +755,14 @@ export function UmkmDiscoveryPanel({
     ? buildReportListingHref(selectedPlace.store, isId)
     : '';
 
-  const listedPlaces = visibleStores.filter(
-    item => item.store.id !== selectedPlace?.store.id,
+  const listedPlaces = useMemo(
+    () =>
+      visibleStores.filter(item => item.store.id !== selectedPlace?.store.id),
+    [selectedPlace?.store.id, visibleStores],
   );
-  const paginatedListedPlaces = listedPlaces.slice(
-    0,
-    listPage * LIST_PAGE_SIZE,
+  const paginatedListedPlaces = useMemo(
+    () => listedPlaces.slice(0, listPage * LIST_PAGE_SIZE),
+    [listPage, listedPlaces],
   );
   const canLoadMoreList = paginatedListedPlaces.length < listedPlaces.length;
   useEffect(() => {
@@ -743,22 +782,24 @@ export function UmkmDiscoveryPanel({
 
   useEffect(() => {
     setListPage(1);
-    setSheetExpanded(
-      variant === 'immersive' ? shouldUseDesktopMapPanel() : false,
-    );
-  }, [city, query, variant, visibleStores.length]);
+    setSheetExpanded(variant === 'immersive' ? canUseDesktopMapPanel : false);
+  }, [canUseDesktopMapPanel, city, query, variant, visibleStores.length]);
 
   useEffect(() => {
-    if (variant !== 'immersive' || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
 
     const desktopPanelQuery = window.matchMedia('(min-width: 1024px)');
-    const syncSheetMode = () => {
-      setSheetExpanded(desktopPanelQuery.matches);
+    const syncMapPanelMode = () => {
+      const isDesktop = desktopPanelQuery.matches;
+      setCanUseDesktopMapPanel(isDesktop);
+      if (isDesktop) setMobileMapOpen(false);
+      if (variant === 'immersive') setSheetExpanded(isDesktop);
     };
 
-    syncSheetMode();
-    desktopPanelQuery.addEventListener('change', syncSheetMode);
-    return () => desktopPanelQuery.removeEventListener('change', syncSheetMode);
+    syncMapPanelMode();
+    desktopPanelQuery.addEventListener('change', syncMapPanelMode);
+    return () =>
+      desktopPanelQuery.removeEventListener('change', syncMapPanelMode);
   }, [variant]);
 
   const handleSelectStore = useCallback(
@@ -778,6 +819,18 @@ export function UmkmDiscoveryPanel({
       setSelectedStoreId(storeId);
     },
     [selectedStoreId, variant],
+  );
+  const handleMapSelectStore = useCallback(
+    (storeId: string) => {
+      handleSelectStore(storeId, { scrollToPreview: true });
+    },
+    [handleSelectStore],
+  );
+  const handleEdgeMapSelectStore = useCallback(
+    (storeId: string) => {
+      handleSelectStore(storeId, { scrollToPreview: false });
+    },
+    [handleSelectStore],
   );
 
   useEffect(() => {
@@ -836,8 +889,9 @@ export function UmkmDiscoveryPanel({
         ? 'Memuat'
         : 'Loading'
       : `${totalCount ?? stores.length} ${isId ? 'usaha' : 'businesses'}`;
-  const mapResultLabel = `${visibleStores.length} ${isId ? 'usaha aktif' : 'active businesses'
-    }`;
+  const mapResultLabel = `${visibleStores.length} ${
+    isId ? 'usaha' : 'businesses'
+  }`;
   const routeDistanceLabel = useMemo(() => {
     if (!routeSummary?.distance_m || routeSummary.used_fallback) return null;
     return formatUmkmPlaceDistance(routeSummary.distance_m / 1000, isId);
@@ -866,13 +920,13 @@ export function UmkmDiscoveryPanel({
 
   const renderDiscoveryMap = useCallback(
     (className: string, edgeToEdge = false) => {
-      const mapStores = visibleStores.map(item => item.store);
       const activeSelectedStoreId = selectedPlace?.store.id || null;
 
       return (
         <div
-          className={`relative isolate overflow-hidden ${edgeToEdge ? 'h-full rounded-none' : 'rounded-[20px]'
-            }`}
+          className={`relative isolate overflow-hidden ${
+            edgeToEdge ? 'h-full rounded-none' : 'rounded-[20px]'
+          }`}
         >
           <UmkmStoreMap
             stores={mapStores}
@@ -886,8 +940,8 @@ export function UmkmDiscoveryPanel({
             onRouteResolved={setRouteSummary}
             focusMode={mapFocusMode}
             focusNonce={mapFocusNonce}
-            onSelectStore={storeId =>
-              handleSelectStore(storeId, { scrollToPreview: !edgeToEdge })
+            onSelectStore={
+              edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
             className={className}
           />
@@ -937,7 +991,8 @@ export function UmkmDiscoveryPanel({
     [
       bumpMapFocus,
       cycleMapTheme,
-      handleSelectStore,
+      handleEdgeMapSelectStore,
+      handleMapSelectStore,
       isId,
       locating,
       locationError,
@@ -950,13 +1005,13 @@ export function UmkmDiscoveryPanel({
       selectedPlace,
       showRoute,
       viewerLocation,
-      visibleStores,
+      mapStores,
     ],
   );
 
   if (variant === 'immersive') {
     const sheetTitle =
-      title || (isId ? 'Usaha sekitar kamu' : 'Businesses around you');
+      title || (isId ? 'Cari usaha sekitar' : 'Businesses around you');
     const sheetSubtitle =
       description ||
       (city?.trim()
@@ -964,15 +1019,17 @@ export function UmkmDiscoveryPanel({
           ? `Area ${city.trim()}`
           : `${city.trim()} area`
         : isId
-          ? 'Geser peta, pilih pin, lalu chat atau lihat rute.'
+          ? 'Pilih usaha, cek singkat, lalu chat atau buka rute.'
           : 'Move the map, pick a pin, then chat or open route.');
 
     return (
-      <section className="absolute inset-0
+      <section
+        className="absolute inset-0
     h-full w-full
     overflow-hidden overscroll-none
     bg-slate-100 text-[color:var(--app-text)]
-    dark:bg-slate-950">
+    dark:bg-slate-950"
+      >
         <div className="absolute inset-0">
           {renderDiscoveryMap('h-full w-full', true)}
         </div>
@@ -988,7 +1045,7 @@ export function UmkmDiscoveryPanel({
               className="pointer-events-auto inline-flex min-h-[38px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-bold text-slate-800 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.34)]  transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
             >
               <Search className="h-4 w-4 text-[color:var(--app-accent)]" />
-              {isId ? 'Cari area ini' : 'Search this area'}
+              {isId ? 'Cari di area ini' : 'Search this area'}
             </button>
             <button
               type="button"
@@ -1005,7 +1062,7 @@ export function UmkmDiscoveryPanel({
                   ? 'Tampilkan daftar'
                   : 'Show list'
                 : isId
-                  ? 'Peta full'
+                  ? 'Peta saja'
                   : 'Full map'}
             </button>
           </div>
@@ -1019,9 +1076,7 @@ export function UmkmDiscoveryPanel({
 
         {loading && !selectedPlace && !error ? (
           <div className="absolute left-3 right-3 top-1/2 z-[1160] mx-auto max-w-sm -translate-y-1/2 rounded-[24px] border border-white/80 bg-white/94 px-5 py-4 text-center text-[13px] font-bold text-slate-700 shadow-[0_22px_52px_-34px_rgba(15,23,42,0.36)]  dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100">
-            {isId
-              ? 'Lagi mencari usaha sekitar...'
-              : 'Finding nearby businesses...'}
+            {isId ? 'Mencari usaha sekitar...' : 'Finding nearby businesses...'}
           </div>
         ) : null}
 
@@ -1130,7 +1185,7 @@ export function UmkmDiscoveryPanel({
                     >
                       <Store className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">
-                        {isId ? 'Profil' : 'Profile'}
+                        {isId ? 'Lihat' : 'View'}
                       </span>
                     </Link>
                     {selectedContactHref ? (
@@ -1226,7 +1281,7 @@ export function UmkmDiscoveryPanel({
                               {' '}
                               ·{' '}
                               {isId
-                                ? 'Chat dulu untuk memastikan jam layanan.'
+                                ? 'Chat dulu untuk memastikan jam dan stok.'
                                 : 'Chat first to confirm service hours.'}
                             </span>
                           </span>
@@ -1243,24 +1298,12 @@ export function UmkmDiscoveryPanel({
                     </div>
                   ) : null}
                 </article>
-
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col gap-2">
-                {/* <div className="flex shrink-0 items-center justify-between gap-3 rounded-[18px] border border-slate-200/80 bg-[linear-gradient(135deg,#ffffff,#f8fafc)] px-3 py-2.5 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,#0f172a,#020617)]">
-                  <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                    {isId ? 'Pilih dari daftar' : 'Pick from results'}
-                  </p>
-                  <span className="inline-flex shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
-                    {totalLabel}
-                  </span>
-                </div> */}
-
                 {loading ? (
                   <div className="rounded-[18px] border border-slate-200/80 bg-white px-4 py-6 text-center text-[12px] font-semibold text-[color:var(--app-text-soft)] dark:border-slate-800 dark:bg-slate-900/84">
-                    {isId
-                      ? 'Lagi memuat daftar usaha...'
-                      : 'Loading business results...'}
+                    {isId ? 'Memuat usaha...' : 'Loading businesses...'}
                   </div>
                 ) : paginatedListedPlaces.length > 0 ? (
                   <div className="grid min-h-0 min-w-0 flex-1 auto-rows-min gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
@@ -1343,7 +1386,7 @@ export function UmkmDiscoveryPanel({
                 ) : (
                   <div className="rounded-[18px] border border-slate-200/80 bg-white px-4 py-6 text-center text-[12px] font-semibold text-[color:var(--app-text-soft)] dark:border-slate-800 dark:bg-slate-900/84">
                     {isId
-                      ? 'Belum ada usaha yang cocok. Coba ubah kata kunci atau area.'
+                      ? 'Belum ada yang cocok. Coba kata kunci lain atau pakai lokasi sekitar.'
                       : 'No matching businesses yet. Try another keyword or area.'}
                   </div>
                 )}
@@ -1362,7 +1405,7 @@ export function UmkmDiscoveryPanel({
             className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-[1250] inline-flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full border border-white/80 bg-white/95 px-4 text-[12px] font-bold text-slate-800 shadow-[0_22px_52px_-32px_rgba(15,23,42,0.42)]  transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-100"
           >
             <List className="h-4 w-4 text-[color:var(--app-accent)]" />
-            {isId ? 'Tampilkan daftar usaha' : 'Show business list'}
+            {isId ? 'Lihat daftar usaha' : 'Show business list'}
           </button>
         ) : null}
       </section>
@@ -1379,7 +1422,9 @@ export function UmkmDiscoveryPanel({
             </h2>
             <p className="mt-0.5 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
               {description ||
-                (isId ? 'Pilih cepat, buka cepat.' : 'Pick fast, open fast.')}
+                (isId
+                  ? 'Cari usaha, cek info singkat, lalu hubungi.'
+                  : 'Pick fast, open fast.')}
             </p>
           </div>
 
@@ -1395,7 +1440,7 @@ export function UmkmDiscoveryPanel({
             className="inline-flex min-h-[36px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[12px] font-semibold text-[color:var(--app-accent)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_10%,white)] sm:w-fit dark:border-slate-800 dark:bg-slate-950"
           >
             <MapPinned className="h-4 w-4" />
-            {isId ? 'Buka Lajukan Maps' : 'Open Lajukan Maps'}
+            {isId ? 'Buka peta' : 'Open map'}
           </button>
         </div>
 
@@ -1405,7 +1450,7 @@ export function UmkmDiscoveryPanel({
           </div>
         ) : loading && !selectedPlace ? (
           <div className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-8 text-center text-sm font-semibold text-[color:var(--app-text-soft)] shadow-[0_18px_34px_-28px_rgba(15,23,42,0.14)]">
-            {isId ? 'Lagi muat daftar usaha...' : 'Loading business results...'}
+            {isId ? 'Memuat usaha...' : 'Loading business results...'}
           </div>
         ) : selectedPlace ? (
           <>
@@ -1467,10 +1512,11 @@ export function UmkmDiscoveryPanel({
 
                       <p className="mt-1.5 inline-flex items-center gap-2 text-[12px] font-semibold text-emerald-600 sm:text-[13px]">
                         <span
-                          className={`h-2.5 w-2.5 rounded-full ${selectedPlace.ui.openNow !== false
-                            ? 'bg-emerald-500'
-                            : 'bg-slate-300'
-                            }`}
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            selectedPlace.ui.openNow !== false
+                              ? 'bg-emerald-500'
+                              : 'bg-slate-300'
+                          }`}
                         />
                         {getOpenLabel(selectedPlace.ui.openNow !== false, isId)}
                       </p>
@@ -1493,7 +1539,7 @@ export function UmkmDiscoveryPanel({
                         >
                           <Store className="h-3.5 w-3.5 shrink-0" />
                           <span className="truncate">
-                            {isId ? 'Profil' : 'Profile'}
+                            {isId ? 'Lihat' : 'View'}
                           </span>
                         </Link>
                         {selectedContactHref ? (
@@ -1540,9 +1586,10 @@ export function UmkmDiscoveryPanel({
                   />
                 ) : null}
 
-                <div ref={mobileMapRef} className="lg:hidden">
-                  {mobileMapOpen ? (
-                    <div className="fixed inset-0 z-[9999] flex h-[var(--app-viewport-height)] min-h-0 flex-col overflow-hidden bg-[color:var(--app-surface-strong)] dark:bg-slate-950">
+                {!canUseDesktopMapPanel ? (
+                  <div ref={mobileMapRef} className="lg:hidden">
+                    {mobileMapOpen ? (
+                      <div className="fixed inset-0 z-[9999] flex h-[var(--app-viewport-height)] min-h-0 flex-col overflow-hidden bg-[color:var(--app-surface-strong)] dark:bg-slate-950">
                       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:border-slate-800">
                         <div>
                           <p className="text-[15px] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">
@@ -1603,7 +1650,7 @@ export function UmkmDiscoveryPanel({
                           >
                             <Store className="h-3.5 w-3.5" />
                             <span className="truncate">
-                              {isId ? 'Profil' : 'Profile'}
+                              {isId ? 'Lihat' : 'View'}
                             </span>
                           </Link>
                           {selectedContactHref ? (
@@ -1648,9 +1695,9 @@ export function UmkmDiscoveryPanel({
                           </a>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-white p-2 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950/82">
+                      </div>
+                    ) : (
+                      <div className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-white p-2 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950/82">
                       <div className="flex min-w-0 items-center justify-between gap-3 px-2 pb-2 pt-1">
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-bold text-[color:var(--app-text)]">
@@ -1670,9 +1717,10 @@ export function UmkmDiscoveryPanel({
                         </button>
                       </div>
                       {renderDiscoveryMap('h-[320px] w-full sm:h-[360px]')}
-                    </div>
-                  )}
-                </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
 
                 {paginatedListedPlaces.length > 0 ? (
                   <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -1722,12 +1770,14 @@ export function UmkmDiscoveryPanel({
                               </div>
 
                               <p
-                                className={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${isOpen ? 'text-emerald-600' : 'text-slate-500'
-                                  }`}
+                                className={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${
+                                  isOpen ? 'text-emerald-600' : 'text-slate-500'
+                                }`}
                               >
                                 <span
-                                  className={`h-2 w-2 rounded-full ${isOpen ? 'bg-emerald-500' : 'bg-slate-300'
-                                    }`}
+                                  className={`h-2 w-2 rounded-full ${
+                                    isOpen ? 'bg-emerald-500' : 'bg-slate-300'
+                                  }`}
                                 />
                                 {getOpenLabel(isOpen, isId)}
                               </p>
@@ -1778,9 +1828,11 @@ export function UmkmDiscoveryPanel({
                     </div>
                   </div>
 
-                  {renderDiscoveryMap(
-                    'h-[min(560px,calc(var(--app-viewport-height)-180px))] min-h-[430px] w-full',
-                  )}
+                  {canUseDesktopMapPanel
+                    ? renderDiscoveryMap(
+                        'h-[min(560px,calc(var(--app-viewport-height)-180px))] min-h-[430px] w-full',
+                      )
+                    : null}
                 </div>
               </aside>
             </div>

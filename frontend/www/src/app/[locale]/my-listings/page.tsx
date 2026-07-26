@@ -784,7 +784,7 @@ export default function MyListingsPage() {
     collectionMode !== 'mine'
       ? {
         label: locale === 'id' ? 'Cari inspirasi' : 'Search ideas',
-        href: '/search',
+        href: '/explore',
         icon: Search,
       }
       : {
@@ -802,7 +802,7 @@ export default function MyListingsPage() {
       }
       : {
         label: locale === 'id' ? 'Cari inspirasi' : 'Find ideas',
-        href: '/search',
+        href: '/explore',
         icon: Search,
       };
   const SecondaryActionIcon = secondaryAction.icon;
@@ -1027,7 +1027,7 @@ export default function MyListingsPage() {
                       </button>
                     ) : (
                       <Link
-                        href="/search"
+                        href="/explore"
                         className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
                       >
                         {locale === 'id' ? 'Cari postingan' : 'Search posts'}
@@ -1146,7 +1146,7 @@ export default function MyListingsPage() {
                       </button>
                     ) : (
                       <Link
-                        href="/search"
+                        href="/explore"
                         className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
                       >
                         {locale === 'id' ? 'Cari inspirasi' : 'Search ideas'}
@@ -1670,7 +1670,7 @@ export default function MyListingsPage() {
                   </button>
                 ) : (
                   <Link
-                    href="/search"
+                    href="/explore"
                     className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                   >
                     {locale === 'id' ? 'Cari listing' : 'Search listings'}
@@ -1711,7 +1711,7 @@ export default function MyListingsPage() {
                     </button>
                   ) : (
                     <Link
-                      href="/search"
+                      href="/explore"
                       className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                     >
                       {locale === 'id' ? 'Cari listing' : 'Search listings'}

@@ -9,6 +9,10 @@ import {
 } from '@/lib/authRoutes';
 import { jwtVerify } from 'jose';
 import { findRouteConfig } from './lib/routesHelpers';
+import {
+  buildPublicWebCsp,
+  buildSecurityHeaders,
+} from '../../shared/config/nextSecurityHeaders.mjs';
 
 /* ---------------- CONFIG ---------------- */
 const LOCALES = ['en', 'id'] as const;
@@ -22,12 +26,16 @@ const DEBUG = process.env.MIDDLEWARE_DEBUG === 'true' && IS_DEV;
 const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const PUBLIC_HTTPS_HOSTS = new Set(['lajukan.com', 'www.lajukan.com']);
 const BASE_ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
   'https://www.lajukan.com',
   'https://lajukan.com',
   'https://usaha.lajukan.com',
+  ...(IS_DEV
+    ? [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+      ]
+    : []),
 ];
 const CORS_ALLOWED_ORIGINS = new Set([
   ...BASE_ALLOWED_ORIGINS,
@@ -38,7 +46,6 @@ const CORS_ALLOWED_ORIGINS = new Set([
 ]);
 const DEAD_ROUTE_SEGMENTS = new Set([
   'pricing',
-  'blog',
   'news',
   'travel',
   'wellness',
@@ -49,12 +56,13 @@ const DEAD_ROUTE_SEGMENTS = new Set([
   'charity',
 ]);
 const CANONICAL_INDEX_REDIRECTS: Record<string, string> = {
-  '/jobs': '/search?type=job&q=lowongan',
-  '/freelancers': '/search?type=freelancer&q=umkm',
-  '/marketplace': '/search?type=product&q=supplier',
-  '/property': '/search?type=property&q=lokasi%20jualan',
+  '/jobs': '/explore?type=job&q=lowongan',
+  '/freelancers': '/explore?type=freelancer&q=umkm',
+  '/marketplace': '/explore?type=product&q=supplier',
+  '/property': '/explore?type=property&q=lokasi%20jualan',
 };
 const LEGACY_EXACT_REDIRECTS: Record<string, string> = {
+  '/kategori': '/explore',
   '/help': '/support',
   '/forum': '/community',
   '/projects': PROMO_ONLY_MODE ? '/home' : '/my-projects',
@@ -65,47 +73,21 @@ const LEGACY_EXACT_REDIRECTS: Record<string, string> = {
   '/company/create': '/usaha/onboarding',
   '/super-app': '/home',
 };
+const LEGACY_EXPLORE_CATEGORY_REDIRECTS: Record<string, string> = {
+  '/explore/machines-equipment': '/explore/machines-tools',
+};
 const LEGACY_PREFIX_REDIRECTS: Record<string, string> = {
   '/finance': PROMO_ONLY_MODE ? '/home' : '/payments',
   '/collaboration': '/chat',
   '/spatial': '/umkm',
 };
-const scriptSrc = IS_DEV
-  ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://static.cloudflareinsights.com"
-  : "script-src 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com";
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "frame-ancestors 'none'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https:",
-  "media-src 'self' data: blob: https:",
-  scriptSrc,
-  [
-    'connect-src',
-    "'self'",
-    'https:',
-    'ws:',
-    'wss:',
-    'stun:',
-    'turn:',
-    'turns:',
-    'http://auth.localhost',
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-    'http://localhost:8081',
-    'http://127.0.0.1:8081',
-    'ws://localhost:3000',
-    'ws://127.0.0.1:3000',
-    'ws://localhost:4000',
-    'ws://127.0.0.1:4000',
-    'https://lajukan.com',
-    'https://auth.lajukan.com',
-    'wss://lajukan.com',
-    'wss://www.lajukan.com',
-    'wss://chat.lajukan.com',
-  ].join(' '),
-].join('; ');
+const SECURITY_HEADERS = buildSecurityHeaders({
+  csp: buildPublicWebCsp({ production: !IS_DEV }),
+  production: !IS_DEV,
+  permissionsPolicy:
+    'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()',
+  crossOriginOpenerPolicy: 'same-origin-allow-popups',
+});
 
 type Locale = (typeof LOCALES)[number];
 
@@ -158,6 +140,12 @@ function applyLocaleCookies(res: NextResponse, locale: Locale) {
   return res;
 }
 
+function nextLocalizedRequest(req: NextRequest, locale: Locale) {
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-lajukan-locale', locale);
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
 function shouldUseSecureCookies(req: NextRequest) {
   const forwardedProto = req.headers
     .get('x-forwarded-proto')
@@ -203,22 +191,7 @@ function syncAuthPresenceCookie(
 }
 
 function applySecurityHeaders(res: NextResponse) {
-  res.headers.set('Content-Security-Policy', CONTENT_SECURITY_POLICY);
-  res.headers.set('X-DNS-Prefetch-Control', 'on');
-  res.headers.set('X-Frame-Options', 'DENY');
-  res.headers.set('X-Content-Type-Options', 'nosniff');
-  res.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
-  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.headers.set(
-    'Permissions-Policy',
-    'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()',
-  );
-  res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-  res.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
-  res.headers.set(
-    'Strict-Transport-Security',
-    'max-age=31536000; includeSubDomains; preload',
-  );
+  SECURITY_HEADERS.forEach(({ key, value }) => res.headers.set(key, value));
   return res;
 }
 
@@ -266,6 +239,7 @@ function getRequestOrigin(req: NextRequest): string {
 function isOriginAllowed(req: NextRequest, origin: string): boolean {
   if (!origin) return false;
   if (CORS_ALLOWED_ORIGINS.has(origin)) return true;
+  if (!IS_DEV) return false;
   if (origin === getRequestOrigin(req)) return true;
 
   try {
@@ -277,6 +251,28 @@ function isOriginAllowed(req: NextRequest, origin: string): boolean {
   }
 
   return false;
+}
+
+function hasCookieAuthentication(req: NextRequest): boolean {
+  return ['access_token', 'refresh_token', 'session_id'].some(name =>
+    Boolean(req.cookies.get(name)?.value),
+  );
+}
+
+function hasBearerAuthentication(req: NextRequest): boolean {
+  return /^Bearer\s+\S+/i.test(req.headers.get('authorization') || '');
+}
+
+function isTrustedCookieMutationWithoutOrigin(
+  req: NextRequest,
+  origin: string,
+  secFetchSite: string,
+): boolean {
+  if (origin || !hasCookieAuthentication(req) || hasBearerAuthentication(req)) {
+    return true;
+  }
+
+  return secFetchSite === 'same-origin';
 }
 
 function localizeInternalPath(target: string, locale: Locale): string {
@@ -323,7 +319,7 @@ function buildCanonicalSearchTarget(
   params.set('type', type);
   params.set('q', query);
 
-  return `/search?${params.toString()}`;
+  return `/explore?${params.toString()}`;
 }
 
 function getCanonicalIndexTarget(
@@ -468,13 +464,13 @@ function getLegacySuperAppTarget(
   }
 
   const serviceTargets: Record<string, string> = {
-    car: '/search?type=product&q=grosir%20usaha',
-    driver: '/search?type=service&q=kurir%20pickup%20usaha',
+    car: '/explore?type=product&q=grosir%20usaha',
+    driver: '/explore?type=service&q=kurir%20pickup%20usaha',
     food: '/umkm?q=kuliner',
-    mart: '/search?type=product&q=bahan%20baku%20kemasan',
-    ride: '/search?type=service&q=kurir%20pickup%20usaha',
-    send: '/search?type=service&q=jasa%20pengiriman%20usaha',
-    services: '/search?type=service&q=jasa%20operasional%20umkm',
+    mart: '/explore?type=product&q=bahan%20baku%20kemasan',
+    ride: '/explore?type=service&q=kurir%20pickup%20usaha',
+    send: '/explore?type=service&q=jasa%20pengiriman%20usaha',
+    services: '/explore?type=service&q=jasa%20operasional%20umkm',
   };
 
   return serviceTargets[service]
@@ -670,6 +666,20 @@ export async function proxy(req: NextRequest) {
       );
     }
 
+    if (
+      isMutation &&
+      !isTrustedCookieMutationWithoutOrigin(req, origin, secFetchSite)
+    ) {
+      return applyNoIndexHeader(
+        applySecurityHeaders(
+          NextResponse.json(
+            { error: 'A trusted request origin is required.' },
+            { status: 403 },
+          ),
+        ),
+      );
+    }
+
     const isPreflight = req.method === 'OPTIONS';
     if (isPreflight && origin && !isAllowedOrigin) {
       return applyNoIndexHeader(
@@ -685,7 +695,10 @@ export async function proxy(req: NextRequest) {
       response.headers.set('Access-Control-Allow-Origin', origin);
     }
 
-    response.headers.set('Vary', 'Origin');
+    response.headers.set(
+      'Vary',
+      'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
+    );
     response.headers.set('Access-Control-Allow-Credentials', 'true');
     response.headers.set(
       'Access-Control-Allow-Methods',
@@ -753,6 +766,14 @@ export async function proxy(req: NextRequest) {
     return redirectToLocalizedTarget(req, locale, '/home');
   }
 
+  if (routePath === '/search') {
+    return redirectToLocalizedTarget(
+      req,
+      locale,
+      appendCurrentSearchToTarget(req, '/explore'),
+    );
+  }
+
   const canonicalTarget =
     getCanonicalIndexTarget(req, routePath) ||
     CANONICAL_INDEX_REDIRECTS[routePath];
@@ -779,6 +800,19 @@ export async function proxy(req: NextRequest) {
       req,
       locale,
       appendCurrentSearchToTarget(req, '/community'),
+    );
+  }
+
+  const legacyExploreCategoryTarget =
+    LEGACY_EXPLORE_CATEGORY_REDIRECTS[routePath];
+  if (legacyExploreCategoryTarget) {
+    return redirectToLocalizedTarget(
+      req,
+      locale,
+      appendCurrentSearchToTarget(req, legacyExploreCategoryTarget, [
+        'category',
+        'type',
+      ]),
     );
   }
 
@@ -838,7 +872,7 @@ export async function proxy(req: NextRequest) {
         NextResponse.redirect(new URL(target, req.url)),
       );
     }
-    return finalizeLocalizedResponse(NextResponse.next());
+    return finalizeLocalizedResponse(nextLocalizedRequest(req, locale));
   }
 
   const isProtectedPrefix = isProtectedRoutePath(routePath);
@@ -849,7 +883,7 @@ export async function proxy(req: NextRequest) {
       log('Recoverable session detected, defer redirect to client refresh', {
         reason: auth.reason,
       });
-      return finalizeLocalizedResponse(NextResponse.next());
+      return finalizeLocalizedResponse(nextLocalizedRequest(req, locale));
     }
 
     const isFetch = req.headers.get('accept')?.includes('application/json');
@@ -857,7 +891,7 @@ export async function proxy(req: NextRequest) {
       log(
         'Dev fetch request allowed without redirect for client-side auth handling',
       );
-      return finalizeLocalizedResponse(NextResponse.next());
+      return finalizeLocalizedResponse(nextLocalizedRequest(req, locale));
     }
 
     return redirectToLogin(
@@ -874,7 +908,7 @@ export async function proxy(req: NextRequest) {
     return syncAuthPresenceCookie(req, redirectToHome(req, locale), true);
   }
 
-  return finalizeLocalizedResponse(NextResponse.next());
+  return finalizeLocalizedResponse(nextLocalizedRequest(req, locale));
 }
 
 /* ---------------- MATCHER ---------------- */

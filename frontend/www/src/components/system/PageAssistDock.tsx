@@ -89,8 +89,8 @@ export function PageAssistDock() {
   const config = useMemo<AssistConfig>(() => {
     const isId = locale === 'id';
     const fallbackSearch: AssistAction = {
-      href: '/search',
-      label: isId ? 'Cari kebutuhan' : 'Search needs',
+      href: '/explore',
+      label: isId ? 'Jelajahi' : 'Explore',
       icon: Compass,
     };
     const fallbackSupport: AssistAction = {
@@ -101,7 +101,9 @@ export function PageAssistDock() {
 
     if (cleanPath.startsWith('/create')) {
       return {
-        title: isId ? 'Isi singkat dulu.' : 'Answer briefly, we will help clean it up.',
+        title: isId
+          ? 'Isi singkat dulu.'
+          : 'Answer briefly, we will help clean it up.',
         description: isId
           ? 'Yang penting isi intinya. Kalau belum lengkap, simpan dulu.'
           : 'If it is not complete yet, save it first. It does not need to be perfect upfront.',
@@ -117,35 +119,37 @@ export function PageAssistDock() {
       };
     }
 
-    if (cleanPath.startsWith('/search')) {
+    if (cleanPath.startsWith('/explore')) {
       return {
-        title: isId ? 'Cari yang dekat dulu.' : 'Start from the closest results first.',
+        title: isId
+          ? 'Cari yang dekat dulu.'
+          : 'Start from the closest results first.',
         description: isId
           ? 'Pilih yang jelas, mudah dihubungi, dan paling masuk akal dulu.'
           : 'Search first, then narrow it down only if needed.',
         actions: [
           user
             ? {
-              href: '/create?mode=quick',
-              label: isId ? 'Posting kebutuhan' : 'Post a need',
-              icon: PlusSquare,
-              primary: true,
-            }
+                href: '/create?mode=quick',
+                label: isId ? 'Posting kebutuhan' : 'Post a need',
+                icon: PlusSquare,
+                primary: true,
+              }
             : {
-              href: '/register',
-              label: isId ? 'Daftar gratis' : 'Start free',
-              icon: ShieldCheck,
-              primary: true,
-            },
+                href: '/register',
+                label: isId ? 'Daftar gratis' : 'Start free',
+                icon: ShieldCheck,
+                primary: true,
+              },
           fallbackSupport,
           ...(user
             ? [
-              {
-                href: '/dashboard',
-                label: isId ? 'Lihat yang aktif' : 'See today tasks',
-                icon: LayoutDashboard,
-              },
-            ]
+                {
+                  href: '/dashboard',
+                  label: isId ? 'Lihat yang aktif' : 'See today tasks',
+                  icon: LayoutDashboard,
+                },
+              ]
             : []),
         ],
       };
@@ -157,7 +161,9 @@ export function PageAssistDock() {
       cleanPath.startsWith('/usaha')
     ) {
       return {
-        title: isId ? 'Lanjut yang paling dekat hasilnya.' : 'Today, continue what is closest to results.',
+        title: isId
+          ? 'Lanjut yang paling dekat hasilnya.'
+          : 'Today, continue what is closest to results.',
         description: isId
           ? 'Balas chat, cek transaksi, atau bikin posting baru.'
           : 'Reply to chats, check transactions, or post a new offer.',
@@ -203,7 +209,9 @@ export function PageAssistDock() {
     if (cleanPath.startsWith('/support') || cleanPath.startsWith('/help')) {
       return {
         title: isId ? 'Bantuan dibuat singkat.' : 'Support kept concise',
-        description: isId ? 'Pilih masalah yang paling mirip dulu.' : 'Search or go back.',
+        description: isId
+          ? 'Pilih masalah yang paling mirip dulu.'
+          : 'Search or go back.',
         actions: [fallbackSearch],
       };
     }
@@ -216,25 +224,25 @@ export function PageAssistDock() {
       actions: [
         user
           ? {
-            href: '/create?mode=quick',
-            label: isId ? 'Posting cepat' : 'Post quickly',
-            icon: PlusSquare,
-            primary: true,
-          }
+              href: '/create?mode=quick',
+              label: isId ? 'Posting cepat' : 'Post quickly',
+              icon: PlusSquare,
+              primary: true,
+            }
           : {
-            href: '/register',
-            label: isId ? 'Daftar gratis' : 'Start free',
-            icon: ShieldCheck,
-            primary: true,
-          },
+              href: '/register',
+              label: isId ? 'Daftar gratis' : 'Start free',
+              icon: ShieldCheck,
+              primary: true,
+            },
         ...(user
           ? [
-            {
-              href: '/dashboard',
-              label: isId ? 'Yang aktif' : 'Today tasks',
-              icon: LayoutDashboard,
-            },
-          ]
+              {
+                href: '/dashboard',
+                label: isId ? 'Yang aktif' : 'Today tasks',
+                icon: LayoutDashboard,
+              },
+            ]
           : []),
         fallbackSearch,
         fallbackSupport,
@@ -284,21 +292,27 @@ export function PageAssistDock() {
   const panelActions =
     showAdminChatLauncher && user
       ? [
-        ...config.actions,
-        {
-          label: locale === 'id' ? 'Chat admin' : 'Chat admin',
-          icon: MessageCircle,
-          onClick: () => {
-            void openAdminChat();
+          ...config.actions,
+          {
+            label: locale === 'id' ? 'Chat admin' : 'Chat admin',
+            icon: MessageCircle,
+            onClick: () => {
+              void openAdminChat();
+            },
           },
-        },
-      ]
+        ]
       : config.actions;
   const primaryAction =
     panelActions.find(action => action.primary) ?? panelActions[0] ?? null;
-  const secondaryActions = panelActions.filter(action => action !== primaryAction);
+  const secondaryActions = panelActions.filter(
+    action => action !== primaryAction,
+  );
 
-  if (cleanPath === '/' || cleanPath.startsWith('/home') || cleanPath.startsWith('/search')) {
+  if (
+    cleanPath === '/' ||
+    cleanPath.startsWith('/home') ||
+    cleanPath.startsWith('/explore')
+  ) {
     return null;
   }
 
@@ -356,14 +370,16 @@ export function PageAssistDock() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            aria-label={locale === 'id' ? 'Buka bantuan cepat' : 'Open quick help'}
+            aria-label={
+              locale === 'id' ? 'Buka bantuan cepat' : 'Open quick help'
+            }
             aria-expanded={open}
             aria-controls="page-assist-dock-panel"
             className={cn(
               'group pointer-events-auto relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--app-accent-border)] bg-[radial-gradient(circle_at_30%_30%,color-mix(in_srgb,var(--app-accent-soft)_92%,white_8%),color-mix(in_srgb,var(--app-accent)_82%,var(--app-surface-strong)_18%))] text-[color:var(--app-accent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--app-accent)_26%,transparent)] transition-all duration-300 ease-out motion-reduce:transition-none sm:h-[52px] sm:w-[52px]',
               open
                 ? 'pointer-events-none translate-y-4 scale-75 opacity-0'
-                : 'translate-y-0 scale-100 opacity-100 hover:-translate-y-1 hover:scale-105'
+                : 'translate-y-0 scale-100 opacity-100 hover:-translate-y-1 hover:scale-105',
             )}
           >
             <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--app-accent-soft)_78%,transparent),transparent_72%)] opacity-80" />
@@ -378,7 +394,7 @@ export function PageAssistDock() {
               'absolute bottom-full right-0 mb-3 origin-bottom-right transition-all duration-300 ease-out motion-reduce:transition-none',
               open
                 ? 'pointer-events-auto visible translate-y-0 scale-100 opacity-100'
-                : 'pointer-events-none invisible translate-y-6 scale-[0.78] opacity-0'
+                : 'pointer-events-none invisible translate-y-6 scale-[0.78] opacity-0',
             )}
           >
             <div className="ui-assist-dock relative w-[min(86vw,320px)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent-border)_70%,var(--app-border)_30%)] bg-[linear-gradient(160deg,color-mix(in_srgb,var(--app-surface-strong)_96%,white_4%),color-mix(in_srgb,var(--app-accent-soft)_28%,var(--app-surface-strong)_72%))] px-4 py-4 shadow-[0_26px_80px_color-mix(in_srgb,var(--app-accent)_16%,transparent)] sm:w-[min(88vw,340px)] sm:rounded-[28px]">
@@ -405,7 +421,9 @@ export function PageAssistDock() {
                   type="button"
                   onClick={() => setOpen(false)}
                   className="ui-shell-button h-9 w-9 shrink-0 rounded-full px-0"
-                  aria-label={locale === 'id' ? 'Tutup bantuan cepat' : 'Close quick help'}
+                  aria-label={
+                    locale === 'id' ? 'Tutup bantuan cepat' : 'Close quick help'
+                  }
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -413,7 +431,9 @@ export function PageAssistDock() {
 
               <div className="relative mt-4 rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-accent-border)_40%,var(--app-border)_60%)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_84%,white_16%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
                 {primaryAction ? (
-                  <div className="min-w-0">{renderAction(primaryAction, true)}</div>
+                  <div className="min-w-0">
+                    {renderAction(primaryAction, true)}
+                  </div>
                 ) : null}
 
                 <div className="mt-3 flex flex-wrap gap-2">

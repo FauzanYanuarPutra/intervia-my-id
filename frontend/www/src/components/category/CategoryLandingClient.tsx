@@ -108,7 +108,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'Trusted quality with competitive pricing',
     },
     illustration: localHomeVisual('supplier'),
-    browseHref: '/search?q=supplier%20bahan%20baku',
+    browseHref: '/explore?q=supplier%20bahan%20baku',
     searchQuery: 'supplier bahan baku',
   },
   {
@@ -133,7 +133,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'Compare area, traffic, and budget faster',
     },
     illustration: localHomeVisual('location'),
-    browseHref: '/search?type=property&q=lokasi%20usaha',
+    browseHref: '/explore?type=property&q=lokasi%20usaha',
     searchQuery: 'lokasi usaha',
   },
   {
@@ -158,7 +158,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'From design and admin to hands-on execution',
     },
     illustration: localContentImageForTopic('service', 'category-service'),
-    browseHref: '/search?q=jasa%20usaha',
+    browseHref: '/explore?q=jasa%20usaha',
     searchQuery: 'jasa usaha',
   },
   {
@@ -183,7 +183,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'Fast-moving items, safer margins, cleaner sourcing',
     },
     illustration: localContentImageForTopic('product', 'category-product'),
-    browseHref: '/search?type=product&q=produk%20reseller',
+    browseHref: '/explore?type=product&q=produk%20reseller',
     searchQuery: 'produk reseller',
   },
   {
@@ -208,7 +208,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'Freelancers, admins, sales support, and creative partners',
     },
     illustration: localContentImageForTopic('talent', 'category-talent'),
-    browseHref: '/search?type=freelancer&q=talent%20usaha',
+    browseHref: '/explore?type=freelancer&q=talent%20usaha',
     searchQuery: 'talent usaha',
   },
 ];
@@ -248,61 +248,61 @@ const ALL_CATEGORY_TOPICS: TopicChip[] = [
     id: 'ayam',
     emoji: '🐔',
     label: { id: 'Ayam & Daging', en: 'Chicken & Meat' },
-    href: '/search?q=supplier%20ayam',
+    href: '/explore?q=supplier%20ayam',
   },
   {
     id: 'seafood',
     emoji: '🐟',
     label: { id: 'Ikan & Seafood', en: 'Seafood' },
-    href: '/search?q=ikan%20seafood',
+    href: '/explore?q=ikan%20seafood',
   },
   {
     id: 'vegetables',
     emoji: '🥬',
     label: { id: 'Sayuran', en: 'Vegetables' },
-    href: '/search?q=sayuran',
+    href: '/explore?q=sayuran',
   },
   {
     id: 'fruit',
     emoji: '🍎',
     label: { id: 'Buah-buahan', en: 'Fruits' },
-    href: '/search?q=buah',
+    href: '/explore?q=buah',
   },
   {
     id: 'dry',
     emoji: '📦',
     label: { id: 'Bahan Kering', en: 'Dry Goods' },
-    href: '/search?q=bahan%20kering',
+    href: '/explore?q=bahan%20kering',
   },
   {
     id: 'drinks',
     emoji: '🥤',
     label: { id: 'Minuman', en: 'Drinks' },
-    href: '/search?q=minuman',
+    href: '/explore?q=minuman',
   },
   {
     id: 'kitchen',
     emoji: '🍳',
     label: { id: 'Peralatan Dapur', en: 'Kitchen Tools' },
-    href: '/search?q=peralatan%20dapur',
+    href: '/explore?q=peralatan%20dapur',
   },
   {
     id: 'packaging',
     emoji: '🧃',
     label: { id: 'Kemasan', en: 'Packaging' },
-    href: '/search?q=kemasan',
+    href: '/explore?q=kemasan',
   },
   {
     id: 'creative',
     emoji: '✏️',
     label: { id: 'Desain & Kreatif', en: 'Design & Creative' },
-    href: '/search?q=desain%20kreatif',
+    href: '/explore?q=desain%20kreatif',
   },
   {
     id: 'marketing',
     emoji: '📣',
     label: { id: 'Marketing', en: 'Marketing' },
-    href: '/search?q=marketing',
+    href: '/explore?q=marketing',
   },
 ];
 
@@ -312,37 +312,37 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'chicken',
       emoji: '🐔',
       label: { id: 'Ayam', en: 'Chicken' },
-      href: '/search?q=supplier%20ayam',
+      href: '/explore?q=supplier%20ayam',
     },
     {
       id: 'meat',
       emoji: '🥩',
       label: { id: 'Daging', en: 'Meat' },
-      href: '/search?q=supplier%20daging',
+      href: '/explore?q=supplier%20daging',
     },
     {
       id: 'seafood',
       emoji: '🐟',
       label: { id: 'Ikan & Seafood', en: 'Seafood' },
-      href: '/search?q=supplier%20seafood',
+      href: '/explore?q=supplier%20seafood',
     },
     {
       id: 'vegetables',
       emoji: '🥬',
       label: { id: 'Sayuran', en: 'Vegetables' },
-      href: '/search?q=supplier%20sayuran',
+      href: '/explore?q=supplier%20sayuran',
     },
     {
       id: 'fruit',
       emoji: '🍊',
       label: { id: 'Buah', en: 'Fruit' },
-      href: '/search?q=supplier%20buah',
+      href: '/explore?q=supplier%20buah',
     },
     {
       id: 'dry',
       emoji: '📦',
       label: { id: 'Bahan Kering', en: 'Dry Goods' },
-      href: '/search?q=bahan%20kering',
+      href: '/explore?q=bahan%20kering',
     },
   ],
   location: [
@@ -350,37 +350,37 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'ruko',
       emoji: '🏬',
       label: { id: 'Ruko', en: 'Shophouse' },
-      href: '/search?type=property&q=ruko',
+      href: '/explore?type=property&q=ruko',
     },
     {
       id: 'kios',
       emoji: '🛍️',
       label: { id: 'Kios', en: 'Kiosk' },
-      href: '/search?type=property&q=kios',
+      href: '/explore?type=property&q=kios',
     },
     {
       id: 'booth',
       emoji: '🧺',
       label: { id: 'Booth', en: 'Booth' },
-      href: '/search?type=property&q=booth',
+      href: '/explore?type=property&q=booth',
     },
     {
       id: 'cloud',
       emoji: '🍽️',
       label: { id: 'Cloud Kitchen', en: 'Cloud Kitchen' },
-      href: '/search?type=property&q=cloud%20kitchen',
+      href: '/explore?type=property&q=cloud%20kitchen',
     },
     {
       id: 'warehouse',
       emoji: '🏭',
       label: { id: 'Gudang Kecil', en: 'Small Warehouse' },
-      href: '/search?type=property&q=gudang',
+      href: '/explore?type=property&q=gudang',
     },
     {
       id: 'mall',
       emoji: '🏢',
       label: { id: 'Mall Area', en: 'Mall Area' },
-      href: '/search?type=property&q=mall',
+      href: '/explore?type=property&q=mall',
     },
   ],
   service: [
@@ -388,37 +388,37 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'design',
       emoji: '🎨',
       label: { id: 'Desain', en: 'Design' },
-      href: '/search?q=jasa%20desain',
+      href: '/explore?q=jasa%20desain',
     },
     {
       id: 'photo',
       emoji: '📷',
       label: { id: 'Foto Produk', en: 'Product Photo' },
-      href: '/search?q=foto%20produk',
+      href: '/explore?q=foto%20produk',
     },
     {
       id: 'admin',
       emoji: '🧾',
       label: { id: 'Admin', en: 'Admin' },
-      href: '/search?q=jasa%20admin',
+      href: '/explore?q=jasa%20admin',
     },
     {
       id: 'legal',
       emoji: '⚖️',
       label: { id: 'Legal', en: 'Legal' },
-      href: '/search?q=jasa%20legal',
+      href: '/explore?q=jasa%20legal',
     },
     {
       id: 'marketing',
       emoji: '📣',
       label: { id: 'Marketing', en: 'Marketing' },
-      href: '/search?q=jasa%20marketing',
+      href: '/explore?q=jasa%20marketing',
     },
     {
       id: 'delivery',
       emoji: '🛵',
       label: { id: 'Kurir', en: 'Courier' },
-      href: '/search?q=jasa%20kurir',
+      href: '/explore?q=jasa%20kurir',
     },
   ],
   product: [
@@ -426,37 +426,37 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'frozen',
       emoji: '🧊',
       label: { id: 'Frozen Food', en: 'Frozen Food' },
-      href: '/search?type=product&q=Frozen%20Food',
+      href: '/explore?type=product&q=Frozen%20Food',
     },
     {
       id: 'drinks',
       emoji: '🥤',
       label: { id: 'Minuman', en: 'Drinks' },
-      href: '/search?type=product&q=Minuman',
+      href: '/explore?type=product&q=Minuman',
     },
     {
       id: 'snacks',
       emoji: '🍪',
       label: { id: 'Snack', en: 'Snacks' },
-      href: '/search?type=product&q=Snack',
+      href: '/explore?type=product&q=Snack',
     },
     {
       id: 'staples',
       emoji: '🛒',
       label: { id: 'Sembako', en: 'Staples' },
-      href: '/search?type=product&q=Sembako',
+      href: '/explore?type=product&q=Sembako',
     },
     {
       id: 'packaging',
       emoji: '📦',
       label: { id: 'Kemasan', en: 'Packaging' },
-      href: '/search?type=product&q=Kemasan',
+      href: '/explore?type=product&q=Kemasan',
     },
     {
       id: 'tools',
       emoji: '🍳',
       label: { id: 'Peralatan', en: 'Tools' },
-      href: '/search?type=product&q=Peralatan',
+      href: '/explore?type=product&q=Peralatan',
     },
   ],
   talent: [
@@ -464,37 +464,37 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'cashier',
       emoji: '💳',
       label: { id: 'Kasir', en: 'Cashier' },
-      href: '/search?type=freelancer&q=kasir',
+      href: '/explore?type=freelancer&q=kasir',
     },
     {
       id: 'admin',
       emoji: '🧾',
       label: { id: 'Admin Toko', en: 'Store Admin' },
-      href: '/search?type=freelancer&q=admin%20toko',
+      href: '/explore?type=freelancer&q=admin%20toko',
     },
     {
       id: 'creator',
       emoji: '🎥',
       label: { id: 'Konten Kreator', en: 'Content Creator' },
-      href: '/search?type=freelancer&q=konten%20kreator',
+      href: '/explore?type=freelancer&q=konten%20kreator',
     },
     {
       id: 'sales',
       emoji: '🤝',
       label: { id: 'Sales', en: 'Sales' },
-      href: '/search?type=freelancer&q=sales',
+      href: '/explore?type=freelancer&q=sales',
     },
     {
       id: 'ops',
       emoji: '📋',
       label: { id: 'Operasional', en: 'Operations' },
-      href: '/search?type=freelancer&q=operasional',
+      href: '/explore?type=freelancer&q=operasional',
     },
     {
       id: 'design',
       emoji: '✏️',
       label: { id: 'Desainer', en: 'Designer' },
-      href: '/search?type=freelancer&q=desainer',
+      href: '/explore?type=freelancer&q=desainer',
     },
   ],
 };
@@ -511,17 +511,17 @@ function canonicalizeDiscoveryHref(href: string): string {
 
   if (pathname === '/property') {
     const query = params.get('q') || params.get('category') || 'lokasi jualan';
-    return `/search?type=property&q=${encodeURIComponent(query)}`;
+    return `/explore?type=property&q=${encodeURIComponent(query)}`;
   }
 
   if (pathname === '/marketplace') {
     const query = params.get('q') || params.get('category') || 'supplier';
-    return `/search?type=product&q=${encodeURIComponent(query)}`;
+    return `/explore?type=product&q=${encodeURIComponent(query)}`;
   }
 
   if (pathname === '/freelancers') {
     const query = params.get('q') || 'umkm';
-    return `/search?type=freelancer&q=${encodeURIComponent(query)}`;
+    return `/explore?type=freelancer&q=${encodeURIComponent(query)}`;
   }
 
   return href;
@@ -590,19 +590,19 @@ function getPrimaryAction(
 ): { href: string; label: string } {
   if (category === 'location') {
     return {
-      href: '/search?type=property&q=lokasi%20jualan',
+      href: '/explore?type=property&q=lokasi%20jualan',
       label: isId ? 'Cari Lokasi' : 'Find Location',
     };
   }
   if (category === 'product') {
     return {
-      href: '/search?type=product&q=supplier',
+      href: '/explore?type=product&q=supplier',
       label: isId ? 'Lihat Produk' : 'View Products',
     };
   }
   if (category === 'talent') {
     return {
-      href: '/search?type=freelancer&q=umkm',
+      href: '/explore?type=freelancer&q=umkm',
       label: isId ? 'Cari Talent' : 'Find Talent',
     };
   }
@@ -679,7 +679,7 @@ export function CategoryLandingClient({
     event.preventDefault();
     const trimmed = searchValue.trim();
     router.push(
-      trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : '/search',
+      trimmed ? `/explore?q=${encodeURIComponent(trimmed)}` : '/explore',
     );
   };
 
@@ -1066,7 +1066,7 @@ export function CategoryLandingClient({
                   }
                   actionHref={
                     desktopCategory === 'all'
-                      ? '/search'
+                      ? '/explore'
                       : CATEGORY_BY_ID[desktopCategory].browseHref
                   }
                   actionLabel={isId ? 'Lihat Semua' : 'View All'}
@@ -1097,7 +1097,7 @@ export function CategoryLandingClient({
                   }
                   actionHref={
                     desktopCategory === 'all'
-                      ? '/search'
+                      ? '/explore'
                       : CATEGORY_BY_ID[desktopCategory].browseHref
                   }
                   actionLabel={isId ? 'Lihat Semua' : 'View All'}
@@ -1118,7 +1118,7 @@ export function CategoryLandingClient({
                     isId={isId}
                     href={
                       desktopCategory === 'all'
-                        ? '/search'
+                        ? '/explore'
                         : CATEGORY_BY_ID[desktopCategory].browseHref
                     }
                   />

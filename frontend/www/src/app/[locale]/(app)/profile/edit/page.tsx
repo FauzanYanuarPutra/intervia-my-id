@@ -24,7 +24,15 @@ import {
 } from '@/lib/media/prepareUploadMedia';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import { ArrowLeft, Globe2, Loader2, Save, Upload } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CircleAlert,
+  Globe2,
+  Loader2,
+  Save,
+  Upload,
+} from 'lucide-react';
 
 type UserDetail = {
   id: string;
@@ -55,6 +63,12 @@ type LinkEntry = {
 };
 
 type EditFocus = 'identity' | 'work' | 'media';
+type ProfileChecklistItem = {
+  key: string;
+  label: string;
+  focus: EditFocus;
+  done: boolean;
+};
 
 function createEmptyProfileEntry(): ProfileEntry {
   return { title: '', subtitle: '', meta: '', url: '' };
@@ -385,37 +399,111 @@ export default function EditProfilePage() {
     [publicProfilePath],
   );
 
+  const profileChecklist = useMemo<ProfileChecklistItem[]>(
+    () => [
+      {
+        key: 'fullName',
+        label: 'Nama jelas',
+        focus: 'identity',
+        done: Boolean(fullName.trim()),
+      },
+      {
+        key: 'location',
+        label: 'Kota / area',
+        focus: 'identity',
+        done: Boolean(location.trim()),
+      },
+      {
+        key: 'bio',
+        label: 'Bio singkat',
+        focus: 'identity',
+        done: Boolean(bio.trim()),
+      },
+      {
+        key: 'avatar',
+        label: 'Foto profil',
+        focus: 'media',
+        done: Boolean(avatarUrl.trim()),
+      },
+      {
+        key: 'headline',
+        label: 'Judul keahlian',
+        focus: 'work',
+        done: Boolean(headline.trim()),
+      },
+      {
+        key: 'skills',
+        label: 'Skill / layanan',
+        focus: 'work',
+        done: Boolean(skills.trim()),
+      },
+      {
+        key: 'provider',
+        label: 'Judul usaha',
+        focus: 'work',
+        done: Boolean(providerHeadline.trim()),
+      },
+      {
+        key: 'buyerIntent',
+        label: 'Kebutuhan buyer',
+        focus: 'work',
+        done: Boolean(buyerIntent.trim()),
+      },
+      {
+        key: 'gallery',
+        label: 'Galeri usaha',
+        focus: 'media',
+        done: galleryImages.length > 0,
+      },
+      {
+        key: 'education',
+        label: 'Pendidikan',
+        focus: 'work',
+        done: educationEntries.length > 0,
+      },
+      {
+        key: 'certificates',
+        label: 'Sertifikat',
+        focus: 'work',
+        done: certificateEntries.length > 0,
+      },
+      {
+        key: 'experience',
+        label: 'Pengalaman',
+        focus: 'work',
+        done: experienceEntries.length > 0,
+      },
+    ],
+    [
+      avatarUrl,
+      bio,
+      buyerIntent,
+      certificateEntries.length,
+      educationEntries.length,
+      experienceEntries.length,
+      fullName,
+      galleryImages.length,
+      headline,
+      location,
+      providerHeadline,
+      skills,
+    ],
+  );
+
   const profileScore = useMemo(() => {
-    const checks = [
-      fullName.trim(),
-      location.trim(),
-      bio.trim(),
-      avatarUrl.trim(),
-      headline.trim(),
-      skills.trim(),
-      providerHeadline.trim(),
-      buyerIntent.trim(),
-      galleryImages.length > 0 ? '1' : '',
-      educationEntries.length > 0 ? '1' : '',
-      certificateEntries.length > 0 ? '1' : '',
-      experienceEntries.length > 0 ? '1' : '',
-    ];
-    const complete = checks.filter(Boolean).length;
-    return Math.round((complete / checks.length) * 100);
-  }, [
-    avatarUrl,
-    bio,
-    buyerIntent,
-    certificateEntries.length,
-    educationEntries.length,
-    experienceEntries.length,
-    fullName,
-    galleryImages.length,
-    headline,
-    location,
-    providerHeadline,
-    skills,
-  ]);
+    const complete = profileChecklist.filter(item => item.done).length;
+    return Math.round((complete / profileChecklist.length) * 100);
+  }, [profileChecklist]);
+
+  const nextProfileTask = useMemo(
+    () => profileChecklist.find(item => !item.done) || null,
+    [profileChecklist],
+  );
+
+  const completedProfileItems = useMemo(
+    () => profileChecklist.filter(item => item.done).length,
+    [profileChecklist],
+  );
 
   const phoneDigits = useMemo(() => normalizePhoneDigits(phone), [phone]);
   const phoneVerificationReady = useMemo(
@@ -471,6 +559,19 @@ export default function EditProfilePage() {
     );
   };
 
+  const focusAndScrollSection = (focus: EditFocus) => {
+    setFocusSection(focus);
+    if (typeof window === 'undefined') return;
+
+    const target = focusSections.find(section => section.key === focus);
+    window.setTimeout(() => {
+      if (!target) return;
+      document
+        .getElementById(target.targetId)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  };
+
   useEffect(() => {
     const raw = searchParams.get('focus');
     const nextFocus =
@@ -492,9 +593,49 @@ export default function EditProfilePage() {
     focusSections.find(section => section.key === activeFocus) ||
     focusSections[0];
 
-  const inputClass = 'ui-control ui-data-control w-full px-3 text-sm';
+  const focusProgress = useMemo(() => {
+    const progress = focusSections.reduce(
+      (acc, section) => {
+        const items = profileChecklist.filter(
+          item => item.focus === section.key,
+        );
+        const complete = items.filter(item => item.done).length;
+        acc[section.key] = {
+          complete,
+          total: items.length,
+          percent:
+            items.length > 0 ? Math.round((complete / items.length) * 100) : 0,
+        };
+        return acc;
+      },
+      {} as Record<
+        EditFocus,
+        { complete: number; total: number; percent: number }
+      >,
+    );
+    return progress;
+  }, [focusSections, profileChecklist]);
+
+  const activeFocusProgress = focusProgress[activeFocus] || {
+    complete: 0,
+    total: 0,
+    percent: 0,
+  };
+
+  const activeFocusChecklist = useMemo(
+    () => profileChecklist.filter(item => item.focus === activeFocus),
+    [activeFocus, profileChecklist],
+  );
+
+  const activeFocusMissingCount = useMemo(
+    () => activeFocusChecklist.filter(item => !item.done).length,
+    [activeFocusChecklist],
+  );
+
+  const inputClass =
+    'ui-control ui-data-control min-h-11 w-full rounded-xl px-3 text-sm focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)]';
   const textareaClass =
-    'ui-control ui-data-control ui-data-textarea w-full px-3 py-2 text-sm';
+    'ui-control ui-data-control ui-data-textarea w-full rounded-xl px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)]';
 
   const isFocusVisible = (
     focus: 'identity' | 'talent' | 'seller' | 'buyer' | 'media',
@@ -507,11 +648,18 @@ export default function EditProfilePage() {
   const sectionCardClass = (
     focus: 'identity' | 'talent' | 'seller' | 'buyer' | 'media',
   ) =>
-    `ui-panel p-4 transition ${
+    `ui-panel p-5 transition sm:p-6 ${
       isFocusVisible(focus)
         ? 'border-[color:var(--app-accent-border)] shadow-[0_20px_45px_-32px_rgba(16,185,129,0.55)]'
         : 'hidden'
     }`;
+
+  const saveDisabled =
+    saving ||
+    uploadingImages ||
+    uploadingDocs ||
+    uploadingCover ||
+    uploadingAvatar;
 
   const sendPhoneOtp = async () => {
     if (phoneDigits.length < 8) {
@@ -1097,87 +1245,202 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden ui-surface-muted pb-12 pt-4 dark:bg-[color:var(--app-surface-strong)] sm:pt-6">
-      <div className="page-shell max-w-4xl overflow-x-hidden">
-        <section className="ui-panel mb-4 p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] ui-accent-text">
-                Profil
-              </p>
-              <h1 className="mt-1 text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                Rapikan profil
-              </h1>
-              <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                Fokus ke satu area dulu. Sisanya bisa nyusul.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <LocalizedLink
-                href="/profile"
-                className="ui-button-secondary inline-flex w-full items-center gap-2 px-3 text-sm font-semibold sm:w-auto"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Kembali
-              </LocalizedLink>
-              <LocalizedLink
-                href={publicProfilePath}
-                className="ui-button-secondary inline-flex w-full items-center gap-2 px-3 text-sm font-semibold sm:w-auto"
-              >
-                <Globe2 className="h-4 w-4" />
-                Profil publik
-              </LocalizedLink>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={
-                  saving ||
-                  uploadingImages ||
-                  uploadingDocs ||
-                  uploadingCover ||
-                  uploadingAvatar
-                }
-                className="ui-button-primary inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-sm font-semibold disabled:opacity-60 sm:w-auto"
-              >
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Simpan perubahan
-              </button>
+    <div className="min-h-screen overflow-x-hidden ui-surface-muted pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 dark:bg-[color:var(--app-surface-strong)] sm:pt-6">
+      <div className="page-shell max-w-5xl overflow-x-hidden px-3 sm:px-4 lg:px-6">
+        <section className="ui-panel mb-5 overflow-hidden p-0">
+          <div className="border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] ui-accent-text">
+                  Profil
+                </p>
+                <h1 className="mt-1 text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                  Rapikan profil
+                </h1>
+                <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                  Buat profil gampang dipahami orang Indonesia: siapa kamu, apa
+                  yang ditawarkan, area mana, dan tombol mana yang bisa mereka
+                  klik.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end">
+                <LocalizedLink
+                  href="/profile"
+                  className="ui-button-secondary inline-flex w-full items-center justify-center gap-2 px-3 text-sm font-semibold"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Kembali
+                </LocalizedLink>
+                <LocalizedLink
+                  href={publicProfilePath}
+                  className="ui-button-secondary inline-flex w-full items-center justify-center gap-2 px-3 text-sm font-semibold"
+                >
+                  <Globe2 className="h-4 w-4" />
+                  Lihat publik
+                </LocalizedLink>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saveDisabled}
+                  className="ui-button-primary inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Simpan
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-sm font-semibold ui-accent-text">
-              Progress {profileScore}%
-            </span>
-            <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-sm font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-              Fokus {activeFocusSection.title}
-            </span>
+          <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-sm font-semibold ui-accent-text">
+                  Progress {profileScore}%
+                </span>
+                <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-sm font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
+                  {completedProfileItems}/{profileChecklist.length} selesai
+                </span>
+                <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-sm font-semibold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                  Fokus {activeFocusSection.title}
+                </span>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
+                <div
+                  className="h-full rounded-full bg-[color:var(--app-accent)] transition-[width] duration-500"
+                  style={{ width: `${profileScore}%` }}
+                />
+              </div>
+              <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {activeFocusSection.description} Tab ini sudah{' '}
+                {activeFocusProgress.complete}/{activeFocusProgress.total} item.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  {nextProfileTask ? (
+                    <CircleAlert className="h-5 w-5" />
+                  ) : (
+                    <CheckCircle2 className="h-5 w-5" />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {nextProfileTask
+                      ? 'Langkah berikutnya'
+                      : 'Profil sudah rapi'}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    {nextProfileTask
+                      ? nextProfileTask.label
+                      : 'Cek tampilan publik dan simpan perubahan terbaru.'}
+                  </p>
+                </div>
+              </div>
+              {nextProfileTask ? (
+                <button
+                  type="button"
+                  onClick={() => focusAndScrollSection(nextProfileTask.focus)}
+                  className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-bold ui-accent-text transition hover:bg-[color:var(--app-accent-soft)]"
+                >
+                  Isi bagian ini
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {focusSections.map(section => (
-              <button
-                key={section.key}
-                type="button"
-                onClick={() => setFocusSection(section.key)}
-                className={`inline-flex shrink-0 items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                  activeFocus === section.key
-                    ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-muted)]'
+          <div className="border-t border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)] sm:p-4">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {focusSections.map(section => {
+                const progress = focusProgress[section.key];
+                const active = activeFocus === section.key;
+
+                return (
+                  <button
+                    key={section.key}
+                    type="button"
+                    onClick={() => focusAndScrollSection(section.key)}
+                    className={`min-h-[74px] rounded-2xl border px-4 py-3 text-left transition ${
+                      active
+                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] shadow-sm'
+                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]'
+                    }`}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {section.title}
+                      </span>
+                      <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/10">
+                        {progress.complete}/{progress.total}
+                      </span>
+                    </span>
+                    <span className="mt-1 block line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                      {section.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] sm:p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  Checklist {activeFocusSection.title}
+                </p>
+                <p className="mt-0.5 text-xs text-[color:var(--app-text-soft)]">
+                  {activeFocusMissingCount > 0
+                    ? `${activeFocusMissingCount} item masih perlu diisi.`
+                    : 'Bagian ini sudah siap ditampilkan.'}
+                </p>
+              </div>
+              <span
+                className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-bold ${
+                  activeFocusMissingCount > 0
+                    ? 'bg-[color:var(--app-warning-soft)] ui-warning-text'
+                    : 'bg-[color:var(--app-success-soft)] text-[color:var(--app-success)]'
                 }`}
               >
-                {section.title}
-              </button>
-            ))}
-          </div>
+                {activeFocusProgress.complete}/{activeFocusProgress.total}{' '}
+                selesai
+              </span>
+            </div>
 
-          <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
-            {activeFocusSection.description}
-          </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {activeFocusChecklist.map(item =>
+                item.done ? (
+                  <div
+                    key={item.key}
+                    className="flex min-h-11 items-center gap-2 rounded-xl border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] px-3 text-sm font-semibold text-[color:var(--app-success)]"
+                  >
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 truncate">{item.label}</span>
+                  </div>
+                ) : (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => focusAndScrollSection(item.focus)}
+                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3 text-left text-sm font-semibold ui-warning-text transition hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <CircleAlert className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {item.label}
+                    </span>
+                    <span className="shrink-0 rounded-lg bg-white/80 px-2 py-1 text-[10px] font-bold dark:bg-white/10">
+                      Isi
+                    </span>
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
         </section>
 
         <div className="grid gap-4">
@@ -1190,7 +1453,7 @@ export default function EditProfilePage() {
             </h2>
             <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
               Dipakai untuk identitas utama akun, tampilan public profile, dan
-              hasil discover/search.
+              hasil Jelajahi.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <input
@@ -1964,37 +2227,38 @@ export default function EditProfilePage() {
           </p>
         ) : null}
 
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[color:var(--app-text-soft)]">
-            Simpan kalau info utamanya sudah pas.
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <LocalizedLink
-              href={publicProfilePath}
-              className="ui-button-secondary inline-flex w-full items-center gap-2 px-3 text-sm font-semibold sm:w-auto"
-            >
-              <Globe2 className="h-4 w-4" />
-              Profil publik
-            </LocalizedLink>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={
-                saving ||
-                uploadingImages ||
-                uploadingDocs ||
-                uploadingCover ||
-                uploadingAvatar
-              }
-              className="ui-button-primary inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-sm font-semibold disabled:opacity-60 sm:w-auto"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Simpan perubahan
-            </button>
+        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 mt-6 rounded-t-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_-18px_40px_-32px_rgba(15,23,42,0.55)] dark:border-[color:var(--app-border-strong)] sm:bottom-4 sm:mx-0 sm:rounded-2xl">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                Simpan perubahan profil
+              </p>
+              <p className="mt-0.5 text-xs text-[color:var(--app-text-soft)]">
+                Progress {profileScore}% - fokus {activeFocusSection.title}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <LocalizedLink
+                href={publicProfilePath}
+                className="ui-button-secondary inline-flex w-full items-center justify-center gap-2 px-3 text-sm font-semibold sm:w-auto"
+              >
+                <Globe2 className="h-4 w-4" />
+                Profil publik
+              </LocalizedLink>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saveDisabled}
+                className="ui-button-primary inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Simpan perubahan
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -3,13 +3,24 @@
   --app-bottom-nav-height: 0px;
   --app-safe-area-top: env(safe-area-inset-top, 0px);
   --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --app-viewport-height: 100vh;
+  --app-document-viewport-height: 100vh;
+  --app-visual-viewport-height: 100vh;
+  --visual-viewport-height: 100vh;
+  --app-viewport-height: var(--app-visual-viewport-height);
   --app-viewport-dynamic-height: 100vh;
   --app-viewport-small-height: 100vh;
+  --app-layout-viewport-height: 100vh;
+  --app-visual-viewport-width: 100vw;
+  --app-viewport-offset-top: 0px;
+  --app-viewport-offset-left: 0px;
+  --app-keyboard-inset-height: 0px;
+  --app-viewport-scale: 1;
   --app-mobile-topbar-height: calc(2.75rem + var(--app-safe-area-top));
   --app-mobile-bottom-nav-height: calc(4.5rem + var(--app-safe-area-bottom));
   --app-thumb-zone-gap: clamp(12px, 2.6vh, 22px);
-  --app-thumb-zone-offset: calc(var(--app-bottom-nav-height) + var(--app-thumb-zone-gap));
+  --app-thumb-zone-offset: calc(
+    var(--app-bottom-nav-height) + var(--app-thumb-zone-gap)
+  );
   --app-page-x-base: clamp(10px, 1.8vw, 20px);
   --app-mobile-page-x: 0.25rem;
   --app-section-y-base: clamp(10px, 1.8vw, 22px);
@@ -23,36 +34,52 @@
   --app-radius-lg: calc(var(--app-radius-lg-base) * var(--ui-radius-scale, 1));
   --app-brand-primary: #128a45;
   --app-brand-primary-strong: #0f6f39;
-  --app-brand-primary-soft: color-mix(in srgb,
-      var(--app-brand-primary) 16%,
-      transparent);
-  --app-brand-primary-border: color-mix(in srgb,
-      var(--app-brand-primary) 36%,
-      transparent);
+  --app-brand-primary-soft: color-mix(
+    in srgb,
+    var(--app-brand-primary) 16%,
+    transparent
+  );
+  --app-brand-primary-border: color-mix(
+    in srgb,
+    var(--app-brand-primary) 36%,
+    transparent
+  );
   --app-brand-action: #ff7a1a;
   --app-brand-action-strong: #e45f00;
-  --app-brand-action-soft: color-mix(in srgb,
-      var(--app-brand-action) 16%,
-      transparent);
-  --app-brand-action-border: color-mix(in srgb,
-      var(--app-brand-action) 36%,
-      transparent);
+  --app-brand-action-soft: color-mix(
+    in srgb,
+    var(--app-brand-action) 16%,
+    transparent
+  );
+  --app-brand-action-border: color-mix(
+    in srgb,
+    var(--app-brand-action) 36%,
+    transparent
+  );
   --app-brand-info: #0f766e;
   --app-brand-info-strong: #0b5f59;
-  --app-brand-info-soft: color-mix(in srgb,
-      var(--app-brand-info) 16%,
-      transparent);
-  --app-brand-info-border: color-mix(in srgb,
-      var(--app-brand-info) 36%,
-      transparent);
+  --app-brand-info-soft: color-mix(
+    in srgb,
+    var(--app-brand-info) 16%,
+    transparent
+  );
+  --app-brand-info-border: color-mix(
+    in srgb,
+    var(--app-brand-info) 36%,
+    transparent
+  );
   --app-brand-social: #18a058;
   --app-brand-social-strong: #128a45;
-  --app-brand-social-soft: color-mix(in srgb,
-      var(--app-brand-social) 14%,
-      transparent);
-  --app-brand-social-border: color-mix(in srgb,
-      var(--app-brand-social) 32%,
-      transparent);
+  --app-brand-social-soft: color-mix(
+    in srgb,
+    var(--app-brand-social) 14%,
+    transparent
+  );
+  --app-brand-social-border: color-mix(
+    in srgb,
+    var(--app-brand-social) 32%,
+    transparent
+  );
   --app-shadow:
     0 24px 56px -38px rgba(15, 23, 42, 0.18),
     0 10px 20px -18px rgba(18, 138, 69, 0.08);
@@ -124,19 +151,22 @@
   --z-modal: 200;
   --z-loading: 998;
   --z-offline: 999;
-  --z-preview: 1000;
+  --z-preview: 200000;
   --z-not-found: 999999;
 }
 
 @supports (height: 100svh) {
   :root {
-    --app-viewport-height: 100svh;
+    --app-document-viewport-height: 100svh;
+    --app-visual-viewport-height: 100svh;
+    --visual-viewport-height: 100svh;
     --app-viewport-small-height: 100svh;
   }
 }
 
 @supports (height: 100dvh) {
   :root {
+    --app-document-viewport-height: 100dvh;
     --app-viewport-dynamic-height: 100dvh;
   }
 }
@@ -144,36 +174,52 @@
 .dark {
   --app-brand-primary: #5ee28a;
   --app-brand-primary-strong: #34c56a;
-  --app-brand-primary-soft: color-mix(in srgb,
-      var(--app-brand-primary) 18%,
-      transparent);
-  --app-brand-primary-border: color-mix(in srgb,
-      var(--app-brand-primary) 38%,
-      transparent);
+  --app-brand-primary-soft: color-mix(
+    in srgb,
+    var(--app-brand-primary) 18%,
+    transparent
+  );
+  --app-brand-primary-border: color-mix(
+    in srgb,
+    var(--app-brand-primary) 38%,
+    transparent
+  );
   --app-brand-action: #ff8a3d;
   --app-brand-action-strong: #ff6b00;
-  --app-brand-action-soft: color-mix(in srgb,
-      var(--app-brand-action) 18%,
-      transparent);
-  --app-brand-action-border: color-mix(in srgb,
-      var(--app-brand-action) 38%,
-      transparent);
+  --app-brand-action-soft: color-mix(
+    in srgb,
+    var(--app-brand-action) 18%,
+    transparent
+  );
+  --app-brand-action-border: color-mix(
+    in srgb,
+    var(--app-brand-action) 38%,
+    transparent
+  );
   --app-brand-info: #5eead4;
   --app-brand-info-strong: #2dd4bf;
-  --app-brand-info-soft: color-mix(in srgb,
-      var(--app-brand-info) 18%,
-      transparent);
-  --app-brand-info-border: color-mix(in srgb,
-      var(--app-brand-info) 38%,
-      transparent);
+  --app-brand-info-soft: color-mix(
+    in srgb,
+    var(--app-brand-info) 18%,
+    transparent
+  );
+  --app-brand-info-border: color-mix(
+    in srgb,
+    var(--app-brand-info) 38%,
+    transparent
+  );
   --app-brand-social: #86efac;
   --app-brand-social-strong: #5ee28a;
-  --app-brand-social-soft: color-mix(in srgb,
-      var(--app-brand-social) 16%,
-      transparent);
-  --app-brand-social-border: color-mix(in srgb,
-      var(--app-brand-social) 34%,
-      transparent);
+  --app-brand-social-soft: color-mix(
+    in srgb,
+    var(--app-brand-social) 16%,
+    transparent
+  );
+  --app-brand-social-border: color-mix(
+    in srgb,
+    var(--app-brand-social) 34%,
+    transparent
+  );
   --app-border: rgba(255, 255, 255, 0.12);
   --app-border-strong: rgba(255, 255, 255, 0.18);
   --app-surface: rgba(18, 18, 18, 0.94);
@@ -219,9 +265,11 @@
 :root[data-theme='ocean'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb,
-      var(--app-brand-primary) 18%,
-      transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 18%,
+    transparent
+  );
 }
 
 :root[data-theme='sunset'] {
@@ -233,25 +281,31 @@
 :root[data-theme='orchid'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb,
-      var(--app-brand-primary) 18%,
-      transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 18%,
+    transparent
+  );
 }
 
 :root[data-theme='mono'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb,
-      var(--app-brand-primary) 14%,
-      transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 14%,
+    transparent
+  );
 }
 
 .dark[data-theme='ocean'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb,
-      var(--app-brand-primary) 20%,
-      transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 20%,
+    transparent
+  );
 }
 
 .dark[data-theme='sunset'] {
@@ -263,17 +317,21 @@
 .dark[data-theme='orchid'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb,
-      var(--app-brand-primary) 20%,
-      transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 20%,
+    transparent
+  );
 }
 
 .dark[data-theme='mono'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb,
-      var(--app-brand-primary) 14%,
-      transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 14%,
+    transparent
+  );
 }
 
 .ui-layer-content-raised {
@@ -415,27 +473,37 @@ button,
   isolation: isolate;
   --route-accent: var(--app-accent);
   --route-accent-soft: color-mix(in srgb, var(--route-accent) 12%, transparent);
-  --route-accent-border: color-mix(in srgb,
-      var(--route-accent) 24%,
-      transparent);
+  --route-accent-border: color-mix(
+    in srgb,
+    var(--route-accent) 24%,
+    transparent
+  );
   background:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       rgba(18, 138, 69, 0.1),
-      transparent 28%),
-    radial-gradient(circle at top right,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
       rgba(255, 122, 26, 0.1),
-      transparent 24%),
+      transparent 24%
+    ),
     linear-gradient(180deg, #fbfcff 0%, #ffffff 24%, #f6f7fb 100%);
 }
 
 .dark .app-shell {
   background:
-    radial-gradient(circle at top left,
+    radial-gradient(
+      circle at top left,
       rgba(94, 226, 138, 0.11),
-      transparent 28%),
-    radial-gradient(circle at top right,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
       rgba(52, 197, 106, 0.08),
-      transparent 24%),
+      transparent 24%
+    ),
     linear-gradient(180deg, #000000 0%, #050505 36%, #000000 100%);
 }
 
@@ -445,16 +513,20 @@ button,
   position: absolute;
   inset: 0 0 auto 0;
   height: min(300px, 36vh);
-  background: radial-gradient(circle at 50% 0%,
-      color-mix(in srgb, var(--route-accent) 14%, transparent),
-      transparent 70%);
+  background: radial-gradient(
+    circle at 50% 0%,
+    color-mix(in srgb, var(--route-accent) 14%, transparent),
+    transparent 70%
+  );
   z-index: -1;
 }
 
 .dark .app-shell::before {
-  background: radial-gradient(circle at 50% 0%,
-      color-mix(in srgb, var(--route-accent) 18%, transparent),
-      transparent 66%);
+  background: radial-gradient(
+    circle at 50% 0%,
+    color-mix(in srgb, var(--route-accent) 18%, transparent),
+    transparent 66%
+  );
 }
 
 .app-shell[data-route-intent='search'] {
@@ -478,7 +550,7 @@ button,
 }
 
 .app-shell[data-route-intent='create'] {
-  --route-accent: var(--app-brand-action-strong);
+  --route-accent: var(--app-accent);
 }
 
 .app-shell[data-route-intent='payments'],
@@ -487,7 +559,7 @@ button,
 }
 
 .app-shell[data-route-intent='notifications'] {
-  --route-accent: var(--app-brand-social);
+  --route-accent: var(--app-accent);
 }
 
 .app-shell[data-route-intent='settings'] {
@@ -503,16 +575,18 @@ button,
 }
 
 .app-shell[data-route-intent='support'] {
-  --route-accent: var(--app-info);
+  --route-accent: var(--app-accent);
 }
 
 .ui-route-strip {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--route-accent-border);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
-      color-mix(in srgb, var(--route-accent-soft) 26%, var(--app-surface)));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
+    color-mix(in srgb, var(--route-accent-soft) 26%, var(--app-surface))
+  );
   box-shadow: var(--app-shadow-soft);
 }
 
@@ -532,9 +606,11 @@ button,
   pointer-events: none;
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--route-accent) 4%, transparent),
-      transparent 38%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--route-accent) 4%, transparent),
+    transparent 38%
+  );
 }
 
 .ui-route-kicker {
@@ -542,9 +618,11 @@ button,
 }
 
 .ui-route-icon {
-  background: color-mix(in srgb,
-      var(--route-accent) 12%,
-      var(--app-surface-strong));
+  background: color-mix(
+    in srgb,
+    var(--route-accent) 12%,
+    var(--app-surface-strong)
+  );
   color: var(--route-accent);
   box-shadow: inset 0 0 0 1px var(--route-accent-border);
 }
@@ -553,9 +631,11 @@ button,
   min-height: 44px;
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--route-accent) 46%, transparent);
-  background: linear-gradient(135deg,
-      color-mix(in srgb, var(--route-accent) 88%, white 12%),
-      color-mix(in srgb, var(--route-accent) 78%, black 12%));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--route-accent) 88%, white 12%),
+    color-mix(in srgb, var(--route-accent) 78%, black 12%)
+  );
   color: var(--app-text-inverse);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--app-text-inverse) 24%, transparent),
@@ -587,10 +667,13 @@ button,
 .ui-route-action-secondary:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--route-accent) 36%, transparent);
-  background: color-mix(in srgb,
-      var(--route-accent-soft) 28%,
-      var(--app-surface-strong));
-  box-shadow: 0 16px 28px -24px color-mix(in srgb, var(--route-accent) 30%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--route-accent-soft) 28%,
+    var(--app-surface-strong)
+  );
+  box-shadow: 0 16px 28px -24px
+    color-mix(in srgb, var(--route-accent) 30%, transparent);
 }
 
 .ui-page-eyebrow {
@@ -679,7 +762,9 @@ button,
   box-shadow: var(--app-shadow-soft);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']) {
   --app-max-width: 1180px;
   --app-page-x-base: clamp(10px, 1.6vw, 18px);
   --app-section-y-base: clamp(8px, 1.35vw, 16px);
@@ -688,133 +773,218 @@ button,
   --app-radius-lg-base: 22px;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .page-shell {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .page-shell {
   padding-top: clamp(0.75rem, 1.4vw, 1.25rem);
   padding-bottom: clamp(1.25rem, 2.2vw, 2rem);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])> :where(main, section, div)[class*='mx-auto'][class*='max-w-'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  > :where(main, section, div)[class*='mx-auto'][class*='max-w-'] {
   padding-inline: var(--app-page-x);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .page-rhythm>*+* {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .page-rhythm
+  > *
+  + * {
   margin-top: clamp(0.65rem, 1.2vw, 1rem);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel,
-  .ui-panel-strong,
-  .ui-sheet,
-  .ui-hero-panel,
-  .ui-feed-section,
-  .ui-section-shell-content) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-panel,
+    .ui-panel-strong,
+    .ui-sheet,
+    .ui-hero-panel,
+    .ui-feed-section,
+    .ui-section-shell-content
+  ) {
   border-color: var(--app-border);
   border-radius: var(--app-radius);
   box-shadow: var(--app-shadow-soft);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-section-shell-content) {
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
-      color-mix(in srgb, var(--app-surface) 94%, transparent));
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-section-shell-content) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
+    color-mix(in srgb, var(--app-surface) 94%, transparent)
+  );
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-hero-panel {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-hero-panel {
   background:
-    radial-gradient(360px 190px at 100% 0%,
+    radial-gradient(
+      360px 190px at 100% 0%,
       color-mix(in srgb, var(--route-accent) 14%, transparent),
-      transparent 66%),
-    linear-gradient(145deg,
+      transparent 66%
+    ),
+    linear-gradient(
+      145deg,
       color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
-      color-mix(in srgb, var(--route-accent-soft) 22%, var(--app-surface)) 100%);
+      color-mix(in srgb, var(--route-accent-soft) 22%, var(--app-surface)) 100%
+    );
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-8'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-7'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-6'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-5'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-8'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-7'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-6'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-5'] {
   padding: clamp(0.875rem, 1.45vw, 1.2rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-page-eyebrow {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-page-eyebrow {
   font-size: 10px;
   letter-spacing: 0.12em;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-kicker {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-kicker {
   min-height: 28px;
   padding: 0.3rem 0.65rem;
   font-size: 10px;
   letter-spacing: 0.12em;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-page-title {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-page-title {
   font-size: clamp(1.12rem, 1.45vw, 1.55rem);
   line-height: 1.12;
   letter-spacing: -0.025em;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-page-copy {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-page-copy {
   max-width: 38rem;
   font-size: 0.84rem;
   line-height: 1.5;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-page-actions {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-page-actions {
   gap: 0.45rem;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-page-link-grid {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-page-link-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   gap: 0.55rem;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-page-link-card {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-page-link-card {
   border-radius: 16px;
   background: color-mix(in srgb, var(--app-surface-strong) 96%, transparent);
   box-shadow: 0 14px 28px -26px rgba(15, 23, 42, 0.18);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .ui-page-step-grid {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .ui-page-step-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-button-primary,
-  .ui-button-secondary,
-  .ui-button-danger,
-  .ui-route-action-primary,
-  .ui-route-action-secondary) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-button-primary,
+    .ui-button-secondary,
+    .ui-button-danger,
+    .ui-route-action-primary,
+    .ui-route-action-secondary
+  ) {
   min-height: 38px;
   border-radius: 13px;
   padding-inline: 0.85rem;
   font-size: 0.78rem;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-inline-meta, .ui-action-cue) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-inline-meta, .ui-action-cue) {
   min-height: 27px;
   padding-inline: 0.55rem;
   font-size: 10px;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-page-stack, .ui-feed-tight-stack) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(.ui-page-stack, .ui-feed-tight-stack) {
   gap: 0.625rem;
 }
 
 @media (max-width: 640px) {
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .page-shell {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    .page-shell {
     padding-inline: 0.5rem;
     padding-top: 0.5rem;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-panel,
-    .ui-panel-strong,
-    .ui-sheet,
-    .ui-hero-panel,
-    .ui-section-shell-content) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      .ui-panel,
+      .ui-panel-strong,
+      .ui-sheet,
+      .ui-hero-panel,
+      .ui-section-shell-content
+    ) {
     border-radius: 16px;
   }
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']) {
   --app-max-width: 1440px;
   --app-page-x-base: clamp(8px, 1.2vw, 16px);
   --app-section-y-base: clamp(7px, 1vw, 14px);
@@ -822,131 +992,196 @@ button,
   --app-radius-lg-base: 20px;
 }
 
-.lajukan-route-surface:is([data-route-intent='search'],
-  [data-route-intent='jobs'],
-  [data-route-intent='property'],
-  [data-route-intent='market'],
-  [data-route-intent='activity'],
-  [data-route-intent='dashboard'],
-  [data-route-intent='profile'],
-  [data-route-intent='super'],
-  [data-route-intent='create']) :where([class*='max-w-7xl'],
-  [class*='max-w-6xl'],
-  [class*='max-w-[var(--app-max-width)]']) {
+.lajukan-route-surface:is(
+    [data-route-intent='search'],
+    [data-route-intent='jobs'],
+    [data-route-intent='property'],
+    [data-route-intent='market'],
+    [data-route-intent='activity'],
+    [data-route-intent='dashboard'],
+    [data-route-intent='profile'],
+    [data-route-intent='super'],
+    [data-route-intent='create']
+  )
+  :where(
+    [class*='max-w-7xl'],
+    [class*='max-w-6xl'],
+    [class*='max-w-[var(--app-max-width)]']
+  ) {
   max-width: min(1500px, calc(100vw - 12px)) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='gap-8'],
-  [class~='gap-7'],
-  [class~='gap-6'],
-  [class~='gap-5']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='gap-8'],
+    [class~='gap-7'],
+    [class~='gap-6'],
+    [class~='gap-5']
+  ) {
   gap: 0.875rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='gap-4']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where([class~='gap-4']) {
   gap: 0.75rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='space-y-8'],
-  [class*='space-y-7'],
-  [class*='space-y-6'],
-  [class*='space-y-5'],
-  [class*='space-y-4'])> :not([hidden])~ :not([hidden]) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='space-y-8'],
+    [class*='space-y-7'],
+    [class*='space-y-6'],
+    [class*='space-y-5'],
+    [class*='space-y-4']
+  )
+  > :not([hidden])
+  ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
   margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse))) !important;
   margin-bottom: calc(0.75rem * var(--tw-space-y-reverse)) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='p-10'],
-  [class~='p-9'],
-  [class~='p-8'],
-  [class~='p-7'],
-  [class~='p-6'],
-  [class~='p-5']) {
-  padding: clamp(0.75rem, 1.2vw, 1rem) !important;
-}
-
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='px-10'],
-  [class~='px-9'],
-  [class~='px-8'],
-  [class~='px-7'],
-  [class~='px-6'],
-  [class~='px-5']) {
-  padding-left: clamp(0.75rem, 1.2vw, 1rem) !important;
-  padding-right: clamp(0.75rem, 1.2vw, 1rem) !important;
-}
-
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='py-24'],
-  [class~='py-20'],
-  [class~='py-16'],
-  [class~='py-14'],
-  [class~='py-12'],
-  [class~='py-10'],
-  [class~='py-8']) {
-  padding-top: clamp(1rem, 1.7vw, 1.5rem) !important;
-  padding-bottom: clamp(1rem, 1.7vw, 1.5rem) !important;
-}
-
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) [class*='min-h-[120px]'] {
-  min-height: 4.25rem !important;
-}
-
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='rounded-[40px]'],
-  [class*='rounded-[36px]'],
-  [class*='rounded-[34px]'],
-  [class*='rounded-[32px]'],
-  [class*='rounded-[30px]'],
-  [class*='rounded-[28px]'],
-  [class*='rounded-3xl']) {
-  border-radius: 20px !important;
-}
-
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a,
-  button,
-  [role='button'],
-  input,
-  select,
-  textarea)[class*='rounded-2xl'] {
-  border-radius: 14px !important;
-}
-
-@media (max-width: 640px) {
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
-    --app-page-x-base: 0.5rem;
-    --app-section-y-base: 0.5rem;
-  }
-
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='p-10'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='p-10'],
     [class~='p-9'],
     [class~='p-8'],
     [class~='p-7'],
     [class~='p-6'],
-    [class~='p-5'],
-    [class~='p-4']) {
-    padding: 0.75rem !important;
-  }
+    [class~='p-5']
+  ) {
+  padding: clamp(0.75rem, 1.2vw, 1rem) !important;
+}
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='px-10'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='px-10'],
     [class~='px-9'],
     [class~='px-8'],
     [class~='px-7'],
     [class~='px-6'],
-    [class~='px-5'],
-    [class~='px-4']) {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-  }
+    [class~='px-5']
+  ) {
+  padding-left: clamp(0.75rem, 1.2vw, 1rem) !important;
+  padding-right: clamp(0.75rem, 1.2vw, 1rem) !important;
+}
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='py-24'],
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='py-24'],
     [class~='py-20'],
     [class~='py-16'],
     [class~='py-14'],
     [class~='py-12'],
     [class~='py-10'],
-    [class~='py-8'],
-    [class~='py-6'],
-    [class~='py-5'],
-    [class~='py-4']) {
+    [class~='py-8']
+  ) {
+  padding-top: clamp(1rem, 1.7vw, 1.5rem) !important;
+  padding-bottom: clamp(1rem, 1.7vw, 1.5rem) !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  [class*='min-h-[120px]'] {
+  min-height: 4.25rem !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='rounded-[40px]'],
+    [class*='rounded-[36px]'],
+    [class*='rounded-[34px]'],
+    [class*='rounded-[32px]'],
+    [class*='rounded-[30px]'],
+    [class*='rounded-[28px]'],
+    [class*='rounded-3xl']
+  ) {
+  border-radius: 20px !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    a,
+    button,
+    [role='button'],
+    input,
+    select,
+    textarea
+  )[class*='rounded-2xl'] {
+  border-radius: 14px !important;
+}
+
+@media (max-width: 640px) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels']) {
+    --app-page-x-base: 0.5rem;
+    --app-section-y-base: 0.5rem;
+  }
+
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='p-10'],
+      [class~='p-9'],
+      [class~='p-8'],
+      [class~='p-7'],
+      [class~='p-6'],
+      [class~='p-5'],
+      [class~='p-4']
+    ) {
+    padding: 0.75rem !important;
+  }
+
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4']
+    ) {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='py-24'],
+      [class~='py-20'],
+      [class~='py-16'],
+      [class~='py-14'],
+      [class~='py-12'],
+      [class~='py-10'],
+      [class~='py-8'],
+      [class~='py-6'],
+      [class~='py-5'],
+      [class~='py-4']
+    ) {
     padding-top: 0.75rem !important;
     padding-bottom: 0.75rem !important;
   }
@@ -978,15 +1213,17 @@ canvas {
   text-rendering: optimizeLegibility;
 }
 
-.lajukan-route-surface :where(.flex, .grid)>* {
+.lajukan-route-surface :where(.flex, .grid) > * {
   min-width: 0;
 }
 
-.lajukan-route-surface :where(h1, h2, h3, h4, h5, h6, p, a, button, label, input, textarea, select) {
+.lajukan-route-surface
+  :where(h1, h2, h3, h4, h5, h6, p, a, button, label, input, textarea, select) {
   letter-spacing: 0 !important;
 }
 
-.lajukan-route-surface :where(h1, h2, h3, h4, h5, h6, p, span, a, button, label) {
+.lajukan-route-surface
+  :where(h1, h2, h3, h4, h5, h6, p, span, a, button, label) {
   overflow-wrap: break-word;
 }
 
@@ -998,15 +1235,21 @@ canvas {
   min-width: 0;
 }
 
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']),
-  textarea,
-  select) {
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select
+  ) {
   max-width: 100%;
 }
 
-.lajukan-route-surface :where(button, a, input, select, textarea)[class*='rounded-full'],
-.lajukan-route-surface :where(button, a, input, select, textarea)[class*='rounded-2xl'],
-.lajukan-route-surface :where(button, a, input, select, textarea)[class*='rounded-['] {
+.lajukan-route-surface
+  :where(button, a, input, select, textarea)[class*='rounded-full'],
+.lajukan-route-surface
+  :where(button, a, input, select, textarea)[class*='rounded-2xl'],
+.lajukan-route-surface
+  :where(button, a, input, select, textarea)[class*='rounded-['] {
   white-space: normal;
 }
 
@@ -1022,42 +1265,50 @@ canvas {
   padding-inline: var(--app-page-x);
 }
 
-.page-rhythm>*+* {
+.page-rhythm > * + * {
   margin-top: var(--app-section-y);
 }
 
 .ui-panel {
   border: 1px solid color-mix(in srgb, var(--app-border) 92%, white 8%);
   border-radius: var(--app-radius);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, white 2%),
-      color-mix(in srgb, var(--app-surface) 96%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, white 2%),
+    color-mix(in srgb, var(--app-surface) 96%, transparent)
+  );
   box-shadow: var(--app-shadow);
 }
 
 .ui-panel-muted {
   border: 1px solid color-mix(in srgb, var(--app-border) 90%, transparent);
   border-radius: var(--app-radius-sm);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-muted) 98%, white 2%),
-      color-mix(in srgb, var(--app-surface) 88%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-muted) 98%, white 2%),
+    color-mix(in srgb, var(--app-surface) 88%, transparent)
+  );
 }
 
 .ui-sheet {
   border: 1px solid color-mix(in srgb, var(--app-border) 96%, white 4%);
   border-radius: var(--app-radius-lg);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, white 2%),
-      color-mix(in srgb, var(--app-surface) 94%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, white 2%),
+    color-mix(in srgb, var(--app-surface) 94%, transparent)
+  );
   box-shadow: var(--app-shadow-sheet);
 }
 
 .ui-panel-strong {
   border: 1px solid color-mix(in srgb, var(--app-border) 90%, white 10%);
   border-radius: var(--app-radius);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, white 2%),
-      color-mix(in srgb, var(--app-surface-muted) 96%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, white 2%),
+    color-mix(in srgb, var(--app-surface-muted) 96%, transparent)
+  );
   box-shadow: var(--app-shadow-strong);
 }
 
@@ -1081,14 +1332,17 @@ canvas {
   gap: 0.375rem;
   border-radius: 9999px;
   border: 1px solid color-mix(in srgb, var(--app-accent) 16%, var(--app-border));
-  background: color-mix(in srgb,
-      var(--app-accent-soft) 56%,
-      var(--app-surface-strong));
+  background: color-mix(
+    in srgb,
+    var(--app-accent-soft) 56%,
+    var(--app-surface-strong)
+  );
   padding: 0.18rem 0.6rem;
   font-size: 10px;
   font-weight: 700;
   color: var(--app-accent-strong);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--app-text-inverse) 24%, transparent);
+  box-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--app-text-inverse) 24%, transparent);
 }
 
 .ui-action-note {
@@ -1142,7 +1396,8 @@ canvas {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 0%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--app-accent) 0%, transparent);
   opacity: 0;
   transition:
     opacity 140ms ease,
@@ -1154,10 +1409,13 @@ canvas {
 .ui-pressable-card:focus-visible::after,
 .ui-pressable-card:focus-within::after {
   opacity: 1;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, transparent);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-accent) 3%, transparent),
-      transparent 36%);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--app-accent) 22%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-accent) 3%, transparent),
+    transparent 36%
+  );
 }
 
 .ui-kicker {
@@ -1334,18 +1592,22 @@ canvas {
 
 .ui-shell-bar {
   border: 1px solid var(--app-border);
-  background: linear-gradient(180deg,
-      var(--app-surface-strong),
-      var(--app-surface));
+  background: linear-gradient(
+    180deg,
+    var(--app-surface-strong),
+    var(--app-surface)
+  );
   box-shadow: var(--app-shadow);
 }
 
 .ui-assist-dock {
   border: 1px solid var(--app-border-strong);
   background:
-    radial-gradient(140px 120px at 100% 0%,
+    radial-gradient(
+      140px 120px at 100% 0%,
       color-mix(in srgb, var(--app-accent) 20%, transparent),
-      transparent 72%),
+      transparent 72%
+    ),
     linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
   box-shadow: var(--app-shadow-strong);
 }
@@ -1358,11 +1620,14 @@ canvas {
   gap: 0.45rem;
   border-radius: 12px;
   border: 1px solid var(--app-border);
-  background: linear-gradient(180deg,
-      var(--app-surface-strong),
-      var(--app-surface));
+  background: linear-gradient(
+    180deg,
+    var(--app-surface-strong),
+    var(--app-surface)
+  );
   color: var(--app-text);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--app-text-inverse) 35%, transparent);
+  box-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--app-text-inverse) 35%, transparent);
   transition:
     transform 140ms ease,
     border-color 140ms ease,
@@ -1371,18 +1636,22 @@ canvas {
 }
 
 .dark .ui-shell-button {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--app-text-inverse) 3%, transparent);
+  box-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--app-text-inverse) 3%, transparent);
 }
 
 .ui-shell-button:hover {
   transform: translateY(-1px);
   border-color: var(--app-accent-border);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-strong) 88%, transparent),
-      color-mix(in srgb, var(--app-accent-soft) 36%, var(--app-surface)));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 88%, transparent),
+    color-mix(in srgb, var(--app-accent-soft) 36%, var(--app-surface))
+  );
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--app-text-inverse) 45%, transparent),
-    0 18px 34px -28px color-mix(in srgb, var(--app-shadow-color) 34%, transparent);
+    0 18px 34px -28px
+      color-mix(in srgb, var(--app-shadow-color) 34%, transparent);
 }
 
 .ui-shell-button:focus-visible {
@@ -1396,7 +1665,8 @@ canvas {
 .dark .ui-shell-button:hover {
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--app-text-inverse) 4%, transparent),
-    0 22px 40px -30px color-mix(in srgb, var(--app-shadow-color) 90%, transparent);
+    0 22px 40px -30px
+      color-mix(in srgb, var(--app-shadow-color) 90%, transparent);
 }
 
 .ui-nav-pill {
@@ -1422,7 +1692,8 @@ canvas {
   border-color: color-mix(in srgb, var(--app-accent) 12%, var(--app-border));
   background: color-mix(in srgb, var(--app-surface-strong) 74%, transparent);
   color: var(--app-text);
-  box-shadow: 0 16px 28px -24px color-mix(in srgb, var(--app-accent) 30%, transparent);
+  box-shadow: 0 16px 28px -24px
+    color-mix(in srgb, var(--app-accent) 30%, transparent);
 }
 
 .dark .ui-nav-pill:hover {
@@ -1430,9 +1701,11 @@ canvas {
 }
 
 .ui-nav-pill[data-active='true'] {
-  background: color-mix(in srgb,
-      var(--app-accent-soft) 70%,
-      var(--app-surface-strong));
+  background: color-mix(
+    in srgb,
+    var(--app-accent-soft) 70%,
+    var(--app-surface-strong)
+  );
   color: var(--app-accent);
   box-shadow: inset 0 0 0 1px var(--app-border-strong);
 }
@@ -1479,10 +1752,12 @@ canvas {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg,
-      transparent,
-      color-mix(in srgb, var(--app-text-inverse) 24%, transparent),
-      transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--app-text-inverse) 24%, transparent),
+    transparent
+  );
   animation: ui-shimmer 1.8s ease-in-out infinite;
 }
 
@@ -1490,30 +1765,42 @@ canvas {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(500px 240px at 100% 0%,
+    radial-gradient(
+      500px 240px at 100% 0%,
       color-mix(in srgb, var(--app-accent) 22%, transparent),
-      transparent 65%),
-    radial-gradient(420px 220px at 0% 100%,
+      transparent 65%
+    ),
+    radial-gradient(
+      420px 220px at 0% 100%,
       var(--app-highlight),
-      transparent 70%),
-    linear-gradient(135deg,
+      transparent 70%
+    ),
+    linear-gradient(
+      135deg,
       color-mix(in srgb, var(--app-surface-strong) 96%, transparent),
       color-mix(in srgb, var(--app-surface-muted) 94%, transparent) 48%,
-      color-mix(in srgb, var(--app-warning-soft) 82%, transparent));
+      color-mix(in srgb, var(--app-warning-soft) 82%, transparent)
+    );
 }
 
 .dark .ui-hero-panel {
   background:
-    radial-gradient(540px 260px at 100% 0%,
+    radial-gradient(
+      540px 260px at 100% 0%,
       color-mix(in srgb, var(--app-accent) 24%, transparent),
-      transparent 65%),
-    radial-gradient(440px 240px at 0% 100%,
+      transparent 65%
+    ),
+    radial-gradient(
+      440px 240px at 0% 100%,
       var(--app-highlight),
-      transparent 70%),
-    linear-gradient(135deg,
+      transparent 70%
+    ),
+    linear-gradient(
+      135deg,
       color-mix(in srgb, var(--app-surface-strong) 96%, transparent),
       color-mix(in srgb, var(--app-surface-muted) 94%, transparent) 48%,
-      color-mix(in srgb, var(--app-warning-soft) 60%, transparent));
+      color-mix(in srgb, var(--app-warning-soft) 60%, transparent)
+    );
 }
 
 .ui-contrast-panel {
@@ -1521,13 +1808,17 @@ canvas {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--app-accent) 18%, transparent);
   background:
-    radial-gradient(380px 220px at 100% 0%,
+    radial-gradient(
+      380px 220px at 100% 0%,
       color-mix(in srgb, var(--app-accent) 20%, transparent),
-      transparent 60%),
-    linear-gradient(160deg,
+      transparent 60%
+    ),
+    linear-gradient(
+      160deg,
       var(--app-surface-strong),
       var(--app-surface-muted) 58%,
-      var(--app-surface));
+      var(--app-surface)
+    );
   color: var(--app-text-inverse);
 }
 
@@ -1536,9 +1827,11 @@ canvas {
   pointer-events: none;
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-text-inverse) 6%, transparent),
-      transparent 38%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-text-inverse) 6%, transparent),
+    transparent 38%
+  );
 }
 
 .ui-scroll-rail {
@@ -1555,7 +1848,7 @@ canvas {
   padding-bottom: 0.25rem;
 }
 
-.ui-scroll-rail>* {
+.ui-scroll-rail > * {
   scroll-snap-align: start;
   flex-shrink: 0;
 }
@@ -1571,7 +1864,8 @@ canvas {
   appearance: none;
   -webkit-appearance: none;
   border-radius: 11px;
-  border: 1.5px solid color-mix(in srgb, var(--app-text) 18%, var(--app-border-strong));
+  border: 1.5px solid
+    color-mix(in srgb, var(--app-text) 18%, var(--app-border-strong));
   background: var(--app-surface-strong);
   color: var(--app-text);
   box-shadow:
@@ -1626,7 +1920,8 @@ canvas {
   min-height: 40px;
   appearance: none;
   -webkit-appearance: none;
-  border: 1.5px solid color-mix(in srgb, var(--app-text) 22%, var(--app-border-strong));
+  border: 1.5px solid
+    color-mix(in srgb, var(--app-text) 22%, var(--app-border-strong));
   border-radius: 12px;
   background: var(--app-surface-strong);
   color: var(--app-text);
@@ -1641,18 +1936,24 @@ canvas {
 }
 
 .ui-data-control[data-filled='true'] {
-  border-color: color-mix(in srgb,
-      var(--app-accent) 46%,
-      var(--app-border-strong));
-  background: color-mix(in srgb,
-      var(--app-accent-soft) 12%,
-      var(--app-surface-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-accent) 46%,
+    var(--app-border-strong)
+  );
+  background: color-mix(
+    in srgb,
+    var(--app-accent-soft) 12%,
+    var(--app-surface-strong)
+  );
 }
 
 .ui-data-control:hover {
-  border-color: color-mix(in srgb,
-      var(--app-text) 32%,
-      var(--app-border-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-text) 32%,
+    var(--app-border-strong)
+  );
 }
 
 .ui-data-control:focus,
@@ -1677,21 +1978,27 @@ canvas {
 
 .dark .ui-control,
 .dark .ui-data-control {
-  border-color: color-mix(in srgb,
-      var(--app-text) 22%,
-      var(--app-border-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-text) 22%,
+    var(--app-border-strong)
+  );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 1px 0 rgba(0, 0, 0, 0.22);
 }
 
 .dark .ui-data-control[data-filled='true'] {
-  border-color: color-mix(in srgb,
-      var(--app-accent) 48%,
-      var(--app-border-strong));
-  background: color-mix(in srgb,
-      var(--app-accent) 10%,
-      var(--app-surface-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-accent) 48%,
+    var(--app-border-strong)
+  );
+  background: color-mix(
+    in srgb,
+    var(--app-accent) 10%,
+    var(--app-surface-strong)
+  );
 }
 
 .ui-form-textarea {
@@ -1768,12 +2075,16 @@ canvas {
   justify-content: center;
   min-height: 44px;
   border-radius: 13px;
-  border: 1px solid color-mix(in srgb, var(--app-accent-strong) 42%, transparent);
-  background: linear-gradient(135deg,
-      color-mix(in srgb, var(--app-accent) 92%, white 8%),
-      var(--app-accent-strong));
+  border: 1px solid
+    color-mix(in srgb, var(--app-accent-strong) 42%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--app-accent) 92%, white 8%),
+    var(--app-accent-strong)
+  );
   color: var(--app-text-inverse);
-  text-shadow: 0 1px 1px color-mix(in srgb, var(--app-shadow-color) 22%, transparent);
+  text-shadow: 0 1px 1px
+    color-mix(in srgb, var(--app-shadow-color) 22%, transparent);
   line-height: 1.2;
   text-align: center;
   font-weight: 700;
@@ -1812,9 +2123,11 @@ canvas {
   min-height: 44px;
   border-radius: 13px;
   border: 1px solid color-mix(in srgb, var(--app-accent) 14%, var(--app-border));
-  background: linear-gradient(180deg,
-      var(--app-surface-strong),
-      color-mix(in srgb, var(--app-accent-soft) 32%, var(--app-surface)));
+  background: linear-gradient(
+    180deg,
+    var(--app-surface-strong),
+    color-mix(in srgb, var(--app-accent-soft) 32%, var(--app-surface))
+  );
   color: var(--app-text);
   line-height: 1.2;
   text-align: center;
@@ -1825,17 +2138,21 @@ canvas {
     background 120ms ease,
     color 120ms ease,
     transform 120ms ease;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--app-text-inverse) 32%, transparent);
+  box-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--app-text-inverse) 32%, transparent);
 }
 
 .ui-button-secondary:hover {
   transform: translateY(-1px);
   border-color: var(--app-accent-border);
-  background: linear-gradient(180deg,
-      var(--app-surface-strong),
-      color-mix(in srgb, var(--app-accent-soft) 44%, var(--app-surface)));
+  background: linear-gradient(
+    180deg,
+    var(--app-surface-strong),
+    color-mix(in srgb, var(--app-accent-soft) 44%, var(--app-surface))
+  );
   color: var(--app-accent-strong);
-  box-shadow: 0 16px 28px -24px color-mix(in srgb, var(--app-accent) 32%, transparent);
+  box-shadow: 0 16px 28px -24px
+    color-mix(in srgb, var(--app-accent) 32%, transparent);
 }
 
 .ui-button-secondary:active {
@@ -1889,7 +2206,8 @@ canvas {
 
 .ui-button-danger:hover {
   filter: brightness(1.03);
-  box-shadow: 0 16px 28px -22px color-mix(in srgb, var(--app-danger) 45%, transparent);
+  box-shadow: 0 16px 28px -22px
+    color-mix(in srgb, var(--app-danger) 45%, transparent);
 }
 
 .ui-button-danger:focus-visible {
@@ -1900,9 +2218,11 @@ canvas {
 }
 
 .ui-surface-grid {
-  background-image: radial-gradient(circle at 1px 1px,
-      color-mix(in srgb, var(--app-dot) 92%, transparent) 1px,
-      transparent 0);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, var(--app-dot) 92%, transparent) 1px,
+    transparent 0
+  );
   background-size: 18px 18px;
 }
 
@@ -1910,9 +2230,11 @@ canvas {
   border-top-left-radius: calc(var(--app-radius-lg) + 4px);
   border-top-right-radius: calc(var(--app-radius-lg) + 4px);
   border: 1px solid color-mix(in srgb, var(--app-border) 94%, transparent);
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
-      color-mix(in srgb, var(--app-surface) 94%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
+    color-mix(in srgb, var(--app-surface) 94%, transparent)
+  );
   box-shadow: var(--app-shadow-sheet);
 }
 
@@ -1977,7 +2299,6 @@ canvas {
 }
 
 @keyframes ui-status-pulse {
-
   0%,
   100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-accent) 18%, transparent);
@@ -1989,7 +2310,6 @@ canvas {
 }
 
 @keyframes ui-skeleton-pulse {
-
   0%,
   100% {
     opacity: 1;
@@ -2019,7 +2339,6 @@ canvas {
 }
 
 @media (min-width: 640px) {
-
   .ui-section-shell,
   .ui-home-section-shell {
     padding-top: 1rem;
@@ -2033,10 +2352,12 @@ canvas {
     right: 0.25rem;
     top: 0;
     height: 1px;
-    background: linear-gradient(90deg,
-        transparent,
-        color-mix(in srgb, var(--app-accent-border) 75%, white 25%),
-        transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--app-accent-border) 75%, white 25%),
+      transparent
+    );
     opacity: 0.9;
   }
 
@@ -2070,7 +2391,9 @@ canvas {
     --app-page-x-base: clamp(9px, 3vw, 16px);
     --app-section-y-base: clamp(10px, 2.8vw, 16px);
     --app-page-x: calc(var(--app-page-x-base) * var(--ui-spacing-scale, 1));
-    --app-section-y: calc(var(--app-section-y-base) * var(--ui-spacing-scale, 1));
+    --app-section-y: calc(
+      var(--app-section-y-base) * var(--ui-spacing-scale, 1)
+    );
   }
 
   .ui-sticky-controls {
@@ -2179,18 +2502,18 @@ canvas {
     gap: 0 !important;
   }
 
-  .ui-page-stack>.ui-feed-section,
-  .ui-page-stack>.ui-page-section {
+  .ui-page-stack > .ui-feed-section,
+  .ui-page-stack > .ui-page-section {
     position: relative;
   }
 
-  .ui-page-stack>.ui-section-shell {
+  .ui-page-stack > .ui-section-shell {
     position: relative;
   }
 
-  .ui-page-stack>.ui-feed-section::before,
-  .ui-page-stack>.ui-page-section::before,
-  .ui-page-stack>.ui-section-shell::before {
+  .ui-page-stack > .ui-feed-section::before,
+  .ui-page-stack > .ui-page-section::before,
+  .ui-page-stack > .ui-section-shell::before {
     content: '';
     position: absolute;
     left: var(--app-page-x);
@@ -2200,16 +2523,16 @@ canvas {
     background: color-mix(in srgb, var(--app-border) 92%, transparent);
   }
 
-  .ui-page-stack>.ui-feed-section:first-child::before,
-  .ui-page-stack>.ui-page-section:first-child::before,
-  .ui-page-stack>.ui-section-shell:first-child::before {
+  .ui-page-stack > .ui-feed-section:first-child::before,
+  .ui-page-stack > .ui-page-section:first-child::before,
+  .ui-page-stack > .ui-section-shell:first-child::before {
     display: none;
   }
 
-  .ui-page-stack>.ui-feed-section,
-  .ui-page-stack>.ui-page-section .ui-feed-section,
-  .ui-page-stack>.ui-page-section .ui-panel,
-  .ui-page-stack>.ui-page-section .ui-panel-muted {
+  .ui-page-stack > .ui-feed-section,
+  .ui-page-stack > .ui-page-section .ui-feed-section,
+  .ui-page-stack > .ui-page-section .ui-panel,
+  .ui-page-stack > .ui-page-section .ui-panel-muted {
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
@@ -2217,32 +2540,42 @@ canvas {
     padding-inline: max(0.7rem, var(--app-page-x)) !important;
   }
 
-  .ui-page-stack>.ui-feed-section,
-  .ui-page-stack>.ui-page-section .ui-feed-section {
+  .ui-page-stack > .ui-feed-section,
+  .ui-page-stack > .ui-page-section .ui-feed-section {
     padding-block: 0.8rem !important;
   }
 
-  .ui-page-stack>.ui-feed-section .ui-feed-tile,
-  .ui-page-stack>.ui-feed-section .ui-feed-row,
-  .ui-page-stack>.ui-page-section .ui-feed-tile,
-  .ui-page-stack>.ui-page-section .ui-feed-row {
+  .ui-page-stack > .ui-feed-section .ui-feed-tile,
+  .ui-page-stack > .ui-feed-section .ui-feed-row,
+  .ui-page-stack > .ui-page-section .ui-feed-tile,
+  .ui-page-stack > .ui-page-section .ui-feed-row {
     border: 0 !important;
-    background: var(--route-panel-muted-bg,
-        linear-gradient(180deg,
-          color-mix(in srgb, var(--app-surface-strong) 96%, white 4%),
-          color-mix(in srgb, var(--app-surface) 92%, transparent))) !important;
+    background: var(
+      --route-panel-muted-bg,
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--app-surface-strong) 96%, white 4%),
+        color-mix(in srgb, var(--app-surface) 92%, transparent)
+      )
+    ) !important;
   }
 
-  .dark .ui-page-stack>.ui-feed-section .ui-feed-tile,
-  .dark .ui-page-stack>.ui-feed-section .ui-feed-row,
-  .dark .ui-page-stack>.ui-page-section .ui-feed-tile,
-  .dark .ui-page-stack>.ui-page-section .ui-feed-row {
-    background: var(--route-panel-muted-bg,
-        linear-gradient(180deg,
-          color-mix(in srgb,
-            var(--app-surface-strong) 96%,
-            rgba(15, 23, 42, 0.98)),
-          color-mix(in srgb, var(--app-surface) 94%, rgba(2, 6, 23, 0.98)))) !important;
+  .dark .ui-page-stack > .ui-feed-section .ui-feed-tile,
+  .dark .ui-page-stack > .ui-feed-section .ui-feed-row,
+  .dark .ui-page-stack > .ui-page-section .ui-feed-tile,
+  .dark .ui-page-stack > .ui-page-section .ui-feed-row {
+    background: var(
+      --route-panel-muted-bg,
+      linear-gradient(
+        180deg,
+        color-mix(
+          in srgb,
+          var(--app-surface-strong) 96%,
+          rgba(15, 23, 42, 0.98)
+        ),
+        color-mix(in srgb, var(--app-surface) 94%, rgba(2, 6, 23, 0.98))
+      )
+    ) !important;
   }
 }
 
@@ -2259,7 +2592,6 @@ canvas {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .ui-card-hover,
   .ui-shell-button,
   .ui-button-primary,
@@ -2277,7 +2609,9 @@ canvas {
 }
 
 /* Compact app density pass for authenticated/work pages. */
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']) {
   --app-max-width: 1560px;
   --app-page-x-base: clamp(6px, 0.9vw, 13px);
   --app-section-y-base: clamp(6px, 0.8vw, 11px);
@@ -2297,6 +2631,84 @@ canvas {
   scroll-padding-top: var(--app-mobile-topbar-height);
 }
 
+/* Mobile chrome must stay identical across route intents. */
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true'] {
+  font-size: 1rem !important;
+  line-height: normal !important;
+}
+
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true'],
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true'] * {
+  box-sizing: border-box;
+}
+
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true']
+  a {
+  min-height: 58px !important;
+}
+
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true']
+  ul {
+  gap: 0.25rem !important;
+  padding: 0 !important;
+}
+
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true']
+  li {
+  padding: 0 !important;
+}
+
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true']
+  [data-testid='mobile-nav-profile']
+  > span:first-child {
+  height: 34px !important;
+  width: 34px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+}
+
+.lajukan-route-surface[data-mobile-bottom-nav='true']
+  [data-lajukan-mobile-nav='true']
+  [data-testid='mobile-nav-profile']
+  img {
+  height: 31px !important;
+  width: 31px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: contain !important;
+  border-radius: 9999px !important;
+}
+
+/* Profile pages should read like compact app surfaces, not landing pages. */
+.lajukan-route-surface[data-route-intent='profile']
+  :where([class~='rounded-[28px]'], [class~='rounded-[24px]']):not(
+    [data-lajukan-mobile-nav] *
+  ) {
+  border-radius: 1rem !important;
+}
+
+.lajukan-route-surface[data-route-intent='profile']
+  :where([class~='p-6'], [class~='p-5'], [class~='p-4']):not(
+    [data-lajukan-mobile-nav] *
+  ) {
+  padding: 0.75rem !important;
+}
+
+.lajukan-route-surface[data-route-intent='profile']
+  :where([class~='min-h-11'], [class~='min-h-10']):not(
+    [data-lajukan-mobile-nav] *
+  ) {
+  min-height: 2.25rem !important;
+}
+
 @media (min-width: 1024px) {
   .lajukan-route-surface[data-mobile-bottom-nav='true'] {
     --app-bottom-nav-height: 0px;
@@ -2308,93 +2720,139 @@ canvas {
   }
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .page-shell {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .page-shell {
   padding-top: clamp(0.35rem, 0.8vw, 0.75rem);
   padding-bottom: clamp(0.6rem, 1.15vw, 1rem);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='gap-10'],
-  [class~='gap-9'],
-  [class~='gap-8'],
-  [class~='gap-7'],
-  [class~='gap-6'],
-  [class~='gap-5']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='gap-10'],
+    [class~='gap-9'],
+    [class~='gap-8'],
+    [class~='gap-7'],
+    [class~='gap-6'],
+    [class~='gap-5']
+  ) {
   gap: 0.65rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='gap-4'], [class~='gap-3']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where([class~='gap-4'], [class~='gap-3']) {
   gap: 0.55rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='space-y-10'],
-  [class*='space-y-9'],
-  [class*='space-y-8'],
-  [class*='space-y-7'],
-  [class*='space-y-6'],
-  [class*='space-y-5'],
-  [class*='space-y-4'])> :not([hidden])~ :not([hidden]) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='space-y-10'],
+    [class*='space-y-9'],
+    [class*='space-y-8'],
+    [class*='space-y-7'],
+    [class*='space-y-6'],
+    [class*='space-y-5'],
+    [class*='space-y-4']
+  )
+  > :not([hidden])
+  ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
   margin-top: calc(0.6rem * calc(1 - var(--tw-space-y-reverse))) !important;
   margin-bottom: calc(0.6rem * var(--tw-space-y-reverse)) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='p-10'],
-  [class~='p-9'],
-  [class~='p-8'],
-  [class~='p-7'],
-  [class~='p-6'],
-  [class~='p-5'],
-  [class~='p-4']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='p-10'],
+    [class~='p-9'],
+    [class~='p-8'],
+    [class~='p-7'],
+    [class~='p-6'],
+    [class~='p-5'],
+    [class~='p-4']
+  ) {
   padding: clamp(0.625rem, 0.95vw, 0.875rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='px-10'],
-  [class~='px-9'],
-  [class~='px-8'],
-  [class~='px-7'],
-  [class~='px-6'],
-  [class~='px-5'],
-  [class~='px-4']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='px-10'],
+    [class~='px-9'],
+    [class~='px-8'],
+    [class~='px-7'],
+    [class~='px-6'],
+    [class~='px-5'],
+    [class~='px-4']
+  ) {
   padding-left: clamp(0.625rem, 0.95vw, 0.875rem) !important;
   padding-right: clamp(0.625rem, 0.95vw, 0.875rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='py-24'],
-  [class~='py-20'],
-  [class~='py-16'],
-  [class~='py-14'],
-  [class~='py-12'],
-  [class~='py-10'],
-  [class~='py-8'],
-  [class~='py-6'],
-  [class~='py-5'],
-  [class~='py-4']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='py-24'],
+    [class~='py-20'],
+    [class~='py-16'],
+    [class~='py-14'],
+    [class~='py-12'],
+    [class~='py-10'],
+    [class~='py-8'],
+    [class~='py-6'],
+    [class~='py-5'],
+    [class~='py-4']
+  ) {
   padding-top: clamp(0.625rem, 1vw, 0.9rem) !important;
   padding-bottom: clamp(0.625rem, 1vw, 0.9rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='rounded-[44px]'],
-  [class*='rounded-[40px]'],
-  [class*='rounded-[36px]'],
-  [class*='rounded-[34px]'],
-  [class*='rounded-[32px]'],
-  [class*='rounded-[30px]'],
-  [class*='rounded-[28px]'],
-  [class*='rounded-3xl'],
-  [class*='rounded-2xl']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='rounded-[44px]'],
+    [class*='rounded-[40px]'],
+    [class*='rounded-[36px]'],
+    [class*='rounded-[34px]'],
+    [class*='rounded-[32px]'],
+    [class*='rounded-[30px]'],
+    [class*='rounded-[28px]'],
+    [class*='rounded-3xl'],
+    [class*='rounded-2xl']
+  ) {
   border-radius: 14px !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'], input, select, textarea) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(a, button, [role='button'], input, select, textarea) {
   min-height: 38px;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-button-primary,
-  .ui-button-secondary,
-  .ui-button-danger,
-  .ui-shell-button,
-  .ui-route-action-primary,
-  .ui-route-action-secondary) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-button-primary,
+    .ui-button-secondary,
+    .ui-button-danger,
+    .ui-shell-button,
+    .ui-route-action-primary,
+    .ui-route-action-secondary
+  ) {
   min-height: 36px;
   border-radius: 11px;
   padding-inline: 0.7rem;
@@ -2435,116 +2893,164 @@ canvas {
 }
 
 @media (max-width: 640px) {
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels']) {
     --app-page-x-base: 0.375rem;
     --app-section-y-base: 0.375rem;
     font-size: 0.875rem;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .page-shell {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    .page-shell {
     padding-inline: var(--app-mobile-page-x) !important;
     padding-top: 0.25rem !important;
     padding-bottom: 0.5rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='p-10'],
-    [class~='p-9'],
-    [class~='p-8'],
-    [class~='p-7'],
-    [class~='p-6'],
-    [class~='p-5'],
-    [class~='p-4'],
-    [class~='p-3']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='p-10'],
+      [class~='p-9'],
+      [class~='p-8'],
+      [class~='p-7'],
+      [class~='p-6'],
+      [class~='p-5'],
+      [class~='p-4'],
+      [class~='p-3']
+    ) {
     padding: 0.625rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='px-10'],
-    [class~='px-9'],
-    [class~='px-8'],
-    [class~='px-7'],
-    [class~='px-6'],
-    [class~='px-5'],
-    [class~='px-4'],
-    [class~='px-3']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4'],
+      [class~='px-3']
+    ) {
     padding-left: 0.625rem !important;
     padding-right: 0.625rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class~='py-24'],
-    [class~='py-20'],
-    [class~='py-16'],
-    [class~='py-14'],
-    [class~='py-12'],
-    [class~='py-10'],
-    [class~='py-8'],
-    [class~='py-6'],
-    [class~='py-5'],
-    [class~='py-4'],
-    [class~='py-3']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='py-24'],
+      [class~='py-20'],
+      [class~='py-16'],
+      [class~='py-14'],
+      [class~='py-12'],
+      [class~='py-10'],
+      [class~='py-8'],
+      [class~='py-6'],
+      [class~='py-5'],
+      [class~='py-4'],
+      [class~='py-3']
+    ) {
     padding-top: 0.625rem !important;
     padding-bottom: 0.625rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where([class*='rounded-[44px]'],
-    [class*='rounded-[40px]'],
-    [class*='rounded-[36px]'],
-    [class*='rounded-[34px]'],
-    [class*='rounded-[32px]'],
-    [class*='rounded-[30px]'],
-    [class*='rounded-[28px]'],
-    [class*='rounded-3xl'],
-    [class*='rounded-2xl']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class*='rounded-[44px]'],
+      [class*='rounded-[40px]'],
+      [class*='rounded-[36px]'],
+      [class*='rounded-[34px]'],
+      [class*='rounded-[32px]'],
+      [class*='rounded-[30px]'],
+      [class*='rounded-[28px]'],
+      [class*='rounded-3xl'],
+      [class*='rounded-2xl']
+    ) {
     border-radius: 12px !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(a, button, [role='button'], input, select, textarea) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(a, button, [role='button'], input, select, textarea) {
     min-height: 40px !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) :where(.ui-button-primary,
-    .ui-button-secondary,
-    .ui-button-danger,
-    .ui-shell-button,
-    .ui-route-action-primary,
-    .ui-route-action-secondary) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      .ui-button-primary,
+      .ui-button-secondary,
+      .ui-button-danger,
+      .ui-shell-button,
+      .ui-route-action-primary,
+      .ui-route-action-secondary
+    ) {
     min-height: 40px !important;
   }
 
-  .lajukan-route-surface :where(.page-shell, .page-shell-inset):not(.lajukan-header-shell) {
+  .lajukan-route-surface
+    :where(.page-shell, .page-shell-inset):not(.lajukan-header-shell) {
     padding-inline: var(--app-mobile-page-x) !important;
   }
 
-  .lajukan-route-surface.lajukan-route-surface>div> :where(main, section, div):not(.lajukan-mobile-topbar):not(.ui-layer-mobile-topbar):not([class*='fixed']):where([class~='px-10'],
-    [class~='px-9'],
-    [class~='px-8'],
-    [class~='px-7'],
-    [class~='px-6'],
-    [class~='px-5'],
-    [class~='px-4'],
-    [class~='px-3'],
-    [class~='px-2.5'],
-    [class~='px-2']) {
+  .lajukan-route-surface.lajukan-route-surface
+    > div
+    > :where(main, section, div):not(.lajukan-mobile-topbar):not(
+      .ui-layer-mobile-topbar
+    ):not([class*='fixed']):where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4'],
+      [class~='px-3'],
+      [class~='px-2.5'],
+      [class~='px-2']
+    ) {
     padding-left: var(--app-mobile-page-x) !important;
     padding-right: var(--app-mobile-page-x) !important;
   }
 
-  .lajukan-route-surface.lajukan-route-surface :where(main, section, div):not([class*='fixed']):not([class*='rounded']):where([class*='mx-auto']):where([class*='max-w-']):where([class~='px-10'],
-    [class~='px-9'],
-    [class~='px-8'],
-    [class~='px-7'],
-    [class~='px-6'],
-    [class~='px-5'],
-    [class~='px-4'],
-    [class~='px-3'],
-    [class~='px-2.5'],
-    [class~='px-2']) {
+  .lajukan-route-surface.lajukan-route-surface
+    :where(main, section, div):not([class*='fixed']):not(
+      [class*='rounded']
+    ):where([class*='mx-auto']):where([class*='max-w-']):where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4'],
+      [class~='px-3'],
+      [class~='px-2.5'],
+      [class~='px-2']
+    ) {
     padding-left: var(--app-mobile-page-x) !important;
     padding-right: var(--app-mobile-page-x) !important;
   }
 }
 
 .lajukan-route-surface .lajukan-header-shell.page-shell,
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) .lajukan-header-shell.page-shell {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .lajukan-header-shell.page-shell {
   max-width: min(1700px, 100vw) !important;
   padding-inline: clamp(0.75rem, 1.35vw, 1.125rem) !important;
   padding-top: 0 !important;
@@ -2556,26 +3062,43 @@ canvas {
    - Icon/search/composer wrappers draw the field border; children stay plain. */
 .app-cohesive-theme,
 .lajukan-route-surface {
-  --app-field-border: color-mix(in srgb,
-      var(--app-text) 30%,
-      var(--app-border-strong));
-  --app-field-border-hover: color-mix(in srgb,
-      var(--app-text) 42%,
-      var(--app-border-strong));
-  --app-field-focus: color-mix(in srgb,
-      var(--route-accent, var(--app-accent)) 72%,
-      var(--app-border-strong));
-  --app-field-bg: color-mix(in srgb,
-      var(--app-surface-strong) 96%,
-      transparent);
-  --app-field-focus-ring: color-mix(in srgb,
-      var(--route-accent, var(--app-accent)) 16%,
-      transparent);
+  --app-field-border: color-mix(
+    in srgb,
+    var(--app-text) 30%,
+    var(--app-border-strong)
+  );
+  --app-field-border-hover: color-mix(
+    in srgb,
+    var(--app-text) 42%,
+    var(--app-border-strong)
+  );
+  --app-field-focus: color-mix(
+    in srgb,
+    var(--route-accent, var(--app-accent)) 72%,
+    var(--app-border-strong)
+  );
+  --app-field-bg: color-mix(
+    in srgb,
+    var(--app-surface-strong) 96%,
+    transparent
+  );
+  --app-field-focus-ring: color-mix(
+    in srgb,
+    var(--route-accent, var(--app-accent)) 16%,
+    transparent
+  );
 }
 
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']),
-  textarea,
-  select):not(.ui-navbar-search-input) {
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input) {
   min-height: 44px;
   border: 1.5px solid var(--app-field-border) !important;
   border-radius: 14px !important;
@@ -2587,50 +3110,92 @@ canvas {
   outline: none !important;
 }
 
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']),
-  textarea,
-  select):not(.ui-navbar-search-input):hover {
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):hover {
   border-color: var(--app-field-border-hover) !important;
 }
 
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']),
-  textarea,
-  select):not(.ui-navbar-search-input):focus,
-.lajukan-route-surface :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']),
-  textarea,
-  select):not(.ui-navbar-search-input):focus-visible {
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):focus,
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):focus-visible {
   border-color: var(--app-field-focus) !important;
   box-shadow:
     inset 0 0 0 1px var(--app-field-focus),
     0 0 0 3px var(--app-field-focus-ring) !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row,
-  label:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  div:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  form:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0']))):has( :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-    textarea,
-    select)) {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ) {
   border: 1.5px solid var(--app-field-border) !important;
   background-color: var(--app-field-bg) !important;
   box-shadow:
@@ -2638,93 +3203,155 @@ canvas {
     0 1px 0 rgba(15, 23, 42, 0.04) !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row,
-  label:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  div:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  form:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0']))):has( :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-    textarea,
-    select)):hover {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ):hover {
   border-color: var(--app-field-border-hover) !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row,
-  label:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  div:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  form:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0']))):has( :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-    textarea,
-    select)):focus-within {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ):focus-within {
   border-color: var(--app-field-focus) !important;
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--app-field-focus) 58%, transparent),
     0 0 0 3px var(--app-field-focus-ring) !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row,
-  label:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  div:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  form:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0']))) :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select) {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
   min-height: 0;
   border: 0 !important;
   border-radius: 0 !important;
@@ -2733,60 +3360,87 @@ canvas {
   outline: none !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row) {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  ) {
   border-color: var(--app-field-border) !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row):hover {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  ):hover {
   border-color: var(--app-field-border-hover) !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row):focus-within {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  ):focus-within {
   border-color: var(--app-field-focus) !important;
 }
 
-.lajukan-route-surface :where(label, div, form):has(> :where(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0'])) {
+.lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ) {
   border: 1.5px solid var(--app-field-border) !important;
   background-color: var(--app-field-bg) !important;
 }
 
-.lajukan-route-surface :where(label, div, form):has(> :where(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0'])):focus-within {
+.lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ):focus-within {
   border-color: var(--app-field-focus) !important;
 }
 
-.lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row) :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select) {
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
   min-height: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -2795,22 +3449,93 @@ canvas {
   outline: none !important;
 }
 
-.app-cohesive-theme .lajukan-route-surface :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row) :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme .lajukan-route-surface :where(label, div, form):has(> :where(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0']))> :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select) {
+/* Route canvas guard:
+   keep every non-immersive page on the same quiet app background while letting
+   cards, warnings, and small status accents keep their local color. */
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']):not([data-route-immersive='true']) {
+  background:
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--route-accent, var(--app-accent)) 6%, transparent),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      color-mix(in srgb, var(--app-brand-info) 5%, transparent),
+      transparent 24%
+    ),
+    var(--app-surface-muted) !important;
+}
+
+.dark
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']):not([data-route-immersive='true']) {
+  background:
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--route-accent, var(--app-accent)) 5%, transparent),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      color-mix(in srgb, var(--app-brand-info) 4%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #000000 0%, #090909 48%, #000000 100%) !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    main[class*='min-h-screen'][class*='bg-'],
+    main[class*='min-h-[100svh]'][class*='bg-'],
+    main[class*='min-h-svh'][class*='bg-'],
+    .lajukan-market-page,
+    .lajukan-create-compact
+  ):not(.ui-layer-modal):not(.ui-layer-drawer):not(.ui-layer-popover) {
+  background: transparent !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
   min-height: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -2819,20 +3544,34 @@ canvas {
   outline: none !important;
 }
 
-.app-cohesive-theme .lajukan-route-surface :where(.ui-field-shell, .ui-input-shell, .ui-search-form)> :where(label, div):has(> :where(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0'])) {
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(.ui-field-shell, .ui-input-shell, .ui-search-form)
+  > :where(label, div):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ) {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
-.app-cohesive-theme :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']),
-  textarea,
-  select):not(.ui-navbar-search-input) {
+.app-cohesive-theme
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input) {
   min-height: 44px;
   border: 1.5px solid var(--app-field-border) !important;
   border-radius: 14px !important;
@@ -2844,49 +3583,82 @@ canvas {
   outline: none !important;
 }
 
-.app-cohesive-theme :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row,
-  label:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  div:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0'])),
-  form:has(> :where(input[class*='bg-transparent'],
-      input[class*='border-0'],
-      textarea[class*='bg-transparent'],
-      textarea[class*='border-0'],
-      select[class*='bg-transparent'],
-      select[class*='border-0']))) {
+.app-cohesive-theme
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ) {
   border-color: var(--app-field-border) !important;
 }
 
-.app-cohesive-theme :where(.ui-field-shell,
-  .ui-input-shell,
-  .ui-navbar-search-field,
-  .ui-search-form,
-  .ui-control,
-  .ui-feed-row) :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme :where(label, div, form):has(> :where(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0']))> :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select) {
+.app-cohesive-theme
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
   min-height: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -2895,43 +3667,95 @@ canvas {
   outline: none !important;
 }
 
-.app-cohesive-theme :where(.ui-field-shell, .ui-input-shell, .ui-search-form)> :where(label, div):has(> :where(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0'])) {
+.app-cohesive-theme
+  :where(.ui-field-shell, .ui-input-shell, .ui-search-form)
+  > :where(label, div):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ) {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
-.app-cohesive-theme .ui-field-shell :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme .ui-input-shell :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme .ui-navbar-search-field :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme .ui-search-form :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme .ui-control :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme .ui-feed-row :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select),
-.app-cohesive-theme :is(label, div, form):has(> :is(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0']))> :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select) {
+.app-cohesive-theme
+  .ui-field-shell
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-input-shell
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-navbar-search-field
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-search-form
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-control
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-feed-row
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  :is(label, div, form):has(
+    > :is(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
   min-height: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -2940,14 +3764,24 @@ canvas {
   outline: none !important;
 }
 
-.lajukan-route-surface :where(label, div, form):has(> :where(input[class*='bg-transparent'],
-    input[class*='border-0'],
-    textarea[class*='bg-transparent'],
-    textarea[class*='border-0'],
-    select[class*='bg-transparent'],
-    select[class*='border-0']))> :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
-  textarea,
-  select) {
+.lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
   min-height: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;

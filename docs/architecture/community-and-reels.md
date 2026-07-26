@@ -15,6 +15,8 @@ Implemented concepts:
 
 - Community feed/search.
 - Groups, members, join/leave, permissions.
+- Group identity media: avatar/photo and cover image, managed by group owner/moderator through the existing group permissions surface.
+- Group management: owner/moderator can edit group name, description, privacy, posting/join permissions, rules, and moderate members with an audit reason for removal/block actions.
 - Forum overview/search/tags/categories.
 - Threads/posts/votes/polls/solution.
 - Media upload/media serving.
@@ -32,6 +34,7 @@ Implemented concepts:
 
 - Reel listing/feed.
 - Create/update/delete.
+- Reels Studio can create media from camera, device upload, or a direct browser-playable HTTPS video URL such as MP4/WebM/MOV/M4V. External hosted video is stored as `media_url`/`video_src`; source provenance is kept in metadata.
 - Viewer state/actions/events.
 - Comments.
 - Store metadata fields exist in community service code.

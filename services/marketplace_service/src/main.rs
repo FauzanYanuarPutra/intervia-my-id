@@ -71,6 +71,22 @@ const MAX_EVENT_NAME_LEN: usize = 120;
 const MAX_EVENT_STRING_LEN: usize = 512;
 const MAX_EVENT_PAGE_LEN: usize = 1_024;
 const MAX_EVENT_PROPERTIES_BYTES: usize = 32 * 1024;
+const SENSITIVE_EVENT_PROPERTY_KEY_PARTS: [&str; 14] = [
+    "authorization",
+    "cookie",
+    "credential",
+    "id_card",
+    "identity_document",
+    "ktp",
+    "message_body",
+    "nik",
+    "otp",
+    "passcode",
+    "password",
+    "raw_document",
+    "secret",
+    "token",
+];
 const MAX_LEARNING_TITLE_LEN: usize = 160;
 const MAX_LEARNING_SUMMARY_LEN: usize = 500;
 const MAX_LEARNING_DESCRIPTION_LEN: usize = 20_000;
@@ -121,9 +137,7 @@ fn parse_cors_origins() -> Vec<HeaderValue> {
     let raw = env::var("CORS_ORIGINS")
         .ok()
         .or_else(|| env::var("CORS_ORIGIN").ok())
-        .unwrap_or_else(|| {
-            "http://localhost:3000,http://localhost:3001,http://localhost:3002".to_string()
-        });
+        .unwrap_or_default();
 
     raw.split(',')
         .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
@@ -328,8 +342,13 @@ struct AccessClaims {
 struct ListContentQuery {
     #[serde(alias = "content_type")]
     r#type: Option<String>,
+    category: Option<String>,
+    subcategory: Option<String>,
+    industries: Option<String>,
     q: Option<String>,
     location: Option<String>,
+    min_price: Option<i64>,
+    max_price: Option<i64>,
     level: Option<String>,
     sector: Option<String>,
     sub_sector: Option<String>,
@@ -431,6 +450,157 @@ struct UpsertContentRequest {
     metadata: Option<Value>,
     content_status: Option<String>,
     slug: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListListingDraftsQuery {
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateListingDraftRequest {
+    intent: Option<String>,
+    category_slug: Option<String>,
+    subcategory_slug: Option<String>,
+    industry_ids: Option<Vec<String>>,
+    current_step: Option<i32>,
+    values: Option<Value>,
+    media: Option<Value>,
+    attributes: Option<Value>,
+    contact_snapshot: Option<Value>,
+    completion_percentage: Option<i32>,
+    business_profile_id: Option<Uuid>,
+    idempotency_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct PatchListingDraftRequest {
+    expected_version: Option<i32>,
+    current_step: Option<i32>,
+    values: Option<Value>,
+    media: Option<Value>,
+    attributes: Option<Value>,
+    contact_snapshot: Option<Value>,
+    completion_percentage: Option<i32>,
+    title: Option<String>,
+    summary: Option<String>,
+    body: Option<String>,
+    price_cents: Option<i64>,
+    pricing_mode: Option<String>,
+    price_unit: Option<String>,
+    cover_image: Option<String>,
+    industry_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct ListingDraftRow {
+    id: Uuid,
+    owner_id: Uuid,
+    draft_version: i32,
+    listing_intent: Option<String>,
+    category_slug: Option<String>,
+    subcategory_slug: Option<String>,
+    industry_ids: Vec<String>,
+    current_step: i32,
+    listing_status: String,
+    completion_percentage: i32,
+    title: String,
+    summary: Option<String>,
+    body: String,
+    price_cents: Option<i64>,
+    pricing_mode: String,
+    price_unit: Option<String>,
+    cover_image: Option<String>,
+    media: Value,
+    values: Value,
+    attributes: Value,
+    contact_snapshot: Value,
+    business_profile_id: Option<Uuid>,
+    last_saved_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListingDraftResponse {
+    draft: ListingDraftRow,
+}
+
+#[derive(Debug, Serialize)]
+struct ListListingDraftsResponse {
+    items: Vec<ListingDraftRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateCreationDraftRequest {
+    target: Option<String>,
+    payload: Option<Value>,
+    media: Option<Value>,
+    field_metadata: Option<Value>,
+    title: Option<String>,
+    summary: Option<String>,
+    completeness_score: Option<i32>,
+    missing_required_fields: Option<Vec<String>>,
+    warnings: Option<Value>,
+    source_conversation_id: Option<String>,
+    created_by: Option<String>,
+    idempotency_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct PatchCreationDraftRequest {
+    expected_version: Option<i32>,
+    payload: Option<Value>,
+    media: Option<Value>,
+    field_metadata: Option<Value>,
+    title: Option<String>,
+    summary: Option<String>,
+    completeness_score: Option<i32>,
+    missing_required_fields: Option<Vec<String>>,
+    warnings: Option<Value>,
+    updated_by: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ConsumeCreationDraftRequest {
+    resource_id: Option<String>,
+    resource_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CreationDraftRow {
+    id: String,
+    owner_id: Uuid,
+    target: String,
+    status: String,
+    schema_version: i32,
+    draft_version: i32,
+    payload: Value,
+    media: Value,
+    field_metadata: Value,
+    title: String,
+    summary: Option<String>,
+    completeness_score: i32,
+    missing_required_fields: Vec<String>,
+    warnings: Value,
+    source_conversation_id: Option<String>,
+    created_by: String,
+    resource_id: Option<String>,
+    resource_url: Option<String>,
+    expires_at: DateTime<Utc>,
+    consumed_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct CreationDraftResponse {
+    data: CreationDraftRow,
 }
 
 #[derive(Debug, Deserialize)]
@@ -998,6 +1168,7 @@ struct CreateUmkmProductRequest {
 #[derive(Debug, Deserialize, Default)]
 struct ListLajukanRequestsQuery {
     limit: Option<i64>,
+    mine: Option<bool>,
 }
 
 #[derive(Debug, Serialize, FromRow, Clone)]
@@ -1541,6 +1712,127 @@ struct ListSectorsResponse {
 }
 
 #[derive(Debug, Deserialize, Default)]
+struct ListMarketplaceTaxonomyQuery {
+    active: Option<bool>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct MarketplaceCategoryRow {
+    id: Uuid,
+    slug: String,
+    legacy_key: Option<String>,
+    name_id: String,
+    name_en: String,
+    description_id: String,
+    description_en: String,
+    icon: Option<String>,
+    badge: Option<String>,
+    sort_order: i32,
+    is_active: bool,
+    listing_count: i64,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct MarketplaceSubcategoryRow {
+    id: Uuid,
+    category_id: Uuid,
+    category_slug: String,
+    slug: String,
+    name_id: String,
+    name_en: String,
+    description_id: Option<String>,
+    description_en: Option<String>,
+    icon: Option<String>,
+    sort_order: i32,
+    is_active: bool,
+    listing_count: i64,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct MarketplaceIndustryRow {
+    id: Uuid,
+    slug: String,
+    name_id: String,
+    name_en: String,
+    icon: Option<String>,
+    sort_order: i32,
+    is_active: bool,
+    listing_count: i64,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct MarketplaceAttributeRow {
+    id: Uuid,
+    category_id: Option<Uuid>,
+    subcategory_id: Option<Uuid>,
+    key: String,
+    label_id: String,
+    label_en: String,
+    value_type: String,
+    unit: Option<String>,
+    options: Value,
+    is_filterable: bool,
+    is_required: bool,
+    sort_order: i32,
+    is_active: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ListMarketplaceCategoriesResponse {
+    items: Vec<MarketplaceCategoryRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ListMarketplaceSubcategoriesResponse {
+    items: Vec<MarketplaceSubcategoryRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ListMarketplaceIndustriesResponse {
+    items: Vec<MarketplaceIndustryRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct SearchSuggestionsQuery {
+    q: Option<String>,
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct SearchSuggestionRow {
+    kind: String,
+    value: String,
+    label_id: String,
+    label_en: String,
+    category_slug: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SearchSuggestionsResponse {
+    items: Vec<SearchSuggestionRow>,
+}
+
+#[derive(Debug, Deserialize, Default)]
 struct ListBannersQuery {
     location: Option<String>,
     status: Option<String>,
@@ -1631,6 +1923,18 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
+    let strict_secrets =
+        app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
+    let normalized_secret = jwt_secret.trim().to_ascii_lowercase();
+    if strict_secrets
+        && (jwt_secret.trim().len() < 32
+            || matches!(
+                normalized_secret.as_str(),
+                "change_me" | "changeme" | "secret" | "your_secret_here"
+            ))
+    {
+        anyhow::bail!("JWT_SECRET must be at least 32 characters and not a placeholder");
+    }
     ensure_base_schema(&db).await?;
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
@@ -1707,10 +2011,10 @@ async fn main() -> anyhow::Result<()> {
     if !configured_origins.is_empty() {
         cors = cors.allow_origin(configured_origins);
     } else if app_env.eq_ignore_ascii_case("production") {
-        if let Ok(frontend_url) = env::var("FRONTEND_URL") {
-            if let Ok(value) = frontend_url.parse::<HeaderValue>() {
-                cors = cors.allow_origin(value);
-            }
+        let frontend_url =
+            env::var("FRONTEND_URL").unwrap_or_else(|_| "https://www.lajukan.com".to_string());
+        if let Ok(value) = frontend_url.parse::<HeaderValue>() {
+            cors = cors.allow_origin(value);
         }
     } else {
         cors = cors.allow_origin([
@@ -1731,6 +2035,50 @@ async fn main() -> anyhow::Result<()> {
                 .patch(update_content)
                 .delete(delete_content),
         )
+        .route("/v1/listings", get(list_content).post(create_content))
+        .route(
+            "/v1/listings/{id}",
+            get(get_content)
+                .put(update_content)
+                .patch(update_content)
+                .delete(delete_content),
+        )
+        .route(
+            "/v1/listing-drafts",
+            get(list_listing_drafts).post(create_listing_draft),
+        )
+        .route(
+            "/v1/listing-drafts/{id}",
+            get(get_listing_draft)
+                .patch(patch_listing_draft)
+                .delete(delete_listing_draft),
+        )
+        .route(
+            "/v1/listing-drafts/{id}/publish",
+            post(publish_listing_draft),
+        )
+        .route("/v1/creation-drafts", post(create_creation_draft))
+        .route(
+            "/v1/creation-drafts/{id}",
+            get(get_creation_draft)
+                .patch(patch_creation_draft)
+                .delete(discard_creation_draft),
+        )
+        .route(
+            "/v1/creation-drafts/{id}/consume",
+            post(consume_creation_draft),
+        )
+        .route(
+            "/listing-drafts",
+            get(list_listing_drafts).post(create_listing_draft),
+        )
+        .route(
+            "/listing-drafts/{id}",
+            get(get_listing_draft)
+                .patch(patch_listing_draft)
+                .delete(delete_listing_draft),
+        )
+        .route("/listing-drafts/{id}/publish", post(publish_listing_draft))
         .route(
             "/v1/content/{id}/like",
             get(get_content_like_state).put(update_content_like),
@@ -1872,6 +2220,35 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/super-app/trust-profiles/{user_id}",
             get(get_super_app_trust_profile).put(upsert_super_app_trust_profile),
+        )
+        .route("/v1/categories", get(list_marketplace_categories))
+        .route("/v1/categories/{slug}", get(get_marketplace_category))
+        .route(
+            "/v1/categories/{slug}/subcategories",
+            get(list_marketplace_subcategories),
+        )
+        .route("/v1/industries", get(list_marketplace_industries))
+        .route("/v1/filters/{category_slug}", get(get_marketplace_filters))
+        .route("/v1/search/suggestions", get(list_search_suggestions))
+        .route(
+            "/v1/marketplace/categories",
+            get(list_marketplace_categories),
+        )
+        .route(
+            "/v1/marketplace/categories/{slug}",
+            get(get_marketplace_category),
+        )
+        .route(
+            "/v1/marketplace/categories/{slug}/subcategories",
+            get(list_marketplace_subcategories),
+        )
+        .route(
+            "/v1/marketplace/industries",
+            get(list_marketplace_industries),
+        )
+        .route(
+            "/v1/marketplace/filters/{category_slug}",
+            get(get_marketplace_filters),
         )
         .route("/v1/sectors", get(list_sectors).post(create_sector))
         .route(
@@ -5732,19 +6109,90 @@ fn is_valid_event_name(name: &str) -> bool {
         .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
 }
 
+fn canonical_event_name(raw: &str) -> String {
+    let normalized = raw.trim().to_lowercase();
+    match normalized.as_str() {
+        "homepage_view" | "home_viewed" => "home.viewed",
+        "search_started" => "search.started",
+        "search_submitted" => "search.submitted",
+        "search_result_clicked" => "search.result_clicked",
+        "search_zero_result" | "zero_result_seen" => "search.zero_result",
+        "filter_applied" => "search.filter_applied",
+        "location_changed" => "location.changed",
+        "listing_viewed" => "listing.viewed",
+        "listing_saved" => "listing.saved",
+        "listing_shared" => "listing.shared",
+        "supplier_profile_viewed" => "profile.supplier_viewed",
+        "need_post_started" => "need.create_started",
+        "need_post_published" => "need.published",
+        "offer_post_started" => "offer.create_started",
+        "offer_post_published" => "offer.published",
+        "rfq_created" => "rfq.created",
+        "supplier_invited" => "rfq.supplier_invited",
+        "quote_started" => "quote.create_started",
+        "quote_submitted" => "quote.submitted",
+        "quote_viewed" => "quote.viewed",
+        "quote_shortlisted" => "quote.shortlisted",
+        "quote_accepted" => "quote.accepted",
+        "chat_started" => "chat.opened",
+        "sample_requested" => "sample.requested",
+        "export_assessment_started" => "export.assessment_started",
+        "export_assessment_completed" => "export.assessment_completed",
+        "buyer_request_viewed" => "buyer_request.viewed",
+        "buyer_request_applied" => "buyer_request.applied",
+        "report_submitted" => "report.submitted",
+        "verification_started" => "verification.started",
+        "verification_completed" => "verification.completed",
+        _ => normalized.as_str(),
+    }
+    .to_string()
+}
+
+fn is_sensitive_event_property_key(key: &str) -> bool {
+    let normalized = key.to_lowercase();
+    SENSITIVE_EVENT_PROPERTY_KEY_PARTS
+        .iter()
+        .any(|part| normalized.contains(part))
+}
+
+fn scrub_sensitive_event_properties(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            let sensitive_keys = map
+                .keys()
+                .filter(|key| is_sensitive_event_property_key(key))
+                .cloned()
+                .collect::<Vec<_>>();
+            for key in sensitive_keys {
+                map.remove(&key);
+            }
+            for entry in map.values_mut() {
+                scrub_sensitive_event_properties(entry);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                scrub_sensitive_event_properties(item);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn normalize_event_payload(
     event: TrackEventRequest,
     headers: &HeaderMap,
 ) -> Result<NormalizedEvent, String> {
-    let event_name = event.event_name.trim().to_lowercase();
+    let event_name = canonical_event_name(&event.event_name);
     if !is_valid_event_name(&event_name) {
         return Err("Invalid event_name".to_string());
     }
 
-    let properties = event.properties.unwrap_or_else(|| json!({}));
+    let mut properties = event.properties.unwrap_or_else(|| json!({}));
     if !properties.is_object() {
         return Err("properties must be an object".to_string());
     }
+    scrub_sensitive_event_properties(&mut properties);
     if serde_json::to_vec(&properties)
         .map(|bytes| bytes.len() > MAX_EVENT_PROPERTIES_BYTES)
         .unwrap_or(true)
@@ -5756,6 +6204,7 @@ fn normalize_event_payload(
     if !context.is_object() {
         context = json!({});
     }
+    scrub_sensitive_event_properties(&mut context);
 
     if let Some(obj) = context.as_object_mut() {
         if let Some(ip) = header_str(headers, "x-forwarded-for")
@@ -7611,6 +8060,98 @@ fn json_text_at(value: &Value, path: &[&str]) -> Option<String> {
     }
 }
 
+async fn resolve_marketplace_taxonomy_refs(
+    db: &PgPool,
+    metadata: Value,
+) -> Result<(Option<Uuid>, Option<Uuid>, Value), sqlx::Error> {
+    let category_candidate = json_text_at(&metadata, &["marketplace_category_slug"])
+        .or_else(|| json_text_at(&metadata, &["create_category"]))
+        .or_else(|| json_text_at(&metadata, &["business_discovery_category"]))
+        .or_else(|| json_text_at(&metadata, &["discovery_category"]));
+    let subcategory_candidate = json_text_at(&metadata, &["marketplace_subcategory_slug"])
+        .or_else(|| json_text_at(&metadata, &["subcategory"]))
+        .or_else(|| json_text_at(&metadata, &["sub_category"]));
+
+    let category = if let Some(candidate) = category_candidate {
+        let normalized = make_slug(&candidate);
+        sqlx::query_as::<_, (Uuid, String, Option<String>)>(
+            r#"
+            SELECT id, slug, legacy_key
+            FROM marketplace_categories
+            WHERE slug = $1
+               OR legacy_key = $1
+               OR metadata->'aliases' ? $1
+            LIMIT 1
+            "#,
+        )
+        .bind(normalized)
+        .fetch_optional(db)
+        .await?
+    } else {
+        None
+    };
+
+    let subcategory = if let (Some((category_id, _, _)), Some(candidate)) =
+        (category.as_ref(), subcategory_candidate)
+    {
+        let normalized = make_slug(&candidate);
+        sqlx::query_as::<_, (Uuid, String)>(
+            r#"
+            SELECT id, slug
+            FROM marketplace_subcategories
+            WHERE category_id = $1
+              AND slug = $2
+            LIMIT 1
+            "#,
+        )
+        .bind(category_id)
+        .bind(normalized)
+        .fetch_optional(db)
+        .await?
+    } else {
+        None
+    };
+
+    let mut enriched = metadata;
+    if let Value::Object(ref mut map) = enriched {
+        if let Some((_, slug, legacy_key)) = category.as_ref() {
+            map.insert(
+                "marketplace_category_slug".to_string(),
+                Value::String(slug.clone()),
+            );
+            let discovery_category = legacy_key
+                .as_deref()
+                .or_else(|| business_discovery_category_for_marketplace_slug(slug));
+            if let Some(discovery_category) = discovery_category {
+                map.insert(
+                    "marketplace_category_legacy_key".to_string(),
+                    Value::String(discovery_category.to_string()),
+                );
+                map.insert(
+                    "create_category".to_string(),
+                    Value::String(discovery_category.to_string()),
+                );
+                map.insert(
+                    "business_discovery_category".to_string(),
+                    Value::String(discovery_category.to_string()),
+                );
+            }
+        }
+        if let Some((_, slug)) = subcategory.as_ref() {
+            map.insert(
+                "marketplace_subcategory_slug".to_string(),
+                Value::String(slug.clone()),
+            );
+        }
+    }
+
+    Ok((
+        category.map(|(id, _, _)| id),
+        subcategory.map(|(id, _)| id),
+        enriched,
+    ))
+}
+
 fn json_i64_at(value: &Value, path: &[&str]) -> Option<i64> {
     match json_lookup(value, path) {
         Some(Value::Number(number)) => number.as_i64(),
@@ -7821,7 +8362,21 @@ fn build_lajukan_offer_preview(row: &LajukanRequestOfferRow) -> LajukanOfferPrev
     }
 }
 
-async fn fetch_lajukan_request_counts(db: &PgPool) -> Result<LajukanRequestCounts, sqlx::Error> {
+fn resolve_lajukan_request_owner_filter(
+    mine: bool,
+    actor_user_id: Option<Uuid>,
+) -> Result<Option<Uuid>, StatusCode> {
+    if !mine {
+        return Ok(None);
+    }
+
+    actor_user_id.map(Some).ok_or(StatusCode::UNAUTHORIZED)
+}
+
+async fn fetch_lajukan_request_counts(
+    db: &PgPool,
+    owner_id: Option<Uuid>,
+) -> Result<LajukanRequestCounts, sqlx::Error> {
     let row = sqlx::query_as::<_, LajukanRequestSummaryAggRow>(
         r#"
         WITH request_statuses AS (
@@ -7836,6 +8391,7 @@ async fn fetch_lajukan_request_counts(db: &PgPool) -> Result<LajukanRequestCount
           LEFT JOIN transactions t ON t.content_id = c.id
           WHERE c.content_status = 'active'
             AND c.pricing_mode = 'request'
+            AND ($1::uuid IS NULL OR c.owner_id = $1)
           GROUP BY c.id, c.metadata
         )
         SELECT
@@ -7846,6 +8402,7 @@ async fn fetch_lajukan_request_counts(db: &PgPool) -> Result<LajukanRequestCount
         FROM request_statuses
         "#,
     )
+    .bind(owner_id)
     .fetch_one(db)
     .await?;
 
@@ -7875,7 +8432,7 @@ async fn find_umkm_store_row(
         "#,
     )
     .bind(parsed_id)
-    .bind(normalized)
+    .bind(&normalized)
     .fetch_optional(db)
     .await
 }
@@ -7932,7 +8489,7 @@ async fn get_lajukan_summary(State(state): State<Arc<AppState>>) -> impl IntoRes
     .fetch_one(&state.db)
     .await;
 
-    let request_counts = fetch_lajukan_request_counts(&state.db).await;
+    let request_counts = fetch_lajukan_request_counts(&state.db, None).await;
 
     match (listing_counts, store_counts, request_counts) {
         (Ok(listing), Ok(stores), Ok(requests)) => {
@@ -7976,9 +8533,17 @@ async fn get_lajukan_summary(State(state): State<Arc<AppState>>) -> impl IntoRes
 
 async fn list_lajukan_requests(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<ListLajukanRequestsQuery>,
 ) -> impl IntoResponse {
     let limit = query.limit.unwrap_or(24).clamp(1, 60);
+    let owner_filter = match resolve_lajukan_request_owner_filter(
+        query.mine.unwrap_or(false),
+        user_id_from_auth(&headers, &state.jwt_secret),
+    ) {
+        Ok(owner_filter) => owner_filter,
+        Err(status) => return err(status, "authentication required").into_response(),
+    };
 
     let request_rows = sqlx::query_as::<_, LajukanRequestRow>(
         r#"
@@ -7999,6 +8564,7 @@ async fn list_lajukan_requests(
         LEFT JOIN transactions t ON t.content_id = c.id
         WHERE c.content_status = 'active'
           AND c.pricing_mode = 'request'
+          AND ($2::uuid IS NULL OR c.owner_id = $2)
         GROUP BY
           c.id, c.slug, c.title, c.summary, c.body, c.content_type, c.category,
           c.price_cents, c.cover_image, c.metadata, c.created_at, c.updated_at
@@ -8007,15 +8573,16 @@ async fn list_lajukan_requests(
         "#,
     )
     .bind(limit)
+    .bind(owner_filter)
     .fetch_all(&state.db)
     .await;
 
-    let request_counts = fetch_lajukan_request_counts(&state.db).await;
+    let request_counts = fetch_lajukan_request_counts(&state.db, owner_filter).await;
 
     match (request_rows, request_counts) {
         (Ok(rows), Ok(counts)) => {
             let request_ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
-            let offer_rows = if request_ids.is_empty() {
+            let offer_rows = if request_ids.is_empty() || owner_filter.is_none() {
                 Ok(Vec::new())
             } else {
                 sqlx::query_as::<_, LajukanRequestOfferRow>(
@@ -8577,6 +9144,1383 @@ async fn create_umkm_product(
     }
 }
 
+fn normalize_listing_intent(value: Option<String>) -> Option<String> {
+    clean_text(value).and_then(|value| match value.to_lowercase().as_str() {
+        "offer" | "supply" | "sell" | "seller" => Some("offer".to_string()),
+        "request" | "demand" | "need" | "buyer" => Some("request".to_string()),
+        _ => None,
+    })
+}
+
+fn sanitize_draft_step(value: Option<i32>) -> i32 {
+    value.unwrap_or(3).clamp(1, 9)
+}
+
+fn sanitize_completion(value: Option<i32>) -> i32 {
+    value.unwrap_or(0).clamp(0, 100)
+}
+
+fn draft_form_values(metadata: &Value) -> Option<&Value> {
+    json_lookup(metadata, &["form_values"])
+}
+
+fn has_any_json_value_at(value: &Value, keys: &[&str]) -> bool {
+    keys.iter().any(|key| json_has_value_at(value, &[*key]))
+}
+
+fn draft_publish_intent(metadata: &Value) -> String {
+    let normalized = clean_json_string(json_lookup(metadata, &["listing_intent"]))
+        .or_else(|| clean_json_string(json_lookup(metadata, &["intent"])))
+        .and_then(|value| normalize_listing_intent(Some(value)));
+    normalized.unwrap_or_else(|| {
+        if is_demand_listing_metadata(metadata) {
+            "request".to_string()
+        } else {
+            "offer".to_string()
+        }
+    })
+}
+
+fn draft_primary_field_keys(intent: &str, category_slug: &str) -> &'static [&'static str] {
+    match (intent, category_slug) {
+        ("request", "materials-suppliers") => &["item_needed"],
+        ("offer", "materials-suppliers") => &["item_name"],
+        ("request", "services") => &["service_needed"],
+        ("offer", "services") => &["service_name"],
+        ("request", "machines-tools") => &["equipment_needed"],
+        ("offer", "machines-tools") => &["equipment_name"],
+        ("request", "business-places") => &["place_needed"],
+        ("offer", "business-places") => &["place_name"],
+        ("request", "business-opportunities") => &["opportunity_needed"],
+        ("offer", "business-opportunities") => &["opportunity_name"],
+        _ => &["title"],
+    }
+}
+
+fn validate_listing_draft_publish_requirements(
+    title: &str,
+    body: &str,
+    metadata: &Value,
+) -> Result<(), &'static str> {
+    let Some(form_values) = draft_form_values(metadata) else {
+        return Err("draft form values are required");
+    };
+    if !form_values.is_object() {
+        return Err("draft form values are required");
+    }
+
+    let intent = draft_publish_intent(metadata);
+    let Some(category_slug) =
+        clean_json_string(json_lookup(metadata, &["marketplace_category_slug"]))
+    else {
+        return Err("draft category is required");
+    };
+    let primary_keys = draft_primary_field_keys(&intent, &category_slug);
+    if !has_any_json_value_at(form_values, primary_keys) {
+        return Err("draft is missing the primary listing field");
+    }
+
+    if title.trim().len() < 6 {
+        return Err("draft title is too short");
+    }
+    if body.trim().len() < 12 && !json_has_value_at(form_values, &["summary"]) {
+        return Err("draft summary is required");
+    }
+
+    if !json_has_value_at(form_values, &["display_as"]) {
+        return Err("draft display identity is required");
+    }
+    if !json_has_value_at(form_values, &["contact_channel"]) {
+        return Err("draft contact channel is required");
+    }
+
+    if intent == "offer" {
+        let location_keys = match category_slug.as_str() {
+            "services" => &["service_area", "location"][..],
+            "business-places" => &["address", "location", "selected_location"],
+            _ => &["location", "address", "service_area"],
+        };
+        if !has_any_json_value_at(form_values, location_keys) {
+            return Err("offer draft location or service area is required");
+        }
+    }
+
+    Ok(())
+}
+
+fn json_object_or_default(value: Option<Value>) -> Value {
+    match value {
+        Some(value @ Value::Object(_)) => value,
+        _ => json!({}),
+    }
+}
+
+fn json_array_or_default(value: Option<Value>) -> Value {
+    match value {
+        Some(value @ Value::Array(_)) => value,
+        _ => json!([]),
+    }
+}
+
+fn normalize_industry_slugs(values: Option<Vec<String>>) -> Vec<String> {
+    let mut slugs: Vec<String> = values
+        .unwrap_or_default()
+        .into_iter()
+        .map(|value| make_slug(&value))
+        .filter(|value| !value.is_empty())
+        .collect();
+    slugs.sort();
+    slugs.dedup();
+    slugs
+}
+
+fn content_type_for_marketplace_category(category_slug: &str) -> String {
+    match category_slug {
+        "services" | "business-opportunities" => "service".to_string(),
+        "business-places" => "property".to_string(),
+        _ => "product".to_string(),
+    }
+}
+
+fn business_discovery_category_for_marketplace_slug(slug: &str) -> Option<&'static str> {
+    match slug {
+        "materials-suppliers" => Some("supplies"),
+        "services" => Some("service"),
+        "machines-tools" => Some("equipment"),
+        "business-places" => Some("property"),
+        "business-opportunities" => Some("opportunity"),
+        _ => None,
+    }
+}
+
+fn draft_title_for(intent: &str, category_slug: &str) -> String {
+    let category = match category_slug {
+        "materials-suppliers" => "Bahan & Supplier",
+        "services" => "Cari Jasa",
+        "machines-tools" => "Mesin & Alat",
+        "business-places" => "Tempat Usaha",
+        "business-opportunities" => "Peluang Usaha",
+        _ => "Marketplace",
+    };
+    if intent == "request" {
+        format!("Draft kebutuhan {}", category)
+    } else {
+        format!("Draft penawaran {}", category)
+    }
+}
+
+async fn sync_listing_industry_slugs(
+    db: &PgPool,
+    content_id: Uuid,
+    industry_slugs: &[String],
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM listing_industries WHERE content_id = $1")
+        .bind(content_id)
+        .execute(db)
+        .await?;
+    if industry_slugs.is_empty() {
+        return Ok(());
+    }
+    sqlx::query(
+        r#"
+        INSERT INTO listing_industries (content_id, industry_id)
+        SELECT $1, i.id
+        FROM industries i
+        WHERE i.slug = ANY($2)
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .bind(content_id)
+    .bind(industry_slugs)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+fn normalize_creation_target(value: Option<String>) -> Option<String> {
+    let target = clean_text(value)?.to_lowercase();
+    match target.as_str() {
+        "offering_listing"
+        | "looking_for_listing"
+        | "business_profile"
+        | "community_post"
+        | "reel"
+        | "business_opportunity"
+        | "job_listing" => Some(target),
+        _ => None,
+    }
+}
+
+fn normalize_creation_actor(value: Option<String>, fallback: &str) -> String {
+    match clean_text(value)
+        .unwrap_or_else(|| fallback.to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "user" => "user".to_string(),
+        "admin" => "admin".to_string(),
+        _ => "ai".to_string(),
+    }
+}
+
+fn normalize_creation_string_list(values: Option<Vec<String>>, max_items: usize) -> Vec<String> {
+    let mut result = Vec::new();
+    for value in values.unwrap_or_default() {
+        let Some(cleaned) = clean_text(Some(value)) else {
+            continue;
+        };
+        if cleaned.len() > 120 || result.iter().any(|item| item == &cleaned) {
+            continue;
+        }
+        result.push(cleaned);
+        if result.len() >= max_items {
+            break;
+        }
+    }
+    result
+}
+
+fn valid_creation_media(media: &Value, owner_id: Uuid) -> bool {
+    let Some(items) = media.as_array() else {
+        return false;
+    };
+    if items.len() > 10 {
+        return false;
+    }
+    let owner_path = format!("/personal-ai/{}/", owner_id);
+    items.iter().all(|item| {
+        let Some(record) = item.as_object() else {
+            return false;
+        };
+        let media_type = record
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("image");
+        if !matches!(media_type, "image" | "video" | "document") {
+            return false;
+        }
+        let Some(asset_id) = record.get("assetId").and_then(Value::as_str) else {
+            return false;
+        };
+        if asset_id.is_empty() || asset_id.len() > 700 {
+            return false;
+        }
+        let url = record
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or(asset_id);
+        url.starts_with("/api/content/media/")
+            || (url.starts_with("/api/ai/personal/media/") && url.contains(&owner_path))
+    })
+}
+
+fn valid_creation_json(payload: &Value, media: &Value, metadata: &Value, warnings: &Value) -> bool {
+    payload.is_object()
+        && media.is_array()
+        && metadata.is_array()
+        && warnings.is_array()
+        && payload.to_string().len() <= MAX_METADATA_BYTES
+        && media.to_string().len() <= MAX_METADATA_BYTES
+        && metadata.to_string().len() <= MAX_METADATA_BYTES
+        && warnings.to_string().len() <= MAX_METADATA_BYTES
+}
+
+async fn fetch_creation_draft(
+    db: &PgPool,
+    owner_id: Uuid,
+    draft_id: &str,
+) -> Result<Option<CreationDraftRow>, sqlx::Error> {
+    sqlx::query(
+        r#"
+        UPDATE creation_drafts
+        SET status = 'expired', updated_at = NOW()
+        WHERE id = $1
+          AND owner_id = $2
+          AND status IN ('generating', 'ready', 'editing')
+          AND expires_at <= NOW()
+        "#,
+    )
+    .bind(draft_id)
+    .bind(owner_id)
+    .execute(db)
+    .await?;
+
+    sqlx::query_as::<_, CreationDraftRow>(
+        r#"
+        SELECT
+          id, owner_id, target, status, schema_version, draft_version,
+          payload, media, field_metadata, title, summary, completeness_score,
+          missing_required_fields, warnings, source_conversation_id, created_by,
+          resource_id, resource_url, expires_at, consumed_at, created_at, updated_at
+        FROM creation_drafts
+        WHERE id = $1 AND owner_id = $2 AND status <> 'discarded'
+        LIMIT 1
+        "#,
+    )
+    .bind(draft_id)
+    .bind(owner_id)
+    .fetch_optional(db)
+    .await
+}
+
+async fn create_creation_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateCreationDraftRequest>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let target = match normalize_creation_target(payload.target) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "invalid creation target").into_response(),
+    };
+    let title = match clean_text_limited(payload.title, MAX_TITLE_LEN) {
+        Ok(Some(value)) if value.len() >= 3 => value,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid draft title").into_response(),
+    };
+    let summary = match clean_text_limited(payload.summary, MAX_SUMMARY_LEN) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "draft summary is too long").into_response(),
+    };
+    let source_conversation_id = match clean_text_limited(payload.source_conversation_id, 160) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid conversation id").into_response(),
+    };
+    let idempotency_key = match clean_text_limited(payload.idempotency_key, 180) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid idempotency key").into_response(),
+    };
+
+    if let Some(ref key) = idempotency_key {
+        let existing_id = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT id FROM creation_drafts
+            WHERE owner_id = $1 AND idempotency_key = $2 AND status <> 'discarded'
+            LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(key)
+        .fetch_optional(&state.db)
+        .await;
+        match existing_id {
+            Ok(Some(id)) => {
+                return match fetch_creation_draft(&state.db, owner_id, &id).await {
+                    Ok(Some(draft)) => {
+                        (StatusCode::OK, Json(CreationDraftResponse { data: draft }))
+                            .into_response()
+                    }
+                    Ok(None) => err(StatusCode::CONFLICT, "draft already exists").into_response(),
+                    Err(error) => {
+                        tracing::error!(
+                            "create_creation_draft idempotent fetch error: {:?}",
+                            error
+                        );
+                        err(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "failed to load creation draft",
+                        )
+                        .into_response()
+                    }
+                };
+            }
+            Ok(None) => {}
+            Err(error) => {
+                tracing::error!("create_creation_draft idempotent lookup error: {:?}", error);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to create creation draft",
+                )
+                .into_response();
+            }
+        }
+    }
+
+    let draft_payload = json_object_or_default(payload.payload);
+    let media = json_array_or_default(payload.media);
+    let field_metadata = json_array_or_default(payload.field_metadata);
+    let warnings = json_array_or_default(payload.warnings);
+    if !valid_creation_json(&draft_payload, &media, &field_metadata, &warnings)
+        || !valid_creation_media(&media, owner_id)
+    {
+        return err(StatusCode::BAD_REQUEST, "invalid creation draft payload").into_response();
+    }
+    let missing_required_fields =
+        normalize_creation_string_list(payload.missing_required_fields, 30);
+    let completeness_score = payload.completeness_score.unwrap_or(0).clamp(0, 100);
+    let created_by = normalize_creation_actor(payload.created_by, "ai");
+    let id = format!("drf_{}", Uuid::new_v4().simple());
+
+    let mut tx = match state.db.begin().await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("create_creation_draft begin error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create creation draft",
+            )
+            .into_response();
+        }
+    };
+    let inserted = sqlx::query(
+        r#"
+        INSERT INTO creation_drafts (
+          id, owner_id, target, status, schema_version, draft_version,
+          payload, media, field_metadata, title, summary, completeness_score,
+          missing_required_fields, warnings, source_conversation_id, created_by,
+          idempotency_key
+        ) VALUES (
+          $1, $2, $3, 'ready', 1, 1,
+          $4, $5, $6, $7, $8, $9,
+          $10, $11, $12, $13, $14
+        )
+        "#,
+    )
+    .bind(&id)
+    .bind(owner_id)
+    .bind(&target)
+    .bind(&draft_payload)
+    .bind(&media)
+    .bind(&field_metadata)
+    .bind(&title)
+    .bind(&summary)
+    .bind(completeness_score)
+    .bind(&missing_required_fields)
+    .bind(&warnings)
+    .bind(&source_conversation_id)
+    .bind(&created_by)
+    .bind(&idempotency_key)
+    .execute(&mut *tx)
+    .await;
+    if let Err(error) = inserted {
+        let _ = tx.rollback().await;
+        tracing::error!("create_creation_draft insert error: {:?}", error);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create creation draft",
+        )
+        .into_response();
+    }
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO creation_draft_versions (draft_id, version, payload, media, updated_by)
+        VALUES ($1, 1, $2, $3, $4)
+        "#,
+    )
+    .bind(&id)
+    .bind(&draft_payload)
+    .bind(&media)
+    .bind(&created_by)
+    .execute(&mut *tx)
+    .await
+    {
+        let _ = tx.rollback().await;
+        tracing::error!("create_creation_draft history error: {:?}", error);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create creation draft",
+        )
+        .into_response();
+    }
+    if let Err(error) = tx.commit().await {
+        tracing::error!("create_creation_draft commit error: {:?}", error);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create creation draft",
+        )
+        .into_response();
+    }
+
+    match fetch_creation_draft(&state.db, owner_id, &id).await {
+        Ok(Some(draft)) => (
+            StatusCode::CREATED,
+            Json(CreationDraftResponse { data: draft }),
+        )
+            .into_response(),
+        Ok(None) => err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to load creation draft",
+        )
+        .into_response(),
+        Err(error) => {
+            tracing::error!("create_creation_draft fetch error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load creation draft",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_creation_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    match fetch_creation_draft(&state.db, owner_id, &id).await {
+        Ok(Some(draft)) => {
+            (StatusCode::OK, Json(CreationDraftResponse { data: draft })).into_response()
+        }
+        Ok(None) => err(StatusCode::NOT_FOUND, "creation draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("get_creation_draft error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load creation draft",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn patch_creation_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<PatchCreationDraftRequest>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let current = match fetch_creation_draft(&state.db, owner_id, &id).await {
+        Ok(Some(draft)) => draft,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "creation draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("patch_creation_draft fetch error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update creation draft",
+            )
+            .into_response();
+        }
+    };
+    if !matches!(current.status.as_str(), "ready" | "editing") {
+        return err(StatusCode::CONFLICT, "creation draft cannot be edited").into_response();
+    }
+    if payload
+        .expected_version
+        .is_some_and(|value| value != current.draft_version)
+    {
+        return err(StatusCode::CONFLICT, "creation draft version conflict").into_response();
+    }
+
+    let draft_payload = payload.payload.unwrap_or(current.payload);
+    let media = payload.media.unwrap_or(current.media);
+    let field_metadata = payload.field_metadata.unwrap_or(current.field_metadata);
+    let warnings = payload.warnings.unwrap_or(current.warnings);
+    if !valid_creation_json(&draft_payload, &media, &field_metadata, &warnings)
+        || !valid_creation_media(&media, owner_id)
+    {
+        return err(StatusCode::BAD_REQUEST, "invalid creation draft payload").into_response();
+    }
+    let title = match payload.title {
+        Some(value) => match clean_text_limited(Some(value), MAX_TITLE_LEN) {
+            Ok(Some(cleaned)) if cleaned.len() >= 3 => cleaned,
+            _ => return err(StatusCode::BAD_REQUEST, "invalid draft title").into_response(),
+        },
+        None => current.title,
+    };
+    let summary = match payload.summary {
+        Some(value) => match clean_text_limited(Some(value), MAX_SUMMARY_LEN) {
+            Ok(value) => value,
+            Err(_) => {
+                return err(StatusCode::BAD_REQUEST, "draft summary is too long").into_response()
+            }
+        },
+        None => current.summary,
+    };
+    let missing_required_fields = payload
+        .missing_required_fields
+        .map(|values| normalize_creation_string_list(Some(values), 30))
+        .unwrap_or(current.missing_required_fields);
+    let completeness_score = payload
+        .completeness_score
+        .unwrap_or(current.completeness_score)
+        .clamp(0, 100);
+    let updated_by = normalize_creation_actor(payload.updated_by, "user");
+
+    let mut tx = match state.db.begin().await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("patch_creation_draft begin error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update creation draft",
+            )
+            .into_response();
+        }
+    };
+    let next_version = current.draft_version + 1;
+    let updated = sqlx::query(
+        r#"
+        UPDATE creation_drafts
+        SET status = 'editing', draft_version = $3, payload = $4, media = $5,
+            field_metadata = $6, title = $7, summary = $8,
+            completeness_score = $9, missing_required_fields = $10,
+            warnings = $11, updated_at = NOW()
+        WHERE id = $1 AND owner_id = $2
+          AND draft_version = $12
+          AND status IN ('ready', 'editing')
+          AND expires_at > NOW()
+        "#,
+    )
+    .bind(&id)
+    .bind(owner_id)
+    .bind(next_version)
+    .bind(&draft_payload)
+    .bind(&media)
+    .bind(&field_metadata)
+    .bind(&title)
+    .bind(&summary)
+    .bind(completeness_score)
+    .bind(&missing_required_fields)
+    .bind(&warnings)
+    .bind(current.draft_version)
+    .execute(&mut *tx)
+    .await;
+    match updated {
+        Ok(result) if result.rows_affected() == 1 => {}
+        Ok(_) => {
+            let _ = tx.rollback().await;
+            return err(StatusCode::CONFLICT, "creation draft version conflict").into_response();
+        }
+        Err(error) => {
+            let _ = tx.rollback().await;
+            tracing::error!("patch_creation_draft update error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update creation draft",
+            )
+            .into_response();
+        }
+    }
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO creation_draft_versions (draft_id, version, payload, media, updated_by)
+        VALUES ($1, $2, $3, $4, $5)
+        "#,
+    )
+    .bind(&id)
+    .bind(next_version)
+    .bind(&draft_payload)
+    .bind(&media)
+    .bind(&updated_by)
+    .execute(&mut *tx)
+    .await
+    {
+        let _ = tx.rollback().await;
+        tracing::error!("patch_creation_draft history error: {:?}", error);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to update creation draft",
+        )
+        .into_response();
+    }
+    if let Err(error) = tx.commit().await {
+        tracing::error!("patch_creation_draft commit error: {:?}", error);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to update creation draft",
+        )
+        .into_response();
+    }
+
+    match fetch_creation_draft(&state.db, owner_id, &id).await {
+        Ok(Some(draft)) => {
+            (StatusCode::OK, Json(CreationDraftResponse { data: draft })).into_response()
+        }
+        Ok(None) => err(StatusCode::NOT_FOUND, "creation draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("patch_creation_draft reload error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update creation draft",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn discard_creation_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let result = sqlx::query(
+        r#"
+        UPDATE creation_drafts
+        SET status = 'discarded', updated_at = NOW()
+        WHERE id = $1 AND owner_id = $2 AND status IN ('generating', 'ready', 'editing', 'expired')
+        "#,
+    )
+    .bind(&id)
+    .bind(owner_id)
+    .execute(&state.db)
+    .await;
+    match result {
+        Ok(value) if value.rows_affected() == 1 => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => err(StatusCode::NOT_FOUND, "creation draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("discard_creation_draft error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to discard creation draft",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn consume_creation_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<ConsumeCreationDraftRequest>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let resource_id = match clean_text_limited(payload.resource_id, 180) {
+        Ok(Some(value)) => value,
+        _ => return err(StatusCode::BAD_REQUEST, "resource_id is required").into_response(),
+    };
+    let resource_url = match clean_text_limited(payload.resource_url, 600) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid resource_url").into_response(),
+    };
+    let result = sqlx::query(
+        r#"
+        UPDATE creation_drafts
+        SET status = 'consumed', resource_id = $3, resource_url = $4,
+            consumed_at = NOW(), updated_at = NOW()
+        WHERE id = $1 AND owner_id = $2
+          AND status IN ('ready', 'editing')
+          AND expires_at > NOW()
+        "#,
+    )
+    .bind(&id)
+    .bind(owner_id)
+    .bind(&resource_id)
+    .bind(&resource_url)
+    .execute(&state.db)
+    .await;
+    match result {
+        Ok(value) if value.rows_affected() == 1 => {
+            match fetch_creation_draft(&state.db, owner_id, &id).await {
+                Ok(Some(draft)) => {
+                    (StatusCode::OK, Json(CreationDraftResponse { data: draft })).into_response()
+                }
+                Ok(None) => err(StatusCode::NOT_FOUND, "creation draft not found").into_response(),
+                Err(error) => {
+                    tracing::error!("consume_creation_draft fetch error: {:?}", error);
+                    err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to consume creation draft",
+                    )
+                    .into_response()
+                }
+            }
+        }
+        Ok(_) => err(StatusCode::CONFLICT, "creation draft cannot be consumed").into_response(),
+        Err(error) => {
+            tracing::error!("consume_creation_draft error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to consume creation draft",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn fetch_listing_draft(
+    db: &PgPool,
+    owner_id: Uuid,
+    draft_id: Uuid,
+) -> Result<Option<ListingDraftRow>, sqlx::Error> {
+    sqlx::query_as::<_, ListingDraftRow>(
+        r#"
+        SELECT
+          ci.id,
+          ci.owner_id,
+          ci.draft_version,
+          ci.listing_intent,
+          mc.slug AS category_slug,
+          ms.slug AS subcategory_slug,
+          COALESCE(
+            ARRAY(
+              SELECT i.slug
+              FROM listing_industries li
+              JOIN industries i ON i.id = li.industry_id
+              WHERE li.content_id = ci.id
+              ORDER BY i.sort_order ASC, i.slug ASC
+            ),
+            ARRAY[]::text[]
+          ) AS industry_ids,
+          ci.current_step,
+          ci.listing_status,
+          ci.completion_percentage,
+          ci.title,
+          ci.summary,
+          ci.body,
+          ci.price_cents,
+          ci.pricing_mode,
+          ci.price_unit,
+          ci.cover_image,
+          COALESCE(ci.metadata->'media', '[]'::jsonb) AS media,
+          COALESCE(ci.metadata->'form_values', '{}'::jsonb) AS values,
+          ci.attributes,
+          ci.contact_snapshot,
+          ci.business_profile_id,
+          ci.last_saved_at,
+          ci.created_at,
+          ci.updated_at
+        FROM content_items ci
+        LEFT JOIN marketplace_categories mc ON mc.id = ci.marketplace_category_id
+        LEFT JOIN marketplace_subcategories ms ON ms.id = ci.marketplace_subcategory_id
+        WHERE ci.id = $1
+          AND ci.owner_id = $2
+          AND ci.content_status <> 'deleted'
+          AND ci.listing_status IN ('draft', 'in_review', 'rejected')
+        LIMIT 1
+        "#,
+    )
+    .bind(draft_id)
+    .bind(owner_id)
+    .fetch_optional(db)
+    .await
+}
+
+async fn list_listing_drafts(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListListingDraftsQuery>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let rows = sqlx::query_as::<_, ListingDraftRow>(
+        r#"
+        SELECT
+          ci.id, ci.owner_id, ci.draft_version, ci.listing_intent,
+          mc.slug AS category_slug, ms.slug AS subcategory_slug,
+          COALESCE(
+            ARRAY(
+              SELECT i.slug FROM listing_industries li
+              JOIN industries i ON i.id = li.industry_id
+              WHERE li.content_id = ci.id
+              ORDER BY i.sort_order ASC, i.slug ASC
+            ),
+            ARRAY[]::text[]
+          ) AS industry_ids,
+          ci.current_step, ci.listing_status, ci.completion_percentage,
+          ci.title, ci.summary, ci.body, ci.price_cents, ci.pricing_mode,
+          ci.price_unit, ci.cover_image,
+          COALESCE(ci.metadata->'media', '[]'::jsonb) AS media,
+          COALESCE(ci.metadata->'form_values', '{}'::jsonb) AS values,
+          ci.attributes, ci.contact_snapshot, ci.business_profile_id,
+          ci.last_saved_at, ci.created_at, ci.updated_at
+        FROM content_items ci
+        LEFT JOIN marketplace_categories mc ON mc.id = ci.marketplace_category_id
+        LEFT JOIN marketplace_subcategories ms ON ms.id = ci.marketplace_subcategory_id
+        WHERE ci.owner_id = $1
+          AND ci.content_status <> 'deleted'
+          AND ci.listing_status IN ('draft', 'in_review', 'rejected')
+        ORDER BY COALESCE(ci.last_saved_at, ci.updated_at) DESC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(owner_id)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListListingDraftsResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("list_listing_drafts error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load drafts").into_response()
+        }
+    }
+}
+
+async fn get_listing_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    match fetch_listing_draft(&state.db, owner_id, id).await {
+        Ok(Some(draft)) => (StatusCode::OK, Json(ListingDraftResponse { draft })).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("get_listing_draft error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load draft").into_response()
+        }
+    }
+}
+
+async fn create_listing_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateListingDraftRequest>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let intent = match normalize_listing_intent(payload.intent) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "intent is required").into_response(),
+    };
+    let category_slug = match clean_text(payload.category_slug).map(|value| make_slug(&value)) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "category_slug is required").into_response(),
+    };
+    let subcategory_slug = match clean_text(payload.subcategory_slug).map(|value| make_slug(&value))
+    {
+        Some(value) => value,
+        None => {
+            return err(StatusCode::BAD_REQUEST, "subcategory_slug is required").into_response()
+        }
+    };
+    let industry_slugs = normalize_industry_slugs(payload.industry_ids);
+    if industry_slugs.is_empty() {
+        return err(StatusCode::BAD_REQUEST, "industry_ids is required").into_response();
+    }
+    let idempotency_key = clean_text(payload.idempotency_key);
+
+    if let Some(ref key) = idempotency_key {
+        let existing_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT id
+            FROM content_items
+            WHERE owner_id = $1
+              AND draft_idempotency_key = $2
+              AND content_status <> 'deleted'
+            LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(key)
+        .fetch_optional(&state.db)
+        .await;
+        match existing_id {
+            Ok(Some(id)) => {
+                return match fetch_listing_draft(&state.db, owner_id, id).await {
+                    Ok(Some(draft)) => {
+                        (StatusCode::OK, Json(ListingDraftResponse { draft })).into_response()
+                    }
+                    Ok(None) => err(StatusCode::CONFLICT, "draft already exists").into_response(),
+                    Err(error) => {
+                        tracing::error!("create_listing_draft idempotent fetch error: {:?}", error);
+                        err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load draft")
+                            .into_response()
+                    }
+                };
+            }
+            Ok(None) => {}
+            Err(error) => {
+                tracing::error!("create_listing_draft idempotent lookup error: {:?}", error);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create draft")
+                    .into_response();
+            }
+        }
+    }
+
+    let values = json_object_or_default(payload.values);
+    let media = json_array_or_default(payload.media);
+    let attributes = json_object_or_default(payload.attributes);
+    let contact_snapshot = json_object_or_default(payload.contact_snapshot);
+    let content_type = content_type_for_marketplace_category(&category_slug);
+    let title = draft_title_for(&intent, &category_slug);
+    let listing_side = if intent == "request" {
+        "demand"
+    } else {
+        "supply"
+    };
+    let current_step = sanitize_draft_step(payload.current_step);
+    let completion_percentage = sanitize_completion(payload.completion_percentage);
+    let metadata = json!({
+        "listing_mode": "guided_business_create",
+        "create_business_rules_version": 2,
+        "listing_intent": intent,
+        "intent": intent,
+        "market_side": listing_side,
+        "listing_side": listing_side,
+        "marketplace_category_slug": category_slug,
+        "marketplace_subcategory_slug": subcategory_slug,
+        "industry_ids": industry_slugs,
+        "contact_policy": "user_controlled_contact",
+        "form_values": values,
+        "media": media
+    });
+    let (category_id, subcategory_id, metadata) =
+        match resolve_marketplace_taxonomy_refs(&state.db, metadata).await {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!("create_listing_draft taxonomy resolve error: {:?}", error);
+                (None, None, json!({}))
+            }
+        };
+
+    let inserted = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO content_items (
+          owner_id, content_type, title, summary, body, pricing_mode,
+          currency, tags, category, content_status,
+          marketplace_category_id, marketplace_subcategory_id, metadata,
+          listing_intent, current_step, listing_status, completion_percentage,
+          draft_version, last_saved_at, attributes, contact_snapshot,
+          business_profile_id, draft_idempotency_key
+        ) VALUES (
+          $1, $2, $3, NULL, '', 'request',
+          'IDR', ARRAY[]::text[], $2, 'draft',
+          $4, $5, $6,
+          $7, $8, 'draft', $9,
+          1, NOW(), $10, $11,
+          $12, $13
+        )
+        RETURNING id
+        "#,
+    )
+    .bind(owner_id)
+    .bind(content_type)
+    .bind(title)
+    .bind(category_id)
+    .bind(subcategory_id)
+    .bind(metadata)
+    .bind(intent)
+    .bind(current_step)
+    .bind(completion_percentage)
+    .bind(attributes)
+    .bind(contact_snapshot)
+    .bind(payload.business_profile_id)
+    .bind(idempotency_key)
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(id) => {
+            if let Err(error) = sync_listing_industry_slugs(&state.db, id, &industry_slugs).await {
+                tracing::error!("create_listing_draft industry sync error: {:?}", error);
+            }
+            match fetch_listing_draft(&state.db, owner_id, id).await {
+                Ok(Some(draft)) => {
+                    (StatusCode::CREATED, Json(ListingDraftResponse { draft })).into_response()
+                }
+                Ok(None) => {
+                    err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load draft").into_response()
+                }
+                Err(error) => {
+                    tracing::error!("create_listing_draft fetch error: {:?}", error);
+                    err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load draft").into_response()
+                }
+            }
+        }
+        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
+            err(StatusCode::CONFLICT, "draft already exists").into_response()
+        }
+        Err(error) => {
+            tracing::error!("create_listing_draft error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create draft").into_response()
+        }
+    }
+}
+
+async fn patch_listing_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<PatchListingDraftRequest>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let current = match fetch_listing_draft(&state.db, owner_id, id).await {
+        Ok(Some(draft)) => draft,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("patch_listing_draft fetch error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update draft")
+                .into_response();
+        }
+    };
+    if let Some(expected) = payload.expected_version {
+        if expected != current.draft_version {
+            return err(StatusCode::CONFLICT, "draft version conflict").into_response();
+        }
+    }
+
+    let title = clean_text(payload.title).unwrap_or(current.title);
+    let summary = match payload.summary {
+        Some(value) => clean_text(Some(value)),
+        None => current.summary,
+    };
+    let body = clean_text(payload.body).unwrap_or(current.body);
+    let pricing_mode = normalize_pricing_mode(payload.pricing_mode).unwrap_or(current.pricing_mode);
+    let price_cents = payload
+        .price_cents
+        .or(current.price_cents)
+        .filter(|value| *value >= 0);
+    let price_unit = normalize_price_unit(payload.price_unit).or(current.price_unit);
+    let cover_image = clean_text(payload.cover_image).or(current.cover_image);
+    let values = payload.values.unwrap_or(current.values);
+    let media = payload.media.unwrap_or(current.media);
+    let attributes = json_object_or_default(payload.attributes.or(Some(current.attributes)));
+    let contact_snapshot =
+        json_object_or_default(payload.contact_snapshot.or(Some(current.contact_snapshot)));
+    let current_step = payload
+        .current_step
+        .unwrap_or(current.current_step)
+        .clamp(1, 9);
+    let completion_percentage = payload
+        .completion_percentage
+        .unwrap_or(current.completion_percentage)
+        .clamp(0, 100);
+    let industry_slugs = payload
+        .industry_ids
+        .map(|values| normalize_industry_slugs(Some(values)))
+        .unwrap_or(current.industry_ids);
+
+    let updated = sqlx::query_scalar::<_, i32>(
+        r#"
+        UPDATE content_items
+        SET
+          title = $3,
+          summary = $4,
+          body = $5,
+          pricing_mode = $6,
+          price_cents = $7,
+          price_unit = $8,
+          cover_image = $9,
+          metadata = jsonb_set(
+            jsonb_set(COALESCE(metadata, '{}'::jsonb), '{form_values}', $10, true),
+            '{media}', $11, true
+          ),
+          attributes = $12,
+          contact_snapshot = $13,
+          current_step = $14,
+          completion_percentage = $15,
+          draft_version = draft_version + 1,
+          last_saved_at = NOW(),
+          updated_at = NOW()
+        WHERE id = $1
+          AND owner_id = $2
+          AND content_status = 'draft'
+          AND listing_status IN ('draft', 'rejected')
+        RETURNING draft_version
+        "#,
+    )
+    .bind(id)
+    .bind(owner_id)
+    .bind(title)
+    .bind(summary)
+    .bind(body)
+    .bind(pricing_mode)
+    .bind(price_cents)
+    .bind(price_unit)
+    .bind(cover_image)
+    .bind(values)
+    .bind(media)
+    .bind(attributes)
+    .bind(contact_snapshot)
+    .bind(current_step)
+    .bind(completion_percentage)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(_)) => {
+            if let Err(error) = sync_listing_industry_slugs(&state.db, id, &industry_slugs).await {
+                tracing::error!("patch_listing_draft industry sync error: {:?}", error);
+            }
+            match fetch_listing_draft(&state.db, owner_id, id).await {
+                Ok(Some(draft)) => {
+                    (StatusCode::OK, Json(ListingDraftResponse { draft })).into_response()
+                }
+                Ok(None) => err(StatusCode::NOT_FOUND, "draft not found").into_response(),
+                Err(error) => {
+                    tracing::error!("patch_listing_draft reload error: {:?}", error);
+                    err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update draft").into_response()
+                }
+            }
+        }
+        Ok(None) => err(StatusCode::CONFLICT, "draft cannot be updated").into_response(),
+        Err(error) => {
+            tracing::error!("patch_listing_draft error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update draft").into_response()
+        }
+    }
+}
+
+async fn delete_listing_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let result = sqlx::query(
+        r#"
+        UPDATE content_items
+        SET content_status = 'deleted',
+            listing_status = 'archived',
+            updated_at = NOW()
+        WHERE id = $1
+          AND owner_id = $2
+          AND content_status = 'draft'
+        "#,
+    )
+    .bind(id)
+    .bind(owner_id)
+    .execute(&state.db)
+    .await;
+
+    match result {
+        Ok(done) if done.rows_affected() > 0 => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => err(StatusCode::NOT_FOUND, "draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("delete_listing_draft error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to delete draft").into_response()
+        }
+    }
+}
+
+async fn publish_listing_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let current = match find_content(&state.db, &id.to_string()).await {
+        Ok(Some(row)) if row.owner_id == owner_id => row,
+        Ok(Some(_)) => return err(StatusCode::FORBIDDEN, "forbidden").into_response(),
+        Ok(None) => return err(StatusCode::NOT_FOUND, "draft not found").into_response(),
+        Err(error) => {
+            tracing::error!("publish_listing_draft fetch error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to publish draft")
+                .into_response();
+        }
+    };
+    if current.content_status != "draft" {
+        return err(StatusCode::CONFLICT, "draft is already published").into_response();
+    }
+    if current.title.trim().is_empty()
+        || current.body.trim().is_empty()
+        || current.metadata.get("form_values").is_none()
+    {
+        return err(StatusCode::BAD_REQUEST, "draft is not ready to publish").into_response();
+    }
+    if let Err(message) = validate_listing_draft_publish_requirements(
+        &current.title,
+        &current.body,
+        &current.metadata,
+    ) {
+        return err(StatusCode::BAD_REQUEST, message).into_response();
+    }
+    if let Err(message) = validate_content_media_requirements(
+        &current.content_type,
+        "active",
+        current.cover_image.as_deref(),
+        &current.metadata,
+    ) {
+        return err(StatusCode::BAD_REQUEST, message).into_response();
+    }
+
+    let updated = sqlx::query_as::<_, ContentRow>(
+        r#"
+        UPDATE content_items
+        SET content_status = 'active',
+            listing_status = 'published',
+            published_at = COALESCE(published_at, NOW()),
+            current_step = 9,
+            completion_percentage = GREATEST(completion_percentage, 100),
+            draft_version = draft_version + 1,
+            last_saved_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+          AND owner_id = $2
+          AND content_status = 'draft'
+        RETURNING
+            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
+            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
+            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM content_item_likes cil
+                WHERE cil.content_id = content_items.id
+            ), 0) AS like_count,
+            metadata, created_at, updated_at
+        "#,
+    )
+    .bind(id)
+    .bind(owner_id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(row)) => {
+            let seller_stats = fetch_seller_stats(&state.db, &[row.owner_id])
+                .await
+                .ok()
+                .and_then(|map| map.get(&row.owner_id).cloned());
+            (
+                StatusCode::OK,
+                Json(json!({ "listing": ContentResponse::from_row(row, seller_stats) })),
+            )
+                .into_response()
+        }
+        Ok(None) => err(StatusCode::CONFLICT, "draft cannot be published").into_response(),
+        Err(error) => {
+            tracing::error!("publish_listing_draft error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to publish draft").into_response()
+        }
+    }
+}
+
 async fn list_content(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -8585,6 +10529,22 @@ async fn list_content(
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
     let typ = normalize_content_type(query.r#type);
+    let marketplace_category = clean_text(query.category).map(|s| make_slug(&s));
+    let marketplace_subcategory = clean_text(query.subcategory).map(|s| make_slug(&s));
+    let industry_filter = clean_text(query.industries).and_then(|raw| {
+        let values: Vec<String> = raw
+            .split(',')
+            .map(make_slug)
+            .filter(|value| !value.is_empty())
+            .collect();
+        if values.is_empty() {
+            None
+        } else {
+            Some(values)
+        }
+    });
+    let min_price = query.min_price.filter(|value| *value >= 0);
+    let max_price = query.max_price.filter(|value| *value >= 0);
     let q = clean_text(query.q);
     let location = clean_text(query.location);
     let level = clean_text(query.level);
@@ -8663,6 +10623,43 @@ async fn list_content(
           AND (
               $8::uuid IS NULL OR owner_id = $8
           )
+          AND (
+              $9::text IS NULL OR
+              EXISTS (
+                SELECT 1
+                FROM marketplace_categories mc
+                WHERE mc.id = content_items.marketplace_category_id
+                  AND (mc.slug = $9 OR mc.legacy_key = $9 OR mc.metadata->'aliases' ? $9)
+              ) OR
+              coalesce(metadata->>'marketplace_category_slug', '') = $9 OR
+              coalesce(metadata->>'create_category', '') = $9
+          )
+          AND (
+              $10::text IS NULL OR
+              EXISTS (
+                SELECT 1
+                FROM marketplace_subcategories ms
+                WHERE ms.id = content_items.marketplace_subcategory_id
+                  AND ms.slug = $10
+              ) OR
+              coalesce(metadata->>'marketplace_subcategory_slug', '') = $10 OR
+              coalesce(metadata->>'sub_category', '') = $10 OR
+              coalesce(metadata->>'subcategory', '') = $10
+          )
+          AND (
+              $11::text[] IS NULL OR
+              EXISTS (
+                SELECT 1
+                FROM listing_industries li
+                JOIN industries i ON i.id = li.industry_id
+                WHERE li.content_id = content_items.id
+                  AND i.slug = ANY($11)
+              ) OR
+              coalesce(metadata->>'industry_slug', '') = ANY($11) OR
+              coalesce(metadata->>'sector', '') = ANY($11)
+          )
+          AND ($12::bigint IS NULL OR price_cents >= $12)
+          AND ($13::bigint IS NULL OR price_cents <= $13)
         ORDER BY
           CASE WHEN $2::text IS NULL THEN 0 ELSE
             (CASE WHEN title ILIKE ($2 || '%') THEN 80 ELSE 0 END) +
@@ -8676,7 +10673,7 @@ async fn list_content(
           END DESC,
           updated_at DESC,
           created_at DESC
-        LIMIT $9 OFFSET $10
+        LIMIT $14 OFFSET $15
         "#,
     )
     .bind(typ)
@@ -8687,6 +10684,11 @@ async fn list_content(
     .bind(sub_sector)
     .bind(status)
     .bind(owner_id)
+    .bind(marketplace_category)
+    .bind(marketplace_subcategory)
+    .bind(industry_filter)
+    .bind(min_price)
+    .bind(max_price)
     .bind(limit + 1)
     .bind(offset)
     .fetch_all(&state.db)
@@ -9452,6 +11454,15 @@ async fn create_content(
         clean_text(payload.minimum_order).or_else(|| json_text_at(&metadata, &["minimum_order"]));
     let metadata =
         attach_supplier_metadata(metadata, seller_type.as_deref(), minimum_order.as_deref());
+    let metadata_before_taxonomy = metadata.clone();
+    let (marketplace_category_id, marketplace_subcategory_id, metadata) =
+        match resolve_marketplace_taxonomy_refs(&state.db, metadata).await {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!("create_content taxonomy resolve error: {:?}", error);
+                (None, None, metadata_before_taxonomy)
+            }
+        };
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
@@ -9479,16 +11490,50 @@ async fn create_content(
         return err(StatusCode::BAD_REQUEST, message).into_response();
     }
 
+    let listing_intent = normalize_listing_intent(
+        json_text_at(&metadata, &["listing_intent"])
+            .or_else(|| json_text_at(&metadata, &["intent"]))
+            .or_else(|| json_text_at(&metadata, &["market_side"]))
+            .or_else(|| json_text_at(&metadata, &["listing_side"])),
+    )
+    .unwrap_or_else(|| {
+        if pricing_mode == "request" {
+            "request".to_string()
+        } else {
+            "offer".to_string()
+        }
+    });
+    let listing_status = match content_status.as_str() {
+        "active" => "published",
+        "archived" | "paused" => "archived",
+        _ => "draft",
+    };
+    let published_at = if listing_status == "published" {
+        Some(Utc::now())
+    } else {
+        None
+    };
+    let attributes = json_object_or_default(metadata.get("attributes").cloned());
+    let contact_snapshot = json_object_or_default(metadata.get("contact_snapshot").cloned());
+    let completion_on_create = if listing_status == "published" {
+        100_i32
+    } else {
+        0_i32
+    };
+
     let inserted = sqlx::query_as::<_, ContentRow>(
         r#"
         INSERT INTO content_items (
             owner_id, content_type, slug, title, summary, body, pricing_mode, price_cents,
             price_unit, original_price_cents, seller_type, minimum_order, promo_label,
             promo_start_at, promo_end_at, currency, tags, cover_image, category, content_status,
-            metadata
+            marketplace_category_id, marketplace_subcategory_id, metadata,
+            listing_intent, listing_status, current_step, completion_percentage,
+            last_saved_at, published_at, attributes, contact_snapshot
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+            $24, $25, $26, $27, NOW(), $28, $29, $30
         )
         RETURNING
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
@@ -9522,7 +11567,16 @@ async fn create_content(
     .bind(cover_image)
     .bind(category)
     .bind(content_status)
+    .bind(marketplace_category_id)
+    .bind(marketplace_subcategory_id)
     .bind(metadata)
+    .bind(listing_intent)
+    .bind(listing_status)
+    .bind(9_i32)
+    .bind(completion_on_create)
+    .bind(published_at)
+    .bind(attributes)
+    .bind(contact_snapshot)
     .fetch_one(&state.db)
     .await;
 
@@ -9794,6 +11848,15 @@ async fn update_content(
         .or_else(|| existing.minimum_order.clone());
     let metadata =
         attach_supplier_metadata(metadata, seller_type.as_deref(), minimum_order.as_deref());
+    let metadata_before_taxonomy = metadata.clone();
+    let (marketplace_category_id, marketplace_subcategory_id, metadata) =
+        match resolve_marketplace_taxonomy_refs(&state.db, metadata).await {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!("update_content taxonomy resolve error: {:?}", error);
+                (None, None, metadata_before_taxonomy)
+            }
+        };
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
@@ -9815,6 +11878,8 @@ async fn update_content(
     ) {
         return err(StatusCode::BAD_REQUEST, message).into_response();
     }
+    let attributes = json_object_or_default(metadata.get("attributes").cloned());
+    let contact_snapshot = json_object_or_default(metadata.get("contact_snapshot").cloned());
 
     let updated = sqlx::query_as::<_, ContentRow>(
         r#"
@@ -9839,7 +11904,22 @@ async fn update_content(
             cover_image = $18,
             category = $19,
             content_status = $20,
-            metadata = $21,
+            marketplace_category_id = $21,
+            marketplace_subcategory_id = $22,
+            metadata = $23,
+            listing_status = CASE
+                WHEN $20 = 'active' THEN 'published'
+                WHEN $20 IN ('archived', 'paused') THEN 'archived'
+                ELSE 'draft'
+            END,
+            published_at = CASE
+                WHEN $20 = 'active' THEN COALESCE(published_at, NOW())
+                ELSE published_at
+            END,
+            last_saved_at = NOW(),
+            draft_version = draft_version + 1,
+            attributes = $24,
+            contact_snapshot = $25,
             updated_at = NOW()
         WHERE id = $1
         RETURNING
@@ -9874,7 +11954,11 @@ async fn update_content(
     .bind(cover_image)
     .bind(category)
     .bind(content_status)
+    .bind(marketplace_category_id)
+    .bind(marketplace_subcategory_id)
     .bind(metadata)
+    .bind(attributes)
+    .bind(contact_snapshot)
     .fetch_one(&state.db)
     .await;
 
@@ -16562,6 +18646,10 @@ async fn create_review(
     if !(1..=5).contains(&payload.rating) {
         return err(StatusCode::BAD_REQUEST, "rating must be between 1 and 5").into_response();
     }
+    let comment = match clean_text_limited(payload.comment, 1000) {
+        Ok(comment) => comment,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
     let txn = match find_transaction_for_user(&state.db, id, reviewer_id).await {
         Ok(Some(row)) => row,
         Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
@@ -16613,7 +18701,7 @@ async fn create_review(
     .bind(reviewer_id)
     .bind(reviewee_id)
     .bind(payload.rating)
-    .bind(clean_text(payload.comment))
+    .bind(comment)
     .fetch_one(&state.db)
     .await;
 
@@ -18793,6 +20881,406 @@ async fn upsert_super_app_trust_profile(
     }
 }
 
+async fn list_marketplace_categories(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListMarketplaceTaxonomyQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let active = query.active.or(Some(true));
+
+    let rows = sqlx::query_as::<_, MarketplaceCategoryRow>(
+        r#"
+        SELECT
+          c.id, c.slug, c.legacy_key, c.name_id, c.name_en,
+          c.description_id, c.description_en, c.icon, c.badge,
+          c.sort_order, c.is_active,
+          COUNT(ci.id)::bigint AS listing_count,
+          c.metadata, c.created_at, c.updated_at
+        FROM marketplace_categories c
+        LEFT JOIN content_items ci
+          ON ci.marketplace_category_id = c.id
+         AND lower(ci.content_status) = 'active'
+        WHERE ($1::bool IS NULL OR c.is_active = $1)
+        GROUP BY c.id
+        ORDER BY c.sort_order ASC, c.name_id ASC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(active)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListMarketplaceCategoriesResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_marketplace_categories error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load categories",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_marketplace_category(
+    State(state): State<Arc<AppState>>,
+    Path(slug): Path<String>,
+) -> impl IntoResponse {
+    let normalized = make_slug(&slug);
+    let row = sqlx::query_as::<_, MarketplaceCategoryRow>(
+        r#"
+        SELECT
+          c.id, c.slug, c.legacy_key, c.name_id, c.name_en,
+          c.description_id, c.description_en, c.icon, c.badge,
+          c.sort_order, c.is_active,
+          COUNT(ci.id)::bigint AS listing_count,
+          c.metadata, c.created_at, c.updated_at
+        FROM marketplace_categories c
+        LEFT JOIN content_items ci
+          ON ci.marketplace_category_id = c.id
+         AND lower(ci.content_status) = 'active'
+        WHERE c.slug = $1
+           OR c.legacy_key = $1
+           OR c.metadata->'aliases' ? $1
+        GROUP BY c.id
+        LIMIT 1
+        "#,
+    )
+    .bind(normalized)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(category)) => {
+            (StatusCode::OK, Json(json!({ "category": category }))).into_response()
+        }
+        Ok(None) => err(StatusCode::NOT_FOUND, "category not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_marketplace_category error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load category").into_response()
+        }
+    }
+}
+
+async fn list_marketplace_subcategories(
+    State(state): State<Arc<AppState>>,
+    Path(slug): Path<String>,
+    Query(query): Query<ListMarketplaceTaxonomyQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(100).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let active = query.active.or(Some(true));
+    let normalized = make_slug(&slug);
+
+    let rows = sqlx::query_as::<_, MarketplaceSubcategoryRow>(
+        r#"
+        SELECT
+          s.id, s.category_id, c.slug AS category_slug, s.slug,
+          s.name_id, s.name_en, s.description_id, s.description_en, s.icon,
+          s.sort_order, s.is_active,
+          COUNT(ci.id)::bigint AS listing_count,
+          s.metadata, s.created_at, s.updated_at
+        FROM marketplace_subcategories s
+        JOIN marketplace_categories c ON c.id = s.category_id
+        LEFT JOIN content_items ci
+          ON ci.marketplace_subcategory_id = s.id
+         AND lower(ci.content_status) = 'active'
+        WHERE (c.slug = $1 OR c.legacy_key = $1 OR c.metadata->'aliases' ? $1)
+          AND ($2::bool IS NULL OR s.is_active = $2)
+        GROUP BY s.id, c.slug
+        ORDER BY s.sort_order ASC, s.name_id ASC
+        LIMIT $3 OFFSET $4
+        "#,
+    )
+    .bind(normalized)
+    .bind(active)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListMarketplaceSubcategoriesResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_marketplace_subcategories error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load subcategories",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn list_marketplace_industries(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListMarketplaceTaxonomyQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(100).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let active = query.active.or(Some(true));
+
+    let rows = sqlx::query_as::<_, MarketplaceIndustryRow>(
+        r#"
+        SELECT
+          i.id, i.slug, i.name_id, i.name_en, i.icon,
+          i.sort_order, i.is_active,
+          COUNT(ci.id)::bigint AS listing_count,
+          i.metadata, i.created_at, i.updated_at
+        FROM industries i
+        LEFT JOIN listing_industries li ON li.industry_id = i.id
+        LEFT JOIN content_items ci
+          ON ci.id = li.content_id
+         AND lower(ci.content_status) = 'active'
+        WHERE ($1::bool IS NULL OR i.is_active = $1)
+        GROUP BY i.id
+        ORDER BY i.sort_order ASC, i.name_id ASC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(active)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListMarketplaceIndustriesResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_marketplace_industries error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load industries",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_marketplace_filters(
+    State(state): State<Arc<AppState>>,
+    Path(category_slug): Path<String>,
+) -> impl IntoResponse {
+    let normalized = make_slug(&category_slug);
+    let rows = sqlx::query_as::<_, MarketplaceAttributeRow>(
+        r#"
+        SELECT
+          a.id, a.category_id, a.subcategory_id, a.key, a.label_id, a.label_en,
+          a.value_type, a.unit, a.options, a.is_filterable, a.is_required,
+          a.sort_order, a.is_active
+        FROM listing_attributes a
+        JOIN marketplace_categories c ON c.id = a.category_id
+        WHERE (c.slug = $1 OR c.legacy_key = $1 OR c.metadata->'aliases' ? $1)
+          AND a.is_active = true
+          AND a.is_filterable = true
+        ORDER BY a.sort_order ASC, a.label_id ASC
+        "#,
+    )
+    .bind(&normalized)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(attributes) => (
+            StatusCode::OK,
+            Json(json!({
+                "category_slug": normalized,
+                "common": [
+                  "location",
+                  "radius",
+                  "min_price",
+                  "max_price",
+                  "sort",
+                  "verified",
+                  "rating",
+                  "available_now"
+                ],
+                "attributes": attributes
+            })),
+        )
+            .into_response(),
+        Err(e) => {
+            tracing::error!("get_marketplace_filters error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load filters").into_response()
+        }
+    }
+}
+
+async fn list_search_suggestions(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<SearchSuggestionsQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(12).clamp(1, 25);
+    let q = clean_text(query.q).unwrap_or_default().to_lowercase();
+    if q.len() < 2 {
+        return (
+            StatusCode::OK,
+            Json(SearchSuggestionsResponse { items: vec![] }),
+        )
+            .into_response();
+    }
+
+    let rows = sqlx::query_as::<_, SearchSuggestionRow>(
+        r#"
+        WITH candidates AS (
+          SELECT
+            'category'::text AS kind,
+            c.slug AS value,
+            c.name_id AS label_id,
+            c.name_en AS label_en,
+            c.slug AS category_slug,
+            c.sort_order AS score_order
+          FROM marketplace_categories c
+          WHERE c.is_active = true
+            AND (
+              c.slug ILIKE ('%' || $1 || '%') OR
+              c.legacy_key ILIKE ('%' || $1 || '%') OR
+              c.name_id ILIKE ('%' || $1 || '%') OR
+              c.name_en ILIKE ('%' || $1 || '%') OR
+              c.metadata->'aliases' ? $1
+            )
+          UNION ALL
+          SELECT
+            'subcategory',
+            s.slug,
+            s.name_id,
+            s.name_en,
+            c.slug,
+            100 + s.sort_order
+          FROM marketplace_subcategories s
+          JOIN marketplace_categories c ON c.id = s.category_id
+          WHERE s.is_active = true
+            AND (
+              s.slug ILIKE ('%' || $1 || '%') OR
+              s.name_id ILIKE ('%' || $1 || '%') OR
+              s.name_en ILIKE ('%' || $1 || '%')
+            )
+          UNION ALL
+          SELECT
+            'industry',
+            i.slug,
+            i.name_id,
+            i.name_en,
+            NULL::text,
+            300 + i.sort_order
+          FROM industries i
+          WHERE i.is_active = true
+            AND (
+              i.slug ILIKE ('%' || $1 || '%') OR
+              i.name_id ILIKE ('%' || $1 || '%') OR
+              i.name_en ILIKE ('%' || $1 || '%')
+            )
+          UNION ALL
+          SELECT
+            'synonym',
+            s.term,
+            s.term,
+            s.term,
+            c.slug,
+            500
+          FROM marketplace_search_synonyms s
+          LEFT JOIN marketplace_categories c ON c.id = s.category_id
+          WHERE s.is_active = true
+            AND (
+              s.term ILIKE ('%' || $1 || '%') OR
+              EXISTS (
+                SELECT 1 FROM unnest(s.synonyms) syn
+                WHERE syn ILIKE ('%' || $1 || '%')
+              )
+            )
+          UNION ALL
+          SELECT
+            'listing',
+            ci.id::text,
+            ci.title,
+            ci.title,
+            c.slug,
+            700
+          FROM content_items ci
+          LEFT JOIN marketplace_categories c ON c.id = ci.marketplace_category_id
+          WHERE lower(ci.content_status) = 'active'
+            AND (
+              ci.title ILIKE ('%' || $1 || '%') OR
+              COALESCE(ci.summary, '') ILIKE ('%' || $1 || '%') OR
+              COALESCE(ci.metadata->>'product_name', '') ILIKE ('%' || $1 || '%') OR
+              COALESCE(ci.metadata->>'service_scope', '') ILIKE ('%' || $1 || '%') OR
+              COALESCE(ci.metadata->>'location', '') ILIKE ('%' || $1 || '%') OR
+              COALESCE(array_to_string(ci.tags, ' '), '') ILIKE ('%' || $1 || '%')
+            )
+        )
+        SELECT kind, value, label_id, label_en, category_slug
+        FROM candidates
+        ORDER BY score_order ASC, label_id ASC
+        LIMIT $2
+        "#,
+    )
+    .bind(q)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(items) => (StatusCode::OK, Json(SearchSuggestionsResponse { items })).into_response(),
+        Err(e) => {
+            tracing::error!("list_search_suggestions error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load suggestions",
+            )
+            .into_response()
+        }
+    }
+}
+
 async fn list_sectors(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ListSectorsQuery>,
@@ -20230,6 +22718,48 @@ mod tests {
     }
 
     #[test]
+    fn canonical_event_name_normalizes_master_prompt_aliases() {
+        assert_eq!(canonical_event_name("homepage_view"), "home.viewed");
+        assert_eq!(canonical_event_name("search_submitted"), "search.submitted");
+        assert_eq!(
+            canonical_event_name("zero_result_seen"),
+            "search.zero_result"
+        );
+        assert_eq!(canonical_event_name("rfq_created"), "rfq.created");
+        assert_eq!(canonical_event_name("chat_started"), "chat.opened");
+    }
+
+    #[test]
+    fn scrub_sensitive_event_properties_removes_nested_secrets() {
+        let mut properties = json!({
+            "query": "bahan baku kopi",
+            "otp": "123456",
+            "profile": {
+                "token": "secret-token",
+                "category": "supplier"
+            },
+            "items": [
+                {
+                    "message_body": "pesan privat",
+                    "surface": "rfq"
+                }
+            ]
+        });
+
+        scrub_sensitive_event_properties(&mut properties);
+
+        assert!(properties.get("otp").is_none());
+        assert!(properties.pointer("/profile/token").is_none());
+        assert!(properties.pointer("/items/0/message_body").is_none());
+        assert_eq!(
+            properties
+                .pointer("/items/0/surface")
+                .and_then(Value::as_str),
+            Some("rfq")
+        );
+    }
+
+    #[test]
     fn resolve_requested_content_type_accepts_matching_aliases() {
         let resolved = resolve_requested_content_type(
             Some("property".to_string()),
@@ -20548,6 +23078,72 @@ mod tests {
     }
 
     #[test]
+    fn listing_draft_publish_requires_offer_location() {
+        let result = validate_listing_draft_publish_requirements(
+            "Biji kopi arabika Gayo",
+            "Stok rutin untuk kebutuhan kedai dan reseller lokal.",
+            &json!({
+                "listing_intent": "offer",
+                "marketplace_category_slug": "materials-suppliers",
+                "form_values": {
+                    "title": "Biji kopi arabika Gayo",
+                    "item_name": "Biji kopi arabika Gayo",
+                    "summary": "Stok rutin untuk kebutuhan kedai dan reseller lokal.",
+                    "display_as": "business",
+                    "contact_channel": "chat"
+                }
+            }),
+        );
+        assert!(
+            result.is_err(),
+            "offer drafts need a location or service area"
+        );
+    }
+
+    #[test]
+    fn listing_draft_publish_allows_request_without_precise_location() {
+        let result = validate_listing_draft_publish_requirements(
+            "Butuh biji kopi arabika",
+            "Butuh supplier mingguan untuk kebutuhan kedai.",
+            &json!({
+                "listing_intent": "request",
+                "marketplace_category_slug": "materials-suppliers",
+                "form_values": {
+                    "title": "Butuh biji kopi arabika",
+                    "item_needed": "Biji kopi arabika",
+                    "summary": "Butuh supplier mingguan untuk kebutuhan kedai.",
+                    "display_as": "personal",
+                    "contact_channel": "chat"
+                }
+            }),
+        );
+        assert!(
+            result.is_ok(),
+            "request drafts can start from a general need before exact address is shared"
+        );
+    }
+
+    #[test]
+    fn listing_draft_publish_requires_primary_category_field() {
+        let result = validate_listing_draft_publish_requirements(
+            "Jasa foto produk",
+            "Paket foto produk untuk katalog marketplace.",
+            &json!({
+                "listing_intent": "offer",
+                "marketplace_category_slug": "services",
+                "form_values": {
+                    "title": "Jasa foto produk",
+                    "summary": "Paket foto produk untuk katalog marketplace.",
+                    "service_area": "Bandung",
+                    "display_as": "business",
+                    "contact_channel": "chat"
+                }
+            }),
+        );
+        assert!(result.is_err(), "service offers need service_name");
+    }
+
+    #[test]
     fn active_product_accepts_relative_cover_image_path() {
         let result = validate_content_media_requirements(
             "product",
@@ -20714,5 +23310,30 @@ mod tests {
             normalize_dispute_reason_code(Some("schedule_issue".to_string())),
             None
         );
+    }
+
+    #[test]
+    fn lajukan_request_owner_filter_keeps_public_mode_unscoped() {
+        let actor_user_id = Uuid::new_v4();
+        let owner_filter = resolve_lajukan_request_owner_filter(false, Some(actor_user_id))
+            .expect("public request listing remains available");
+
+        assert_eq!(owner_filter, None);
+    }
+
+    #[test]
+    fn lajukan_request_owner_filter_requires_authentication_for_mine() {
+        let result = resolve_lajukan_request_owner_filter(true, None);
+
+        assert_eq!(result, Err(StatusCode::UNAUTHORIZED));
+    }
+
+    #[test]
+    fn lajukan_request_owner_filter_uses_authenticated_actor() {
+        let actor_user_id = Uuid::new_v4();
+        let owner_filter = resolve_lajukan_request_owner_filter(true, Some(actor_user_id))
+            .expect("authenticated owner filter");
+
+        assert_eq!(owner_filter, Some(actor_user_id));
     }
 }

@@ -290,7 +290,7 @@ export function BusinessOsCommandCenter() {
       items.push({
         id: 'leads',
         count: activeLeads,
-        href: '/search',
+        href: '/explore',
         icon: Briefcase,
         tone: 'emerald',
         title: isId
@@ -389,7 +389,7 @@ export function BusinessOsCommandCenter() {
       },
       {
         id: 'search',
-        href: '/search',
+        href: '/explore',
         icon: Search,
         tone: 'slate',
         title: isId ? 'Buka pencarian' : 'Open search',
@@ -867,7 +867,7 @@ export function BusinessOsCommandCenter() {
                 {isId ? 'Pasang cepat' : 'Quick post'}
               </Link>
               <Link
-                href="/search"
+                href="/explore"
                 className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2 text-[12px] font-semibold text-[color:var(--app-text)]"
               >
                 {isId ? 'Buka pencarian' : 'Open search'}

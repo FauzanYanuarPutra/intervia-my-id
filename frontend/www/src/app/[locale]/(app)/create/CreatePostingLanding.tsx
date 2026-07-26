@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import {
   ArrowRight,
@@ -15,8 +16,6 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
-  Search,
-  Store,
   Users,
   Package,
   BriefcaseBusiness,
@@ -35,7 +34,7 @@ type IntentCard = {
   descriptionId: string;
   descriptionEn: string;
   examples: string[];
-  icon: typeof Store;
+  imageSrc: string;
   href: string;
 };
 
@@ -57,14 +56,24 @@ const STEP_LABELS_EN = [
   'Preview',
 ];
 
-const OFFER_EXAMPLES = ['Supplier', 'Produk', 'Jasa', 'Tempat Usaha', 'Freelancer', 'Franchise'];
-const FIND_EXAMPLES = ['Supplier', 'Produk', 'Freelancer', 'Investor', 'Partner', 'Distributor'];
+const OFFER_EXAMPLES = [
+  'Supplier',
+  'Produk',
+  'Jasa',
+  'Tempat Usaha',
+  'Freelancer',
+  'Franchise',
+];
+const FIND_EXAMPLES = [
+  'Supplier',
+  'Produk',
+  'Freelancer',
+  'Investor',
+  'Partner',
+  'Distributor',
+];
 
-function Stepper({
-  locale,
-}: {
-  locale: 'id' | 'en';
-}) {
+function Stepper({ locale }: { locale: 'id' | 'en' }) {
   const labels = locale === 'id' ? STEP_LABELS_ID : STEP_LABELS_EN;
   return (
     <div className="flex items-center gap-2 overflow-hidden">
@@ -126,7 +135,9 @@ function SidebarCard({
         </span>
         <div className="min-w-0">
           <p className="text-[12px] font-bold text-slate-900">{title}</p>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500">{description}</p>
+          <p className="mt-1 text-[11px] leading-5 text-slate-500">
+            {description}
+          </p>
         </div>
       </div>
       {children ? <div className="mt-4">{children}</div> : null}
@@ -141,7 +152,6 @@ function IntentTile({
   item: IntentCard;
   locale: 'id' | 'en';
 }) {
-  const Icon = item.icon;
   const isOffer = item.key === 'offer';
   return (
     <Link
@@ -156,10 +166,17 @@ function IntentTile({
       <span
         className={cn(
           'absolute left-4 top-4 inline-flex h-5 w-5 items-center justify-center rounded-full border-2 bg-white',
-          isOffer ? 'border-emerald-500 text-emerald-500' : 'border-slate-300 text-slate-300',
+          isOffer
+            ? 'border-emerald-500 text-emerald-500'
+            : 'border-slate-300 text-slate-300',
         )}
       >
-        <span className={cn('h-2.5 w-2.5 rounded-full', isOffer ? 'bg-emerald-500' : 'bg-transparent')} />
+        <span
+          className={cn(
+            'h-2.5 w-2.5 rounded-full',
+            isOffer ? 'bg-emerald-500' : 'bg-transparent',
+          )}
+        />
       </span>
 
       <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 pl-4 pt-5">
@@ -172,7 +189,14 @@ function IntentTile({
                 : 'border-slate-100 bg-slate-50 text-slate-700',
             )}
           >
-            <Icon className="h-16 w-16" />
+            <Image
+              src={item.imageSrc}
+              alt={locale === 'id' ? item.titleId : item.titleEn}
+              width={112}
+              height={112}
+              className="h-full w-full rounded-full border border-white/80 object-cover shadow-sm"
+              draggable={false}
+            />
           </div>
         </div>
 
@@ -204,7 +228,9 @@ function IntentTile({
 
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
         <div className="text-[11px] font-semibold text-slate-500">
-          {locale === 'id' ? 'Langsung ke form yang relevan' : 'Jump straight to the relevant form'}
+          {locale === 'id'
+            ? 'Langsung ke form yang relevan'
+            : 'Jump straight to the relevant form'}
         </div>
         <span
           className={cn(
@@ -252,7 +278,7 @@ function MobileMock({ locale }: { locale: 'id' | 'en' }) {
                 descriptionEn:
                   'Offer products, services, or business opportunities to the right audience.',
                 examples: OFFER_EXAMPLES,
-                icon: Store,
+                imageSrc: '/images/create/kategori/tawar.png',
                 href: offerHref,
               }}
             />
@@ -260,14 +286,14 @@ function MobileMock({ locale }: { locale: 'id' | 'en' }) {
               locale={locale}
               item={{
                 key: 'find',
-                titleId: 'Saya Mau Mencari',
-                titleEn: 'I Want To Find',
+                titleId: 'Saya sedang membutuhkan',
+                titleEn: 'I need something',
                 descriptionId:
                   'Temukan supplier, partner, investor, atau peluang yang Anda butuhkan.',
                 descriptionEn:
                   'Find suppliers, partners, investors, or the opportunity you need.',
                 examples: FIND_EXAMPLES,
-                icon: Search,
+                imageSrc: '/images/create/kategori/cari.png',
                 href: findHref,
               }}
             />
@@ -314,19 +340,23 @@ function MobileMock({ locale }: { locale: 'id' | 'en' }) {
           </Link>
 
           <div className="mt-4 grid grid-cols-5 border-t border-slate-100 pt-3 text-center text-[10px] text-slate-500">
-            {['Beranda', 'Jelajahi', 'Buat', 'Chat', 'Profil'].map((label, index) => (
-              <div key={label} className="flex flex-col items-center gap-1">
-                <span
-                  className={cn(
-                    'inline-flex h-6 w-6 items-center justify-center rounded-full',
-                    index === 2 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500',
-                  )}
-                >
-                  {index === 2 ? '+' : '•'}
-                </span>
-                <span>{label}</span>
-              </div>
-            ))}
+            {['Beranda', 'Jelajahi', 'Buat', 'Chat', 'Profil'].map(
+              (label, index) => (
+                <div key={label} className="flex flex-col items-center gap-1">
+                  <span
+                    className={cn(
+                      'inline-flex h-6 w-6 items-center justify-center rounded-full',
+                      index === 2
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-100 text-slate-500',
+                    )}
+                  >
+                    {index === 2 ? '+' : '•'}
+                  </span>
+                  <span>{label}</span>
+                </div>
+              ),
+            )}
           </div>
         </div>
       </div>
@@ -348,26 +378,26 @@ export default function CreatePostingLanding() {
     descriptionEn:
       'Offer products, services, or business opportunities to the right audience.',
     examples: OFFER_EXAMPLES,
-    icon: Store,
+    imageSrc: '/images/create/kategori/tawar.png',
     href: offerHref,
   };
 
   const findIntent: IntentCard = {
     key: 'find',
-    titleId: 'Saya Mau Mencari',
-    titleEn: 'I Want To Find',
+    titleId: 'Saya sedang membutuhkan',
+    titleEn: 'I need something',
     descriptionId:
       'Temukan supplier, partner, investor, atau peluang yang Anda butuhkan.',
     descriptionEn:
       'Find suppliers, partners, investors, or the opportunity you need.',
     examples: FIND_EXAMPLES,
-    icon: Search,
+    imageSrc: '/images/create/kategori/cari.png',
     href: findHref,
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-3 py-3 sm:px-4 lg:px-6 lg:py-4">
-      <div className="mx-auto max-w-[1760px]">
+    <div className="min-h-screen bg-transparent px-3 py-3 sm:px-4 lg:px-6 lg:py-4">
+      <div className="mx-auto max-w-[1700px]">
         <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_50px_-44px_rgba(15,23,42,0.22)]">
           <div className="grid grid-cols-1 gap-0 border-b border-slate-100 px-4 py-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)_auto] lg:px-6 lg:py-5">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-3 lg:border-b-0 lg:border-r lg:pr-6">
@@ -417,13 +447,19 @@ export default function CreatePostingLanding() {
             <aside className="hidden lg:flex lg:flex-col lg:gap-4">
               <SidebarCard
                 icon={Lightbulb}
-                title={locale === 'id' ? 'Progres Postingan' : 'Posting progress'}
-                description={locale === 'id' ? 'Langkah 1 dari 6' : 'Step 1 of 6'}
+                title={
+                  locale === 'id' ? 'Progres Postingan' : 'Posting progress'
+                }
+                description={
+                  locale === 'id' ? 'Langkah 1 dari 6' : 'Step 1 of 6'
+                }
               >
                 <div className="rounded-full bg-slate-100">
                   <div className="h-1.5 w-1/6 rounded-full bg-emerald-600" />
                 </div>
-                <p className="mt-2 text-right text-[10px] font-semibold text-slate-500">16%</p>
+                <p className="mt-2 text-right text-[10px] font-semibold text-slate-500">
+                  16%
+                </p>
               </SidebarCard>
 
               <SidebarCard
@@ -438,8 +474,16 @@ export default function CreatePostingLanding() {
 
               <SidebarCard
                 icon={ShieldCheck}
-                title={locale === 'id' ? 'Draft tersimpan otomatis' : 'Auto-saved draft'}
-                description={locale === 'id' ? 'Terakhir disimpan 2 menit lalu' : 'Last saved 2 minutes ago'}
+                title={
+                  locale === 'id'
+                    ? 'Draft tersimpan otomatis'
+                    : 'Auto-saved draft'
+                }
+                description={
+                  locale === 'id'
+                    ? 'Terakhir disimpan 2 menit lalu'
+                    : 'Last saved 2 minutes ago'
+                }
               />
 
               <SidebarCard
@@ -495,7 +539,9 @@ export default function CreatePostingLanding() {
                     </span>
                     <div>
                       <p className="text-[14px] font-bold text-slate-900">
-                        {locale === 'id' ? 'Tujuan Bisnismu' : 'Your business direction'}
+                        {locale === 'id'
+                          ? 'Tujuan Bisnismu'
+                          : 'Your business direction'}
                       </p>
                       <p className="mt-1 text-[12px] text-slate-500">
                         {locale === 'id'
@@ -507,19 +553,24 @@ export default function CreatePostingLanding() {
 
                   <p className="mt-4 text-[12px] text-slate-500">
                     {locale === 'id'
-                      ? 'Postingan Anda akan direkomendasikan kepada orang yang paling relevan.'
-                      : 'Your posting will be recommended to the most relevant people.'}
+                      ? 'Kategori dan detail yang jelas membantu postingan ditemukan oleh pihak yang relevan.'
+                      : 'Clear categories and details help relevant people discover your post.'}
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-3">
-                    {['Pemilik UMKM', 'Distributor', 'Pabrik', 'Pebisnis'].map(label => (
-                      <div key={label} className="flex flex-col items-center gap-2">
-                        <div className="h-12 w-12 rounded-full bg-slate-100" />
-                        <span className="text-[10px] font-semibold text-slate-600">
-                          {label}
-                        </span>
-                      </div>
-                    ))}
+                    {['Pemilik UMKM', 'Distributor', 'Pabrik', 'Pebisnis'].map(
+                      label => (
+                        <div
+                          key={label}
+                          className="flex flex-col items-center gap-2"
+                        >
+                          <div className="h-12 w-12 rounded-full bg-slate-100" />
+                          <span className="text-[10px] font-semibold text-slate-600">
+                            {label}
+                          </span>
+                        </div>
+                      ),
+                    )}
                     <div className="flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-500">
                       +2
                     </div>
@@ -540,23 +591,52 @@ export default function CreatePostingLanding() {
               <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_20px_38px_-34px_rgba(15,23,42,0.16)]">
                 <p className="text-center text-[12px] font-semibold text-slate-900">
                   {locale === 'id'
-                    ? 'Dipercaya ribuan bisnis di seluruh Indonesia'
-                    : 'Trusted by thousands of businesses across Indonesia'}
+                    ? 'Alur singkat untuk kebutuhan usaha'
+                    : 'A focused flow for business needs'}
                 </p>
                 <div className="mt-4 grid gap-3 md:grid-cols-4">
                   {[
-                    ['50.000+', locale === 'id' ? 'Pengguna Aktif' : 'Active users'],
-                    ['120.000+', locale === 'id' ? 'Postingan Dibuat' : 'Posts created'],
-                    ['3,5 Juta+', locale === 'id' ? 'Interaksi per Bulan' : 'Monthly interactions'],
-                    ['98%', locale === 'id' ? 'Respon Positif' : 'Positive response'],
-                  ].map(([value, label]) => (
-                    <div key={value} className="flex items-center gap-3 rounded-[18px] bg-slate-50 px-4 py-3">
+                    [
+                      locale === 'id' ? 'Tujuan jelas' : 'Clear purpose',
+                      locale === 'id'
+                        ? 'Pilih mencari atau menawarkan'
+                        : 'Choose whether to seek or offer',
+                    ],
+                    [
+                      locale === 'id' ? 'Form relevan' : 'Relevant form',
+                      locale === 'id'
+                        ? 'Pertanyaan mengikuti jenis kebutuhan'
+                        : 'Questions adapt to the business need',
+                    ],
+                    [
+                      locale === 'id' ? 'Draft terjaga' : 'Draft preserved',
+                      locale === 'id'
+                        ? 'Lanjutkan setelah masuk tanpa mengulang'
+                        : 'Continue after sign-in without restarting',
+                    ],
+                    [
+                      locale === 'id'
+                        ? 'Siap dibandingkan'
+                        : 'Ready to compare',
+                      locale === 'id'
+                        ? 'Detail penting lebih mudah dibaca vendor'
+                        : 'Key details are easier for providers to review',
+                    ],
+                  ].map(([title, description]) => (
+                    <div
+                      key={title}
+                      className="flex items-center gap-3 rounded-[18px] bg-slate-50 px-4 py-3"
+                    >
                       <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
                         <CheckCircle2 className="h-4.5 w-4.5" />
                       </span>
                       <div>
-                        <p className="text-[16px] font-bold text-slate-900">{value}</p>
-                        <p className="text-[11px] text-slate-500">{label}</p>
+                        <p className="text-[13px] font-bold text-slate-900">
+                          {title}
+                        </p>
+                        <p className="text-[11px] leading-4 text-slate-500">
+                          {description}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -567,7 +647,11 @@ export default function CreatePostingLanding() {
             <aside className="hidden xl:flex xl:flex-col xl:gap-4">
               <SidebarCard
                 icon={ShieldCheck}
-                title={locale === 'id' ? 'Mengapa pilih tujuan?' : 'Why choose a purpose?'}
+                title={
+                  locale === 'id'
+                    ? 'Mengapa pilih tujuan?'
+                    : 'Why choose a purpose?'
+                }
                 description={
                   locale === 'id'
                     ? 'Form lebih relevan, hasil lebih tepat, dan lebih hemat waktu.'
@@ -578,7 +662,10 @@ export default function CreatePostingLanding() {
                   {[
                     {
                       icon: Users,
-                      title: locale === 'id' ? 'Form lebih relevan' : 'More relevant form',
+                      title:
+                        locale === 'id'
+                          ? 'Form lebih relevan'
+                          : 'More relevant form',
                       desc:
                         locale === 'id'
                           ? 'Kami tampilkan pertanyaan yang sesuai dengan tujuan Anda.'
@@ -586,7 +673,10 @@ export default function CreatePostingLanding() {
                     },
                     {
                       icon: Sparkles,
-                      title: locale === 'id' ? 'Hasil lebih tepat' : 'Better results',
+                      title:
+                        locale === 'id'
+                          ? 'Hasil lebih tepat'
+                          : 'Better results',
                       desc:
                         locale === 'id'
                           ? 'Postingan Anda akan lebih mudah ditemukan oleh orang yang tepat.'
@@ -608,8 +698,12 @@ export default function CreatePostingLanding() {
                           <Icon className="h-4.5 w-4.5" />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-[12px] font-bold text-slate-900">{item.title}</p>
-                          <p className="mt-1 text-[11px] leading-5 text-slate-500">{item.desc}</p>
+                          <p className="text-[12px] font-bold text-slate-900">
+                            {item.title}
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                            {item.desc}
+                          </p>
                         </div>
                       </div>
                     );
@@ -619,8 +713,14 @@ export default function CreatePostingLanding() {
 
               <SidebarCard
                 icon={Lightbulb}
-                title={locale === 'id' ? 'Tips Membuat Postingan' : 'Posting tips'}
-                description={locale === 'id' ? 'Langkah sederhana untuk hasil lebih baik.' : 'Simple steps for better results.'}
+                title={
+                  locale === 'id' ? 'Tips Membuat Postingan' : 'Posting tips'
+                }
+                description={
+                  locale === 'id'
+                    ? 'Langkah sederhana untuk hasil lebih baik.'
+                    : 'Simple steps for better results.'
+                }
               >
                 <div className="space-y-2 text-[12px] text-slate-600">
                   {[
@@ -657,8 +757,13 @@ export default function CreatePostingLanding() {
                     : 'Lajukan protects your business data and privacy with strong encryption.'
                 }
               >
-                <Link href={offerHref} className="inline-flex items-center gap-2 text-[12px] font-semibold text-emerald-700">
-                  {locale === 'id' ? 'Lebih lanjut tentang keamanan' : 'Learn more about safety'}
+                <Link
+                  href={offerHref}
+                  className="inline-flex items-center gap-2 text-[12px] font-semibold text-emerald-700"
+                >
+                  {locale === 'id'
+                    ? 'Lebih lanjut tentang keamanan'
+                    : 'Learn more about safety'}
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               </SidebarCard>

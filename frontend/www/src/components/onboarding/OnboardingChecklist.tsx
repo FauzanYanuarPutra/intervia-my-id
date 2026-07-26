@@ -38,7 +38,7 @@ const DEFAULT_STEPS: Step[] = [
     id: 'first-action',
     title: 'Post or request',
     desc: 'Create a listing or request to start matching.',
-    href: '/search?type=product&q=supplier',
+    href: '/explore?type=product&q=supplier',
   },
   {
     id: 'trust',

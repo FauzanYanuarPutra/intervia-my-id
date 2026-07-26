@@ -169,9 +169,9 @@ Do not delete the broader vision, but do not treat every module as equal in the 
 
 ### Core Transaction Categories
 
-1. Mesin & Alat.
-2. Bahan Usaha.
-3. Jasa.
+1. Bahan & Supplier.
+2. Jasa.
+3. Mesin & Alat.
 4. Tempat Usaha.
 
 ### Platform Capability
@@ -200,7 +200,7 @@ Video inspires
 Recommended focus:
 
 - one region;
-- three categories: Mesin & Alat, Bahan Usaha, Jasa;
+- three categories: Bahan & Supplier, Jasa, Mesin & Alat;
 - search;
 - needs/request posting;
 - listings;
@@ -302,4 +302,3 @@ Dashboards should answer:
 | `Mencari` posts improve cold-start supply acquisition | Supplier response rate and matched connection rate |
 | WhatsApp primary CTA increases contact conversion | WhatsApp click/contact rate vs internal chat |
 | Assisted onboarding improves listing quality | Completion time, accepted AI fields, admin correction rate |
-

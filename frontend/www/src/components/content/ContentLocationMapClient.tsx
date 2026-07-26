@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import {
+  AttributionControl,
   MapContainer,
   Marker,
   Popup,
@@ -86,10 +87,12 @@ export function ContentLocationMapClient({
         maxZoom={19}
         scrollWheelZoom={false}
         zoomControl={false}
-        className="h-full w-full"
+        attributionControl={false}
+        className="leaflet-content-location-map h-full w-full"
       >
         <ContentMapCenter point={point} />
         <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+        <AttributionControl position="bottomleft" prefix={false} />
         <ZoomControl position="bottomright" />
         <Marker position={position} icon={markerIcon}>
           <Popup>

@@ -4,6 +4,7 @@ import { AuthProvider } from '@/context/AuthContext';
 export const metadata = {
   title: 'Lajukan CMS',
   description: 'Content management system for sectors and knowledge base.',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

@@ -1,6 +1,10 @@
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
 import {
   MAX_REELS_PAGE_LIMIT,
   REELS_PAGE_SIZE,
+  isVideoReel,
   type LajukanReel,
   type ReelsPageResult,
 } from '../../_data/reels';
@@ -16,13 +20,57 @@ type PageProps = {
   }>;
 };
 
-function getCommunityBackendBase(): string | null {
-  const base =
-    process.env.COMMUNITY_SERVICE_URL ||
-    process.env.INTERNAL_COMMUNITY_URL ||
-    process.env.NEXT_PUBLIC_COMMUNITY_URL ||
-    '';
-  return base.trim() || null;
+const REELS_INITIAL_REQUEST_TIMEOUT_MS = 1_800;
+
+export async function generateMetadata({
+  params,
+}: Pick<PageProps, 'params'>): Promise<Metadata> {
+  const { locale } = await params;
+  if (locale !== 'id' && locale !== 'en') notFound();
+  const isId = locale === 'id';
+  const canonical = `https://www.lajukan.com/${locale}/reels`;
+  const title = isId
+    ? 'Video Usaha dan Inspirasi UMKM | Lajukan'
+    : 'Business Videos and SME Ideas | Lajukan';
+  const description = isId
+    ? 'Tonton video singkat tentang produk lokal, supplier, alat usaha, pemasaran, dan pengalaman UMKM Indonesia.'
+    : 'Watch short videos about local products, suppliers, business tools, marketing, and Indonesian SME experiences.';
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical,
+      languages: {
+        'id-ID': 'https://www.lajukan.com/id/reels',
+        'en-US': 'https://www.lajukan.com/en/reels',
+        'x-default': 'https://www.lajukan.com/id/reels',
+      },
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: 'Lajukan',
+      type: 'website',
+      locale: isId ? 'id_ID' : 'en_US',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+  };
+}
+
+function getCommunityBackendBases(): string[] {
+  return [
+    process.env.COMMUNITY_SERVICE_URL,
+    process.env.INTERNAL_COMMUNITY_URL,
+    process.env.NEXT_PUBLIC_COMMUNITY_URL,
+  ]
+    .map(value => value?.trim() || '')
+    .filter((value, index, source) => value && source.indexOf(value) === index);
 }
 
 async function getInitialReelsPage(
@@ -30,55 +78,72 @@ async function getInitialReelsPage(
   limit: number,
   q?: string,
 ): Promise<ReelsPageResult> {
-  const base = getCommunityBackendBase();
-  if (!base) return { items: [], nextCursor: null, hasMore: false };
+  const candidates = await Promise.all(
+    getCommunityBackendBases().map(async base => {
+      const url = new URL('/v1/reels', base.endsWith('/') ? base : `${base}/`);
+      url.searchParams.set('cursor', String(cursor));
+      url.searchParams.set('limit', String(limit));
+      if (q?.trim()) url.searchParams.set('q', q.trim());
 
-  const url = new URL('/v1/reels', base.endsWith('/') ? base : `${base}/`);
-  url.searchParams.set('cursor', String(cursor));
-  url.searchParams.set('limit', String(limit));
-  if (q?.trim()) url.searchParams.set('q', q.trim());
+      try {
+        const response = await fetch(url, {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+          signal: AbortSignal.timeout(REELS_INITIAL_REQUEST_TIMEOUT_MS),
+        });
+        if (!response.ok) return null;
+        const payload = (await response.json()) as Partial<ReelsPageResult>;
+        return {
+          items: Array.isArray(payload.items)
+            ? payload.items.filter(isVideoReel)
+            : [],
+          nextCursor:
+            typeof payload.nextCursor === 'number' ? payload.nextCursor : null,
+          hasMore: Boolean(payload.hasMore),
+        } satisfies ReelsPageResult;
+      } catch {
+        return null;
+      }
+    }),
+  );
 
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-    });
-    if (!response.ok) return { items: [], nextCursor: null, hasMore: false };
-    const payload = (await response.json()) as Partial<ReelsPageResult>;
-    return {
-      items: Array.isArray(payload.items) ? payload.items : [],
-      nextCursor:
-        typeof payload.nextCursor === 'number' ? payload.nextCursor : null,
-      hasMore: Boolean(payload.hasMore),
-    };
-  } catch {
-    return { items: [], nextCursor: null, hasMore: false };
-  }
+  return (
+    candidates.find(
+      (candidate): candidate is ReelsPageResult => candidate !== null,
+    ) ?? { items: [], nextCursor: null, hasMore: false }
+  );
 }
 
 async function getInitialReel(reelId?: string): Promise<LajukanReel | null> {
   const cleanReelId = decodeURIComponent(reelId || '').trim();
   if (!cleanReelId) return null;
 
-  const base = getCommunityBackendBase();
-  if (!base) return null;
+  const candidates = await Promise.all(
+    getCommunityBackendBases().map(async base => {
+      const url = new URL(
+        `/v1/reels/${encodeURIComponent(cleanReelId)}`,
+        base.endsWith('/') ? base : `${base}/`,
+      );
 
-  const url = new URL(
-    `/v1/reels/${encodeURIComponent(cleanReelId)}`,
-    base.endsWith('/') ? base : `${base}/`,
+      try {
+        const response = await fetch(url, {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+          signal: AbortSignal.timeout(REELS_INITIAL_REQUEST_TIMEOUT_MS),
+        });
+        if (!response.ok) return null;
+        const payload = (await response.json()) as {
+          reel?: LajukanReel | null;
+        };
+        const reel = payload.reel ?? null;
+        return reel && isVideoReel(reel) ? reel : null;
+      } catch {
+        return null;
+      }
+    }),
   );
 
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-    });
-    if (!response.ok) return null;
-    const payload = (await response.json()) as { reel?: LajukanReel | null };
-    return payload.reel ?? null;
-  } catch {
-    return null;
-  }
+  return candidates.find((reel): reel is LajukanReel => reel !== null) ?? null;
 }
 
 function getRequestedNumericIndex(video?: string): number | null {
@@ -135,9 +200,9 @@ export default async function ReelsPage({ params, searchParams }: PageProps) {
   const requestedReel = needsIdLookup ? await getInitialReel(video) : null;
   const initialItems = requestedReel
     ? [
-      requestedReel,
-      ...initialPage.items.filter(item => item.id !== requestedReel.id),
-    ]
+        requestedReel,
+        ...initialPage.items.filter(item => item.id !== requestedReel.id),
+      ]
     : initialPage.items;
   const initialIndex = requestedReel
     ? 0

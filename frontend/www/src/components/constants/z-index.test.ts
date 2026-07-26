@@ -14,6 +14,8 @@ describe('z-index layer contract', () => {
     expect(Z_INDEX.loading).toBeGreaterThan(Z_INDEX.modal);
     expect(Z_INDEX.offline).toBeGreaterThan(Z_INDEX.modal);
     expect(Z_INDEX.preview).toBeGreaterThan(Z_INDEX.modal);
+    expect(Z_INDEX.preview).toBeGreaterThan(Z_INDEX.loading);
+    expect(Z_INDEX.preview).toBeGreaterThan(Z_INDEX.offline);
     expect(Z_INDEX.notFound).toBeGreaterThan(Z_INDEX.preview);
   });
 
@@ -21,6 +23,10 @@ describe('z-index layer contract', () => {
     expect(Z_INDEX_CLASS.header).toBe('ui-layer-header');
     expect(Z_INDEX_CLASS.localTopbar).toBe('ui-layer-local-topbar');
     expect(Z_INDEX_CLASS.modal).toBe('ui-layer-modal');
-    expect(Object.values(Z_INDEX_CLASS).every(className => className.startsWith('ui-layer-'))).toBe(true);
+    expect(
+      Object.values(Z_INDEX_CLASS).every(className =>
+        className.startsWith('ui-layer-'),
+      ),
+    ).toBe(true);
   });
 });

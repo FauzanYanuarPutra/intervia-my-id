@@ -95,7 +95,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
         ctaDescription:
           'Buka pencarian Lajukan, masukkan kebutuhan, lalu bandingkan supplier dari lokasi dan kategori yang relevan.',
         ctaLabel: 'Cari supplier',
-        ctaHref: '/search?type=product&side=supply&q=supplier',
+        ctaHref: '/explore?type=product&side=supply&q=supplier',
       },
       en: {
         title: 'How Indonesian SMEs can find local suppliers faster',
@@ -143,7 +143,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
         ctaDescription:
           'Open Lajukan search, enter your need, and compare suppliers by location and category.',
         ctaLabel: 'Search suppliers',
-        ctaHref: '/search?type=product&side=supply&q=supplier',
+        ctaHref: '/explore?type=product&side=supply&q=supplier',
       },
     },
   },
@@ -509,7 +509,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
         ctaDescription:
           'Gunakan Lajukan untuk mencari supplier, jasa produksi, dan produk lokal yang relevan dengan kebutuhan usaha.',
         ctaLabel: 'Cari pasokan lokal',
-        ctaHref: '/search?q=supplier%20lokal',
+        ctaHref: '/explore?q=supplier%20lokal',
       },
       en: {
         title: 'Import substitution: opportunities for Indonesian suppliers',
@@ -551,7 +551,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
         ctaDescription:
           'Use Lajukan to search suppliers, production services, and local products that match your business needs.',
         ctaLabel: 'Search local supply',
-        ctaHref: '/search?q=local%20supplier',
+        ctaHref: '/explore?q=local%20supplier',
       },
     },
   },

@@ -484,6 +484,14 @@ function formatQuickPrice(rawValue: string, locale: string): string | null {
   }).format(amount);
 }
 
+function resolveApiPricingModeForContent(
+  listingSide: ListingSide,
+  priceCents: number | undefined,
+): 'fixed' | 'request' {
+  if (listingSide === 'demand') return 'request';
+  return priceCents && priceCents > 0 ? 'fixed' : 'request';
+}
+
 function buildSimpleModeFallbackCopy({
   title,
   locale,
@@ -3337,8 +3345,8 @@ const DEMAND_FORM_VISUALS: Partial<
 };
 const DEMAND_TYPE_META: Partial<Record<ListingTypeId, DemandTypeMeta>> = {
   product: {
-    stepsId: ['Kebutuhan', 'Spesifikasi', 'Media', 'Promosi'],
-    stepsEn: ['Need', 'Specs', 'Media', 'Promotion'],
+    stepsId: ['Kebutuhan', 'Spesifikasi', 'Referensi', 'Promosi'],
+    stepsEn: ['Need', 'Specs', 'References', 'Promotion'],
     step2HintId:
       'Lengkapin qty, merek, area kirim, target datang, dan detail supplier yang cocok.',
     step2HintEn:
@@ -3353,24 +3361,24 @@ const DEMAND_TYPE_META: Partial<Record<ListingTypeId, DemandTypeMeta>> = {
       'Add the work setup, expected output, coverage area, and deadline if you want more relevant providers.',
   },
   job: {
-    stepsId: ['Talent', 'Kriteria', 'Media', 'Promosi'],
-    stepsEn: ['Talent', 'Criteria', 'Media', 'Promotion'],
+    stepsId: ['Talent', 'Kriteria', 'Referensi', 'Promosi'],
+    stepsEn: ['Talent', 'Criteria', 'References', 'Promotion'],
     step2HintId:
       'Lengkapin skill, shift, jumlah orang, KPI, dan target mulai kerja.',
     step2HintEn:
       'Complete skills, shifts, headcount, KPI, and target start date.',
   },
   property: {
-    stepsId: ['Lokasi', 'Kriteria', 'Media', 'Promosi'],
-    stepsEn: ['Location', 'Criteria', 'Media', 'Promotion'],
+    stepsId: ['Lokasi', 'Kriteria', 'Referensi', 'Promosi'],
+    stepsEn: ['Location', 'Criteria', 'References', 'Promotion'],
     step2HintId:
       'Lengkapin area, traffic, luas, akses, fasilitas, dan target mulai pakai.',
     step2HintEn:
       'Complete area, traffic, size, access, facilities, and target usage date.',
   },
   tool_rental: {
-    stepsId: ['Alat', 'Sewa', 'Media', 'Promosi'],
-    stepsEn: ['Tool', 'Rental', 'Media', 'Promotion'],
+    stepsId: ['Alat', 'Sewa', 'Referensi', 'Promosi'],
+    stepsEn: ['Tool', 'Rental', 'References', 'Promotion'],
     step2HintId:
       'Lengkapin kapasitas alat, durasi sewa, operator, lokasi pakai, dan batas deposit.',
     step2HintEn:
@@ -3651,18 +3659,29 @@ export function CreatePostingClient({
   }, []);
   function renderMediaUploadPanel() {
     if (!showImages) return null;
+    const isDemandMedia = listingSide === 'demand';
     return (
       <div className="space-y-2.5">
         <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
-                {locale === 'id' ? 'Foto utama' : 'Primary photo'}
+                {isDemandMedia
+                  ? locale === 'id'
+                    ? 'Referensi opsional'
+                    : 'Optional reference'
+                  : locale === 'id'
+                    ? 'Foto utama'
+                    : 'Primary photo'}
               </p>
               <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)]">
-                {locale === 'id'
-                  ? 'Upload foto utama dulu. Ini yang paling cepat dilihat pembeli.'
-                  : 'Upload the main photo first. This is what people see first.'}
+                {isDemandMedia
+                  ? locale === 'id'
+                    ? 'Kalau punya contoh, screenshot, atau dokumen visual, tambahkan sebagai konteks. Brief teks tetap cukup.'
+                    : 'Add samples, screenshots, or visual documents as context if you have them. A text brief is enough.'
+                  : locale === 'id'
+                    ? 'Upload foto utama dulu. Ini yang paling cepat dilihat pembeli.'
+                    : 'Upload the main photo first. This is what people see first.'}
               </p>
             </div>
             <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
@@ -3670,9 +3689,13 @@ export function CreatePostingClient({
                 ? locale === 'id'
                   ? `${images.length} foto`
                   : `${images.length} photos`
-                : locale === 'id'
-                  ? 'Belum ada foto'
-                  : 'No photos yet'}
+                : isDemandMedia
+                  ? locale === 'id'
+                    ? 'Opsional'
+                    : 'Optional'
+                  : locale === 'id'
+                    ? 'Belum ada foto'
+                    : 'No photos yet'}
             </span>
           </div>
           {coverImage ? (
@@ -3696,9 +3719,13 @@ export function CreatePostingClient({
             </div>
           ) : (
             <div className="mt-3 rounded-lg border border-dashed border-[color:var(--app-border)] px-3 py-3 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
-              {locale === 'id'
-                ? 'Upload foto dulu biar listing terasa lebih jelas.'
-                : 'Upload a photo first so the listing feels clearer.'}
+              {isDemandMedia
+                ? locale === 'id'
+                  ? 'Tidak wajib upload. Pakai bagian ini hanya kalau ada referensi yang membantu penyedia memahami kebutuhan.'
+                  : 'Upload is not required. Use this only when a reference helps providers understand the need.'
+                : locale === 'id'
+                  ? 'Upload foto dulu biar listing terasa lebih jelas.'
+                  : 'Upload a photo first so the listing feels clearer.'}
             </div>
           )}
         </div>
@@ -3909,7 +3936,7 @@ export function CreatePostingClient({
     [fieldValues, promotionRequiredFields],
   );
   const requiresPrimaryImageForPublish =
-    typePicked && requiresPrimaryImageForType(activeType);
+    listingSide === 'supply' && typePicked && requiresPrimaryImageForType(activeType);
   const publishReadiness = useMemo(
     () => [
       {
@@ -3931,8 +3958,14 @@ export function CreatePostingClient({
       {
         key: 'images',
         done: !requiresPrimaryImageForPublish || images.length > 0,
-        labelId: 'Foto utama siap',
-        labelEn: 'Primary photo ready',
+        labelId:
+          listingSide === 'demand'
+            ? 'Referensi opsional'
+            : 'Foto utama siap',
+        labelEn:
+          listingSide === 'demand'
+            ? 'Optional reference'
+            : 'Primary photo ready',
       },
       {
         key: 'promotion',
@@ -3952,6 +3985,7 @@ export function CreatePostingClient({
       requiredDone,
       requiredFields.length,
       isSimpleModeActive,
+      listingSide,
       requiresPrimaryImageForPublish,
       typePicked,
     ],
@@ -5534,16 +5568,26 @@ export function CreatePostingClient({
         ? 'Skip aja kalau belum perlu.'
         : 'Skip if not needed.'
       : stepCopy.step2Description;
-  const stepThreeMainTitle = isNeedServiceJourney
-    ? locale === 'id'
-      ? 'Lampiran pendukung'
-      : 'Supporting attachments'
-    : stepCopy.step3Title;
-  const stepThreeMainDescription = isNeedServiceJourney
-    ? locale === 'id'
-      ? 'Tambah foto, brief, atau tag kalau perlu.'
-      : 'Add photos, a brief, or tags only if they help people understand faster.'
-    : stepCopy.step3Description;
+  const stepThreeMainTitle =
+    listingSide === 'demand'
+      ? locale === 'id'
+        ? 'Referensi opsional'
+        : 'Optional references'
+      : isNeedServiceJourney
+        ? locale === 'id'
+          ? 'Lampiran pendukung'
+          : 'Supporting attachments'
+        : stepCopy.step3Title;
+  const stepThreeMainDescription =
+    listingSide === 'demand'
+      ? locale === 'id'
+        ? 'Lewati kalau brief teks sudah cukup. Tambahkan foto, screenshot, dokumen, atau tag hanya kalau membantu penyedia memahami konteks.'
+        : 'Skip this when the text brief is enough. Add photos, screenshots, documents, or tags only when they help providers understand the context.'
+      : isNeedServiceJourney
+        ? locale === 'id'
+          ? 'Tambah foto, brief, atau tag kalau perlu.'
+          : 'Add photos, a brief, or tags only if they help people understand faster.'
+        : stepCopy.step3Description;
   const demandActionTitle =
     activeType === 'property'
       ? locale === 'id'
@@ -6538,6 +6582,10 @@ export function CreatePostingClient({
       const priceCents = priceStr.trim()
         ? parseInt(String(priceStr).replace(/\D/g, ''), 10) * 100
         : undefined;
+      const pricingMode = resolveApiPricingModeForContent(
+        listingSide,
+        priceCents,
+      );
       const summaryValue = cleanText(fieldValues.summary);
       const bodyValue = cleanText(fieldValues.body);
       const fallbackCopy =
@@ -6568,7 +6616,9 @@ export function CreatePostingClient({
 
       const coverImage = uploadedImageUrls[0] || undefined;
       const requiresPrimaryImage =
-        status === 'active' && requiresPrimaryImageForType(activeType);
+        listingSide === 'supply' &&
+        status === 'active' &&
+        requiresPrimaryImageForType(activeType);
       if (requiresPrimaryImage && !coverImage) {
         throw new Error(
           locale === 'id'
@@ -6744,8 +6794,9 @@ export function CreatePostingClient({
         title,
         summary: resolvedSummary || undefined,
         body: resolvedBody || undefined,
+        pricing_mode: pricingMode,
         price_cents: priceCents,
-        price_unit: priceUnit || undefined,
+        price_unit: pricingMode === 'fixed' ? priceUnit || undefined : undefined,
         seller_type: sellerType || undefined,
         original_price_cents: derivedPromotionFields.originalPriceCents,
         promo_label: derivedPromotionFields.promoLabel,
@@ -6856,7 +6907,8 @@ export function CreatePostingClient({
       );
       return;
     }
-    const needsPrimaryImage = requiresPrimaryImageForType(activeType);
+    const needsPrimaryImage =
+      listingSide === 'supply' && requiresPrimaryImageForType(activeType);
     if (currentStep < TOTAL_STEPS) {
       if (currentStep === 1 || currentStep === 2) {
         const currentStepFields = currentStep === 1 ? step1Fields : step2Fields;
@@ -7280,8 +7332,8 @@ export function CreatePostingClient({
           : 'Do you want to sell or need something?',
       description:
         locale === 'id'
-          ? 'Pilih sesuai tujuan Anda. Setelah itu isi detail singkat seperti judul, harga atau budget, lokasi, dan foto.'
-          : 'Choose one first. Then add the short details like title, price/budget, location, and photos.',
+          ? 'Pilih sesuai tujuan Anda. Setelah itu isi detail singkat seperti judul, harga atau budget, lokasi, dan referensi bila ada.'
+          : 'Choose one first. Then add short details like title, price/budget, location, and references when available.',
       children: (
         <>
           {/* <div className="grid gap-3 lg:grid-cols-2">
@@ -8149,7 +8201,15 @@ export function CreatePostingClient({
           {currentStep === 3 && (
             <>
               <CreateFormSectionCard
-                eyebrow={locale === 'id' ? 'Foto & dokumen' : 'Photos & docs'}
+                eyebrow={
+                  listingSide === 'demand'
+                    ? locale === 'id'
+                      ? 'Referensi opsional'
+                      : 'Optional references'
+                    : locale === 'id'
+                      ? 'Foto & dokumen'
+                      : 'Photos & docs'
+                }
                 title={stepThreeMainTitle}
                 description={stepThreeMainDescription}
                 aside={
@@ -8162,14 +8222,22 @@ export function CreatePostingClient({
                 {showImages ? (
                   <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
                     <p className="font-semibold">
-                      {locale === 'id'
-                        ? 'Foto utama sudah dipasang di step 1.'
-                        : 'The main photo is already handled in step 1.'}
+                      {listingSide === 'demand'
+                        ? locale === 'id'
+                          ? 'Tidak perlu upload kalau brief sudah jelas.'
+                          : 'No upload needed when the brief is clear.'
+                        : locale === 'id'
+                          ? 'Foto utama sudah dipasang di step 1.'
+                          : 'The main photo is already handled in step 1.'}
                     </p>
                     <p className="mt-1 leading-5">
-                      {locale === 'id'
-                        ? 'Di sini tinggal tambah dokumen pendukung, kalau memang ada.'
-                        : 'Use this step for supporting documents if needed.'}
+                      {listingSide === 'demand'
+                        ? locale === 'id'
+                          ? 'Pakai lampiran hanya untuk contoh barang, ukuran, kondisi, lokasi, atau referensi visual.'
+                          : 'Use attachments only for sample goods, size, condition, location, or visual references.'
+                        : locale === 'id'
+                          ? 'Di sini tinggal tambah dokumen pendukung, kalau memang ada.'
+                          : 'Use this step for supporting documents if needed.'}
                     </p>
                   </div>
                 ) : null}
@@ -8180,8 +8248,12 @@ export function CreatePostingClient({
                       <FileText className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
                       <span>
                         {locale === 'id'
-                          ? 'Dokumen tambahan'
-                          : 'Supporting documents'}
+                          ? listingSide === 'demand'
+                            ? 'Dokumen referensi'
+                            : 'Dokumen tambahan'
+                          : listingSide === 'demand'
+                            ? 'Reference documents'
+                            : 'Supporting documents'}
                       </span>
                     </span>
                   </label>

@@ -1,18 +1,24 @@
 'use client';
 
-import { Icon, IconEnum } from '@/components/ui-kit';
+// import { Icon, IconEnum } from '@/components/ui-kit';
 import { useTheme } from '@/context/ThemeContext';
-import { cn } from '@/lib/utils';
+// import { cn } from '@/lib/utils';
 
 type ThemeToggleProps = {
   className?: string;
 };
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
-  const { isDark, toggleDarkMode, isReady } = useTheme();
+  const { isReady } = useTheme();
+  void className;
 
   if (!isReady) return null;
 
+  // Dark/light switching is paused for now. Keep the original button below
+  // commented so it can be restored after light mode is polished.
+  return null;
+
+  /*
   return (
     <button
       onClick={toggleDarkMode}
@@ -36,4 +42,5 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       )}
     </button>
   );
+  */
 }

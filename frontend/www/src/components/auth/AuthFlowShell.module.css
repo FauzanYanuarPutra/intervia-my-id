@@ -1,0 +1,68 @@
+:global(.lajukan-route-surface)
+  .authFlow.authFlow.authFlow
+  .contentGrid {
+  align-content: start;
+  gap: 1.5rem !important;
+  padding-top: 2.5rem !important;
+  padding-bottom: 1.5rem !important;
+}
+
+:global(.lajukan-route-surface)
+  .authFlow.authFlow.authFlow
+  .heroPanel {
+  padding: 2rem !important;
+}
+
+:global(.lajukan-route-surface)
+  .authFlow.authFlow.authFlow
+  .heroTitle {
+  font-size: 2.65rem !important;
+  line-height: 1.08 !important;
+  letter-spacing: 0 !important;
+}
+
+:global(.lajukan-route-surface)
+  .authFlow.authFlow.authFlow
+  .highlightRow {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+}
+
+:global(.lajukan-route-surface)
+  .authFlow.authFlow.authFlow
+  .formPanel {
+  padding: 1.25rem !important;
+}
+
+:global(.lajukan-route-surface)
+  .authFlow.authFlow.authFlow
+  .formTitle {
+  font-size: 1.7rem !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0 !important;
+}
+
+@media (min-width: 640px) {
+  :global(.lajukan-route-surface)
+    .authFlow.authFlow.authFlow
+    .formPanel {
+    padding: 1.75rem !important;
+  }
+
+  :global(.lajukan-route-surface)
+    .authFlow.authFlow.authFlow
+    .formTitle {
+    font-size: 1.9rem !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  :global(.lajukan-route-surface)
+    .authFlow.authFlow.authFlow
+    .contentGrid {
+    align-content: center;
+    gap: 2.5rem !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
+}

@@ -9,6 +9,11 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+$StorageEnvScript = Join-Path $PSScriptRoot "scripts\use-d-drive-env.ps1"
+if (Test-Path -LiteralPath $StorageEnvScript) {
+    . $StorageEnvScript -Quiet
+}
+
 $runner = Join-Path $PSScriptRoot "up-super-fast.ps1"
 $stateFile = Join-Path $PSScriptRoot ".docker-build-state.json"
 

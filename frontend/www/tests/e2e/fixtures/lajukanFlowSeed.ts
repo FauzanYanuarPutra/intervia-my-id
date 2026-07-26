@@ -4,7 +4,7 @@ export const seedSearchQuery = 'supplier kemasan';
 
 export const seedCriticalRoutes = [
   '/id/home',
-  `/id/search?q=${encodeURIComponent(seedSearchQuery)}`,
+  `/id/explore?q=${encodeURIComponent(seedSearchQuery)}`,
   '/id/community',
   '/id/reels',
   '/id/create',
@@ -12,6 +12,15 @@ export const seedCriticalRoutes = [
   '/id/profile',
   '/id/my-projects',
 ];
+
+const seedImages = {
+  packaging:
+    'https://images.unsplash.com/photo-1648587456176-4969b0124b12?auto=format&fit=crop&w=1200&q=80',
+  productStudio:
+    'https://images.unsplash.com/photo-1545242640-7c9e9cc07d23?auto=format&fit=crop&w=1200&q=80',
+  reels:
+    'https://images.unsplash.com/photo-1750127885334-5d983eb7967b?auto=format&fit=crop&w=900&h=1600&q=80',
+};
 
 const contentItems = [
   {
@@ -22,12 +31,16 @@ const contentItems = [
     category: 'product',
     content_status: 'active',
     price_cents: 450000,
-    image_url: 'https://placehold.co/640x480/png?text=Kemasan',
+    image_url: seedImages.packaging,
     metadata: {
       city: 'Bandung',
       location: 'Bandung',
       unit: 'paket',
       entity_kind: 'listing',
+      image_credit: {
+        provider: 'Unsplash',
+        source_url: 'https://unsplash.com/s/photos/paper-packaging',
+      },
     },
     seller_stats: {
       rating: 4.8,
@@ -44,11 +57,15 @@ const contentItems = [
     category: 'service',
     content_status: 'active',
     price_cents: 25000000,
-    image_url: 'https://placehold.co/640x480/png?text=Foto+Produk',
+    image_url: seedImages.productStudio,
     metadata: {
       city: 'Jakarta',
       location: 'Jakarta',
       entity_kind: 'listing',
+      image_credit: {
+        provider: 'Unsplash',
+        source_url: 'https://unsplash.com/s/photos/product-photography-studio',
+      },
     },
     seller_stats: {
       rating: 4.7,
@@ -77,7 +94,12 @@ const communityGroup = {
   rules: ['No spam', 'Transaksi aman di platform'],
 };
 
-const communityTag = { id: 'kemasan', slug: 'kemasan', name: 'Kemasan', usageCount: 1 };
+const communityTag = {
+  id: 'kemasan',
+  slug: 'kemasan',
+  name: 'Kemasan',
+  usageCount: 1,
+};
 
 const communityAuthor = {
   id: 'e2e-user-001',
@@ -113,7 +135,14 @@ const communityFeed = {
     },
   ],
   overview: {
-    categories: [{ id: 'supply', slug: 'supply', name: 'Supply & Operasional', postCount: 1 }],
+    categories: [
+      {
+        id: 'supply',
+        slug: 'supply',
+        name: 'Supply & Operasional',
+        postCount: 1,
+      },
+    ],
     groups: [communityGroup],
     recommendedGroups: [communityGroup],
     joinedGroups: [communityGroup],
@@ -141,11 +170,25 @@ const reels = {
       id: 'e2e-reel-001',
       title: 'Cara packing produk biar terlihat premium',
       caption: 'Tiga langkah singkat untuk UMKM.',
-      videoSrc: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-      thumbnail: 'https://placehold.co/720x1280/png?text=Reels',
-      author: { id: 'e2e-user-002', name: 'Lajukan Studio', avatarUrl: '/default-avatar.svg' },
+      videoSrc:
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      sourceUrl:
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      mediaType: 'video',
+      mediaSource: 'external_direct_video',
+      thumbnail: seedImages.reels,
+      author: {
+        id: 'e2e-user-002',
+        name: 'Lajukan Studio',
+        avatarUrl: '/default-avatar.svg',
+      },
+      metadata: {
+        external: true,
+        sourceKind: 'direct_browser_playable_video',
+        seedPack: 'e2e_external_video',
+      },
       stats: { likes: 24, comments: 3, shares: 2, views: 1200 },
-      productHref: '/search?q=kemasan',
+      productHref: '/explore?q=kemasan',
       createdAt: '2026-05-21T08:00:00.000Z',
     },
   ],
@@ -160,15 +203,30 @@ async function fulfillJson(route: Route, payload: unknown) {
 }
 
 export async function installStableApiFixtures(page: Page) {
-  await page.route('**/api/content?**', route => fulfillJson(route, { items: contentItems }));
-  await page.route('**/api/community/feed?**', route => fulfillJson(route, communityFeed));
-  await page.route('**/api/community/search?**', route => fulfillJson(route, communitySearch));
+  await page.route('**/api/content?**', route =>
+    fulfillJson(route, { items: contentItems }),
+  );
+  await page.route('**/api/community/feed?**', route =>
+    fulfillJson(route, communityFeed),
+  );
+  await page.route('**/api/community/search?**', route =>
+    fulfillJson(route, communitySearch),
+  );
   await page.route('**/api/reels?**', route => fulfillJson(route, reels));
-  await page.route('**/api/reels/*/comments?**', route => fulfillJson(route, { data: [] }));
+  await page.route('**/api/reels/*/comments?**', route =>
+    fulfillJson(route, { data: [] }),
+  );
   await page.route('**/api/lajukan/summary', route =>
     fulfillJson(route, {
       data: {
-        categories: { all: 42, supplier: 12, location: 6, service: 9, product: 10, talent: 5 },
+        categories: {
+          all: 42,
+          supplier: 12,
+          location: 6,
+          service: 9,
+          product: 10,
+          talent: 5,
+        },
         requests: { total: 18, active: 7, waiting: 3, completed: 8 },
         stores: { total: 16, cities: 5, verified: 4 },
       },

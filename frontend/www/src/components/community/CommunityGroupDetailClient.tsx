@@ -1,13 +1,23 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
+import {
+  Camera,
   ChevronLeft,
   Earth,
+  ImageIcon,
   Loader2,
   Lock,
   MessageCircle,
+  Settings,
   ShieldCheck,
+  Upload,
   Users,
 } from 'lucide-react';
 import { LajukanImage } from '@/components/common/LajukanImage';
@@ -16,6 +26,7 @@ import {
   CommunityDetailModal,
   CommunityFeedSkeleton,
   CommunityPostCard,
+  GroupAvatarMark,
   GroupMembersModal,
   readCommunityAvatar,
 } from '@/components/community/CommunityFeedClient';
@@ -23,6 +34,11 @@ import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/system/feedback/ToastProvider';
+import {
+  isPreviewableContentMediaUrl,
+  normalizeContentMediaUrl,
+} from '@/lib/content/catalog';
+import { prepareUploadFiles } from '@/lib/media/prepareUploadMedia';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 import type {
@@ -45,7 +61,7 @@ type GroupResponse = {
   error?: string;
 };
 
-type GroupTab = 'discussion' | 'members' | 'rules';
+type GroupTab = 'discussion' | 'members' | 'about' | 'rules';
 
 function compactNumber(value: number | undefined) {
   const safe = Math.max(Number(value || 0), 0);
@@ -130,6 +146,41 @@ function makeGroupOverview(group: CommunityGroup): CommunityFeedOverview {
   };
 }
 
+function resolveGroupMediaSrc(value?: string | null): string {
+  const clean = normalizeContentMediaUrl(String(value || '').trim());
+  if (!clean) return '';
+  if (!isPreviewableContentMediaUrl(clean)) return '';
+  return clean;
+}
+
+function readUploadedGroupMediaUrl(payload: unknown): string {
+  const data =
+    payload && typeof payload === 'object'
+      ? (payload as Record<string, unknown>)
+      : {};
+  const dataFile =
+    data.data && typeof data.data === 'object'
+      ? (data.data as Record<string, unknown>)
+      : null;
+  const files = Array.isArray(data.files) ? data.files : [];
+  const urls = Array.isArray(data.urls) ? data.urls : [];
+  const candidates = [
+    urls[0],
+    dataFile?.url,
+    files[0] && typeof files[0] === 'object'
+      ? (files[0] as Record<string, unknown>).url
+      : null,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const resolved = resolveGroupMediaSrc(candidate);
+    if (resolved) return resolved;
+  }
+
+  return '';
+}
+
 function MemberRow({
   member,
   isId,
@@ -165,6 +216,267 @@ function MemberRow({
   );
 }
 
+function GroupSettingsModal({
+  group,
+  isId,
+  open,
+  onClose,
+  onSaved,
+}: {
+  group: CommunityGroup;
+  isId: boolean;
+  open: boolean;
+  onClose: () => void;
+  onSaved: (group: CommunityGroup) => void;
+}) {
+  const { authFetch } = useAuth();
+  const { notify } = useToast();
+  const [name, setName] = useState(group.name);
+  const [description, setDescription] = useState(group.description);
+  const [privacy, setPrivacy] = useState<CommunityGroup['privacy']>(
+    group.privacy,
+  );
+  const [postingPermission, setPostingPermission] = useState<
+    CommunityGroup['postingPermission']
+  >(group.postingPermission);
+  const [membershipPermission, setMembershipPermission] = useState<
+    CommunityGroup['membershipPermission']
+  >(group.membershipPermission);
+  const [rules, setRules] = useState<string[]>(
+    group.rules.length ? group.rules : [''],
+  );
+  const [saving, setSaving] = useState(false);
+
+  if (!open) return null;
+
+  const updateRule = (index: number, value: string) => {
+    setRules(current =>
+      current.map((item, itemIndex) => (itemIndex === index ? value : item)),
+    );
+  };
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const cleanRules = rules.map(rule => rule.trim()).filter(Boolean);
+    setSaving(true);
+    const response = await authFetch(
+      `/api/community/groups/${encodeURIComponent(group.id)}/permissions`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description,
+          privacy,
+          postingPermission,
+          membershipPermission,
+          rules: cleanRules,
+        }),
+      },
+    );
+    const payload = (await response.json().catch(() => ({}))) as GroupResponse;
+    setSaving(false);
+
+    if (!response.ok || !payload.data) {
+      notify({
+        title: isId ? 'Edit group gagal' : 'Group update failed',
+        description: payload.error || '',
+        variant: 'error',
+      });
+      return;
+    }
+
+    onSaved(payload.data);
+    notify({
+      title: isId ? 'Group diperbarui' : 'Group updated',
+      variant: 'success',
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 px-2 py-2 sm:items-center">
+      <form
+        onSubmit={submit}
+        className="flex max-h-[min(780px,calc(100dvh-24px))] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_24px_70px_-34px_rgba(15,23,42,0.42)]"
+      >
+        <header className="flex min-h-[62px] items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[color:var(--app-text)]">
+              {isId ? 'Edit group' : 'Edit group'}
+            </p>
+            <p className="text-[11px] text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Nama, deskripsi, akses, dan aturan.'
+                : 'Name, description, access, and rules.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-50"
+            aria-label={isId ? 'Tutup' : 'Close'}
+          >
+            <ChevronLeft className="h-5 w-5 rotate-[-90deg]" />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          <label className="block">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
+              {isId ? 'Nama group' : 'Group name'}
+            </span>
+            <input
+              value={name}
+              onChange={event => setName(event.target.value)}
+              maxLength={72}
+              className="mt-1 min-h-[42px] w-full rounded-[14px] bg-slate-50 px-3 text-sm outline-none"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
+              {isId ? 'Deskripsi' : 'Description'}
+            </span>
+            <textarea
+              value={description}
+              onChange={event => setDescription(event.target.value)}
+              maxLength={520}
+              rows={4}
+              className="mt-1 w-full resize-none rounded-[14px] bg-slate-50 px-3 py-2 text-sm leading-6 outline-none"
+            />
+          </label>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            <label className="block">
+              <span className="text-xs font-bold text-[color:var(--app-text)]">
+                {isId ? 'Privasi' : 'Privacy'}
+              </span>
+              <select
+                value={privacy}
+                onChange={event =>
+                  setPrivacy(event.target.value as CommunityGroup['privacy'])
+                }
+                className="mt-1 min-h-[40px] w-full rounded-[14px] bg-slate-50 px-3 text-xs outline-none"
+              >
+                <option value="public">{isId ? 'Publik' : 'Public'}</option>
+                <option value="private">{isId ? 'Privat' : 'Private'}</option>
+                <option value="hidden">
+                  {isId ? 'Tersembunyi' : 'Hidden'}
+                </option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-bold text-[color:var(--app-text)]">
+                {isId ? 'Posting' : 'Posting'}
+              </span>
+              <select
+                value={postingPermission}
+                onChange={event =>
+                  setPostingPermission(
+                    event.target.value as CommunityGroup['postingPermission'],
+                  )
+                }
+                className="mt-1 min-h-[40px] w-full rounded-[14px] bg-slate-50 px-3 text-xs outline-none"
+              >
+                <option value="public">
+                  {isId ? 'Semua orang' : 'Everyone'}
+                </option>
+                <option value="member">{isId ? 'Member' : 'Members'}</option>
+                <option value="moderator">
+                  {isId ? 'Moderator' : 'Moderators'}
+                </option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-bold text-[color:var(--app-text)]">
+                {isId ? 'Join' : 'Join'}
+              </span>
+              <select
+                value={membershipPermission}
+                onChange={event =>
+                  setMembershipPermission(
+                    event.target
+                      .value as CommunityGroup['membershipPermission'],
+                  )
+                }
+                className="mt-1 min-h-[40px] w-full rounded-[14px] bg-slate-50 px-3 text-xs outline-none"
+              >
+                <option value="open">{isId ? 'Langsung masuk' : 'Open'}</option>
+                <option value="approval">
+                  {isId ? 'Perlu approve' : 'Approval'}
+                </option>
+                <option value="invite">
+                  {isId ? 'Undangan saja' : 'Invite only'}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div className="rounded-[18px] bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-bold text-[color:var(--app-text)]">
+                {isId ? 'Aturan group' : 'Group rules'}
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  setRules(current =>
+                    current.length >= 10 ? current : [...current, ''],
+                  )
+                }
+                className="inline-flex min-h-[30px] items-center gap-1 rounded-full bg-white px-3 text-[11px] font-bold text-[color:var(--app-accent)]"
+              >
+                {isId ? 'Tambah' : 'Add'}
+              </button>
+            </div>
+            <div className="mt-2 space-y-2">
+              {rules.map((rule, index) => (
+                <div key={index} className="flex gap-2">
+                  <input
+                    value={rule}
+                    onChange={event => updateRule(index, event.target.value)}
+                    className="min-h-[38px] min-w-0 flex-1 rounded-[13px] bg-white px-3 text-xs outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRules(current =>
+                        current.length <= 1
+                          ? ['']
+                          : current.filter(
+                              (_, itemIndex) => itemIndex !== index,
+                            ),
+                      )
+                    }
+                    className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[13px] bg-white text-[color:var(--app-text-soft)]"
+                    aria-label={isId ? 'Hapus aturan' : 'Remove rule'}
+                  >
+                    <ChevronLeft className="h-4 w-4 rotate-180" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <footer className="border-t border-[color:var(--app-border)] p-4">
+          <button
+            type="submit"
+            disabled={saving || !name.trim() || !description.trim()}
+            className="inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-white disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {isId ? 'Simpan perubahan' : 'Save changes'}
+          </button>
+        </footer>
+      </form>
+    </div>
+  );
+}
+
 export default function CommunityGroupDetailClient({
   isId,
   slug,
@@ -186,12 +498,16 @@ export default function CommunityGroupDetailClient({
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [busyJoin, setBusyJoin] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState<
+    'avatar' | 'cover' | null
+  >(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [nextCursor, setNextCursor] = useState<number | null>(0);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selectedThreadId = searchParams.get('thread');
   const loginHref = buildLoginHref(pathname, searchParams.toString());
@@ -386,6 +702,90 @@ export default function CommunityGroupDetailClient({
     });
   };
 
+  const uploadGroupMedia = async (file: File, target: 'avatar' | 'cover') => {
+    if (!group) return;
+    if (!isAuthenticated) {
+      router.push(loginHref);
+      return;
+    }
+    if (!group.viewerCanManage) {
+      notify({
+        title: isId ? 'Tidak punya akses' : 'No access',
+        description: isId
+          ? 'Hanya admin atau moderator yang bisa mengubah tampilan grup.'
+          : 'Only admins or moderators can update group media.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    setUploadingMedia(target);
+    try {
+      const [optimizedFile] = await prepareUploadFiles([file]);
+      const formData = new FormData();
+      formData.append('image', optimizedFile || file);
+      const uploadResponse = await authFetch('/api/forum/upload-images', {
+        method: 'POST',
+        body: formData,
+      });
+      const uploadPayload = await uploadResponse.json().catch(() => ({}));
+      const uploadedUrl = readUploadedGroupMediaUrl(uploadPayload);
+
+      if (!uploadResponse.ok || !uploadedUrl) {
+        notify({
+          title: isId ? 'Upload gambar gagal' : 'Image upload failed',
+          description:
+            typeof uploadPayload.error === 'string' ? uploadPayload.error : '',
+          variant: 'error',
+        });
+        return;
+      }
+
+      const updateResponse = await authFetch(
+        `/api/community/groups/${encodeURIComponent(group.id)}/permissions`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            target === 'avatar'
+              ? { avatarUrl: uploadedUrl }
+              : { coverUrl: uploadedUrl },
+          ),
+        },
+      );
+      const updatePayload = (await updateResponse
+        .json()
+        .catch(() => ({}))) as GroupResponse;
+
+      if (!updateResponse.ok) {
+        notify({
+          title: isId ? 'Gagal menyimpan tampilan' : 'Failed to save media',
+          description: updatePayload.error || '',
+          variant: 'error',
+        });
+        return;
+      }
+
+      setGroup(updatePayload.data || updatePayload.group || group);
+      notify({
+        title: isId ? 'Tampilan grup diperbarui' : 'Group media updated',
+        variant: 'success',
+      });
+    } finally {
+      setUploadingMedia(null);
+    }
+  };
+
+  const handleGroupMediaInput = (
+    event: ChangeEvent<HTMLInputElement>,
+    target: 'avatar' | 'cover',
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    void uploadGroupMedia(file, target);
+  };
+
   const closeThreadDetail = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('thread');
@@ -456,6 +856,7 @@ export default function CommunityGroupDetailClient({
   const tabs: Array<{ id: GroupTab; label: string }> = [
     { id: 'discussion', label: isId ? 'Diskusi' : 'Discussions' },
     { id: 'members', label: isId ? 'Anggota' : 'Members' },
+    { id: 'about', label: isId ? 'Tentang' : 'About' },
     { id: 'rules', label: isId ? 'Aturan' : 'Rules' },
   ];
 
@@ -470,6 +871,11 @@ export default function CommunityGroupDetailClient({
           >
             <ChevronLeft className="h-4 w-4" />
           </Link>
+          <GroupAvatarMark
+            group={group}
+            className="h-9 w-9 rounded-[13px] text-sm"
+            sizes="36px"
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
               {group.name}
@@ -486,6 +892,16 @@ export default function CommunityGroupDetailClient({
           >
             {joined ? (isId ? 'Joined' : 'Joined') : isId ? 'Gabung' : 'Join'}
           </button>
+          {group.viewerCanManage ? (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[color:var(--app-text)]"
+              aria-label={isId ? 'Edit group' : 'Edit group'}
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -502,6 +918,17 @@ export default function CommunityGroupDetailClient({
             <h1 className="mt-3 text-[1.25rem] font-bold leading-tight tracking-[-0.04em] text-[color:var(--app-text)]">
               {group.name}
             </h1>
+            <div className="mt-3 flex items-center gap-3">
+              <GroupAvatarMark
+                group={group}
+                className="h-14 w-14 rounded-[18px] text-lg"
+                sizes="56px"
+              />
+              <div className="min-w-0 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                <p className="truncate">{groupPrivacyLabel(group, isId)}</p>
+                <p className="truncate">{groupJoinLabel(group, isId)}</p>
+              </div>
+            </div>
             <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
               {group.description}
             </p>
@@ -555,6 +982,16 @@ export default function CommunityGroupDetailClient({
               <Users className="h-4 w-4" />
               {isId ? 'Anggota' : 'Members'}
             </button>
+            {group.viewerCanManage ? (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-[15px] bg-[color:var(--app-accent-soft)] text-sm font-bold text-[color:var(--app-accent)]"
+              >
+                <Settings className="h-4 w-4" />
+                {isId ? 'Edit group' : 'Edit group'}
+              </button>
+            ) : null}
           </section>
         </aside>
 
@@ -578,6 +1015,23 @@ export default function CommunityGroupDetailClient({
                 </div>
               )}
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.10),rgba(15,23,42,0.50))]" />
+              {group.viewerCanManage ? (
+                <label className="absolute right-4 top-4 z-[2] inline-flex min-h-[34px] cursor-pointer items-center gap-2 rounded-full bg-white/94 px-3 text-xs font-bold text-[color:var(--app-text)] shadow-sm transition hover:text-[color:var(--app-accent)]">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploadingMedia !== null}
+                    onChange={event => handleGroupMediaInput(event, 'cover')}
+                  />
+                  {uploadingMedia === 'cover' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4" />
+                  )}
+                  {isId ? 'Ganti cover' : 'Change cover'}
+                </label>
+              ) : null}
               <div className="relative z-[1] flex min-h-[136px] flex-col justify-between sm:min-h-[158px]">
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
                   <Link
@@ -590,23 +1044,56 @@ export default function CommunityGroupDetailClient({
                     {group.name}
                   </span>
                 </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-accent)]">
-                      {groupJoinLabel(group, isId)}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text)]">
-                      {group.privacy === 'public' ? (
-                        <Earth className="h-3.5 w-3.5" />
-                      ) : (
-                        <Lock className="h-3.5 w-3.5" />
-                      )}
-                      {groupPrivacyLabel(group, isId)}
-                    </span>
+                <div className="flex items-end gap-3">
+                  {group.viewerCanManage ? (
+                    <label className="relative inline-flex cursor-pointer">
+                      <GroupAvatarMark
+                        group={group}
+                        className="h-20 w-20 rounded-[24px] border-[4px] border-white text-2xl shadow-[0_20px_34px_-26px_rgba(15,23,42,0.5)]"
+                        sizes="80px"
+                      />
+                      <span className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-[color:var(--app-accent)] text-white shadow-sm">
+                        {uploadingMedia === 'avatar' ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Camera className="h-4 w-4" />
+                        )}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        disabled={uploadingMedia !== null}
+                        onChange={event =>
+                          handleGroupMediaInput(event, 'avatar')
+                        }
+                      />
+                    </label>
+                  ) : (
+                    <GroupAvatarMark
+                      group={group}
+                      className="h-20 w-20 rounded-[24px] border-[4px] border-white text-2xl shadow-[0_20px_34px_-26px_rgba(15,23,42,0.5)]"
+                      sizes="80px"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-accent)]">
+                        {groupJoinLabel(group, isId)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text)]">
+                        {group.privacy === 'public' ? (
+                          <Earth className="h-3.5 w-3.5" />
+                        ) : (
+                          <Lock className="h-3.5 w-3.5" />
+                        )}
+                        {groupPrivacyLabel(group, isId)}
+                      </span>
+                    </div>
+                    <h2 className="mt-2 max-w-2xl text-[1.55rem] font-bold leading-tight tracking-[-0.05em] text-white sm:text-[2.1rem]">
+                      {group.name}
+                    </h2>
                   </div>
-                  <h2 className="mt-2 max-w-2xl text-[1.65rem] font-bold leading-tight tracking-[-0.05em] text-white sm:text-[2.1rem]">
-                    {group.name}
-                  </h2>
                 </div>
               </div>
             </div>
@@ -756,6 +1243,159 @@ export default function CommunityGroupDetailClient({
             </section>
           ) : null}
 
+          {activeTab === 'about' ? (
+            <section className="space-y-3">
+              <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+                <h2 className="text-base font-bold text-[color:var(--app-text)]">
+                  {isId ? 'Tentang grup' : 'About this group'}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[color:var(--app-text)]">
+                  {group.description}
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    {
+                      label: isId ? 'Privasi' : 'Privacy',
+                      value: groupPrivacyLabel(group, isId),
+                    },
+                    {
+                      label: isId ? 'Cara join' : 'Join mode',
+                      value: groupJoinLabel(group, isId),
+                    },
+                    {
+                      label: isId ? 'Izin posting' : 'Posting permission',
+                      value: groupPostLabel(group, isId),
+                    },
+                    {
+                      label: isId ? 'Role kamu' : 'Your role',
+                      value: groupRoleLabel(group.viewerRole, isId),
+                    },
+                    {
+                      label: isId ? 'Anggota' : 'Members',
+                      value: compactNumber(group.memberCount),
+                    },
+                    {
+                      label: 'Post',
+                      value: compactNumber(group.postCount),
+                    },
+                  ].map(item => (
+                    <div
+                      key={item.label}
+                      className="rounded-[18px] bg-slate-50 p-3"
+                    >
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-[color:var(--app-text)]">
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold text-[color:var(--app-text)]">
+                      {isId ? 'Admin & moderator' : 'Admins & moderators'}
+                    </h2>
+                    <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                      {isId
+                        ? 'Orang yang menjaga arah diskusi dan membership.'
+                        : 'People keeping discussions and membership healthy.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMembersModalGroup(group)}
+                    className="inline-flex min-h-[36px] shrink-0 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
+                  >
+                    {isId ? 'Lihat semua' : 'View all'}
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {leaders.length ? (
+                    leaders.map(member => (
+                      <MemberRow
+                        key={member.userId}
+                        member={member}
+                        isId={isId}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-sm leading-6 text-[color:var(--app-text-soft)]">
+                      {isId
+                        ? 'Belum ada admin atau moderator yang bisa ditampilkan.'
+                        : 'No visible admins or moderators yet.'}
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {group.viewerCanManage ? (
+                <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-bold text-[color:var(--app-text)]">
+                        {isId ? 'Kelola group' : 'Manage group'}
+                      </h2>
+                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {isId
+                          ? 'Edit informasi, aturan, izin akses, foto, dan cover.'
+                          : 'Edit info, rules, access, photo, and cover.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsOpen(true)}
+                      className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
+                    >
+                      <Settings className="h-4 w-4" />
+                      {isId ? 'Edit' : 'Edit'}
+                    </button>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-white">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        disabled={uploadingMedia !== null}
+                        onChange={event =>
+                          handleGroupMediaInput(event, 'avatar')
+                        }
+                      />
+                      {uploadingMedia === 'avatar' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                      {isId ? 'Upload foto grup' : 'Upload group photo'}
+                    </label>
+                    <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-bold text-[color:var(--app-text)]">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        disabled={uploadingMedia !== null}
+                        onChange={event =>
+                          handleGroupMediaInput(event, 'cover')
+                        }
+                      />
+                      {uploadingMedia === 'cover' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ImageIcon className="h-4 w-4" />
+                      )}
+                      {isId ? 'Upload cover' : 'Upload cover'}
+                    </label>
+                  </div>
+                </section>
+              ) : null}
+            </section>
+          ) : null}
+
           {activeTab === 'rules' ? (
             <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
               <h2 className="text-base font-bold text-[color:var(--app-text)]">
@@ -765,10 +1405,10 @@ export default function CommunityGroupDetailClient({
                 {(group.rules.length
                   ? group.rules
                   : [
-                    isId
-                      ? 'Diskusi harus relevan dengan usaha.'
-                      : 'Discussions must be relevant to business.',
-                  ]
+                      isId
+                        ? 'Diskusi harus relevan dengan usaha.'
+                        : 'Discussions must be relevant to business.',
+                    ]
                 ).map(rule => (
                   <div
                     key={rule}
@@ -836,6 +1476,19 @@ export default function CommunityGroupDetailClient({
         onClose={() => setMembersModalGroup(null)}
         onChanged={() => setRefreshKey(value => value + 1)}
       />
+      {settingsOpen ? (
+        <GroupSettingsModal
+          key={`${group.id}:${group.name}`}
+          group={group}
+          isId={isId}
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={nextGroup => {
+            setGroup(nextGroup);
+            setRefreshKey(value => value + 1);
+          }}
+        />
+      ) : null}
     </main>
   );
 }

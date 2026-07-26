@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: 'Usaha Lajukan',
   description:
     'Portal bisnis terpisah untuk mengelola usaha, tim, produk, operasional, dan keamanan per usaha.',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

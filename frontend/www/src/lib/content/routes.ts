@@ -46,5 +46,5 @@ export function buildContentHref(
   if (normalizedId) {
     return `/content/${slugifyContentTitle(title || 'listing')}-${normalizedId}`;
   }
-  return '/search';
+  return '/explore';
 }

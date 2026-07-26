@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2, MapPin, Store, UploadCloud } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -12,6 +13,7 @@ import {
 } from '@/components/super-app/manage/UmkmManagePrimitives';
 import { buildUsahaPath } from '@/lib/umkmSurface';
 import type { LatLng } from '@/lib/super-app/maps';
+import type { SelectedLocation } from '@/lib/location/location.types';
 import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
 import {
   getUmkmBusinessCategoryLabel,
@@ -19,6 +21,8 @@ import {
   type UmkmBusinessCategoryId,
 } from '@/lib/super-app/umkm-taxonomy';
 import { cn } from '@/lib/utils';
+import { mapCreationDraftToBusinessPrefill } from '@/lib/creation-drafts/adapters';
+import type { AICreationDraft } from '@/lib/creation-drafts/types';
 
 type SimpleUsahaCreateFlowProps = {
   isId: boolean;
@@ -33,6 +37,7 @@ type SimpleCreateFormState = {
   address: string;
   photoUrl: string;
   point: LatLng;
+  selectedLocation: SelectedLocation | null;
 };
 
 const SIMPLE_CREATE_STEPS: Array<{
@@ -79,18 +84,94 @@ function createInitialState(): SimpleCreateFormState {
     address: '',
     photoUrl: '',
     point: DEFAULT_POINT,
+    selectedLocation: null,
   };
 }
 
 export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
-  const { authFetch } = useAuth();
+  const { authFetch, loading: authLoading, isAuthenticated } = useAuth();
   const { notify } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const creationDraftId = searchParams.get('draft')?.trim() || '';
+  const importedCreationDraftRef = useRef('');
   const [step, setStep] = useState<SimpleCreateStepId>('basic');
   const [form, setForm] = useState<SimpleCreateFormState>(createInitialState);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      !creationDraftId ||
+      authLoading ||
+      !isAuthenticated ||
+      importedCreationDraftRef.current === creationDraftId
+    ) {
+      return;
+    }
+    importedCreationDraftRef.current = creationDraftId;
+    let cancelled = false;
+    setError(null);
+    authFetch(`/api/creation-drafts/${encodeURIComponent(creationDraftId)}`, {
+      cache: 'no-store',
+    })
+      .then(async response => {
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: AICreationDraft;
+          error?: string;
+        };
+        if (!response.ok || !payload.data) {
+          throw new Error(
+            payload.error ||
+              (isId ? 'Draft AI tidak ditemukan.' : 'AI draft was not found.'),
+          );
+        }
+        const prefill = mapCreationDraftToBusinessPrefill(payload.data);
+        if (!prefill) {
+          throw new Error(
+            isId
+              ? 'Jenis draft AI tidak cocok dengan pendaftaran usaha.'
+              : 'This AI draft does not match business registration.',
+          );
+        }
+        if (cancelled) return;
+        setForm(current => ({
+          ...current,
+          name: prefill.name,
+          category: prefill.category,
+          city: prefill.city,
+          address: prefill.address,
+          photoUrl: prefill.photoUrl,
+          selectedLocation: prefill.selectedLocation,
+          point: prefill.selectedLocation
+            ? {
+                lat: prefill.selectedLocation.latitude,
+                lng: prefill.selectedLocation.longitude,
+              }
+            : current.point,
+        }));
+      })
+      .catch(caught => {
+        if (cancelled) return;
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : isId
+              ? 'Draft AI gagal dibuka.'
+              : 'Failed to open AI draft.',
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authFetch,
+    authLoading,
+    creationDraftId,
+    isAuthenticated,
+    isId,
+  ]);
 
   const categoryOptions = useMemo(() => getUmkmBusinessCategoryOptions(), []);
   const categoryLabel = useMemo(
@@ -103,7 +184,7 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
   const point = form.point || DEFAULT_POINT;
 
   const canContinueBasic = name.length >= 3;
-  const canContinueLocation = city.length >= 2 && address.length >= 3;
+  const canContinueLocation = Boolean(form.selectedLocation);
 
   const stepState = useMemo(
     () => [
@@ -125,7 +206,11 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
       return;
     }
     if (step === 'location' && !canContinueLocation) {
-      setError(isId ? 'Isi kota dan alamat dulu.' : 'Add the city and address first.');
+      setError(
+        isId
+          ? 'Pilih salah satu lokasi dari hasil pencarian.'
+          : 'Pick one location from the search results.',
+      );
       return;
     }
 
@@ -215,9 +300,13 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
       setError(isId ? 'Nama usaha minimal 3 huruf.' : 'Business name needs at least 3 characters.');
       return;
     }
-    if (cleanCity.length < 2 || cleanAddress.length < 3) {
+    if (!form.selectedLocation || cleanCity.length < 2 || cleanAddress.length < 3) {
       setStep('location');
-      setError(isId ? 'Lokasi belum lengkap.' : 'Location is not complete.');
+      setError(
+        isId
+          ? 'Pilih salah satu lokasi dari hasil pencarian.'
+          : 'Pick one location from the search results.',
+      );
       return;
     }
     if (!normalizeSingleLineInput(form.photoUrl).length) {
@@ -248,6 +337,9 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
             business_type: form.category,
             segment: categoryLabel,
             source: 'simple-setup',
+            selected_location: form.selectedLocation,
+            location_place_id: form.selectedLocation.placeId,
+            location_provider: form.selectedLocation.provider || 'osm',
           },
         }),
       });
@@ -268,6 +360,22 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
           : 'You can now continue with the details.',
         variant: 'success',
       });
+
+      if (creationDraftId) {
+        await authFetch(
+          `/api/creation-drafts/${encodeURIComponent(creationDraftId)}/consume`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              resource_id: payload.data.store.id,
+              resource_url: buildUsahaPath('profile', {
+                storeId: payload.data.store.id,
+              }),
+            }),
+          },
+        ).catch(() => undefined);
+      }
 
       router.replace(buildUsahaPath('profile', { storeId: payload.data.store.id }));
     } catch (caught) {
@@ -473,47 +581,12 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
         ) : null}
 
         {step === 'location' ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <TextInput
-                  label={isId ? 'Kota' : 'City'}
-                  value={form.city}
-                  onChange={event =>
-                    setForm(current => ({ ...current, city: event.target.value }))
-                  }
-                  required
-                  maxLength={80}
-                  placeholder={isId ? 'Contoh: Jakarta' : 'Example: Jakarta'}
-                />
-                <TextInput
-                  label={isId ? 'Alamat / patokan' : 'Address / landmark'}
-                  value={form.address}
-                  onChange={event =>
-                    setForm(current => ({ ...current, address: event.target.value }))
-                  }
-                  required
-                  maxLength={240}
-                  placeholder={
-                    isId
-                      ? 'Contoh: Jl. Melati No. 12'
-                      : 'Example: Jl. Melati No. 12'
-                  }
-                />
-              </div>
-
-              <div className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-sm leading-6 ui-text-soft">
-                {isId
-                  ? 'Geser pin kalau titiknya perlu diubah. Kalau tidak, titik awal sudah dipakai.'
-                  : 'Move the pin if needed. Otherwise the default point is already set.'}
-              </div>
-            </div>
-
+          <div className="grid gap-4">
             <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.18)]">
               <div className="flex items-center gap-2 px-1 pb-3">
                 <MapPin className="h-4 w-4 text-[color:var(--app-accent)]" />
                 <p className="text-sm font-bold ui-text">
-                  {isId ? 'Titik lokasi' : 'Location pin'}
+                  {isId ? 'Lokasi usaha' : 'Business location'}
                 </p>
               </div>
               <UmkmLocationPicker
@@ -521,9 +594,36 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
                 onChange={nextPoint =>
                   setForm(current => ({ ...current, point: nextPoint }))
                 }
+                selectedLocation={form.selectedLocation}
+                onLocationChange={location =>
+                  setForm(current => ({
+                    ...current,
+                    selectedLocation: location,
+                    point: location
+                      ? {
+                          lat: location.latitude,
+                          lng: location.longitude,
+                        }
+                      : current.point,
+                    city:
+                      location?.city ||
+                      location?.regency ||
+                      location?.district ||
+                      location?.province ||
+                      '',
+                    address: location?.formattedAddress || '',
+                  }))
+                }
                 isId={isId}
                 markerLabel={isId ? 'Geser pin untuk usaha' : 'Move the business pin'}
               />
+              <div className="mt-4 rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-sm leading-6 ui-text-soft">
+                {form.selectedLocation
+                  ? form.selectedLocation.formattedAddress
+                  : isId
+                    ? 'Pilih lokasi dari hasil pencarian. Kota, alamat, dan koordinat akan terisi otomatis.'
+                    : 'Pick a search result. City, address, and coordinates will be filled automatically.'}
+              </div>
             </div>
           </div>
         ) : null}
@@ -537,8 +637,10 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
                 { label: isId ? 'Kota' : 'City', value: city },
                 { label: isId ? 'Alamat' : 'Address', value: address },
                 {
-                  label: isId ? 'Titik' : 'Pin',
-                  value: `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`,
+                  label: isId ? 'Data peta' : 'Map data',
+                  value: form.selectedLocation
+                    ? form.selectedLocation.placeId
+                    : `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`,
                 },
               ].map(card => (
                 <div

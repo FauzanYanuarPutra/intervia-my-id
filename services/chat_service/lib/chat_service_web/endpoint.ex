@@ -1,11 +1,13 @@
 defmodule ChatServiceWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :chat_service
 
-  @allowed_origins [
+  @production_origins [
     "https://lajukan.com",
     "https://www.lajukan.com",
     "https://chat.lajukan.com",
-    "https://usaha.lajukan.com",
+    "https://usaha.lajukan.com"
+  ]
+  @development_origins [
     "http://127.0.0.1",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
@@ -16,11 +18,13 @@ defmodule ChatServiceWeb.Endpoint do
     "http://localhost:3002"
   ]
 
-  @socket_allowed_origins [
+  @production_socket_origins [
     "//lajukan.com",
     "//www.lajukan.com",
     "//chat.lajukan.com",
-    "//usaha.lajukan.com",
+    "//usaha.lajukan.com"
+  ]
+  @development_socket_origins [
     "//127.0.0.1",
     "//127.0.0.1:3000",
     "//127.0.0.1:3001",
@@ -30,6 +34,12 @@ defmodule ChatServiceWeb.Endpoint do
     "//localhost:3001",
     "//localhost:3002"
   ]
+  @allowed_origins if Mix.env() == :prod,
+                     do: @production_origins,
+                     else: @production_origins ++ @development_origins
+  @socket_allowed_origins if Mix.env() == :prod,
+                          do: @production_socket_origins,
+                          else: @production_socket_origins ++ @development_socket_origins
 
   socket "/socket", ChatServiceWeb.UserSocket,
     websocket: [
@@ -60,6 +70,7 @@ defmodule ChatServiceWeb.Endpoint do
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
+    length: 2_000_000,
     json_decoder: Phoenix.json_library()
 
   plug ChatServiceWeb.Router

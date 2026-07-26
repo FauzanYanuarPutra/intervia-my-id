@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { buildContentHref } from '@/lib/content/routes';
 import { BLOG_ARTICLES } from '@/lib/seo/blog';
+import { LAJUKAN_EXPLORE_CATEGORIES } from '@/lib/discovery/lajukanCategories';
 
 export const revalidate = 900;
 
@@ -14,6 +15,7 @@ const marketplaceBase = (
 ).replace(/\/+$/, '');
 const locales = ['id', 'en'] as const;
 const CONTENT_SITEMAP_LIMIT = 200;
+const CONTENT_SITEMAP_MAX_ITEMS = 1000;
 
 type SitemapContentItem = {
   id?: string | null;
@@ -47,11 +49,11 @@ function isIndexableContent(item: SitemapContentItem): boolean {
   return !status || ['active', 'published', 'live'].includes(status);
 }
 
-function safeDate(value: unknown, fallback: Date): Date {
+function safeDate(value: unknown): Date | undefined {
   const raw = readText(value);
-  if (!raw) return fallback;
+  if (!raw) return undefined;
   const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? fallback : date;
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 function contentPriority(item: SitemapContentItem): number {
@@ -63,26 +65,35 @@ function contentPriority(item: SitemapContentItem): number {
 }
 
 async function fetchContentSitemapItems(): Promise<SitemapContentItem[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2500);
-  const params = new URLSearchParams({
-    limit: String(CONTENT_SITEMAP_LIMIT),
-    offset: '0',
-    content_status: 'active',
-  });
+  const offsets = Array.from(
+    { length: CONTENT_SITEMAP_MAX_ITEMS / CONTENT_SITEMAP_LIMIT },
+    (_, index) => index * CONTENT_SITEMAP_LIMIT,
+  );
+  const pages = await Promise.all(
+    offsets.map(async offset => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2500);
+      const params = new URLSearchParams({
+        limit: String(CONTENT_SITEMAP_LIMIT),
+        offset: String(offset),
+        content_status: 'active',
+      });
 
-  try {
-    const res = await fetch(`${marketplaceBase}/v1/content?${params}`, {
-      signal: controller.signal,
-      next: { revalidate },
-    });
-    if (!res.ok) return [];
-    return readContentItems(await res.json()).filter(isIndexableContent);
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timeout);
-  }
+      try {
+        const res = await fetch(`${marketplaceBase}/v1/content?${params}`, {
+          signal: controller.signal,
+          next: { revalidate },
+        });
+        return res.ok ? readContentItems(await res.json()) : [];
+      } catch {
+        return [];
+      } finally {
+        clearTimeout(timeout);
+      }
+    }),
+  );
+
+  return pages.flat().filter(isIndexableContent);
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -92,8 +103,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'];
   }> = [
     { path: '/home', priority: 1.0, changeFrequency: 'daily' },
-    { path: '/search', priority: 1.0, changeFrequency: 'daily' },
-    { path: '/kategori', priority: 0.88, changeFrequency: 'daily' },
+    { path: '/explore', priority: 0.96, changeFrequency: 'daily' },
+    ...LAJUKAN_EXPLORE_CATEGORIES.map(category => ({
+      path: `/explore/${category.slug}`,
+      priority: 0.9,
+      changeFrequency: 'daily' as const,
+    })),
     { path: '/umkm', priority: 0.92, changeFrequency: 'daily' },
     { path: '/community', priority: 0.86, changeFrequency: 'daily' },
     { path: '/reels', priority: 0.8, changeFrequency: 'daily' },
@@ -101,7 +116,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/blog', priority: 0.86, changeFrequency: 'weekly' },
     { path: '/education', priority: 0.8, changeFrequency: 'weekly' },
     { path: '/microgigs', priority: 0.7, changeFrequency: 'daily' },
-    { path: '/crm', priority: 0.62, changeFrequency: 'weekly' },
     { path: '/lainnya', priority: 0.68, changeFrequency: 'weekly' },
     { path: '/support', priority: 0.8, changeFrequency: 'weekly' },
     { path: '/trust', priority: 0.76, changeFrequency: 'monthly' },
@@ -114,13 +128,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const sitemapEntries: MetadataRoute.Sitemap = [];
-  const now = new Date();
-
   routes.forEach(route => {
     locales.forEach(lang => {
       sitemapEntries.push({
         url: `${baseUrl}/${lang}${route.path}`,
-        lastModified: now,
         changeFrequency: route.changeFrequency,
         priority: route.priority,
         alternates: {
@@ -135,7 +146,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   });
 
   BLOG_ARTICLES.forEach(article => {
-    const lastModified = safeDate(article.updatedAt, now);
+    const lastModified = safeDate(article.updatedAt);
     locales.forEach(lang => {
       sitemapEntries.push({
         url: `${baseUrl}/${lang}/blog/${article.slug}`,
@@ -162,7 +173,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!path || seenContentPaths.has(path)) return;
     seenContentPaths.add(path);
 
-    const lastModified = safeDate(item.updated_at || item.created_at, now);
+    const lastModified = safeDate(item.updated_at || item.created_at);
     locales.forEach(lang => {
       sitemapEntries.push({
         url: `${baseUrl}/${lang}${path}`,

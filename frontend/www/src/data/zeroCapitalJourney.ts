@@ -172,7 +172,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'emerald',
       },
       {
-        href: '/search?type=job&q=lowongan',
+        href: '/explore?type=job&q=lowongan',
         title: {
           id: 'Masuk ke kerja yang paling dekat',
           en: 'Enter the nearest work path',
@@ -279,7 +279,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'emerald',
       },
       {
-        href: '/search?type=freelancer&q=umkm',
+        href: '/explore?type=freelancer&q=umkm',
         title: {
           id: 'Lihat benchmark talent lain',
           en: 'See how other talent positions themselves',
@@ -296,7 +296,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'sky',
       },
       {
-        href: '/search',
+        href: '/explore',
         title: {
           id: 'Cari peluang yang serupa',
           en: 'Look for similar opportunities',
@@ -386,7 +386,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'sky',
       },
       {
-        href: '/search?type=product&q=supplier',
+        href: '/explore?type=product&q=supplier',
         title: {
           id: 'Cari alat atau barang pendukung',
           en: 'Find tools or support goods',
@@ -724,7 +724,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'amber',
       },
       {
-        href: '/search?type=product&q=supplier',
+        href: '/explore?type=product&q=supplier',
         title: {
           id: 'Perluas penawaran dan partner',
           en: 'Expand offers and partners',
@@ -790,7 +790,7 @@ export const ZERO_CAPITAL_OPPORTUNITIES: OpportunityLane[] = [
       id: 'Affiliate, reseller tanpa stok, makelar sehat, jasa titip, atau pencarian lead bisa jadi jembatan saat modal masih nol.',
       en: 'Affiliate work, inventory-free reselling, healthy brokering, concierge sourcing, or lead generation can bridge the gap while capital is still zero.',
     },
-    href: '/search?type=product&q=supplier',
+    href: '/explore?type=product&q=supplier',
     cta: {
       id: 'Lihat barang dan peluang tanpa stok',
       en: 'See stock-light opportunities',
@@ -807,7 +807,7 @@ export const ZERO_CAPITAL_OPPORTUNITIES: OpportunityLane[] = [
       id: 'Bantu UMKM, toko, creator, atau tim kecil lain untuk belajar sistem sebelum buka usaha sendiri.',
       en: 'Support MSMEs, shops, creators, or other small teams to learn the system before opening your own business.',
     },
-    href: '/search?type=job&q=lowongan',
+    href: '/explore?type=job&q=lowongan',
     cta: {
       id: 'Cari pintu masuk',
       en: 'Find an entry point',

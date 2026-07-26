@@ -220,6 +220,11 @@ export const TransactionDisputeResolveSchema = z
 export const TransactionReviewSchema = z
   .object({
     rating: z.number().int().min(1).max(5),
-    comment: optionalTrimmed,
+    comment: z.preprocess(value => {
+      if (value == null) return undefined;
+      const normalized = String(value).trim();
+      return normalized.length > 0 ? normalized : undefined;
+    }, z.string().max(1000).optional()),
+    attestationAccepted: z.literal(true),
   })
   .strip();

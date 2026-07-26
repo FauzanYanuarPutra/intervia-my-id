@@ -128,13 +128,17 @@ function formatCurrency(cents: number, currency = 'IDR'): string {
   const value = Number.isFinite(cents) ? cents / 100 : 0;
   const normalizedCurrency = currency.toUpperCase();
   const prefix = normalizedCurrency === 'IDR' ? 'Rp' : normalizedCurrency;
-  if (value >= 1_000_000_000) return `${prefix} ${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `${prefix} ${(value / 1_000_000).toFixed(1)}jt`;
+  if (value >= 1_000_000_000)
+    return `${prefix} ${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000)
+    return `${prefix} ${(value / 1_000_000).toFixed(1)}jt`;
   return `${prefix} ${Math.round(value).toLocaleString('id-ID')}`;
 }
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat('id-ID').format(Number.isFinite(value) ? value : 0);
+  return new Intl.NumberFormat('id-ID').format(
+    Number.isFinite(value) ? value : 0,
+  );
 }
 
 function formatDateTime(value: string): string {
@@ -178,8 +182,10 @@ function isUmkmItem(item: ListingAnalyticsItem): boolean {
 }
 
 function levelClass(level: RecommendationItem['level']): string {
-  if (level === 'high') return 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]';
-  if (level === 'medium') return 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]';
+  if (level === 'high')
+    return 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]';
+  if (level === 'medium')
+    return 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]';
   return 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]';
 }
 
@@ -201,14 +207,28 @@ export function UmkmOwnerDashboard() {
       setError('');
 
       try {
-        const response = await authFetch('/api/dashboard/umkm', { cache: 'no-store' });
-        const data = (await response.json().catch(() => null)) as DashboardPayload | null;
+        const response = await authFetch('/api/dashboard/umkm', {
+          cache: 'no-store',
+        });
+        const data = (await response
+          .json()
+          .catch(() => null)) as DashboardPayload | null;
         if (!response.ok || !data) {
-          throw new Error(isId ? 'Gagal memuat dashboard usaha' : 'Failed to load business dashboard');
+          throw new Error(
+            isId
+              ? 'Gagal memuat dashboard usaha'
+              : 'Failed to load business dashboard',
+          );
         }
         setPayload(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : isId ? 'Terjadi kesalahan' : 'Unexpected error');
+        setError(
+          err instanceof Error
+            ? err.message
+            : isId
+              ? 'Terjadi kesalahan'
+              : 'Unexpected error',
+        );
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -234,7 +254,7 @@ export function UmkmOwnerDashboard() {
     const items = payload?.listing_analytics || [];
     if (filter === 'all') return items;
     if (filter === 'umkm') return items.filter(isUmkmItem);
-    return items.filter((item) => item.content_type === filter);
+    return items.filter(item => item.content_type === filter);
   }, [payload?.listing_analytics, filter]);
 
   const bestListing = filteredListings[0];
@@ -242,24 +262,41 @@ export function UmkmOwnerDashboard() {
   const exportCsv = useCallback(() => {
     if (!payload) return;
 
-    const headers = [
-      'Listing ID',
-      'Title',
-      'Type',
-      'Sector',
-      'Status',
-      'Views',
-      'Clicks',
-      'Orders Total',
-      'Orders Completed',
-      'Conversion Rate (%)',
-      'Gross (Cents)',
-      'Revenue (Cents)',
-      'Repeat Customers',
-      'Updated At',
-    ];
+    const headers = isId
+      ? [
+          'ID Listing',
+          'Judul',
+          'Tipe',
+          'Sektor',
+          'Status',
+          'Tayangan',
+          'Klik',
+          'Total Order',
+          'Order Selesai',
+          'Rasio Konversi (%)',
+          'Gross (Cents)',
+          'Revenue (Cents)',
+          'Pelanggan Repeat',
+          'Diperbarui',
+        ]
+      : [
+          'Listing ID',
+          'Title',
+          'Type',
+          'Sector',
+          'Status',
+          'Views',
+          'Clicks',
+          'Orders Total',
+          'Orders Completed',
+          'Conversion Rate (%)',
+          'Gross (Cents)',
+          'Revenue (Cents)',
+          'Repeat Customers',
+          'Updated At',
+        ];
 
-    const rows = payload.listing_analytics.map((item) => [
+    const rows = payload.listing_analytics.map(item => [
       item.listing_id,
       item.title,
       item.content_type,
@@ -278,20 +315,38 @@ export function UmkmOwnerDashboard() {
 
     const summaryRows = [
       [],
-      ['Summary'],
-      ['Total Listings', payload.summary.total_listings],
-      ['Active Listings', payload.summary.active_listings],
-      ['Draft Listings', payload.summary.draft_listings],
-      ['Total Sales Transactions', payload.summary.total_sales_transactions],
-      ['Completed Sales Transactions', payload.summary.completed_sales_transactions],
+      [isId ? 'Ringkasan' : 'Summary'],
+      [
+        isId ? 'Total Listing' : 'Total Listings',
+        payload.summary.total_listings,
+      ],
+      [
+        isId ? 'Listing aktif' : 'Active listings',
+        payload.summary.active_listings,
+      ],
+      [
+        isId ? 'Draft Listing' : 'Draft Listings',
+        payload.summary.draft_listings,
+      ],
+      [
+        isId ? 'Total Transaksi Penjualan' : 'Total Sales Transactions',
+        payload.summary.total_sales_transactions,
+      ],
+      [
+        isId ? 'Transaksi Penjualan Selesai' : 'Completed Sales Transactions',
+        payload.summary.completed_sales_transactions,
+      ],
       ['Gross Sales (Cents)', payload.summary.gross_sales_cents],
       ['Settled Sales (Cents)', payload.summary.settled_sales_cents],
-      ['Conversion Rate (%)', payload.summary.conversion_rate],
-      ['Generated At', payload.generated_at],
+      [
+        isId ? 'Rasio Konversi (%)' : 'Conversion Rate (%)',
+        payload.summary.conversion_rate,
+      ],
+      [isId ? 'Dibuat Pada' : 'Generated At', payload.generated_at],
     ];
 
     const csv = [headers, ...rows, ...summaryRows]
-      .map((row) => row.map((cell) => csvEscape(cell as string | number)).join(','))
+      .map(row => row.map(cell => csvEscape(cell as string | number)).join(','))
       .join('\n');
 
     const blob = new Blob([`\uFEFF${csv}`], {
@@ -305,13 +360,14 @@ export function UmkmOwnerDashboard() {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  }, [payload]);
+  }, [isId, payload]);
 
   const sourceWarnings = useMemo(() => {
     if (!payload?.data_health) return [];
     const warnings: string[] = [];
     if (!payload.data_health.listing_source_ok) warnings.push('listing');
-    if (!payload.data_health.transaction_source_ok) warnings.push('transaction');
+    if (!payload.data_health.transaction_source_ok)
+      warnings.push('transaction');
     if (!payload.data_health.inbox_source_ok) warnings.push('chat inbox');
     if (!payload.data_health.support_source_ok) warnings.push('support');
     return warnings;
@@ -323,7 +379,9 @@ export function UmkmOwnerDashboard() {
         <div className="ui-panel rounded-3xl p-6 text-sm text-[color:var(--app-text-soft)]">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-[color:var(--app-accent)]" />
-            {isId ? 'Memuat dashboard usaha...' : 'Loading business dashboard...'}
+            {isId
+              ? 'Memuat dashboard usaha...'
+              : 'Loading business dashboard...'}
           </span>
         </div>
       </div>
@@ -335,9 +393,14 @@ export function UmkmOwnerDashboard() {
       <div className="page-shell py-10">
         <div className="ui-panel rounded-3xl p-6">
           <p className="text-sm text-[color:var(--app-text-soft)]">
-            {isId ? 'Silakan login untuk melihat dashboard usaha.' : 'Please login to view your business dashboard.'}
+            {isId
+              ? 'Silakan login untuk melihat dashboard usaha.'
+              : 'Please login to view your business dashboard.'}
           </p>
-          <Link href="/login" className="ui-button-primary mt-4 inline-flex items-center px-4 text-sm">
+          <Link
+            href="/login"
+            className="ui-button-primary mt-4 inline-flex items-center px-4 text-sm"
+          >
             {isId ? 'Masuk' : 'Login'}
           </Link>
         </div>
@@ -349,7 +412,8 @@ export function UmkmOwnerDashboard() {
     return (
       <div className="page-shell py-10">
         <div className="ui-panel rounded-3xl p-6 text-sm text-[color:var(--app-accent)]">
-          {error || (isId ? 'Dashboard belum tersedia.' : 'Dashboard is unavailable.')}
+          {error ||
+            (isId ? 'Dashboard belum tersedia.' : 'Dashboard is unavailable.')}
         </div>
       </div>
     );
@@ -364,7 +428,9 @@ export function UmkmOwnerDashboard() {
               {isId ? 'Kelola usaha' : 'Business control'}
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
-              {isId ? 'Kontrol listing, order, dan analytics dalam satu panel' : 'One panel for listings, orders, and analytics'}
+              {isId
+                ? 'Kontrol listing, order, dan analytics dalam satu panel'
+                : 'One panel for listings, orders, and analytics'}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
               {isId
@@ -373,7 +439,7 @@ export function UmkmOwnerDashboard() {
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-1 font-semibold text-[color:var(--app-accent)]">
-                {isId ? 'Global analytics' : 'Global analytics'}
+                {isId ? 'Analitik global' : 'Global analytics'}
               </span>
               <span className="rounded-full border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-1 font-semibold text-[color:var(--app-accent)]">
                 {isId ? 'Per listing' : 'Per listing'}
@@ -384,11 +450,17 @@ export function UmkmOwnerDashboard() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/create?mode=quick" className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm">
+            <Link
+              href="/create?mode=quick"
+              className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm"
+            >
               <Sparkles className="h-4 w-4" />
               {isId ? 'Tambah listing' : 'Add listing'}
             </Link>
-            <Link href="/my-listings" className="ui-button-secondary inline-flex items-center gap-2 px-4 text-sm">
+            <Link
+              href="/my-listings"
+              className="ui-button-secondary inline-flex items-center gap-2 px-4 text-sm"
+            >
               <ShoppingBag className="h-4 w-4" />
               {isId ? 'Kelola Listing' : 'Manage Listings'}
             </Link>
@@ -397,8 +469,10 @@ export function UmkmOwnerDashboard() {
               onClick={() => void loadDashboard(true)}
               className="ui-shell-button px-4 text-sm font-semibold"
             >
-              <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {isId ? 'Refresh' : 'Refresh'}
+              <RefreshCcw
+                className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+              />
+              {isId ? 'Muat ulang' : 'Refresh'}
             </button>
             <button
               type="button"
@@ -406,7 +480,7 @@ export function UmkmOwnerDashboard() {
               className="ui-shell-button px-4 text-sm font-semibold"
             >
               <Download className="h-4 w-4" />
-              {isId ? 'Export CSV' : 'Export CSV'}
+              {isId ? 'Ekspor CSV' : 'Export CSV'}
             </button>
           </div>
         </div>
@@ -434,45 +508,56 @@ export function UmkmOwnerDashboard() {
             icon: LayoutDashboard,
           },
           {
-            label: isId ? 'Sales selesai' : 'Completed sales',
+            label: isId ? 'Penjualan selesai' : 'Completed sales',
             value: formatNumber(summary.completed_sales_transactions),
             note: `${growthDiff(summary.weekly_sales_transactions, summary.previous_week_sales_transactions)} ${isId ? 'vs minggu lalu' : 'vs last week'}`,
             icon: BriefcaseBusiness,
           },
           {
-            label: isId ? 'Revenue settled' : 'Settled revenue',
+            label: isId ? 'Pendapatan cair' : 'Settled revenue',
             value: formatCurrency(summary.settled_sales_cents),
-            note: `${formatCurrency(summary.avg_order_cents)} ${isId ? 'avg order' : 'avg order'}`,
+            note: `${formatCurrency(summary.avg_order_cents)} ${
+              isId ? 'rata-rata order' : 'avg order'
+            }`,
             icon: BadgeDollarSign,
           },
           {
-            label: isId ? 'Conversion global' : 'Global conversion',
+            label: isId ? 'Konversi global' : 'Global conversion',
             value: `${summary.conversion_rate}%`,
             note: `${summary.unique_customers} ${isId ? 'pelanggan unik' : 'unique customers'}`,
             icon: BarChart3,
           },
           {
-            label: isId ? 'Unread chat' : 'Unread chat',
+            label: isId ? 'Chat belum dibaca' : 'Unread chat',
             value: formatNumber(summary.unread_messages),
             note: `${summary.active_sales_transactions} ${isId ? 'order aktif' : 'active orders'}`,
             icon: MessageCircle,
           },
           {
-            label: isId ? 'Open support' : 'Open support',
+            label: isId ? 'Support terbuka' : 'Open support',
             value: formatNumber(summary.open_support_tickets),
             note: `${summary.disputed_sales_transactions} ${isId ? 'dispute' : 'disputes'}`,
             icon: ShieldAlert,
           },
-        ].map((item) => {
+        ].map(item => {
           const Icon = item.icon;
           return (
-            <article key={item.label} className="ui-panel ui-card-hover rounded-3xl p-5">
+            <article
+              key={item.label}
+              className="ui-panel ui-card-hover rounded-3xl p-5"
+            >
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,_var(--app-accent),_var(--app-accent-strong))] text-[color:var(--app-accent)]">
                 <Icon className="h-5 w-5" />
               </span>
-              <p className="mt-4 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">{item.value}</p>
-              <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{item.label}</p>
-              <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">{item.note}</p>
+              <p className="mt-4 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
+                {item.value}
+              </p>
+              <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+                {item.label}
+              </p>
+              <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                {item.note}
+              </p>
             </article>
           );
         })}
@@ -486,7 +571,9 @@ export function UmkmOwnerDashboard() {
                 {isId ? 'Analytics Sektor' : 'Sector analytics'}
               </p>
               <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
-                {isId ? 'Sektor usaha paling kuat' : 'Strongest business sectors'}
+                {isId
+                  ? 'Sektor usaha paling kuat'
+                  : 'Strongest business sectors'}
               </h2>
             </div>
             <span className="rounded-full border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-1 text-xs font-semibold bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
@@ -500,25 +587,36 @@ export function UmkmOwnerDashboard() {
                 {isId ? 'Belum ada data sektor.' : 'No sector data yet.'}
               </p>
             ) : (
-              payload.sector_analytics.slice(0, 6).map((sector) => (
-                <div key={sector.sector} className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
+              payload.sector_analytics.slice(0, 6).map(sector => (
+                <div
+                  key={sector.sector}
+                  className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-[color:var(--app-text)]">{sector.sector}</p>
+                      <p className="text-sm font-semibold text-[color:var(--app-text)]">
+                        {sector.sector}
+                      </p>
                       <p className="text-xs text-[color:var(--app-text-soft)]">
-                        {sector.listings} {isId ? 'listing' : 'listings'} - {sector.orders} {isId ? 'order' : 'orders'}
+                        {sector.listings} {isId ? 'listing' : 'listings'} -{' '}
+                        {sector.orders} {isId ? 'order' : 'orders'}
                       </p>
                     </div>
-                    <p className="text-sm font-semibold text-[color:var(--app-text)]">{formatCurrency(sector.revenue_cents)}</p>
+                    <p className="text-sm font-semibold text-[color:var(--app-text)]">
+                      {formatCurrency(sector.revenue_cents)}
+                    </p>
                   </div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                     <div
                       className="h-full rounded-full bg-gradient-to-r bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
-                      style={{ width: `${Math.max(6, Math.min(100, sector.conversion_rate))}%` }}
+                      style={{
+                        width: `${Math.max(6, Math.min(100, sector.conversion_rate))}%`,
+                      }}
                     />
                   </div>
                   <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
-                    {isId ? 'Conversion' : 'Conversion'}: {sector.conversion_rate}%
+                    {isId ? 'Konversi' : 'Conversion'}: {sector.conversion_rate}
+                    %
                   </p>
                 </div>
               ))
@@ -528,7 +626,7 @@ export function UmkmOwnerDashboard() {
 
         <article className="ui-panel rounded-3xl p-5">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-            {isId ? 'Status Order' : 'Order status'}
+            {isId ? 'Status order' : 'Order status'}
           </p>
           <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
             {isId ? 'Distribusi status transaksi' : 'Transaction status mix'}
@@ -540,7 +638,7 @@ export function UmkmOwnerDashboard() {
                 {isId ? 'Belum ada transaksi.' : 'No transactions yet.'}
               </p>
             ) : (
-              payload.transaction_status_breakdown.map((item) => (
+              payload.transaction_status_breakdown.map(item => (
                 <span
                   key={item.status}
                   className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-1 text-xs font-semibold bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
@@ -556,7 +654,7 @@ export function UmkmOwnerDashboard() {
 
           <div className="mt-5 rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
             <p className="text-xs font-semibold text-[color:var(--app-text-soft)]">
-              {isId ? 'Listing performa tertinggi' : 'Top performing listing'}
+              {isId ? 'Listing terbaik' : 'Top performing listing'}
             </p>
             <p className="mt-1 text-base font-semibold text-[color:var(--app-text)]">
               {bestListing?.title || (isId ? 'Belum ada data' : 'No data yet')}
@@ -571,15 +669,24 @@ export function UmkmOwnerDashboard() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/transactions" className="ui-shell-button px-3 text-xs font-semibold">
+            <Link
+              href="/transactions"
+              className="ui-shell-button px-3 text-xs font-semibold"
+            >
               <BriefcaseBusiness className="h-3.5 w-3.5" />
               {isId ? 'Transaksi' : 'Open transactions'}
             </Link>
-            <Link href="/chat" className="ui-shell-button px-3 text-xs font-semibold">
+            <Link
+              href="/chat"
+              className="ui-shell-button px-3 text-xs font-semibold"
+            >
               <BellRing className="h-3.5 w-3.5" />
               {isId ? 'Buka chat' : 'Open chat'}
             </Link>
-            <Link href={buildUsahaPath('home')} className="ui-shell-button px-3 text-xs font-semibold">
+            <Link
+              href={buildUsahaPath('home')}
+              className="ui-shell-button px-3 text-xs font-semibold"
+            >
               <LayoutDashboard className="h-3.5 w-3.5" />
               {isId ? 'Kelola usaha' : 'Manage business'}
             </Link>
@@ -591,28 +698,33 @@ export function UmkmOwnerDashboard() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-              {isId ? 'Analytics per Listing' : 'Per-listing analytics'}
+              {isId ? 'Analitik per listing' : 'Per-listing analytics'}
             </p>
             <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
-              {isId ? 'Usaha, jasa, produk, dan project kamu' : 'Your businesses, services, products, and projects'}
+              {isId
+                ? 'Usaha, jasa, produk, dan project kamu'
+                : 'Your businesses, services, products, and projects'}
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            {([
-              ['all', isId ? 'Semua' : 'All'],
-              ['umkm', isId ? 'Usaha' : 'Business'],
-              ['service', isId ? 'Jasa' : 'Service'],
-              ['product', isId ? 'Produk' : 'Product'],
-              ['project', isId ? 'Project' : 'Project'],
-            ] as Array<[ListingFilter, string]>).map(([value, label]) => (
+            {(
+              [
+                ['all', isId ? 'Semua' : 'All'],
+                ['umkm', isId ? 'Usaha' : 'Business'],
+                ['service', isId ? 'Jasa' : 'Service'],
+                ['product', isId ? 'Produk' : 'Product'],
+                ['project', isId ? 'Proyek' : 'Project'],
+              ] as Array<[ListingFilter, string]>
+            ).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setFilter(value)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filter === value
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  filter === value
                     ? 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]'
                     : 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]'
-                  }`}
+                }`}
               >
                 {label}
               </button>
@@ -625,36 +737,54 @@ export function UmkmOwnerDashboard() {
             <thead>
               <tr className="border-b text-[color:var(--app-accent)] text-xs uppercase tracking-wide border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
                 <th className="px-3 py-2">{isId ? 'Listing' : 'Listing'}</th>
-                <th className="px-3 py-2">{isId ? 'Traffic' : 'Traffic'}</th>
+                <th className="px-3 py-2">{isId ? 'Performa' : 'Traffic'}</th>
                 <th className="px-3 py-2">{isId ? 'Order' : 'Orders'}</th>
-                <th className="px-3 py-2">{isId ? 'Conversion' : 'Conversion'}</th>
-                <th className="px-3 py-2">{isId ? 'Revenue' : 'Revenue'}</th>
+                <th className="px-3 py-2">
+                  {isId ? 'Konversi' : 'Conversion'}
+                </th>
+                <th className="px-3 py-2">{isId ? 'Pendapatan' : 'Revenue'}</th>
                 <th className="px-3 py-2">{isId ? 'Aksi' : 'Action'}</th>
               </tr>
             </thead>
             <tbody>
               {filteredListings.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-sm text-[color:var(--app-text-soft)]">
-                    {isId ? 'Belum ada listing untuk filter ini.' : 'No listings found for this filter.'}
+                  <td
+                    colSpan={6}
+                    className="px-3 py-4 text-sm text-[color:var(--app-text-soft)]"
+                  >
+                    {isId
+                      ? 'Belum ada listing untuk filter ini.'
+                      : 'No listings found for this filter.'}
                   </td>
                 </tr>
               ) : (
-                filteredListings.slice(0, 20).map((item) => (
-                  <tr key={item.listing_id} className="border-b border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
+                filteredListings.slice(0, 20).map(item => (
+                  <tr
+                    key={item.listing_id}
+                    className="border-b border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
+                  >
                     <td className="px-3 py-3 align-top">
-                      <p className="font-semibold text-[color:var(--app-text)]">{item.title}</p>
+                      <p className="font-semibold text-[color:var(--app-text)]">
+                        {item.title}
+                      </p>
                       <p className="text-xs text-[color:var(--app-text-soft)]">
                         {item.content_type} - {item.status} - {item.sector}
                       </p>
                     </td>
                     <td className="px-3 py-3 align-top text-xs text-[color:var(--app-text-soft)]">
-                      <p>{formatNumber(item.views)} views</p>
-                      <p>{formatNumber(item.clicks)} clicks</p>
+                      <p>
+                        {formatNumber(item.views)} {isId ? 'tayangan' : 'views'}
+                      </p>
+                      <p>
+                        {formatNumber(item.clicks)} {isId ? 'klik' : 'clicks'}
+                      </p>
                     </td>
                     <td className="px-3 py-3 align-top text-xs text-[color:var(--app-text-soft)]">
                       <p>{item.orders_total} total</p>
-                      <p>{item.orders_completed} completed</p>
+                      <p>
+                        {item.orders_completed} {isId ? 'selesai' : 'completed'}
+                      </p>
                     </td>
                     <td className="px-3 py-3 align-top">
                       <span className="rounded-full border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-2 py-1 text-xs font-semibold text-[color:var(--app-accent)]">
@@ -666,10 +796,16 @@ export function UmkmOwnerDashboard() {
                     </td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex flex-wrap gap-1.5">
-                        <Link href={`/content/${item.listing_id}`} className="ui-shell-button px-2.5 text-xs font-semibold">
+                        <Link
+                          href={`/content/${item.listing_id}`}
+                          className="ui-shell-button px-2.5 text-xs font-semibold"
+                        >
                           {isId ? 'Lihat' : 'View'}
                         </Link>
-                        <Link href={`/create?draft=${item.listing_id}`} className="ui-shell-button px-2.5 text-xs font-semibold">
+                        <Link
+                          href={`/create?draft=${item.listing_id}`}
+                          className="ui-shell-button px-2.5 text-xs font-semibold"
+                        >
                           {isId ? 'Edit' : 'Edit'}
                         </Link>
                       </div>
@@ -684,29 +820,50 @@ export function UmkmOwnerDashboard() {
         <div className="mt-4 grid grid-cols-1 gap-3 lg:hidden">
           {filteredListings.length === 0 ? (
             <div className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 text-sm text-[color:var(--app-text-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-              {isId ? 'Belum ada listing untuk filter ini.' : 'No listings found for this filter.'}
+              {isId
+                ? 'Belum ada listing untuk filter ini.'
+                : 'No listings found for this filter.'}
             </div>
           ) : (
-            filteredListings.slice(0, 8).map((item) => (
-              <article key={item.listing_id} className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-                <p className="text-sm font-semibold text-[color:var(--app-text)]">{item.title}</p>
+            filteredListings.slice(0, 8).map(item => (
+              <article
+                key={item.listing_id}
+                className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
+              >
+                <p className="text-sm font-semibold text-[color:var(--app-text)]">
+                  {item.title}
+                </p>
                 <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
                   {item.content_type} - {item.status}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[color:var(--app-text-soft)]">
-                  <p>{formatNumber(item.views)} views</p>
-                  <p>{formatNumber(item.clicks)} clicks</p>
-                  <p>{item.orders_total} orders</p>
-                  <p>{item.conversion_rate}% conversion</p>
+                  <p>
+                    {formatNumber(item.views)} {isId ? 'tayangan' : 'views'}
+                  </p>
+                  <p>
+                    {formatNumber(item.clicks)} {isId ? 'klik' : 'clicks'}
+                  </p>
+                  <p>
+                    {item.orders_total} {isId ? 'order' : 'orders'}
+                  </p>
+                  <p>
+                    {item.conversion_rate}% {isId ? 'konversi' : 'conversion'}
+                  </p>
                 </div>
                 <p className="mt-2 text-sm font-semibold text-[color:var(--app-text)]">
                   {formatCurrency(item.revenue_cents, item.currency)}
                 </p>
                 <div className="mt-3 flex gap-2">
-                  <Link href={`/content/${item.listing_id}`} className="ui-shell-button px-3 text-xs font-semibold">
+                  <Link
+                    href={`/content/${item.listing_id}`}
+                    className="ui-shell-button px-3 text-xs font-semibold"
+                  >
                     {isId ? 'Lihat' : 'View'}
                   </Link>
-                  <Link href={`/create?draft=${item.listing_id}`} className="ui-shell-button px-3 text-xs font-semibold">
+                  <Link
+                    href={`/create?draft=${item.listing_id}`}
+                    className="ui-shell-button px-3 text-xs font-semibold"
+                  >
                     {isId ? 'Edit' : 'Edit'}
                   </Link>
                 </div>
@@ -726,13 +883,15 @@ export function UmkmOwnerDashboard() {
           </h2>
 
           <div className="mt-4 space-y-3">
-            {payload.recommendations.map((item) => (
+            {payload.recommendations.map(item => (
               <Link
                 key={item.id}
                 href={item.href}
                 className={`block rounded-2xl border p-4 transition hover:shadow-sm ${levelClass(item.level)}`}
               >
-                <p className="text-xs font-bold uppercase tracking-wide">{item.level}</p>
+                <p className="text-xs font-bold uppercase tracking-wide">
+                  {item.level}
+                </p>
                 <p className="mt-1 text-sm font-semibold">{item.title}</p>
                 <p className="mt-1 text-xs">{item.description}</p>
               </Link>
@@ -745,24 +904,34 @@ export function UmkmOwnerDashboard() {
             {isId ? 'Aktivitas Terbaru' : 'Recent activities'}
           </p>
           <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
-            {isId ? 'Gerakan terbaru usaha kamu' : 'Latest movement across your businesses'}
+            {isId
+              ? 'Gerakan terbaru usaha kamu'
+              : 'Latest movement across your businesses'}
           </h2>
 
           <div className="mt-4 space-y-3">
             {payload.recent_activities.length === 0 ? (
               <p className="text-sm text-[color:var(--app-text-soft)]">
-                {isId ? 'Belum ada aktivitas terbaru.' : 'No recent activity yet.'}
+                {isId
+                  ? 'Belum ada aktivitas terbaru.'
+                  : 'No recent activity yet.'}
               </p>
             ) : (
-              payload.recent_activities.map((item) => (
+              payload.recent_activities.map(item => (
                 <Link
                   key={item.id}
                   href={item.href}
                   className="block rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 transition bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
                 >
-                  <p className="text-sm font-semibold text-[color:var(--app-text)]">{item.title}</p>
-                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">{item.description}</p>
-                  <p className="mt-2 text-[11px] text-[color:var(--app-text-soft)]">{formatDateTime(item.at)}</p>
+                  <p className="text-sm font-semibold text-[color:var(--app-text)]">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                    {item.description}
+                  </p>
+                  <p className="mt-2 text-[11px] text-[color:var(--app-text-soft)]">
+                    {formatDateTime(item.at)}
+                  </p>
                 </Link>
               ))
             )}
@@ -773,7 +942,8 @@ export function UmkmOwnerDashboard() {
       <section className="ui-panel rounded-2xl p-4 text-xs text-[color:var(--app-text-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p>
-            {isId ? 'Sinkron terakhir' : 'Last sync'}: {formatDateTime(payload.generated_at)}
+            {isId ? 'Sinkron terakhir' : 'Last sync'}:{' '}
+            {formatDateTime(payload.generated_at)}
           </p>
           {sourceWarnings.length > 0 ? (
             <p className="bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">

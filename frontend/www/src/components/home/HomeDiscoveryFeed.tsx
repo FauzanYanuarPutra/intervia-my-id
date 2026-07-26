@@ -1,7 +1,8 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@/i18n/navigation';
+import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { MarketplaceDiscoveryCard } from '@/components/discovery/MarketplaceDiscoveryCard';
 import { HorizontalRail } from '@/components/home/minimal/HorizontalRail';
 import { type User, useAuth } from '@/context/AuthContext';
@@ -21,6 +22,7 @@ import { resolveSupplierListingBadges } from '@/lib/content/supplierInfo';
 import {
   getListingSideContextLabel,
   getListingSideLabel,
+  getListingValueFallback,
   resolveListingSide,
   type ListingSide,
 } from '@/lib/content/listingSide';
@@ -32,7 +34,6 @@ import { cn } from '@/lib/utils';
 import {
   RefreshCcw,
   Sparkles,
-  ArrowRight,
   UserRound,
   Store,
   Handshake,
@@ -116,19 +117,19 @@ const FILTER_OPTIONS: Array<{
   labelId: string;
   labelEn: string;
 }> = [
-    { value: 'all', labelId: 'Semua', labelEn: 'All' },
-    { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
-    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
-    { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
-    { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
-    {
-      value: 'business_transfer',
-      labelId: 'Oper Usaha',
-      labelEn: 'Business Transfer',
-    },
-    { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
-    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
-  ];
+  { value: 'all', labelId: 'Semua', labelEn: 'All' },
+  { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
+  { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
+  { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
+  { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
+  {
+    value: 'business_transfer',
+    labelId: 'Oper Usaha',
+    labelEn: 'Business Transfer',
+  },
+  { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
+  { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
+];
 
 function isDiscoveryFilter(value: string | null): value is DiscoveryFilter {
   return [
@@ -257,13 +258,23 @@ function resolveSideContextLabel(
   }
 
   if (typeKey === 'tool_rental') {
-    return locale === 'id' ? 'Sewa alat usaha' : 'Business tool rental';
+    return locale === 'id'
+      ? side === 'demand'
+        ? 'Cari sewa alat usaha'
+        : 'Sewa alat usaha'
+      : side === 'demand'
+        ? 'Looking for tool rental'
+        : 'Business tool rental';
   }
 
   if (typeKey === 'business_transfer') {
     return locale === 'id'
-      ? 'Usaha berjalan siap dialihkan'
-      : 'Running business for transfer';
+      ? side === 'demand'
+        ? 'Cari peluang usaha'
+        : 'Usaha berjalan siap dialihkan'
+      : side === 'demand'
+        ? 'Looking for business opportunities'
+        : 'Running business for transfer';
   }
 
   if (typeKey === 'property') {
@@ -288,8 +299,12 @@ function resolveSideContextLabel(
 
   if (typeKey === 'service') {
     return locale === 'id'
-      ? 'Jasa operasional usaha'
-      : 'Business operations service';
+      ? side === 'demand'
+        ? 'Cari jasa operasional'
+        : 'Jasa operasional usaha'
+      : side === 'demand'
+        ? 'Looking for business services'
+        : 'Business operations service';
   }
 
   if (typeKey === 'umkm') {
@@ -379,22 +394,38 @@ function mapContentItem(
     asString(meta.city) ||
     asString(meta.region) ||
     'Indonesia';
+  const side = resolveListingSide({
+    type: item.content_type || item.category,
+    metadata: meta,
+    title: item.title,
+    summary: item.summary,
+  });
 
   const price = formatIDRFromCents(item.price_cents);
   const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
   const fallbackPriceLabel =
-    asString(meta.price_label) ||
-    asString(meta.salary_range) ||
-    asString(meta.budget_range) ||
-    asString(meta.rate_label);
+    side === 'demand'
+      ? asString(meta.budget_label) ||
+        asString(meta.budget_range) ||
+        asString(meta.budget) ||
+        asString(meta.capital_range)
+      : asString(meta.price_label) ||
+        asString(meta.salary_range) ||
+        asString(meta.rate_label);
   const priceLabel =
     price !== '-'
-      ? formatPriceWithUnit(price, priceUnitLabel)
+      ? side === 'demand'
+        ? price
+        : formatPriceWithUnit(price, priceUnitLabel)
       : fallbackPriceLabel
-        ? formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
-        : locale === 'id'
-          ? 'Negosiasi'
-          : 'Negotiable';
+        ? side === 'demand'
+          ? fallbackPriceLabel
+          : formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
+        : getListingValueFallback(
+            side,
+            locale,
+            item.content_type || item.category,
+          );
 
   const typeToken = [
     item.content_type,
@@ -407,13 +438,6 @@ function mapContentItem(
 
   const typeKey = resolveCardType(typeToken);
   const typeLabel = displayTypeLabel(typeKey, locale);
-
-  const side = resolveListingSide({
-    type: item.content_type || item.category,
-    metadata: meta,
-    title: item.title,
-    summary: item.summary,
-  });
 
   const sideLabel = getListingSideLabel(side, locale);
   const sideContextLabel = resolveSideContextLabel(side, typeKey, locale);
@@ -568,10 +592,10 @@ function resolveBrowseHref(
   filter: DiscoveryFilter,
   mode: DiscoverySort,
 ): string {
-  if (filter === 'all') return '/search';
+  if (filter === 'all') return '/explore';
   return mode === 'newest'
-    ? `/search?type=${filter}&sort=newest`
-    : `/search?type=${filter}`;
+    ? `/explore?type=${filter}&sort=newest`
+    : `/explore?type=${filter}`;
 }
 
 function DiscoveryCardRail({
@@ -680,8 +704,6 @@ function RailSection({
   emptyLabel,
   icon,
 }: RailSectionProps) {
-  const seeAll = locale === 'id' ? 'Lihat semua' : 'See all';
-
   return (
     <section className="flex h-full w-full min-w-0 max-w-full flex-col rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_92%,white_8%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_92%,var(--app-surface-muted)))] p-3.5 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.18)] ring-1 ring-white/55 dark:border-[color:color-mix(in_srgb,var(--app-border)_90%,transparent)] dark:ring-white/5 sm:p-4">
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
@@ -703,13 +725,13 @@ function RailSection({
           ) : null}
         </div>
 
-        <Link
+        <CompactSeeAllLink
           href={href}
-          className="ui-action-cue ui-pressable inline-flex items-center gap-1"
-        >
-          {seeAll}
-          <ArrowRight className="h-3 w-3" />
-        </Link>
+          isId={locale === 'id'}
+          ariaLabel={
+            locale === 'id' ? `Lihat semua ${title}` : `View all ${title}`
+          }
+        />
       </div>
 
       <div className="mt-3 flex-1">
@@ -771,9 +793,9 @@ export function HomeDiscoveryFeed({
       if (!response.ok) {
         throw new Error(
           (payload as { error?: string }).error ||
-          (isId
-            ? 'Konten belum bisa dimuat.'
-            : 'Content is unavailable right now.'),
+            (isId
+              ? 'Konten belum bisa dimuat.'
+              : 'Content is unavailable right now.'),
         );
       }
 
@@ -934,9 +956,9 @@ export function HomeDiscoveryFeed({
         ? allCards
         : filter === 'service'
           ? dedupeCards([
-            ...(cardsByFilter.service || []),
-            ...(cardsByFilter.tool_rental || []),
-          ])
+              ...(cardsByFilter.service || []),
+              ...(cardsByFilter.tool_rental || []),
+            ])
           : dedupeCards(cardsByFilter[filter] || fallback);
 
     return sortCards(source, 'top').slice(0, 12);
@@ -957,7 +979,6 @@ export function HomeDiscoveryFeed({
       : isId
         ? 'Pilih jalur. Hubungi yang siap.'
         : 'Users do not need to see everything first. Pick a lane, then continue to listings that are ready to contact.',
-    seeAll: isId ? 'Lihat semua' : 'See all',
     refresh: isId ? 'Coba lagi' : 'Retry',
     empty: isId ? 'Belum ada yang pas.' : 'Nothing fits yet.',
     products: isId ? 'Supplier' : 'Suppliers',
@@ -996,15 +1017,15 @@ export function HomeDiscoveryFeed({
 
   const growthLinks = isId
     ? [
-      { href: '/community', label: 'Komunitas' },
-      { href: '/learn', label: 'Harga sehat' },
-      { href: '/search?type=product&q=distributor', label: 'Distributor' },
-    ]
+        { href: '/community', label: 'Komunitas' },
+        { href: '/learn', label: 'Harga sehat' },
+        { href: '/explore?type=product&q=distributor', label: 'Distributor' },
+      ]
     : [
-      { href: '/community', label: 'Community' },
-      { href: '/learn', label: 'Healthy pricing' },
-      { href: '/search?type=product&q=distributor', label: 'Distributors' },
-    ];
+        { href: '/community', label: 'Community' },
+        { href: '/learn', label: 'Healthy pricing' },
+        { href: '/explore?type=product&q=distributor', label: 'Distributors' },
+      ];
 
   const browseHref = resolveBrowseHref(filter, 'newest');
   const activeLoading = loading;
@@ -1034,13 +1055,15 @@ export function HomeDiscoveryFeed({
                 </p>
               </div>
 
-              <Link
+              <CompactSeeAllLink
                 href={browseHref}
-                className="ui-action-cue ui-pressable inline-flex items-center gap-1"
-              >
-                {text.seeAll}
-                <ArrowRight className="h-3 w-3" />
-              </Link>
+                isId={isId}
+                ariaLabel={
+                  isId
+                    ? 'Lihat semua pilihan marketplace'
+                    : 'View all marketplace picks'
+                }
+              />
             </div>
           )}
           <div
@@ -1127,7 +1150,7 @@ export function HomeDiscoveryFeed({
             <RailSection
               title={text.products}
               description={text.productsDescription}
-              href="/search?type=product"
+              href="/explore?type=product"
               items={topProducts}
               locale={localeCode}
               loading={loading}
@@ -1138,7 +1161,7 @@ export function HomeDiscoveryFeed({
             <RailSection
               title={text.properties}
               description={text.propertiesDescription}
-              href="/search?type=property&q=lokasi%20jualan"
+              href="/explore?type=property&q=lokasi%20jualan"
               items={topProperties}
               locale={localeCode}
               loading={loading}
@@ -1149,7 +1172,7 @@ export function HomeDiscoveryFeed({
             <RailSection
               title={text.operations}
               description={text.operationsDescription}
-              href="/search?type=service"
+              href="/explore?type=service"
               items={topOperations}
               locale={localeCode}
               loading={loading}
@@ -1160,7 +1183,7 @@ export function HomeDiscoveryFeed({
             <RailSection
               title={text.businessTransfers}
               description={text.businessTransfersDescription}
-              href="/search?type=business_transfer"
+              href="/explore?type=business_transfer"
               items={topBusinessTransfers}
               locale={localeCode}
               loading={loading}
@@ -1171,7 +1194,7 @@ export function HomeDiscoveryFeed({
             <RailSection
               title={text.freelancers}
               description={text.freelancersDescription}
-              href="/search?type=freelancer"
+              href="/explore?type=freelancer"
               items={topFreelancers}
               locale={localeCode}
               loading={loading}

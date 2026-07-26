@@ -21,6 +21,7 @@ export default function ReviewPage({
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [attestationAccepted, setAttestationAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [formMessage, setFormMessage] = useState<{
@@ -39,10 +40,18 @@ export default function ReviewPage({
     if (rating === 0) {
       setFormMessage({
         variant: 'error',
+        text: locale === 'id' ? 'Pilih nilai dulu.' : 'Please select a rating.',
+      });
+      return;
+    }
+
+    if (!attestationAccepted) {
+      setFormMessage({
+        variant: 'error',
         text:
           locale === 'id'
-            ? 'Pilih nilai dulu.'
-            : 'Please select a rating.',
+            ? 'Centang pernyataan pengalaman nyata dulu.'
+            : 'Please confirm this review is based on a real experience.',
       });
       return;
     }
@@ -59,6 +68,7 @@ export default function ReviewPage({
         body: JSON.stringify({
           rating,
           comment: comment.trim() || undefined,
+          attestationAccepted,
         }),
       });
 
@@ -101,13 +111,20 @@ export default function ReviewPage({
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
       <div className="mx-auto w-full max-w-2xl px-0 py-8 sm:px-6 lg:px-8">
         <div className="rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:var(--app-surface-strong)] p-6 dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-3xl sm:border-x sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--app-accent)]">
+            {locale === 'id'
+              ? 'Transaksi terverifikasi'
+              : 'Verified transaction'}
+          </p>
           <h1 className="text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
-            {locale === 'id' ? 'Beri ulasan' : 'Leave a review'}
+            {locale === 'id'
+              ? 'Nilai pengalaman transaksi'
+              : 'Review this transaction'}
           </h1>
           <p className="mt-2 text-sm text-[color:var(--app-text)]">
             {locale === 'id'
-              ? 'Tulis singkat saja. Detail lain tidak perlu.'
-              : 'Keep it short. Extra detail is not necessary.'}
+              ? 'Bantu pengguna lain memahami kualitas produk, jasa, komunikasi, dan ketepatan prosesnya.'
+              : 'Help others understand the product, service, communication, and fulfillment quality.'}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
@@ -122,6 +139,31 @@ export default function ReviewPage({
                 {formMessage.text}
               </div>
             ) : null}
+
+            <div className="grid gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-sm text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+              <p className="font-semibold">
+                {locale === 'id'
+                  ? 'Ulasan ini akan tampil sebagai ulasan transaksi.'
+                  : 'This will appear as a transaction review.'}
+              </p>
+              <ul className="space-y-1 text-[color:var(--app-text-soft)]">
+                <li>
+                  {locale === 'id'
+                    ? 'Tulis berdasarkan pengalaman nyata dari transaksi ini.'
+                    : 'Write based on your real experience with this transaction.'}
+                </li>
+                <li>
+                  {locale === 'id'
+                    ? 'Jangan tulis nomor pribadi, alamat lengkap, ancaman, fitnah, atau promosi.'
+                    : 'Do not include private numbers, full addresses, threats, defamation, or promotion.'}
+                </li>
+                <li>
+                  {locale === 'id'
+                    ? 'Ulasan berbayar atau dipaksa untuk rating tertentu bisa dihapus.'
+                    : 'Paid or pressured reviews for specific ratings may be removed.'}
+                </li>
+              </ul>
+            </div>
 
             <div>
               <label className="mb-3 block text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -185,15 +227,33 @@ export default function ReviewPage({
               <textarea
                 value={comment}
                 onChange={e => setComment(e.target.value)}
+                maxLength={1000}
                 placeholder={
                   locale === 'id'
-                    ? 'Tulis poin penting saja...'
-                    : 'Share the important point only...'
+                    ? 'Contoh: barang sesuai, respon cepat, pengiriman aman...'
+                    : 'Example: item matched, fast response, safe delivery...'
                 }
                 rows={4}
                 className="w-full rounded-xl border border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] px-4 py-3 text-sm"
               />
+              <p className="mt-1 text-right text-xs text-[color:var(--app-text-soft)]">
+                {comment.length}/1000
+              </p>
             </div>
+
+            <label className="flex gap-3 rounded-2xl border border-[color:var(--app-border)] p-4 text-sm text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]">
+              <input
+                type="checkbox"
+                checked={attestationAccepted}
+                onChange={e => setAttestationAccepted(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-[color:var(--app-border)]"
+              />
+              <span>
+                {locale === 'id'
+                  ? 'Saya menulis ulasan ini berdasarkan pengalaman transaksi nyata dan tidak menerima imbalan untuk memberi rating tertentu.'
+                  : 'I am writing this review based on a real transaction experience and was not rewarded for giving a specific rating.'}
+              </span>
+            </label>
 
             <div className="flex gap-3">
               <button
@@ -205,7 +265,7 @@ export default function ReviewPage({
               </button>
               <button
                 type="submit"
-                disabled={loading || rating === 0}
+                disabled={loading || rating === 0 || !attestationAccepted}
                 className="flex-1 h-12 rounded-xl bg-[color:var(--app-accent)] font-semibold text-[color:var(--app-text-inverse)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading

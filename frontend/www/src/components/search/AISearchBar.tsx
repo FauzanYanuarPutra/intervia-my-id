@@ -93,7 +93,7 @@ export default function AISearchBar({
       if (onSearch) {
         onSearch(query.trim());
       } else {
-        router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+        router.push(`/explore?q=${encodeURIComponent(query.trim())}`);
       }
       setShowSuggestions(false);
     },
@@ -107,7 +107,7 @@ export default function AISearchBar({
       if (onSearch) {
         onSearch(suggestion);
       } else {
-        router.push(`/search?q=${encodeURIComponent(suggestion)}`);
+        router.push(`/explore?q=${encodeURIComponent(suggestion)}`);
       }
     },
     [onSearch, router],

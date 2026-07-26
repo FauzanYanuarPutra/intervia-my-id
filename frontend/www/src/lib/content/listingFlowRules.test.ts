@@ -252,6 +252,61 @@ describe('validateListingPayload', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('requires provenance before activating reference-only open-data listings', () => {
+    const result = validateListingPayload(
+      {
+        content_type: 'product',
+        content_status: 'active',
+        title: 'Referensi pasar lokal',
+        summary: 'Rujukan publik untuk konteks bisnis lokal.',
+        body: 'Konten ini bukan penawaran transaksi langsung.',
+        metadata: {
+          listing_mode: 'simple',
+          listing_side: 'demand',
+          market_side: 'demand',
+          source_only: true,
+          is_transactional: false,
+        },
+      },
+      { mode: 'create' },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(
+      result.issues.some(issue => issue.includes('metadata.source_url')),
+    ).toBe(true);
+    expect(
+      result.issues.some(issue =>
+        issue.includes('contact_policy=no_private_contact_seeded'),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts active reference-only open-data listings with source and no-private-contact policy', () => {
+    const result = validateListingPayload(
+      {
+        content_type: 'product',
+        content_status: 'active',
+        title: 'Referensi pasar lokal',
+        summary: 'Rujukan publik untuk konteks bisnis lokal.',
+        body: 'Konten ini bukan penawaran transaksi langsung.',
+        metadata: {
+          listing_mode: 'simple',
+          listing_side: 'demand',
+          market_side: 'demand',
+          source_only: true,
+          is_transactional: false,
+          source_url: 'https://commons.wikimedia.org/wiki/File:Lokbaintan.jpg',
+          contact_policy: 'no_private_contact_seeded',
+        },
+      },
+      { mode: 'create' },
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
   it('accepts active demand property briefs without a primary image', () => {
     const result = validateListingPayload(
       {

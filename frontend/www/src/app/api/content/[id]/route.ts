@@ -67,6 +67,60 @@ function normalizeStatus(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function hasPositivePrice(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0;
+  if (typeof value !== 'string') return false;
+  const amount = Number(value.replace(/[^\d.-]/g, ''));
+  return Number.isFinite(amount) && amount > 0;
+}
+
+function inferPatchPricingMode(payload: Record<string, unknown>) {
+  if (typeof payload.pricing_mode === 'string' && payload.pricing_mode.trim()) {
+    return;
+  }
+  const metadata = readRecord(payload.metadata);
+  const formValues = readRecord(metadata?.form_values);
+  const priceMode =
+    typeof formValues?.price_mode === 'string'
+      ? formValues.price_mode.trim().toLowerCase()
+      : '';
+  const budgetMode =
+    typeof formValues?.budget_mode === 'string'
+      ? formValues.budget_mode.trim().toLowerCase()
+      : '';
+  const marketSide =
+    typeof metadata?.market_side === 'string'
+      ? metadata.market_side.trim().toLowerCase()
+      : '';
+  const listingSide =
+    typeof metadata?.listing_side === 'string'
+      ? metadata.listing_side.trim().toLowerCase()
+      : '';
+
+  if (
+    budgetMode ||
+    marketSide === 'demand' ||
+    listingSide === 'demand' ||
+    marketSide === 'seeker' ||
+    listingSide === 'seeker'
+  ) {
+    payload.pricing_mode = 'request';
+    return;
+  }
+
+  payload.pricing_mode = hasPositivePrice(payload.price_cents)
+    ? 'fixed'
+    : priceMode
+      ? 'request'
+      : undefined;
+}
+
 async function readUpstreamPayload(res: Response): Promise<unknown> {
   const text = await res.text();
   if (!text) return null;
@@ -389,6 +443,7 @@ export async function PUT(
   }
 
   const requestedPayload = parsedBody.data as Record<string, unknown>;
+  inferPatchPricingMode(requestedPayload);
 
   const validatedPatch = validateListingPayload(requestedPayload, {
     mode: 'update',

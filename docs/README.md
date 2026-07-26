@@ -32,6 +32,7 @@ This documentation system describes what exists in the repository now. It is not
 - `architecture/transaction-status.md`
 - `architecture/deployment-architecture.md`
 - `architecture/crm-architecture.md`
+- `architecture/ai-creation-hub.md`
 - `architecture/decisions/ADR-0001-crm-owner-internal-boundary.md`
 
 ## Product
@@ -40,9 +41,12 @@ This documentation system describes what exists in the repository now. It is not
 - `product/cluster-strategy.md`
 - `product/current-capabilities.md`
 - `product/taxonomy.md`
+- `product/create-flow.md`
 - `product/crm-strategy.md`
+- `product/reviews-and-ratings.md`
 - `product/decision-log.md`
 - `product/hypothesis-register.md`
+- `product/marketplace-transformation-audit.md`
 
 ## CRM And Matching
 

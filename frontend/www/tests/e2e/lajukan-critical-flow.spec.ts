@@ -44,7 +44,7 @@ test.describe('Lajukan Indonesian critical journey', () => {
     });
   });
 
-  test('home search routes users to results without extra ceremony', async ({ page }) => {
+  test('home search opens Explore results without extra ceremony', async ({ page }) => {
     await installFixturesWhenRequested(page);
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto('/id/home', { waitUntil: 'domcontentloaded' });
@@ -53,14 +53,14 @@ test.describe('Lajukan Indonesian critical journey', () => {
       .locator('[data-testid="home-mobile-search-link"], [data-testid="app-header-mobile-search-link"]')
       .first()
       .click();
-    await expect(page).toHaveURL(/\/id\/search/);
+    await expect(page).toHaveURL(/\/id\/explore/);
 
     const searchInput = page.getByTestId('search-mobile-input');
     await expect(searchInput).toBeVisible();
     await searchInput.fill(seedSearchQuery);
     await searchInput.press('Enter');
 
-    await expect(page).toHaveURL(/\/id\/search\?q=supplier(\+|%20)kemasan/);
+    await expect(page).toHaveURL(/\/id\/explore\?q=supplier(\+|%20)kemasan/);
     await expect(page.locator('body')).toContainText(/supplier|kemasan|hasil|cari/i);
     await expectNoHorizontalOverflow(page);
   });

@@ -590,25 +590,25 @@ export default function SupportTicketForm() {
   ]);
 
   return (
-    <div className="mt-6 space-y-4">
-      <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-4 shadow-sm">
+    <div className="mt-0 space-y-3">
+      <div className="ui-panel p-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
           Alur cepat
         </p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-accent-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_70%,_transparent)] p-3 text-xs text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]">
+          <div className="rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] p-3 text-xs text-[color:var(--app-accent)]">
             <p className="font-semibold">1. Buat ticket</p>
             <p className="mt-1 text-[11px] text-[color:color-mix(in_srgb,_var(--app-accent)_80%,_transparent)] dark:text-[color:color-mix(in_srgb,_var(--app-accent)_70%,_transparent)]">
               Tulis masalah + ID transaksi.
             </p>
           </div>
-          <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-3 text-xs text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+          <div className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 text-xs text-[color:var(--app-text)]">
             <p className="font-semibold">2. Pantau status</p>
             <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
               Lihat balasan agent dan update status ticket.
             </p>
           </div>
-          <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-3 text-xs text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+          <div className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 text-xs text-[color:var(--app-text)]">
             <p className="font-semibold">3. Live tools</p>
             <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
               Aktifkan chat realtime atau AI bila perlu.
@@ -617,8 +617,8 @@ export default function SupportTicketForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <div className="lg:col-span-3 rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="ui-panel p-4 sm:p-5 lg:col-span-3">
           <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             Buat Ticket Bantuan
           </h3>
@@ -731,8 +731,8 @@ export default function SupportTicketForm() {
           </form>
         </div>
 
-        <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
+        <div className="space-y-3 lg:col-span-2">
+          <div className="ui-panel p-4 sm:p-5">
             <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Ticket Terakhir
             </h3>
@@ -797,7 +797,7 @@ export default function SupportTicketForm() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
+          <div className="ui-panel p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                 {isId ? 'Detail tiket' : 'Ticket details'}
@@ -923,7 +923,7 @@ export default function SupportTicketForm() {
           </div>
 
           <details
-            className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm"
+            className="ui-panel p-4 sm:p-5"
             open={liveToolsOpen}
             onToggle={e => setLiveToolsOpen(e.currentTarget.open)}
           >
@@ -1085,7 +1085,7 @@ export default function SupportTicketForm() {
             </div>
           </details>
 
-          <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
+          <div className="ui-panel p-4 sm:p-5">
             <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Biar cepat
             </h4>

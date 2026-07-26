@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import SimpleCreateFlow from '../../SimpleCreateFlow';
+import CreateListingWizard from '../../CreateListingWizard';
 import { normalizeCreateFlowSegment } from '../../createPageUtils';
 import {
   buildCreateBusinessCategoryHref,
@@ -65,9 +65,7 @@ export default async function CreateFlowListingPage({ params }: PageProps) {
   const category = normalizeCreateBusinessCategorySegment(listing);
   if (!intent || !category) notFound();
 
-  return (
-    <SimpleCreateFlow entryMode={intent} categoryId={category.id} />
-  );
+  return <CreateListingWizard entryMode={intent} categoryId={category.id} />;
 }
 
 export async function generateMetadata({
@@ -85,11 +83,13 @@ export async function generateMetadata({
     needId: category.titleId.toLowerCase(),
     needEn: category.titleEn.toLowerCase(),
   };
-  const canonical = `https://www.lajukan.com/${locale}${buildCreateBusinessCategoryHref({
-    locale,
-    side: sideId,
-    category,
-  })}`;
+  const canonical = `https://www.lajukan.com/${locale}${buildCreateBusinessCategoryHref(
+    {
+      locale,
+      side: sideId,
+      category,
+    },
+  )}`;
 
   const title =
     intent === 'demand'

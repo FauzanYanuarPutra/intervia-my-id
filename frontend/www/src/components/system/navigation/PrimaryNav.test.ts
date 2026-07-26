@@ -25,19 +25,22 @@ describe('PrimaryNav route activity', () => {
     ).toBeNull();
   });
 
-  it('keeps buyer discovery surfaces under search', () => {
+  it('keeps Explore active for browsing and result URLs', () => {
     const items = buildPrimaryNavItems(false, 'id');
 
-    expect(resolveActivePrimaryNavKey(items, '/id/search')).toBe('search');
-    expect(resolveActivePrimaryNavKey(items, '/id/kategori/kuliner')).toBe(
-      'search',
-    );
-    expect(resolveActivePrimaryNavKey(items, '/id/umkm/dapur-kawan')).toBe(
-      'search',
-    );
-    expect(resolveActivePrimaryNavKey(items, '/id/toko/dapur-kawan')).toBe(
-      'search',
-    );
+    expect(resolveActivePrimaryNavKey(items, '/id/explore')).toBe('explore');
+    expect(
+      resolveActivePrimaryNavKey(items, '/id/explore/materials-suppliers'),
+    ).toBe('explore');
+    expect(
+      resolveActivePrimaryNavKey(items, '/id/explore?q=kemasan'),
+    ).toBe('explore');
+    expect(
+      resolveActivePrimaryNavKey(items, '/id/umkm/dapur-kawan'),
+    ).toBeNull();
+    expect(
+      resolveActivePrimaryNavKey(items, '/id/toko/dapur-kawan'),
+    ).toBeNull();
   });
 
   it('distinguishes the signed-in profile from public profile pages', () => {

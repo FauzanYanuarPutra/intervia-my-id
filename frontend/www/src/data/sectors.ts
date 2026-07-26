@@ -1,4 +1,4 @@
-import { 
+import {
   Zap, Laptop, Heart, Building2, Hammer, Home, Factory, Wheat, Pickaxe, Car,
   Plane, Radio, Truck, ShoppingCart, Hotel, GraduationCap, Film, Scale, BarChart3,
   Megaphone, FlaskConical, Shirt, UtensilsCrossed, Ship, Recycle, Landmark
@@ -34,7 +34,7 @@ export const SECTORS: Sector[] = [
   { id: 'education', icon: GraduationCap, nameEn: 'Education', nameId: 'Pendidikan', color: 'bg-yellow-500', descEn: 'Schools, Universities, EdTech, Training', descId: 'Sekolah, Universitas, EdTech, Pelatihan' },
   { id: 'media', icon: Film, nameEn: 'Media & Entertainment', nameId: 'Media & Hiburan', color: 'bg-blue-700', descEn: 'Film, Music, Gaming, Publishing', descId: 'Film, Musik, Gaming, Penerbitan' },
   { id: 'legal', icon: Scale, nameEn: 'Legal', nameId: 'Hukum', color: 'bg-slate-600', descEn: 'Law Firms, Compliance, Regulatory', descId: 'Firma Hukum, Kepatuhan, Regulasi' },
-  { id: 'consulting', icon: BarChart3, nameEn: 'Consulting', nameId: 'Konsultansi', color: 'bg-blue-600', descEn: 'Management, Strategy, HR Consulting', descId: 'Manajemen, Strategi, Konsultansi SDM' },
+  { id: 'consulting', icon: BarChart3, nameEn: 'Consulting', nameId: 'Konsultansi', color: '', descEn: 'Management, Strategy, HR Consulting', descId: 'Manajemen, Strategi, Konsultansi SDM' },
   { id: 'marketing', icon: Megaphone, nameEn: 'Marketing & Advertising', nameId: 'Pemasaran & Periklanan', color: 'bg-rose-400', descEn: 'Digital Marketing, Branding, PR', descId: 'Pemasaran Digital, Branding, Humas' },
   { id: 'chemical', icon: FlaskConical, nameEn: 'Chemical & Petrochemical', nameId: 'Kimia & Petrokimia', color: 'bg-teal-600', descEn: 'Chemicals, Plastics, Fertilizers', descId: 'Bahan Kimia, Plastik, Pupuk' },
   { id: 'textiles', icon: Shirt, nameEn: 'Textiles & Fashion', nameId: 'Tekstil & Mode', color: 'bg-pink-400', descEn: 'Clothing, Footwear, Luxury Goods', descId: 'Pakaian, Alas Kaki, Barang Mewah' },

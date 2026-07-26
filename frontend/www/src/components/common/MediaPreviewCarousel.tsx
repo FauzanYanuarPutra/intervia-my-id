@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -20,15 +21,16 @@ import {
   isPreviewableContentMediaUrl,
   normalizeContentMediaUrl,
 } from '@/lib/content/catalog';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { cn } from '@/lib/utils';
 
 export type MediaPreviewItem =
   | string
   | {
-    src?: string | null;
-    type?: 'image' | 'video';
-    alt?: string;
-  };
+      src?: string | null;
+      type?: 'image' | 'video';
+      alt?: string;
+    };
 
 type MediaPreviewCarouselProps = {
   items: MediaPreviewItem[];
@@ -183,6 +185,31 @@ export function MediaPreviewCarousel({
     [visibleMediaItems.length],
   );
 
+  useBodyScrollLock(lightboxOpen);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setLightboxOpen(false);
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        scrollToIndex(active - 1);
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        scrollToIndex(active + 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [active, lightboxOpen, scrollToIndex]);
+
   const updateIndexFromScroll = () => {
     if (isScrolling.current) return;
     const node = viewportRef.current;
@@ -272,7 +299,7 @@ export function MediaPreviewCarousel({
 
         {/* Counter Badge */}
         {visibleMediaItems.length > 1 && showCounter ? (
-          <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white  shadow-sm select-none">
+          <span className="absolute left-3 top-3 z-[3] rounded-full bg-black/64 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm select-none ring-1 ring-white/15">
             {active + 1} / {visibleMediaItems.length}
           </span>
         ) : null}
@@ -286,10 +313,10 @@ export function MediaPreviewCarousel({
               event.stopPropagation();
               setLightboxOpen(true);
             }}
-            className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md  transition-all duration-200 hover:scale-105 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white dark:hover:bg-slate-900"
+            className="absolute bottom-2.5 right-2.5 z-[3] inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-slate-900 shadow-md ring-1 ring-black/5 transition-all duration-200 hover:scale-105 hover:bg-white active:scale-95 dark:bg-slate-900/92 dark:text-white dark:ring-white/10 dark:hover:bg-slate-900 sm:bottom-3 sm:right-3"
             aria-label="Perbesar media"
           >
-            <Expand className="h-4 w-4" />
+            <Expand className="h-3.5 w-3.5" />
           </button>
         ) : null}
 
@@ -305,12 +332,13 @@ export function MediaPreviewCarousel({
                 scrollToIndex(active - 1);
               }}
               className={cn(
-                "absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md  transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white md:opacity-0 md:group-hover:opacity-100",
-                active === 0 && "cursor-not-allowed opacity-40 md:group-hover:opacity-40"
+                'absolute left-2.5 top-1/2 z-[3] inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-slate-900 shadow-md ring-1 ring-black/5 transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/92 dark:text-white dark:ring-white/10 md:opacity-0 md:group-hover:opacity-100 sm:left-3',
+                active === 0 &&
+                  'cursor-not-allowed opacity-40 md:group-hover:opacity-40',
               )}
               aria-label="Media sebelumnya"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -321,19 +349,20 @@ export function MediaPreviewCarousel({
                 scrollToIndex(active + 1);
               }}
               className={cn(
-                "absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md  transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white md:opacity-0 md:group-hover:opacity-100",
-                active === visibleMediaItems.length - 1 && "cursor-not-allowed opacity-40 md:group-hover:opacity-40"
+                'absolute right-2.5 top-1/2 z-[3] inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-slate-900 shadow-md ring-1 ring-black/5 transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/92 dark:text-white dark:ring-white/10 md:opacity-0 md:group-hover:opacity-100 sm:right-3',
+                active === visibleMediaItems.length - 1 &&
+                  'cursor-not-allowed opacity-40 md:group-hover:opacity-40',
               )}
               aria-label="Media berikutnya"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </>
         ) : null}
 
         {/* Dynamic Indicator Dots */}
         {showDots && hasMany ? (
-          <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5 pointer-events-none">
+          <div className="pointer-events-none absolute inset-x-0 bottom-2.5 z-[3] flex justify-center gap-1 sm:bottom-3">
             {visibleMediaItems.map((_, index) => (
               <div
                 key={`dot-${index}`}
@@ -349,22 +378,28 @@ export function MediaPreviewCarousel({
 
       {/* Fullscreen Lightbox Modal */}
       {lightboxOpen ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4  animate-in fade-in duration-200">
+        <div
+          className="ui-layer-preview fixed inset-0 flex h-[var(--app-visual-viewport-height)] w-screen items-center justify-center overflow-hidden bg-black/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] animate-in fade-in duration-200 sm:px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Preview media"
+        >
           <button
             type="button"
             onClick={() => setLightboxOpen(false)}
-            className="absolute right-4 top-4 z-[110] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white  transition-all duration-200 hover:bg-white/20 hover:scale-105 active:scale-95"
+            className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[2] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/12 text-white shadow-[0_18px_48px_-28px_rgba(0,0,0,0.85)] ring-1 ring-white/15 transition-all duration-200 hover:scale-105 hover:bg-white/22 active:scale-95 sm:right-4"
             aria-label="Tutup preview"
           >
             <X className="h-6 w-6" />
           </button>
 
-          <div className="w-full max-w-5xl aspect-video md:h-[calc(var(--app-viewport-height)-2rem)]">
+          <div className="h-[min(78vh,calc(var(--app-visual-viewport-height)-5.5rem))] w-full max-w-6xl sm:h-[min(84vh,calc(var(--app-visual-viewport-height)-5rem))]">
             <MediaPreviewCarousel
+              key={`lightbox-${active}`}
               items={visibleMediaItems}
               alt={alt}
               aspectClassName="h-full w-full"
-              className="rounded-2xl bg-transparent"
+              className="rounded-[18px] bg-black shadow-[0_28px_90px_-34px_rgba(0,0,0,0.92)] ring-1 ring-white/10"
               sizes="100vw"
               controls
               showCounter

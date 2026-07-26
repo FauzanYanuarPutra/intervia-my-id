@@ -97,6 +97,15 @@ foto + hasil AI + koreksi user
   -> optional fine-tune batch setelah data cukup bersih
 ```
 
+Dataset domain eksternal untuk Personal AI:
+
+- `frontend/www/scripts/pull-lajukan-ai-domain-dataset.mjs` boleh menarik referensi dari Wikidata/Wikimedia Commons ke `.runtime/personal-ai/domain-dataset.json`.
+- Mode penuh `npm --prefix frontend/www run ai:dataset:pull:full` juga menarik contoh produk nyata dari Open Food Facts untuk referensi produk/kemasan/bahan pangan.
+- Dataset Hugging Face hanya boleh dipakai dari allowlist yang tercatat di output dataset (`approved_dataset_sources`). Saat ini yang lolos audit awal: `openfoodfacts/product-database` untuk metadata produk dan `Voxel51/NutriGreen` untuk evaluasi kemasan opsional.
+- Dataset ini dipakai sebagai referensi/RAG: nama kandidat, alias, deskripsi, ciri visual umum, fungsi usaha, dan pertanyaan verifikasi.
+- Dataset ini bukan bukti bahwa foto pasti berisi item tertentu. AI tetap harus mulai dari fakta visual gambar dan menandai asumsi.
+- Gambar/data dari dataset eksternal tidak boleh diklaim sebagai milik Lajukan. Simpan URL, sumber, lisensi, dan atribusi; cek lisensi sebelum redistribusi atau fine-tune. Dataset non-commercial, gated, evaluation-only, atau tanpa lisensi eksplisit tidak boleh masuk runtime default.
+
 Tahap berikutnya saat data Lajukan sudah cukup:
 
 1. Index listing supplier/bahan/mesin/jasa ke Qdrant.
@@ -169,7 +178,7 @@ All frontend and backend events must use a shared envelope.
   "tenant_id": "default",
   "locale": "id",
   "source": "web",
-  "page": "/id/search",
+  "page": "/id/explore",
   "entity_type": "listing",
   "entity_id": "uuid_or_slug",
   "properties": {},

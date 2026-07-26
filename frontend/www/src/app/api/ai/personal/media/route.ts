@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MEDIA_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
-import { requireAuth } from '@/lib/serverAuth';
+import { safeErrorCode } from '@/lib/server/safeLog';
+import { guardUploadRequest } from '@/lib/server/uploadGuard';
 import {
   collectUploadFiles,
   inferUploadMime,
@@ -39,8 +40,8 @@ function isUnsafePersonalAiUpload(file: File) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) return auth.res;
+  const guard = await guardUploadRequest(req, 'personal-ai-media');
+  if (!guard.ok) return guard.response;
 
   try {
     const incomingFiles = collectUploadFiles(await req.formData(), PERSONAL_AI_MEDIA_KEYS);
@@ -69,9 +70,9 @@ export async function POST(req: NextRequest) {
     const result = await storeValidatedUploads(files, {
       accept: 'media',
       concurrency: 2,
-      folder: `personal-ai/${auth.ctx.userId}`,
+      folder: `personal-ai/${guard.auth.userId}`,
       maxBytes: MEDIA_UPLOAD_RAW_MAX_BYTES,
-      minioTarget: `personal-ai/${auth.ctx.userId}`,
+      minioTarget: `personal-ai/${guard.auth.userId}`,
       requireMinio: true,
       minioTimeoutMs: 20_000,
     });
@@ -90,13 +91,9 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (error) {
-    console.error('[PERSONAL_AI_MEDIA_UPLOAD_ERROR]', error);
-    return NextResponse.json(
-      {
-        error: 'Upload failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 },
-    );
+    console.error('[PERSONAL_AI_MEDIA_UPLOAD_ERROR]', {
+      error: safeErrorCode(error),
+    });
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 }

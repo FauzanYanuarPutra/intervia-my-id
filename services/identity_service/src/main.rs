@@ -4,10 +4,17 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use std::sync::Arc;
+use lapin::{
+    options::{BasicPublishOptions, ExchangeDeclareOptions},
+    types::FieldTable,
+    BasicProperties, Channel, ExchangeKind,
+};
+use serde_json::Value;
+use sqlx::FromRow;
+use std::{env, sync::Arc};
 use tokio::{
     net::TcpListener,
-    time::{timeout, Duration},
+    time::{sleep, timeout, Duration},
 };
 use tower_http::{
     compression::CompressionLayer, cors::CorsLayer, set_header::SetResponseHeaderLayer,
@@ -17,12 +24,23 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use identity_service::config::{AppState, Config};
 use identity_service::db;
+use identity_service::dev_seed::ensure_development_ops_user;
 use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
     get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_users, login,
     login_phone, logout, me, oauth_google, refresh_token, register, reset_password,
     update_me_profile,
 };
+
+#[derive(Debug, FromRow)]
+struct IdentityOutboxEventRow {
+    id: uuid::Uuid,
+    aggregate_type: String,
+    aggregate_id: String,
+    event_type: String,
+    routing_key: String,
+    payload: Value,
+}
 
 async fn ensure_identity_runtime_schema(db: &sqlx::PgPool) -> Result<()> {
     sqlx::query("CREATE EXTENSION IF NOT EXISTS citext")
@@ -142,6 +160,165 @@ async fn ensure_identity_runtime_schema(db: &sqlx::PgPool) -> Result<()> {
     Ok(())
 }
 
+async fn connect_outbox_channel(rabbitmq_url: &str, exchange: &str) -> Result<Channel> {
+    let conn =
+        lapin::Connection::connect(rabbitmq_url, lapin::ConnectionProperties::default()).await?;
+    let channel = conn.create_channel().await?;
+    channel
+        .exchange_declare(
+            exchange,
+            ExchangeKind::Topic,
+            ExchangeDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await?;
+    Ok(channel)
+}
+
+async fn publish_identity_outbox_batch(
+    db: &sqlx::PgPool,
+    channel: &Channel,
+    exchange: &str,
+    batch_size: i64,
+) -> Result<usize> {
+    let events = sqlx::query_as::<_, IdentityOutboxEventRow>(
+        r#"
+        SELECT id, aggregate_type, aggregate_id, event_type, routing_key, payload
+        FROM events.event_outbox
+        WHERE status IN ('pending', 'failed') AND available_at <= NOW()
+        ORDER BY created_at ASC
+        LIMIT $1
+        "#,
+    )
+    .bind(batch_size)
+    .fetch_all(db)
+    .await?;
+
+    if events.is_empty() {
+        return Ok(0);
+    }
+
+    for event in events.iter() {
+        let claimed = sqlx::query(
+            "UPDATE events.event_outbox SET status = 'publishing' WHERE id = $1 AND status IN ('pending', 'failed')",
+        )
+        .bind(event.id)
+        .execute(db)
+        .await?;
+
+        if claimed.rows_affected() == 0 {
+            continue;
+        }
+
+        let mut envelope = event.payload.clone();
+        if let Value::Object(ref mut object) = envelope {
+            object.insert("event_id".to_string(), Value::String(event.id.to_string()));
+            object.insert(
+                "event_type".to_string(),
+                Value::String(event.event_type.clone()),
+            );
+            object.insert(
+                "aggregate_type".to_string(),
+                Value::String(event.aggregate_type.clone()),
+            );
+            object.insert(
+                "aggregate_id".to_string(),
+                Value::String(event.aggregate_id.clone()),
+            );
+        }
+
+        let payload_bytes = serde_json::to_vec(&envelope)?;
+        let publish_result = channel
+            .basic_publish(
+                exchange,
+                &event.routing_key,
+                BasicPublishOptions::default(),
+                &payload_bytes,
+                BasicProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2u8)
+                    .with_message_id(event.id.to_string().into())
+                    .with_type(event.event_type.clone().into()),
+            )
+            .await;
+
+        match publish_result {
+            Ok(confirm) => {
+                if let Err(error) = confirm.await {
+                    mark_identity_outbox_retry(db, event.id, format!("confirm: {error:?}")).await;
+                    continue;
+                }
+            }
+            Err(error) => {
+                mark_identity_outbox_retry(db, event.id, format!("publish: {error:?}")).await;
+                continue;
+            }
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE events.event_outbox
+            SET status = 'published', published_at = NOW(), error_message = NULL
+            WHERE id = $1
+            "#,
+        )
+        .bind(event.id)
+        .execute(db)
+        .await?;
+    }
+
+    Ok(events.len())
+}
+
+async fn mark_identity_outbox_retry(db: &sqlx::PgPool, event_id: uuid::Uuid, error: String) {
+    let _ = sqlx::query(
+        r#"
+        UPDATE events.event_outbox
+        SET
+          status = 'failed',
+          retry_count = retry_count + 1,
+          available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
+          error_message = $2
+        WHERE id = $1
+        "#,
+    )
+    .bind(event_id)
+    .bind(error)
+    .execute(db)
+    .await;
+}
+
+async fn run_identity_outbox_publisher(
+    db: sqlx::PgPool,
+    rabbitmq_url: String,
+    exchange: String,
+    batch_size: i64,
+    poll_ms: u64,
+) {
+    loop {
+        match connect_outbox_channel(&rabbitmq_url, &exchange).await {
+            Ok(channel) => loop {
+                match publish_identity_outbox_batch(&db, &channel, &exchange, batch_size).await {
+                    Ok(0) => sleep(Duration::from_millis(poll_ms)).await,
+                    Ok(count) => tracing::info!("published {count} identity outbox events"),
+                    Err(error) => {
+                        tracing::warn!("identity outbox publish error: {error:?}");
+                        sleep(Duration::from_secs(2)).await;
+                        break;
+                    }
+                }
+            },
+            Err(error) => {
+                tracing::warn!("identity outbox RabbitMQ connection error: {error:?}");
+                sleep(Duration::from_secs(3)).await;
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // 1. Logging
@@ -209,6 +386,10 @@ async fn main() -> Result<()> {
 
     ensure_identity_runtime_schema(&db_pool).await?;
 
+    if ensure_development_ops_user(&db_pool, &cfg.env).await? {
+        tracing::info!("Development CRM agent is ready");
+    }
+
     println!("Initializing Redis...");
     let redis_pool = db::init_redis(&cfg).await;
     println!("Initializing RabbitMQ...");
@@ -220,6 +401,26 @@ async fn main() -> Result<()> {
         rabbitmq: rabbitmq_conn,
         config: cfg.clone(),
     });
+
+    let identity_outbox_exchange =
+        env::var("IDENTITY_OUTBOX_EXCHANGE").unwrap_or_else(|_| "identity.outbox".to_string());
+    let identity_outbox_batch_size = env::var("IDENTITY_OUTBOX_BATCH_SIZE")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(50)
+        .clamp(1, 500);
+    let identity_outbox_poll_ms = env::var("IDENTITY_OUTBOX_POLL_MS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(750)
+        .clamp(100, 30_000);
+    tokio::spawn(run_identity_outbox_publisher(
+        app_state.db.clone(),
+        cfg.rabbitmq_url.clone(),
+        identity_outbox_exchange,
+        identity_outbox_batch_size,
+        identity_outbox_poll_ms,
+    ));
 
     // 3. Konfigurasi CORS Adaptif
     let mut cors = CorsLayer::new()

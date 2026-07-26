@@ -3,6 +3,7 @@ import {
   type LearningCourse,
 } from '@/components/learn/LearningHubClient';
 import type { Metadata } from 'next';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -97,7 +98,7 @@ export default async function LearnPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <LearningHubClient locale={locale} initialCourses={courses} />
     </>

@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { memo } from 'react';
 import type { LatLng } from '@/lib/super-app/maps';
 
 export type UmkmMapStore = {
@@ -73,7 +74,8 @@ const UmkmStoreMapClient = dynamic(
   },
 );
 
-export function UmkmStoreMap(props: UmkmStoreMapProps) {
+export const UmkmStoreMap = memo(function UmkmStoreMap(
+  props: UmkmStoreMapProps,
+) {
   return <UmkmStoreMapClient {...props} />;
-}
-
+});

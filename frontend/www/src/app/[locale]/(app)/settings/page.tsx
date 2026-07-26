@@ -178,7 +178,7 @@ function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="ui-feed-row flex flex-col gap-3 rounded-[18px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.24)] sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-950/72">
+    <div className="ui-feed-row flex flex-col gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 sm:flex-row sm:items-center sm:justify-between dark:border-[color:var(--app-border-strong)]">
       <div className="space-y-1">
         <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {label}
@@ -244,7 +244,7 @@ function SettingsPanel({
   return (
     <section
       id={id}
-      className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] sm:p-4"
+      className="ui-panel p-3 sm:p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
@@ -285,19 +285,21 @@ function PreferenceRow({
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2.5 dark:border-[color:var(--app-border-strong)]">
       <span
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${danger
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${
+          danger
             ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
             : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]'
-          }`}
+        }`}
       >
         <Icon className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className={`block truncate text-sm font-bold ${danger
+          className={`block truncate text-sm font-bold ${
+            danger
               ? 'text-[color:var(--app-danger)]'
               : 'text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
-            }`}
+          }`}
         >
           {title}
         </span>
@@ -379,10 +381,10 @@ export default function SettingsPage() {
   const { confirm } = useDialog();
   const { authFetch, logout, refreshUser, user } = useAuth();
   const {
-    colorScheme,
+    // colorScheme,
     themePreset,
     colorVision,
-    setColorScheme,
+    // setColorScheme,
     setThemePreset,
     setColorVision,
   } = useTheme();
@@ -710,15 +712,15 @@ export default function SettingsPage() {
       },
       ...(!PROMO_ONLY_MODE
         ? [
-          {
-            href: '/payments',
-            icon: WalletCards,
-            label: isId ? 'Saldo & pembayaran' : 'Balance and payments',
-            description: isId
-              ? 'Wallet, invoice, payout'
-              : 'Wallet, invoices, payouts',
-          },
-        ]
+            {
+              href: '/payments',
+              icon: WalletCards,
+              label: isId ? 'Saldo & pembayaran' : 'Balance and payments',
+              description: isId
+                ? 'Wallet, invoice, payout'
+                : 'Wallet, invoices, payouts',
+            },
+          ]
         : []),
       {
         href: '/notifications',
@@ -1013,9 +1015,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <section className="min-h-screen bg-[color:var(--app-surface-muted)] px-2 py-2 pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-[color:var(--app-surface)] sm:px-4 sm:py-5 lg:pb-8">
+    <section className="page-shell page-rhythm pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-3 lg:pb-10">
       <div className="mx-auto w-full max-w-[1180px]">
-        <header className="overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] sm:p-4">
+        <header className="ui-hero-panel p-4 sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[18px] bg-[color:var(--app-surface-muted)] ring-1 ring-[color:var(--app-border)]">
@@ -1086,7 +1088,7 @@ export default function SettingsPage() {
           </div>
         </header>
 
-        <div className="mt-3 grid gap-3 lg:grid-cols-[290px_minmax(0,1fr)]">
+        <div className="mt-3 grid gap-3 lg:grid-cols-[250px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-[calc(72px+env(safe-area-inset-top))] lg:self-start">
             <div className="overflow-x-auto pb-1 lg:overflow-visible lg:pb-0">
               <div className="flex gap-1.5 lg:grid">
@@ -1098,16 +1100,18 @@ export default function SettingsPage() {
                       key={item.key}
                       type="button"
                       onClick={() => setActiveCategory(item.key)}
-                      className={`flex min-w-[154px] items-center gap-2 rounded-[15px] border px-3 py-2 text-left transition lg:min-w-0 ${active
+                      className={`flex min-w-[154px] items-center gap-2 rounded-[15px] border px-3 py-2 text-left transition lg:min-w-0 ${
+                        active
                           ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-sm'
                           : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]'
-                        }`}
+                      }`}
                     >
                       <span
-                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${active
+                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${
+                          active
                             ? 'bg-white text-[color:var(--app-accent)]'
                             : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                          }`}
+                        }`}
                       >
                         <Icon className="h-4 w-4" />
                       </span>
@@ -1367,27 +1371,27 @@ export default function SettingsPage() {
                       },
                       ...(!PROMO_ONLY_MODE
                         ? [
-                          {
-                            key: 'escrowRequired' as const,
-                            icon: ShieldCheck,
-                            title: isId
-                              ? 'Sarankan pembayaran aman'
-                              : 'Recommend protected payments',
-                            desc: isId
-                              ? 'Tampilkan opsi escrow saat transaksi jasa atau project.'
-                              : 'Show escrow options for services and projects.',
-                          },
-                          {
-                            key: 'autoInvoice' as const,
-                            icon: WalletCards,
-                            title: isId
-                              ? 'Buat invoice otomatis'
-                              : 'Auto-create invoices',
-                            desc: isId
-                              ? 'Invoice disiapkan setelah deal di chat.'
-                              : 'Invoices are prepared after a chat deal.',
-                          },
-                        ]
+                            {
+                              key: 'escrowRequired' as const,
+                              icon: ShieldCheck,
+                              title: isId
+                                ? 'Sarankan pembayaran aman'
+                                : 'Recommend protected payments',
+                              desc: isId
+                                ? 'Tampilkan opsi escrow saat transaksi jasa atau project.'
+                                : 'Show escrow options for services and projects.',
+                            },
+                            {
+                              key: 'autoInvoice' as const,
+                              icon: WalletCards,
+                              title: isId
+                                ? 'Buat invoice otomatis'
+                                : 'Auto-create invoices',
+                              desc: isId
+                                ? 'Invoice disiapkan setelah deal di chat.'
+                                : 'Invoices are prepared after a chat deal.',
+                            },
+                          ]
                         : []),
                     ].map(item => (
                       <PreferenceRow
@@ -1425,25 +1429,25 @@ export default function SettingsPage() {
                   {[
                     PROMO_ONLY_MODE
                       ? {
-                        key: 'orderAlerts' as const,
-                        icon: Store,
-                        title: isId
-                          ? 'Update katalog & profil'
-                          : 'Catalog and profile updates',
-                        desc: isId
-                          ? 'Perubahan listing, etalase, dan profil usaha.'
-                          : 'Listing, showcase, and business profile changes.',
-                      }
+                          key: 'orderAlerts' as const,
+                          icon: Store,
+                          title: isId
+                            ? 'Update katalog & profil'
+                            : 'Catalog and profile updates',
+                          desc: isId
+                            ? 'Perubahan listing, etalase, dan profil usaha.'
+                            : 'Listing, showcase, and business profile changes.',
+                        }
                       : {
-                        key: 'orderAlerts' as const,
-                        icon: WalletCards,
-                        title: isId
-                          ? 'Order dan pembayaran'
-                          : 'Orders and payments',
-                        desc: isId
-                          ? 'Top up, invoice, escrow, payout, refund.'
-                          : 'Top ups, invoices, escrow, payouts, refunds.',
-                      },
+                          key: 'orderAlerts' as const,
+                          icon: WalletCards,
+                          title: isId
+                            ? 'Order dan pembayaran'
+                            : 'Orders and payments',
+                          desc: isId
+                            ? 'Top up, invoice, escrow, payout, refund.'
+                            : 'Top ups, invoices, escrow, payouts, refunds.',
+                        },
                     {
                       key: 'chatAlerts' as const,
                       icon: MessageCircle,
@@ -1621,6 +1625,7 @@ export default function SettingsPage() {
                   description={text.appearanceDesc}
                 >
                   <div className="space-y-2">
+                    {/* Dark/light switching is paused while Lajukan focuses on light mode.
                     <SettingRow
                       label={text.themeMode}
                       description={text.themeModeDesc}
@@ -1643,6 +1648,7 @@ export default function SettingsPage() {
                         <option value="dark">{isId ? 'Gelap' : 'Dark'}</option>
                       </select>
                     </SettingRow>
+                    */}
                     <SettingRow
                       label={text.themePreset}
                       description={text.themePresetDesc}
@@ -1768,8 +1774,9 @@ export default function SettingsPage() {
                       aria-label={text.refreshSessions}
                     >
                       <RefreshCcw
-                        className={`h-4 w-4 ${sessionsState === 'loading' ? 'animate-spin' : ''
-                          }`}
+                        className={`h-4 w-4 ${
+                          sessionsState === 'loading' ? 'animate-spin' : ''
+                        }`}
                       />
                     </button>
                   }

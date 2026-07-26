@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { proxyCommunityBackend } from '@/lib/community/backendProxy';
 import {
   collectUploadFiles,
-  readUploadToken,
   storeValidatedUploads,
   uploadErrorResponse,
   uploadSuccessResponse,
 } from '@/lib/server/uploadFiles';
 import { IMAGE_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
+import { guardUploadRequest } from '@/lib/server/uploadGuard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,9 @@ const MAX_FILES = 12;
 const IMAGE_KEYS = ['images', 'image', 'file', 'files', 'media', 'photo'];
 
 export async function POST(req: NextRequest) {
+  const guard = await guardUploadRequest(req, 'forum:image');
+  if (!guard.ok) return guard.response;
+
   const proxyReq = new NextRequest(req.clone());
   const proxied = await proxyCommunityBackend(
     proxyReq,
@@ -43,9 +46,6 @@ export async function POST(req: NextRequest) {
 
 async function uploadForumImagesLocally(req: NextRequest) {
   try {
-    if (!readUploadToken(req)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     const files = collectUploadFiles(await req.formData(), IMAGE_KEYS);
     if (files.length === 0) {
       return NextResponse.json(

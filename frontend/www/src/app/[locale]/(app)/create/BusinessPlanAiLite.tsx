@@ -66,7 +66,7 @@ function formatRupiah(value: number) {
 }
 
 function searchHref(query: string) {
-  return `/search?q=${encodeURIComponent(query)}`;
+  return `/explore?q=${encodeURIComponent(query)}`;
 }
 
 function NeedGroup({

@@ -14,9 +14,12 @@ import {
   buildBlogArticleJsonLd,
   buildBlogPath,
   buildBlogUrl,
-  getBlogArticle,
-  getBlogArticles,
 } from '@/lib/seo/blog';
+import {
+  getPublishedBlogArticle,
+  getPublishedBlogArticles,
+} from '@/lib/seo/blogContent';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -33,7 +36,7 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { locale, slug } = await params;
-  const article = getBlogArticle(slug, locale);
+  const article = await getPublishedBlogArticle(slug, locale);
   if (!article) return {};
 
   return {
@@ -78,10 +81,10 @@ export async function generateMetadata({
 export default async function BlogArticlePage({ params }: PageProps) {
   const { locale, slug } = await params;
   const isId = locale === 'id';
-  const article = getBlogArticle(slug, locale);
+  const article = await getPublishedBlogArticle(slug, locale);
   if (!article) notFound();
 
-  const related = getBlogArticles(locale)
+  const related = (await getPublishedBlogArticles(locale))
     .filter(item => item.slug !== article.slug)
     .slice(0, 3);
   const jsonLd = buildBlogArticleJsonLd(article, locale);
@@ -96,7 +99,7 @@ export default async function BlogArticlePage({ params }: PageProps) {
     <main className="page-shell page-rhythm pb-12 pt-6">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
 
       <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm">

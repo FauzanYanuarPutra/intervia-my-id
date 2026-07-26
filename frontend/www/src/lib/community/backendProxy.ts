@@ -8,10 +8,17 @@ function getCommunityBackendBase(): string | null {
     process.env.INTERNAL_COMMUNITY_URL ||
     process.env.NEXT_PUBLIC_COMMUNITY_URL ||
     '';
-  return base.trim() || null;
+  const configured = base.trim();
+  if (configured) return configured;
+  return process.env.NODE_ENV === 'development'
+    ? 'http://127.0.0.1:8082'
+    : null;
 }
 
-function readCookieValue(cookieHeader: string | null, name: string): string | null {
+function readCookieValue(
+  cookieHeader: string | null,
+  name: string,
+): string | null {
   if (!cookieHeader) return null;
   const pattern = new RegExp(`(?:^|;\\s*)${name}=([^;]*)`);
   const match = cookieHeader.match(pattern);
@@ -24,7 +31,9 @@ function readForwardToken(req: Request): string | null {
     ?.replace(/^Bearer\s+/i, '')
     .trim();
   if (bearer) return bearer;
-  return readCookieValue(req.headers.get('cookie'), 'access_token')?.trim() || null;
+  return (
+    readCookieValue(req.headers.get('cookie'), 'access_token')?.trim() || null
+  );
 }
 
 function appendSearch(req: Request, upstream: URL) {
@@ -82,8 +91,9 @@ export async function proxyCommunityBackend(
 ): Promise<NextResponse> {
   const base = getCommunityBackendBase();
   if (!base) {
+    console.error('[COMMUNITY_BACKEND_CONFIG_MISSING]');
     return NextResponse.json(
-      { error: 'Community service is not configured' },
+      { error: 'Community service unavailable' },
       { status: 503 },
     );
   }
@@ -115,6 +125,11 @@ export async function proxyCommunityBackend(
 
   let body: ArrayBuffer | undefined;
   const method = options.method || req.method;
+  const range = req.headers.get('range');
+  if (method === 'GET' && range) {
+    headers.Range = range;
+  }
+
   if (method !== 'GET' && method !== 'HEAD') {
     body = await req.arrayBuffer();
     const contentType = req.headers.get('content-type');
@@ -148,11 +163,19 @@ export async function proxyCommunityBackend(
     if (cacheControl) {
       responseHeaders['cache-control'] = cacheControl;
     }
+    const isJsonContent = contentType
+      .toLowerCase()
+      .includes('application/json');
+    for (const headerName of ['accept-ranges', 'content-range']) {
+      const headerValue = response.headers.get(headerName);
+      if (headerValue) responseHeaders[headerName] = headerValue;
+    }
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && !isJsonContent) {
+      responseHeaders['content-length'] = contentLength;
+    }
 
-    if (
-      contentType.toLowerCase().includes('application/json') &&
-      bodyBuffer.byteLength
-    ) {
+    if (isJsonContent && bodyBuffer.byteLength) {
       try {
         const parsed = JSON.parse(
           new TextDecoder().decode(bodyBuffer),

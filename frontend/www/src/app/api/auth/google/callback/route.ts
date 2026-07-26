@@ -7,6 +7,14 @@ import {
 } from '@/lib/authSecurity';
 import { shouldUseSecureCookies } from '@/lib/server/forwardCookies';
 import { DEFAULT_PROFILE_AVATAR } from '@/lib/profile/avatar';
+import {
+  localizeCallbackPath,
+  preferredLocaleForCallback,
+  resolvePublicOrigin,
+  safeEqualState,
+  sanitizeInternalCallbackPath,
+} from '@/lib/auth/oauthRedirects';
+import { safeErrorCode } from '@/lib/server/safeLog';
 import { z } from 'zod';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -14,9 +22,13 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
 const GOOGLE_OAUTH_STATE_COOKIE = 'google_oauth_state';
 const GoogleCallbackQuerySchema = z.object({
-  code: z.string().optional(),
-  state: z.string().optional(),
-  error: z.string().optional(),
+  code: z.string().min(1).max(4096).optional(),
+  state: z.string().min(1).max(8192).optional(),
+  error: z.string().max(256).optional(),
+});
+const GoogleStateSchema = z.object({
+  callbackUrl: z.string().max(2048).optional(),
+  nonce: z.string().uuid(),
 });
 
 interface GoogleTokenResponse {
@@ -47,10 +59,12 @@ interface BackendOAuthResponse {
 }
 
 function getPublicBaseUrl(req: NextRequest): string {
-  const envBase =
-    process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL || '';
-  if (envBase.trim()) return envBase.replace(/\/$/, '');
-  return req.nextUrl.origin || 'https://www.lajukan.com';
+  return resolvePublicOrigin({
+    configuredOrigin:
+      process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
+    requestOrigin: req.nextUrl.origin,
+    production: process.env.NODE_ENV === 'production',
+  });
 }
 
 function getGoogleRedirectUri(req: NextRequest): string {
@@ -58,14 +72,6 @@ function getGoogleRedirectUri(req: NextRequest): string {
     process.env.GOOGLE_REDIRECT_URI ||
     `${getPublicBaseUrl(req)}/api/auth/google/callback`
   );
-}
-
-function sanitizeCallbackPath(input: string | undefined): string {
-  const fallback = '/home';
-  if (!input) return fallback;
-  if (!input.startsWith('/')) return fallback;
-  if (input.startsWith('//')) return fallback;
-  return input;
 }
 
 function clearGoogleOAuthState(response: NextResponse, secure: boolean) {
@@ -80,13 +86,24 @@ function clearGoogleOAuthState(response: NextResponse, secure: boolean) {
 
 function getPreferredLocale(
   req: NextRequest,
-  callbackUrl?: string,
+  callbackUrl = '/home',
 ): 'id' | 'en' {
-  if (callbackUrl?.startsWith('/en')) return 'en';
-  if (callbackUrl?.startsWith('/id')) return 'id';
   const cookieLocale =
     req.cookies.get('NEXT_LOCALE')?.value || req.cookies.get('locale')?.value;
-  return cookieLocale === 'en' ? 'en' : 'id';
+  return preferredLocaleForCallback(callbackUrl, cookieLocale);
+}
+
+function oauthFailureResponse(
+  baseUrl: string,
+  locale: 'id' | 'en',
+  errorCode: string,
+  secure: boolean,
+) {
+  const url = new URL(`/${locale}/login`, baseUrl);
+  url.searchParams.set('error', errorCode);
+  const response = NextResponse.redirect(url);
+  clearGoogleOAuthState(response, secure);
+  return response;
 }
 
 /**
@@ -123,50 +140,59 @@ export async function GET(req: NextRequest) {
     let stateNonce = '';
     if (state) {
       try {
-        const stateData = JSON.parse(
-          Buffer.from(state, 'base64url').toString(),
+        const parsedState = GoogleStateSchema.safeParse(
+          JSON.parse(Buffer.from(state, 'base64url').toString()),
         );
-        callbackUrl = sanitizeCallbackPath(stateData.callbackUrl);
-        stateNonce =
-          typeof stateData.nonce === 'string' ? stateData.nonce.trim() : '';
-      } catch { }
+        if (parsedState.success) {
+          callbackUrl = sanitizeInternalCallbackPath(
+            parsedState.data.callbackUrl,
+          );
+          stateNonce = parsedState.data.nonce;
+        }
+      } catch {}
     }
 
     const baseUrl = getPublicBaseUrl(req);
     const preferredLocale = getPreferredLocale(req, callbackUrl);
 
     if (error) {
-      console.error('Google OAuth error:', error);
-      const response = NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=oauth_failed`,
+      console.warn('Google OAuth provider returned an error', {
+        providerError: error.slice(0, 64),
+      });
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'oauth_failed',
+        secure,
       );
-      clearGoogleOAuthState(response, secure);
-      return response;
     }
 
     if (!code) {
-      const response = NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=no_code`,
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'no_code',
+        secure,
       );
-      clearGoogleOAuthState(response, secure);
-      return response;
     }
 
     const cookieNonce = req.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value || '';
-    if (!stateNonce || !cookieNonce || stateNonce !== cookieNonce) {
-      const response = NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=oauth_state_invalid`,
+    if (!safeEqualState(stateNonce, cookieNonce)) {
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'oauth_state_invalid',
+        secure,
       );
-      clearGoogleOAuthState(response, secure);
-      return response;
     }
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      const response = NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=oauth_not_configured`,
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'oauth_not_configured',
+        secure,
       );
-      clearGoogleOAuthState(response, secure);
-      return response;
     }
 
     // Exchange code for tokens
@@ -184,8 +210,11 @@ export async function GET(req: NextRequest) {
 
     if (!tokenResponse.ok) {
       console.error('Failed to exchange code for tokens');
-      return NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=token_exchange_failed`,
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'token_exchange_failed',
+        secure,
       );
     }
 
@@ -201,8 +230,11 @@ export async function GET(req: NextRequest) {
 
     if (!userInfoResponse.ok) {
       console.error('Failed to get user info from Google');
-      return NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=user_info_failed`,
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'user_info_failed',
+        secure,
       );
     }
 
@@ -228,14 +260,15 @@ export async function GET(req: NextRequest) {
     });
 
     if (!backendResponse.ok) {
-      const backendError = await backendResponse.text().catch(() => '');
       console.error('Backend OAuth failed', {
         status: backendResponse.status,
-        body: backendError.slice(0, 500),
       });
-      // return NextResponse.redirect(
-      //   `${baseUrl}/${preferredLocale}/login?error=backend_failed`,
-      // );
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'backend_failed',
+        secure,
+      );
     }
 
     const authData: BackendOAuthResponse = await backendResponse.json();
@@ -243,8 +276,11 @@ export async function GET(req: NextRequest) {
     const backendSessionId = authData.session_id?.trim() || undefined;
     if (!userId || !authData.access_token) {
       console.error('Backend OAuth response missing required fields');
-      return NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=backend_invalid_response`,
+      return oauthFailureResponse(
+        baseUrl,
+        preferredLocale,
+        'backend_invalid_response',
+        secure,
       );
     }
 
@@ -268,7 +304,7 @@ export async function GET(req: NextRequest) {
 
     // Create response with cookies
     const response = NextResponse.redirect(
-      `${baseUrl}/${preferredLocale}${callbackUrl}`,
+      new URL(localizeCallbackPath(callbackUrl, preferredLocale), baseUrl),
     );
 
     response.cookies.set('access_token', authData.access_token, {
@@ -305,12 +341,17 @@ export async function GET(req: NextRequest) {
     clearGoogleOAuthState(response, secure);
 
     return response;
-  } catch (e) {
-    console.error('Google OAuth callback error:', e);
+  } catch (error) {
+    console.error('Google OAuth callback error', {
+      error: safeErrorCode(error),
+    });
     const baseUrl = getPublicBaseUrl(req);
     const preferredLocale = getPreferredLocale(req);
-    return NextResponse.redirect(
-      `${baseUrl}/${preferredLocale}/login?error=oauth_error`,
+    return oauthFailureResponse(
+      baseUrl,
+      preferredLocale,
+      'oauth_error',
+      secure,
     );
   }
 }

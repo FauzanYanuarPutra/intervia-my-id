@@ -51,12 +51,6 @@ export function useHorizontalDragScroll<T extends HTMLElement = HTMLDivElement>(
       startScrollLeft: rail.scrollLeft,
       dragging: false,
     };
-
-    try {
-      rail.setPointerCapture(event.pointerId);
-    } catch {
-      // Best effort. Browsers that do not support capture will still work.
-    }
   }, []);
 
   const onPointerMove = useCallback((event: ReactPointerEvent<T>) => {
@@ -69,6 +63,12 @@ export function useHorizontalDragScroll<T extends HTMLElement = HTMLDivElement>(
 
     if (!state.dragging) {
       state.dragging = true;
+
+      try {
+        rail.setPointerCapture(event.pointerId);
+      } catch {
+        // Best effort. Browsers that do not support capture will still work.
+      }
     }
 
     const maxScrollLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);

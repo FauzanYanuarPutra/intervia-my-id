@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   collectUploadFiles,
-  readUploadToken,
   storeValidatedUploads,
   uploadErrorResponse,
   uploadSuccessResponse,
 } from '@/lib/server/uploadFiles';
 import { DOCUMENT_UPLOAD_MAX_BYTES } from '@/lib/media/uploadStandard';
+import { guardUploadRequest } from '@/lib/server/uploadGuard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,9 +26,8 @@ const DOCUMENT_KEYS = [
 
 export async function POST(req: NextRequest) {
   try {
-    if (!readUploadToken(req)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await guardUploadRequest(req, 'content:document');
+    if (!guard.ok) return guard.response;
 
     const files = collectUploadFiles(await req.formData(), DOCUMENT_KEYS);
     if (files.length === 0) {
@@ -65,10 +64,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('[UPLOAD_FILES_ERROR]', error);
     return NextResponse.json(
-      {
-        error: 'Upload failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { error: 'Upload failed' },
       { status: 500 },
     );
   }

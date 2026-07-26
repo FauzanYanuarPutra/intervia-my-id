@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import SimpleCreateFlow from '../SimpleCreateFlow';
+import CreateListingWizard from '../CreateListingWizard';
 import {
   buildCreateBasePath,
   normalizeCreateFlowSegment,
@@ -15,7 +15,7 @@ export default async function CreateFlowPage({ params }: PageProps) {
   const intent = normalizeCreateFlowSegment(flow);
   if (!intent) notFound();
 
-  return <SimpleCreateFlow entryMode={intent} />;
+  return <CreateListingWizard entryMode={intent} />;
 }
 
 export async function generateMetadata({

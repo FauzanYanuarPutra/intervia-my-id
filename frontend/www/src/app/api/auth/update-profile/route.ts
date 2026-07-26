@@ -10,6 +10,39 @@ import { z } from 'zod';
 
 const API_URL = process.env.INTERNAL_API_URL || 'http://localhost:8080';
 
+function getCommunityApiUrl(): string | null {
+  const configured =
+    process.env.COMMUNITY_SERVICE_URL ||
+    process.env.INTERNAL_COMMUNITY_URL ||
+    '';
+  if (configured.trim()) return configured.trim().replace(/\/$/, '');
+  return process.env.NODE_ENV === 'development'
+    ? 'http://127.0.0.1:8082'
+    : null;
+}
+
+async function syncCommunityProfile(token: string): Promise<void> {
+  const communityApiUrl = getCommunityApiUrl();
+  if (!communityApiUrl) return;
+
+  try {
+    const response = await fetch(
+      `${communityApiUrl}/v1/community/profile/sync`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(2500),
+      },
+    );
+    if (!response.ok) {
+      console.warn('[COMMUNITY_PROFILE_SYNC_FAILED]', response.status);
+    }
+  } catch (error) {
+    console.warn('[COMMUNITY_PROFILE_SYNC_UNAVAILABLE]', error);
+  }
+}
+
 const UpdateProfileSchema = z
   .object({
     name: z.string().min(1).optional(),
@@ -125,6 +158,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const data = await res.json();
+    await syncCommunityProfile(token);
     return NextResponse.json(data);
   } catch (e) {
     console.error('Update profile error:', e);

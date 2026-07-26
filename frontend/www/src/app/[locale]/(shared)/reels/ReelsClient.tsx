@@ -13,9 +13,7 @@ import {
   type CSSProperties,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
-  type TouchEvent,
   type UIEvent,
-  type WheelEvent,
 } from 'react';
 import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
 import {
@@ -65,6 +63,43 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
+import {
+  MEDIA_UPLOAD_RAW_MAX_BYTES,
+  MEDIA_UPLOAD_RAW_MAX_MB,
+} from '@/lib/media/uploadStandard';
+import { getUserMediaErrorName } from '@/lib/mediaDevices';
+import {
+  DEFAULT_REELS_PERFORMANCE_PROFILE,
+  buildReelsCameraConstraints,
+  getReelsRecordingExtension,
+  needsReelsCanvasPipeline,
+  readReelsPerformanceProfile,
+  selectReelsRecorderMimeType,
+  type ReelsPerformanceProfile,
+} from '@/lib/reels/performance';
+import {
+  boostReelPreferenceProfile as boostProfile,
+  createEmptyReelPreferenceProfile as emptyProfile,
+  formatCompactReelMetric as formatCompactMetric,
+  getReelMetricCount as metricCount,
+  getReelPreferenceTokens as reelTokens,
+  getTopReelPreferenceTerms as topProfileTerms,
+  rankReelsByPreference as rankItems,
+  readReelPreferenceProfile as readProfile,
+  readReelsMutedPreference as readInitialMuted,
+  scoreReelPreference as scoreReel,
+  tokenizeReelText as tokenize,
+  writeReelPreferenceProfile as writeProfile,
+  writeReelsMutedPreference as writeSoundPreference,
+  type ReelPreferenceProfile as PreferenceProfile,
+} from '@/lib/reels/preferences';
+import {
+  appendHrefQuery as appendQuery,
+  buildLocalizedHref as localizedHref,
+  formatReelCommentTime as formatCommentTime,
+  isDirectReelVideoUrl as isDirectVideoMediaUrl,
+  isReelImageUrl as isImageMediaUrl,
+} from '@/lib/reels/presentation';
 import { PROFILE_SOCIAL_STORAGE_KEY } from '@/components/profile/profile-hub/services/profileStorage.service';
 import {
   mapDiscoverUserToSocialUser,
@@ -74,11 +109,15 @@ import {
   normalizePlayableReel,
   normalizePlayableReels,
   REELS_PAGE_SIZE,
+  isVideoReel,
   type LajukanReel,
   type ReelsPageResult,
 } from '../../_data/reels';
 import type { InboxNotification } from '@/context/NotificationInboxContext';
-import type { DiscoverUser, SocialUser } from '@/components/profile/profile-hub/types/profileSocial';
+import type {
+  DiscoverUser,
+  SocialUser,
+} from '@/components/profile/profile-hub/types/profileSocial';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
@@ -156,8 +195,14 @@ type UploadReelStep = 'media' | 'edit' | 'post';
 
 type ReelsFeedTab = 'fyp' | 'friends' | 'following';
 
-type ReelsStudioMode = 'gallery' | 'photo' | 'video' | 'live';
-type ReelsStudioPanel = 'filters' | 'effects' | 'music' | 'speed' | null;
+type ReelsStudioMode = 'gallery' | 'photo' | 'video' | 'link' | 'live';
+type ReelsStudioPanel =
+  | 'filters'
+  | 'effects'
+  | 'music'
+  | 'speed'
+  | 'link'
+  | null;
 type ReelsStudioSpeed = (typeof REELS_STUDIO_SPEEDS)[number];
 type ReelsStudioDuration = (typeof REELS_STUDIO_DURATIONS)[number];
 type ReelsStudioEffect =
@@ -170,13 +215,6 @@ type ReelsStudioEffect =
   | 'grain';
 type ReelsStudioFacingMode = 'environment' | 'user';
 
-type PreferenceProfile = {
-  terms: Record<string, number>;
-  searches: string[];
-  signals: number;
-  updatedAt: number;
-};
-
 type ShareSheetRecipient = SocialUser & {
   source: 'creator' | 'following' | 'suggested';
   linked: boolean;
@@ -184,41 +222,16 @@ type ShareSheetRecipient = SocialUser & {
 
 type NotificationData = Record<string, unknown>;
 
-const PROFILE_STORAGE_KEY = 'lajukan.reels.preference.v1';
-const SOUND_STORAGE_KEY = 'lajukan.reels.sound.v1';
 const REELS_SNAP_LOCK_MS = 520;
-const REELS_WHEEL_THRESHOLD = 42;
-const REELS_TOUCH_THRESHOLD = 46;
 const REELS_AUTO_SCROLL_MS = 11000;
-const REELS_RENDER_WINDOW = 2;
+const REELS_FEED_REQUEST_TIMEOUT_MS = 8_000;
 const REEL_SLIDE_LOADED_STYLE: CSSProperties = {
   contentVisibility: 'visible',
 };
 const REEL_SLIDE_PLACEHOLDER_STYLE: CSSProperties = {
   contentVisibility: 'auto',
-  containIntrinsicSize: '100svh 430px',
+  containIntrinsicSize: '430px var(--app-visual-viewport-height)',
 };
-const STOP_WORDS = new Set([
-  'dan',
-  'atau',
-  'yang',
-  'untuk',
-  'dengan',
-  'the',
-  'and',
-  'for',
-  'a',
-  'an',
-  'to',
-  'of',
-  'di',
-  'ke',
-  'ini',
-  'itu',
-  'buat',
-  'cara',
-]);
-
 function normalizeRecipientName(value: string): string {
   return value
     .toLowerCase()
@@ -226,7 +239,9 @@ function normalizeRecipientName(value: string): string {
     .trim();
 }
 
-function readNotificationData(notification: InboxNotification): NotificationData {
+function readNotificationData(
+  notification: InboxNotification,
+): NotificationData {
   const data = notification.data;
   return data && typeof data === 'object' && !Array.isArray(data)
     ? (data as NotificationData)
@@ -387,31 +402,49 @@ const EMPTY_UPLOAD_FORM: UploadReelForm = {
   productHref: '',
 };
 
+const REELS_VIDEO_EXTENSIONS = /\.(m4v|mov|mp4|webm)$/i;
+
+function isPlayableReelsVideoFile(file: File) {
+  return (
+    file.type.startsWith('video/') || REELS_VIDEO_EXTENSIONS.test(file.name)
+  );
+}
+
+function buildCleanReelTitleFromFile(file: File) {
+  const cleaned = file.name
+    .replace(/\.[^.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return 'Video usaha';
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1, 90);
+}
+
 const REEL_CAPTURE_MODES: Array<{
   id: NonNullable<LajukanReel['captureMode']>;
   label: string;
   helper: string;
   icon: LucideIcon;
 }> = [
-    {
-      id: 'camera',
-      label: 'Kamera',
-      helper: 'Rekam cepat',
-      icon: Camera,
-    },
-    {
-      id: 'upload',
-      label: 'Galeri',
-      helper: 'Pilih file',
-      icon: Upload,
-    },
-    {
-      id: 'live',
-      label: 'Live',
-      helper: 'Jadwal siaran',
-      icon: Radio,
-    },
-  ];
+  {
+    id: 'camera',
+    label: 'Kamera',
+    helper: 'Rekam cepat',
+    icon: Camera,
+  },
+  {
+    id: 'upload',
+    label: 'Galeri',
+    helper: 'Pilih file',
+    icon: Upload,
+  },
+  {
+    id: 'live',
+    label: 'Live',
+    helper: 'Jadwal siaran',
+    icon: Radio,
+  },
+];
 
 const REELS_STUDIO_MODES: Array<{
   id: ReelsStudioMode;
@@ -419,31 +452,37 @@ const REELS_STUDIO_MODES: Array<{
   helper: string;
   icon: LucideIcon;
 }> = [
-    {
-      id: 'gallery',
-      label: 'Galeri',
-      helper: 'Ambil file',
-      icon: Upload,
-    },
-    {
-      id: 'photo',
-      label: 'Foto',
-      helper: 'Jepret cepat',
-      icon: Camera,
-    },
-    {
-      id: 'video',
-      label: 'Video',
-      helper: 'Rekam',
-      icon: Clapperboard,
-    },
-    {
-      id: 'live',
-      label: 'Live',
-      helper: 'Siaran',
-      icon: Radio,
-    },
-  ];
+  {
+    id: 'gallery',
+    label: 'Galeri',
+    helper: 'Ambil file',
+    icon: Upload,
+  },
+  {
+    id: 'photo',
+    label: 'Foto',
+    helper: 'Jepret cepat',
+    icon: Camera,
+  },
+  {
+    id: 'video',
+    label: 'Video',
+    helper: 'Rekam',
+    icon: Clapperboard,
+  },
+  {
+    id: 'link',
+    label: 'Link',
+    helper: 'Video URL',
+    icon: Link2,
+  },
+  {
+    id: 'live',
+    label: 'Live',
+    helper: 'Siaran',
+    icon: Radio,
+  },
+];
 
 const REELS_MUSIC_TRACKS = [
   'Original sound',
@@ -455,9 +494,6 @@ const REELS_MUSIC_TRACKS = [
 
 const REELS_STUDIO_SPEEDS = ['0,25x', '0,5x', '1x', '1,5x', '2x'] as const;
 const REELS_STUDIO_DURATIONS = ['60s', '15s', '05s'] as const;
-const REELS_CAPTURE_CANVAS_WIDTH = 540;
-const REELS_CAPTURE_CANVAS_HEIGHT = 960;
-const REELS_CAPTURE_FPS = 24;
 
 const REEL_FILTER_PRESETS: Array<{
   id: NonNullable<LajukanReel['filterPreset']>;
@@ -466,49 +502,49 @@ const REEL_FILTER_PRESETS: Array<{
   css: string;
   swatch: string;
 }> = [
-    {
-      id: 'natural',
-      label: 'Asli',
-      helper: 'warna normal',
-      css: 'none',
-      swatch: 'bg-gradient-to-br from-slate-100 via-white to-emerald-100',
-    },
-    {
-      id: 'fresh',
-      label: 'Fresh',
-      helper: 'produk lebih segar',
-      css: 'saturate(1.12) contrast(1.04) brightness(1.03)',
-      swatch: 'bg-gradient-to-br from-emerald-200 via-teal-100 to-white',
-    },
-    {
-      id: 'warm',
-      label: 'Warm',
-      helper: 'kuliner hangat',
-      css: 'sepia(0.08) saturate(1.14) contrast(1.02) brightness(1.02)',
-      swatch: 'bg-gradient-to-br from-amber-200 via-orange-100 to-white',
-    },
-    {
-      id: 'pop',
-      label: 'Pop',
-      helper: 'promo mencolok',
-      css: 'saturate(1.28) contrast(1.08)',
-      swatch: 'bg-gradient-to-br from-rose-200 via-fuchsia-100 to-sky-100',
-    },
-    {
-      id: 'cinema',
-      label: 'Cinema',
-      helper: 'lebih dramatis',
-      css: 'contrast(1.12) saturate(0.94) brightness(0.96)',
-      swatch: 'bg-gradient-to-br from-slate-900 via-slate-500 to-amber-100',
-    },
-    {
-      id: 'mono',
-      label: 'Mono',
-      helper: 'hitam putih',
-      css: 'grayscale(1) contrast(1.1)',
-      swatch: 'bg-gradient-to-br from-slate-950 via-slate-400 to-white',
-    },
-  ];
+  {
+    id: 'natural',
+    label: 'Asli',
+    helper: 'warna normal',
+    css: 'none',
+    swatch: 'bg-gradient-to-br from-slate-100 via-white to-emerald-100',
+  },
+  {
+    id: 'fresh',
+    label: 'Fresh',
+    helper: 'produk lebih segar',
+    css: 'saturate(1.12) contrast(1.04) brightness(1.03)',
+    swatch: 'bg-gradient-to-br from-emerald-200 via-teal-100 to-white',
+  },
+  {
+    id: 'warm',
+    label: 'Warm',
+    helper: 'kuliner hangat',
+    css: 'sepia(0.08) saturate(1.14) contrast(1.02) brightness(1.02)',
+    swatch: 'bg-gradient-to-br from-amber-200 via-orange-100 to-white',
+  },
+  {
+    id: 'pop',
+    label: 'Pop',
+    helper: 'promo mencolok',
+    css: 'saturate(1.28) contrast(1.08)',
+    swatch: 'bg-gradient-to-br from-rose-200 via-fuchsia-100 to-sky-100',
+  },
+  {
+    id: 'cinema',
+    label: 'Cinema',
+    helper: 'lebih dramatis',
+    css: 'contrast(1.12) saturate(0.94) brightness(0.96)',
+    swatch: 'bg-gradient-to-br from-slate-900 via-slate-500 to-amber-100',
+  },
+  {
+    id: 'mono',
+    label: 'Mono',
+    helper: 'hitam putih',
+    css: 'grayscale(1) contrast(1.1)',
+    swatch: 'bg-gradient-to-br from-slate-950 via-slate-400 to-white',
+  },
+];
 
 const REELS_STUDIO_EFFECTS: Array<{
   id: ReelsStudioEffect;
@@ -516,57 +552,51 @@ const REELS_STUDIO_EFFECTS: Array<{
   helper: string;
   swatch: string;
 }> = [
-    {
-      id: 'none',
-      label: 'Original',
-      helper: 'tanpa efek',
-      swatch: 'bg-gradient-to-br from-white via-slate-100 to-slate-300',
-    },
-    {
-      id: 'clean',
-      label: 'Clean',
-      helper: 'cahaya halus',
-      swatch: 'bg-gradient-to-br from-white via-emerald-100 to-sky-100',
-    },
-    {
-      id: 'product',
-      label: 'Product',
-      helper: 'produk pop',
-      swatch: 'bg-gradient-to-br from-yellow-200 via-white to-rose-200',
-    },
-    {
-      id: 'focus',
-      label: 'Focus',
-      helper: 'vignette',
-      swatch: 'bg-gradient-to-br from-slate-950 via-slate-500 to-white',
-    },
-    {
-      id: 'scan',
-      label: 'Scan',
-      helper: 'garis preview',
-      swatch:
-        'bg-[repeating-linear-gradient(180deg,#67e8f9_0_3px,#0f172a_3px_7px)]',
-    },
-    {
-      id: 'dog',
-      label: 'Dog',
-      helper: 'kuping + hidung',
-      swatch:
-        'bg-[radial-gradient(circle_at_30%_18%,#92400e_0_18%,transparent_19%),radial-gradient(circle_at_70%_18%,#92400e_0_18%,transparent_19%),radial-gradient(circle_at_50%_58%,#111827_0_16%,transparent_17%),#fef3c7]',
-    },
-    {
-      id: 'grain',
-      label: 'Grain',
-      helper: 'tekstur halus',
-      swatch:
-        'bg-[radial-gradient(circle_at_30%_20%,#fef3c7,transparent_24%),radial-gradient(circle_at_70%_64%,#e879f9,transparent_22%),#111827]',
-    },
-  ];
-
-const REELS_FEED_TABS: Array<{ id: ReelsFeedTab; label: string }> = [
-  { id: 'fyp', label: 'FYP' },
-  { id: 'friends', label: 'Teman' },
-  { id: 'following', label: 'Diikuti' },
+  {
+    id: 'none',
+    label: 'Original',
+    helper: 'tanpa efek',
+    swatch: 'bg-gradient-to-br from-white via-slate-100 to-slate-300',
+  },
+  {
+    id: 'clean',
+    label: 'Clean',
+    helper: 'cahaya halus',
+    swatch: 'bg-gradient-to-br from-white via-emerald-100 to-sky-100',
+  },
+  {
+    id: 'product',
+    label: 'Product',
+    helper: 'produk pop',
+    swatch: 'bg-gradient-to-br from-yellow-200 via-white to-rose-200',
+  },
+  {
+    id: 'focus',
+    label: 'Focus',
+    helper: 'vignette',
+    swatch: 'bg-gradient-to-br from-slate-950 via-slate-500 to-white',
+  },
+  {
+    id: 'scan',
+    label: 'Scan',
+    helper: 'garis preview',
+    swatch:
+      'bg-[repeating-linear-gradient(180deg,#67e8f9_0_3px,#0f172a_3px_7px)]',
+  },
+  {
+    id: 'dog',
+    label: 'Dog',
+    helper: 'kuping + hidung',
+    swatch:
+      'bg-[radial-gradient(circle_at_30%_18%,#92400e_0_18%,transparent_19%),radial-gradient(circle_at_70%_18%,#92400e_0_18%,transparent_19%),radial-gradient(circle_at_50%_58%,#111827_0_16%,transparent_17%),#fef3c7]',
+  },
+  {
+    id: 'grain',
+    label: 'Grain',
+    helper: 'tekstur halus',
+    swatch:
+      'bg-[radial-gradient(circle_at_30%_20%,#fef3c7,transparent_24%),radial-gradient(circle_at_70%_64%,#e879f9,transparent_22%),#111827]',
+  },
 ];
 
 const SIGNAL_WEIGHT: Record<ReelsSignal | ReelUserAction, number> = {
@@ -638,6 +668,69 @@ function getStudioDurationMs(duration: ReelsStudioDuration) {
   return Math.max(Number.isFinite(seconds) ? seconds : 15, 5) * 1000;
 }
 
+type VideoFramePumpElement = HTMLVideoElement & {
+  requestVideoFrameCallback?: (callback: (now: number) => void) => number;
+  cancelVideoFrameCallback?: (handle: number) => void;
+};
+
+function startVideoFramePump(
+  video: HTMLVideoElement,
+  fps: number,
+  paintFrame: () => void,
+): () => void {
+  const targetFrameDuration = 1000 / Math.max(1, fps);
+  const frameVideo = video as VideoFramePumpElement;
+
+  if (frameVideo.requestVideoFrameCallback) {
+    let stopped = false;
+    let frameHandle = 0;
+    let lastPaintedAt = 0;
+    const tick = (now: number) => {
+      if (stopped) return;
+      if (now - lastPaintedAt >= targetFrameDuration - 2) {
+        lastPaintedAt = now;
+        paintFrame();
+      }
+      frameHandle = frameVideo.requestVideoFrameCallback!(tick);
+    };
+    frameHandle = frameVideo.requestVideoFrameCallback(tick);
+    return () => {
+      stopped = true;
+      frameVideo.cancelVideoFrameCallback?.(frameHandle);
+    };
+  }
+
+  const interval = window.setInterval(
+    paintFrame,
+    Math.max(Math.round(targetFrameDuration), 20),
+  );
+  return () => window.clearInterval(interval);
+}
+
+function getReelsCameraErrorMessage(error: unknown, locale: string): string {
+  const isId = locale === 'id';
+  const name = getUserMediaErrorName(error);
+
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return isId
+      ? 'Izin kamera ditolak. Izinkan kamera di pengaturan browser, lalu coba lagi.'
+      : 'Camera permission was denied. Allow it in browser settings, then try again.';
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return isId
+      ? 'Kamera tidak ditemukan di perangkat ini. Kamu masih bisa pilih video dari galeri.'
+      : 'No camera was found. You can still choose a video from the gallery.';
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return isId
+      ? 'Kamera sedang dipakai aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.'
+      : 'The camera is being used by another app. Close it and try again.';
+  }
+  return isId
+    ? 'Kamera belum bisa dibuka. Coba lagi atau pilih video dari galeri.'
+    : 'The camera could not be opened. Try again or choose a gallery video.';
+}
+
 function drawVideoCoverFrame(
   context: CanvasRenderingContext2D,
   video: HTMLVideoElement,
@@ -662,35 +755,6 @@ function drawVideoCoverFrame(
   }
 
   context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
-}
-
-function drawVideoContainFrame(
-  context: CanvasRenderingContext2D,
-  video: HTMLVideoElement,
-  width: number,
-  height: number,
-) {
-  const sourceWidth = video.videoWidth || width;
-  const sourceHeight = video.videoHeight || height;
-  const targetRatio = width / height;
-  const sourceRatio = sourceWidth / sourceHeight;
-
-  let dx = 0;
-  let dy = 0;
-  let dw = width;
-  let dh = height;
-
-  if (sourceRatio > targetRatio) {
-    dh = width / sourceRatio;
-    dy = (height - dh) / 2;
-  } else {
-    dw = height * sourceRatio;
-    dx = (width - dw) / 2;
-  }
-
-  context.fillStyle = '#000';
-  context.fillRect(0, 0, width, height);
-  context.drawImage(video, 0, 0, sourceWidth, sourceHeight, dx, dy, dw, dh);
 }
 
 function drawStudioCanvasEffect(
@@ -882,197 +946,6 @@ function readActionValue(state: ReelActionState, action: ReelUserAction) {
   return state.followed;
 }
 
-const compactMultipliers: Record<string, number> = {
-  K: 1_000,
-  M: 1_000_000,
-  B: 1_000_000_000,
-  T: 1_000_000_000_000,
-};
-
-function emptyProfile(): PreferenceProfile {
-  return { terms: {}, searches: [], signals: 0, updatedAt: Date.now() };
-}
-
-function readProfile(): PreferenceProfile {
-  if (typeof window === 'undefined') return emptyProfile();
-
-  try {
-    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
-    if (!raw) return emptyProfile();
-    const parsed = JSON.parse(raw) as Partial<PreferenceProfile>;
-
-    return {
-      terms:
-        parsed.terms && typeof parsed.terms === 'object' ? parsed.terms : {},
-      searches: Array.isArray(parsed.searches)
-        ? parsed.searches.slice(0, 12)
-        : [],
-      signals: Number.isFinite(parsed.signals) ? Number(parsed.signals) : 0,
-      updatedAt: Number.isFinite(parsed.updatedAt)
-        ? Number(parsed.updatedAt)
-        : Date.now(),
-    };
-  } catch {
-    return emptyProfile();
-  }
-}
-
-function writeProfile(profile: PreferenceProfile) {
-  if (typeof window === 'undefined') return;
-
-  try {
-    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-  } catch { }
-}
-
-function readInitialMuted() {
-  if (typeof window === 'undefined') return true;
-
-  try {
-    return window.localStorage.getItem(SOUND_STORAGE_KEY) !== 'on';
-  } catch {
-    return true;
-  }
-}
-
-function writeSoundPreference(muted: boolean) {
-  if (typeof window === 'undefined') return;
-
-  try {
-    window.localStorage.setItem(SOUND_STORAGE_KEY, muted ? 'off' : 'on');
-  } catch { }
-}
-
-function normalizeToken(value: string) {
-  return value
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
-    .trim();
-}
-
-function tokenize(value: string) {
-  return normalizeToken(value)
-    .split(/\s+/)
-    .map(token => token.replace(/^-+|-+$/g, ''))
-    .filter(token => token.length > 2 && !STOP_WORDS.has(token));
-}
-
-function reelTokens(reel: LajukanReel) {
-  return [
-    ...tokenize(reel.title),
-    ...tokenize(reel.creator),
-    ...tokenize(reel.caption),
-    ...tokenize(reel.tag),
-    ...tokenize(reel.productName || ''),
-    ...tokenize(reel.productPrice || ''),
-  ];
-}
-
-function boostProfile(
-  profile: PreferenceProfile,
-  tokens: string[],
-  weight: number,
-  search?: string,
-) {
-  const next: PreferenceProfile = {
-    terms: { ...profile.terms },
-    searches: [...profile.searches],
-    signals: profile.signals + 1,
-    updatedAt: Date.now(),
-  };
-
-  tokens.forEach(token => {
-    next.terms[token] = Math.min((next.terms[token] || 0) + weight, 999);
-  });
-
-  const normalizedSearch = normalizeToken(search || '');
-  if (normalizedSearch) {
-    next.searches = [
-      normalizedSearch,
-      ...next.searches.filter(item => item !== normalizedSearch),
-    ].slice(0, 12);
-    tokenize(normalizedSearch).forEach(token => {
-      next.terms[token] = Math.min(
-        (next.terms[token] || 0) + weight * 1.4,
-        999,
-      );
-    });
-  }
-
-  return next;
-}
-
-function scoreReel(reel: LajukanReel, profile: PreferenceProfile, query = '') {
-  const tokens = reelTokens(reel);
-  const queryTokens = tokenize(query);
-  const preferenceScore = tokens.reduce(
-    (total, token) => total + (profile.terms[token] || 0),
-    0,
-  );
-  const queryScore = queryTokens.reduce(
-    (total, token) => total + (tokens.includes(token) ? 80 : 0),
-    0,
-  );
-
-  return preferenceScore + queryScore;
-}
-
-function topProfileTerms(profile: PreferenceProfile) {
-  return Object.entries(profile.terms)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([term]) => term);
-}
-
-function rankItems(items: LajukanReel[], profile: PreferenceProfile) {
-  return [...items].sort(
-    (a, b) => scoreReel(b, profile) - scoreReel(a, profile),
-  );
-}
-
-function parseCompactMetric(value: string) {
-  const match = value.trim().match(/^([\d.,]+)\s*([KMBT])?/i);
-  if (!match) return 0;
-  const amount = Number.parseFloat(match[1].replace(',', '.'));
-  const suffix = (match[2] || '').toUpperCase();
-  return Math.round(amount * (compactMultipliers[suffix] || 1));
-}
-
-function formatCompactMetric(value: number) {
-  const suffixes = ['', 'K', 'M', 'B', 'T'];
-  let scaled = Math.max(value, 0);
-  let suffixIndex = 0;
-
-  while (scaled >= 1000 && suffixIndex < suffixes.length - 1) {
-    scaled /= 1000;
-    suffixIndex += 1;
-  }
-
-  const formatted =
-    scaled >= 100 || suffixIndex === 0
-      ? Math.round(scaled).toString()
-      : scaled >= 10
-        ? scaled.toFixed(1)
-        : scaled.toFixed(2);
-
-  return `${formatted.replace(/\.0+$/, '')}${suffixes[suffixIndex]}`;
-}
-
-function metricCount(
-  reel: LajukanReel,
-  field: 'likes' | 'comments' | 'shares',
-) {
-  const numericKey = `${field}Count` as
-    | 'likesCount'
-    | 'commentsCount'
-    | 'sharesCount';
-  const numeric = reel[numericKey];
-  return typeof numeric === 'number' && Number.isFinite(numeric)
-    ? numeric
-    : parseCompactMetric(reel[field]);
-}
-
 function buildReelShareUrl(locale: string, reel: LajukanReel | null) {
   const fallbackPath = `/${locale}/reels`;
   if (typeof window === 'undefined') return fallbackPath;
@@ -1111,6 +984,47 @@ function readReelMetadataText(reel: LajukanReel, ...keys: string[]): string {
   }
 
   return '';
+}
+
+function readReelMetadataNumber(reel: LajukanReel, ...keys: string[]): number {
+  const metadata = reel.metadata;
+  if (!metadata) return 0;
+
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.max(0, value);
+    }
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return Math.max(0, parsed);
+    }
+  }
+
+  return 0;
+}
+
+function getReelCreatorStats(reel: LajukanReel) {
+  return {
+    followers: readReelMetadataNumber(
+      reel,
+      'creator_followers_count',
+      'followers_count',
+      'followersCount',
+    ),
+    following: readReelMetadataNumber(
+      reel,
+      'creator_following_count',
+      'following_count',
+      'followingCount',
+    ),
+    reels: readReelMetadataNumber(
+      reel,
+      'creator_reels_count',
+      'reels_count',
+      'reelsCount',
+    ),
+  };
 }
 
 function getReelCreatorAvatarSrc(reel: LajukanReel) {
@@ -1182,8 +1096,6 @@ export default function ReelsClient({
   const loadingRef = useRef(false);
   const firstScrollDoneRef = useRef(false);
   const scrollLockRef = useRef(false);
-  const wheelDeltaRef = useRef(0);
-  const touchStartYRef = useRef<number | null>(null);
   const normalizedInitialItems = useMemo(
     () => normalizePlayableReels(initialItems),
     [initialItems],
@@ -1199,12 +1111,12 @@ export default function ReelsClient({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [profile, setProfile] = useState<PreferenceProfile>(() =>
     emptyProfile(),
   );
 
   const [activeIndex, setActiveIndex] = useState(safeInitialIndex);
-  const [feedTab, setFeedTab] = useState<ReelsFeedTab>('fyp');
   const [searchContextQuery, setSearchContextQuery] = useState(
     initialSearchQuery.trim(),
   );
@@ -1213,6 +1125,9 @@ export default function ReelsClient({
   const [pausedByUser, setPausedByUser] = useState(false);
   const [autoScroll] = useState(false);
   const [bufferingId, setBufferingId] = useState<string | null>(null);
+  const [pageVisible, setPageVisible] = useState(true);
+  const [performanceProfile, setPerformanceProfile] =
+    useState<ReelsPerformanceProfile>(DEFAULT_REELS_PERFORMANCE_PROFILE);
 
   const [searchOpen, setSearchOpen] = useState(Boolean(initialSearchQuery));
   const [searchSeed, setSearchSeed] = useState(initialSearchQuery);
@@ -1221,6 +1136,8 @@ export default function ReelsClient({
   const [commentsReel, setCommentsReel] = useState<LajukanReel | null>(null);
   const [shareReel, setShareReel] = useState<LajukanReel | null>(null);
   const [actionsReel, setActionsReel] = useState<LajukanReel | null>(null);
+  const [creatorProfileReel, setCreatorProfileReel] =
+    useState<LajukanReel | null>(null);
   const [commentsByReel, setCommentsByReel] = useState<
     Record<string, ReelCommentsBucket>
   >({});
@@ -1240,6 +1157,36 @@ export default function ReelsClient({
     commentsByReelRef.current = commentsByReel;
   }, [commentsByReel]);
 
+  useEffect(() => {
+    const updateProfile = () =>
+      setPerformanceProfile(readReelsPerformanceProfile());
+    const connection = (
+      navigator as Navigator & {
+        connection?: {
+          addEventListener?: (type: string, listener: () => void) => void;
+          removeEventListener?: (type: string, listener: () => void) => void;
+        };
+      }
+    ).connection;
+
+    updateProfile();
+    window.addEventListener('resize', updateProfile, { passive: true });
+    connection?.addEventListener?.('change', updateProfile);
+
+    return () => {
+      window.removeEventListener('resize', updateProfile);
+      connection?.removeEventListener?.('change', updateProfile);
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateVisibility = () => setPageVisible(!document.hidden);
+    updateVisibility();
+    document.addEventListener('visibilitychange', updateVisibility);
+    return () =>
+      document.removeEventListener('visibilitychange', updateVisibility);
+  }, []);
+
   const overlayOpen =
     searchOpen ||
     detailReel !== null ||
@@ -1247,8 +1194,42 @@ export default function ReelsClient({
     commentsReel !== null ||
     shareReel !== null ||
     actionsReel !== null ||
+    creatorProfileReel !== null ||
     uploadOpen ||
     authPrompt !== null;
+
+  const playVideoWithPolicyFallback = useCallback(
+    async (video: HTMLVideoElement) => {
+      video.playsInline = true;
+      if (video.readyState === HTMLMediaElement.HAVE_NOTHING) {
+        video.load();
+      }
+
+      try {
+        await video.play();
+        return true;
+      } catch {
+        if (!video.muted) {
+          video.muted = true;
+          video.defaultMuted = true;
+          video.volume = 0;
+          setMuted(true);
+          setSoundUnlocked(false);
+          writeSoundPreference(true);
+
+          try {
+            await video.play();
+            return true;
+          } catch {
+            return false;
+          }
+        }
+
+        return false;
+      }
+    },
+    [],
+  );
 
   const hasEndSlide = !hasMore && items.length > 0;
   const reelPageCount = items.length + (hasEndSlide ? 1 : 0);
@@ -1279,6 +1260,7 @@ export default function ReelsClient({
 
   const replaceReel = useCallback((nextReel: LajukanReel) => {
     const safeNextReel = normalizePlayableReel(nextReel);
+    if (!isVideoReel(safeNextReel)) return;
 
     setItems(current =>
       current.map(item => (item.id === safeNextReel.id ? safeNextReel : item)),
@@ -1364,7 +1346,17 @@ export default function ReelsClient({
         })
         .catch(() => undefined);
     },
-    [authFetch, isAuthenticated, replaceReel, user?.avatarUrl, user?.avatar_url, user?.fullName, user?.id, user?.name, user?.username],
+    [
+      authFetch,
+      isAuthenticated,
+      replaceReel,
+      user?.avatarUrl,
+      user?.avatar_url,
+      user?.fullName,
+      user?.id,
+      user?.name,
+      user?.username,
+    ],
   );
 
   const loadReelActionState = useCallback(
@@ -1392,7 +1384,7 @@ export default function ReelsClient({
           ...current,
           [reel.id]: normalizeReelActionState(payload),
         }));
-      } catch { }
+      } catch {}
     },
     [authFetch, isAuthenticated],
   );
@@ -1490,7 +1482,18 @@ export default function ReelsClient({
         );
       }
     },
-    [actionsByReel, authFetch, isAuthenticated, replaceReel, user?.avatarUrl, user?.avatar_url, user?.fullName, user?.id, user?.name, user?.username],
+    [
+      actionsByReel,
+      authFetch,
+      isAuthenticated,
+      replaceReel,
+      user?.avatarUrl,
+      user?.avatar_url,
+      user?.fullName,
+      user?.id,
+      user?.name,
+      user?.username,
+    ],
   );
 
   const openShareSheet = useCallback(
@@ -1526,6 +1529,11 @@ export default function ReelsClient({
     loadingRef.current = true;
     setLoadingMore(true);
     setLoadError(null);
+    const requestController = new AbortController();
+    const requestTimeout = window.setTimeout(
+      () => requestController.abort(),
+      REELS_FEED_REQUEST_TIMEOUT_MS,
+    );
 
     try {
       const params = new URLSearchParams({
@@ -1538,6 +1546,7 @@ export default function ReelsClient({
 
       const response = await fetch(`/api/reels?${params.toString()}`, {
         cache: 'no-store',
+        signal: requestController.signal,
       });
 
       if (!response.ok) {
@@ -1554,20 +1563,79 @@ export default function ReelsClient({
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
     } catch {
-      setLoadError('Gagal memuat video. Coba lagi.');
+      setLoadError(
+        locale === 'id'
+          ? 'Gagal memuat video. Coba lagi.'
+          : 'Unable to load videos. Please retry.',
+      );
     } finally {
+      window.clearTimeout(requestTimeout);
       loadingRef.current = false;
       setLoadingMore(false);
     }
-  }, [cursor, hasMore, initialSearchQuery, profile]);
+  }, [cursor, hasMore, initialSearchQuery, locale, profile]);
 
-  const loadComments = useCallback(
-    async (reelId: string, reset = false) => {
-      const current = commentsByReelRef.current[reelId];
-      if (current?.loading) return;
-      if (!reset && current && !current.hasMore) return;
+  const loadComments = useCallback(async (reelId: string, reset = false) => {
+    const current = commentsByReelRef.current[reelId];
+    if (current?.loading) return;
+    if (!reset && current && !current.hasMore) return;
 
-      const cursorValue = reset ? 0 : (current?.cursor ?? 0);
+    const cursorValue = reset ? 0 : (current?.cursor ?? 0);
+
+    setCommentsByReel(state => {
+      const existing = state[reelId] ?? {
+        items: [],
+        cursor: null,
+        hasMore: true,
+        loading: false,
+        error: null,
+      };
+      return {
+        ...state,
+        [reelId]: {
+          ...existing,
+          loading: true,
+          error: null,
+        },
+      };
+    });
+
+    try {
+      const params = new URLSearchParams({
+        cursor: String(cursorValue),
+        limit: '20',
+      });
+      const requestOptions = {
+        cache: 'no-store' as const,
+        headers: { Accept: 'application/json' },
+      };
+      let response = await fetch(
+        `/api/reels/${encodeURIComponent(reelId)}/comments?${params.toString()}`,
+        requestOptions,
+      );
+      let payload = (await response.json().catch(() => ({}))) as {
+        items?: ReelComment[];
+        nextCursor?: number | null;
+        hasMore?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !Array.isArray(payload.items)) {
+        const fallbackUrl = buildCommunityReelCommentsUrl(reelId, cursorValue);
+        if (fallbackUrl) {
+          response = await fetch(fallbackUrl, requestOptions);
+          payload = (await response.json().catch(() => ({}))) as {
+            items?: ReelComment[];
+            nextCursor?: number | null;
+            hasMore?: boolean;
+            error?: string;
+          };
+        }
+      }
+
+      if (!response.ok || !Array.isArray(payload.items)) {
+        throw new Error(payload.error || 'Gagal memuat komentar');
+      }
 
       setCommentsByReel(state => {
         const existing = state[reelId] ?? {
@@ -1580,96 +1648,37 @@ export default function ReelsClient({
         return {
           ...state,
           [reelId]: {
-            ...existing,
-            loading: true,
+            items: reset
+              ? payload.items!
+              : [...existing.items, ...payload.items!],
+            cursor: payload.nextCursor ?? null,
+            hasMore: Boolean(payload.hasMore),
+            loading: false,
             error: null,
           },
         };
       });
-
-      try {
-        const params = new URLSearchParams({
-          cursor: String(cursorValue),
-          limit: '20',
-        });
-        const requestOptions = {
-          cache: 'no-store' as const,
-          headers: { Accept: 'application/json' },
+    } catch (error) {
+      setCommentsByReel(state => {
+        const existing = state[reelId] ?? {
+          items: [],
+          cursor: null,
+          hasMore: true,
+          loading: false,
+          error: null,
         };
-        let response = await fetch(
-          `/api/reels/${encodeURIComponent(reelId)}/comments?${params.toString()}`,
-          requestOptions,
-        );
-        let payload = (await response.json().catch(() => ({}))) as {
-          items?: ReelComment[];
-          nextCursor?: number | null;
-          hasMore?: boolean;
-          error?: string;
+        return {
+          ...state,
+          [reelId]: {
+            ...existing,
+            loading: false,
+            error:
+              error instanceof Error ? error.message : 'Gagal memuat komentar',
+          },
         };
-
-        if (!response.ok || !Array.isArray(payload.items)) {
-          const fallbackUrl = buildCommunityReelCommentsUrl(reelId, cursorValue);
-          if (fallbackUrl) {
-            response = await fetch(fallbackUrl, requestOptions);
-            payload = (await response.json().catch(() => ({}))) as {
-              items?: ReelComment[];
-              nextCursor?: number | null;
-              hasMore?: boolean;
-              error?: string;
-            };
-          }
-        }
-
-        if (!response.ok || !Array.isArray(payload.items)) {
-          throw new Error(payload.error || 'Gagal memuat komentar');
-        }
-
-        setCommentsByReel(state => {
-          const existing = state[reelId] ?? {
-            items: [],
-            cursor: null,
-            hasMore: true,
-            loading: false,
-            error: null,
-          };
-          return {
-            ...state,
-            [reelId]: {
-              items: reset
-                ? payload.items!
-                : [...existing.items, ...payload.items!],
-              cursor: payload.nextCursor ?? null,
-              hasMore: Boolean(payload.hasMore),
-              loading: false,
-              error: null,
-            },
-          };
-        });
-      } catch (error) {
-        setCommentsByReel(state => {
-          const existing = state[reelId] ?? {
-            items: [],
-            cursor: null,
-            hasMore: true,
-            loading: false,
-            error: null,
-          };
-          return {
-            ...state,
-            [reelId]: {
-              ...existing,
-              loading: false,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : 'Gagal memuat komentar',
-            },
-          };
-        });
-      }
-    },
-    [],
-  );
+      });
+    }
+  }, []);
 
   const refreshReelFromServer = useCallback(
     async (reelId: string) => {
@@ -1800,8 +1809,6 @@ export default function ReelsClient({
   );
 
   const submitComment = useCallback(async () => {
-
-
     if (!commentsReel || commentSubmitting) return;
     if (!isAuthenticated) {
       setAuthPrompt('Masuk dulu untuk ikut komentar di reels ini.');
@@ -1834,10 +1841,7 @@ export default function ReelsClient({
       };
 
       if (!response.ok || !payload.comment) {
-        const fallbackUrl = buildCommunityReelCommentsUrl(
-          commentsReel.id,
-          0,
-        );
+        const fallbackUrl = buildCommunityReelCommentsUrl(commentsReel.id, 0);
         if (fallbackUrl) {
           response = await authFetch(fallbackUrl, requestOptions);
           payload = (await response.json().catch(() => ({}))) as {
@@ -1898,10 +1902,7 @@ export default function ReelsClient({
         );
       }
       notify({
-        title:
-          locale === 'id'
-            ? 'Komentar terkirim'
-            : 'Comment posted',
+        title: locale === 'id' ? 'Komentar terkirim' : 'Comment posted',
         description:
           locale === 'id'
             ? 'Komentar kamu sudah masuk dan akan ikut update realtime.'
@@ -1931,9 +1932,11 @@ export default function ReelsClient({
       notify({
         title: locale === 'id' ? 'Komentar gagal' : 'Comment failed',
         description:
-          error instanceof Error ? error.message : locale === 'id'
-            ? 'Coba lagi beberapa saat.'
-            : 'Please try again in a moment.',
+          error instanceof Error
+            ? error.message
+            : locale === 'id'
+              ? 'Coba lagi beberapa saat.'
+              : 'Please try again in a moment.',
         variant: 'error',
       });
     } finally {
@@ -2029,56 +2032,6 @@ export default function ReelsClient({
     [activeIndex, overlayOpen, reelPageCount, scrollToIndex],
   );
 
-  const handleWheel = useCallback(
-    (event: WheelEvent<HTMLDivElement>) => {
-      if (overlayOpen) return;
-
-      const delta =
-        Math.abs(event.deltaY) >= Math.abs(event.deltaX)
-          ? event.deltaY
-          : event.deltaX;
-
-      if (delta === 0) return;
-
-      event.preventDefault();
-      wheelDeltaRef.current += delta;
-
-      if (Math.abs(wheelDeltaRef.current) < REELS_WHEEL_THRESHOLD) return;
-
-      const direction = wheelDeltaRef.current > 0 ? 1 : -1;
-      wheelDeltaRef.current = 0;
-      snapToAdjacent(direction);
-    },
-    [overlayOpen, snapToAdjacent],
-  );
-
-  const handleTouchStart = useCallback(
-    (event: TouchEvent<HTMLDivElement>) => {
-      if (overlayOpen) return;
-      touchStartYRef.current = event.touches[0]?.clientY ?? null;
-    },
-    [overlayOpen],
-  );
-
-  const handleTouchEnd = useCallback(
-    (event: TouchEvent<HTMLDivElement>) => {
-      if (overlayOpen) return;
-
-      const startY = touchStartYRef.current;
-      touchStartYRef.current = null;
-
-      if (startY === null) return;
-
-      const endY = event.changedTouches[0]?.clientY ?? startY;
-      const delta = startY - endY;
-
-      if (Math.abs(delta) < REELS_TOUCH_THRESHOLD) return;
-
-      snapToAdjacent(delta > 0 ? 1 : -1);
-    },
-    [overlayOpen, snapToAdjacent],
-  );
-
   const handleReelsKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (overlayOpen) return;
@@ -2097,15 +2050,33 @@ export default function ReelsClient({
     [overlayOpen, snapToAdjacent],
   );
 
-  const handleReelCreated = useCallback((reel: LajukanReel) => {
-    setItems(current => [reel, ...current.filter(item => item.id !== reel.id)]);
-    setActiveIndex(0);
-    setPausedByUser(false);
-    setUploadOpen(false);
-    window.requestAnimationFrame(() => {
-      containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  }, []);
+  const handleReelCreated = useCallback(
+    (reel: LajukanReel) => {
+      if (!isVideoReel(reel)) {
+        notify({
+          title: locale === 'id' ? 'Reels butuh video' : 'Reels need video',
+          description:
+            locale === 'id'
+              ? 'Upload tersimpan, tapi feed Reels hanya menampilkan video.'
+              : 'The upload was saved, but the Reels feed only shows videos.',
+          variant: 'info',
+        });
+        return;
+      }
+
+      setItems(current => [
+        reel,
+        ...current.filter(item => item.id !== reel.id),
+      ]);
+      setActiveIndex(0);
+      setPausedByUser(false);
+      setUploadOpen(false);
+      window.requestAnimationFrame(() => {
+        containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    },
+    [locale, notify],
+  );
 
   const handleScroll = useCallback(() => {
     if (rafRef.current !== null) return;
@@ -2170,17 +2141,24 @@ export default function ReelsClient({
   }, [activeReel, locale]);
 
   useEffect(() => {
-    if (!activeReel || overlayOpen) return;
+    if (!activeReel || overlayOpen || !pageVisible) return;
 
     const timer = window.setTimeout(() => {
       recordSignal(activeReel, 'watch');
     }, 2200);
 
     return () => window.clearTimeout(timer);
-  }, [activeReel, overlayOpen, recordSignal]);
+  }, [activeReel, overlayOpen, pageVisible, recordSignal]);
 
   useEffect(() => {
-    if (!autoScroll || overlayOpen || pausedByUser || items.length <= 1) return;
+    if (
+      !autoScroll ||
+      overlayOpen ||
+      pausedByUser ||
+      !pageVisible ||
+      items.length <= 1
+    )
+      return;
 
     const timer = window.setTimeout(() => {
       const nextIndex = activeIndex >= items.length - 1 ? 0 : activeIndex + 1;
@@ -2193,6 +2171,7 @@ export default function ReelsClient({
     autoScroll,
     items.length,
     overlayOpen,
+    pageVisible,
     pausedByUser,
     scrollToIndex,
   ]);
@@ -2200,6 +2179,7 @@ export default function ReelsClient({
   useEffect(() => {
     setPausedByUser(false);
     setBufferingId(null);
+    setPlaybackError(null);
   }, [activeIndex]);
 
   useEffect(() => {
@@ -2211,22 +2191,39 @@ export default function ReelsClient({
 
       const isActiveVideo = reelId === activeReelId;
 
-      if (overlayOpen || !isActiveVideo || pausedByUser) {
+      if (!pageVisible || overlayOpen || !isActiveVideo || pausedByUser) {
         video.pause();
         return;
       }
 
-      video.play().catch(() => {
-        if (!muted) {
-          video.muted = true;
-          video.volume = 0;
-          setMuted(true);
-          setSoundUnlocked(false);
-          writeSoundPreference(true);
+      if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+        setBufferingId(reelId);
+      }
+
+      void playVideoWithPolicyFallback(video).then(played => {
+        if (reelId !== activeReelId) return;
+        if (played) {
+          setBufferingId(current => (current === reelId ? null : current));
+          setPlaybackError(null);
+        } else if (video.error) {
+          setBufferingId(current => (current === reelId ? null : current));
+          setPlaybackError(
+            locale === 'id'
+              ? 'Video belum bisa diputar. Periksa koneksi lalu coba lagi.'
+              : 'The video cannot play yet. Check your connection and retry.',
+          );
         }
       });
     });
-  }, [activeReelId, muted, overlayOpen, pausedByUser]);
+  }, [
+    activeReelId,
+    locale,
+    muted,
+    overlayOpen,
+    pageVisible,
+    pausedByUser,
+    playVideoWithPolicyFallback,
+  ]);
 
   useEffect(() => {
     const mountedVideoRefs = videoRefs.current;
@@ -2244,8 +2241,8 @@ export default function ReelsClient({
     if (!video) return;
 
     if (video.paused) {
-      video.play().catch(() => { });
       setPausedByUser(false);
+      void playVideoWithPolicyFallback(video);
     } else {
       video.pause();
       setPausedByUser(true);
@@ -2271,8 +2268,33 @@ export default function ReelsClient({
     video.volume = nextMuted ? 0 : 1;
 
     if (!nextMuted) {
-      video.play().catch(() => { });
       setPausedByUser(false);
+      void playVideoWithPolicyFallback(video);
+    }
+  }
+
+  function retryCurrentVideo() {
+    if (!playbackError || !activeReel) {
+      void loadMore();
+      return;
+    }
+
+    const video = videoRefs.current[activeReel.id];
+    setPlaybackError(null);
+    setBufferingId(activeReel.id);
+    setPausedByUser(false);
+    video?.load();
+    if (video) {
+      void playVideoWithPolicyFallback(video).then(played => {
+        setBufferingId(null);
+        if (!played) {
+          setPlaybackError(
+            locale === 'id'
+              ? 'Video belum bisa diputar. Periksa koneksi lalu coba lagi.'
+              : 'The video cannot play yet. Check your connection and retry.',
+          );
+        }
+      });
     }
   }
 
@@ -2280,19 +2302,6 @@ export default function ReelsClient({
     setSearchSeed(seed);
     setSearchOpen(true);
   };
-
-  const handleFeedTabChange = useCallback(
-    (tab: ReelsFeedTab) => {
-      setFeedTab(tab);
-      setSearchContextQuery('');
-      wheelDeltaRef.current = 0;
-
-      if (tab !== feedTab) {
-        scrollToIndex(0);
-      }
-    },
-    [feedTab, scrollToIndex],
-  );
 
   const requestUpload = useCallback(() => {
     if (!isAuthenticated) {
@@ -2315,29 +2324,26 @@ export default function ReelsClient({
   }, [authLoading, initialUploadOpen, isAuthenticated]);
 
   return (
-    <main className="h-[var(--app-viewport-height)] min-h-0 overflow-hidden bg-black text-white">
-      <div className="relative h-full w-full overflow-hidden bg-[#050505]">
-        <div className="relative h-full min-w-0 overflow-hidden bg-black lg:bg-[#050505]">
-          <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.10),transparent_32%)] lg:block" />
-
-          <div className="relative mx-auto h-full w-full max-w-[430px] overflow-hidden bg-black shadow-2xl sm:max-w-[460px] lg:my-3 lg:h-[calc(var(--app-viewport-height)-24px)] lg:max-w-[430px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10">
+    <main
+      className="ui-layer-header fixed inset-x-0 top-[var(--app-viewport-offset-top)] isolate h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-0 overflow-hidden bg-[#090909] text-white"
+      data-reels-performance={performanceProfile.tier}
+    >
+      <div className="relative h-full min-h-0 w-full overflow-hidden bg-[#090909]">
+        <div className="relative h-full min-h-0 min-w-0 overflow-hidden bg-[#090909]">
+          <div className="relative mx-auto h-full min-h-0 w-full max-w-[520px] overflow-hidden bg-black shadow-[0_0_70px_rgba(0,0,0,0.38)] sm:border-x sm:border-white/10">
             <ReelsTopBar
               locale={locale}
-              feedTab={feedTab}
               searchQuery={activeSearchQuery}
-              onFeedTabChange={handleFeedTabChange}
               onOpenSearch={() => openSearchOverlay(activeSearchQuery)}
+              onOpenUpload={requestUpload}
             />
 
             <div
               ref={containerRef}
               onScroll={handleScroll}
-              onWheel={handleWheel}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
               onKeyDown={handleReelsKeyDown}
               tabIndex={0}
-              className="h-full snap-y snap-mandatory overflow-hidden scroll-smooth outline-none [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden"
+              className="h-full min-h-0 max-h-full snap-y snap-mandatory overflow-y-auto overscroll-contain scroll-smooth outline-none motion-reduce:scroll-auto [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden"
             >
               {items.length > 0 ? (
                 <>
@@ -2346,10 +2352,12 @@ export default function ReelsClient({
                       key={reel.id}
                       locale={locale}
                       reel={reel}
-                      active={index === activeIndex}
+                      active={index === activeIndex && pageVisible}
                       shouldLoad={
-                        Math.abs(index - activeIndex) <= REELS_RENDER_WINDOW
+                        Math.abs(index - activeIndex) <=
+                        performanceProfile.renderWindow
                       }
+                      performanceProfile={performanceProfile}
                       muted={muted}
                       soundUnlocked={soundUnlocked}
                       paused={pausedByUser && index === activeIndex}
@@ -2371,10 +2379,17 @@ export default function ReelsClient({
                       }}
                       onPlaying={() => {
                         if (bufferingId === reel.id) setBufferingId(null);
+                        if (index === activeIndex) setPlaybackError(null);
                       }}
                       onError={() => {
                         if (index === activeIndex) setBufferingId(null);
-                        setLoadError('Video dari database tidak bisa diputar.');
+                        if (index === activeIndex) {
+                          setPlaybackError(
+                            locale === 'id'
+                              ? 'Video belum bisa diputar. Periksa koneksi lalu coba lagi.'
+                              : 'The video cannot play yet. Check your connection and retry.',
+                          );
+                        }
                       }}
                       onTogglePlay={toggleCurrentVideo}
                       onToggleSound={toggleSound}
@@ -2417,15 +2432,10 @@ export default function ReelsClient({
             </div>
 
             <LoadingToast
-              loading={loadingMore}
-              error={loadError}
-              onRetry={() => void loadMore()}
-            />
-
-            <ReelsCreateDock
               locale={locale}
-              isAuthenticated={isAuthenticated}
-              onOpenUpload={requestUpload}
+              loading={loadingMore}
+              error={playbackError || loadError}
+              onRetry={retryCurrentVideo}
             />
           </div>
         </div>
@@ -2468,12 +2478,31 @@ export default function ReelsClient({
             setProductReel(reel);
           }}
           onOpenShare={openShareSheet}
+          onOpenCreatorProfile={reel => setCreatorProfileReel(reel)}
           onMessageCreator={reel => void startChatFromReel(reel)}
           chatBusyReelId={chatBusyReelId}
           onClose={() => setDetailReel(null)}
         />
 
+        <CreatorProfileSheet
+          locale={locale}
+          reel={creatorProfileReel}
+          actionState={
+            creatorProfileReel
+              ? actionsByReel[creatorProfileReel.id] || EMPTY_REEL_ACTION_STATE
+              : EMPTY_REEL_ACTION_STATE
+          }
+          chatBusy={chatBusyReelId === creatorProfileReel?.id}
+          onAction={(reel, action, active) =>
+            void handleReelAction(reel, action, active)
+          }
+          onMessageCreator={reel => void startChatFromReel(reel)}
+          onOpenComments={reel => openComments(reel)}
+          onClose={() => setCreatorProfileReel(null)}
+        />
+
         <CommentsSheet
+          locale={locale}
           reel={commentsReel}
           bucket={commentsReel ? commentsByReel[commentsReel.id] : undefined}
           body={commentBody}
@@ -2523,9 +2552,7 @@ export default function ReelsClient({
           reel={shareReel}
           chatBusy={chatBusyReelId === shareReel?.id}
           onMessageCreator={reel => void startChatFromReel(reel)}
-          onMessageUser={(userId, reel) =>
-            void startChatWithUser(userId, reel)
-          }
+          onMessageUser={(userId, reel) => void startChatWithUser(userId, reel)}
           onClose={() => setShareReel(null)}
         />
 
@@ -2567,6 +2594,7 @@ export default function ReelsClient({
           open={uploadOpen}
           authFetch={authFetch}
           displayName={displayName}
+          performanceProfile={performanceProfile}
           onClose={() => setUploadOpen(false)}
           onCreated={handleReelCreated}
         />
@@ -2613,25 +2641,25 @@ function ReelsDesktopSidebar({
     helper: string;
     icon: LucideIcon;
   }> = [
-      {
-        id: 'fyp',
-        label: 'Untukmu',
-        helper: 'FYP bisnis yang paling relevan',
-        icon: Compass,
-      },
-      {
-        id: 'friends',
-        label: 'Friend',
-        helper: 'Aktivitas akun yang sering interaksi',
-        icon: Users,
-      },
-      {
-        id: 'following',
-        label: 'Following',
-        helper: 'Creator dan usaha yang kamu ikuti',
-        icon: UserPlus,
-      },
-    ];
+    {
+      id: 'fyp',
+      label: 'Untukmu',
+      helper: 'FYP bisnis yang paling relevan',
+      icon: Compass,
+    },
+    {
+      id: 'friends',
+      label: 'Friend',
+      helper: 'Aktivitas akun yang sering interaksi',
+      icon: Users,
+    },
+    {
+      id: 'following',
+      label: 'Following',
+      helper: 'Creator dan usaha yang kamu ikuti',
+      icon: UserPlus,
+    },
+  ];
   const trendTerms =
     learnedTerms.length > 0
       ? learnedTerms.slice(0, 6)
@@ -2725,6 +2753,14 @@ function ReelsDesktopSidebar({
           <MessageCircle className="h-5 w-5" />
           Komunitas
         </Link>
+
+        <Link
+          href={`/${locale}/manage/reels`}
+          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-white/72 transition hover:bg-white/8 hover:text-white"
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+          Manage Reels
+        </Link>
       </nav>
 
       <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
@@ -2797,6 +2833,7 @@ function ReelsDesktopInfoSidebar({
   onOpenComments,
   onOpenProduct,
   onOpenShare,
+  onOpenCreatorProfile,
   onMessageCreator,
   onSave,
   onFollow,
@@ -2812,6 +2849,7 @@ function ReelsDesktopInfoSidebar({
   onOpenComments: () => void;
   onOpenProduct: () => void;
   onOpenShare: () => void;
+  onOpenCreatorProfile: () => void;
   onMessageCreator: () => void;
   onSave: () => void;
   onFollow: () => void;
@@ -2845,21 +2883,22 @@ function ReelsDesktopInfoSidebar({
     ? localizedHref(locale, reel.productHref)
     : null;
   const profileHref = buildReelCreatorProfileHref(locale, reel);
+  const creatorStats = getReelCreatorStats(reel);
   const actions: Array<{
     label: string;
     icon: LucideIcon;
     onClick: () => void;
     featured?: boolean;
   }> = [
-      { label: 'Detail', icon: Info, onClick: onOpenDetail },
-      { label: 'Komentar', icon: MessageCircle, onClick: onOpenComments },
-      { label: 'Share', icon: Forward, onClick: onOpenShare, featured: true },
-      {
-        label: actionState.saved ? 'Tersimpan' : 'Simpan',
-        icon: Bookmark,
-        onClick: onSave,
-      },
-    ];
+    { label: 'Detail', icon: Info, onClick: onOpenDetail },
+    { label: 'Komentar', icon: MessageCircle, onClick: onOpenComments },
+    { label: 'Share', icon: Forward, onClick: onOpenShare, featured: true },
+    {
+      label: actionState.saved ? 'Tersimpan' : 'Simpan',
+      icon: Bookmark,
+      onClick: onSave,
+    },
+  ];
 
   return (
     <aside className="hidden h-full min-h-0 flex-col border-l border-white/10 bg-[#080808] text-white lg:flex">
@@ -2928,13 +2967,14 @@ function ReelsDesktopInfoSidebar({
 
         <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="flex items-center gap-3">
-            <Link
-              href={profileHref}
+            <button
+              type="button"
+              onClick={onOpenCreatorProfile}
               className="shrink-0 rounded-full bg-white/14 p-0.5 ring-1 ring-white/18 transition active:scale-95"
               aria-label={`Lihat profil ${reel.creator}`}
             >
               <ReelCreatorAvatar reel={reel} className="h-10 w-10" size={40} />
-            </Link>
+            </button>
             <div className="min-w-0 flex-1">
               <Link
                 href={profileHref}
@@ -2979,6 +3019,21 @@ function ReelsDesktopInfoSidebar({
               )}
               {actionState.followed ? 'Diikuti' : 'Ikuti'}
             </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <CreatorStatCell
+              label="Followers"
+              value={formatCompactMetric(creatorStats.followers)}
+            />
+            <CreatorStatCell
+              label="Following"
+              value={formatCompactMetric(creatorStats.following)}
+            />
+            <CreatorStatCell
+              label="Reels"
+              value={formatCompactMetric(creatorStats.reels)}
+            />
           </div>
 
           <p className="mt-3 line-clamp-4 text-sm font-medium leading-relaxed text-white/72">
@@ -3172,107 +3227,77 @@ function ReelsDesktopInfoSidebar({
 
 function ReelsTopBar({
   locale,
-  feedTab,
   searchQuery,
-  onFeedTabChange,
   onOpenSearch,
+  onOpenUpload,
 }: {
   locale: string;
-  feedTab: ReelsFeedTab;
   searchQuery: string;
-  onFeedTabChange: (tab: ReelsFeedTab) => void;
   onOpenSearch: () => void;
+  onOpenUpload: () => void;
 }) {
   const router = useRouter();
+  const isId = locale === 'id';
   const hasSearchContext = searchQuery.trim().length > 0;
   const handleBack = useAppBack(router, `/${locale}/home`);
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/86 via-black/30 to-transparent px-3 pb-4 pt-[calc(env(safe-area-inset-top)+8px)] sm:px-4">
-      <div className="pointer-events-auto grid min-h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-1.5 sm:gap-2">
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/[0.78] via-black/[0.18] to-transparent px-2.5 pb-5 pt-[calc(env(safe-area-inset-top)+7px)] sm:px-3.5">
+      <div className="pointer-events-auto grid h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
         <button
           type="button"
           onClick={handleBack}
-          aria-label={locale === 'id' ? 'Kembali' : 'Back'}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-black/45 font-bold text-white  transition active:scale-[0.96]"
+          aria-label={isId ? 'Kembali' : 'Back'}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.34] font-bold text-white ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-95"
         >
-          <ArrowLeft className="h-4.5 w-4.5" />
+          <ArrowLeft className="h-[18px] w-[18px]" />
         </button>
 
-        <div className="flex min-w-0 justify-center px-1">
+        <div className="flex min-w-0 justify-center">
           {hasSearchContext ? (
             <button
               type="button"
               onClick={onOpenSearch}
-              className="inline-flex h-10 min-w-0 max-w-full items-center gap-2 rounded-full border border-white/14 bg-black/52 px-3 text-left text-xs font-bold text-white/92 shadow-[0_18px_38px_-26px_rgba(0,0,0,0.9)]  transition active:scale-[0.98] sm:px-4 sm:text-sm"
+              className="inline-flex h-9 min-w-0 max-w-full items-center gap-1.5 rounded-full bg-black/[0.34] px-3 text-left text-[11px] font-bold text-white/[0.92] ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-[0.98] sm:text-xs"
             >
-              <Search className="h-4 w-4 shrink-0" />
+              <Search className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{searchQuery}</span>
-              <Sparkles className="hidden h-3.5 w-3.5 shrink-0 text-yellow-300 min-[390px]:block" />
             </button>
           ) : (
-            <nav
-              aria-label="Filter reels"
-              className="inline-flex h-10 max-w-full items-center justify-center gap-0.5 rounded-full border border-white/70 bg-white/92 p-1 text-[12px] font-bold text-slate-700 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.72)] ring-1 ring-black/5  sm:text-sm"
-            >
-              {REELS_FEED_TABS.map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={event => {
-                    event.stopPropagation();
-                    onFeedTabChange(tab.id);
-                  }}
-                  aria-pressed={feedTab === tab.id}
-                  className={cn(
-                    'relative h-8 rounded-full px-2.5 text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800 active:scale-95 sm:px-3',
-                    feedTab === tab.id &&
-                    'bg-[linear-gradient(135deg,#047857,#16a34a)] text-white shadow-lg shadow-emerald-900/24',
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+            <span className="inline-flex h-9 items-center border-b-2 border-white px-2 text-[13px] font-bold text-white">
+              Reels
+            </span>
           )}
         </div>
 
-        <div className="flex h-10 shrink-0 items-start justify-end gap-1.5">
+        <div className="flex h-10 shrink-0 items-center justify-end gap-1">
+          <Link
+            href={`/${locale}/manage/reels`}
+            aria-label={isId ? 'Kelola Reels' : 'Manage Reels'}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.34] text-white ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-95"
+          >
+            <SlidersHorizontal className="h-[17px] w-[17px]" />
+          </Link>
           <button
             type="button"
             onClick={onOpenSearch}
-            aria-label="Cari reels"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/12 bg-black/45 text-white  transition active:scale-[0.96]"
+            aria-label={isId ? 'Cari Reels' : 'Search Reels'}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.34] text-white ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-95"
           >
-            <Search className="h-4.5 w-4.5" />
+            <Search className="h-[17px] w-[17px]" />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenUpload}
+            aria-label={isId ? 'Buat Reels' : 'Create Reels'}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-lg shadow-black/25 transition hover:bg-emerald-100 active:scale-95"
+            data-testid="reels-create-button"
+          >
+            <Plus className="h-[18px] w-[18px] stroke-[2.8]" />
           </button>
         </div>
       </div>
     </header>
-  );
-}
-
-function ReelsCreateDock({
-  locale,
-  isAuthenticated,
-  onOpenUpload,
-}: {
-  locale: string;
-  isAuthenticated: boolean;
-  onOpenUpload: () => void;
-}) {
-  return (
-    <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+20px)] right-3 z-50 flex justify-end lg:hidden">
-      <button
-        type="button"
-        onClick={onOpenUpload}
-        className="pointer-events-auto flex h-12 min-h-12 w-12 min-w-12 touch-manipulation items-center justify-center rounded-full bg-[#6cd698] text-slate-950 shadow-[0_18px_38px_-14px_rgba(16,185,129,0.82),0_8px_18px_-10px_rgba(0,0,0,0.72)] ring-4 ring-black/35 transition active:scale-95 dark:ring-black/45"
-        aria-label={isAuthenticated ? (locale === 'id' ? 'Buat Reels' : 'Create Reels') : locale === 'id' ? 'Masuk untuk buat reels' : 'Sign in to create reels'}
-        data-testid="reels-create-fab"
-      >
-        <Camera className="h-6 w-6 stroke-[2.6]" aria-hidden="true" />
-      </button>
-    </div>
   );
 }
 
@@ -3288,8 +3313,8 @@ function ReelsEmptyState({
   const isId = locale === 'id';
 
   return (
-    <div className="flex h-full snap-start items-center justify-center px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+6rem)] text-center">
-      <div className="w-full max-w-[320px] rounded-[28px] border border-white/10 bg-white/[0.07] p-5 text-white shadow-[0_24px_58px_-36px_rgba(0,0,0,0.85)] ">
+    <div className="flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always items-center justify-center px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+4.5rem)] text-center">
+      <div className="w-full max-w-[320px] rounded-[22px] border border-white/10 bg-white/[0.07] p-5 text-white shadow-[0_24px_58px_-36px_rgba(0,0,0,0.85)] ">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-950/20">
           <Clapperboard className="h-7 w-7" />
         </div>
@@ -3346,7 +3371,7 @@ function ReelsEndSlide({
       : ['supplier', 'kuliner', 'packaging', 'cashflow', 'reseller', 'promo'];
 
   return (
-    <article className="relative h-full snap-start overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_34%),linear-gradient(180deg,#f8fafc_0%,#f6f9f4_46%,#eef2ff_100%)] text-slate-900">
+    <article className="relative h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_34%),linear-gradient(180deg,#f8fafc_0%,#f6f9f4_46%,#eef2ff_100%)] text-slate-900">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.6)_0%,rgba(255,255,255,0.16)_42%,rgba(255,255,255,0.38)_100%)]" />
 
       <div
@@ -3514,6 +3539,7 @@ function ReelSlide({
   reel,
   active,
   shouldLoad,
+  performanceProfile,
   muted,
   soundUnlocked,
   paused,
@@ -3536,6 +3562,7 @@ function ReelSlide({
   reel: LajukanReel;
   active: boolean;
   shouldLoad: boolean;
+  performanceProfile: ReelsPerformanceProfile;
   muted: boolean;
   soundUnlocked: boolean;
   paused: boolean;
@@ -3554,16 +3581,15 @@ function ReelSlide({
   onOpenActions: () => void;
   onAction: (action: ReelUserAction, active?: boolean) => void;
 }) {
-  const Icon = iconMap[reel.iconKey] ?? Clapperboard;
-  const imageMedia = isImageMediaUrl(reel.videoSrc);
   const mediaStyle = getReelMediaStyle(reel.filterPreset);
   const studioEffect = getReelStudioEffect(reel);
   const liveLabel = getLiveLabel(reel);
+  const [mediaFit, setMediaFit] = useState<'cover' | 'contain'>('cover');
 
   if (!shouldLoad) {
     return (
       <article
-        className="relative flex h-full snap-start overflow-hidden bg-black px-2.5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+18px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
+        className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden bg-black px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
         style={REEL_SLIDE_PLACEHOLDER_STYLE}
         aria-hidden="true"
       >
@@ -3579,51 +3605,67 @@ function ReelSlide({
 
   return (
     <article
-      className="relative flex h-full snap-start overflow-hidden !bg-black !text-white px-2.5 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+20px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
+      className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden !bg-black !text-white px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
       style={REEL_SLIDE_LOADED_STYLE}
     >
-      {imageMedia ? (
-        <img
-          src={reel.videoSrc}
-          alt={reel.title}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={mediaStyle}
-        />
-      ) : (
-        <video
-          ref={setVideoRef}
-          src={reel.videoSrc}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={mediaStyle}
-          muted={muted}
-          loop
-          playsInline
-          preload={active ? 'auto' : 'metadata'}
-          autoPlay={active && !paused}
-          disablePictureInPicture
-          onWaiting={onWaiting}
-          onPlaying={onPlaying}
-          onCanPlay={onPlaying}
-          onError={onError}
-        />
-      )}
+      <video
+        ref={setVideoRef}
+        src={reel.videoSrc}
+        className={cn(
+          'absolute inset-0 h-full w-full [backface-visibility:hidden]',
+          mediaFit === 'contain'
+            ? 'object-contain bg-black'
+            : 'object-cover object-center',
+          active && 'will-change-transform',
+        )}
+        style={mediaStyle}
+        muted={muted}
+        loop
+        playsInline
+        preload={
+          active
+            ? performanceProfile.activePreload
+            : performanceProfile.adjacentPreload
+        }
+        autoPlay={active && !paused}
+        disablePictureInPicture
+        disableRemotePlayback
+        controlsList="nodownload noplaybackrate noremoteplayback"
+        aria-hidden={!active}
+        onLoadedMetadata={event => {
+          const video = event.currentTarget;
+          const aspect =
+            video.videoWidth > 0 && video.videoHeight > 0
+              ? video.videoWidth / video.videoHeight
+              : 9 / 16;
+          setMediaFit(aspect > 0.68 || aspect < 0.46 ? 'contain' : 'cover');
+        }}
+        onWaiting={onWaiting}
+        onPlaying={onPlaying}
+        onCanPlay={onPlaying}
+        onError={onError}
+      />
       <StudioEffectOverlay effect={studioEffect} />
 
       <button
         type="button"
         onClick={onTogglePlay}
         className="absolute inset-0 z-10"
-        aria-label={paused ? 'Putar video' : 'Pause video'}
+        aria-label={
+          paused
+            ? locale === 'id'
+              ? 'Putar video'
+              : 'Play video'
+            : locale === 'id'
+              ? 'Jeda video'
+              : 'Pause video'
+        }
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/16 to-black/36" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/[0.88] via-black/[0.12] to-black/[0.24]" />
 
-      <div className="absolute left-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 flex max-w-[calc(100%-84px)] items-center gap-1.5 rounded-full bg-black/32 px-2 py-1 text-[10px] font-bold  sm:left-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:max-w-[calc(100%-108px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
-        <Icon className="h-4 w-4" />
-        <span className="truncate">{reel.tag}</span>
-      </div>
       {liveLabel && (
-        <div className="absolute right-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-bold text-white shadow-2xl shadow-rose-950/25 sm:right-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
+        <div className="absolute left-3 top-[calc(env(safe-area-inset-top)+52px)] z-20 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-bold text-white shadow-lg shadow-rose-950/25 sm:left-4">
           <Radio className="h-3.5 w-3.5" />
           {liveLabel}
         </div>
@@ -3635,13 +3677,12 @@ function ReelSlide({
         actionState={actionState}
         onOpenComments={onOpenComments}
         onOpenShare={onOpenShare}
-        onOpenActions={onOpenActions}
         onAction={onAction}
       />
 
       {buffering && (
         <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
-          <div className="grid h-16 w-16 place-items-center rounded-full bg-black/35 ">
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-black/[0.35] ">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         </div>
@@ -3662,50 +3703,69 @@ function ReelSlide({
             event.stopPropagation();
             onToggleSound();
           }}
-          className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+100px)] z-40 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-xs font-bold text-slate-950 shadow-2xl  sm:top-[calc(env(safe-area-inset-top)+110px)] sm:gap-2 sm:px-4"
+          className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+55px)] z-40 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/[0.48] px-2.5 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/[0.14] transition active:scale-95"
         >
-          <Volume2 className="h-4 w-4" />
-          Ketuk untuk suara
+          <Volume2 className="h-3.5 w-3.5" />
+          {locale === 'id' ? 'Nyalakan suara' : 'Turn on sound'}
         </button>
       )}
 
-      <div className="relative z-20 mt-auto min-w-0 flex-1 pr-[72px]">
-        <div className="max-w-[78%] text-white">
+      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 px-3 pb-[calc(env(safe-area-inset-bottom)+13px)] pr-[62px] text-white sm:px-4 sm:pr-[68px]">
+        <div className="flex min-w-0 items-center gap-1.5">
           <button
             type="button"
             onClick={onOpenDetail}
-            className="block text-left"
+            className="min-w-0 truncate text-left text-[14px] font-bold drop-shadow"
           >
-            <h1 className="line-clamp-1 text-[15px] font-bold">
-              @{reel.creator}
-            </h1>
+            @{reel.creator}
           </button>
-
-          <div className="mt-1 text-[14px] leading-5">
-            <ExpandableCaption text={reel.caption} maxLength={90} />
-          </div>
-
-          {reel.productName && (
-            <button
-              onClick={onOpenProduct}
-              className="
-                mt-2
-                inline-flex
-                items-center
-                gap-2
-                rounded-full
-                bg-black/40
-                px-3
-                py-1.5
-                text-xs
-                font-semibold
-              "
-            >
-              <ShoppingBag className="h-3.5 w-3.5" />
-              {reel.productName}
-            </button>
-          )}
+          <span className="h-1 w-1 shrink-0 rounded-full bg-white/50" />
+          <span className="min-w-0 truncate text-[10px] font-bold text-white/[0.72]">
+            #{reel.tag.replace(/^#/, '')}
+          </span>
+          <button
+            type="button"
+            onClick={onOpenActions}
+            className="ml-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/30 text-white ring-1 ring-white/10 transition active:scale-95"
+            aria-label={locale === 'id' ? 'Aksi lainnya' : 'More actions'}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
         </div>
+
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          className="mt-1 block max-w-full text-left"
+        >
+          <h1 className="line-clamp-1 text-[14px] font-bold leading-5 drop-shadow">
+            {reel.title}
+          </h1>
+        </button>
+
+        <div className="mt-0.5 text-[12px] font-medium leading-[18px] text-white/[0.88] drop-shadow sm:text-[13px]">
+          <ExpandableCaption
+            text={reel.caption}
+            maxLength={76}
+            locale={locale}
+          />
+        </div>
+
+        {reel.productName ? (
+          <button
+            type="button"
+            onClick={onOpenProduct}
+            className="mt-2 inline-flex h-9 max-w-full items-center gap-2 rounded-lg bg-white/[0.94] px-2.5 text-left text-[11px] font-bold text-slate-950 shadow-lg ring-1 ring-white/70 transition active:scale-[0.98]"
+          >
+            <ShoppingBag className="h-4 w-4 shrink-0 text-emerald-700" />
+            <span className="min-w-0 truncate">{reel.productName}</span>
+            {reel.productPrice ? (
+              <span className="shrink-0 text-[10px] text-slate-600">
+                {reel.productPrice}
+              </span>
+            ) : null}
+          </button>
+        ) : null}
       </div>
     </article>
   );
@@ -3714,9 +3774,11 @@ function ReelSlide({
 function ExpandableCaption({
   text,
   maxLength = 90,
+  locale,
 }: {
   text: string;
   maxLength?: number;
+  locale: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -3733,46 +3795,15 @@ function ExpandableCaption({
         onClick={() => setExpanded(!expanded)}
         className="font-bold text-white"
       >
-        {expanded ? ' lebih sedikit' : ' lainnya'}
+        {expanded
+          ? locale === 'id'
+            ? ' lebih sedikit'
+            : ' less'
+          : locale === 'id'
+            ? ' lainnya'
+            : ' more'}
       </button>
     </p>
-  );
-}
-
-/* =========================
-   PRODUCT CART
-========================= */
-
-function ProductCartDock({
-  reel,
-  onOpenProduct,
-}: {
-  reel: LajukanReel;
-  onOpenProduct: () => void;
-}) {
-  if (!reel.productName || !reel.productPrice || !reel.productHref) {
-    return null;
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onOpenProduct}
-      className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-[18px] bg-white/94 px-1.5 py-1.5 text-left text-slate-950 shadow-xl shadow-black/20 ring-1 ring-white/70 transition active:scale-[0.98] sm:mt-2.5 sm:gap-2 sm:px-2"
-    >
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[14px] bg-yellow-400 text-slate-950 sm:h-9 sm:w-9">
-        <ShoppingBag className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[11px] font-bold sm:text-[12px]">
-          {reel.productName}
-        </span>
-        <span className="block truncate text-[9px] font-bold text-slate-600 sm:text-[10px]">
-          {reel.productPrice}
-        </span>
-      </span>
-      <ChevronRight className="h-4 w-4 shrink-0" />
-    </button>
   );
 }
 
@@ -3782,7 +3813,6 @@ function ActionRail({
   actionState,
   onOpenComments,
   onOpenShare,
-  onOpenActions,
   onAction,
 }: {
   locale: string;
@@ -3790,69 +3820,74 @@ function ActionRail({
   actionState: ReelActionState;
   onOpenComments: () => void;
   onOpenShare: () => void;
-  onOpenActions: () => void;
   onAction: (action: ReelUserAction, active?: boolean) => void;
 }) {
+  const isId = locale === 'id';
   const profileHref = buildReelCreatorProfileHref(locale, reel);
   const actions: Array<{
     key: string;
     label?: string;
+    ariaLabel: string;
     icon: LucideIcon;
     active?: boolean;
     loading?: boolean;
     onClick: () => void;
   }> = [
-      {
-        key: 'like',
-        label: formatCompactMetric(metricCount(reel, 'likes')),
-        icon: Heart,
-        active: actionState.liked,
-        loading: actionState.loading === 'like',
-        onClick: () => onAction('like'),
-      },
-      {
-        key: 'comments',
-        label: formatCompactMetric(metricCount(reel, 'comments')),
-        icon: MessageCircle,
-        onClick: onOpenComments,
-      },
-      {
-        key: 'share',
-        label: formatCompactMetric(metricCount(reel, 'shares')),
-        icon: Forward,
-        onClick: onOpenShare,
-      },
-      {
-        key: 'more',
-        icon: MoreHorizontal,
-        onClick: onOpenActions,
-      },
-    ];
+    {
+      key: 'like',
+      label: formatCompactMetric(metricCount(reel, 'likes')),
+      ariaLabel: isId ? 'Sukai Reels' : 'Like Reel',
+      icon: Heart,
+      active: actionState.liked,
+      loading: actionState.loading === 'like',
+      onClick: () => onAction('like'),
+    },
+    {
+      key: 'comments',
+      label: formatCompactMetric(metricCount(reel, 'comments')),
+      ariaLabel: isId ? 'Buka komentar' : 'Open comments',
+      icon: MessageCircle,
+      onClick: onOpenComments,
+    },
+    {
+      key: 'save',
+      ariaLabel: actionState.saved
+        ? isId
+          ? 'Hapus dari tersimpan'
+          : 'Remove from saved'
+        : isId
+          ? 'Simpan Reels'
+          : 'Save Reel',
+      icon: Bookmark,
+      active: actionState.saved,
+      loading: actionState.loading === 'save',
+      onClick: () => onAction('save'),
+    },
+    {
+      key: 'share',
+      label: formatCompactMetric(metricCount(reel, 'shares')),
+      ariaLabel: isId ? 'Bagikan Reels' : 'Share Reel',
+      icon: Forward,
+      onClick: onOpenShare,
+    },
+  ];
 
   return (
-    <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+148px)] right-1.5 z-30 flex flex-col items-center gap-2 sm:bottom-[calc(env(safe-area-inset-bottom)+166px)] sm:right-3">
-      <div className="relative mb-2 flex h-16 w-16 items-center justify-center">
+    <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+88px)] right-1.5 z-30 flex flex-col items-center gap-1.5 sm:right-2.5">
+      <div className="relative mb-1.5 flex h-[50px] w-[50px] items-center justify-center">
         <Link
           href={profileHref}
-          aria-label={`Lihat profil ${reel.creator}`}
-          className="
-            absolute
-            inset-0
-            overflow-hidden
-            rounded-full
-            bg-white/10
-            p-[2px]
-            shadow-[0_12px_28px_-12px_rgba(0,0,0,0.7)]
-            ring-2
-            ring-white/25
-            transition
-            active:scale-95
-          "
+          aria-label={
+            isId
+              ? `Lihat profil ${reel.creator}`
+              : `View ${reel.creator}'s profile`
+          }
+          className="absolute inset-0 overflow-hidden rounded-full bg-white/10 p-[2px] shadow-lg shadow-black/[0.35] ring-2 ring-white/[0.55] transition active:scale-95"
         >
           <ReelCreatorAvatar
             reel={reel}
             className="h-full w-full rounded-full object-cover"
-            size={64}
+            size={50}
           />
         </Link>
 
@@ -3860,42 +3895,17 @@ function ActionRail({
           type="button"
           onClick={() => onAction('follow')}
           disabled={actionState.loading === 'follow'}
+          aria-label={
+            actionState.followed
+              ? isId
+                ? 'Berhenti mengikuti'
+                : 'Unfollow creator'
+              : isId
+                ? 'Ikuti pembuat'
+                : 'Follow creator'
+          }
           className={cn(
-            `
-            absolute
-            left-1/2
-            -bottom-1
-            z-20
-
-            !h-7
-            !w-7
-
-            !min-h-0
-            !min-w-0
-
-            !max-h-7
-            !max-w-7
-
-            aspect-square
-            shrink-0
-
-            -translate-x-1/2
-
-            flex
-            items-center
-            justify-center
-
-            rounded-full
-
-            p-0
-
-            !text-white
-            shadow-[0_8px_20px_-8px_rgba(0,0,0,0.9)]
-
-            transition
-            active:scale-95
-            disabled:opacity-60
-            `,
+            'absolute -bottom-1 left-1/2 z-20 flex !h-6 !max-h-6 !min-h-0 !w-6 !min-w-0 !max-w-6 -translate-x-1/2 items-center justify-center rounded-full p-0 !text-white shadow-lg shadow-black/45 transition active:scale-95 disabled:opacity-60',
             actionState.followed ? '!bg-emerald-500' : '!bg-[#ff2d55]',
           )}
         >
@@ -3918,27 +3928,31 @@ function ActionRail({
             type="button"
             onClick={action.onClick}
             disabled={action.loading}
-            className="flex max-w-[48px] flex-col items-center gap-0.5 transition active:scale-95"
+            aria-label={action.ariaLabel}
+            title={action.ariaLabel}
+            className="flex max-w-[44px] flex-col items-center gap-0.5 transition active:scale-95"
             data-testid={`reels-action-${action.key}`}
           >
             <span
               className={cn(
-                '!grid !h-11 !w-11 place-items-center rounded-full !bg-transparent !text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.88)] transition sm:!h-12 sm:!w-12',
-                action.active && '!text-rose-500',
+                '!grid !h-10 !w-10 place-items-center rounded-full !bg-black/[0.32] !text-white shadow-md shadow-black/25 ring-1 ring-white/10 transition',
+                action.key === 'like' && action.active && '!text-rose-500',
+                action.key === 'save' && action.active && '!text-yellow-300',
               )}
             >
               {action.loading ? (
-                <Loader2 className="h-6 w-6 animate-spin sm:h-6 sm:w-6" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 <ActionIcon
                   className={cn(
-                    '!h-6 !w-6 fill-current stroke-current stroke-[2.65] sm:!h-6 sm:!w-6',
+                    '!h-[22px] !w-[22px] fill-none stroke-current stroke-[2.45]',
+                    action.active && 'fill-current',
                   )}
                 />
               )}
             </span>
             {action.label && (
-              <span className="max-w-full truncate text-center text-[9px] font-bold leading-3 drop-shadow sm:text-[10px]">
+              <span className="max-w-full truncate text-center text-[9px] font-bold leading-3 drop-shadow">
                 {action.label}
               </span>
             )}
@@ -4018,7 +4032,7 @@ function SearchOverlay({
       .sort(
         (a, b) =>
           scoreReel(b.item, profile, query) -
-          scoreReel(a.item, profile, query) || a.index - b.index,
+            scoreReel(a.item, profile, query) || a.index - b.index,
       );
   }, [items, profile, query]);
 
@@ -4253,7 +4267,6 @@ function SearchVideoCard({
   onClick: () => void;
 }) {
   const Icon = iconMap[reel.iconKey] ?? Clapperboard;
-  const imageMedia = isImageMediaUrl(reel.videoSrc);
   const mediaStyle = getReelMediaStyle(reel.filterPreset);
   const liveLabel = getLiveLabel(reel);
 
@@ -4264,7 +4277,7 @@ function SearchVideoCard({
       onMouseEnter={event => {
         const video = event.currentTarget.querySelector('video');
         if (video instanceof HTMLVideoElement) {
-          video.play().catch(() => { });
+          video.play().catch(() => {});
         }
       }}
       onMouseLeave={event => {
@@ -4276,24 +4289,15 @@ function SearchVideoCard({
       }}
       className="group relative aspect-[9/14] overflow-hidden rounded-2xl bg-white/10 text-left ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:ring-white/20 active:scale-[0.98]"
     >
-      {imageMedia ? (
-        <img
-          src={reel.videoSrc}
-          alt={reel.title}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={mediaStyle}
-        />
-      ) : (
-        <video
-          src={reel.videoSrc}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={mediaStyle}
-          muted
-          loop
-          playsInline
-          preload="none"
-        />
-      )}
+      <video
+        src={reel.videoSrc}
+        className="absolute inset-0 h-full w-full object-cover"
+        style={mediaStyle}
+        muted
+        loop
+        playsInline
+        preload="metadata"
+      />
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/12 to-black/25" />
 
@@ -4358,6 +4362,7 @@ function DetailOverlay({
   onOpenComments,
   onOpenProduct,
   onOpenShare,
+  onOpenCreatorProfile,
   onMessageCreator,
   chatBusyReelId,
   onClose,
@@ -4373,6 +4378,7 @@ function DetailOverlay({
   onOpenComments: (reel: LajukanReel) => void;
   onOpenProduct: (reel: LajukanReel) => void;
   onOpenShare: (reel: LajukanReel) => void;
+  onOpenCreatorProfile: (reel: LajukanReel) => void;
   onMessageCreator: (reel: LajukanReel) => void;
   chatBusyReelId: string | null;
   onClose: () => void;
@@ -4384,6 +4390,7 @@ function DetailOverlay({
   const mediaStyle = getReelMediaStyle(reel.filterPreset);
   const liveLabel = getLiveLabel(reel);
   const profileHref = buildReelCreatorProfileHref(locale, reel);
+  const creatorStats = getReelCreatorStats(reel);
 
   return (
     <div
@@ -4495,6 +4502,15 @@ function DetailOverlay({
 
             <button
               type="button"
+              onClick={() => onOpenCreatorProfile(reel)}
+              className="hidden items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-bold text-white transition active:scale-[0.98] min-[430px]:inline-flex"
+            >
+              <Users className="h-3.5 w-3.5" />
+              Sosial
+            </button>
+
+            <button
+              type="button"
               onClick={() => onMessageCreator(reel)}
               disabled={chatBusyReelId === reel.id}
               className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
@@ -4527,6 +4543,21 @@ function DetailOverlay({
               )}
               {actionState.followed ? 'Diikuti' : 'Ikuti'}
             </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <CreatorStatCell
+              label="Followers"
+              value={formatCompactMetric(creatorStats.followers)}
+            />
+            <CreatorStatCell
+              label="Following"
+              value={formatCompactMetric(creatorStats.following)}
+            />
+            <CreatorStatCell
+              label="Reels"
+              value={formatCompactMetric(creatorStats.reels)}
+            />
           </div>
 
           <p className="mt-5 text-sm leading-relaxed text-white/72">
@@ -4624,6 +4655,161 @@ function StatPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CreatorStatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/8 px-3 py-3 text-center ring-1 ring-white/10">
+      <p className="text-sm font-bold text-white">{value}</p>
+      <p className="mt-0.5 text-[10px] font-bold text-white/48">{label}</p>
+    </div>
+  );
+}
+
+function CreatorProfileSheet({
+  locale,
+  reel,
+  actionState,
+  chatBusy,
+  onAction,
+  onMessageCreator,
+  onOpenComments,
+  onClose,
+}: {
+  locale: string;
+  reel: LajukanReel | null;
+  actionState: ReelActionState;
+  chatBusy: boolean;
+  onAction: (
+    reel: LajukanReel,
+    action: ReelUserAction,
+    active?: boolean,
+  ) => void;
+  onMessageCreator: (reel: LajukanReel) => void;
+  onOpenComments: (reel: LajukanReel) => void;
+  onClose: () => void;
+}) {
+  if (!reel) return null;
+
+  const profileHref = buildReelCreatorProfileHref(locale, reel);
+  const stats = getReelCreatorStats(reel);
+
+  return (
+    <div
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white lg:items-center lg:justify-center"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        aria-label="Tutup profil creator"
+        onClick={onClose}
+        className="absolute inset-0"
+      />
+
+      <section className="relative w-full overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl ring-1 ring-white/10 lg:max-w-[430px] lg:rounded-[24px]">
+        <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
+        <div className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <ReelCreatorAvatar
+                reel={reel}
+                className="h-16 w-16 bg-white/10 ring-2 ring-white/20"
+                size={64}
+              />
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-bold">{reel.creator}</h2>
+                <p className="truncate text-xs font-semibold text-white/50">
+                  {reel.tag} / Creator Lajukan
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10"
+              aria-label="Tutup"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <CreatorStatCell
+              label="Followers"
+              value={formatCompactMetric(stats.followers)}
+            />
+            <CreatorStatCell
+              label="Following"
+              value={formatCompactMetric(stats.following)}
+            />
+            <CreatorStatCell
+              label="Reels"
+              value={formatCompactMetric(stats.reels)}
+            />
+          </div>
+
+          <p className="mt-4 line-clamp-3 text-sm font-medium leading-relaxed text-white/68">
+            {reel.caption}
+          </p>
+
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onAction(reel, 'follow')}
+              disabled={actionState.loading === 'follow'}
+              className={cn(
+                'inline-flex h-11 items-center justify-center gap-2 rounded-2xl text-sm font-bold disabled:opacity-60',
+                actionState.followed
+                  ? 'bg-emerald-400 text-slate-950'
+                  : 'bg-white text-slate-950',
+              )}
+            >
+              {actionState.loading === 'follow' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : actionState.followed ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <UserPlus className="h-4 w-4" />
+              )}
+              {actionState.followed ? 'Diikuti' : 'Ikuti'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onMessageCreator(reel)}
+              disabled={chatBusy}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {chatBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MessageSquareText className="h-4 w-4" />
+              )}
+              Chat
+            </button>
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Link
+              href={profileHref}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/10 text-sm font-bold text-white ring-1 ring-white/10"
+            >
+              <User className="h-4 w-4" />
+              Profil penuh
+            </Link>
+            <button
+              type="button"
+              onClick={() => onOpenComments(reel)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/10 text-sm font-bold text-white ring-1 ring-white/10"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Komentar
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ShareSheet({
   locale,
   reel,
@@ -4706,9 +4892,9 @@ function ShareSheet({
         );
         if (!response.ok) return null;
 
-        const payload = (await response.json().catch(() => null)) as
-          | DiscoverUser
-          | null;
+        const payload = (await response
+          .json()
+          .catch(() => null)) as DiscoverUser | null;
         if (!payload) return null;
 
         const mapped = mapDiscoverUserToSocialUser(payload, isId);
@@ -4768,7 +4954,9 @@ function ShareSheet({
 
         const [creatorById, creatorBySearch, followedUsers, suggestedUsers] =
           await Promise.all([
-            creatorUserId ? loadPublicUser(creatorUserId) : Promise.resolve(null),
+            creatorUserId
+              ? loadPublicUser(creatorUserId)
+              : Promise.resolve(null),
             normalizedCreator
               ? loadDiscoverUsers(reelCreator, 6)
               : Promise.resolve([]),
@@ -4780,13 +4968,15 @@ function ShareSheet({
           creatorById ||
           (Array.isArray(creatorBySearch)
             ? creatorBySearch.find(candidate => {
-              const candidateName = normalizeRecipientName(candidate.name);
-              const candidateHandle = normalizeRecipientName(candidate.handle);
-              return (
-                candidateName === normalizedCreator ||
-                candidateHandle === normalizedCreator
-              );
-            }) || null
+                const candidateName = normalizeRecipientName(candidate.name);
+                const candidateHandle = normalizeRecipientName(
+                  candidate.handle,
+                );
+                return (
+                  candidateName === normalizedCreator ||
+                  candidateHandle === normalizedCreator
+                );
+              }) || null
             : null);
 
         const effectiveCreatorCandidate = creatorIsSelf
@@ -4795,10 +4985,10 @@ function ShareSheet({
         const creatorRecipient: ShareSheetRecipient | null =
           effectiveCreatorCandidate
             ? {
-              ...effectiveCreatorCandidate,
-              source: 'creator',
-              linked: true,
-            }
+                ...effectiveCreatorCandidate,
+                source: 'creator',
+                linked: true,
+              }
             : null;
 
         const filteredFollowedUsers = followedUsers.filter(
@@ -4813,11 +5003,11 @@ function ShareSheet({
             !followedIdSet.has(item.id),
         );
         const validFollowedUsers = filteredFollowedUsers.filter(
-          (user): user is SocialUser => user !== null
+          (user): user is SocialUser => user !== null,
         );
 
         const validSuggestedUsers = filteredSuggestedUsers.filter(
-          (user): user is SocialUser => user !== null
+          (user): user is SocialUser => user !== null,
         );
 
         const restRecipients = mergeSocialUsers(
@@ -4874,7 +5064,7 @@ function ShareSheet({
 
     try {
       await navigator.clipboard?.writeText(shareUrl);
-    } catch { }
+    } catch {}
 
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
@@ -4949,63 +5139,63 @@ function ShareSheet({
     className: string;
     onClick: () => void;
   }> = [
-      {
-        label: 'Repost',
-        icon: RefreshCcw,
-        className: 'bg-yellow-400 text-white',
-        onClick: () => void copyLink(),
-      },
-      {
-        label: 'WhatsApp',
-        icon: MessageCircle,
-        className: 'bg-[#25D366] text-white',
-        onClick: () => openExternal(`https://wa.me/?text=${encodedText}`),
-      },
-      {
-        label: copied ? 'Copied' : 'Copy link',
-        icon: Link2,
-        className: 'bg-emerald-600 text-white',
-        onClick: () => void copyLink(),
-      },
-      {
-        label: 'Status',
-        icon: Plus,
-        className: 'bg-emerald-500 text-white',
-        onClick: () => void copyLink(),
-      },
-      {
-        label: 'Facebook',
-        glyph: 'f',
-        className: 'bg-[#1877F2] text-white',
-        onClick: () =>
-          openExternal(
-            `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-          ),
-      },
-      {
-        label: 'Instagram',
-        icon: Send,
-        className:
-          'bg-gradient-to-br from-emerald-600 via-lime-500 to-orange-400 text-white',
-        onClick: () => void copyLink(),
-      },
-    ];
+    {
+      label: 'Repost',
+      icon: RefreshCcw,
+      className: 'bg-yellow-400 text-white',
+      onClick: () => void copyLink(),
+    },
+    {
+      label: 'WhatsApp',
+      icon: MessageCircle,
+      className: 'bg-[#25D366] text-white',
+      onClick: () => openExternal(`https://wa.me/?text=${encodedText}`),
+    },
+    {
+      label: copied ? 'Copied' : 'Copy link',
+      icon: Link2,
+      className: 'bg-emerald-600 text-white',
+      onClick: () => void copyLink(),
+    },
+    {
+      label: 'Status',
+      icon: Plus,
+      className: 'bg-emerald-500 text-white',
+      onClick: () => void copyLink(),
+    },
+    {
+      label: 'Facebook',
+      glyph: 'f',
+      className: 'bg-[#1877F2] text-white',
+      onClick: () =>
+        openExternal(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+        ),
+    },
+    {
+      label: 'Instagram',
+      icon: Send,
+      className:
+        'bg-gradient-to-br from-emerald-600 via-lime-500 to-orange-400 text-white',
+      onClick: () => void copyLink(),
+    },
+  ];
   const utilityActions: Array<{
     label: string;
     icon: LucideIcon;
     onClick: () => void;
   }> = [
-      { label: 'Report', icon: Flag, onClick: onClose },
-      { label: 'Not interested', icon: X, onClick: onClose },
-      {
-        label: 'Download',
-        icon: Download,
-        onClick: () => openExternal(reel.videoSrc),
-      },
-      { label: 'Add to Story', icon: Plus, onClick: () => void copyLink() },
-      { label: 'Promote', icon: Megaphone, onClick: onClose },
-      { label: 'Cast', icon: Radio, onClick: onClose },
-    ];
+    { label: 'Report', icon: Flag, onClick: onClose },
+    { label: 'Not interested', icon: X, onClick: onClose },
+    {
+      label: 'Download',
+      icon: Download,
+      onClick: () => openExternal(reel.videoSrc),
+    },
+    { label: 'Add to Story', icon: Plus, onClick: () => void copyLink() },
+    { label: 'Promote', icon: Megaphone, onClick: onClose },
+    { label: 'Cast', icon: Radio, onClick: onClose },
+  ];
 
   return (
     <div
@@ -5058,53 +5248,53 @@ function ShareSheet({
           >
             {recipientsLoading && recipients.length === 0
               ? Array.from({ length: 4 }, (_, index) => (
-                <div key={`recipient-skel-${index}`} className="w-[76px] shrink-0 text-center">
-                  <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10 ring-1 ring-white/10">
-                    <Loader2 className="h-5 w-5 animate-spin text-white/55" />
-                  </span>
-                  <span className="mt-2 block h-3 rounded-full bg-white/10" />
-                  <span className="mt-1 block h-2.5 rounded-full bg-white/6" />
-                </div>
-              ))
-              : recipients.map(recipient => (
-                <button
-                  key={recipient.id}
-                  type="button"
-                  disabled={
-                    chatBusy ||
-                    sendingRecipientId === recipient.id
-                  }
-                  onClick={() => void handleRecipientPress(recipient)}
-                  className="w-[76px] shrink-0 text-center transition active:scale-95 disabled:opacity-60"
-                >
-                  <span
-                    className={cn(
-                      'mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-lg ring-1 ring-black/5',
-                      recipientTone(recipient),
-                    )}
+                  <div
+                    key={`recipient-skel-${index}`}
+                    className="w-[76px] shrink-0 text-center"
                   >
-                    {sendingRecipientId === recipient.id ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : recipient.avatarUrl ? (
-                      <NextImage
-                        src={recipient.avatarUrl}
-                        alt={recipient.name}
-                        width={64}
-                        height={64}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      recipient.name.slice(0, 2).toUpperCase()
-                    )}
-                  </span>
-                  <span className="mt-2 block truncate text-xs font-semibold text-white">
-                    {recipient.name}
-                  </span>
-                  <span className="block truncate text-[10px] font-medium text-white/48">
-                    {recipientCaption(recipient)}
-                  </span>
-                </button>
-              ))}
+                    <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10 ring-1 ring-white/10">
+                      <Loader2 className="h-5 w-5 animate-spin text-white/55" />
+                    </span>
+                    <span className="mt-2 block h-3 rounded-full bg-white/10" />
+                    <span className="mt-1 block h-2.5 rounded-full bg-white/6" />
+                  </div>
+                ))
+              : recipients.map(recipient => (
+                  <button
+                    key={recipient.id}
+                    type="button"
+                    disabled={chatBusy || sendingRecipientId === recipient.id}
+                    onClick={() => void handleRecipientPress(recipient)}
+                    className="w-[76px] shrink-0 text-center transition active:scale-95 disabled:opacity-60"
+                  >
+                    <span
+                      className={cn(
+                        'mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-lg ring-1 ring-black/5',
+                        recipientTone(recipient),
+                      )}
+                    >
+                      {sendingRecipientId === recipient.id ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : recipient.avatarUrl ? (
+                        <NextImage
+                          src={recipient.avatarUrl}
+                          alt={recipient.name}
+                          width={64}
+                          height={64}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        recipient.name.slice(0, 2).toUpperCase()
+                      )}
+                    </span>
+                    <span className="mt-2 block truncate text-xs font-semibold text-white">
+                      {recipient.name}
+                    </span>
+                    <span className="block truncate text-[10px] font-medium text-white/48">
+                      {recipientCaption(recipient)}
+                    </span>
+                  </button>
+                ))}
           </div>
 
           <div
@@ -5234,43 +5424,43 @@ function MoreActionsSheet({
     featured?: boolean;
     disabled?: boolean;
   }> = [
-      {
-        label: actionState.saved ? 'Tersimpan' : 'Simpan',
-        icon: Bookmark,
-        active: actionState.saved,
-        disabled: actionState.loading === 'save',
-        onClick: () => onAction(reel, 'save'),
-      },
-      {
-        label: 'Detail',
-        icon: Info,
-        onClick: () => onOpenDetail(reel),
-      },
-      {
-        label: 'Komentar',
-        icon: MessageCircle,
-        onClick: () => onOpenComments(reel),
-      },
-      {
-        label: 'Share',
-        icon: Forward,
-        featured: true,
-        onClick: () => onOpenShare(reel),
-      },
-      {
-        label: actionState.followed ? 'Diikuti' : 'Ikuti',
-        icon: actionState.followed ? Check : UserPlus,
-        active: actionState.followed,
-        disabled: actionState.loading === 'follow',
-        onClick: () => onAction(reel, 'follow'),
-      },
-      {
-        label: 'Chat',
-        icon: chatBusy ? Loader2 : MessageSquareText,
-        disabled: chatBusy,
-        onClick: () => onMessageCreator(reel),
-      },
-    ];
+    {
+      label: actionState.saved ? 'Tersimpan' : 'Simpan',
+      icon: Bookmark,
+      active: actionState.saved,
+      disabled: actionState.loading === 'save',
+      onClick: () => onAction(reel, 'save'),
+    },
+    {
+      label: 'Detail',
+      icon: Info,
+      onClick: () => onOpenDetail(reel),
+    },
+    {
+      label: 'Komentar',
+      icon: MessageCircle,
+      onClick: () => onOpenComments(reel),
+    },
+    {
+      label: 'Share',
+      icon: Forward,
+      featured: true,
+      onClick: () => onOpenShare(reel),
+    },
+    {
+      label: actionState.followed ? 'Diikuti' : 'Ikuti',
+      icon: actionState.followed ? Check : UserPlus,
+      active: actionState.followed,
+      disabled: actionState.loading === 'follow',
+      onClick: () => onAction(reel, 'follow'),
+    },
+    {
+      label: 'Chat',
+      icon: chatBusy ? Loader2 : MessageSquareText,
+      disabled: chatBusy,
+      onClick: () => onMessageCreator(reel),
+    },
+  ];
 
   if (reel.productName) {
     actions.splice(2, 0, {
@@ -5348,6 +5538,7 @@ function MoreActionsSheet({
 }
 
 function CommentsSheet({
+  locale,
   reel,
   bucket,
   body,
@@ -5365,6 +5556,7 @@ function CommentsSheet({
   onSubmit,
   onRequireLogin,
 }: {
+  locale: string;
   reel: LajukanReel | null;
   bucket?: ReelCommentsBucket;
   body: string;
@@ -5424,7 +5616,9 @@ function CommentsSheet({
             <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
               {formatCompactMetric(metricCount(reel, 'comments'))} komentar
             </p>
-            <h2 className="truncate text-base !text-black font-bold">{reel.title}</h2>
+            <h2 className="truncate text-base !text-black font-bold">
+              {reel.title}
+            </h2>
           </div>
 
           <button
@@ -5485,7 +5679,9 @@ function CommentsSheet({
                           </p>
                         </div>
                         <div className="!text-black mt-1 flex items-center gap-3 px-2 text-[11px] font-bold text-white/42">
-                          <span>{formatCommentTime(comment.createdAt)}</span>
+                          <span>
+                            {formatCommentTime(comment.createdAt, locale)}
+                          </span>
                           <button
                             type="button"
                             onClick={() => onReply(comment)}
@@ -5527,7 +5723,7 @@ function CommentsSheet({
                                 </p>
                               </div>
                               <p className="mt-1 px-2 text-[10px] font-semibold text-white/40">
-                                {formatCommentTime(reply.createdAt)}
+                                {formatCommentTime(reply.createdAt, locale)}
                               </p>
                             </div>
                           </div>
@@ -5703,7 +5899,9 @@ function ProductSheet({
               <ShoppingBag className="h-7 w-7" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-white">{reel.creator}</p>
+              <p className="truncate text-sm font-bold text-white">
+                {reel.creator}
+              </p>
               <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-relaxed text-white/72">
                 {reel.caption}
               </p>
@@ -5751,6 +5949,7 @@ function UploadReelSheet({
   open,
   authFetch,
   displayName,
+  performanceProfile,
   onClose,
   onCreated,
 }: {
@@ -5758,6 +5957,7 @@ function UploadReelSheet({
   open: boolean;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   displayName: string;
+  performanceProfile: ReelsPerformanceProfile;
   onClose: () => void;
   onCreated: (reel: LajukanReel) => void;
 }) {
@@ -5780,36 +5980,23 @@ function UploadReelSheet({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recorderChunksRef = useRef<Blob[]>([]);
   const recordingTimeoutRef = useRef<number | null>(null);
-  const recordingAnimationRef = useRef<number | null>(null);
+  const recordingFrameCleanupRef = useRef<(() => void) | null>(null);
+  const recordingOutputStreamRef = useRef<MediaStream | null>(null);
+  const cameraRequestIdRef = useRef(0);
+  const cameraOpeningRef = useRef(false);
   const autoCameraAttemptedRef = useRef(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraOpening, setCameraOpening] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(
     null,
   );
   const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
   const hasMedia = Boolean(file || form.mediaUrl.trim());
   const studioPanelRail = useHorizontalDragScroll<HTMLDivElement>();
   const studioFilterRail = useHorizontalDragScroll<HTMLDivElement>();
   const studioMusicRail = useHorizontalDragScroll<HTMLDivElement>();
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-
-    const query = window.matchMedia('(pointer: coarse)');
-    const updatePointerMode = () => setIsCoarsePointer(query.matches);
-
-    updatePointerMode();
-    if (typeof query.addEventListener === 'function') {
-      query.addEventListener('change', updatePointerMode);
-      return () => query.removeEventListener('change', updatePointerMode);
-    }
-
-    query.addListener(updatePointerMode);
-    return () => query.removeListener(updatePointerMode);
-  }, []);
 
   const setField = useCallback(
     <K extends keyof UploadReelForm>(field: K, value: UploadReelForm[K]) => {
@@ -5819,20 +6006,30 @@ function UploadReelSheet({
   );
 
   const stopCamera = useCallback(() => {
+    cameraRequestIdRef.current += 1;
+    cameraOpeningRef.current = false;
+    setCameraOpening(false);
     if (recordingTimeoutRef.current !== null) {
       window.clearTimeout(recordingTimeoutRef.current);
       recordingTimeoutRef.current = null;
     }
-    if (recordingAnimationRef.current !== null) {
-      window.clearInterval(recordingAnimationRef.current);
-      recordingAnimationRef.current = null;
-    }
+    recordingFrameCleanupRef.current?.();
+    recordingFrameCleanupRef.current = null;
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
       recorderRef.current.ondataavailable = null;
       recorderRef.current.onstop = null;
       recorderRef.current.stop();
     }
     recorderRef.current = null;
+    if (
+      recordingOutputStreamRef.current &&
+      recordingOutputStreamRef.current !== cameraStreamRef.current
+    ) {
+      recordingOutputStreamRef.current
+        .getVideoTracks()
+        .forEach(track => track.stop());
+    }
+    recordingOutputStreamRef.current = null;
     cameraStreamRef.current?.getTracks().forEach(track => track.stop());
     cameraStreamRef.current = null;
     if (cameraVideoRef.current) {
@@ -5846,12 +6043,17 @@ function UploadReelSheet({
 
   const openCamera = useCallback(
     async (facingMode = cameraFacingMode) => {
+      if (cameraOpeningRef.current) return;
       setError(null);
       setCameraError(null);
       setForm(current => ({ ...current, captureMode: 'camera' }));
 
       if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError('Kamera belum didukung di browser ini.');
+        setCameraError(
+          locale === 'id'
+            ? 'Kamera belum didukung di browser ini. Pilih video dari galeri.'
+            : 'This browser does not support camera access. Choose a gallery video.',
+        );
         return;
       }
 
@@ -5861,47 +6063,70 @@ function UploadReelSheet({
 
       requestNativePermissions(['camera', 'microphone']);
       stopCamera();
+      const requestId = ++cameraRequestIdRef.current;
+      cameraOpeningRef.current = true;
+      setCameraOpening(true);
 
       try {
         const needsAudio = studioMode !== 'photo';
-        const videoConstraints: MediaTrackConstraints = {
-          facingMode: { ideal: facingMode },
-          width: { ideal: isCoarsePointer ? 540 : 720 },
-          height: { ideal: isCoarsePointer ? 960 : 1280 },
-          aspectRatio: { ideal: 9 / 16 },
-          frameRate: { ideal: 24, max: 30 },
-        };
-        let stream: MediaStream;
-
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: needsAudio,
-            video: videoConstraints,
-          });
-        } catch {
-          stream = await navigator.mediaDevices.getUserMedia({
+        const videoConstraints = buildReelsCameraConstraints(
+          performanceProfile,
+          facingMode,
+        );
+        const attempts: MediaStreamConstraints[] = [
+          { audio: needsAudio, video: videoConstraints },
+          { audio: false, video: videoConstraints },
+          {
             audio: false,
-            video: videoConstraints,
-          });
-          setCameraError(
-            'Kamera aktif tanpa mikrofon. Kamu tetap bisa rekam visual atau upload audio nanti.',
-          );
+            video: { facingMode: { ideal: facingMode } },
+          },
+        ];
+        let stream: MediaStream | null = null;
+        let lastError: unknown = null;
+
+        for (const constraints of attempts) {
+          if (stream) break;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+          } catch (cameraRequestError) {
+            lastError = cameraRequestError;
+          }
+        }
+
+        if (!stream) throw lastError;
+        if (requestId !== cameraRequestIdRef.current) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
         }
 
         cameraStreamRef.current = stream;
         setCameraFacingMode(facingMode);
         setCameraReady(true);
+        if (needsAudio && stream.getAudioTracks().length === 0) {
+          setCameraError(
+            locale === 'id'
+              ? 'Kamera aktif tanpa mikrofon. Rekaman tetap bisa dibuat tanpa suara.'
+              : 'The camera is active without a microphone. You can still record without sound.',
+          );
+        }
         if (cameraVideoRef.current) {
           cameraVideoRef.current.srcObject = stream;
           await cameraVideoRef.current.play().catch(() => undefined);
         }
-      } catch {
-        setCameraError(
-          'Kamera belum bisa dibuka. Cek izin browser atau pakai galeri dulu.',
-        );
+      } catch (cameraRequestError) {
+        if (requestId === cameraRequestIdRef.current) {
+          setCameraError(
+            getReelsCameraErrorMessage(cameraRequestError, locale),
+          );
+        }
+      } finally {
+        if (requestId === cameraRequestIdRef.current) {
+          cameraOpeningRef.current = false;
+          setCameraOpening(false);
+        }
       }
     },
-    [cameraFacingMode, isCoarsePointer, stopCamera, studioMode],
+    [cameraFacingMode, locale, performanceProfile, stopCamera, studioMode],
   );
 
   const flipCamera = useCallback(() => {
@@ -5937,6 +6162,19 @@ function UploadReelSheet({
         return;
       }
 
+      if (mode === 'link') {
+        stopCamera();
+        setFile(null);
+        setForm(current => ({
+          ...current,
+          captureMode: 'upload',
+          title: current.title.trim() ? current.title : 'Video usaha',
+          hook: current.hook.trim() ? current.hook : 'Lihat videonya',
+        }));
+        setStudioPanel('link');
+        return;
+      }
+
       setForm(current => ({
         ...current,
         captureMode: 'camera',
@@ -5966,8 +6204,8 @@ function UploadReelSheet({
       return;
     }
 
-    const width = REELS_CAPTURE_CANVAS_WIDTH;
-    const height = REELS_CAPTURE_CANVAS_HEIGHT;
+    const width = performanceProfile.captureWidth;
+    const height = performanceProfile.captureHeight;
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -5978,11 +6216,7 @@ function UploadReelSheet({
     }
 
     context.filter = getReelFilterCss(form.filterPreset);
-    if (isCoarsePointer) {
-      drawVideoContainFrame(context, video, width, height);
-    } else {
-      drawVideoCoverFrame(context, video, width, height);
-    }
+    drawVideoCoverFrame(context, video, width, height);
     context.filter = 'none';
     drawStudioCanvasEffect(context, width, height, studioEffect);
     canvas.toBlob(
@@ -6009,11 +6243,19 @@ function UploadReelSheet({
             : current.hook.trim() || 'Foto usaha dari kamera Lajukan.',
         }));
         setStep('edit');
+        stopCamera();
       },
       'image/jpeg',
-      0.92,
+      performanceProfile.photoQuality,
     );
-  }, [cameraReady, form.filterPreset, isCoarsePointer, setStudioMode, studioEffect]);
+  }, [
+    cameraReady,
+    form.filterPreset,
+    performanceProfile,
+    setStudioMode,
+    stopCamera,
+    studioEffect,
+  ]);
 
   const startCameraRecording = useCallback(() => {
     setError(null);
@@ -6022,25 +6264,39 @@ function UploadReelSheet({
     setStudioMode('video');
     const stream = cameraStreamRef.current;
     if (!stream) {
-      setCameraError('Buka kamera dulu, baru rekam.');
+      setCameraError(
+        locale === 'id'
+          ? 'Buka kamera dulu, baru rekam.'
+          : 'Open the camera before recording.',
+      );
       return;
     }
     if (typeof MediaRecorder === 'undefined') {
-      setCameraError('Rekam langsung belum didukung di browser ini.');
+      setCameraError(
+        locale === 'id'
+          ? 'Rekam langsung belum didukung. Pilih video dari galeri.'
+          : 'Direct recording is not supported. Choose a gallery video.',
+      );
       return;
     }
 
     const video = cameraVideoRef.current;
     let recorderStream: MediaStream = stream;
+    let startProcessedFrames: (() => void) | null = null;
 
-    if (video) {
+    if (video && needsReelsCanvasPipeline(form.filterPreset, studioEffect)) {
       const canvas = document.createElement('canvas');
-      canvas.width = REELS_CAPTURE_CANVAS_WIDTH;
-      canvas.height = REELS_CAPTURE_CANVAS_HEIGHT;
-      const context = canvas.getContext('2d');
+      const width = performanceProfile.captureWidth;
+      const height = performanceProfile.captureHeight;
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d', {
+        alpha: false,
+        desynchronized: true,
+      });
       const canvasStream =
         context && typeof canvas.captureStream === 'function'
-          ? canvas.captureStream(REELS_CAPTURE_FPS)
+          ? canvas.captureStream(performanceProfile.captureFps)
           : null;
 
       if (context && canvasStream) {
@@ -6049,67 +6305,34 @@ function UploadReelSheet({
 
         const paintFrame = () => {
           const currentVideo = cameraVideoRef.current;
-          const currentRecorder = recorderRef.current;
-          if (
-            !currentVideo ||
-            !currentRecorder ||
-            currentRecorder.state === 'inactive'
-          ) {
-            if (recordingAnimationRef.current !== null) {
-              window.clearInterval(recordingAnimationRef.current);
-              recordingAnimationRef.current = null;
-            }
-            return;
-          }
-
-          context.clearRect(
-            0,
-            0,
-            REELS_CAPTURE_CANVAS_WIDTH,
-            REELS_CAPTURE_CANVAS_HEIGHT,
-          );
+          if (!currentVideo || currentVideo.readyState < 2) return;
+          context.clearRect(0, 0, width, height);
           context.filter = getReelFilterCss(form.filterPreset);
-          if (isCoarsePointer) {
-            drawVideoContainFrame(
-              context,
-              currentVideo,
-              REELS_CAPTURE_CANVAS_WIDTH,
-              REELS_CAPTURE_CANVAS_HEIGHT,
-            );
-          } else {
-            drawVideoCoverFrame(
-              context,
-              currentVideo,
-              REELS_CAPTURE_CANVAS_WIDTH,
-              REELS_CAPTURE_CANVAS_HEIGHT,
-            );
-          }
+          drawVideoCoverFrame(context, currentVideo, width, height);
           context.filter = 'none';
-          drawStudioCanvasEffect(
-            context,
-            REELS_CAPTURE_CANVAS_WIDTH,
-            REELS_CAPTURE_CANVAS_HEIGHT,
-            studioEffect,
-          );
+          drawStudioCanvasEffect(context, width, height, studioEffect);
         };
 
         paintFrame();
-        recordingAnimationRef.current = window.setInterval(
-          paintFrame,
-          Math.max(Math.round(1000 / REELS_CAPTURE_FPS), 16),
-        );
+        startProcessedFrames = () => {
+          recordingFrameCleanupRef.current?.();
+          recordingFrameCleanupRef.current = startVideoFramePump(
+            video,
+            performanceProfile.captureFps,
+            paintFrame,
+          );
+        };
       }
     }
 
-    const mimeType = [
-      'video/webm;codecs=vp9',
-      'video/webm;codecs=vp8',
-      'video/webm',
-    ].find(type => MediaRecorder.isTypeSupported(type));
+    const mimeType = selectReelsRecorderMimeType(
+      performanceProfile.tier,
+      type => MediaRecorder.isTypeSupported(type),
+    );
     const recorderOptions = {
       ...(mimeType ? { mimeType } : {}),
-      videoBitsPerSecond: isCoarsePointer ? 1_200_000 : 1_800_000,
-      audioBitsPerSecond: 64_000,
+      videoBitsPerSecond: performanceProfile.videoBitsPerSecond,
+      audioBitsPerSecond: performanceProfile.audioBitsPerSecond,
     };
     let recorder: MediaRecorder;
     try {
@@ -6124,6 +6347,7 @@ function UploadReelSheet({
     }
 
     recorderRef.current = recorder;
+    recordingOutputStreamRef.current = recorderStream;
     recorderChunksRef.current = [];
     recorder.ondataavailable = event => {
       if (event.data.size > 0) {
@@ -6135,16 +6359,15 @@ function UploadReelSheet({
         window.clearTimeout(recordingTimeoutRef.current);
         recordingTimeoutRef.current = null;
       }
-      if (recordingAnimationRef.current !== null) {
-        window.clearInterval(recordingAnimationRef.current);
-        recordingAnimationRef.current = null;
-      }
+      recordingFrameCleanupRef.current?.();
+      recordingFrameCleanupRef.current = null;
       const type = recorder.mimeType || 'video/webm';
       const blob = new Blob(recorderChunksRef.current, { type });
       if (blob.size > 0) {
+        const extension = getReelsRecordingExtension(type);
         const recordedFile = new File(
           [blob],
-          `lajukan-reels-${Date.now()}.webm`,
+          `lajukan-reels-${Date.now()}.${extension}`,
           { type },
         );
         setFile(recordedFile);
@@ -6156,15 +6379,17 @@ function UploadReelSheet({
           caption: current.caption.trim()
             ? current.caption
             : current.hook.trim() ||
-            'Rekaman singkat usaha dari kamera Lajukan.',
+              'Rekaman singkat usaha dari kamera Lajukan.',
         }));
         setStep('edit');
       }
       setRecording(false);
       setRecordingStartedAt(null);
       setRecordingElapsedMs(0);
+      stopCamera();
     };
-    recorder.start(250);
+    recorder.start(1000);
+    startProcessedFrames?.();
     setRecording(true);
     setRecordingStartedAt(Date.now());
     setRecordingElapsedMs(0);
@@ -6176,8 +6401,10 @@ function UploadReelSheet({
     }, getStudioDurationMs(studioDuration));
   }, [
     form.filterPreset,
-    isCoarsePointer,
+    locale,
+    performanceProfile,
     setStudioMode,
+    stopCamera,
     studioDuration,
     studioEffect,
   ]);
@@ -6191,10 +6418,8 @@ function UploadReelSheet({
         window.clearTimeout(recordingTimeoutRef.current);
         recordingTimeoutRef.current = null;
       }
-      if (recordingAnimationRef.current !== null) {
-        window.clearInterval(recordingAnimationRef.current);
-        recordingAnimationRef.current = null;
-      }
+      recordingFrameCleanupRef.current?.();
+      recordingFrameCleanupRef.current = null;
       setRecording(false);
       setRecordingStartedAt(null);
       setRecordingElapsedMs(0);
@@ -6229,9 +6454,26 @@ function UploadReelSheet({
     const updateElapsed = () =>
       setRecordingElapsedMs(Date.now() - recordingStartedAt);
     updateElapsed();
-    const interval = window.setInterval(updateElapsed, 200);
+    const interval = window.setInterval(updateElapsed, 500);
     return () => window.clearInterval(interval);
   }, [recording, recordingStartedAt]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleVisibility = () => {
+      if (!document.hidden || !cameraStreamRef.current) return;
+      autoCameraAttemptedRef.current = true;
+      stopCamera();
+      setCameraError(
+        locale === 'id'
+          ? 'Kamera dijeda saat aplikasi tidak aktif. Ketuk tombol rekam untuk membukanya lagi.'
+          : 'The camera was paused while the app was inactive. Tap record to reopen it.',
+      );
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibility);
+  }, [locale, open, stopCamera]);
 
   useEffect(() => {
     if (form.captureMode !== 'camera') {
@@ -6285,9 +6527,10 @@ function UploadReelSheet({
       const path = typeof detail.path === 'string' ? detail.path : '';
       const mode: ReelsStudioMode =
         detail.mode === 'photo' ||
-          detail.mode === 'video' ||
-          detail.mode === 'gallery' ||
-          detail.mode === 'live'
+        detail.mode === 'video' ||
+        detail.mode === 'gallery' ||
+        detail.mode === 'link' ||
+        detail.mode === 'live'
           ? detail.mode
           : 'video';
       const mediaType = detail.mediaType === 'image' ? 'image' : 'video';
@@ -6299,12 +6542,12 @@ function UploadReelSheet({
         typeof detail.music === 'string' ? detail.music : form.musicTrack;
       const speed =
         typeof detail.speed === 'string' &&
-          REELS_STUDIO_SPEEDS.includes(detail.speed as ReelsStudioSpeed)
+        REELS_STUDIO_SPEEDS.includes(detail.speed as ReelsStudioSpeed)
           ? (detail.speed as ReelsStudioSpeed)
           : studioSpeed;
       const duration =
         typeof detail.duration === 'string' &&
-          REELS_STUDIO_DURATIONS.includes(detail.duration as ReelsStudioDuration)
+        REELS_STUDIO_DURATIONS.includes(detail.duration as ReelsStudioDuration)
           ? (detail.duration as ReelsStudioDuration)
           : studioDuration;
       const effect = isStudioEffect(detail.effect)
@@ -6318,7 +6561,11 @@ function UploadReelSheet({
       setForm(current => ({
         ...current,
         captureMode:
-          mode === 'live' ? 'live' : mode === 'gallery' ? 'upload' : 'camera',
+          mode === 'live'
+            ? 'live'
+            : mode === 'gallery' || mode === 'link'
+              ? 'upload'
+              : 'camera',
         mediaUrl: path || current.mediaUrl,
         filterPreset: REEL_FILTER_PRESETS.some(item => item.id === filter)
           ? (filter as UploadReelForm['filterPreset'])
@@ -6376,7 +6623,16 @@ function UploadReelSheet({
   const selectedCaptureMode = REEL_CAPTURE_MODES.find(
     mode => mode.id === form.captureMode,
   );
-  const SelectedCaptureIcon = selectedCaptureMode?.icon ?? Camera;
+  const directVideoUrl = form.mediaUrl.trim();
+  const isExternalVideoLink = Boolean(
+    !file && directVideoUrl && isDirectVideoMediaUrl(directVideoUrl),
+  );
+  const selectedCaptureLabel = isExternalVideoLink
+    ? 'Link video'
+    : (selectedCaptureMode?.label ?? 'Kamera');
+  const SelectedCaptureIcon = isExternalVideoLink
+    ? Link2
+    : (selectedCaptureMode?.icon ?? Camera);
   const activeStudioMode =
     REELS_STUDIO_MODES.find(mode => mode.id === studioMode) ||
     REELS_STUDIO_MODES[2];
@@ -6394,6 +6650,18 @@ function UploadReelSheet({
   };
 
   const handleFile = (nextFile: File | null) => {
+    if (nextFile && nextFile.size > MEDIA_UPLOAD_RAW_MAX_BYTES) {
+      setFile(null);
+      setError(`Video terlalu besar. Maksimum ${MEDIA_UPLOAD_RAW_MAX_MB} MB.`);
+      return;
+    }
+    if (nextFile && !isPlayableReelsVideoFile(nextFile)) {
+      setFile(null);
+      setError(
+        'Reels saat ini hanya menerima video .mp4, .webm, .mov, atau .m4v.',
+      );
+      return;
+    }
     setFile(nextFile);
     setError(null);
     setStudioPanel(null);
@@ -6401,13 +6669,24 @@ function UploadReelSheet({
       setStudioMode('gallery');
       setField('captureMode', 'upload');
     }
+    if (nextFile) {
+      setField('mediaUrl', '');
+    }
     if (nextFile && !form.title.trim()) {
-      const name = nextFile.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
-      setField('title', name.slice(0, 90));
+      setField('title', buildCleanReelTitleFromFile(nextFile));
     }
     if (nextFile) {
       setStep('edit');
     }
+  };
+
+  const openLinkPanel = () => {
+    stopCamera();
+    setFile(null);
+    setError(null);
+    setStudioMode('link');
+    setStudioPanel('link');
+    setField('captureMode', 'upload');
   };
 
   const goNext = () => {
@@ -6417,9 +6696,23 @@ function UploadReelSheet({
         setError(
           form.captureMode === 'live'
             ? 'Tambahkan poster atau teaser live dulu.'
-            : 'Pilih video/foto dulu sebelum lanjut.',
+            : 'Pilih video dulu sebelum lanjut.',
         );
         return;
+      }
+      if (!file && form.mediaUrl.trim()) {
+        if (isImageMediaUrl(form.mediaUrl)) {
+          setError(
+            'Link gambar belum masuk feed reels. Pakai link video langsung.',
+          );
+          return;
+        }
+        if (!isDirectVideoMediaUrl(form.mediaUrl)) {
+          setError(
+            'Pakai direct link video HTTPS yang berakhir .mp4, .webm, .ogv, .mov, atau .m4v.',
+          );
+          return;
+        }
       }
       setStep('edit');
       return;
@@ -6430,6 +6723,10 @@ function UploadReelSheet({
   };
 
   const handleStudioCapture = () => {
+    if (studioMode === 'link') {
+      openLinkPanel();
+      return;
+    }
     if (studioMode === 'gallery') {
       setStudioMode('video');
       setForm(current => ({ ...current, captureMode: 'camera' }));
@@ -6459,12 +6756,12 @@ function UploadReelSheet({
     event.preventDefault();
     if (submitting) return;
 
-    const title = form.title.trim() || form.hook.trim() || 'Reels usaha';
-    const caption =
-      form.caption.trim() ||
+    const title =
+      form.title.trim() ||
       form.hook.trim() ||
-      title ||
-      'Reels usaha dari Lajukan';
+      (file ? buildCleanReelTitleFromFile(file) : 'Video usaha');
+    const caption =
+      form.caption.trim() || form.hook.trim() || `${title} dari ${displayName}`;
     const tag = form.tag.trim();
     let mediaUrl = form.mediaUrl.trim();
 
@@ -6475,6 +6772,25 @@ function UploadReelSheet({
     if (!hasMedia) {
       setError('Pilih atau upload media dulu.');
       return;
+    }
+    if (file && !isPlayableReelsVideoFile(file)) {
+      setError('Pilih file video .mp4, .webm, .mov, atau .m4v.');
+      setStep('media');
+      return;
+    }
+    if (!file && mediaUrl) {
+      if (isImageMediaUrl(mediaUrl)) {
+        setError(
+          'Link gambar belum masuk feed reels. Pakai link video langsung.',
+        );
+        return;
+      }
+      if (!isDirectVideoMediaUrl(mediaUrl)) {
+        setError(
+          'Pakai direct link video HTTPS yang berakhir .mp4, .webm, .ogv, .mov, atau .m4v.',
+        );
+        return;
+      }
     }
     if (form.captureMode === 'live' && !form.liveTitle.trim()) {
       setError('Judul live wajib diisi biar penonton langsung paham.');
@@ -6497,19 +6813,33 @@ function UploadReelSheet({
         const uploadPayload = (await uploadResponse
           .json()
           .catch(() => ({}))) as {
-            urls?: string[];
-            rejected?: Array<{ reason?: string }>;
-            error?: string;
-          };
+          urls?: string[];
+          rejected?: Array<{ reason?: string }>;
+          error?: string;
+        };
         if (!uploadResponse.ok || !uploadPayload.urls?.[0]) {
           throw new Error(
             uploadPayload.error ||
-            uploadPayload.rejected?.[0]?.reason ||
-            'Upload media gagal',
+              uploadPayload.rejected?.[0]?.reason ||
+              'Upload media gagal',
           );
         }
         mediaUrl = uploadPayload.urls[0];
       }
+
+      const mediaSource = file
+        ? 'uploaded_file'
+        : form.captureMode === 'live'
+          ? 'live_teaser'
+          : form.captureMode === 'camera'
+            ? 'camera_capture'
+            : isExternalVideoLink
+              ? 'external_direct_video'
+              : 'manual_media_url';
+      const sourceKind =
+        mediaSource === 'external_direct_video'
+          ? 'direct_browser_playable_video'
+          : mediaSource;
 
       const response = await authFetch('/api/reels', {
         method: 'POST',
@@ -6538,6 +6868,10 @@ function UploadReelSheet({
               ? toIsoDateTime(form.liveSchedule)
               : undefined,
           metadata: {
+            mediaSource,
+            sourceKind,
+            external: mediaSource === 'external_direct_video',
+            sourceUrl: mediaUrl,
             studio: {
               filterPreset: form.filterPreset,
               captureMode: form.captureMode,
@@ -6591,10 +6925,10 @@ function UploadReelSheet({
         onSubmit={submit}
         data-lajukan-reels-studio="true"
         className={cn(
-          'relative flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full flex-col overflow-hidden bg-[color:var(--app-surface)] text-[color:var(--app-text)] shadow-2xl dark:bg-[#050505] dark:text-white',
+          'relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] w-full flex-col overflow-hidden bg-[color:var(--app-surface)] text-[color:var(--app-text)] shadow-2xl dark:bg-[#050505] dark:text-white',
           step === 'media'
             ? 'lg:max-w-[460px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10'
-            : 'lg:h-[calc(var(--app-viewport-height)-2rem)] lg:max-w-[960px] lg:rounded-[30px] lg:ring-1 lg:ring-white/10',
+            : 'lg:h-[calc(var(--app-visual-viewport-height)-2rem)] lg:max-w-[960px] lg:rounded-[30px] lg:ring-1 lg:ring-white/10',
         )}
       >
         <div
@@ -6668,7 +7002,7 @@ function UploadReelSheet({
               className={cn(
                 'mx-auto',
                 step === 'media'
-                  ? 'aspect-[9/16] h-auto w-full max-w-[420px] self-center sm:max-h-[820px]'
+                  ? 'h-full w-full max-w-none sm:aspect-[9/16] sm:h-auto sm:max-h-[calc(var(--app-visual-viewport-height)-1.5rem)] sm:max-w-[420px] sm:self-center'
                   : 'w-full max-w-[340px]',
               )}
             >
@@ -6676,7 +7010,7 @@ function UploadReelSheet({
                 className={cn(
                   'relative overflow-hidden bg-[color:var(--app-surface-strong)] shadow-2xl ring-1 ring-[color:var(--app-border)] dark:bg-[#2d374b] dark:ring-white/10',
                   step === 'media'
-                    ? 'h-full w-full rounded-[28px] sm:rounded-[32px]'
+                    ? 'h-full w-full rounded-none sm:rounded-[32px]'
                     : 'aspect-[9/16] max-h-[calc(var(--app-viewport-height)-128px)] rounded-[24px] lg:max-h-[calc(var(--app-viewport-height)-150px)]',
                 )}
               >
@@ -6707,24 +7041,27 @@ function UploadReelSheet({
                       muted
                       playsInline
                       autoPlay
+                      aria-busy={cameraOpening}
                     />
                     {!cameraReady && (
                       <div className="absolute inset-0 grid place-items-center p-5 text-center text-white">
                         <div>
-                          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/12">
-                            <Camera className="h-8 w-8" />
+                          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-black/[0.34] ring-1 ring-white/[0.12]">
+                            {cameraOpening ? (
+                              <Loader2 className="h-7 w-7 animate-spin" />
+                            ) : (
+                              <Camera className="h-7 w-7" />
+                            )}
                           </div>
-                          {step !== 'media' && (
-                            <>
-                              <p className="mt-4 text-sm font-bold">
-                                Buka kamera Lajukan
-                              </p>
-                              <p className="mt-1 text-xs font-semibold leading-5 text-white/58">
-                                Rekam video, ambil foto, tambah filter, lalu
-                                post.
-                              </p>
-                            </>
-                          )}
+                          <p className="mt-3 text-xs font-bold text-white/[0.84]">
+                            {cameraOpening
+                              ? locale === 'id'
+                                ? 'Menyiapkan kamera...'
+                                : 'Preparing camera...'
+                              : locale === 'id'
+                                ? 'Ketuk rekam untuk buka kamera'
+                                : 'Tap record to open the camera'}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -6732,13 +7069,11 @@ function UploadReelSheet({
                 ) : (
                   <div className="grid h-full place-items-center p-6 text-center text-white">
                     <div>
-                      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/12">
+                      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/[0.12]">
                         <Clapperboard className="h-8 w-8" />
                       </div>
-                      <p className="mt-4 text-sm font-bold">
-                        Pilih media dulu
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-white/55">
+                      <p className="mt-4 text-sm font-bold">Pilih media dulu</p>
+                      <p className="mt-1 text-xs font-semibold text-white/[0.55]">
                         Reels tampil 9:16, video asli bisa langsung diputar.
                       </p>
                     </div>
@@ -6759,7 +7094,7 @@ function UploadReelSheet({
                 {step !== 'media' && (
                   <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 text-[11px] font-bold text-white ">
                     <SelectedCaptureIcon className="h-3.5 w-3.5" />
-                    {selectedCaptureMode?.label ?? 'Kamera'}
+                    {selectedCaptureLabel}
                   </div>
                 )}
                 {step !== 'media' && form.captureMode === 'live' && (
@@ -6799,7 +7134,7 @@ function UploadReelSheet({
                           key={tool.label}
                           type="button"
                           onClick={tool.action}
-                          className="grid h-10 w-10 place-items-center rounded-full bg-black/38 text-white shadow-xl ring-1 ring-white/12  transition active:scale-95"
+                          className="grid h-10 w-10 place-items-center rounded-full bg-black/[0.38] text-white shadow-xl ring-1 ring-white/[0.12] transition active:scale-95"
                           aria-label={tool.label}
                         >
                           <ToolIcon className="h-4.5 w-4.5" />
@@ -6810,11 +7145,11 @@ function UploadReelSheet({
                 )}
                 {step !== 'media' && (
                   <div className="absolute inset-x-2 bottom-3 z-20">
-                    <div className="mx-auto flex max-w-[240px] items-center justify-center rounded-full bg-black/42 px-3 py-2 text-white shadow-2xl ring-1 ring-white/12 ">
+                    <div className="mx-auto flex max-w-[240px] items-center justify-center rounded-full bg-black/[0.42] px-3 py-2 text-white shadow-2xl ring-1 ring-white/[0.12]">
                       <div className="flex items-center gap-2 text-[11px] font-bold">
                         <Camera className="h-4 w-4 text-emerald-200" />
-                        <span>{selectedCaptureMode?.label ?? 'Kamera'}</span>
-                        <span className="rounded-full bg-white/12 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/74">
+                        <span>{selectedCaptureLabel}</span>
+                        <span className="rounded-full bg-white/[0.12] px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/[0.74]">
                           {locale === 'id' ? 'Mode cepat' : 'Quick mode'}
                         </span>
                       </div>
@@ -6823,12 +7158,12 @@ function UploadReelSheet({
                 )}
                 {step === 'media' && (
                   <>
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/42 via-transparent to-black/74" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/[0.42] via-transparent to-black/[0.74]" />
 
                     <button
                       type="button"
                       onClick={onClose}
-                      className="absolute left-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/34 text-white ring-1 ring-white/12 "
+                      className="absolute left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 grid h-10 w-10 place-items-center rounded-full bg-black/[0.34] text-white ring-1 ring-white/[0.12]"
                       aria-label="Tutup"
                     >
                       <X className="h-5 w-5" />
@@ -6841,7 +7176,7 @@ function UploadReelSheet({
                           current === 'music' ? null : 'music',
                         )
                       }
-                      className="absolute left-1/2 top-4 z-30 inline-flex max-w-[210px] -translate-x-1/2 items-center gap-2 rounded-full bg-black/24 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10 "
+                      className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] z-30 inline-flex max-w-[210px] -translate-x-1/2 items-center gap-2 rounded-full bg-black/[0.24] px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10"
                     >
                       <Music className="h-4 w-4" />
                       <span className="truncate">
@@ -6855,14 +7190,14 @@ function UploadReelSheet({
                       <button
                         type="button"
                         onClick={goNext}
-                        className="absolute right-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-white text-slate-950 shadow-xl"
+                        className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 grid h-10 w-10 place-items-center rounded-full bg-white text-slate-950 shadow-xl"
                         aria-label="Lanjut edit"
                       >
                         <Check className="h-5 w-5" />
                       </button>
                     )}
 
-                    <div className="absolute right-2 top-[calc(env(safe-area-inset-top)+76px)] z-30 flex w-11 flex-col items-center gap-2 text-white">
+                    <div className="absolute right-2 top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 flex w-11 flex-col items-center gap-2 text-white">
                       {[
                         {
                           key: 'filters' as const,
@@ -6895,6 +7230,13 @@ function UploadReelSheet({
                           active: studioPanel === 'speed',
                         },
                         {
+                          key: 'link' as const,
+                          label: 'Link',
+                          icon: Link2,
+                          onClick: openLinkPanel,
+                          active: studioPanel === 'link',
+                        },
+                        {
                           key: 'flip' as const,
                           label: 'Flip',
                           icon: RefreshCcw,
@@ -6909,10 +7251,10 @@ function UploadReelSheet({
                             type="button"
                             onClick={tool.onClick}
                             className={cn(
-                              'grid h-10 w-10 place-items-center rounded-full text-white shadow-lg ring-1 ring-white/12  transition active:scale-95',
+                              'grid h-10 w-10 place-items-center rounded-full text-white shadow-lg ring-1 ring-white/[0.12] transition active:scale-95',
                               tool.active
                                 ? 'bg-white text-slate-950'
-                                : 'bg-black/32',
+                                : 'bg-black/[0.32]',
                             )}
                             aria-label={tool.label}
                             title={tool.label}
@@ -6926,26 +7268,30 @@ function UploadReelSheet({
                     {cameraError && (
                       <div
                         className={cn(
-                          'absolute inset-x-4 z-40 rounded-[16px] bg-amber-300/18 px-3 py-2 text-center text-xs font-bold text-amber-50 ring-1 ring-amber-200/20 ',
-                          studioPanel ? 'bottom-[258px]' : 'bottom-[196px]',
+                          'absolute inset-x-4 z-40 rounded-[16px] bg-amber-300/[0.18] px-3 py-2 text-center text-xs font-bold text-amber-50 ring-1 ring-amber-200/20',
+                          studioPanel
+                            ? 'bottom-[calc(env(safe-area-inset-bottom)+258px)]'
+                            : 'bottom-[calc(env(safe-area-inset-bottom)+196px)]',
                         )}
                       >
                         {cameraError}
                       </div>
                     )}
 
-                    <div className="absolute inset-x-0 bottom-[148px] z-30 flex justify-center px-3">
+                    <div className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+148px)] z-30 flex justify-center px-3">
                       {studioPanel ? (
-                        <div className="w-full max-w-[340px] rounded-[24px] bg-black/58 p-2 shadow-2xl ring-1 ring-white/12 ">
+                        <div className="w-full max-w-[340px] rounded-[24px] bg-black/[0.58] p-2 shadow-2xl ring-1 ring-white/[0.12]">
                           <div className="mb-2 flex items-center justify-between gap-2 px-1 text-white">
-                            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/64">
+                            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/[0.64]">
                               {studioPanel === 'filters'
                                 ? 'Filter'
                                 : studioPanel === 'effects'
                                   ? 'Efek'
                                   : studioPanel === 'music'
                                     ? 'Audio'
-                                    : 'Speed'}
+                                    : studioPanel === 'link'
+                                      ? 'Link video'
+                                      : 'Speed'}
                             </span>
                             <button
                               type="button"
@@ -6956,113 +7302,136 @@ function UploadReelSheet({
                               <X className="h-3.5 w-3.5" />
                             </button>
                           </div>
-                          <div
-                            ref={studioPanelRail.ref}
-                            onClickCapture={studioPanelRail.onClickCapture}
-                            onPointerCancel={studioPanelRail.onPointerCancel}
-                            onPointerDown={studioPanelRail.onPointerDown}
-                            onPointerLeave={studioPanelRail.onPointerLeave}
-                            onPointerMove={studioPanelRail.onPointerMove}
-                            onPointerUp={studioPanelRail.onPointerUp}
-                            onWheel={studioPanelRail.onWheel}
-                            className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
-                          >
-                            {studioPanel === 'filters'
-                              ? REEL_FILTER_PRESETS.map(filter => {
-                                const active =
-                                  form.filterPreset === filter.id;
-                                return (
-                                  <button
-                                    key={filter.id}
-                                    type="button"
-                                    onClick={() =>
-                                      setField('filterPreset', filter.id)
-                                    }
-                                    className={cn(
-                                      'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
-                                      active
-                                        ? 'bg-white text-slate-950'
-                                        : 'bg-white/9 text-white/72',
-                                    )}
-                                  >
-                                    <span
-                                      className={cn(
-                                        'h-9 w-9 rounded-full ring-1 ring-white/18',
-                                        filter.swatch,
-                                      )}
-                                    />
-                                    <span className="max-w-full truncate">
-                                      {filter.label}
-                                    </span>
-                                  </button>
-                                );
-                              })
-                              : studioPanel === 'effects'
-                                ? REELS_STUDIO_EFFECTS.map(effect => {
-                                  const active = studioEffect === effect.id;
-                                  return (
-                                    <button
-                                      key={effect.id}
-                                      type="button"
-                                      onClick={() =>
-                                        setStudioEffect(effect.id)
-                                      }
-                                      className={cn(
-                                        'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
-                                        active
-                                          ? 'bg-yellow-300 text-slate-950'
-                                          : 'bg-white/9 text-white/72',
-                                      )}
-                                    >
-                                      <span
+                          {studioPanel === 'link' ? (
+                            <div className="space-y-2">
+                              <input
+                                value={form.mediaUrl}
+                                onChange={event => {
+                                  setFile(null);
+                                  setError(null);
+                                  setStudioMode('link');
+                                  setField('captureMode', 'upload');
+                                  setField('mediaUrl', event.target.value);
+                                }}
+                                inputMode="url"
+                                placeholder="https://.../video.mp4"
+                                className="h-10 w-full rounded-[15px] border border-white/12 bg-white px-3 text-[12px] font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-300"
+                              />
+                              <p className="px-1 text-[10px] font-semibold leading-4 text-white/[0.62]">
+                                Pakai direct link video HTTPS: MP4, WebM, MOV,
+                                atau M4V. Link YouTube/TikTok belum diputar
+                                langsung.
+                              </p>
+                            </div>
+                          ) : (
+                            <div
+                              ref={studioPanelRail.ref}
+                              onClickCapture={studioPanelRail.onClickCapture}
+                              onPointerCancel={studioPanelRail.onPointerCancel}
+                              onPointerDown={studioPanelRail.onPointerDown}
+                              onPointerLeave={studioPanelRail.onPointerLeave}
+                              onPointerMove={studioPanelRail.onPointerMove}
+                              onPointerUp={studioPanelRail.onPointerUp}
+                              onWheel={studioPanelRail.onWheel}
+                              className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+                            >
+                              {studioPanel === 'filters'
+                                ? REEL_FILTER_PRESETS.map(filter => {
+                                    const active =
+                                      form.filterPreset === filter.id;
+                                    return (
+                                      <button
+                                        key={filter.id}
+                                        type="button"
+                                        onClick={() =>
+                                          setField('filterPreset', filter.id)
+                                        }
                                         className={cn(
-                                          'h-9 w-9 rounded-full ring-1 ring-white/18',
-                                          effect.swatch,
+                                          'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
+                                          active
+                                            ? 'bg-white text-slate-950'
+                                            : 'bg-white/[0.09] text-white/[0.72]',
                                         )}
-                                      />
-                                      <span className="max-w-full truncate">
-                                        {effect.label}
-                                      </span>
-                                    </button>
-                                  );
-                                })
-                                : studioPanel === 'music'
-                                  ? REELS_MUSIC_TRACKS.map(track => (
-                                    <button
-                                      key={track}
-                                      type="button"
-                                      onClick={() =>
-                                        setField('musicTrack', track)
-                                      }
-                                      className={cn(
-                                        'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-bold transition active:scale-95',
-                                        form.musicTrack === track
-                                          ? 'bg-yellow-300 text-slate-950'
-                                          : 'bg-white/9 text-white/72',
-                                      )}
-                                    >
-                                      {track}
-                                    </button>
-                                  ))
-                                  : REELS_STUDIO_SPEEDS.map(speed => (
-                                    <button
-                                      key={speed}
-                                      type="button"
-                                      onClick={() => setStudioSpeed(speed)}
-                                      className={cn(
-                                        'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-bold transition active:scale-95',
-                                        studioSpeed === speed
-                                          ? 'bg-white text-slate-950'
-                                          : 'bg-white/9 text-white/72',
-                                      )}
-                                    >
-                                      {speed}
-                                    </button>
-                                  ))}
-                          </div>
+                                      >
+                                        <span
+                                          className={cn(
+                                            'h-9 w-9 rounded-full ring-1 ring-white/[0.18]',
+                                            filter.swatch,
+                                          )}
+                                        />
+                                        <span className="max-w-full truncate">
+                                          {filter.label}
+                                        </span>
+                                      </button>
+                                    );
+                                  })
+                                : studioPanel === 'effects'
+                                  ? REELS_STUDIO_EFFECTS.map(effect => {
+                                      const active = studioEffect === effect.id;
+                                      return (
+                                        <button
+                                          key={effect.id}
+                                          type="button"
+                                          onClick={() =>
+                                            setStudioEffect(effect.id)
+                                          }
+                                          className={cn(
+                                            'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
+                                            active
+                                              ? 'bg-yellow-300 text-slate-950'
+                                              : 'bg-white/[0.09] text-white/[0.72]',
+                                          )}
+                                        >
+                                          <span
+                                            className={cn(
+                                              'h-9 w-9 rounded-full ring-1 ring-white/[0.18]',
+                                              effect.swatch,
+                                            )}
+                                          />
+                                          <span className="max-w-full truncate">
+                                            {effect.label}
+                                          </span>
+                                        </button>
+                                      );
+                                    })
+                                  : studioPanel === 'music'
+                                    ? REELS_MUSIC_TRACKS.map(track => (
+                                        <button
+                                          key={track}
+                                          type="button"
+                                          onClick={() =>
+                                            setField('musicTrack', track)
+                                          }
+                                          className={cn(
+                                            'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-bold transition active:scale-95',
+                                            form.musicTrack === track
+                                              ? 'bg-yellow-300 text-slate-950'
+                                              : 'bg-white/[0.09] text-white/[0.72]',
+                                          )}
+                                        >
+                                          {track}
+                                        </button>
+                                      ))
+                                    : REELS_STUDIO_SPEEDS.map(speed => (
+                                        <button
+                                          key={speed}
+                                          type="button"
+                                          onClick={() => setStudioSpeed(speed)}
+                                          className={cn(
+                                            'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-bold transition active:scale-95',
+                                            studioSpeed === speed
+                                              ? 'bg-white text-slate-950'
+                                              : 'bg-white/[0.09] text-white/[0.72]',
+                                          )}
+                                        >
+                                          {speed}
+                                        </button>
+                                      ))}
+                            </div>
+                          )}
                         </div>
                       ) : recording ? (
-                        <div className="w-[210px] overflow-hidden rounded-full bg-black/52 px-3 py-2 text-[12px] font-bold text-white shadow-xl ring-1 ring-white/12 ">
+                        <div className="w-[210px] overflow-hidden rounded-full bg-black/[0.52] px-3 py-2 text-[12px] font-bold text-white shadow-xl ring-1 ring-white/[0.12]">
                           <div className="flex items-center justify-between gap-3">
                             <span className="inline-flex items-center gap-1.5">
                               <span className="h-2 w-2 rounded-full bg-rose-500" />
@@ -7070,7 +7439,7 @@ function UploadReelSheet({
                             </span>
                             <span>{recordingRemainingSeconds}s</span>
                           </div>
-                          <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/16">
+                          <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/[0.16]">
                             <span
                               className="block h-full origin-left rounded-full bg-rose-500"
                               style={{
@@ -7080,7 +7449,7 @@ function UploadReelSheet({
                           </span>
                         </div>
                       ) : (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-black/42 p-1 text-[12px] font-bold text-white/50 shadow-xl ring-1 ring-white/12 ">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-black/[0.42] p-1 text-[12px] font-bold text-white/50 shadow-xl ring-1 ring-white/[0.12]">
                           {REELS_STUDIO_DURATIONS.map(duration => (
                             <button
                               key={duration}
@@ -7090,7 +7459,7 @@ function UploadReelSheet({
                                 'h-8 rounded-full px-3 transition',
                                 studioDuration === duration
                                   ? 'bg-white text-slate-950'
-                                  : 'text-white/62',
+                                  : 'text-white/[0.62]',
                               )}
                             >
                               {duration}
@@ -7100,7 +7469,7 @@ function UploadReelSheet({
                       )}
                     </div>
 
-                    <div className="absolute inset-x-5 bottom-[52px] z-30 grid grid-cols-[68px_minmax(88px,1fr)_68px] items-end gap-2 text-white">
+                    <div className="absolute inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 grid grid-cols-[54px_minmax(76px,1fr)_54px_54px] items-end gap-2 text-white min-[390px]:inset-x-5 min-[390px]:grid-cols-[58px_minmax(82px,1fr)_58px_58px]">
                       <button
                         type="button"
                         onClick={() =>
@@ -7110,7 +7479,7 @@ function UploadReelSheet({
                         }
                         className="flex flex-col items-center gap-1 text-[11px] font-bold"
                       >
-                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 ">
+                        <span className="grid h-11 w-11 place-items-center rounded-xl bg-black/[0.32] ring-1 ring-white/[0.14]">
                           <Sparkles className="h-5 w-5 text-yellow-200" />
                         </span>
                         <span className="max-w-[64px] truncate">
@@ -7124,45 +7493,62 @@ function UploadReelSheet({
                         type="button"
                         data-lajukan-reels-camera="true"
                         onClick={handleStudioCapture}
+                        disabled={cameraOpening || submitting}
                         className={cn(
-                          'mx-auto grid h-[86px] w-[86px] place-items-center rounded-full border-[5px] border-white shadow-2xl transition active:scale-95',
-                          recording ? 'bg-rose-500' : 'bg-white/12',
+                          'mx-auto grid h-[76px] w-[76px] place-items-center rounded-full border-4 border-white shadow-2xl transition active:scale-95 disabled:cursor-wait disabled:opacity-70',
+                          recording ? 'bg-rose-500' : 'bg-white/[0.12]',
                         )}
-                        aria-label="Ambil media reels"
+                        aria-label={
+                          locale === 'id'
+                            ? 'Ambil media Reels'
+                            : 'Capture Reels media'
+                        }
                       >
-                        {recording ? (
+                        {cameraOpening ? (
+                          <Loader2 className="h-7 w-7 animate-spin" />
+                        ) : recording ? (
                           <span className="h-8 w-8 rounded-[8px] bg-white" />
                         ) : studioMode === 'photo' ? (
                           <Camera className="h-8 w-8" />
                         ) : studioMode === 'live' ? (
                           <Radio className="h-8 w-8" />
                         ) : (
-                          <span className="h-[62px] w-[62px] rounded-full bg-rose-500 ring-4 ring-rose-400/35" />
+                          <span className="h-14 w-14 rounded-full bg-rose-500 ring-4 ring-rose-400/35" />
                         )}
                       </button>
 
                       <label className="flex cursor-pointer flex-col items-center gap-1 text-[11px] font-bold">
-                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 ">
+                        <span className="grid h-11 w-11 place-items-center rounded-xl bg-black/[0.32] ring-1 ring-white/[0.14]">
                           <Upload className="h-5 w-5 text-orange-200" />
                         </span>
                         Upload
                         <input
                           type="file"
-                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/*"
+                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
                           onChange={event =>
                             handleFile(event.target.files?.[0] ?? null)
                           }
                           className="sr-only"
                         />
                       </label>
-                    </div>
 
-                    <div className="absolute inset-x-7 bottom-3 z-30 flex items-center justify-center">
-                      <span className="rounded-full bg-black/30 px-3 py-1.5 text-[11px] font-bold text-white/72 ring-1 ring-white/10 ">
-                        {locale === 'id'
-                          ? 'Langsung rekam dari sini'
-                          : 'Record straight from here'}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={openLinkPanel}
+                        className="flex flex-col items-center gap-1 text-[11px] font-bold"
+                      >
+                        <span
+                          className={cn(
+                            'grid h-11 w-11 place-items-center rounded-xl ring-1 ring-white/[0.14]',
+                            isExternalVideoLink
+                              ? 'bg-emerald-300 text-slate-950'
+                              : 'bg-white/[0.18] text-white',
+                          )}
+                        >
+                          <Link2 className="h-5 w-5 text-inherit" />
+                        </span>
+                        Link
+                      </button>
                     </div>
                   </>
                 )}
@@ -7188,9 +7574,11 @@ function UploadReelSheet({
                             ? 'Pilih dari galeri'
                             : studioMode === 'photo'
                               ? 'Ambil foto produk'
-                              : studioMode === 'live'
-                                ? 'Siapkan live'
-                                : 'Rekam video vertikal'}
+                              : studioMode === 'link'
+                                ? 'Tempel link video'
+                                : studioMode === 'live'
+                                  ? 'Siapkan live'
+                                  : 'Rekam video vertikal'}
                         </h3>
                       </div>
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-950">
@@ -7204,7 +7592,7 @@ function UploadReelSheet({
                         Galeri
                         <input
                           type="file"
-                          accept="video/*,image/*"
+                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
                           onChange={event =>
                             handleFile(event.target.files?.[0] ?? null)
                           }
@@ -7218,6 +7606,10 @@ function UploadReelSheet({
                         onClick={() => {
                           if (studioMode === 'gallery') {
                             selectStudioMode('video');
+                            return;
+                          }
+                          if (studioMode === 'link') {
+                            openLinkPanel();
                             return;
                           }
                           if (studioMode === 'live') {
@@ -7240,7 +7632,7 @@ function UploadReelSheet({
                         }}
                         className={cn(
                           'grid h-16 w-16 place-items-center rounded-full border-4 border-white text-white shadow-2xl transition active:scale-95',
-                          recording ? 'bg-rose-500' : 'bg-white/18',
+                          recording ? 'bg-rose-500' : 'bg-white/[0.18]',
                         )}
                         aria-label="Ambil media reels"
                       >
@@ -7248,6 +7640,8 @@ function UploadReelSheet({
                           <span className="h-6 w-6 rounded-[6px] bg-white" />
                         ) : studioMode === 'photo' ? (
                           <Camera className="h-7 w-7" />
+                        ) : studioMode === 'link' ? (
+                          <Link2 className="h-7 w-7" />
                         ) : studioMode === 'live' ? (
                           <Radio className="h-7 w-7" />
                         ) : (
@@ -7259,7 +7653,9 @@ function UploadReelSheet({
                         type="button"
                         onClick={() => void openCamera()}
                         disabled={
-                          studioMode === 'gallery' || studioMode === 'live'
+                          studioMode === 'gallery' ||
+                          studioMode === 'link' ||
+                          studioMode === 'live'
                         }
                         className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-xs font-bold text-slate-950 transition active:scale-[0.98] disabled:bg-white/10 disabled:text-white/38"
                       >
@@ -7353,8 +7749,8 @@ function UploadReelSheet({
                   </div>
 
                   <div className="rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2 text-xs leading-5 text-white/60">
-                    Media diambil dari file yang dipilih atau hasil upload
-                    internal. Kita tidak mendorong paste URL manual di flow ini.
+                    Media bisa dari kamera, file video perangkat, atau direct
+                    link video yang bisa diputar browser.
                   </div>
 
                   {studioMode === 'live' && (
@@ -7366,7 +7762,7 @@ function UploadReelSheet({
                   <label className="hidden cursor-pointer rounded-[18px] border-2 border-dashed border-white/12 bg-white/[0.05] p-4 text-center transition hover:border-emerald-300">
                     <input
                       type="file"
-                      accept="video/*,image/*"
+                      accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
                       onChange={event =>
                         handleFile(event.target.files?.[0] ?? null)
                       }
@@ -7386,7 +7782,8 @@ function UploadReelSheet({
                       MP4, WebM, MOV, JPG, PNG, WebP
                     </p>
                     <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                      Video sampai 80 MB aman, jadi 16 MB harusnya lolos kalau file-nya valid.
+                      Video sampai 80 MB aman, jadi 16 MB harusnya lolos kalau
+                      file-nya valid.
                     </p>
                   </label>
 
@@ -7408,7 +7805,8 @@ function UploadReelSheet({
                       Rapikan reels
                     </h3>
                     <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-white/52">
-                      Media sudah dipilih, jadi fokusnya tinggal caption dan kategori.
+                      Media sudah dipilih, jadi fokusnya tinggal caption dan
+                      kategori.
                     </p>
                   </div>
 
@@ -7477,7 +7875,6 @@ function UploadReelSheet({
                       </button>
                     ))}
                   </div>
-
                 </div>
               )}
 
@@ -7544,7 +7941,6 @@ function UploadReelSheet({
                       className={textareaClass}
                     />
                   </label>
-
                 </div>
               )}
 
@@ -7670,88 +8066,42 @@ function AuthPromptSheet({
 ========================= */
 
 function LoadingToast({
+  locale,
   loading,
   error,
   onRetry,
 }: {
+  locale: string;
   loading: boolean;
   error: string | null;
   onRetry: () => void;
 }) {
   if (!loading && !error) return null;
+  const isId = locale === 'id';
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
-      <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-950 shadow-xl">
+    <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+6rem)] z-40 flex justify-center px-3">
+      <div className="pointer-events-auto flex min-h-10 min-w-0 max-w-full items-center gap-2 rounded-xl bg-black/[0.72] px-3 py-2 text-[11px] font-bold leading-4 text-white shadow-xl ring-1 ring-white/[0.14]">
         {loading ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Memuat reels...
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            <span>{isId ? 'Memuat video...' : 'Loading videos...'}</span>
           </>
         ) : (
           <>
-            <span>{error}</span>
+            <span className="min-w-0 line-clamp-2">{error}</span>
             <button
               type="button"
               onClick={onRetry}
-              className="rounded-full bg-slate-950 px-3 py-1 text-white"
+              className="min-h-8 shrink-0 whitespace-nowrap rounded-lg bg-white px-2.5 text-[10px] font-bold text-slate-950 transition active:scale-95"
             >
-              Coba
+              {isId ? 'Coba lagi' : 'Retry'}
             </button>
           </>
         )}
       </div>
     </div>
   );
-}
-
-/* =========================
-   UTILS
-========================= */
-
-function localizedHref(locale: string, href: string) {
-  const value = href.trim() || '/home';
-  if (/^https?:\/\//i.test(value)) return value;
-  if (value.startsWith(`/${locale}/`) || value === `/${locale}`) return value;
-  if (value.startsWith('/')) return `/${locale}${value}`;
-  return `/${locale}/${value}`;
-}
-
-function appendQuery(href: string, key: string, value: string) {
-  if (/^https?:\/\//i.test(href)) {
-    const url = new URL(href);
-    url.searchParams.set(key, value);
-    return url.toString();
-  }
-
-  const [path, hash = ''] = href.split('#');
-  const separator = path.includes('?') ? '&' : '?';
-  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash ? `#${hash}` : ''
-    }`;
-}
-
-function formatCommentTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Baru saja';
-
-  const diffMs = Date.now() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
-  if (diffMinutes < 1) return 'Baru saja';
-  if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} jam lalu`;
-
-  return date.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function isImageMediaUrl(value: string) {
-  const lower = value.split('?')[0]?.toLowerCase() || '';
-  return /\.(avif|gif|jpe?g|png|webp)$/.test(lower);
 }
 
 function cn(...classes: Array<string | false | null | undefined>) {

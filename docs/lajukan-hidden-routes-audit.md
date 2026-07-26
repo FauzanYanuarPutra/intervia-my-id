@@ -7,12 +7,13 @@ Status: 2026-05-28
 - Satu kebutuhan user harus punya satu pintu utama.
 - Route lama boleh tetap hidup untuk kompatibilitas, tapi harus redirect ke pintu utama jika fungsinya duplikat.
 - Halaman yang menambah trust, SEO, edukasi, transaksi, atau operasional boleh dipertahankan.
-- Halaman yang hanya variasi nama tanpa flow jelas harus digabung atau diarahkan ke home/search.
+- Halaman yang hanya variasi nama tanpa flow jelas harus digabung atau diarahkan ke home/Explore.
 
 ## Route Yang Dipertahankan
 
 - `/home`: beranda utama.
-- `/search`: discovery terpadu supplier, jasa, produk, talent, lokasi, peluang.
+- `/explore`: satu pintu untuk kategori dan hasil pencarian supplier, jasa, produk, talent, lokasi, serta peluang.
+- `/search`: route kompatibilitas yang selalu redirect ke `/explore` dengan parameter yang sama.
 - `/umkm`: peta usaha fisik dan business directory.
 - `/toko/[slug]`: detail toko/usaha fisik.
 - `/content/[id]`: detail listing utama untuk produk, jasa, property, dan peluang.
@@ -29,15 +30,15 @@ Status: 2026-05-28
 
 ## Route Duplikat Yang Redirect Ke Canonical
 
-- `/marketplace` -> `/search?type=product&q=supplier`
+- `/marketplace` -> `/explore?type=product&q=supplier`
 - `/listing/[id]` -> `/content/[id]`
 - `/projects` -> `/my-projects`
 - `/my-applications` -> `/dashboard`
-- `/freelancers` -> `/search?type=freelancer&q=umkm`
+- `/freelancers` -> `/explore?type=freelancer&q=umkm`
 - `/freelancers/[slug]` -> `/profile/[slug]` jika profile publik tersedia.
-- `/property` -> `/search?type=property&q=lokasi%20jualan`
+- `/property` -> `/explore?type=property&q=lokasi%20jualan`
 - `/property/[slug]` -> `/content/[slug]` atau detail property canonical jika sudah ada.
-- `/jobs` -> `/search?type=job&q=lowongan`
+- `/jobs` -> `/explore?type=job&q=lowongan`
 - `/jobs/[slug]` -> `/content/[slug]` atau job canonical.
 - `/super-app/umkm` -> `/umkm`
 - `/super-app/umkm/[slug]` -> `/toko/[slug]`

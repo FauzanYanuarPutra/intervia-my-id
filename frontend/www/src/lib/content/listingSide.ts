@@ -253,6 +253,94 @@ export function getListingSideLabel(
   return side === 'demand' ? 'Looking For' : 'Offering';
 }
 
+export function getListingSideActorLabel(
+  side: ListingSide,
+  locale: LocaleCode,
+): string {
+  if (locale === 'id') {
+    return side === 'demand' ? 'Pembeli' : 'Penyedia';
+  }
+  return side === 'demand' ? 'Buyer' : 'Provider';
+}
+
+export function getListingSideVerbLabel(
+  side: ListingSide,
+  locale: LocaleCode,
+): string {
+  if (locale === 'id') {
+    return side === 'demand' ? 'Mencari' : 'Menawarkan';
+  }
+  return side === 'demand' ? 'Looking for' : 'Offering';
+}
+
+export function getListingSideObjectLabel(
+  side: ListingSide,
+  locale: LocaleCode,
+): string {
+  if (locale === 'id') {
+    return side === 'demand' ? 'Kebutuhan' : 'Penawaran';
+  }
+  return side === 'demand' ? 'Need' : 'Offer';
+}
+
+export function getListingSideCounterpartyLabel(
+  side: ListingSide,
+  locale: LocaleCode,
+): string {
+  if (locale === 'id') {
+    return side === 'demand' ? 'penyedia' : 'pembeli';
+  }
+  return side === 'demand' ? 'providers' : 'buyers';
+}
+
+export function getListingValueFallback(
+  side: ListingSide,
+  locale: LocaleCode,
+  type?: unknown,
+): string {
+  if (side === 'demand') {
+    return locale === 'id' ? 'Budget fleksibel' : 'Flexible budget';
+  }
+
+  const normalizedType = normalizeType(type);
+  if (normalizedType === 'service') {
+    return locale === 'id' ? 'Konsultasikan harga' : 'Discuss pricing';
+  }
+  if (normalizedType === 'tool_rental') {
+    return locale === 'id' ? 'Tarif menyesuaikan' : 'Rate on request';
+  }
+  if (normalizedType === 'property') {
+    return locale === 'id' ? 'Harga menyesuaikan' : 'Price on request';
+  }
+  return locale === 'id' ? 'Negosiasi' : 'Negotiable';
+}
+
+export function getListingCardCtaLabel(
+  side: ListingSide,
+  type: unknown,
+  locale: LocaleCode,
+): string {
+  const normalizedType = normalizeType(type);
+
+  if (side === 'demand') {
+    if (normalizedType === 'service') {
+      return locale === 'id' ? 'Kirim proposal' : 'Send proposal';
+    }
+    return locale === 'id' ? 'Tawarkan bantuan' : 'Offer help';
+  }
+
+  if (normalizedType === 'service') {
+    return locale === 'id' ? 'Cek jasa' : 'Check service';
+  }
+  if (normalizedType === 'property') {
+    return locale === 'id' ? 'Cek lokasi' : 'Check location';
+  }
+  if (normalizedType === 'tool_rental') {
+    return locale === 'id' ? 'Cek sewa' : 'Check rental';
+  }
+  return locale === 'id' ? 'Cek penawaran' : 'Check offer';
+}
+
 export function getListingSideContextLabel(
   side: ListingSide,
   type: unknown,

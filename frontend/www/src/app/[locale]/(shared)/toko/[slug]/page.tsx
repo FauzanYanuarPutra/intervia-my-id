@@ -12,6 +12,7 @@ import {
   type UmkmStore,
 } from '@/lib/super-app/umkm-commerce';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -216,7 +217,7 @@ export default async function TokoPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <main className="min-h-screen bg-slate-50 px-3 py-4 text-slate-950 sm:px-5 lg:px-8">
         <div className="mx-auto max-w-6xl">

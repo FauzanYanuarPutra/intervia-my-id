@@ -1,4 +1,13 @@
 import { Metadata } from 'next';
+import {
+  Ban,
+  CreditCard,
+  FileText,
+  Handshake,
+  PhoneCall,
+  RotateCcw,
+  ShieldCheck,
+} from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
   TERMS_SECTIONS,
@@ -11,15 +20,6 @@ import {
   LegalSectionView,
   SummaryCard,
 } from '@/components/trust/TrustUI';
-import {
-  ShieldCheck,
-  FileText,
-  Handshake,
-  Ban,
-  CreditCard,
-  PhoneCall,
-  RotateCcw,
-} from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Syarat & Ketentuan | Lajukan',
@@ -40,148 +40,159 @@ type PageProps = {
 export default async function TermsPage({ params }: PageProps) {
   const { locale } = await params;
   const isId = locale === 'id';
+  const principles = [
+    {
+      icon: ShieldCheck,
+      text: isId
+        ? 'Keamanan transaksi jadi prioritas.'
+        : 'Transaction safety comes first.',
+    },
+    {
+      icon: Handshake,
+      text: isId
+        ? 'Pembeli dan penjual wajib bertransaksi dengan jujur.'
+        : 'Buyers and sellers must transact honestly.',
+    },
+    {
+      icon: FileText,
+      text: isId
+        ? 'Setiap listing dan chat harus bisa dipertanggungjawabkan.'
+        : 'Listings and chats must be accountable.',
+    },
+    {
+      icon: Ban,
+      text: isId
+        ? 'Penipuan, spam, dan aktivitas ilegal tidak diperbolehkan.'
+        : 'Fraud, spam, and illegal activity are not allowed.',
+    },
+  ];
+  const meaning = isId
+    ? [
+        'Kamu boleh mencari, menawarkan, dan menghubungi kebutuhan usaha.',
+        'Transaksi terbaik dilakukan dengan bukti dan komunikasi yang jelas.',
+        'Kesepakatan di luar platform punya risiko lebih tinggi.',
+        'Pelanggaran dapat membuat konten atau akun dibatasi.',
+      ]
+    : [
+        'You can search, offer, and contact business needs.',
+        'Good transactions use clear proof and communication.',
+        'Off-platform deals carry higher risk.',
+        'Violations may restrict content or accounts.',
+      ];
+  const related = [
+    {
+      icon: CreditCard,
+      title: isId ? 'Pembayaran' : 'Payments',
+      body: isId
+        ? 'Harga, refund, dan transaksi memakai Rupiah (IDR).'
+        : 'Prices, refunds, and transactions use Indonesian Rupiah (IDR).',
+      href: '/trust/payments',
+      cta: isId ? 'Baca pembayaran' : 'Read payments',
+    },
+    {
+      icon: RotateCcw,
+      title: isId ? 'Refund & retur' : 'Refunds & returns',
+      body: isId
+        ? 'Pembatalan, komplain, dan retur mengikuti kebijakan Lajukan.'
+        : 'Cancellations, complaints, and returns follow Lajukan policy.',
+      href: '/refund-policy',
+      cta: isId ? 'Buka kebijakan' : 'Open policy',
+    },
+    {
+      icon: PhoneCall,
+      title: isId ? 'Kontak bantuan' : 'Support contact',
+      body: isId
+        ? 'Butuh bantuan transaksi, listing, atau verifikasi? Hubungi support.'
+        : 'Need help with transactions, listings, or verification? Contact support.',
+      href: '/contact',
+      cta: isId ? 'Hubungi kami' : 'Contact us',
+    },
+  ];
 
   return (
-    <main className="page-shell page-rhythm pb-10 pt-8">
-
-      {/* HERO SUMMARY */}
+    <main className="page-shell page-rhythm pb-10 pt-4">
       <SummaryCard
         title={isId ? 'Aturan penggunaan Lajukan' : 'Lajukan Terms of Service'}
         description={
           isId
-            ? 'Aturan ini menjaga transaksi tetap aman, jelas, dan adil untuk semua pengguna.'
-            : 'These terms ensure safe, fair, and transparent transactions for all users.'
+            ? 'Aturan ini menjaga pencarian, listing, chat, dan transaksi tetap aman untuk semua pihak.'
+            : 'These terms keep search, listings, chat, and transactions safe for everyone.'
         }
-        meta={isId ? 'Legal & Trust' : 'Legal'}
+        meta={isId ? 'Syarat & ketentuan' : 'Terms'}
       >
-
-        {/* PRINCIPLES */}
-        <div className="mt-3 grid gap-2 text-sm text-[color:var(--app-text-soft)]">
-
-          <p className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4" />
-            {isId
-              ? 'Keamanan transaksi adalah prioritas utama'
-              : 'Transaction safety is our top priority'}
-          </p>
-
-          <p className="flex items-center gap-2">
-            <Handshake className="h-4 w-4" />
-            {isId
-              ? 'Kami menghubungkan buyer & seller secara adil'
-              : 'We connect buyers and sellers fairly'}
-          </p>
-
-          <p className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            {isId
-              ? 'Setiap transaksi memiliki aturan yang jelas'
-              : 'Every transaction follows clear rules'}
-          </p>
-
-          <p className="flex items-center gap-2">
-            <Ban className="h-4 w-4" />
-            {isId
-              ? 'Aktivitas ilegal & penipuan tidak diperbolehkan'
-              : 'Illegal or fraudulent activities are not allowed'}
-          </p>
+        <div className="grid w-full gap-2 sm:grid-cols-2">
+          {principles.map(item => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.text}
+                className="flex items-start gap-2 rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2 text-sm text-[color:var(--app-text-soft)]"
+              >
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                <span>{item.text}</span>
+              </div>
+            );
+          })}
         </div>
 
-        {/* QUICK NAV */}
-        <div className="mt-5">
-          {isId && (
-            <InfoChips
-              items={[
-                'Hak & kewajiban',
-                'Aturan transaksi',
-                'Pelarangan',
-                'Penyelesaian masalah',
-              ]}
+        <InfoChips
+          items={[
+            isId ? 'Hak & kewajiban' : 'Rights & duties',
+            isId ? 'Aturan transaksi' : 'Transaction rules',
+            isId ? 'Pelarangan' : 'Prohibited activity',
+            isId ? 'Penyelesaian masalah' : 'Issue resolution',
+          ]}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          {TERMS_SECTIONS.map(section => (
+            <AnchorLink
+              key={section.id}
+              href={`#${section.id}`}
+              label={pickText(locale, section.title)}
             />
-          )}
+          ))}
+        </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {TERMS_SECTIONS.map((section) => (
-              <AnchorLink
-                key={section.id}
-                href={`#${section.id}`}
-                label={pickText(locale, section.title)}
-              />
-            ))}
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              href="/trust"
-              className="ui-button-secondary inline-flex items-center px-4 text-sm"
-            >
-              {isId ? 'Pusat Keamanan' : 'Trust Center'}
-            </Link>
-
-            <Link
-              href="/privacy"
-              className="ui-button-secondary inline-flex items-center px-4 text-sm"
-            >
-              {isId ? 'Privasi' : 'Privacy Policy'}
-            </Link>
-          </div>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/trust"
+            className="ui-button-secondary inline-flex items-center px-4 text-sm"
+          >
+            {isId ? 'Pusat keamanan' : 'Trust Center'}
+          </Link>
+          <Link
+            href="/privacy"
+            className="ui-button-secondary inline-flex items-center px-4 text-sm"
+          >
+            {isId ? 'Privasi' : 'Privacy Policy'}
+          </Link>
         </div>
       </SummaryCard>
 
-      {/* LAST UPDATED */}
-      <section className="text-xs text-[color:var(--app-text-soft)] px-1">
+      <section className="text-xs text-[color:var(--app-text-soft)]">
         {isId ? 'Terakhir diperbarui' : 'Last updated'}:{' '}
         {pickText(locale, TRUST_LAST_UPDATED)}
       </section>
 
-      {/* SIMPLE EXPLANATION (NEW UX LAYER) */}
-      <section className="ui-panel p-6 sm:p-8">
-        <h2 className="text-lg font-bold">
-          {isId ? 'Apa arti aturan ini untuk kamu?' : 'What these terms mean for you'}
+      <section className="ui-panel rounded-[24px] p-5">
+        <h2 className="text-lg font-bold text-[color:var(--app-text)]">
+          {isId ? 'Artinya untuk kamu' : 'What this means for you'}
         </h2>
-
-        <div className="mt-4 grid gap-3 text-sm text-[color:var(--app-text-soft)]">
-
-          <p>• {isId ? 'Kamu boleh jual & beli di platform' : 'You can buy and sell on the platform'}</p>
-
-          <p>• {isId ? 'Kami menyediakan sistem transaksi aman' : 'We provide secure transaction system'}</p>
-
-          <p>• {isId ? 'Kami tidak bertanggung jawab atas kesepakatan di luar platform' : 'We are not responsible for off-platform deals'}</p>
-
-          <p>• {isId ? 'Pelanggaran dapat menyebabkan akun dibatasi' : 'Violations may lead to account restrictions'}</p>
+        <div className="mt-4 grid gap-2 text-sm text-[color:var(--app-text-soft)] sm:grid-cols-2">
+          {meaning.map(item => (
+            <p
+              key={item}
+              className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2"
+            >
+              {item}
+            </p>
+          ))}
         </div>
       </section>
 
       <section className="grid gap-3 md:grid-cols-3">
-        {[
-          {
-            icon: CreditCard,
-            title: isId ? 'Pembayaran Rupiah' : 'Rupiah payments',
-            body: isId
-              ? 'Harga, biaya, refund, dan transaksi di Lajukan memakai Rupiah (IDR). Mata uang lain hanya sebagai informasi pembanding bila ada.'
-              : 'Prices, fees, refunds, and transactions on Lajukan use Indonesian Rupiah (IDR). Other currencies are only informational if shown.',
-            href: '/trust/payments',
-            cta: isId ? 'Baca pembayaran' : 'Read payments',
-          },
-          {
-            icon: RotateCcw,
-            title: isId ? 'Refund & retur' : 'Refunds & returns',
-            body: isId
-              ? 'Pengembalian dana, pembatalan, retur produk, dan komplain layanan mengikuti kebijakan refund/retur Lajukan.'
-              : 'Refunds, cancellations, product returns, and service complaints follow the Lajukan refund and return policy.',
-            href: '/refund-policy',
-            cta: isId ? 'Buka kebijakan' : 'Open policy',
-          },
-          {
-            icon: PhoneCall,
-            title: isId ? 'Kontak bisnis' : 'Business contact',
-            body: isId
-              ? 'Untuk bantuan transaksi, listing, atau verifikasi, hubungi 0821 1714 8623 atau support@lajukan.com.'
-              : 'For transaction, listing, or verification help, contact 0821 1714 8623 or support@lajukan.com.',
-            href: '/contact',
-            cta: isId ? 'Hubungi kami' : 'Contact us',
-          },
-        ].map(item => {
+        {related.map(item => {
           const Icon = item.icon;
           return (
             <Link
@@ -206,10 +217,9 @@ export default async function TermsPage({ params }: PageProps) {
         })}
       </section>
 
-      {/* LEGAL CONTENT */}
       <section className="space-y-3">
-        {TERMS_SECTIONS.map((section) => (
-          <div key={section.id} id={section.id}>
+        {TERMS_SECTIONS.map(section => (
+          <div key={section.id} id={section.id} className="scroll-mt-24">
             <LegalSectionView
               section={section}
               locale={locale as 'id' | 'en'}
@@ -218,30 +228,18 @@ export default async function TermsPage({ params }: PageProps) {
         ))}
       </section>
 
-      {/* FINAL CTA TRUST */}
-      <section className="ui-panel ui-hero-panel p-6 sm:p-8 text-center">
-        <h3 className="text-lg font-bold">
+      <section className="ui-panel ui-hero-panel rounded-[24px] p-6 text-center sm:p-8">
+        <h3 className="text-lg font-bold text-[color:var(--app-text)]">
           {isId
-            ? 'Gunakan Lajukan dengan aman & bertanggung jawab'
-            : 'Use Lajukan safely and responsibly'}
+            ? 'Gunakan Lajukan dengan aman dan bertanggung jawab.'
+            : 'Use Lajukan safely and responsibly.'}
         </h3>
-
         <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
           {isId
-            ? 'Semua transaksi terbaik terjadi ketika kedua pihak mengikuti aturan yang sama.'
-            : 'The best transactions happen when both parties follow the same rules.'}
+            ? 'Transaksi paling aman terjadi saat kedua pihak mengikuti aturan yang sama.'
+            : 'The safest transactions happen when both sides follow the same rules.'}
         </p>
-
-        <div className="mt-5 flex justify-center gap-3">
-          <Link
-            href="/trust"
-            className="ui-button-primary inline-flex items-center px-5 text-sm"
-          >
-            {isId ? 'Buka Trust Center' : 'Open Trust Center'}
-          </Link>
-        </div>
       </section>
-
     </main>
   );
 }

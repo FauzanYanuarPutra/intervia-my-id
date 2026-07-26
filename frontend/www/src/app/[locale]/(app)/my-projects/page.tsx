@@ -6,12 +6,15 @@ import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { MarketplacePageFrame } from '@/components/layout/MarketplacePageFrame';
 import { MyProjectsSkeleton } from '@/components/system/feedback/RouteSkeletons';
-import { LAJUKAN_SAMPLE_REQUESTS } from '@/data/lajukanMobileReference';
 import {
   type LajukanOfferPreview,
   type LajukanRequestCard as BackendRequestCard,
   type LajukanRequestsPayload,
 } from '@/lib/lajukan-marketplace';
+import {
+  summarizeProjectActivity,
+  type ProjectActivitySummary,
+} from '@/lib/projects/activity';
 import {
   ArrowRight,
   BarChart3,
@@ -21,18 +24,16 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock3,
-  Eye,
   FileText,
   ImageIcon,
   Lightbulb,
   ListFilter,
   MapPin,
   MessageCircleMore,
-  MousePointerClick,
   Plus,
+  RefreshCw,
   Search,
   ShieldCheck,
-  ShoppingCart,
   Sparkles,
   Store,
   Target,
@@ -92,33 +93,7 @@ type LajukanRequestsResponse = {
   error?: string;
 };
 
-type RequestAnalytics = {
-  views: number;
-  profileVisits: number;
-  savedToCart: number;
-  chatLeads: number;
-  offerToChatRate: number;
-  dealReadiness: number;
-  profileLiftLabel: string;
-};
-
-type ProjectAnalytics = {
-  totalRequests: number;
-  activeCount: number;
-  waitingCount: number;
-  completedCount: number;
-  totalOffers: number;
-  projectViews: number;
-  profileVisits: number;
-  savedToCart: number;
-  chatLeads: number;
-  offerRate: number;
-  completionRate: number;
-  dealReadiness: number;
-  profileVisitsChange: number;
-  highIntentCount: number;
-  bestProjectTitle: string;
-};
+type ProjectAnalytics = ProjectActivitySummary;
 
 type ProjectSuggestion = {
   id: string;
@@ -152,142 +127,6 @@ function MyProjectsPageChrome({ children }: { children: ReactNode }) {
   );
 }
 
-const REQUEST_DETAILS: Record<string, RequestDetail> = {
-  'req-supplier': {
-    category: 'Bahan Baku',
-    needType: 'Supplier',
-    amountLabel: '100 - 150 kg',
-    deadlineLabel: '10 Mei 2025',
-    budgetLabel: 'Rp 28.000 - Rp 32.000 / kg',
-    description: 'Butuh ayam segar rutin tiap minggu. Kirim pagi, stok stabil.',
-    locationLabel: 'Jakarta Selatan, DKI Jakarta',
-    extraLabel: 'Prioritas: kirim pagi, kualitas stabil.',
-  },
-  'req-location': {
-    category: 'Lokasi Usaha',
-    needType: 'Sewa Tempat',
-    amountLabel: '40 - 70 m2',
-    deadlineLabel: '18 Mei 2025',
-    budgetLabel: 'Rp 45.000.000 - Rp 70.000.000 / tahun',
-    description: 'Cari ruko/kios coffee shop. Ramai, parkir mudah, siap pakai.',
-    locationLabel: 'Bandung, Jawa Barat',
-    extraLabel: 'Nilai plus: listrik dan air siap.',
-  },
-  'req-social': {
-    category: 'Jasa',
-    needType: 'Social Media Management',
-    amountLabel: '12 - 16 konten / bulan',
-    deadlineLabel: '15 Mei 2025',
-    budgetLabel: 'Rp 3.500.000 - Rp 5.000.000 / bulan',
-    description:
-      'Butuh tim kelola IG dan TikTok. Ide, desain, caption, report.',
-    locationLabel: 'Surabaya, Jawa Timur',
-    extraLabel: 'Nilai plus: paham konten kuliner.',
-  },
-  'req-pos': {
-    category: 'Peralatan Usaha',
-    needType: 'POS System',
-    amountLabel: '1 paket',
-    deadlineLabel: 'Selesai',
-    budgetLabel: 'Rp 8.000.000 - Rp 12.000.000',
-    description: 'Kasir, printer struk, dan laporan harian sudah jalan.',
-    locationLabel: 'Yogyakarta, DIY',
-    extraLabel: 'Vendor sudah instalasi dan training tim.',
-  },
-  'req-packaging': {
-    category: 'Kemasan',
-    needType: 'Packaging Supplier',
-    amountLabel: '2.000 pcs / bulan',
-    deadlineLabel: 'Selesai',
-    budgetLabel: 'Rp 1.800 - Rp 3.200 / pcs',
-    description:
-      'Box, stiker, dan kemasan makanan. Cetak rapi, produksi stabil.',
-    locationLabel: 'Semarang, Jawa Tengah',
-    extraLabel: 'Supplier sudah cocok dari harga dan lead time.',
-  },
-};
-
-const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
-  'req-supplier': [
-    {
-      id: 'freshfarm',
-      vendor: 'FreshFarm Indonesia',
-      ratingLabel: '4.8',
-      reviewLabel: '128 ulasan',
-      priceLabel: 'Rp 29.500 / kg',
-      deliveryLabel: '1 - 2 hari',
-      guaranteeLabel: '100% Segar',
-      note: 'Ayam potong pagi. Bersih, segar, siap kirim.',
-    },
-    {
-      id: 'chickengo',
-      vendor: 'ChickenGo',
-      ratingLabel: '4.6',
-      reviewLabel: '96 ulasan',
-      priceLabel: 'Rp 28.000 / kg',
-      deliveryLabel: '2 - 3 hari',
-      guaranteeLabel: 'Uang kembali 100%',
-      note: 'Dari peternak. Harga masuk, stok rutin.',
-    },
-    {
-      id: 'prima-poultry',
-      vendor: 'Prima Poultry',
-      ratingLabel: '4.5',
-      reviewLabel: '74 ulasan',
-      priceLabel: 'Rp 30.000 / kg',
-      deliveryLabel: '1 - 2 hari',
-      guaranteeLabel: 'Stok stabil',
-      note: 'Cocok buat restoran. Jadwal kirim rapi.',
-    },
-  ],
-  'req-location': [
-    {
-      id: 'urban-space',
-      vendor: 'Urban Space',
-      ratingLabel: '4.9',
-      reviewLabel: '88 ulasan',
-      priceLabel: 'Rp 58.000.000 / tahun',
-      deliveryLabel: 'Survey 1 hari',
-      guaranteeLabel: 'Legal lengkap',
-      note: 'Dekat kampus dan kantor. Parkir aman.',
-    },
-    {
-      id: 'bandung-hub',
-      vendor: 'Bandung Retail Hub',
-      ratingLabel: '4.7',
-      reviewLabel: '63 ulasan',
-      priceLabel: 'Rp 64.000.000 / tahun',
-      deliveryLabel: 'Survey 2 hari',
-      guaranteeLabel: 'Negosiasi fleksibel',
-      note: 'Siap pakai. Tampak depan cocok buat coffee shop.',
-    },
-  ],
-  'req-social': [
-    {
-      id: 'content-kitchen',
-      vendor: 'Content Kitchen',
-      ratingLabel: '4.8',
-      reviewLabel: '52 ulasan',
-      priceLabel: 'Rp 4.200.000 / bulan',
-      deliveryLabel: 'Mulai 3 hari',
-      guaranteeLabel: 'Report mingguan',
-      note: 'Biasa handle brand makanan dan video pendek.',
-    },
-    {
-      id: 'daily-buzz',
-      vendor: 'Daily Buzz Agency',
-      ratingLabel: '4.6',
-      reviewLabel: '41 ulasan',
-      priceLabel: 'Rp 3.800.000 / bulan',
-      deliveryLabel: 'Mulai 5 hari',
-      guaranteeLabel: '2 revisi / konten',
-      note: 'Paket hemat untuk posting rutin.',
-    },
-  ],
-  'req-pos': [],
-  'req-packaging': [],
-};
-
 function normalizeProjectImage(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -316,12 +155,6 @@ function getProjectImage(item: RequestCardView): string | null {
     item.imageUrls.find(Boolean) ||
     null
   );
-}
-
-function legacyStatusKey(status: string): 'active' | 'waiting' | 'completed' {
-  if (status === 'Menunggu') return 'waiting';
-  if (status === 'Selesai') return 'completed';
-  return 'active';
 }
 
 function mapBackendOffer(offer: LajukanOfferPreview): OfferPreview {
@@ -362,26 +195,6 @@ function mapBackendRequestCard(item: BackendRequestCard): RequestCardView {
     },
     offers: item.offers.map(mapBackendOffer),
   };
-}
-
-function buildLegacyRequestViews(): RequestCardView[] {
-  return [
-    ...LAJUKAN_SAMPLE_REQUESTS.active,
-    ...LAJUKAN_SAMPLE_REQUESTS.completed,
-  ].map(item => ({
-    id: item.id,
-    title: item.title,
-    city: item.city,
-    createdLabel: item.createdLabel,
-    offersLabel: item.offersLabel,
-    offerCount: Number.parseInt(item.offersLabel.split(' ')[0] || '0', 10) || 0,
-    coverImage: null,
-    imageUrls: [],
-    status: item.status,
-    statusKey: legacyStatusKey(item.status),
-    detail: REQUEST_DETAILS[item.id],
-    offers: OFFER_PREVIEWS[item.id] || [],
-  }));
 }
 
 function summaryTone(index: number) {
@@ -434,149 +247,14 @@ function projectFilterLabel(filter: ProjectViewFilter) {
   return 'Semua';
 }
 
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function projectSeed(value: string): number {
-  return Array.from(value).reduce(
-    (total, character) => (total * 31 + character.charCodeAt(0)) % 9973,
-    17,
-  );
-}
-
-function buildRequestAnalytics(item: RequestCardView): RequestAnalytics {
-  const seed = projectSeed(`${item.id}:${item.title}:${item.city}`);
-  const tone = requestTone(item.statusKey);
-  const offerCount = Math.max(item.offerCount, item.offers.length);
-  const baseViews =
-    140 + (seed % 420) + offerCount * 58 + (tone === 'completed' ? 96 : 0);
-  const views = clampNumber(baseViews, 96, 1900);
-  const profileVisits = clampNumber(
-    Math.round(views * (0.15 + (seed % 11) / 100)) + offerCount * 10,
-    18,
-    views,
-  );
-  const savedToCart = clampNumber(
-    Math.round(profileVisits * (0.2 + (seed % 7) / 100)) + offerCount * 3,
-    offerCount > 0 ? offerCount : 3,
-    profileVisits,
-  );
-  const chatLeads = clampNumber(
-    Math.round(savedToCart * 0.38) + offerCount * 2,
-    offerCount,
-    savedToCart,
-  );
-  const offerToChatRate = Math.round(
-    (offerCount / Math.max(1, chatLeads)) * 100,
-  );
-  const waitingPenalty = tone === 'waiting' ? 10 : 0;
-  const dealReadiness = clampNumber(
-    Math.round(
-      34 +
-      offerCount * 12 +
-      savedToCart * 0.45 +
-      chatLeads * 0.75 +
-      (tone === 'completed' ? 26 : 0) -
-      waitingPenalty,
-    ),
-    18,
-    96,
-  );
-
-  return {
-    views,
-    profileVisits,
-    savedToCart,
-    chatLeads,
-    offerToChatRate,
-    dealReadiness,
-    profileLiftLabel: `+${clampNumber(6 + (seed % 24) + offerCount * 2, 6, 68)}%`,
-  };
-}
-
 function buildProjectAnalytics(cards: RequestCardView[]): ProjectAnalytics {
-  const requestAnalytics = cards.map(item => ({
-    item,
-    analytics: buildRequestAnalytics(item),
-  }));
-  const totalRequests = cards.length;
-  const activeCount = cards.filter(
-    item => item.statusKey !== 'completed',
-  ).length;
-  const waitingCount = cards.filter(
-    item => requestTone(item.statusKey) === 'waiting',
-  ).length;
-  const completedCount = cards.filter(
-    item => item.statusKey === 'completed',
-  ).length;
-  const totalOffers = cards.reduce((total, item) => total + item.offerCount, 0);
-  const projectViews = requestAnalytics.reduce(
-    (total, item) => total + item.analytics.views,
-    0,
+  return summarizeProjectActivity(
+    cards.map(item => ({
+      title: item.title,
+      statusKey: item.statusKey,
+      offerCount: item.offerCount,
+    })),
   );
-  const profileVisits = requestAnalytics.reduce(
-    (total, item) => total + item.analytics.profileVisits,
-    0,
-  );
-  const savedToCart = requestAnalytics.reduce(
-    (total, item) => total + item.analytics.savedToCart,
-    0,
-  );
-  const chatLeads = requestAnalytics.reduce(
-    (total, item) => total + item.analytics.chatLeads,
-    0,
-  );
-  const highIntentCount = requestAnalytics.filter(
-    item =>
-      item.analytics.dealReadiness >= 72 ||
-      item.analytics.savedToCart >= 14 ||
-      item.item.offerCount >= 2,
-  ).length;
-  const bestProject = [...requestAnalytics].sort(
-    (left, right) =>
-      right.analytics.dealReadiness +
-      right.item.offerCount * 10 -
-      (left.analytics.dealReadiness + left.item.offerCount * 10),
-  )[0]?.item;
-  const offerRate =
-    totalRequests > 0 ? Math.round((totalOffers / totalRequests) * 10) / 10 : 0;
-  const completionRate =
-    totalRequests > 0 ? Math.round((completedCount / totalRequests) * 100) : 0;
-  const dealReadiness = clampNumber(
-    Math.round(
-      35 +
-      highIntentCount * 8 +
-      totalOffers * 4 +
-      completedCount * 6 -
-      waitingCount * 4,
-    ),
-    20,
-    96,
-  );
-  const profileVisitsChange = clampNumber(
-    8 + activeCount * 4 + totalOffers * 2 - waitingCount,
-    3,
-    72,
-  );
-
-  return {
-    totalRequests,
-    activeCount,
-    waitingCount,
-    completedCount,
-    totalOffers,
-    projectViews,
-    profileVisits,
-    savedToCart,
-    chatLeads,
-    offerRate,
-    completionRate,
-    dealReadiness,
-    profileVisitsChange,
-    highIntentCount,
-    bestProjectTitle: bestProject?.title || 'Belum ada proyek unggulan',
-  };
 }
 
 function buildProjectSuggestions(
@@ -614,20 +292,7 @@ function buildProjectSuggestions(
     });
   }
 
-  if (analytics.savedToCart > analytics.totalOffers * 4) {
-    suggestions.push({
-      id: 'cart-intent',
-      icon: ShoppingCart,
-      title: 'Banyak vendor sudah simpan proyek',
-      description:
-        'Kirim pesan singkat ke calon vendor yang tertarik dan minta estimasi harga final.',
-      actionLabel: 'Cari vendor',
-      href: '/umkm',
-      tone: 'growth',
-    });
-  }
-
-  if (analytics.totalOffers >= 3) {
+  if (analytics.totalOffers >= 2) {
     suggestions.push({
       id: 'compare-offers',
       icon: Target,
@@ -656,7 +321,6 @@ function buildProjectSuggestions(
 
 function buildRequestSuggestions(
   request: RequestCardView,
-  analytics: RequestAnalytics,
 ): ProjectSuggestion[] {
   const suggestions: ProjectSuggestion[] = [];
 
@@ -686,15 +350,15 @@ function buildRequestSuggestions(
     });
   }
 
-  if (analytics.savedToCart >= 12) {
+  if (request.offerCount > 1) {
     suggestions.push({
-      id: 'request-cart',
-      icon: ShoppingCart,
-      title: 'Minat vendor cukup tinggi',
+      id: 'request-offers',
+      icon: Target,
+      title: 'Tawaran siap dibandingkan',
       description:
-        'Kunci detail minimal order, satuan harga, dan deadline agar yang tertarik berani kasih harga.',
-      actionLabel: 'Cari pembanding',
-      href: '/umkm',
+        'Bandingkan harga, ruang lingkup, dan jadwal sebelum memilih vendor.',
+      actionLabel: 'Lihat tawaran',
+      href: '/transactions',
       tone: 'growth',
     });
   }
@@ -835,13 +499,15 @@ function ProjectFocusCard({
         <div className="grid min-w-0 gap-2">
           <div className="rounded-[18px] bg-[color:var(--app-surface-muted)] p-3 ring-1 ring-[color:var(--app-border)]">
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
-              Kesiapan deal
+              Ringkasan proyek
             </p>
             <p className="mt-1 text-2xl font-bold text-[color:var(--app-accent)]">
-              {analytics.dealReadiness}%
+              {item.offerCount} tawaran
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-              {analytics.highIntentCount} proyek punya minat tinggi.
+              {analytics.waitingCount > 0
+                ? `${analytics.waitingCount} proyek lain menunggu tindak lanjut.`
+                : `${analytics.activeCount} proyek masih aktif.`}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -917,24 +583,24 @@ function AnalyticsCard({
 function ProjectFunnelPanel({ analytics }: { analytics: ProjectAnalytics }) {
   const stages: FunnelStage[] = [
     {
-      label: 'Dilihat',
-      value: analytics.projectViews,
-      helper: 'orang melihat brief',
+      label: 'Semua kebutuhan',
+      value: analytics.totalRequests,
+      helper: 'kebutuhan milik akun ini',
     },
     {
-      label: 'Profil dibuka',
-      value: analytics.profileVisits,
-      helper: 'cek pemilik proyek',
+      label: 'Aktif',
+      value: analytics.activeCount,
+      helper: 'masih berjalan',
     },
     {
-      label: 'Disimpan',
-      value: analytics.savedToCart,
-      helper: 'masuk shortlist/cart',
+      label: 'Menunggu',
+      value: analytics.waitingCount,
+      helper: 'belum mendapat atau menunggu respons',
     },
     {
-      label: 'Chat',
-      value: analytics.chatLeads,
-      helper: 'calon vendor ngobrol',
+      label: 'Selesai',
+      value: analytics.completedCount,
+      helper: 'sudah ditandai selesai',
     },
     {
       label: 'Tawaran',
@@ -949,10 +615,10 @@ function ProjectFunnelPanel({ analytics }: { analytics: ProjectAnalytics }) {
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
-            Alur Proyek
+            Status Proyek
           </p>
           <h2 className="mt-0.5 text-sm font-bold tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-            Dari dilihat sampai jadi tawaran
+            Ringkasan dari data tersimpan
           </h2>
         </div>
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
@@ -1015,13 +681,15 @@ function ProjectSuggestionPanel({
 
       <div className="mt-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2">
         <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
-          Paling siap deal
+          Perlu perhatian
         </p>
         <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-          {analytics.bestProjectTitle}
+          {analytics.attentionProjectTitle}
         </p>
         <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-          Skor kesiapan {analytics.dealReadiness}%
+          {analytics.noOfferCount > 0
+            ? `${analytics.noOfferCount} proyek aktif belum mendapat tawaran.`
+            : `${analytics.totalOffers} tawaran tercatat dari semua proyek.`}
         </p>
       </div>
 
@@ -1095,13 +763,13 @@ function ProjectInsightsDisclosure({
           </span>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
-              Analitik & saran
+              Aktivitas & saran
             </p>
             <h2 className="mt-0.5 truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
               Ringkasan progres
             </h2>
             <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
-              Funnel, minat vendor, dan langkah yang paling perlu dikerjakan.
+              Status, tawaran masuk, dan langkah yang perlu dikerjakan.
             </p>
           </div>
         </div>
@@ -1161,16 +829,12 @@ function ProjectInsightsDisclosure({
           />
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-2">
+        <div className="mt-1.5 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-2">
           <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
-            Butuh analitik lebih lengkap? Buka halaman khusus analytics usaha.
+            Ringkasan ini hanya memakai data proyek dan penawaran yang sudah
+            tersimpan. View, kunjungan profil, dan chat tidak ditampilkan
+            sebelum event analytics terukur tersedia.
           </p>
-          <Link
-            href="/usaha/analytics"
-            className="inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)]"
-          >
-            Buka analitik
-          </Link>
         </div>
       </div>
     </details>
@@ -1409,8 +1073,7 @@ function RequestDetailDialog({
   const detail = request.detail;
   const offers = request.offers || [];
   const hasOffers = offers.length > 0;
-  const analytics = buildRequestAnalytics(request);
-  const suggestions = buildRequestSuggestions(request, analytics);
+  const suggestions = buildRequestSuggestions(request);
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-5">
@@ -1507,29 +1170,6 @@ function RequestDetailDialog({
             />
           </div>
 
-          <div className="mt-3 grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-4">
-            <DetailMetric
-              icon={Eye}
-              label="Dilihat"
-              value={`${formatNumberId(analytics.views)}x`}
-            />
-            <DetailMetric
-              icon={Users}
-              label="Profil"
-              value={`${formatNumberId(analytics.profileVisits)} visit`}
-            />
-            <DetailMetric
-              icon={ShoppingCart}
-              label="Disimpan"
-              value={`${formatNumberId(analytics.savedToCart)} cart`}
-            />
-            <DetailMetric
-              icon={Target}
-              label="Siap deal"
-              value={`${analytics.dealReadiness}%`}
-            />
-          </div>
-
           <div className="mt-3 min-w-0 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
             <p className="text-[13px] leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
               {detail.description}
@@ -1543,15 +1183,14 @@ function RequestDetailDialog({
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                  Analitik singkat
+                  Langkah berikutnya
                 </h3>
                 <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)] sm:text-xs">
-                  Profil naik {analytics.profileLiftLabel}; chat ke tawaran{' '}
-                  {analytics.offerToChatRate}%.
+                  Saran ini mengikuti status dan jumlah tawaran yang tersimpan.
                 </p>
               </div>
               <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-accent)] sm:px-2.5 sm:py-1 sm:text-xs">
-                {analytics.chatLeads} chat
+                {request.offerCount} tawaran
               </span>
             </div>
             <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-3">
@@ -1628,6 +1267,9 @@ export default function MyProjectsPage() {
   const { user, loading: authLoading } = useAuth();
   const [requestsData, setRequestsData] =
     useState<LajukanRequestsPayload | null>(null);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [requestReloadKey, setRequestReloadKey] = useState(0);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
   const [projectFilter, setProjectFilter] = useState<ProjectViewFilter>('all');
 
@@ -1636,26 +1278,45 @@ export default function MyProjectsPage() {
 
     const load = async () => {
       if (!user) {
+        if (!cancelled) {
+          setRequestsData(null);
+          setRequestsError(null);
+          setRequestsLoading(false);
+        }
         return;
       }
 
+      setRequestsLoading(true);
+      setRequestsError(null);
+
       try {
-        const requestRes = await fetch('/api/lajukan/requests?limit=18', {
-          cache: 'no-store',
-          credentials: 'include',
-        });
+        const requestRes = await fetch(
+          '/api/lajukan/requests?limit=18&mine=true',
+          {
+            cache: 'no-store',
+            credentials: 'include',
+          },
+        );
         const requestData = (await requestRes
           .json()
           .catch(() => ({}))) as LajukanRequestsResponse;
 
-        const nextRequests =
-          requestRes.ok && requestData.data ? requestData.data : null;
+        if (!requestRes.ok || !requestData.data) {
+          throw new Error(requestData.error || 'failed_to_load_projects');
+        }
 
         if (!cancelled) {
-          setRequestsData(nextRequests);
+          setRequestsData(requestData.data);
         }
       } catch {
-        if (!cancelled) setRequestsData(null);
+        if (!cancelled) {
+          setRequestsData(null);
+          setRequestsError(
+            'Proyek belum bisa dimuat. Coba lagi setelah koneksi layanan pulih.',
+          );
+        }
+      } finally {
+        if (!cancelled) setRequestsLoading(false);
       }
     };
 
@@ -1663,15 +1324,13 @@ export default function MyProjectsPage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [requestReloadKey, user]);
 
   const requestCards = useMemo(() => {
-    if (requestsData) {
-      return [...requestsData.active, ...requestsData.completed].map(
-        mapBackendRequestCard,
-      );
-    }
-    return buildLegacyRequestViews();
+    if (!requestsData) return [];
+    return [...requestsData.active, ...requestsData.completed].map(
+      mapBackendRequestCard,
+    );
   }, [requestsData]);
 
   const activeRequests = useMemo(
@@ -1734,35 +1393,35 @@ export default function MyProjectsPage() {
   const analyticsCards = useMemo(
     () => [
       {
-        icon: Eye,
-        label: 'Dilihat',
-        value: formatNumberId(projectAnalytics.projectViews),
-        helper: `${projectAnalytics.profileVisitsChange}% lebih ramai dari minggu lalu`,
+        icon: ClipboardList,
+        label: 'Semua proyek',
+        value: formatNumberId(projectAnalytics.totalRequests),
+        helper: 'Kebutuhan milik akun ini',
         tone: 'growth' as const,
       },
       {
-        icon: Users,
-        label: 'Kunjungan profil',
-        value: formatNumberId(projectAnalytics.profileVisits),
-        helper: 'Orang yang cek profil sebelum chat atau nawar',
+        icon: BriefcaseBusiness,
+        label: 'Masih aktif',
+        value: formatNumberId(projectAnalytics.activeCount),
+        helper: `${projectAnalytics.noOfferCount} belum mendapat tawaran`,
         tone: 'steady' as const,
       },
       {
-        icon: ShoppingCart,
-        label: 'Disimpan / cart',
-        value: formatNumberId(projectAnalytics.savedToCart),
-        helper: 'Vendor dan calon mitra yang menyimpan proyek',
-        tone: 'growth' as const,
-      },
-      {
-        icon: MousePointerClick,
-        label: 'Chat prospek',
-        value: formatNumberId(projectAnalytics.chatLeads),
-        helper: `${projectAnalytics.offerRate} tawaran rata-rata per proyek`,
+        icon: Clock3,
+        label: 'Menunggu',
+        value: formatNumberId(projectAnalytics.waitingCount),
+        helper: 'Perlu respons atau tawaran',
         tone:
           projectAnalytics.waitingCount > 0
             ? ('urgent' as const)
             : ('steady' as const),
+      },
+      {
+        icon: MessageCircleMore,
+        label: 'Tawaran masuk',
+        value: formatNumberId(projectAnalytics.totalOffers),
+        helper: `${projectAnalytics.averageOffers} rata-rata per proyek`,
+        tone: 'growth' as const,
       },
     ],
     [projectAnalytics],
@@ -1770,16 +1429,12 @@ export default function MyProjectsPage() {
 
   const handleSelectRequest = (item: RequestCardView) => {
     setDetailRequestId(item.id);
-    const analytics = buildRequestAnalytics(item);
     void trackLajukanEvent('project.detail_opened', {
       entityType: 'project_request',
       entityId: item.id,
       properties: {
         status: item.statusKey,
         offer_count: item.offerCount,
-        profile_visits: analytics.profileVisits,
-        saved_to_cart: analytics.savedToCart,
-        deal_readiness: analytics.dealReadiness,
       },
     });
   };
@@ -1872,7 +1527,7 @@ export default function MyProjectsPage() {
     ],
   );
 
-  if (authLoading) {
+  if (authLoading || (Boolean(user) && requestsLoading)) {
     return (
       <MyProjectsPageChrome>
         <MyProjectsSkeleton />
@@ -1901,6 +1556,34 @@ export default function MyProjectsPage() {
             >
               Masuk
             </Link>
+          </div>
+        </div>
+      </MyProjectsPageChrome>
+    );
+  }
+
+  if (requestsError) {
+    return (
+      <MyProjectsPageChrome>
+        <div className="mx-auto grid min-h-[68svh] w-full max-w-2xl place-items-center px-4 py-8">
+          <div className="w-full rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6 text-center shadow-[0_24px_56px_-42px_rgba(15,23,42,0.42)]">
+            <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60">
+              <RefreshCw className="h-6 w-6" />
+            </span>
+            <h2 className="mt-4 text-2xl font-bold tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              Proyek belum bisa dimuat
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[color:var(--app-text-soft)]">
+              {requestsError}
+            </p>
+            <button
+              type="button"
+              onClick={() => setRequestReloadKey(value => value + 1)}
+              className="mt-5 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-6 text-sm font-bold text-[color:var(--app-text-inverse)]"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Coba lagi
+            </button>
           </div>
         </div>
       </MyProjectsPageChrome>
@@ -2007,7 +1690,7 @@ export default function MyProjectsPage() {
                     </h2>
                     <p className="mt-0.5 text-sm text-[color:var(--app-text-soft)]">
                       {requestCards.length} proyek,{' '}
-                      {projectAnalytics.highIntentCount} minat tinggi
+                      {projectAnalytics.totalOffers} tawaran tercatat
                     </p>
                   </div>
                 </div>

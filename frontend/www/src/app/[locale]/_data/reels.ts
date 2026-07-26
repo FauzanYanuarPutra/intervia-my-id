@@ -1,11 +1,6 @@
 export type ReelTone = 'emerald' | 'orange' | 'blue' | 'amber' | 'rose';
 export type ReelFilterPreset =
-  | 'natural'
-  | 'warm'
-  | 'fresh'
-  | 'cinema'
-  | 'mono'
-  | 'pop';
+  'natural' | 'warm' | 'fresh' | 'cinema' | 'mono' | 'pop';
 export type ReelCaptureMode = 'upload' | 'camera' | 'live';
 export type ReelLiveStatus = 'none' | 'scheduled' | 'live' | 'ended';
 
@@ -58,22 +53,22 @@ function looksLikeImageMedia(value: string) {
   return /\.(avif|gif|jpe?g|png|webp)$/.test(lower);
 }
 
+export function isVideoReel(reel: Pick<LajukanReel, 'mediaType' | 'videoSrc'>) {
+  return reel.mediaType !== 'image' && !looksLikeImageMedia(reel.videoSrc);
+}
+
 export function normalizePlayableReel(
   reel: LajukanReel,
   index = 0,
 ): LajukanReel {
   void index;
-  if (reel.mediaType === 'image' || looksLikeImageMedia(reel.videoSrc)) {
-    return reel;
-  }
-
   return reel;
 }
 
 export function normalizePlayableReels(reels: LajukanReel[], startIndex = 0) {
-  return reels.map((reel, index) =>
-    normalizePlayableReel(reel, startIndex + index),
-  );
+  return reels
+    .filter(isVideoReel)
+    .map((reel, index) => normalizePlayableReel(reel, startIndex + index));
 }
 
 function normalizeReelsCursor(cursor = 0) {

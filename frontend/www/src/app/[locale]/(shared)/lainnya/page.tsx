@@ -194,7 +194,7 @@ export default async function LainnyaPage({ params }: PageProps) {
 
   const quickRoutes = [
     {
-      href: '/search?type=product&q=supplier',
+      href: '/explore?type=product&q=supplier',
       label: isId ? 'Supplier' : 'Suppliers',
     },
     {
@@ -280,7 +280,7 @@ export default async function LainnyaPage({ params }: PageProps) {
 
   const canonicalSearchRoutes = [
     {
-      href: '/search?type=job&q=lowongan',
+      href: '/explore?type=job&q=lowongan',
       title: isId ? 'Loker' : 'Jobs',
       hint: isId
         ? 'Lowongan, kurir, admin, dan operator.'
@@ -290,7 +290,7 @@ export default async function LainnyaPage({ params }: PageProps) {
       tone: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900',
     },
     {
-      href: '/search?type=freelancer&q=umkm',
+      href: '/explore?type=freelancer&q=umkm',
       title: 'Talent',
       hint: isId
         ? 'Freelancer dan profil skill.'
@@ -300,7 +300,7 @@ export default async function LainnyaPage({ params }: PageProps) {
       tone: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40',
     },
     {
-      href: '/search?type=property&q=lokasi%20jualan',
+      href: '/explore?type=property&q=lokasi%20jualan',
       title: isId ? 'Lokasi' : 'Locations',
       hint: isId
         ? 'Ruko, booth, dapur, gudang.'
@@ -310,7 +310,7 @@ export default async function LainnyaPage({ params }: PageProps) {
       tone: 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40',
     },
     {
-      href: '/search?type=product&q=supplier',
+      href: '/explore?type=product&q=supplier',
       title: 'Marketplace',
       hint: isId
         ? 'Supplier dan produk siap pilih.'
@@ -329,7 +329,7 @@ export default async function LainnyaPage({ params }: PageProps) {
         ? 'Mulai dari supplier atau kebutuhan usaha.'
         : 'Start from suppliers or a business need.',
       meta: isId ? 'Cari cepat' : 'Search fast',
-      href: '/search',
+      href: '/explore',
       cta: isId ? 'Cari' : 'Open search',
       icon: Search,
       toneClass: 'from-emerald-500/18 via-emerald-400/8 to-transparent',
@@ -372,9 +372,9 @@ export default async function LainnyaPage({ params }: PageProps) {
   ];
 
   return (
-    <main className="page-shell overflow-x-hidden py-0 sm:py-6">
-      <div className="ui-page-stack flex w-full flex-col gap-0 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-3">
-        <section className="ui-feed-section relative overflow-hidden rounded-none border-x-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.99)_0%,rgba(239,246,255,0.97)_34%,rgba(238,242,255,0.96)_68%,rgba(236,253,245,0.94)_100%)] p-4 shadow-[0_24px_60px_-38px_rgba(15,23,42,0.4)] sm:rounded-[28px] sm:border sm:border-[color:var(--app-border)] sm:p-4">
+    <main className="page-shell page-rhythm overflow-x-hidden pb-8 pt-3 lg:pb-10">
+      <div className="ui-page-stack flex w-full flex-col gap-3 sm:mx-auto sm:max-w-[var(--app-max-width)]">
+        <section className="ui-hero-panel p-4 sm:p-5">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.04fr)_minmax(320px,0.96fr)]">
             <div className="min-w-0">
               <p className="ui-page-eyebrow">{isId ? 'Lainnya' : 'More'}</p>
@@ -393,7 +393,7 @@ export default async function LainnyaPage({ params }: PageProps) {
 
               <div className="mt-3 flex flex-col gap-2 min-[420px]:flex-row">
                 <Link
-                  href="/search"
+                  href="/explore"
                   className="ui-button-primary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold"
                 >
                   <Search className="h-4 w-4" />
@@ -440,7 +440,7 @@ export default async function LainnyaPage({ params }: PageProps) {
           </div>
         </section>
 
-        <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
+        <section className="ui-panel p-4 sm:p-5">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="rounded-[22px] border border-[color:var(--app-border)]/80 bg-[color:var(--app-surface-strong)] px-3 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
@@ -464,7 +464,7 @@ export default async function LainnyaPage({ params }: PageProps) {
             </div>
 
             {!PROMO_ONLY_MODE ? (
-              <div className="rounded-[22px] border border-[color:var(--app-border)]/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.94))] px-3 py-3 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.22)]">
+              <div className="rounded-[18px] border border-[color:var(--app-border)]/80 bg-[color:var(--app-surface-strong)] px-3 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
                     {isId ? 'Keuangan' : 'Finance'}
@@ -490,7 +490,7 @@ export default async function LainnyaPage({ params }: PageProps) {
           </div>
         </section>
 
-        <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
+        <section className="ui-panel p-4 sm:p-5">
           <div className="flex flex-col gap-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
               {isId ? 'Halaman bernilai' : 'Useful pages'}
@@ -514,7 +514,7 @@ export default async function LainnyaPage({ params }: PageProps) {
           </div>
         </section>
 
-        <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
+        <section className="ui-panel p-4 sm:p-5">
           <div className="flex flex-col gap-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
               {isId ? 'Jalur kanonis' : 'Canonical routes'}

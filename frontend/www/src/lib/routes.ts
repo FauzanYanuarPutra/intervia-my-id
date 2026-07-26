@@ -22,6 +22,7 @@ export enum RoutePath {
   CRM = '/crm',
   DASHBOARD = '/dashboard',
   EDUCATION = '/education',
+  EXPLORE = '/explore',
   FORGOT_PASSWORD = '/forgot-password',
   JOBS = '/jobs',
   KATEGORI = '/kategori',
@@ -29,6 +30,7 @@ export enum RoutePath {
   LEARN = '/learn',
   LOGIN = '/login',
   MICROGIGS = '/microgigs',
+  MANAGE = '/manage',
   MY_LISTINGS = '/my-listings',
   MY_PROJECTS = '/my-projects',
   NOTIFICATIONS = '/notifications',
@@ -41,7 +43,6 @@ export enum RoutePath {
   REELS = '/reels',
   REGISTER = '/register',
   RESET_PASSWORD = '/reset-password',
-  SEARCH = '/search',
   SETTINGS = '/settings',
   SUPPORT = '/support',
   TERMS = '/terms',
@@ -77,7 +78,6 @@ export interface MetaType {
 }
 
 export interface RouteConfig {
-
   path: string;
   name: string;
   meta: MetaType;
@@ -105,16 +105,32 @@ export const routes: RouteConfig[] = [
     shared: true,
   },
   {
-    path: RoutePath.SEARCH,
-    name: 'Search',
+    path: RoutePath.EXPLORE,
+    name: 'Explore',
     meta: {
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
       footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      routeIntent: 'explore',
     },
     access: PUBLIC_ACCESS,
     shared: true,
+    children: [
+      {
+        path: `${RoutePath.EXPLORE}/:category`,
+        name: 'Explore Category',
+        meta: {
+          topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          routeIntent: 'explore',
+        },
+        access: PUBLIC_ACCESS,
+        shared: true,
+      },
+    ],
   },
   {
     path: RoutePath.KATEGORI,
@@ -267,7 +283,7 @@ export const routes: RouteConfig[] = [
       description: 'Pilih jenis postingan yang ingin dibuat.',
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
-      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
     },
 
@@ -278,7 +294,7 @@ export const routes: RouteConfig[] = [
         name: 'Create Flow',
         meta: {
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
-          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
         },
         access: AUTH_ACCESS,
@@ -288,7 +304,7 @@ export const routes: RouteConfig[] = [
         name: 'Create Listing Detail',
         meta: {
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
-          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
         },
         access: AUTH_ACCESS,
@@ -299,7 +315,7 @@ export const routes: RouteConfig[] = [
     path: RoutePath.PROFILE,
     name: 'Profile',
     meta: {
-      title: "Profil",
+      title: 'Profil',
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -403,6 +419,44 @@ export const routes: RouteConfig[] = [
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
     },
     access: AUTH_ACCESS,
+  },
+  {
+    path: RoutePath.MANAGE,
+    name: 'Manage',
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      routeIntent: 'dashboard',
+    },
+    access: AUTH_ACCESS,
+    children: [
+      {
+        path: `${RoutePath.MANAGE}/community`,
+        name: 'Manage Community Posts',
+        meta: {
+          topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          routeIntent: 'community',
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.MANAGE}/reels`,
+        name: 'Manage Reels',
+        meta: {
+          topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          routeIntent: 'reels',
+        },
+        access: AUTH_ACCESS,
+      },
+    ],
   },
   {
     path: RoutePath.MY_LISTINGS,

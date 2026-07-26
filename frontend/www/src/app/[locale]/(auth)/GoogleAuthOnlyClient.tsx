@@ -57,8 +57,8 @@ export default function GoogleAuthOnlyClient({ mode }: Props) {
         ? 'Masuk ke Lajukan'
         : 'Sign in to Lajukan';
   const description = isId
-    ? 'Gunakan satu akun untuk profil, chat, AI Studio, dan aktivitas bisnis kamu.'
-    : 'Use one account for your profile, chats, AI Studio, and business activity.';
+    ? 'Lanjutkan dengan Google untuk membuka profil, chat, dan AI Studio kamu.'
+    : 'Continue with Google to access your profile, chats, and AI Studio.';
 
   return (
     <AuthFlowShell
@@ -68,63 +68,36 @@ export default function GoogleAuthOnlyClient({ mode }: Props) {
       description={description}
       helperText={
         isId
-          ? 'Akun baru otomatis dibuat saat Google pertama kali dipakai di Lajukan.'
-          : 'A new account is created automatically the first time Google is used on Lajukan.'
+          ? 'Belum punya akun? Akun Lajukan akan dibuat otomatis saat kamu pertama kali masuk dengan Google.'
+          : 'New to Lajukan? Your account will be created automatically the first time you continue with Google.'
       }
       highlights={[
         {
-          title: isId ? 'Chat & notifikasi' : 'Chats & notifications',
+          title: isId ? 'Chat tetap tersimpan' : 'Chats stay saved',
           description: isId
-            ? 'Percakapan dan update penting tersimpan di akunmu.'
-            : 'Conversations and key updates stay in your account.',
+            ? 'Buka kembali percakapan dan update penting kapan saja.'
+            : 'Return to conversations and important updates anytime.',
         },
         {
-          title: 'AI Studio',
+          title: isId ? 'AI Studio pribadi' : 'Your AI Studio',
           description: isId
-            ? 'Buat tool AI pribadi, upload media, dan simpan riwayat.'
-            : 'Create personal AI tools, upload media, and keep history.',
+            ? 'Buat tool AI, unggah media, dan simpan riwayat kerja.'
+            : 'Create AI tools, upload media, and keep your work history.',
         },
         {
-          title: isId ? 'Profil bisnis' : 'Business profile',
+          title: isId ? 'Profil dan listing' : 'Profile and listings',
           description: isId
-            ? 'Kelola profil, listing, dan kebutuhan usaha dari satu tempat.'
-            : 'Manage your profile, listings, and business needs in one place.',
+            ? 'Kelola profil bisnis, listing, dan kebutuhan usaha.'
+            : 'Manage your business profile, listings, and business needs.',
         },
       ]}
     >
-      <div className="space-y-3">
-        <a
-          href={googleHref}
-          className="group inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-[16px] bg-[color:var(--app-text)] px-4 text-sm font-bold text-[color:var(--app-surface)] transition hover:bg-[color:var(--app-accent)] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--app-accent)]"
-        >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white">
-            <GoogleBrandIcon className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1 text-left">
-            {isId ? 'Lanjutkan dengan Google' : 'Continue with Google'}
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 transition group-hover:translate-x-0.5" />
-        </a>
-
-        <div className="grid gap-2 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3">
-          {[
-            isId ? 'Tidak perlu password baru.' : 'No new password needed.',
-            isId
-              ? 'Email Google dipakai untuk keamanan akun.'
-              : 'Your Google email is used for account security.',
-            isId
-              ? 'Kamu bisa lanjut ke profil setelah berhasil masuk.'
-              : 'You can continue to your profile after sign-in.',
-          ].map(item => (
-            <div key={item} className="flex items-center gap-2 text-xs font-bold text-[color:var(--app-text-soft)]">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-              <span>{item}</span>
-            </div>
-          ))}
-        </div>
-
+      <div className="space-y-4">
         {rawError ? (
-          <p className="rounded-[14px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3.5 py-3 text-sm font-semibold text-[color:var(--app-danger)]">
+          <p
+            role="alert"
+            className="rounded-lg border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3.5 py-3 text-sm font-semibold leading-6 text-[color:var(--app-danger)]"
+          >
             {mappedError
               ? isId
                 ? mappedError.id
@@ -135,12 +108,48 @@ export default function GoogleAuthOnlyClient({ mode }: Props) {
           </p>
         ) : null}
 
-        <p className="flex items-center justify-center gap-2 text-center text-[11px] font-bold leading-5 text-[color:var(--app-text-soft)]">
-          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" />
-          {isId
-            ? 'Dengan lanjut, kamu memakai autentikasi Google untuk Lajukan.'
-            : 'By continuing, you use Google authentication for Lajukan.'}
-        </p>
+        <a
+          href={googleHref}
+          className="group flex min-h-14 w-full items-center gap-3 !rounded-lg border border-[color:var(--app-accent-strong)] bg-[color:var(--app-accent)] px-3.5 py-2 text-sm font-bold text-white shadow-[0_16px_28px_-18px_rgba(18,138,69,0.72)] transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--app-accent)]"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white shadow-sm">
+            <GoogleBrandIcon className="h-[18px] w-[18px]" />
+          </span>
+          <span className="min-w-0 flex-1 text-left leading-5">
+            {isId ? 'Lanjutkan dengan Google' : 'Continue with Google'}
+          </span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/12 transition group-hover:translate-x-0.5">
+            <ArrowRight className="h-4 w-4" />
+          </span>
+        </a>
+
+        <div className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3">
+          {[
+            isId
+              ? 'Tidak perlu membuat password baru'
+              : 'No new password to create',
+            isId
+              ? 'Email Google digunakan untuk melindungi akunmu'
+              : 'Your Google email helps protect your account',
+          ].map(item => (
+            <div
+              key={item}
+              className="flex min-h-11 items-start gap-2.5 border-b border-[color:var(--app-border)] py-2.5 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] last:border-b-0"
+            >
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+              <span className="min-w-0 flex-1">{item}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* <p className="flex items-start gap-2 text-left text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
+          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" />
+          <span className="min-w-0 flex-1">
+            {isId
+              ? 'Lajukan menggunakan autentikasi Google untuk proses masuk yang aman.'
+              : 'Lajukan uses Google authentication for secure sign-in.'}
+          </span>
+        </p> */}
       </div>
     </AuthFlowShell>
   );

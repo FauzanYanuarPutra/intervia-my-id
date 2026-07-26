@@ -1,25 +1,21 @@
 'use client';
 
 import {
-  ClipboardList,
+  Clapperboard,
+  Compass,
   Home,
-  LayoutGrid,
   PlusCircle,
   User,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import {
-  LEGACY_UMKM_DISCOVERY_PATH,
-  LEGACY_UMKM_OWNER_PATH,
-  UMKM_DISCOVERY_PATH,
-  UMKM_OWNER_PATH,
-} from '@/lib/umkmSurface';
+import { LEGACY_UMKM_OWNER_PATH, UMKM_OWNER_PATH } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 export type PrimaryNavItem = {
-  key: 'home' | 'search' | 'create' | 'umkm' | 'account';
+  key: 'home' | 'explore' | 'community' | 'video' | 'create' | 'account';
   label: string;
   href: string;
   icon: LucideIcon;
@@ -27,7 +23,8 @@ export type PrimaryNavItem = {
 };
 
 function normalizePathname(pathname: string): string {
-  const withoutLocale = pathname.replace(/^\/(id|en)(?=\/|$)/, '');
+  const pathOnly = pathname.split(/[?#]/, 1)[0] || '/';
+  const withoutLocale = pathOnly.replace(/^\/(id|en)(?=\/|$)/, '');
   return withoutLocale === '' ? '/' : withoutLocale;
 }
 
@@ -72,13 +69,13 @@ export function buildPrimaryNavItems(
   locale: 'id' | 'en',
 ): PrimaryNavItem[] {
   const createHref = isAuthenticated ? '/create' : '/register';
-  const categoryHref = '/search';
   const accountHref = isAuthenticated ? '/profile' : '/login';
   const text = {
     home: locale === 'id' ? 'Beranda' : 'Home',
-    search: locale === 'id' ? 'Cari' : 'Search',
+    explore: locale === 'id' ? 'Jelajahi' : 'Explore',
+    community: locale === 'id' ? 'Komunitas' : 'Community',
+    video: locale === 'id' ? 'Video' : 'Video',
     create: locale === 'id' ? 'Buat' : 'Create',
-    umkm: locale === 'id' ? 'Usaha Sekitar' : 'Nearby',
     account: locale === 'id' ? 'Akun' : 'Account',
   };
 
@@ -91,15 +88,25 @@ export function buildPrimaryNavItems(
       matchers: ['/home', '/'],
     },
     {
-      key: 'search',
-      label: text.search,
-      href: categoryHref,
-      icon: LayoutGrid,
-      matchers: [
-        '/kategori',
-        '/search',
-        '/microgigs',
-      ],
+      key: 'explore',
+      label: text.explore,
+      href: '/explore',
+      icon: Compass,
+      matchers: ['/explore'],
+    },
+    {
+      key: 'community',
+      label: text.community,
+      href: '/community',
+      icon: Users,
+      matchers: ['/community'],
+    },
+    {
+      key: 'video',
+      label: text.video,
+      href: '/reels',
+      icon: Clapperboard,
+      matchers: ['/reels'],
     },
     {
       key: 'create',
@@ -110,39 +117,27 @@ export function buildPrimaryNavItems(
     },
   ];
 
-  if (!PROMO_ONLY_MODE) {
-    items.push({
-      key: 'umkm',
-      label: text.umkm,
-      href: UMKM_DISCOVERY_PATH,
-      icon: ClipboardList,
-      matchers: [UMKM_DISCOVERY_PATH, `${LEGACY_UMKM_DISCOVERY_PATH}$`, '/toko'],
-    });
-  }
-
-  items.push(
-    {
-      key: 'account',
-      label: text.account,
-      href: accountHref,
-      icon: User,
-      matchers: isAuthenticated
-        ? [
-            '/profile$',
-            '/profile/edit',
-            '/settings',
-            '/dashboard',
-            '/my-listings',
-            ...(PROMO_ONLY_MODE ? [] : ['/transactions', '/payments']),
-            '/chat',
-            '/notifications',
-            ...(PROMO_ONLY_MODE ? [] : ['/my-projects']),
-            UMKM_OWNER_PATH,
-            LEGACY_UMKM_OWNER_PATH,
-          ]
-        : ['/login', '/forgot-password', '/reset-password'],
-    },
-  );
+  items.push({
+    key: 'account',
+    label: text.account,
+    href: accountHref,
+    icon: User,
+    matchers: isAuthenticated
+      ? [
+          '/profile$',
+          '/profile/edit',
+          '/settings',
+          '/dashboard',
+          '/my-listings',
+          ...(PROMO_ONLY_MODE ? [] : ['/transactions', '/payments']),
+          '/chat',
+          '/notifications',
+          ...(PROMO_ONLY_MODE ? [] : ['/my-projects']),
+          UMKM_OWNER_PATH,
+          LEGACY_UMKM_OWNER_PATH,
+        ]
+      : ['/login', '/forgot-password', '/reset-password'],
+  });
 
   return items;
 }

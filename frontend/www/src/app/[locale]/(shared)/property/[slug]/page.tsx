@@ -15,6 +15,7 @@ import {
   formatPriceWithUnit,
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
+import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
 const MARKETPLACE_BASE =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -232,7 +233,7 @@ export default async function PropertyDetailPage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <MarketPageFrame
         variant="detail"

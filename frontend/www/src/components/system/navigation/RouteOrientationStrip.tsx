@@ -56,7 +56,7 @@ function buildOrientationConfig(
   if (
     cleanPath === '/' ||
     cleanPath.startsWith('/home') ||
-    cleanPath.startsWith('/search') ||
+    cleanPath.startsWith('/explore') ||
     cleanPath.startsWith('/jobs') ||
     cleanPath.startsWith('/property') ||
     cleanPath.startsWith('/microgigs') ||
@@ -113,21 +113,21 @@ function buildOrientationConfig(
         'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
       actions: PROMO_ONLY_MODE
         ? [
-          {
-            href: '/chat',
-            label: isId ? 'Chat' : 'Chat',
-            icon: Bell,
-            primary: true,
-          },
-        ]
+            {
+              href: '/chat',
+              label: isId ? 'Chat' : 'Chat',
+              icon: Bell,
+              primary: true,
+            },
+          ]
         : [
-          {
-            href: '/transactions',
-            label: isId ? 'Transaksi' : 'Transactions',
-            icon: ReceiptText,
-            primary: true,
-          },
-        ],
+            {
+              href: '/transactions',
+              label: isId ? 'Transaksi' : 'Transactions',
+              icon: ReceiptText,
+              primary: true,
+            },
+          ],
     };
   }
 
@@ -229,8 +229,8 @@ function buildOrientationConfig(
         'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
       actions: [
         {
-          href: '/search',
-          label: isId ? 'Cari lagi' : 'Search again',
+          href: '/explore',
+          label: isId ? 'Jelajahi lagi' : 'Explore again',
           icon: Search,
         },
       ],
@@ -257,31 +257,31 @@ function buildOrientationConfig(
         'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
       actions: PROMO_ONLY_MODE
         ? [
-          {
-            href: '/chat',
-            label: isId ? 'Chat' : 'Chat',
-            icon: Bell,
-            primary: true,
-          },
-          {
-            href: '/my-listings',
-            label: isId ? 'Postingan' : 'Listings',
-            icon: FolderKanban,
-          },
-        ]
+            {
+              href: '/chat',
+              label: isId ? 'Chat' : 'Chat',
+              icon: Bell,
+              primary: true,
+            },
+            {
+              href: '/my-listings',
+              label: isId ? 'Postingan' : 'Listings',
+              icon: FolderKanban,
+            },
+          ]
         : [
-          {
-            href: '/transactions',
-            label: isId ? 'Transaksi' : 'Transactions',
-            icon: ReceiptText,
-            primary: true,
-          },
-          {
-            href: '/payments',
-            label: isId ? 'Saldo' : 'Balance',
-            icon: Wallet,
-          },
-        ],
+            {
+              href: '/transactions',
+              label: isId ? 'Transaksi' : 'Transactions',
+              icon: ReceiptText,
+              primary: true,
+            },
+            {
+              href: '/payments',
+              label: isId ? 'Saldo' : 'Balance',
+              icon: Wallet,
+            },
+          ],
     };
   }
 
@@ -301,8 +301,8 @@ function buildOrientationConfig(
         'bg-lime-100 text-lime-800 ring-1 ring-lime-200/80 dark:bg-lime-400/14 dark:text-lime-200 dark:ring-lime-400/20',
       actions: [
         {
-          href: '/search',
-          label: isId ? 'Cari lagi' : 'Search again',
+          href: '/explore',
+          label: isId ? 'Jelajahi lagi' : 'Explore again',
           icon: Search,
           primary: true,
         },
@@ -325,8 +325,8 @@ function buildOrientationConfig(
       'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]',
     actions: [
       {
-        href: '/search',
-        label: isId ? 'Cari' : 'Search',
+        href: '/explore',
+        label: isId ? 'Jelajahi' : 'Explore',
         icon: Search,
         primary: true,
       },

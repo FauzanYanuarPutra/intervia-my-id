@@ -11,17 +11,22 @@ import { formatDistanceKm } from '@/lib/geo/distance';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import type { LatLng } from '@/lib/super-app/maps';
 import { Modal } from '@/components/common/Modal';
+import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
+import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
+import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
-import { ArrowRight, BadgeCheck, CheckCircleIcon, Target, XCircleIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  BadgeCheck,
+  CheckCircleIcon,
+  Target,
+  XCircleIcon,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 
 // INTEGRASI HEROICONS (SOLID)
-import {
-  GlobeAltIcon,
-  MapPinIcon,
-  StarIcon,
-} from "@heroicons/react/24/solid";
+import { GlobeAltIcon, MapPinIcon, StarIcon } from '@heroicons/react/24/solid';
 
 /* ================= TYPES ================= */
 type HomeUmkmMapPreviewProps = {
@@ -119,12 +124,17 @@ export default function HomeUmkmCard({
   return (
     <Link href={href} className="block group ">
       <article className="flex items-center gap-4 rounded-2xl border !border-emerald-600 bg-white p-3.5 shadow-sm transition-all duration-300 !hover:border-emerald-800 hover:shadow-md hover:-translate-y-0.5">
-
         {/* 1. MAIN IMAGE (KIRI) */}
         <div className="relative h-[120px] w-[120px] shrink-0 overflow-hidden rounded-xl bg-zinc-100 border border-zinc-200/60">
           {/* BADGE UMKM */}
           <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded bg-white/95  px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 shadow-sm border border-zinc-200/50">
-            <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
+            <svg
+              className="w-3 h-3 text-emerald-600"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+            </svg>
             UMKM
           </div>
           <LajukanImage
@@ -188,9 +198,7 @@ export default function HomeUmkmCard({
               <span className="flex min-w-0 flex-1 items-center gap-1 text-xs font-bold text-violet-700">
                 <MapPinIcon className="h-3.5 w-3.5 shrink-0 text-violet-500" />
 
-                <span className="truncate">
-                  {distanceLabel}
-                </span>
+                <span className="truncate">{distanceLabel}</span>
               </span>
             ) : (
               <span />
@@ -215,11 +223,15 @@ export default function HomeUmkmCard({
         {/* 3. MOSAIC GALLERY (KANAN) */}
         {hasGallery && (
           <div className="shrink-0 h-[120px] w-[120px] grid grid-cols-2 grid-rows-2 gap-1.5 overflow-hidden">
-
             {/* Jika hanya 1 gambar di galeri */}
             {displayGallery.length === 1 && (
               <div className="relative col-span-2 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                <LajukanImage src={displayGallery[0]} alt="Gallery 1" fill className="object-cover" />
+                <LajukanImage
+                  src={displayGallery[0]}
+                  alt="Gallery 1"
+                  fill
+                  className="object-cover"
+                />
               </div>
             )}
 
@@ -227,10 +239,20 @@ export default function HomeUmkmCard({
             {displayGallery.length === 2 && (
               <>
                 <div className="relative col-span-1 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage src={displayGallery[0]} alt="Gallery 1" fill className="object-cover" />
+                  <LajukanImage
+                    src={displayGallery[0]}
+                    alt="Gallery 1"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
                 <div className="relative col-span-1 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage src={displayGallery[1]} alt="Gallery 2" fill className="object-cover" />
+                  <LajukanImage
+                    src={displayGallery[1]}
+                    alt="Gallery 2"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
               </>
             )}
@@ -239,13 +261,28 @@ export default function HomeUmkmCard({
             {displayGallery.length === 3 && (
               <>
                 <div className="relative col-span-1 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage src={displayGallery[0]} alt="Gallery 1" fill className="object-cover" />
+                  <LajukanImage
+                    src={displayGallery[0]}
+                    alt="Gallery 1"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
                 <div className="relative col-span-1 row-span-1 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage src={displayGallery[1]} alt="Gallery 2" fill className="object-cover" />
+                  <LajukanImage
+                    src={displayGallery[1]}
+                    alt="Gallery 2"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
                 <div className="relative col-span-1 row-span-1 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage src={displayGallery[2]} alt="Gallery 3" fill className="object-cover" />
+                  <LajukanImage
+                    src={displayGallery[2]}
+                    alt="Gallery 3"
+                    fill
+                    className="object-cover"
+                  />
 
                   {/* Overlay sisa gambar */}
                   {remainingCount > 0 && (
@@ -263,12 +300,10 @@ export default function HomeUmkmCard({
         <div className="shrink-0 flex items-end justify-center pl-1">
           <ArrowRight className="h-5 w-5 text-emerald-500 group-hover:translate-x-1 transition-transform duration-300" />
         </div>
-
       </article>
     </Link>
   );
 }
-
 
 /* ================= MAIN ================= */
 export function HomeUmkmMapPreview({
@@ -277,7 +312,6 @@ export function HomeUmkmMapPreview({
   locating: locatingProp,
   locationError: locationErrorProp,
   locationEnabled: locationEnabledProp,
-  locationPromptDismissed: locationPromptDismissedProp,
   requestViewerLocation: requestViewerLocationProp,
   dismissLocationPrompt: dismissLocationPromptProp,
 }: HomeUmkmMapPreviewProps) {
@@ -299,22 +333,18 @@ export function HomeUmkmMapPreview({
     locationErrorProp ?? localViewerLocationState.locationError;
   const locationEnabled =
     locationEnabledProp ?? localViewerLocationState.locationEnabled;
-  const locationPromptDismissed =
-    locationPromptDismissedProp ??
-    localViewerLocationState.locationPromptDismissed;
   const requestViewerLocation =
-    requestViewerLocationProp ??
-    localViewerLocationState.requestViewerLocation;
+    requestViewerLocationProp ?? localViewerLocationState.requestViewerLocation;
   const dismissLocationPrompt =
-    dismissLocationPromptProp ??
-    localViewerLocationState.dismissLocationPrompt;
+    dismissLocationPromptProp ?? localViewerLocationState.dismissLocationPrompt;
 
-  const [emblaRef] = useEmblaCarousel({
+  const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     containScroll: 'keepSnaps',
     dragFree: true,
     skipSnaps: true,
   });
+  useEmblaWheelGestures(emblaApi);
 
   /* FETCH DATA */
   useEffect(() => {
@@ -331,16 +361,20 @@ export function HomeUmkmMapPreview({
           params.set('viewer_lng', String(viewerLocation.lng));
         }
 
-        const res = await fetch(`/api/super-app/umkm/stores?${params.toString()}`, {
-          cache: 'no-store',
-          credentials: 'include',
-        });
+        const res = await fetch(
+          `/api/super-app/umkm/stores?${params.toString()}`,
+          {
+            cache: 'no-store',
+            credentials: 'include',
+          },
+        );
 
         const json = (await res.json().catch(() => ({}))) as StoresResponse;
 
         if (!res.ok || !json.data?.items) {
           throw new Error(
-            json.error || (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.')
+            json.error ||
+            (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
           );
         }
 
@@ -352,7 +386,9 @@ export function HomeUmkmMapPreview({
           setError(
             e instanceof Error
               ? e.message
-              : isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'
+              : isId
+                ? 'Peta usaha belum siap.'
+                : 'Business map unavailable.',
           );
         }
       } finally {
@@ -381,20 +417,8 @@ export function HomeUmkmMapPreview({
         })),
         Boolean(viewerLocation),
       ),
-    [stores, isId, viewerLocation]
+    [stores, isId, viewerLocation],
   );
-
-  useEffect(() => {
-    if (viewerLocation || locationEnabled || locationPromptDismissed || locating) {
-      return;
-    }
-    if (typeof window === 'undefined') return;
-
-    const timer = window.setTimeout(() => {
-      setLocationPromptOpen(true);
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [locating, locationEnabled, locationPromptDismissed, viewerLocation]);
 
   const closeLocationPrompt = () => {
     dismissLocationPrompt();
@@ -410,17 +434,21 @@ export function HomeUmkmMapPreview({
   return (
     <>
       <section className="space-y-4 py-3">
-
         {/* HEADER SECTION */}
         <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
           <div className="space-y-0.5">
             <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
               {/* PENGGUNAAN GLOBEALTICON DI SINI */}
-              <GlobeAltIcon className="h-4 w-4 text-emerald-600 animate-spin-slow" style={{ animationDuration: '10s' }} />
+              <GlobeAltIcon
+                className="h-4 w-4 text-emerald-600 animate-spin-slow"
+                style={{ animationDuration: '10s' }}
+              />
               {isId ? 'Di Sekitarmu' : 'Around You'}
             </h2>
             <p className="text-[11px] font-medium text-zinc-400">
-              {isId ? 'Cari bisnis terdekat dari lokasimu.' : 'Find nearby businesses around.'}
+              {isId
+                ? 'Cari bisnis terdekat dari lokasimu.'
+                : 'Find nearby businesses around.'}
             </p>
           </div>
 
@@ -434,19 +462,22 @@ export function HomeUmkmMapPreview({
               <button
                 type="button"
                 onClick={() => setLocationPromptOpen(true)}
-                className="hidden items-center gap-1 rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700 sm:inline-flex"
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700"
               >
                 <Target className="h-3.5 w-3.5" />
                 {isId ? 'Aktifkan lokasi' : 'Enable location'}
               </button>
             )}
-            <Link
+            <CompactSeeAllLink
               href={UMKM_DISCOVERY_PATH}
-              className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
-            >
-              <span>{isId ? 'Lihat semua' : 'See all'}</span>
-              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+              isId={isId}
+              ariaLabel={
+                isId
+                  ? 'Lihat semua usaha sekitar'
+                  : 'View all nearby businesses'
+              }
+            />
+            <EmblaDesktopControls api={emblaApi} isId={isId} compact />
           </div>
         </div>
 
@@ -467,14 +498,19 @@ export function HomeUmkmMapPreview({
           {/* ERROR STATE */}
           {!loading && error && stores.length === 0 && (
             <div className="px-1 sm:px-3 md:px-6">
-              <p className="text-xs text-red-500 bg-red-50/50 p-3.5 rounded-xl border border-red-100 font-medium">{error}</p>
+              <p className="text-xs text-red-500 bg-red-50/50 p-3.5 rounded-xl border border-red-100 font-medium">
+                {error}
+              </p>
             </div>
           )}
 
           {/* LIST SLIDER */}
           {stores.length > 0 && (
-            <div className="overflow-hidden px-1 sm:px-3 md:px-6 contain-paint" ref={emblaRef}>
-              <div className="flex gap-1 md:gap-2 touch-pan-y [backface-visibility:hidden] [will-change:transform]">
+            <div
+              className="cursor-grab overflow-hidden px-1 contain-paint active:cursor-grabbing sm:px-3 md:px-6"
+              ref={emblaRef}
+            >
+              <div className="flex gap-1 md:gap-2 touch-pan-y [backface-visibility:hidden] [will-change:transform] my-1">
                 {prepared.map(item => (
                   <div
                     key={item.store.id}

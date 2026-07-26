@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  normalizeLajukanEventName,
+  sanitizeLajukanEventRecord,
+} from '@/lib/analytics/eventCatalog';
+
 export type LajukanEventInput = {
   eventId?: string;
   occurredAt?: string;
@@ -93,7 +98,7 @@ export async function trackLajukanEvent(
   const page = input.page || `${window.location.pathname}${window.location.search}`;
   const payload = {
     event_id: input.eventId,
-    event_name: eventName,
+    event_name: normalizeLajukanEventName(eventName),
     occurred_at: input.occurredAt || new Date().toISOString(),
     anonymous_id: input.anonymousId || getLajukanAnonymousId(),
     session_id: input.sessionId || getLajukanSessionId(),
@@ -103,14 +108,14 @@ export async function trackLajukanEvent(
     page,
     entity_type: input.entityType,
     entity_id: input.entityId,
-    properties: input.properties || {},
+    properties: sanitizeLajukanEventRecord(input.properties),
     context: {
       viewport: {
         width: window.innerWidth,
         height: window.innerHeight,
       },
       referrer: document.referrer || undefined,
-      ...input.context,
+      ...sanitizeLajukanEventRecord(input.context),
     },
   };
 

@@ -3,6 +3,7 @@
 import type { ChangeEvent, ComponentType, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { usePathname } from 'next/navigation';
 import { Modal } from '@/components/common/Modal';
 import { IdentityVerificationPanel } from '@/components/profile/IdentityVerificationPanel';
@@ -512,12 +513,12 @@ function mapRecordToSocialUser(
         readSocialText(record.name),
       avatar_url: profileAvatarSrc(
         readSocialText(record.avatar_url) ||
-        readSocialText(record.avatarUrl) ||
-        readSocialText(record.avatar),
+          readSocialText(record.avatarUrl) ||
+          readSocialText(record.avatar),
         readProfileAvatarStyle(record),
         readSocialText(record.full_name) ||
-        readSocialText(record.fullName) ||
-        readSocialText(record.name),
+          readSocialText(record.fullName) ||
+          readSocialText(record.name),
       ),
       avatar_style: record.avatar_style,
       avatarStyle: record.avatarStyle,
@@ -1137,10 +1138,10 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         const terms =
           parsed.terms && typeof parsed.terms === 'object'
             ? Object.entries(parsed.terms)
-              .sort((a, b) => Number(b[1]) - Number(a[1]))
-              .map(([key]) => key)
-              .filter(Boolean)
-              .slice(0, 8)
+                .sort((a, b) => Number(b[1]) - Number(a[1]))
+                .map(([key]) => key)
+                .filter(Boolean)
+                .slice(0, 8)
             : [];
 
         setReelsSignalCount(
@@ -1317,160 +1318,161 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     () =>
       isId
         ? {
-          editQuick: 'Edit cepat',
-          openPublic: 'Buka publik',
-          copyLink: 'Salin link',
-          copied: 'Link tersalin',
-          copyFailed: 'Gagal menyalin',
-          call: 'Telepon',
-          chat: 'Chat',
-          noPhone: 'No HP',
-          overview: 'Ringkas',
-          activity: 'Aktivitas',
-          showcase: 'Etalase',
-          cv: 'CV & Link',
-          trust: 'Trust',
-          activityTitle: 'Aktivitas Lajukan',
-          activitySubtitle: PROMO_ONLY_MODE
-            ? 'Reels, komunitas, listing, chat, dan data profil dibuat kelihatan dari satu profil.'
-            : 'Reels, komunitas, listing, chat, dan transaksi dibuat kelihatan dari satu profil.',
-          quickMoves: 'Satset dari profil',
-          footprint: 'Jejak terbaru',
-          signalMap: 'Sinyal minat',
-          uploadReel: 'Buat Reels',
-          reelsAction: 'Reels',
-          reelsDesc: 'Buka Reels untuk upload, like, komentar, dan simpan.',
-          communityAction: 'Komunitas',
-          communityDesc:
-            'Posting diskusi, foto/video, polling, dan ikut grup.',
-          listingAction: 'Upload listing',
-          listingDesc: 'Produk, jasa, properti, talent, rental, sampai UMKM.',
-          dealAction: PROMO_ONLY_MODE ? 'Chat & minat' : 'Deal & chat',
-          dealDesc: PROMO_ONLY_MODE
-            ? 'Lanjut chat, simpan sinyal kebutuhan, dan rapikan listing dari pertanyaan user.'
-            : 'Lanjut chat, negosiasi, transaksi, wallet, dan riwayat.',
-          aiAction: 'AI Pribadi',
-          aiDesc: 'Atur asisten, tab chat, tombol cepat, memory, dan share.',
-          storeAction: 'Toko UMKM',
-          storeDesc: PROMO_ONLY_MODE
-            ? 'Kelola storefront, katalog, profil, dan chat usaha.'
-            : 'Kelola storefront, katalog, order, QR, dan operasional.',
-          profileAction: 'CV / Trust',
-          profileDesc: 'Lengkapi skill, link, dokumen, dan verifikasi.',
-          open: 'Buka',
-          upload: 'Upload',
-          create: 'Buat',
-          manage: 'Kelola',
-          noActivity: 'Belum ada jejak aktivitas',
-          noActivityDesc:
-            'Buat Reels, posting komunitas, atau buat listing. Nanti aktivitas penting tampil di sini.',
-          completeProfile: 'Lengkapi profil',
-          mainData: 'Data utama',
-          publicProfile: 'Profil publik',
-          setup: 'Setup satset',
-          listings: 'Listing aktif',
-          transactions: PROMO_ONLY_MODE ? 'Chat & minat' : 'Transaksi',
-          professional: 'Profesional',
-          skills: 'Skill',
-          experience: 'Pengalaman',
-          education: 'Pendidikan',
-          links: 'Link',
-          quickApply: 'Quick Apply',
-          saveQuickApply: 'Simpan Quick Apply',
-          uploadCv: 'Upload CV',
-          verification: 'Verifikasi',
-          social: 'Koneksi',
-          followers: 'Pengikut',
-          following: 'Mengikuti',
-          findPeople: 'Cari orang',
-          socialTitle: 'Koneksi profil',
-          socialSubtitle:
-            'Pengikut dan akun yang kamu ikuti akan tampil di sini saat sudah ada data.',
-          emptyConnections: 'Belum ada koneksi',
-          emptyFollowers: 'Belum ada pengikut yang tercatat.',
-          emptyFollowing: 'Belum mengikuti siapa pun.',
-          editFull: 'Edit lengkap',
-          close: 'Tutup',
-          save: 'Simpan',
-        }
+            editQuick: 'Edit cepat',
+            openPublic: 'Buka publik',
+            copyLink: 'Salin link',
+            copied: 'Link tersalin',
+            copyFailed: 'Gagal menyalin',
+            call: 'Telepon',
+            chat: 'Chat',
+            noPhone: 'No HP',
+            overview: 'Ringkas',
+            activity: 'Aktivitas',
+            showcase: 'Etalase',
+            cv: 'CV & Link',
+            trust: 'Trust',
+            activityTitle: 'Aktivitas Lajukan',
+            activitySubtitle: PROMO_ONLY_MODE
+              ? 'Reels, komunitas, listing, chat, dan data profil dibuat kelihatan dari satu profil.'
+              : 'Reels, komunitas, listing, chat, dan transaksi dibuat kelihatan dari satu profil.',
+            quickMoves: 'Satset dari profil',
+            footprint: 'Jejak terbaru',
+            signalMap: 'Sinyal minat',
+            uploadReel: 'Buat Reels',
+            reelsAction: 'Reels',
+            reelsDesc: 'Buka Reels untuk upload, like, komentar, dan simpan.',
+            communityAction: 'Komunitas',
+            communityDesc:
+              'Posting diskusi, foto/video, polling, dan ikut grup.',
+            listingAction: 'Upload listing',
+            listingDesc: 'Produk, jasa, properti, talent, rental, sampai UMKM.',
+            dealAction: PROMO_ONLY_MODE ? 'Chat & minat' : 'Deal & chat',
+            dealDesc: PROMO_ONLY_MODE
+              ? 'Lanjut chat, simpan sinyal kebutuhan, dan rapikan listing dari pertanyaan user.'
+              : 'Lanjut chat, negosiasi, transaksi, wallet, dan riwayat.',
+            aiAction: 'AI Pribadi',
+            aiDesc: 'Atur asisten, tab chat, tombol cepat, memory, dan share.',
+            storeAction: 'Toko UMKM',
+            storeDesc: PROMO_ONLY_MODE
+              ? 'Kelola storefront, katalog, profil, dan chat usaha.'
+              : 'Kelola storefront, katalog, order, QR, dan operasional.',
+            profileAction: 'CV / Trust',
+            profileDesc: 'Lengkapi skill, link, dokumen, dan verifikasi.',
+            open: 'Buka',
+            upload: 'Upload',
+            create: 'Buat',
+            manage: 'Kelola',
+            noActivity: 'Belum ada jejak aktivitas',
+            noActivityDesc:
+              'Buat Reels, posting komunitas, atau buat listing. Nanti aktivitas penting tampil di sini.',
+            completeProfile: 'Lengkapi profil',
+            mainData: 'Data utama',
+            publicProfile: 'Profil publik',
+            setup: 'Setup satset',
+            listings: 'Listing aktif',
+            transactions: PROMO_ONLY_MODE ? 'Chat & minat' : 'Transaksi',
+            professional: 'Profesional',
+            skills: 'Skill',
+            experience: 'Pengalaman',
+            education: 'Pendidikan',
+            links: 'Link',
+            quickApply: 'Quick Apply',
+            saveQuickApply: 'Simpan Quick Apply',
+            uploadCv: 'Upload CV',
+            verification: 'Verifikasi',
+            social: 'Koneksi',
+            followers: 'Pengikut',
+            following: 'Mengikuti',
+            findPeople: 'Cari orang',
+            socialTitle: 'Koneksi profil',
+            socialSubtitle:
+              'Pengikut dan akun yang kamu ikuti akan tampil di sini saat sudah ada data.',
+            emptyConnections: 'Belum ada koneksi',
+            emptyFollowers: 'Belum ada pengikut yang tercatat.',
+            emptyFollowing: 'Belum mengikuti siapa pun.',
+            editFull: 'Edit lengkap',
+            close: 'Tutup',
+            save: 'Simpan',
+          }
         : {
-          editQuick: 'Quick edit',
-          openPublic: 'Open public',
-          copyLink: 'Copy link',
-          copied: 'Link copied',
-          copyFailed: 'Copy failed',
-          call: 'Call',
-          chat: 'Chat',
-          noPhone: 'No phone',
-          overview: 'Overview',
-          activity: 'Activity',
-          showcase: 'Showcase',
-          cv: 'CV & Links',
-          trust: 'Trust',
-          activityTitle: 'Lajukan activity',
-          activitySubtitle: PROMO_ONLY_MODE
-            ? 'Reels, community, listings, chats, and profile data are visible from one profile.'
-            : 'Reels, community, listings, chat, and transactions are visible from one profile.',
-          quickMoves: 'Fast moves',
-          footprint: 'Latest footprint',
-          signalMap: 'Interest signals',
-          uploadReel: 'Create Reels',
-          reelsAction: 'Reels',
-          reelsDesc: 'Open Reels to upload, like, comment, and save.',
-          communityAction: 'Community',
-          communityDesc:
-            'Post discussions, photos/videos, polls, and join groups.',
-          listingAction: 'Upload listing',
-          listingDesc:
-            'Products, services, property, talent, rental, and UMKM.',
-          dealAction: PROMO_ONLY_MODE ? 'Chats & interest' : 'Deals & chat',
-          dealDesc: PROMO_ONLY_MODE
-            ? 'Continue chats, save demand signals, and improve listings from user questions.'
-            : 'Continue chats, negotiations, transactions, wallet, and history.',
-          aiAction: 'Personal AI',
-          aiDesc: 'Manage assistant, chat tabs, quick buttons, memory, and sharing.',
-          storeAction: 'UMKM store',
-          storeDesc: PROMO_ONLY_MODE
-            ? 'Manage storefront, catalog, profile, and business chats.'
-            : 'Manage storefront, catalog, orders, QR, and operations.',
-          profileAction: 'CV / Trust',
-          profileDesc: 'Complete skills, links, documents, and verification.',
-          open: 'Open',
-          upload: 'Upload',
-          create: 'Create',
-          manage: 'Manage',
-          noActivity: 'No activity footprint yet',
-          noActivityDesc:
-            'Upload reels, post in community, or create a listing. Important activity will appear here.',
-          completeProfile: 'Complete profile',
-          mainData: 'Main data',
-          publicProfile: 'Public profile',
-          setup: 'Fast setup',
-          listings: 'Active listings',
-          transactions: PROMO_ONLY_MODE ? 'Chats' : 'Transactions',
-          professional: 'Professional',
-          skills: 'Skills',
-          experience: 'Experience',
-          education: 'Education',
-          links: 'Links',
-          quickApply: 'Quick Apply',
-          saveQuickApply: 'Save Quick Apply',
-          uploadCv: 'Upload CV',
-          verification: 'Verification',
-          social: 'Connections',
-          followers: 'Followers',
-          following: 'Following',
-          findPeople: 'Find people',
-          socialTitle: 'Profile connections',
-          socialSubtitle:
-            'Followers and accounts you follow will appear here once data exists.',
-          emptyConnections: 'No connections yet',
-          emptyFollowers: 'No recorded followers yet.',
-          emptyFollowing: 'Not following anyone yet.',
-          editFull: 'Full edit',
-          close: 'Close',
-          save: 'Save',
-        },
+            editQuick: 'Quick edit',
+            openPublic: 'Open public',
+            copyLink: 'Copy link',
+            copied: 'Link copied',
+            copyFailed: 'Copy failed',
+            call: 'Call',
+            chat: 'Chat',
+            noPhone: 'No phone',
+            overview: 'Overview',
+            activity: 'Activity',
+            showcase: 'Showcase',
+            cv: 'CV & Links',
+            trust: 'Trust',
+            activityTitle: 'Lajukan activity',
+            activitySubtitle: PROMO_ONLY_MODE
+              ? 'Reels, community, listings, chats, and profile data are visible from one profile.'
+              : 'Reels, community, listings, chat, and transactions are visible from one profile.',
+            quickMoves: 'Fast moves',
+            footprint: 'Latest footprint',
+            signalMap: 'Interest signals',
+            uploadReel: 'Create Reels',
+            reelsAction: 'Reels',
+            reelsDesc: 'Open Reels to upload, like, comment, and save.',
+            communityAction: 'Community',
+            communityDesc:
+              'Post discussions, photos/videos, polls, and join groups.',
+            listingAction: 'Upload listing',
+            listingDesc:
+              'Products, services, property, talent, rental, and UMKM.',
+            dealAction: PROMO_ONLY_MODE ? 'Chats & interest' : 'Deals & chat',
+            dealDesc: PROMO_ONLY_MODE
+              ? 'Continue chats, save demand signals, and improve listings from user questions.'
+              : 'Continue chats, negotiations, transactions, wallet, and history.',
+            aiAction: 'Personal AI',
+            aiDesc:
+              'Manage assistant, chat tabs, quick buttons, memory, and sharing.',
+            storeAction: 'UMKM store',
+            storeDesc: PROMO_ONLY_MODE
+              ? 'Manage storefront, catalog, profile, and business chats.'
+              : 'Manage storefront, catalog, orders, QR, and operations.',
+            profileAction: 'CV / Trust',
+            profileDesc: 'Complete skills, links, documents, and verification.',
+            open: 'Open',
+            upload: 'Upload',
+            create: 'Create',
+            manage: 'Manage',
+            noActivity: 'No activity footprint yet',
+            noActivityDesc:
+              'Upload reels, post in community, or create a listing. Important activity will appear here.',
+            completeProfile: 'Complete profile',
+            mainData: 'Main data',
+            publicProfile: 'Public profile',
+            setup: 'Fast setup',
+            listings: 'Active listings',
+            transactions: PROMO_ONLY_MODE ? 'Chats' : 'Transactions',
+            professional: 'Professional',
+            skills: 'Skills',
+            experience: 'Experience',
+            education: 'Education',
+            links: 'Links',
+            quickApply: 'Quick Apply',
+            saveQuickApply: 'Save Quick Apply',
+            uploadCv: 'Upload CV',
+            verification: 'Verification',
+            social: 'Connections',
+            followers: 'Followers',
+            following: 'Following',
+            findPeople: 'Find people',
+            socialTitle: 'Profile connections',
+            socialSubtitle:
+              'Followers and accounts you follow will appear here once data exists.',
+            emptyConnections: 'No connections yet',
+            emptyFollowers: 'No recorded followers yet.',
+            emptyFollowing: 'Not following anyone yet.',
+            editFull: 'Full edit',
+            close: 'Close',
+            save: 'Save',
+          },
     [isId],
   );
 
@@ -1605,8 +1607,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       activeMarketplaceTab === 'all'
         ? listings
         : listings.filter(
-          item => classifyListing(item) === activeMarketplaceTab,
-        ),
+            item => classifyListing(item) === activeMarketplaceTab,
+          ),
     [activeMarketplaceTab, listings],
   );
 
@@ -1749,13 +1751,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       },
       ...(!PROMO_ONLY_MODE
         ? [
-          {
-            label: isId ? 'Transaksi terbaru' : 'Latest deals',
-            value: txPreview.length.toLocaleString(locale),
-            hint: isId ? 'deal' : 'deals',
-            icon: BarChart3,
-          },
-        ]
+            {
+              label: isId ? 'Transaksi terbaru' : 'Latest deals',
+              value: txPreview.length.toLocaleString(locale),
+              hint: isId ? 'deal' : 'deals',
+              icon: BarChart3,
+            },
+          ]
         : []),
       {
         label: isId ? 'Profil siap' : 'Profile ready',
@@ -2190,10 +2192,11 @@ transition  "
                       >
                         <div className="flex items-center gap-2">
                           <div
-                            className={`flex h-5 w-5 items-center justify-center rounded-full ${item.done
+                            className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                              item.done
                                 ? 'bg-emerald-100 text-emerald-600'
                                 : 'bg-slate-100 text-slate-400'
-                              }`}
+                            }`}
                           >
                             {item.done ? (
                               <CheckCircle2 className="h-4 w-4" />
@@ -2248,10 +2251,11 @@ transition  "
                           className="flex flex-col items-center gap-2 text-center"
                         >
                           <div
-                            className={`flex h-10 w-10 items-center justify-center rounded-full ${item.done
+                            className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                              item.done
                                 ? 'bg-emerald-100 text-emerald-600'
                                 : 'bg-slate-100 text-slate-400'
-                              }`}
+                            }`}
                           >
                             {item.done ? (
                               <CheckCircle2 className="h-5 w-5" />
@@ -2934,13 +2938,13 @@ transition  "
                       </span>
                       {reelsPreferenceTags.length > 0
                         ? reelsPreferenceTags.map(tag => (
-                          <span
-                            key={tag}
-                            className="inline-flex min-h-[30px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 text-[11px] font-semibold text-[color:var(--app-accent)]"
-                          >
-                            #{tag}
-                          </span>
-                        ))
+                            <span
+                              key={tag}
+                              className="inline-flex min-h-[30px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 text-[11px] font-semibold text-[color:var(--app-accent)]"
+                            >
+                              #{tag}
+                            </span>
+                          ))
                         : null}
                     </div>
                   </SectionBlock>
@@ -3165,13 +3169,15 @@ transition  "
                         : 'Products, services, talent, jobs, and active needs.'
                     }
                     action={
-                      <LocalizedLink
+                      <CompactSeeAllLink
                         href="/my-listings"
-                        className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--app-accent)]"
-                      >
-                        {isId ? 'Lihat semua' : 'View all'}
-                        <ChevronRight className="h-4 w-4" />
-                      </LocalizedLink>
+                        isId={isId}
+                        ariaLabel={
+                          isId
+                            ? 'Lihat semua listing saya'
+                            : 'View all my listings'
+                        }
+                      />
                     }
                   >
                     <div className="mb-3 overflow-x-auto pb-1">
@@ -3627,7 +3633,7 @@ transition  "
                 </div>
 
                 <LocalizedLink
-                  href="/search?type=people"
+                  href="/explore?type=people"
                   className={cn(TONAL_ACTION_CLASS, 'mt-2.5 w-full')}
                 >
                   <UserPlus className="h-4 w-4" />
@@ -3654,7 +3660,7 @@ transition  "
               {copy.close}
             </button>
             <LocalizedLink
-              href="/search?type=people"
+              href="/explore?type=people"
               className={PRIMARY_ACTION_CLASS}
             >
               <Users className="h-4 w-4" />
@@ -3712,7 +3718,7 @@ transition  "
               }
               action={
                 <LocalizedLink
-                  href="/search?type=people"
+                  href="/explore?type=people"
                   className={TONAL_ACTION_CLASS}
                 >
                   <UserPlus className="h-4 w-4" />

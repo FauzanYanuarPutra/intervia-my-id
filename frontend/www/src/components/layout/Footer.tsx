@@ -47,8 +47,8 @@ export function Footer() {
 
   const mainLinks: FooterLink[] = [
     {
-      href: '/search',
-      label: isId ? 'Cari kebutuhan' : 'Search',
+      href: '/explore',
+      label: isId ? 'Jelajahi' : 'Explore',
     },
     {
       href: '/create',

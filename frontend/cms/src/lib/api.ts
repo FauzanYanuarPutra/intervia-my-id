@@ -1,8 +1,9 @@
 // CMS API Client
 // Handles all API calls to backend services
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const MARKETPLACE_URL = process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8081';
+const API_URL = process.env.NEXT_PUBLIC_CMS_AUTH_API_URL || '/api';
+const MARKETPLACE_URL =
+  process.env.NEXT_PUBLIC_CMS_MARKETPLACE_API_URL || '/api/marketplace';
 
 type FetchOptions = RequestInit & {
   token?: string;
@@ -19,7 +20,21 @@ type AuthLoginResponse = {
   };
 };
 
-async function fetchWithAuth<T = any>(url: string, options: FetchOptions = {}): Promise<T> {
+export type AuthMeResponse = {
+  id: string;
+  email: string;
+  username?: string;
+  roles: string[];
+};
+
+type ApiRecord = Record<string, unknown>;
+
+function readRecord(value: unknown): ApiRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as ApiRecord;
+}
+
+async function fetchWithAuth<T = unknown>(url: string, options: FetchOptions = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
   
   const headers: HeadersInit = {
@@ -37,8 +52,16 @@ async function fetchWithAuth<T = any>(url: string, options: FetchOptions = {}): 
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    const error = readRecord(
+      await response.json().catch(() => ({ message: 'Request failed' })),
+    );
+    const message =
+      typeof error.message === 'string'
+        ? error.message
+        : typeof error.error === 'string'
+          ? error.error
+          : `HTTP ${response.status}`;
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;
@@ -47,15 +70,16 @@ async function fetchWithAuth<T = any>(url: string, options: FetchOptions = {}): 
 // Auth API
 export const authApi = {
   login: async (email: string, password: string): Promise<AuthLoginResponse> => {
-    const res = await fetchWithAuth<any>(`${API_URL}/auth/login`, {
+    const res = await fetchWithAuth<ApiRecord>(`${API_URL}/auth/login`, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+    const userRecord = readRecord(res.user);
 
     const roles = Array.isArray(res?.roles)
       ? res.roles.map((r: unknown) => String(r))
-      : Array.isArray(res?.user?.roles)
-      ? res.user.roles.map((r: unknown) => String(r))
+      : Array.isArray(userRecord.roles)
+      ? userRecord.roles.map((r: unknown) => String(r))
       : [];
 
     return {
@@ -63,7 +87,15 @@ export const authApi = {
       refresh_token: String(res?.refresh_token || ''),
       session_id: String(res?.session_id || ''),
       roles,
-      user: res?.user,
+      user:
+        typeof userRecord.id === 'string'
+          ? {
+              id: userRecord.id,
+              roles: Array.isArray(userRecord.roles)
+                ? userRecord.roles.map((role: unknown) => String(role))
+                : undefined,
+            }
+          : undefined,
     };
   },
 
@@ -74,11 +106,20 @@ export const authApi = {
     });
   },
 
-  me: async (token: string) => {
-    return fetchWithAuth(`${API_URL}/auth/me`, {
+  me: async (token: string): Promise<AuthMeResponse> => {
+    const payload = await fetchWithAuth<ApiRecord>(`${API_URL}/auth/me`, {
       method: 'GET',
       token,
     });
+    return {
+      id: String(payload.id || ''),
+      email: String(payload.email || ''),
+      username:
+        typeof payload.username === 'string' ? payload.username : undefined,
+      roles: Array.isArray(payload.roles)
+        ? payload.roles.map(role => String(role))
+        : [],
+    };
   },
 
   refresh: async (refreshToken: string, sessionId: string) => {
@@ -106,7 +147,7 @@ export const contentApi = {
     });
   },
 
-  create: async (token: string, data: Record<string, any>) => {
+  create: async (token: string, data: Record<string, unknown>) => {
     return fetchWithAuth(`${MARKETPLACE_URL}/v1/content`, {
       method: 'POST',
       token,
@@ -114,7 +155,7 @@ export const contentApi = {
     });
   },
 
-  update: async (token: string, id: string, data: Record<string, any>) => {
+  update: async (token: string, id: string, data: Record<string, unknown>) => {
     return fetchWithAuth(`${MARKETPLACE_URL}/v1/content/${id}`, {
       method: 'PATCH',
       token,
@@ -142,7 +183,7 @@ export const sectorApi = {
     });
   },
 
-  create: async (token: string, data: Record<string, any>) => {
+  create: async (token: string, data: Record<string, unknown>) => {
     return fetchWithAuth(`${MARKETPLACE_URL}/v1/sectors`, {
       method: 'POST',
       token,
@@ -150,7 +191,7 @@ export const sectorApi = {
     });
   },
 
-  update: async (token: string, id: string, data: Record<string, any>) => {
+  update: async (token: string, id: string, data: Record<string, unknown>) => {
     return fetchWithAuth(`${MARKETPLACE_URL}/v1/sectors/${id}`, {
       method: 'PATCH',
       token,
@@ -177,7 +218,7 @@ export const bannerApi = {
     });
   },
 
-  create: async (token: string, data: Record<string, any>) => {
+  create: async (token: string, data: Record<string, unknown>) => {
     return fetchWithAuth(`${MARKETPLACE_URL}/v1/banners`, {
       method: 'POST',
       token,
@@ -185,7 +226,7 @@ export const bannerApi = {
     });
   },
 
-  update: async (token: string, id: string, data: Record<string, any>) => {
+  update: async (token: string, id: string, data: Record<string, unknown>) => {
     return fetchWithAuth(`${MARKETPLACE_URL}/v1/banners/${id}`, {
       method: 'PATCH',
       token,

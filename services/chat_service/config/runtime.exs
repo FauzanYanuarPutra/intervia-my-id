@@ -7,7 +7,10 @@ if config_env() == :prod do
   port = String.to_integer(System.get_env("APP_PORT") || "4000")
   scylla_host = System.get_env("SCYLLA_HOST") || "scylla_db"
   scylla_port = System.get_env("SCYLLA_PORT") || "9042"
-  jwt_secret = System.fetch_env!("JWT_SECRET") || "lajukan_super_secure_vault_key_2026_jakarta_v1_top_secret"
+  jwt_secret = System.fetch_env!("JWT_SECRET")
+  if byte_size(String.trim(jwt_secret)) < 32 do
+    raise "JWT_SECRET must be at least 32 characters"
+  end
   jwt_issuer = System.get_env("JWT_ISSUER") || "laju"
   jwt_audiences =
     (System.get_env("CHAT_JWT_AUDIENCES") ||

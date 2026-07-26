@@ -13,7 +13,7 @@ type MarketplacePageFrameProps = {
 };
 
 const marketplaceFrameClassName =
-  'lajukan-home-compact min-h-screen min-h-[100svh] max-w-[100vw] overflow-x-hidden overscroll-x-none bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_32%,#f8fafc_100%)] px-1 pb-6 pt-3 pt-0 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0';
+  'lajukan-home-compact min-h-screen min-h-[var(--app-document-viewport-height)] max-w-[100vw] overflow-x-hidden overscroll-x-none bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_32%,#f8fafc_100%)] px-1 pb-6 pt-3 pt-0 sm:px-2 lg:h-[calc(var(--app-visual-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0';
 
 const marketplaceShellClassName =
   'lajukan-home-shell mx-auto min-w-0 max-w-full overflow-x-hidden lg:flex lg:h-full lg:flex-col lg:overflow-hidden';

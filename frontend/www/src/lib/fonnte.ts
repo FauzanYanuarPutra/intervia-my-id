@@ -1,10 +1,19 @@
+import {
+  allowSensitiveDevelopmentLogs,
+  maskPhone,
+  safeErrorCode,
+} from '@/lib/server/safeLog';
+
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const IS_DEV = APP_ENV === 'development';
-
 const FONNTE_TOKEN = (process.env.FONNTE_TOKEN || '').trim();
-const FONNTE_API_URL = (process.env.FONNTE_API_URL || 'https://api.fonnte.com/send').trim();
+const FONNTE_API_URL = (
+  process.env.FONNTE_API_URL || 'https://api.fonnte.com/send'
+).trim();
 const FONNTE_COUNTRY_CODE = (process.env.FONNTE_COUNTRY_CODE || '62').trim();
-const FONNTE_DEFAULT_SENDER = (process.env.FONNTE_DEFAULT_SENDER || 'Lajukan').trim();
+const FONNTE_DEFAULT_SENDER = (
+  process.env.FONNTE_DEFAULT_SENDER || 'Lajukan'
+).trim();
 
 function normalizePhoneTarget(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -25,7 +34,7 @@ function buildOtpMessage(otp: string): string {
 
 function buildWebhookMeta(target: string) {
   return {
-    target,
+    target: maskPhone(target),
     source: 'fonnte',
     app: 'lajukan-www',
   };
@@ -43,7 +52,7 @@ export async function sendOtpViaFonnteWhatsApp(
   if (!target) return false;
 
   if (!getFonnteConfigured()) {
-    if (IS_DEV) {
+    if (allowSensitiveDevelopmentLogs()) {
       console.log('[Fonnte] token not configured, skipping WhatsApp delivery', {
         ...buildWebhookMeta(target),
         otp,
@@ -73,11 +82,9 @@ export async function sendOtpViaFonnteWhatsApp(
     });
 
     if (!response.ok) {
-      const text = await response.text().catch(() => '');
       console.error('Fonnte OTP delivery failed', {
         ...buildWebhookMeta(target),
         status: response.status,
-        body: text,
       });
       return false;
     }
@@ -89,7 +96,7 @@ export async function sendOtpViaFonnteWhatsApp(
     if (result?.status === false) {
       console.error('Fonnte OTP delivery rejected', {
         ...buildWebhookMeta(target),
-        result,
+        reason: result.reason || result.detail || 'provider_rejected',
       });
       return false;
     }
@@ -97,7 +104,7 @@ export async function sendOtpViaFonnteWhatsApp(
     if (IS_DEV) {
       console.log('[Fonnte] OTP sent', {
         ...buildWebhookMeta(target),
-        result,
+        accepted: true,
       });
     }
 
@@ -105,7 +112,7 @@ export async function sendOtpViaFonnteWhatsApp(
   } catch (error) {
     console.error('Fonnte OTP delivery error', {
       ...buildWebhookMeta(target),
-      error,
+      error: safeErrorCode(error),
     });
     return false;
   }
@@ -128,4 +135,3 @@ export type FonnteWebhookEvent = {
   inboxid?: string | number;
   [key: string]: unknown;
 };
-

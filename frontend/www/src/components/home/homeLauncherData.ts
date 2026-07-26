@@ -184,7 +184,7 @@ const menuTones = {
 
 export const shortcutItems: ShortcutItem[] = [
   {
-    href: '/search?type=product&q=bahan%20baku%20lokal',
+    href: '/explore?type=product&q=bahan%20baku%20lokal',
     labelId: 'Bahan lokal',
     labelEn: 'Local inputs',
     hintId: 'Pangan, bahan, kemasan',
@@ -193,7 +193,7 @@ export const shortcutItems: ShortcutItem[] = [
     tone: shortcutTones.emerald,
   },
   {
-    href: '/search?type=product&q=produk%20siap%20ekspor',
+    href: '/explore?type=product&q=produk%20siap%20ekspor',
     labelId: 'Siap ekspor',
     labelEn: 'Export-ready',
     hintId: 'Produk & dokumen',
@@ -202,7 +202,7 @@ export const shortcutItems: ShortcutItem[] = [
     tone: shortcutTones.amber,
   },
   {
-    href: '/search?type=product&q=substitusi%20impor',
+    href: '/explore?type=product&q=substitusi%20impor',
     labelId: 'Substitusi impor',
     labelEn: 'Import replacement',
     hintId: 'Alternatif lokal',
@@ -223,7 +223,7 @@ export const shortcutItems: ShortcutItem[] = [
 
 export const serviceItems: LauncherItem[] = [
   {
-    href: '/search?type=product&q=bahan%20baku%20kemasan',
+    href: '/explore?type=product&q=bahan%20baku%20kemasan',
     labelId: 'Bahan',
     labelEn: 'Inputs',
     hintId: 'Bahan lokal & kemasan',
@@ -232,7 +232,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.mart,
   },
   {
-    href: '/search?type=product&q=produk%20siap%20ekspor',
+    href: '/explore?type=product&q=produk%20siap%20ekspor',
     labelId: 'Ekspor',
     labelEn: 'Export',
     hintId: 'Produk siap kirim',
@@ -241,7 +241,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.export,
   },
   {
-    href: '/search?type=service&q=sertifikasi%20halal%20bpom%20tkdn',
+    href: '/explore?type=service&q=sertifikasi%20halal%20bpom%20tkdn',
     labelId: 'Sertifikasi',
     labelEn: 'Certify',
     hintId: 'Halal, BPOM, TKDN',
@@ -250,7 +250,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.agri,
   },
   {
-    href: '/search?type=service&q=jasa%20pengiriman%20usaha',
+    href: '/explore?type=service&q=jasa%20pengiriman%20usaha',
     labelId: 'Logistik',
     labelEn: 'Logistics',
     hintId: 'Order, gudang, kargo',
@@ -259,7 +259,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.send,
   },
   {
-    href: '/search?type=service&q=kurir%20pickup%20usaha',
+    href: '/explore?type=service&q=kurir%20pickup%20usaha',
     labelId: 'Kurir',
     labelEn: 'Courier',
     hintId: 'Pickup cepat',
@@ -268,7 +268,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.ride,
   },
   {
-    href: '/search?type=service&q=manufaktur%20lokal%20mesin%20umkm',
+    href: '/explore?type=service&q=manufaktur%20lokal%20mesin%20umkm',
     labelId: 'Produksi',
     labelEn: 'Produce',
     hintId: 'Mesin & workshop',
@@ -286,7 +286,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.food,
   },
   {
-    href: '/search?type=service&q=jasa%20operasional%20umkm',
+    href: '/explore?type=service&q=jasa%20operasional%20umkm',
     labelId: 'Ops',
     labelEn: 'Ops',
     hintId: 'Jasa harian',
@@ -307,7 +307,7 @@ export const serviceItems: LauncherItem[] = [
 
 export const listingItems: LauncherItem[] = [
   {
-    href: '/search?type=product&q=supplier%20lokal',
+    href: '/explore?type=product&q=supplier%20lokal',
     labelId: 'Supplier lokal',
     labelEn: 'Local suppliers',
     hintId: 'Vendor stok Indonesia',
@@ -316,7 +316,7 @@ export const listingItems: LauncherItem[] = [
     bgClass: menuTones.product,
   },
   {
-    href: '/search?type=product&q=distributor',
+    href: '/explore?type=product&q=distributor',
     labelId: 'Distributor',
     labelEn: 'Distributors',
     hintId: 'Partai & grosir',
@@ -325,7 +325,7 @@ export const listingItems: LauncherItem[] = [
     bgClass: menuTones.product,
   },
   {
-    href: '/search?type=service&q=produsen%20manufaktur%20lokal',
+    href: '/explore?type=service&q=produsen%20manufaktur%20lokal',
     labelId: 'Produsen',
     labelEn: 'Producers',
     hintId: 'Pabrik kecil & workshop',
@@ -334,7 +334,7 @@ export const listingItems: LauncherItem[] = [
     bgClass: menuTones.industry,
   },
   {
-    href: '/search?type=service&q=jasa%20ekspor%20sertifikasi%20umkm',
+    href: '/explore?type=service&q=jasa%20ekspor%20sertifikasi%20umkm',
     labelId: 'Jasa ekspor',
     labelEn: 'Export services',
     hintId: 'Dokumen & compliance',
@@ -343,7 +343,7 @@ export const listingItems: LauncherItem[] = [
     bgClass: menuTones.export,
   },
   {
-    href: '/search?type=freelancer&q=umkm',
+    href: '/explore?type=freelancer&q=umkm',
     labelId: 'Freelancer',
     labelEn: 'Freelancers',
     hintId: 'Eksekusi harian',
@@ -352,7 +352,7 @@ export const listingItems: LauncherItem[] = [
     bgClass: menuTones.freelancer,
   },
   {
-    href: '/search?type=umkm',
+    href: '/explore?type=umkm',
     labelId: 'Usaha',
     labelEn: 'Business',
     hintId: 'Toko aktif',
@@ -364,7 +364,7 @@ export const listingItems: LauncherItem[] = [
 
 export const homePrimaryFocusItems: LauncherItem[] = [
   {
-    href: '/search?type=product&q=supplier%20lokal',
+    href: '/explore?type=product&q=supplier%20lokal',
     labelId: 'Supplier lokal',
     labelEn: 'Local suppliers',
     hintId: 'Stok & bahan baku',
@@ -373,7 +373,7 @@ export const homePrimaryFocusItems: LauncherItem[] = [
     bgClass: menuTones.product,
   },
   {
-    href: '/search?type=product&q=bahan%20baku%20lokal',
+    href: '/explore?type=product&q=bahan%20baku%20lokal',
     labelId: 'Bahan lokal',
     labelEn: 'Local inputs',
     hintId: 'Pangan, bahan, kemasan',
@@ -382,7 +382,7 @@ export const homePrimaryFocusItems: LauncherItem[] = [
     bgClass: menuTones.agri,
   },
   {
-    href: '/search?type=service&q=produsen%20manufaktur%20lokal',
+    href: '/explore?type=service&q=produsen%20manufaktur%20lokal',
     labelId: 'Produsen',
     labelEn: 'Producers',
     hintId: 'Workshop & pabrik kecil',
@@ -391,7 +391,7 @@ export const homePrimaryFocusItems: LauncherItem[] = [
     bgClass: menuTones.industry,
   },
   {
-    href: '/search?type=product&q=produk%20siap%20ekspor',
+    href: '/explore?type=product&q=produk%20siap%20ekspor',
     labelId: 'Siap ekspor',
     labelEn: 'Export-ready',
     hintId: 'Produk & dokumen',
@@ -400,7 +400,7 @@ export const homePrimaryFocusItems: LauncherItem[] = [
     bgClass: menuTones.export,
   },
   {
-    href: '/search?type=service&q=sertifikasi%20halal%20bpom%20tkdn',
+    href: '/explore?type=service&q=sertifikasi%20halal%20bpom%20tkdn',
     labelId: 'Sertifikasi',
     labelEn: 'Certification',
     hintId: 'Halal, BPOM, TKDN',
@@ -422,14 +422,14 @@ export const homePrimaryFocusItems: LauncherItem[] = [
 export const homeSecondaryFocusItems: HomeFocusLinkItem[] = [
   ...LOCAL_FIRST_HOME_LINKS,
   {
-    href: '/search?type=freelancer&q=admin%20marketplace',
+    href: '/explore?type=freelancer&q=admin%20marketplace',
     labelId: 'Freelancer ops',
     labelEn: 'Ops freelancers',
     hintId: 'Admin, CS, konten',
     hintEn: 'Admin, CS, content',
   },
   {
-    href: '/search?type=service&q=logistik%20umkm',
+    href: '/explore?type=service&q=logistik%20umkm',
     labelId: 'Kirim order',
     labelEn: 'Ship orders',
     hintId: 'Kurir & fulfillment',

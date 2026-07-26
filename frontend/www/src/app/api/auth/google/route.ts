@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
+import { shouldUseSecureCookies } from '@/lib/server/forwardCookies';
+import {
+  preferredLocaleForCallback,
+  resolvePublicOrigin,
+  sanitizeInternalCallbackPath,
+} from '@/lib/auth/oauthRedirects';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_OAUTH_STATE_COOKIE = 'google_oauth_state';
 
 function getPublicBaseUrl(req: NextRequest): string {
-  const envBase =
-    process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL || '';
-  if (envBase.trim()) return envBase.replace(/\/$/, '');
-  return req.nextUrl.origin || 'https://www.lajukan.com';
+  return resolvePublicOrigin({
+    configuredOrigin:
+      process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
+    requestOrigin: req.nextUrl.origin,
+    production: process.env.NODE_ENV === 'production',
+  });
 }
 
 function getGoogleRedirectUri(req: NextRequest): string {
@@ -18,12 +27,10 @@ function getGoogleRedirectUri(req: NextRequest): string {
   );
 }
 
-function getPreferredLocale(req: NextRequest, callbackUrl?: string | null): 'id' | 'en' {
-  if (callbackUrl?.startsWith('/en')) return 'en';
-  if (callbackUrl?.startsWith('/id')) return 'id';
+function getPreferredLocale(req: NextRequest, callbackUrl: string): 'id' | 'en' {
   const cookieLocale =
     req.cookies.get('NEXT_LOCALE')?.value || req.cookies.get('locale')?.value;
-  return cookieLocale === 'en' ? 'en' : 'id';
+  return preferredLocaleForCallback(callbackUrl, cookieLocale);
 }
 
 /**
@@ -39,7 +46,9 @@ export async function GET(req: NextRequest) {
   if (!security.ok) return security.response;
 
   const { searchParams } = new URL(req.url);
-  const callbackUrl = searchParams.get('callbackUrl') || '/home';
+  const callbackUrl = sanitizeInternalCallbackPath(
+    searchParams.get('callbackUrl'),
+  );
   const preferredLocale = getPreferredLocale(req, callbackUrl);
   const baseUrl = getPublicBaseUrl(req);
 
@@ -47,7 +56,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=oauth_not_configured`);
   }
 
-  const nonce = crypto.randomUUID();
+  const nonce = randomUUID();
   const state = Buffer.from(JSON.stringify({ callbackUrl, nonce })).toString(
     'base64url',
   );
@@ -67,7 +76,7 @@ export async function GET(req: NextRequest) {
   const response = NextResponse.redirect(url);
   response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, nonce, {
     httpOnly: true,
-    secure: baseUrl.startsWith('https://'),
+    secure: shouldUseSecureCookies(req),
     sameSite: 'lax',
     path: '/',
     maxAge: 10 * 60,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -38,9 +39,9 @@ export function SearchInput({
   onValueChange,
   onSearch,
   placeholder,
-  buttonLabel = 'Search',
-  ariaLabel = 'Global search',
-  inputAriaLabel = 'Search input',
+  buttonLabel,
+  ariaLabel,
+  inputAriaLabel,
   className,
   fieldClassName,
   inputClassName,
@@ -56,9 +57,21 @@ export function SearchInput({
   submitIcon,
 }: SearchInputProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const isId = !pathname?.startsWith('/en');
   const inputId = useId();
   const [internalQuery, setInternalQuery] = useState(defaultValue);
   const query = value ?? internalQuery;
+  const resolvedPlaceholder =
+    placeholder ||
+    (isId
+      ? 'Cari produk, jasa, atau kebutuhan'
+      : 'Search products, services, or needs');
+  const resolvedButtonLabel = buttonLabel || (isId ? 'Cari' : 'Search');
+  const resolvedAriaLabel =
+    ariaLabel || (isId ? 'Pencarian global' : 'Global search');
+  const resolvedInputAriaLabel =
+    inputAriaLabel || (isId ? 'Input pencarian' : 'Search input');
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -68,10 +81,10 @@ export function SearchInput({
       return;
     }
     if (!clean) {
-      router.push('/search');
+      router.push('/explore');
       return;
     }
-    router.push(`/search?q=${encodeURIComponent(clean)}`);
+    router.push(`/explore?q=${encodeURIComponent(clean)}`);
   };
 
   const onInputChange = (nextValue: string) => {
@@ -122,7 +135,7 @@ export function SearchInput({
         className,
       )}
       role="search"
-      aria-label={ariaLabel}
+      aria-label={resolvedAriaLabel}
       data-search-variant={variant}
       data-testid={testId}
     >
@@ -144,12 +157,12 @@ export function SearchInput({
         />
         <input
           id={inputId}
-          aria-label={inputAriaLabel}
+          aria-label={resolvedInputAriaLabel}
           data-testid={inputTestId}
           type="search"
           value={query}
           onChange={event => onInputChange(event.target.value)}
-          placeholder={placeholder || 'Cari produk, jasa, atau lowongan'}
+          placeholder={resolvedPlaceholder}
           className={cn(
             'min-h-0 w-full min-w-0 appearance-none border-0 bg-transparent p-0 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none placeholder:text-[color:var(--app-text-soft)] focus:border-0 focus:outline-none focus:ring-0',
             inputClassName,
@@ -169,7 +182,7 @@ export function SearchInput({
             buttonClassName,
           )}
         >
-          {submitIcon || buttonLabel}
+          {submitIcon || resolvedButtonLabel}
         </button>
       ) : null}
     </form>

@@ -33,7 +33,7 @@
 //   return (
 //     pathname === '/' ||
 //     pathname.startsWith('/home') ||
-//     pathname.startsWith('/search') ||
+//     pathname.startsWith('/explore') ||
 //     pathname.startsWith('/kategori') ||
 //     pathname.startsWith('/create') ||
 //     pathname.startsWith('/my-listings') ||

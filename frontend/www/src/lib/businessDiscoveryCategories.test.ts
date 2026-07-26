@@ -1,60 +1,84 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUSINESS_DISCOVERY_CATEGORIES,
-  CORE_BUSINESS_DISCOVERY_CATEGORY_IDS,
   HOME_BUSINESS_DISCOVERY_CATEGORY_IDS,
   RESULT_BUSINESS_DISCOVERY_CATEGORY_IDS,
-  getBusinessDiscoveryCategoriesByLayer,
+  buildBusinessDiscoveryCreateHref,
+  getBusinessDiscoveryCategoryByCreateSlug,
   getBusinessDiscoveryCategoryById,
-  isCoreBusinessDiscoveryCategoryId,
-  isLocationCapabilityCategoryId,
-  isResultBusinessDiscoveryCategoryId,
 } from './businessDiscoveryCategories';
 
-describe('business discovery taxonomy', () => {
-  it('keeps the MVP transaction categories focused', () => {
-    expect(CORE_BUSINESS_DISCOVERY_CATEGORY_IDS).toEqual([
-      'equipment',
-      'supplies',
-      'service',
-      'property',
-    ]);
-    expect(getBusinessDiscoveryCategoriesByLayer('core').map(item => item.id))
-      .toEqual(CORE_BUSINESS_DISCOVERY_CATEGORY_IDS);
-    expect(isCoreBusinessDiscoveryCategoryId('supplies')).toBe(true);
-    expect(isCoreBusinessDiscoveryCategoryId('nearby')).toBe(false);
-  });
-
-  it('treats nearby as a location capability instead of a transaction category', () => {
-    const nearby = getBusinessDiscoveryCategoryById('nearby');
-
-    expect(nearby?.layer).toBe('capability');
-    expect(nearby?.isLocationCapability).toBe(true);
-    expect(nearby?.isTransactionCategory).toBe(false);
-    expect(isLocationCapabilityCategoryId('nearby')).toBe(true);
-    expect(isResultBusinessDiscoveryCategoryId('nearby')).toBe(false);
-  });
-
-  it('allows growth categories in search results without mixing them into core MVP', () => {
-    const opportunity = getBusinessDiscoveryCategoryById('opportunity');
-
-    expect(opportunity?.layer).toBe('growth');
-    expect(opportunity?.isTransactionCategory).toBe(false);
-    expect(RESULT_BUSINESS_DISCOVERY_CATEGORY_IDS).toContain('opportunity');
-    expect(CORE_BUSINESS_DISCOVERY_CATEGORY_IDS).not.toContain('opportunity');
-  });
-
-  it('keeps home categories canonical and free from legacy duplicate ids', () => {
+describe('business discovery categories', () => {
+  it('exposes exactly five marketplace categories on Home and Explore rails', () => {
     expect(HOME_BUSINESS_DISCOVERY_CATEGORY_IDS).toEqual([
-      'equipment',
       'supplies',
       'service',
+      'equipment',
       'property',
-      'nearby',
       'opportunity',
     ]);
-    expect(BUSINESS_DISCOVERY_CATEGORIES.map(item => item.id)).not.toContain(
-      'business_supplies',
+    expect(RESULT_BUSINESS_DISCOVERY_CATEGORY_IDS).toEqual([
+      'supplies',
+      'service',
+      'equipment',
+      'property',
+      'opportunity',
+    ]);
+  });
+
+  it('keeps nearby as a non-transaction capability outside marketplace rails', () => {
+    const nearby = getBusinessDiscoveryCategoryById('nearby');
+    expect(nearby?.isTransactionCategory).toBe(false);
+    expect(HOME_BUSINESS_DISCOVERY_CATEGORY_IDS).not.toContain('nearby');
+  });
+
+  it('uses stable canonical slugs for create links', () => {
+    const slugs = BUSINESS_DISCOVERY_CATEGORIES.filter(
+      item => item.isTransactionCategory,
+    ).map(item => item.createSlugEn);
+
+    expect(slugs).toEqual([
+      'materials-suppliers',
+      'services',
+      'machines-tools',
+      'business-places',
+      'business-opportunities',
+    ]);
+
+    const category = getBusinessDiscoveryCategoryById('supplies');
+    expect(category).not.toBeNull();
+    if (!category) return;
+    expect(
+      buildBusinessDiscoveryCreateHref({
+        locale: 'id',
+        side: 'supply',
+        category,
+      }),
+    ).toBe('/create/jual/materials-suppliers');
+  });
+
+  it('maps canonical marketplace slugs back to discovery categories', () => {
+    expect(
+      getBusinessDiscoveryCategoryByCreateSlug('materials-suppliers')?.id,
+    ).toBe('supplies');
+    expect(getBusinessDiscoveryCategoryByCreateSlug('machines-tools')?.id).toBe(
+      'equipment',
     );
+    expect(getBusinessDiscoveryCategoryByCreateSlug('services')?.id).toBe(
+      'service',
+    );
+  });
+
+  it('keeps home explore links aligned with canonical category slugs', () => {
+    const categories = BUSINESS_DISCOVERY_CATEGORIES.filter(
+      item => item.isTransactionCategory,
+    );
+
+    for (const category of categories) {
+      expect(category.searchHref).toBe(`/explore/${category.createSlugId}`);
+      expect(
+        getBusinessDiscoveryCategoryByCreateSlug(category.createSlugId)?.id,
+      ).toBe(category.id);
+    }
   });
 });

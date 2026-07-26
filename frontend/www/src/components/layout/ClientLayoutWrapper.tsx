@@ -1,6 +1,7 @@
 'use client';
 
-import { ReactNode, Suspense } from 'react';
+import dynamic from 'next/dynamic';
+import { ReactNode, Suspense, useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
 
 import GlobalLoader from '@/components/GlobalLoader';
@@ -11,11 +12,28 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import StackMaintenanceGate from '@/components/layout/StackMaintenanceGate';
 import { LanguageModalProvider } from '@/components/modal/LanguageModal/LanguageModalContext';
-import { LanguageModal } from '@/components/modal/LanguageModal/LanguageModal';
+import { useLanguageModal } from '@/components/modal/LanguageModal/LanguageModalContext';
 import type { StackStartupState } from '@/lib/system/startupState';
 import { cn } from '@/lib/utils';
 import { useRouteLayout } from '@/lib/useRouteLayout';
+import {
+  recoverStaleBodyScrollLock,
+  useBodyScrollLock,
+} from '@/hooks/useBodyScrollLock';
 import { MobileRouteChrome } from './MobileRouteChrome';
+
+const LazyLanguageModal = dynamic(
+  () =>
+    import('@/components/modal/LanguageModal/LanguageModal').then(
+      module => module.LanguageModal,
+    ),
+  { ssr: false },
+);
+
+function LanguageModalGate() {
+  const { isOpen } = useLanguageModal();
+  return isOpen ? <LazyLanguageModal /> : null;
+}
 
 type Props = {
   children: ReactNode;
@@ -33,6 +51,7 @@ function resolveRouteIntent(pathname: string | null, metaIntent?: string) {
   const routeIntentMap: Record<string, string> = {
     home: 'home',
     search: 'search',
+    explore: 'explore',
     create: 'create',
     chat: 'chat',
     reels: 'reels',
@@ -45,6 +64,7 @@ function resolveRouteIntent(pathname: string | null, metaIntent?: string) {
     support: 'support',
     property: 'property',
     marketplace: 'market',
+    manage: 'dashboard',
     microgigs: 'market',
     'my-listings': 'dashboard',
     'super-app': 'super',
@@ -68,7 +88,7 @@ function DesktopRouteHeader() {
       </div>
       <div
         aria-hidden="true"
-        className="hidden h-[calc(52px+env(safe-area-inset-top))] shrink-0 sm:h-[calc(60px+env(safe-area-inset-top))] lg:block"
+        className="hidden h-[calc(48px+env(safe-area-inset-top))] shrink-0 sm:h-[calc(56px+env(safe-area-inset-top))] lg:block"
       />
     </>
   );
@@ -84,8 +104,16 @@ function PersonalAiFloatingLauncher({
   const cleanPath = normalizePathname(pathname);
   const isPersonalAiPage =
     cleanPath === '/profile/ai' || cleanPath.startsWith('/profile/ai/');
+  const isAllowedSurface =
+    cleanPath === '/' ||
+    cleanPath === '/home' ||
+    cleanPath === '/explore' ||
+    cleanPath === '/profile' ||
+    cleanPath.startsWith('/profile/') ||
+    cleanPath === '/chat' ||
+    (cleanPath.startsWith('/content/') && !cleanPath.endsWith('/edit'));
 
-  if (isPersonalAiPage) return null;
+  if (isPersonalAiPage || !isAllowedSurface) return null;
 
   return (
     <LocalizedAnchor
@@ -97,14 +125,14 @@ function PersonalAiFloatingLauncher({
         'inline-flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/30',
         'bg-emerald-600 text-white shadow-[0_18px_42px_-22px_rgba(5,150,105,0.55)]',
         'transition hover:-translate-y-0.5 hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400',
-        'md:right-[max(env(safe-area-inset-right),1.25rem)] md:h-12 md:w-auto md:gap-2 md:rounded-full md:px-4',
+        'lg:left-[max(env(safe-area-inset-left),1.25rem)] lg:right-auto lg:h-12 lg:w-auto lg:gap-2 lg:rounded-full lg:px-4',
         showBottomNavMobile
-          ? 'bottom-[calc(5.35rem+env(safe-area-inset-bottom))] md:bottom-[max(env(safe-area-inset-bottom),1.25rem)]'
-          : 'bottom-[calc(1rem+env(safe-area-inset-bottom))] md:bottom-[max(env(safe-area-inset-bottom),1.25rem)]',
+          ? 'bottom-[calc(5.35rem+env(safe-area-inset-bottom))] lg:bottom-[max(env(safe-area-inset-bottom),1.25rem)]'
+          : 'bottom-[calc(1rem+env(safe-area-inset-bottom))] lg:bottom-[max(env(safe-area-inset-bottom),1.25rem)]',
       )}
     >
       <Sparkles className="h-5 w-5 shrink-0" />
-      <span className="hidden whitespace-nowrap text-sm font-black md:inline">
+      <span className="hidden whitespace-nowrap text-sm font-black lg:inline">
         Personal AI
       </span>
     </LocalizedAnchor>
@@ -130,6 +158,26 @@ export default function ClientLayoutWrapper({
   const showFooter = showFooterMobile || showFooterDesktop;
   const routeIntent = resolveRouteIntent(pathname, meta.routeIntent);
 
+  useBodyScrollLock(isImmersiveRoute, {
+    resetScroll: true,
+    preserveScrollbarGap: false,
+  });
+
+  useEffect(() => {
+    if (isImmersiveRoute) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      recoverStaleBodyScrollLock();
+    });
+    const handlePageShow = () => recoverStaleBodyScrollLock();
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [isImmersiveRoute, pathname]);
+
   const mobileChrome = {
     showTopBar: showTopBarMobile,
     showBottomNav: showBottomNavMobile,
@@ -152,18 +200,19 @@ export default function ClientLayoutWrapper({
           className={cn(
             'lajukan-route-surface',
             isImmersiveRoute &&
-              'flex h-[var(--app-viewport-height)] min-h-0 flex-col overflow-hidden',
+            'flex h-[var(--app-visual-viewport-height)] min-h-0 flex-col overflow-hidden',
             !isImmersiveRoute &&
-              'min-h-screen min-h-[100svh] overflow-x-hidden',
+            'min-h-screen min-h-[var(--app-document-viewport-height)] overflow-x-hidden',
             showTopBarMobile &&
-              !isImmersiveRoute &&
-              'pt-[calc(2.75rem+env(safe-area-inset-top))] lg:pt-0',
+            !isImmersiveRoute &&
+            'pt-[calc(2.75rem+env(safe-area-inset-top))] lg:pt-0',
             showBottomNavMobile &&
-              !isImmersiveRoute &&
-              'pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0',
+            !isImmersiveRoute &&
+            'pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0',
           )}
           data-route-intent={routeIntent}
           data-route-immersive={isImmersiveRoute ? 'true' : 'false'}
+          data-app-viewport-shell={isImmersiveRoute ? 'true' : undefined}
           data-mobile-topbar={showTopBarMobile ? 'true' : 'false'}
           data-mobile-bottom-nav={showBottomNavMobile ? 'true' : 'false'}
         >
@@ -199,7 +248,7 @@ export default function ClientLayoutWrapper({
           showBottomNavMobile={showBottomNavMobile}
         />
         {!isImmersiveRoute ? <GlobalPreferenceDock /> : null}
-        <LanguageModal />
+        <LanguageModalGate />
       </LanguageModalProvider>
     </>
   );
