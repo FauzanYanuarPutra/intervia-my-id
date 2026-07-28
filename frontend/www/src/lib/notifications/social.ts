@@ -1,4 +1,5 @@
 import { buildContentHref } from '@/lib/content/routes';
+import { buildUmkmDiscoveryPath } from '@/lib/umkmSurface';
 
 type NotificationLike = {
   data?: unknown;
@@ -88,7 +89,7 @@ export function notificationTargetHref(notification: NotificationLike): string {
     );
   }
   if ((entityType === 'map' || entityType === 'maps') && entityId) {
-    return `/umkm?item=${encodeURIComponent(entityId)}`;
+    return buildUmkmDiscoveryPath({ storeId: entityId });
   }
 
   return '/notifications';

@@ -129,6 +129,8 @@ async function installStabilizationFixtures(page: Page) {
 }
 
 test.describe('Lajukan stabilization regression smoke', () => {
+  test.use({ serviceWorkers: 'block' });
+
   for (const viewport of REQUIRED_VIEWPORTS) {
     test(`core routes avoid document overflow at ${viewport.width}x${viewport.height}`, async ({
       page,
@@ -163,6 +165,66 @@ test.describe('Lajukan stabilization regression smoke', () => {
     await input.press('Enter');
 
     await expect(page).toHaveURL(/\/id\/explore\?q=supplier(\+|%20)kemasan/);
+    await expectNoHorizontalOverflow(page, 6);
+  });
+
+  test('content detail exposes its scan-first summary without mobile overflow', async ({
+    page,
+    request,
+  }) => {
+    await installStabilizationFixtures(page);
+
+    const contentResponse = await request.get(
+      '/api/content?limit=10&status=active',
+    );
+    expect(contentResponse.ok()).toBeTruthy();
+    const contentPayload = (await contentResponse.json()) as {
+      items?: Array<{ id?: unknown }>;
+      data?: { items?: Array<{ id?: unknown }> };
+    };
+    const activeContent =
+      contentPayload.items?.[0] || contentPayload.data?.items?.[0];
+    const activeContentId =
+      typeof activeContent?.id === 'string' ? activeContent.id : '';
+    expect(activeContentId).not.toBe('');
+
+    await page.route('**/api/content/**', async route => {
+      const url = new URL(route.request().url());
+      if (
+        url.pathname === `/api/content/${activeContentId}` &&
+        url.searchParams.get('include_owner') === '1'
+      ) {
+        await fulfillJson(route, e2eContentItem);
+        return;
+      }
+      await route.fallback();
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/id/content/${activeContentId}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    const summary = page.getByTestId('content-detail-summary');
+    await expect(summary).toBeVisible();
+    await expect(
+      summary.getByRole('heading', {
+        level: 1,
+        name: e2eContentItem.title,
+      }),
+    ).toBeVisible();
+    await expect(
+      summary.getByText('Menawarkan', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      summary.getByText(e2eContentItem.summary, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      summary.getByText(/^(?:Harga|Mulai dari chat)$/),
+    ).toBeVisible();
+    await expect(summary).toContainText(
+      /(?:Tanya detail|(?:IDR|Rp)\s*4[.,]500)/,
+    );
     await expectNoHorizontalOverflow(page, 6);
   });
 

@@ -15,6 +15,8 @@ import {
   type UmkmMapStore,
 } from '@/components/super-app/UmkmStoreMap';
 import { Link } from '@/i18n/navigation';
+import { formatDistanceKm } from '@/lib/geo/distance';
+import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 
@@ -51,20 +53,14 @@ type SearchUmkmPreviewProps = {
 };
 
 function formatDistance(distanceKm: number | null): string | null {
-  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm))
-    return null;
-  if (distanceKm < 1) return `${Math.max(1, Math.round(distanceKm * 1000))} m`;
-  if (distanceKm < 10) return `${distanceKm.toFixed(1)} km`;
-  return `${distanceKm.toFixed(1)} km`;
+  return formatDistanceKm(distanceKm);
 }
 
 function hasValidCoords(store: UmkmPreviewStore) {
-  return (
-    typeof store.lat === 'number' &&
-    Number.isFinite(store.lat) &&
-    typeof store.lng === 'number' &&
-    Number.isFinite(store.lng)
-  );
+  if (typeof store.lat !== 'number' || typeof store.lng !== 'number') {
+    return false;
+  }
+  return isCoordinateValid({ lat: store.lat, lng: store.lng });
 }
 
 function normalizeRecommendedQr(
@@ -127,12 +123,12 @@ export function SearchUmkmPreview({
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="text-sm font-bold text-[color:var(--app-text)] sm:text-base">
-            Lajukan Maps
+            {isId ? 'Usaha di sekitar' : 'Businesses nearby'}
           </h2>
           <p className="mt-0.5 line-clamp-1 text-[11px] ui-text-soft">
             {isId
-              ? 'Pilih pin, cek profil usaha, lalu lanjut chat atau simpan.'
-              : 'Pick a pin, open a business profile, then chat or save.'}
+              ? 'Pilih usaha, lalu cek produk, kontak, dan rutenya.'
+              : 'Pick a business, then check its products, contact, and route.'}
           </p>
         </div>
 
@@ -141,7 +137,7 @@ export function SearchUmkmPreview({
           onClick={onOpenUmkmView}
           className="ui-pressable inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-full bg-white px-3 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50 dark:bg-slate-900 dark:text-emerald-200 dark:ring-emerald-400/14 dark:hover:bg-slate-950"
         >
-          {isId ? 'Full map' : 'Full map'}
+          {isId ? 'Peta penuh' : 'Full map'}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -228,7 +224,7 @@ export function SearchUmkmPreview({
                           <span className="truncate">
                             {store.city || store.address}
                             {formatDistance(store.distance_km)
-                              ? ` / ${formatDistance(store.distance_km)}`
+                              ? ` · ${formatDistance(store.distance_km)}`
                               : ''}
                           </span>
                         </p>
@@ -242,7 +238,7 @@ export function SearchUmkmPreview({
                       >
                         <Store className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">
-                          {isId ? 'Profil' : 'Profile'}
+                          {isId ? 'Lihat usaha' : 'View business'}
                         </span>
                       </Link>
                       {onAddStoreToCart ? (

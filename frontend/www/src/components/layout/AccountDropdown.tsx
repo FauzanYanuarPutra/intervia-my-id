@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import {
   ChevronDown,
   CreditCard,
+  LayoutDashboard,
   LogOut,
   Plus,
   Settings,
@@ -112,6 +113,7 @@ export function AccountDropdown({
   const text = {
     account: idLocale ? 'Akun saya' : 'My account',
     settings: idLocale ? 'Pengaturan' : 'Settings',
+    manage: idLocale ? 'Pusat Kelola' : 'Manage content',
     listings: idLocale ? 'Postingan' : 'Posts',
     transactions: idLocale ? 'Transaksi' : 'Transactions',
     wallet: idLocale ? 'Saldo' : 'Balance',
@@ -127,6 +129,7 @@ export function AccountDropdown({
   const items: MenuItem[] = [
     { href: '/profile', label: text.account, icon: UserRound },
     { href: '/settings', label: text.settings, icon: Settings },
+    { href: '/manage', label: text.manage, icon: LayoutDashboard },
     { href: '/my-listings', label: text.listings, icon: ShoppingBag },
     ...(!PROMO_ONLY_MODE
       ? [

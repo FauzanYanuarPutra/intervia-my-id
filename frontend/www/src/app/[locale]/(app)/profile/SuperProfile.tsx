@@ -34,6 +34,7 @@ import {
   MoreVertical,
   Package,
   PencilLine,
+  Play,
   Plus,
   RefreshCw,
   Settings2,
@@ -197,8 +198,10 @@ type Copy = ReturnType<typeof buildCopy>;
 
 const ROUTES = {
   create: '/create?mode=quick',
-  manage: '/my-listings',
-  manageSocial: '/manage',
+  manage: '/manage',
+  manageListings: '/my-listings',
+  manageCommunity: '/manage/community',
+  manageReels: '/manage/reels',
   drafts: '/my-listings?status=draft',
   promotion: '/create?mode=promotion',
   insights: '/dashboard',
@@ -259,8 +262,17 @@ function buildCopy(isId: boolean) {
         currentlyActive: 'Sedang tayang',
         quickActions: 'Aksi Cepat',
         createPost: 'Buat Posting',
-        managePosts: 'Kelola Posting',
-        manageSocial: 'Kelola Semua',
+        managePosts: 'Studio Konten',
+        manageListings: 'Listing Saya',
+        contentStudio: 'Pusat kontenmu',
+        contentStudioHint:
+          'Listing, komunitas, dan reels sekarang bisa dikelola dari satu tempat yang mudah dibaca.',
+        openContentStudio: 'Buka Studio Konten',
+        communityChannel: 'Komunitas',
+        reelsChannel: 'Reels',
+        activeChannel: 'Aktif',
+        draftChannel: 'Draft',
+        manageChannel: 'Kelola',
         drafts: 'Draft',
         promotion: 'Promosi',
         insights: 'Insight',
@@ -346,8 +358,17 @@ function buildCopy(isId: boolean) {
         currentlyActive: 'Currently live',
         quickActions: 'Quick Actions',
         createPost: 'Create Post',
-        managePosts: 'Manage Posts',
-        manageSocial: 'Manage All',
+        managePosts: 'Content Studio',
+        manageListings: 'My Listings',
+        contentStudio: 'Your content hub',
+        contentStudioHint:
+          'Listings, community posts, and reels can now be managed from one clear place.',
+        openContentStudio: 'Open Content Studio',
+        communityChannel: 'Community',
+        reelsChannel: 'Reels',
+        activeChannel: 'Live',
+        draftChannel: 'Drafts',
+        manageChannel: 'Manage',
         drafts: 'Drafts',
         promotion: 'Promotion',
         insights: 'Insights',
@@ -1295,9 +1316,7 @@ function CompletionItem({
   }
 
   return (
-    <div
-      className="flex min-w-0 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-500/10 dark:text-emerald-200"
-    >
+    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-500/10 dark:text-emerald-200">
       {content}
     </div>
   );
@@ -1451,7 +1470,7 @@ function ListingCard({
       </div>
 
       <LocalizedLink
-        href={`${ROUTES.manage}?listing=${encodeURIComponent(item.id)}`}
+        href={`${ROUTES.manageListings}?listing=${encodeURIComponent(item.id)}`}
         aria-label={copy.manage}
         title={copy.manage}
         className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] sm:static sm:self-center"
@@ -1486,8 +1505,9 @@ export default function SuperProfile() {
   const [activeTab, setActiveTab] = useState<OwnerTab>('posts');
   const [activeFilter, setActiveFilter] = useState<ListingFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
-  const [socialModalTab, setSocialModalTab] =
-    useState<ProfileSocialTab | null>(null);
+  const [socialModalTab, setSocialModalTab] = useState<ProfileSocialTab | null>(
+    null,
+  );
 
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
   const [coverUrlInput, setCoverUrlInput] = useState('');
@@ -1562,21 +1582,20 @@ export default function SuperProfile() {
           draftResult,
           statsResult,
           socialResult,
-        ] =
-          await Promise.allSettled([
-            authFetch(`/api/users/${user.id}`, { cache: 'no-store' }),
-            authFetch('/api/my-listings?status=active&limit=50', {
-              cache: 'no-store',
-            }),
-            authFetch('/api/my-listings?status=draft&limit=50', {
-              cache: 'no-store',
-            }),
-            authFetch('/api/dashboard/stats', { cache: 'no-store' }),
-            authFetch(
-              `/api/community/users/${encodeURIComponent(user.id)}/social?limit=64`,
-              { cache: 'no-store' },
-            ),
-          ]);
+        ] = await Promise.allSettled([
+          authFetch(`/api/users/${user.id}`, { cache: 'no-store' }),
+          authFetch('/api/my-listings?status=active&limit=50', {
+            cache: 'no-store',
+          }),
+          authFetch('/api/my-listings?status=draft&limit=50', {
+            cache: 'no-store',
+          }),
+          authFetch('/api/dashboard/stats', { cache: 'no-store' }),
+          authFetch(
+            `/api/community/users/${encodeURIComponent(user.id)}/social?limit=64`,
+            { cache: 'no-store' },
+          ),
+        ]);
 
         if (detailResult.status !== 'fulfilled') {
           throw detailResult.reason;
@@ -2170,13 +2189,13 @@ export default function SuperProfile() {
       key: 'manage',
       label: copy.managePosts,
       href: ROUTES.manage,
-      icon: ClipboardList,
+      icon: Clapperboard,
     },
     {
-      key: 'manage-social',
-      label: copy.manageSocial,
-      href: ROUTES.manageSocial,
-      icon: Clapperboard,
+      key: 'manage-listings',
+      label: copy.manageListings,
+      href: ROUTES.manageListings,
+      icon: ClipboardList,
     },
     {
       key: 'drafts',
@@ -2230,7 +2249,7 @@ export default function SuperProfile() {
   return (
     <>
       <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-1 sm:pb-8 sm:pt-3">
-        <div className="page-shell min-w-0 max-w-full space-y-3 overflow-x-clip px-2.5 sm:px-3 lg:px-4">
+        <div className="page-shell min-w-0 space-y-3 overflow-x-clip">
           <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
             <div className="relative h-28 overflow-hidden sm:h-36 lg:h-40">
               {effectiveCoverUrl ? (
@@ -2570,6 +2589,94 @@ export default function SuperProfile() {
                 ) : null}
               </section>
 
+              <section
+                data-testid="profile-content-studio"
+                data-visual-surface="dark"
+                className="profile-content-studio relative mt-6 overflow-hidden rounded-2xl border border-emerald-800 bg-emerald-950 p-4 text-white shadow-[0_20px_46px_-32px_rgba(5,46,37,0.9)] sm:p-5"
+              >
+                <div
+                  aria-hidden="true"
+                  className="absolute -right-10 -top-14 h-36 w-36 rounded-full bg-emerald-300/20 blur-2xl"
+                />
+                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="max-w-2xl">
+                    <p className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">
+                      <Clapperboard className="h-3.5 w-3.5" />
+                      {copy.contentStudio}
+                    </p>
+                    <h2 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">
+                      {copy.openContentStudio}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-emerald-50/85">
+                      {copy.contentStudioHint}
+                    </p>
+                  </div>
+                  <LocalizedLink
+                    href={ROUTES.manage}
+                    className="profile-content-studio-cta inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-emerald-800 shadow-lg transition hover:-translate-y-0.5 hover:bg-emerald-50"
+                  >
+                    {copy.openContentStudio}
+                    <ArrowRight className="h-4 w-4" />
+                  </LocalizedLink>
+                </div>
+
+                <div className="relative mt-4 grid gap-2 sm:grid-cols-3">
+                  <LocalizedLink
+                    href={ROUTES.manageListings}
+                    data-content-channel="listing"
+                    className="profile-content-channel group flex min-h-20 items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur transition hover:bg-white/15"
+                  >
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-200 text-emerald-900">
+                      <ClipboardList className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black">
+                        {copy.manageListings}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-emerald-50/75">
+                        {activeListings.length} {copy.activeChannel} ·{' '}
+                        {draftListings.length} {copy.draftChannel}
+                      </span>
+                    </span>
+                  </LocalizedLink>
+                  <LocalizedLink
+                    href={ROUTES.manageCommunity}
+                    data-content-channel="community"
+                    className="profile-content-channel group flex min-h-20 items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur transition hover:bg-white/15"
+                  >
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-200 text-sky-900">
+                      <MessageCircle className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black">
+                        {copy.communityChannel}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-emerald-50/75">
+                        {copy.manageChannel}
+                      </span>
+                    </span>
+                  </LocalizedLink>
+                  <LocalizedLink
+                    href={ROUTES.manageReels}
+                    data-content-channel="reel"
+                    className="profile-content-channel group flex min-h-20 items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur transition hover:bg-white/15"
+                  >
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-200 text-rose-900">
+                      <Play className="h-5 w-5 fill-current" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black">
+                        {copy.reelsChannel}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-emerald-50/75">
+                        {formatCompactNumber(reelsCount, numberLocale)}{' '}
+                        {copy.reelsChannel}
+                      </span>
+                    </span>
+                  </LocalizedLink>
+                </div>
+              </section>
+
               <section className="mt-6 min-w-0">
                 <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {copy.quickActions}
@@ -2674,7 +2781,11 @@ export default function SuperProfile() {
             {visibleListings.length > 0 ? (
               <div className="px-2.5 pb-3 sm:px-4 sm:pb-4">
                 <LocalizedLink
-                  href={activeTab === 'drafts' ? ROUTES.drafts : ROUTES.manage}
+                  href={
+                    activeTab === 'drafts'
+                      ? ROUTES.drafts
+                      : ROUTES.manageListings
+                  }
                   className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
                 >
                   {copy.viewAll}

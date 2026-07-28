@@ -342,6 +342,7 @@ struct AccessClaims {
 struct ListContentQuery {
     #[serde(alias = "content_type")]
     r#type: Option<String>,
+    side: Option<String>,
     category: Option<String>,
     subcategory: Option<String>,
     industries: Option<String>,
@@ -4981,6 +4982,16 @@ fn canonical_content_type(value: &str) -> String {
 
 fn normalize_content_type(value: Option<String>) -> Option<String> {
     clean_text(value).map(|v| canonical_content_type(&v.to_lowercase()))
+}
+
+fn normalize_listing_side_filter(value: Option<String>) -> Result<Option<String>, &'static str> {
+    let Some(value) = clean_text(value).map(|value| value.to_lowercase()) else {
+        return Ok(None);
+    };
+    match value.as_str() {
+        "supply" | "demand" => Ok(Some(value)),
+        _ => Err("side must be supply or demand"),
+    }
 }
 
 fn resolve_requested_content_type(
@@ -10545,6 +10556,10 @@ async fn list_content(
     });
     let min_price = query.min_price.filter(|value| *value >= 0);
     let max_price = query.max_price.filter(|value| *value >= 0);
+    let side = match normalize_listing_side_filter(query.side) {
+        Ok(side) => side,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
     let q = clean_text(query.q);
     let location = clean_text(query.location);
     let level = clean_text(query.level);
@@ -10660,6 +10675,29 @@ async fn list_content(
           )
           AND ($12::bigint IS NULL OR price_cents >= $12)
           AND ($13::bigint IS NULL OR price_cents <= $13)
+          AND (
+              $14::text IS NULL OR
+              (
+                CASE
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'listing_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
+                    THEN 'demand'
+                  WHEN regexp_replace(lower(btrim(coalesce(metadata->>'listing_side', ''))), '[_-]+', ' ', 'g')
+                    IN ('supply', 'offer', 'offering', 'available', 'provider', 'seller', 'sell', 'penyedia', 'menawarkan', 'menyediakan', 'tersedia')
+                    THEN 'supply'
+                  WHEN btrim(coalesce(metadata->>'market_side', '')) = ''
+                    AND btrim(coalesce(metadata->>'listing_side', '')) = ''
+                    THEN 'supply'
+                  ELSE NULL
+                END
+              ) = $14
+          )
         ORDER BY
           CASE WHEN $2::text IS NULL THEN 0 ELSE
             (CASE WHEN title ILIKE ($2 || '%') THEN 80 ELSE 0 END) +
@@ -10673,7 +10711,7 @@ async fn list_content(
           END DESC,
           updated_at DESC,
           created_at DESC
-        LIMIT $14 OFFSET $15
+        LIMIT $15 OFFSET $16
         "#,
     )
     .bind(typ)
@@ -10689,6 +10727,7 @@ async fn list_content(
     .bind(industry_filter)
     .bind(min_price)
     .bind(max_price)
+    .bind(side)
     .bind(limit + 1)
     .bind(offset)
     .fetch_all(&state.db)
@@ -10785,10 +10824,15 @@ async fn fetch_liked_content_ids(
 
 async fn get_content(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match find_content(&state.db, &id).await {
         Ok(Some(row)) => {
+            let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+            if !can_view_content_detail(&row.content_status, row.owner_id, actor_user_id) {
+                return err(StatusCode::NOT_FOUND, "content not found").into_response();
+            }
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
                 Ok(map) => map.get(&row.owner_id).cloned(),
                 Err(e) => {
@@ -10808,6 +10852,14 @@ async fn get_content(
             err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content").into_response()
         }
     }
+}
+
+fn can_view_content_detail(
+    content_status: &str,
+    owner_id: Uuid,
+    actor_user_id: Option<Uuid>,
+) -> bool {
+    content_status.trim().eq_ignore_ascii_case("active") || actor_user_id == Some(owner_id)
 }
 
 async fn get_content_like_state(
@@ -23335,5 +23387,43 @@ mod tests {
             .expect("authenticated owner filter");
 
         assert_eq!(owner_filter, Some(actor_user_id));
+    }
+
+    #[test]
+    fn listing_side_filter_accepts_canonical_values() {
+        assert_eq!(
+            normalize_listing_side_filter(Some(" Supply ".to_string())),
+            Ok(Some("supply".to_string()))
+        );
+        assert_eq!(
+            normalize_listing_side_filter(Some("DEMAND".to_string())),
+            Ok(Some("demand".to_string()))
+        );
+        assert_eq!(normalize_listing_side_filter(None), Ok(None));
+    }
+
+    #[test]
+    fn listing_side_filter_rejects_unknown_values() {
+        assert_eq!(
+            normalize_listing_side_filter(Some("all".to_string())),
+            Err("side must be supply or demand")
+        );
+    }
+
+    #[test]
+    fn active_content_detail_is_public() {
+        assert!(can_view_content_detail("active", Uuid::new_v4(), None));
+    }
+
+    #[test]
+    fn inactive_content_detail_is_hidden_from_public() {
+        assert!(!can_view_content_detail("draft", Uuid::new_v4(), None));
+        assert!(!can_view_content_detail("archived", Uuid::new_v4(), None));
+    }
+
+    #[test]
+    fn content_owner_can_review_inactive_detail() {
+        let owner_id = Uuid::new_v4();
+        assert!(can_view_content_detail("draft", owner_id, Some(owner_id)));
     }
 }

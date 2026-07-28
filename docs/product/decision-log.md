@@ -4,6 +4,30 @@ Status: repo audit 2026-07-11.
 
 Use this file for approved product/architecture decisions. Do not record unapproved ideas as decisions.
 
+## 2026-07-28: Regular WWW Pages Share One Layout Shell And Footer Owner
+
+- Decision: Non-immersive WWW pages use a 1280 px canonical content shell, with explicit 920 px readable, 1180 px form, and 1440 px wide variants only when the page purpose requires them. The global layout wrapper is the sole owner of the site footer.
+- Evidence: Home rendered its footer inside a narrow desktop feed column, Community placed it after a clipped full-height shell, and shared CSS mixed 1120, 1180, 1240, 1440, 1560, and 1700 px width rules.
+- Consequence: Header, page content, and footer align to shared gutters; regular pages expose one reachable footer; immersive chat, reels, and map-like surfaces remain deliberate exceptions. New routes should use semantic shell variants and pass responsive overflow/footer tests.
+
+## 2026-07-28: Manage Is The Canonical Cross-Content Studio
+
+- Decision: `/manage` is the canonical owner entry point for managing published content across Listing, Community, and Reels. Each channel keeps its existing dedicated editor, while Profile, account navigation, and the footer expose one shared Studio Konten entry point.
+- Evidence: Profile previously emphasized only listing management, and `/manage` presented content and operational tools as a flat grid. Existing `/my-listings`, `/manage/community`, and `/manage/reels` routes already provide the correct domain-specific workflows.
+- Consequence: The manage hub uses scan-first channel previews, channel-specific visual identity, live owner counts, and a separate operational section. New owner content types should extend this hub instead of adding another competing dashboard, and protected owner data must remain filtered by the authenticated identity.
+
+## 2026-07-28: Public Listing Discovery Uses One Scan-First Card
+
+- Decision: Public supply listings use one canonical visual order—media, offer/type, title, price or value, then owner and location—across Home recommendations and Explore results. Demand cards prioritize budget, location, and deadline. The content detail page follows the same intent and value hierarchy before progressively revealing supporting information.
+- Evidence: Home recommendations, unfiltered Explore cards, and filtered product/service results previously used different proportions and fact density, so the same listing changed shape while users browsed. Home also linked a supply-listing rail to the broader UMKM surface.
+- Consequence: Discovery surfaces adapt their data into `ExploreListingCard` instead of creating another listing-card variant. Public cards stay comparison-focused and omit duplicated summaries or CTA labels; owner-management cards may retain status and editing controls. Business results use the canonical `/toko/[slug]` storefront route.
+
+## 2026-07-28: Public UMKM Flows From Discovery To One Storefront
+
+- Decision: `/umkm` remains the immersive public business directory and `/toko/[slug]` remains the canonical public business detail. Business cards use a shared scan order—visual and category, business name, truthful operating state, then city or viewer-backed distance—while the storefront groups identity, products, location, and one dominant contact action. Owner controls remain under `/usaha`.
+- Evidence: Home, Explore/Search, the UMKM map, and the storefront used different card proportions, labels, width rules, and meanings for status. Missing opening hours could appear as open, zero ratings looked like real reviews, and several entry points called the same storefront “Profil”, “Info”, or “Toko”.
+- Consequence: Public entry points link to `/toko/[slug]`, unknown hours, ratings, coordinates, or contact data stay visibly unknown instead of becoming positive claims, and related UMKM surfaces reuse the canonical shell, vocabulary, and business-card hierarchy without duplicating owner workflows.
+
 ## 2026-07-11: Documentation Source Of Truth
 
 - Decision: Root `AGENTS.md` and `docs/*` become the agent/engineering knowledge base.
@@ -25,9 +49,39 @@ Use this file for approved product/architecture decisions. Do not record unappro
 ## Pending Decisions
 
 - Canonical owner surface: `frontend/usaha` vs `/usaha/*` in `frontend/www`.
-- Public wording for payments/escrow/refunds until E2E production verification.
+- External legal review for payment, escrow, refund, and dispute wording.
 - Canonical taxonomy registry location.
 - Required moderation coverage for community/reels/listings/chat.
+
+## 2026-07-27: Public Content Uses Scan-First Visual Hierarchy
+
+- Decision: Content-heavy public surfaces use a scan-first hierarchy: a clear title and intent/status badge, a short summary, grouped facts with meaningful icons or semantic color, bounded reading width, progressive disclosure for long copy, and one visually dominant next action. Color distinguishes content type, intent, status, or action; it is not decorative noise.
+- Evidence: Product input identified flat, visually undifferentiated pages as tiring to read. The canonical `/content/[id]` surface contains mixed media, identity, transaction intent, specifications, location, trust, and long descriptions that require chunking before users can compare or act.
+- Consequence: `/content/[id]` is the reference implementation. Home, Explore, public profiles, UMKM discovery, Community, learning, legal/help content, and future public pages should reuse the shared surface and semantic color tokens. Do not give every card a different arbitrary color. Validate the pattern through readability/responsive QA and measured events such as content views, detail expansion, contact/chat starts, and completion of the intended page action.
+
+## 2026-07-27: Long Forms Use Dedicated Pages
+
+- Decision: Multi-section forms, forms with several permissions/rules, and edit flows with media uploads use dedicated routes instead of modal overlays. Modals remain for confirmations, short prompts, previews, compact filters, and other reversible contextual actions.
+- Evidence: Group creation and group settings combined identity, media, privacy, membership, posting permissions, and dynamic rules inside scroll-constrained overlays. Profile quick edit duplicated the canonical full profile editor.
+- Consequence: Community group creation uses `/community/groups/new`, group settings use `/community/groups/[slug]/settings`, and profile edit triggers use the existing `/profile/edit` route. New long-form flows should extend a canonical page rather than introducing another modal form.
+
+## 2026-07-27: Public Discovery Must Be Readable Before Login
+
+- Decision: Community feeds, community group detail, reels, public profiles, active listing detail, and UMKM discovery are public read surfaces. Authentication is required for write actions such as posting, following, reacting, joining, chatting, or publishing.
+- Evidence: These surfaces already expose public metadata and public GET contracts, while route configuration incorrectly marked Community and Reels as authenticated. The public audit also found profile and UMKM HTML dominated by loading states.
+- Consequence: Route configuration marks Community and Reels as shared/public, client actions retain their existing login gates, and primary profile/listing/UMKM content receives server-rendered initial data where available.
+
+## 2026-07-27: Inactive Listings Are Not Public Pages
+
+- Decision: Only active listings are readable and indexable on `/content/[id]`. Draft, archived, rejected, or otherwise inactive content returns the same public not-found behavior unless requested by its authenticated owner through an owner workflow.
+- Evidence: Marketplace detail previously returned any content status and the client detail page converted backend 404 into a visual `Content not found` message inside an HTTP 200 page.
+- Consequence: Marketplace service enforces active-or-owner access, the public detail page validates data on the server and calls `notFound()`, metadata is `noindex` for unavailable content, and the active-only sitemap query remains canonical.
+
+## 2026-07-27: Payment Claims Require Explicit Runtime Status
+
+- Decision: Public legal and trust copy must not imply that Lajukan payment, escrow, mediation, refund, or binding dispute decisions are generally active. Those capabilities apply only when the relevant transaction explicitly marks them active.
+- Evidence: Public footer/about copy described secure payment as gradual, while Terms and Trust Center used unconditional escrow and platform-decision language.
+- Consequence: Legal copy states the current discovery/listing/chat role, labels payment material as readiness standards, and directs users to verify transaction-level status before paying.
 
 ## 2026-07-23: Create Starts Brief-First
 

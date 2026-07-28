@@ -15,6 +15,7 @@ export const PROTECTED_ROUTE_PREFIXES = [
   '/payments',
   '/notifications',
   '/settings',
+  '/manage',
   '/my-projects',
   '/my-listings',
   '/onboarding',

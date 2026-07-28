@@ -28,6 +28,8 @@ Status: 2026-05-28
 - `/my-projects`, `/my-listings`, `/transactions`, `/payments`, `/chat`, `/profile`, `/settings`: workspace login user.
 - `/trust`, `/trust/[topic]`, `/support`, `/privacy`, `/terms`, `/cookie-policy`, `/contact`, `/about`: trust, legal, dan support.
 
+Community, detail grup, dan reels adalah surface baca publik. Login tetap wajib untuk aksi tulis seperti posting, join, follow, komentar, reaksi, upload, atau memulai chat.
+
 ## Route Duplikat Yang Redirect Ke Canonical
 
 - `/marketplace` -> `/explore?type=product&q=supplier`

@@ -96,7 +96,7 @@ export default async function BlogArticlePage({ params }: PageProps) {
   const publishedDate = dateFormatter.format(new Date(article.publishedAt));
 
   return (
-    <main className="page-shell page-rhythm pb-12 pt-6">
+    <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}

@@ -8,7 +8,6 @@ import {
   ChevronDown,
   LayoutGrid,
   MapPin,
-  Navigation,
   Plus,
   Search,
   ShoppingBag,
@@ -24,6 +23,7 @@ import { AppViewportShell } from '@/components/common/AppViewportShell';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import { cn } from '@/lib/utils';
 import { UmkmDiscoveryPanel } from './UmkmDiscoveryPanel';
+import type { DiscoveryStore } from './UmkmDiscoveryPanel';
 
 type UmkmDiscoveryClientProps = {
   locale: string;
@@ -33,6 +33,9 @@ type UmkmDiscoveryClientProps = {
   initialCategory?: string;
   initialStoreSlug?: string;
   initialStoreId?: string;
+  initialMapOnly?: boolean;
+  initialStores?: DiscoveryStore[];
+  initialCount?: number;
 };
 
 type MapLaneId =
@@ -154,6 +157,9 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
     initialCategory = '',
     initialStoreSlug,
     initialStoreId,
+    initialMapOnly = false,
+    initialStores,
+    initialCount,
   } = props;
   const router = useRouter();
   const handleBack = useAppBack(router, '/home');
@@ -195,10 +201,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
   const activeCategoryLabel = isId
     ? activeLaneConfig.labelId
     : activeLaneConfig.labelEn;
-  const discoveryQuery = [cleanedQuery, activeLaneConfig.keywords]
-    .map(item => item.trim())
-    .filter(Boolean)
-    .join(' ');
+  const discoveryQuery = cleanedQuery;
   const createHref = isAuthenticated ? '/create' : '/register';
   const visibleLanes = showAllLanes
     ? MAP_LANES
@@ -230,7 +233,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
     submitSearch(cleanedQuery, cleanedCity, lane.id);
   };
 
-  const handleUseCurrentLocation = () => {
+  const handleClearCityFilter = () => {
     setCity('');
     submitSearch(cleanedQuery, '', activeLane);
   };
@@ -239,37 +242,45 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
     <AppViewportShell
       as="main"
       className="relative w-full bg-slate-100 text-[color:var(--app-text)] dark:bg-slate-950"
+      data-testid="umkm-discovery-page"
     >
       <UmkmDiscoveryPanel
         isId={isId}
         query={discoveryQuery}
         city={cleanedCity}
+        category={activeLane}
         limit={DISCOVERY_STORE_LIMIT}
         title={
           activeLane === 'all'
             ? isId
-              ? 'Cari usaha sekitar'
-              : 'Nearby businesses'
+              ? 'Usaha yang ditemukan'
+              : 'Businesses found'
             : isId
-              ? activeCategoryLabel
-              : activeCategoryLabel
+              ? `${activeCategoryLabel} yang ditemukan`
+              : `${activeCategoryLabel} found`
         }
         description={
           isId
-            ? 'Cari toko, jasa, kuliner, atau tempat usaha. Pilih hasil, lalu chat atau buka rute.'
-            : 'Pick a pin, scan the summary, then chat or open route.'
+            ? 'Pilih kartu untuk melihat detail usaha, menghubungi penyedia, atau membuka rute.'
+            : 'Choose a card to view business details, contact the provider, or open directions.'
         }
         selectedSlug={initialStoreSlug}
         selectedStoreIdInitial={initialStoreId}
+        initialMapOnly={initialMapOnly}
+        initialStores={initialStores}
+        initialCount={initialCount}
         openMapSignal={mapOpenSignal}
         variant="immersive"
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1400] px-3 pt-[calc(env(safe-area-inset-top)+0.65rem)] sm:px-4 lg:inset-x-auto lg:left-3 lg:w-[486px] lg:px-0 lg:pt-[calc(env(safe-area-inset-top)+0.9rem)]">
-        <div className="mx-auto flex w-full max-w-[860px] flex-col gap-1.5 lg:mx-0 lg:max-w-none">
+        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-1.5 lg:mx-0 lg:max-w-none">
           <form
             onSubmit={handleSearch}
             className="pointer-events-auto overflow-hidden rounded-full border-0 bg-white/96 outline-none ring-0 shadow-[0_16px_38px_-30px_rgba(15,23,42,0.36)] focus-within:ring-2 focus-within:ring-[color:var(--app-accent)] dark:bg-slate-950/92"
+            role="search"
+            aria-label={isId ? 'Cari usaha' : 'Search businesses'}
+            data-testid="umkm-discovery-search-form"
           >
             <div className="flex min-h-[44px] items-center gap-1.5 px-2 sm:min-h-[48px] sm:px-3">
               <button
@@ -283,8 +294,17 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
 
               <Search className="h-4.5 w-4.5 shrink-0 text-[color:var(--app-text-soft)]" />
 
+              <label htmlFor="umkm-discovery-search" className="sr-only">
+                {isId
+                  ? 'Nama usaha, kategori, atau kota'
+                  : 'Business name, category, or city'}
+              </label>
               <input
+                id="umkm-discovery-search"
+                name="q"
                 type="search"
+                enterKeyHint="search"
+                autoComplete="off"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
                 placeholder={
@@ -307,10 +327,11 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
           <div
             className="pointer-events-auto flex min-w-0 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             aria-label={isId ? 'Pilih jenis usaha' : 'Business category filter'}
+            data-testid="umkm-category-filters"
           >
             <button
               type="button"
-              onClick={handleUseCurrentLocation}
+              onClick={handleClearCityFilter}
               aria-pressed={!cleanedCity}
               className={cn(
                 'inline-flex min-h-[32px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:min-h-[34px]',
@@ -319,13 +340,13 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                   : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
               )}
             >
-              <Navigation className="h-3.5 w-3.5" />
-              {isId ? 'Sekitar saya' : 'Near me'}
+              <MapPin className="h-3.5 w-3.5" />
+              {isId ? 'Semua lokasi' : 'All locations'}
             </button>
             {cleanedCity ? (
               <button
                 type="button"
-                onClick={handleUseCurrentLocation}
+                onClick={handleClearCityFilter}
                 aria-label={
                   isId
                     ? `Hapus filter kota ${cleanedCity}`
@@ -345,11 +366,10 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                 <button
                   key={lane.id}
                   type="button"
-                  disabled={active}
                   aria-pressed={active}
                   onClick={() => handleLanePick(lane)}
                   className={cn(
-                    'inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] disabled:pointer-events-none sm:min-h-[34px] sm:px-3',
+                    'inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:min-h-[34px] sm:px-3',
                     active
                       ? 'cursor-default border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-white'
                       : 'cursor-pointer border-white/80 bg-white/92 text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100',

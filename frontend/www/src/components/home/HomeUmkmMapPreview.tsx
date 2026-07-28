@@ -15,18 +15,15 @@ import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
-import {
-  ArrowRight,
-  BadgeCheck,
-  CheckCircleIcon,
-  Target,
-  XCircleIcon,
-} from 'lucide-react';
+import { ArrowRight, BadgeCheck, Target } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 
-// INTEGRASI HEROICONS (SOLID)
-import { GlobeAltIcon, MapPinIcon, StarIcon } from '@heroicons/react/24/solid';
+import {
+  BuildingStorefrontIcon,
+  MapPinIcon,
+  StarIcon,
+} from '@heroicons/react/24/solid';
 
 /* ================= TYPES ================= */
 type HomeUmkmMapPreviewProps = {
@@ -70,12 +67,12 @@ function sortStores(items: PreparedStore[], preferDistance: boolean) {
     if (preferDistance) {
       const leftDistance =
         typeof a.store.distance_km === 'number' &&
-          Number.isFinite(a.store.distance_km)
+        Number.isFinite(a.store.distance_km)
           ? a.store.distance_km
           : null;
       const rightDistance =
         typeof b.store.distance_km === 'number' &&
-          Number.isFinite(b.store.distance_km)
+        Number.isFinite(b.store.distance_km)
           ? b.store.distance_km
           : null;
       if (leftDistance !== null && rightDistance !== null) {
@@ -86,7 +83,11 @@ function sortStores(items: PreparedStore[], preferDistance: boolean) {
         return 1;
       }
     }
-    if (a.ui.openNow !== b.ui.openNow) return b.ui.openNow ? 1 : -1;
+    if (a.ui.openNow !== b.ui.openNow) {
+      const openRank = (value: boolean | null) =>
+        value === true ? 2 : value === null ? 1 : 0;
+      return openRank(b.ui.openNow) - openRank(a.ui.openNow);
+    }
     if (b.ui.ratingNumber !== a.ui.ratingNumber)
       return b.ui.ratingNumber - a.ui.ratingNumber;
     if (b.ui.ratingCount !== a.ui.ratingCount)
@@ -108,197 +109,93 @@ export default function HomeUmkmCard({
   const href = store.slug
     ? buildUmkmStorefrontPath(store.slug)
     : UMKM_DISCOVERY_PATH;
-  const active =
-    (store as PreviewStore & { is_active?: boolean }).is_active !== false;
   const distanceLabel = formatDistance(store.distance_km);
-
-  // Asumsi index 0 di array gallery adalah cover, jadi kita ambil index 1 ke atas untuk mosaik
-  const rawGallery = ui.gallery || [];
-  const galleryImages = rawGallery.length > 1 ? rawGallery.slice(1) : [];
-
-  // Ambil maksimal 3 gambar untuk ditampilkan di grid mosaik
-  const displayGallery = galleryImages.slice(0, 3);
-  const remainingCount = galleryImages.length - 3;
-  const hasGallery = displayGallery.length > 0;
+  const locationLabel =
+    store.city ||
+    store.address ||
+    (isId ? 'Lokasi belum tersedia' : 'Location unavailable');
+  const statusLabel =
+    ui.openNow === true
+      ? isId
+        ? 'Buka'
+        : 'Open'
+      : ui.openNow === false
+        ? isId
+          ? 'Tutup'
+          : 'Closed'
+        : isId
+          ? 'Jam belum diisi'
+          : 'Hours not listed';
 
   return (
-    <Link href={href} className="block group ">
-      <article className="flex items-center gap-4 rounded-2xl border !border-emerald-600 bg-white p-3.5 shadow-sm transition-all duration-300 !hover:border-emerald-800 hover:shadow-md hover:-translate-y-0.5">
-        {/* 1. MAIN IMAGE (KIRI) */}
-        <div className="relative h-[120px] w-[120px] shrink-0 overflow-hidden rounded-xl bg-zinc-100 border border-zinc-200/60">
-          {/* BADGE UMKM */}
-          <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded bg-white/95  px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 shadow-sm border border-zinc-200/50">
-            <svg
-              className="w-3 h-3 text-emerald-600"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-            </svg>
-            UMKM
-          </div>
+    <Link
+      href={href}
+      aria-label={
+        isId ? `Lihat detail ${store.name}` : `View ${store.name} details`
+      }
+      className="group block w-[min(84vw,21rem)] rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2"
+    >
+      <article
+        data-testid="home-umkm-card"
+        className="grid min-h-[132px] grid-cols-[104px_minmax(0,1fr)] overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)] transition motion-reduce:transform-none group-hover:-translate-y-0.5 group-hover:border-[color:var(--app-accent-border)] group-hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)] sm:grid-cols-[112px_minmax(0,1fr)]"
+      >
+        <div className="relative min-h-[132px] overflow-hidden bg-slate-100">
           <LajukanImage
             src={ui.coverImage}
-            alt={store.name || 'Cover'}
+            alt={store.name}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover transition duration-300 motion-reduce:transform-none group-hover:scale-[1.03]"
           />
+          <span className="absolute left-2 top-2 inline-flex min-h-6 items-center rounded-full border border-white/70 bg-white/90 px-2 text-[9px] font-black text-emerald-800 shadow-sm backdrop-blur">
+            UMKM
+          </span>
         </div>
 
-        {/* 2. CONTENT INFO (TENGAH) */}
-        <div className="flex h-[128px] w-full min-w-0 max-w-[200px] flex-1 flex-col justify-between overflow-hidden py-0.5">
-          <div className="min-w-0 overflow-hidden">
-            {/* Header: Title & Rating */}
-            <div className="flex min-w-0 items-start justify-between gap-2 overflow-hidden">
-              <div className="min-w-0 flex-1 overflow-hidden">
-                {/* Maksimal 2 baris, selebihnya otomatis ... */}
-                <h3 className="line-clamp-2 break-words text-[15px] font-bold leading-[19px] text-zinc-900 transition-colors group-hover:text-emerald-700">
-                  {store.name}
-                </h3>
-
-                {/* Satu baris, teks panjang otomatis ... */}
-                <p className="mt-0.5 truncate text-xs font-medium text-zinc-500">
-                  {ui.categoryLabel}
-                </p>
-              </div>
-
-              {/* Rating */}
-              {ui.ratingNumber > 0 && (
-                <div className="flex shrink-0 items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">
-                  <StarIcon className="h-3.5 w-3.5 shrink-0 fill-amber-500 text-amber-500" />
-
-                  <span>{ui.ratingNumber.toFixed(1)}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Location */}
-            <div className="mt-2 flex min-w-0 items-start gap-1.5 overflow-hidden">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-50">
-                <MapPinIcon className="h-3.5 w-3.5 text-sky-600" />
-              </div>
-
-              <div className="min-w-0 flex-1 overflow-hidden">
-                {/* Satu baris, otomatis ... */}
-                <p className="truncate text-xs font-semibold text-zinc-700">
-                  {store.address ||
-                    (isId ? 'Lokasi belum tersedia' : 'Location unavailable')}
-                </p>
-
-                <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                  {store.city || 'Indonesia'}
-                </p>
-              </div>
-            </div>
+        <div className="flex min-w-0 flex-col p-3">
+          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+            <span className="truncate">{ui.categoryLabel}</span>
+            <span aria-hidden="true">·</span>
+            <span
+              className={
+                ui.openNow === true
+                  ? 'shrink-0 text-emerald-700'
+                  : 'shrink-0 text-[color:var(--app-text-soft)]'
+              }
+            >
+              {statusLabel}
+            </span>
+            {ui.ratingNumber > 0 ? (
+              <span className="ml-auto inline-flex shrink-0 items-center gap-1 font-bold text-amber-700">
+                <StarIcon className="h-3 w-3 fill-current" />
+                {ui.ratingNumber.toFixed(1)}
+              </span>
+            ) : null}
           </div>
 
-          {/* Bottom Indicators */}
-          <div className="mt-auto flex min-w-0 items-center justify-between gap-2 overflow-hidden pt-1">
+          <h3 className="mt-1.5 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] transition-colors group-hover:text-[color:var(--app-accent)]">
+            {store.name}
+          </h3>
+
+          <p className="mt-1 line-clamp-1 text-xs leading-4 text-[color:var(--app-text-soft)]">
+            {store.description ||
+              (isId
+                ? 'Lihat produk dan informasi usaha.'
+                : 'See products and business information.')}
+          </p>
+
+          <div className="mt-auto flex min-w-0 items-center gap-1.5 pt-2 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+            <MapPinIcon className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" />
+            <span className="min-w-0 flex-1 truncate">{locationLabel}</span>
             {distanceLabel ? (
-              <span className="flex min-w-0 flex-1 items-center gap-1 text-xs font-bold text-violet-700">
-                <MapPinIcon className="h-3.5 w-3.5 shrink-0 text-violet-500" />
-
-                <span className="truncate">{distanceLabel}</span>
+              <span className="shrink-0">{distanceLabel}</span>
+            ) : null}
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              <span className="sr-only">
+                {isId ? 'Lihat detail usaha' : 'View business details'}
               </span>
-            ) : (
-              <span />
-            )}
-
-            {active ? (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">
-                <CheckCircleIcon className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-
-                <span>{isId ? 'Aktif' : 'Active'}</span>
-              </span>
-            ) : (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-[11px] font-bold text-zinc-600">
-                <XCircleIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-
-                <span>{isId ? 'Nonaktif' : 'Inactive'}</span>
-              </span>
-            )}
+            </span>
           </div>
-        </div>
-
-        {/* 3. MOSAIC GALLERY (KANAN) */}
-        {hasGallery && (
-          <div className="shrink-0 h-[120px] w-[120px] grid grid-cols-2 grid-rows-2 gap-1.5 overflow-hidden">
-            {/* Jika hanya 1 gambar di galeri */}
-            {displayGallery.length === 1 && (
-              <div className="relative col-span-2 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                <LajukanImage
-                  src={displayGallery[0]}
-                  alt="Gallery 1"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            )}
-
-            {/* Jika 2 gambar di galeri */}
-            {displayGallery.length === 2 && (
-              <>
-                <div className="relative col-span-1 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage
-                    src={displayGallery[0]}
-                    alt="Gallery 1"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="relative col-span-1 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage
-                    src={displayGallery[1]}
-                    alt="Gallery 2"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Jika 3 gambar (atau lebih) di galeri */}
-            {displayGallery.length === 3 && (
-              <>
-                <div className="relative col-span-1 row-span-2 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage
-                    src={displayGallery[0]}
-                    alt="Gallery 1"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="relative col-span-1 row-span-1 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage
-                    src={displayGallery[1]}
-                    alt="Gallery 2"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="relative col-span-1 row-span-1 h-full w-full rounded-xl overflow-hidden bg-zinc-100">
-                  <LajukanImage
-                    src={displayGallery[2]}
-                    alt="Gallery 3"
-                    fill
-                    className="object-cover"
-                  />
-
-                  {/* Overlay sisa gambar */}
-                  {remainingCount > 0 && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-lg font-bold text-white">
-                      +{remainingCount}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* 4. ARROW ICON (POJOK KANAN) */}
-        <div className="shrink-0 flex items-end justify-center pl-1">
-          <ArrowRight className="h-5 w-5 text-emerald-500 group-hover:translate-x-1 transition-transform duration-300" />
         </div>
       </article>
     </Link>
@@ -311,7 +208,6 @@ export function HomeUmkmMapPreview({
   viewerLocation: viewerLocationProp,
   locating: locatingProp,
   locationError: locationErrorProp,
-  locationEnabled: locationEnabledProp,
   requestViewerLocation: requestViewerLocationProp,
   dismissLocationPrompt: dismissLocationPromptProp,
 }: HomeUmkmMapPreviewProps) {
@@ -331,8 +227,6 @@ export function HomeUmkmMapPreview({
   const locating = locatingProp ?? localViewerLocationState.locating;
   const locationError =
     locationErrorProp ?? localViewerLocationState.locationError;
-  const locationEnabled =
-    locationEnabledProp ?? localViewerLocationState.locationEnabled;
   const requestViewerLocation =
     requestViewerLocationProp ?? localViewerLocationState.requestViewerLocation;
   const dismissLocationPrompt =
@@ -374,7 +268,7 @@ export function HomeUmkmMapPreview({
         if (!res.ok || !json.data?.items) {
           throw new Error(
             json.error ||
-            (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
+              (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
           );
         }
 
@@ -438,22 +332,28 @@ export function HomeUmkmMapPreview({
         <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
           <div className="space-y-0.5">
             <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
-              {/* PENGGUNAAN GLOBEALTICON DI SINI */}
-              <GlobeAltIcon
-                className="h-4 w-4 text-emerald-600 animate-spin-slow"
-                style={{ animationDuration: '10s' }}
-              />
-              {isId ? 'Di Sekitarmu' : 'Around You'}
+              <BuildingStorefrontIcon className="h-4 w-4 text-emerald-600" />
+              {viewerLocation
+                ? isId
+                  ? 'Usaha di sekitarmu'
+                  : 'Businesses near you'
+                : isId
+                  ? 'Rekomendasi usaha'
+                  : 'Recommended businesses'}
             </h2>
             <p className="text-[11px] font-medium text-zinc-400">
-              {isId
-                ? 'Cari bisnis terdekat dari lokasimu.'
-                : 'Find nearby businesses around.'}
+              {viewerLocation
+                ? isId
+                  ? 'Diurutkan dari lokasi yang paling dekat.'
+                  : 'Sorted from the closest location.'
+                : isId
+                  ? 'Kenali usaha dan layanan yang tersedia di Lajukan.'
+                  : 'Discover businesses and services available on Lajukan.'}
             </p>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {viewerLocation || locationEnabled ? (
+            {viewerLocation ? (
               <span className="hidden items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 sm:inline-flex">
                 <BadgeCheck className="h-3.5 w-3.5" />
                 {isId ? 'Terdekat aktif' : 'Nearby on'}
@@ -472,9 +372,13 @@ export function HomeUmkmMapPreview({
               href={UMKM_DISCOVERY_PATH}
               isId={isId}
               ariaLabel={
-                isId
-                  ? 'Lihat semua usaha sekitar'
-                  : 'View all nearby businesses'
+                viewerLocation
+                  ? isId
+                    ? 'Lihat semua usaha sekitar'
+                    : 'View all nearby businesses'
+                  : isId
+                    ? 'Lihat semua rekomendasi usaha'
+                    : 'View all recommended businesses'
               }
             />
             <EmblaDesktopControls api={emblaApi} isId={isId} compact />
@@ -489,7 +393,7 @@ export function HomeUmkmMapPreview({
               {[1, 2, 3].map(i => (
                 <div
                   key={i}
-                  className="h-[120px] w-[290px] sm:w-[330px] shrink-0 animate-pulse rounded-2xl bg-zinc-50 border border-zinc-100"
+                  className="h-[132px] w-[min(84vw,21rem)] shrink-0 animate-pulse rounded-xl border border-slate-200 bg-slate-100"
                 />
               ))}
             </div>
@@ -504,13 +408,31 @@ export function HomeUmkmMapPreview({
             </div>
           )}
 
+          {!loading && !error && stores.length === 0 ? (
+            <div className="px-1 sm:px-3 md:px-6">
+              <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-5 text-center">
+                <p className="text-sm font-bold text-[color:var(--app-text)]">
+                  {isId
+                    ? 'Belum ada usaha yang bisa ditampilkan.'
+                    : 'No businesses to show yet.'}
+                </p>
+                <Link
+                  href={UMKM_DISCOVERY_PATH}
+                  className="mt-2 inline-flex min-h-9 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white"
+                >
+                  {isId ? 'Buka peta usaha' : 'Open business map'}
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
           {/* LIST SLIDER */}
           {stores.length > 0 && (
             <div
               className="cursor-grab overflow-hidden px-1 contain-paint active:cursor-grabbing sm:px-3 md:px-6"
               ref={emblaRef}
             >
-              <div className="flex gap-1 md:gap-2 touch-pan-y [backface-visibility:hidden] [will-change:transform] my-1">
+              <div className="my-1 flex touch-pan-y gap-3 [backface-visibility:hidden] [will-change:transform]">
                 {prepared.map(item => (
                   <div
                     key={item.store.id}

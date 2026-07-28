@@ -32,9 +32,9 @@ describe('PrimaryNav route activity', () => {
     expect(
       resolveActivePrimaryNavKey(items, '/id/explore/materials-suppliers'),
     ).toBe('explore');
-    expect(
-      resolveActivePrimaryNavKey(items, '/id/explore?q=kemasan'),
-    ).toBe('explore');
+    expect(resolveActivePrimaryNavKey(items, '/id/explore?q=kemasan')).toBe(
+      'explore',
+    );
     expect(
       resolveActivePrimaryNavKey(items, '/id/umkm/dapur-kawan'),
     ).toBeNull();
@@ -54,6 +54,22 @@ describe('PrimaryNav route activity', () => {
       resolveActivePrimaryNavKey(
         items,
         '/id/profile/tech-company-hr--00000000-0000-0000-0000-000000000004',
+      ),
+    ).toBeNull();
+  });
+
+  it('treats the protected manage hub as part of the signed-in account', () => {
+    expect(
+      resolveActivePrimaryNavKey(
+        buildPrimaryNavItems(true, 'id'),
+        '/id/manage/community',
+      ),
+    ).toBe('account');
+
+    expect(
+      resolveActivePrimaryNavKey(
+        buildPrimaryNavItems(false, 'id'),
+        '/id/manage/reels',
       ),
     ).toBeNull();
   });

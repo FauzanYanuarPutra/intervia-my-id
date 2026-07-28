@@ -121,6 +121,7 @@ export default function ClientBottomNav() {
               '/profile/edit',
               '/settings',
               '/dashboard',
+              '/manage',
               '/my-listings',
               ...(PROMO_ONLY_MODE ? [] : ['/transactions', '/payments']),
             ]

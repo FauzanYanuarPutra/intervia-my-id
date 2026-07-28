@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
-import { buildContentHref, extractContentId } from '@/lib/content/routes';
+import { buildContentHref } from '@/lib/content/routes';
 import { SectorProvider } from '@/context/SectorContext';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
+import {
+  getPublicContent,
+  isPublicContentActive,
+} from '@/lib/server/publicContent';
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.lajukan.com';
 const SITE_NAME = 'Lajukan';
@@ -27,6 +31,8 @@ type ContentSeoItem = {
   created_at?: string | null;
   updated_at?: string | null;
   metadata?: Record<string, unknown> | null;
+  content_status?: string | null;
+  status?: string | null;
 };
 
 function readString(value: unknown): string {
@@ -46,7 +52,10 @@ function absoluteUrl(pathOrUrl: string): string {
   try {
     return new URL(pathOrUrl).toString();
   } catch {
-    return new URL(pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`, SITE_URL).toString();
+    return new URL(
+      pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`,
+      SITE_URL,
+    ).toString();
   }
 }
 
@@ -54,7 +63,9 @@ function getContentImage(content: ContentSeoItem): string {
   const meta = content.metadata || {};
   const image =
     readString(content.cover_image) ||
-    (Array.isArray(content.image_urls) ? readString(content.image_urls[0]) : '') ||
+    (Array.isArray(content.image_urls)
+      ? readString(content.image_urls[0])
+      : '') ||
     readString(meta.cover_image) ||
     readString(meta.image_url) ||
     readString(meta.thumbnail);
@@ -70,32 +81,30 @@ function getDescription(content: ContentSeoItem, title: string): string {
 }
 
 function getCanonicalPath(content: ContentSeoItem, fallbackId: string): string {
-  return buildContentHref(content.id || fallbackId, content.title || 'listing', content.slug);
+  return buildContentHref(
+    content.id || fallbackId,
+    content.title || 'listing',
+    content.slug,
+  );
 }
 
-function getSchemaType(content: ContentSeoItem): 'Product' | 'Service' | 'JobPosting' | 'WebPage' {
-  const type = `${content.content_type || ''} ${content.type || ''}`.toLowerCase();
+function getSchemaType(
+  content: ContentSeoItem,
+): 'Product' | 'Service' | 'JobPosting' | 'WebPage' {
+  const type =
+    `${content.content_type || ''} ${content.type || ''}`.toLowerCase();
   if (type.includes('job')) return 'JobPosting';
   if (type.includes('service')) return 'Service';
   if (type.includes('product')) return 'Product';
   return 'WebPage';
 }
 
-async function getContent(id: string) {
-  try {
-    const resolvedId = extractContentId(id) || id;
-    const base = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : SITE_URL;
-    const res = await fetch(`${base}/api/content/${resolvedId}`, {
-      next: { revalidate: 60 },
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as ContentSeoItem;
-  } catch {
+async function getContent(id: string): Promise<ContentSeoItem | null> {
+  const result = await getPublicContent(id);
+  if (result.status !== 'found' || !isPublicContentActive(result.content)) {
     return null;
   }
+  return result.content as ContentSeoItem;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -103,7 +112,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const content = await getContent(id);
   if (!content?.title) {
     return {
-      title: locale === 'id' ? 'Listing tidak ditemukan | Lajukan' : 'Listing not found | Lajukan',
+      title:
+        locale === 'id'
+          ? 'Listing tidak ditemukan | Lajukan'
+          : 'Listing not found | Lajukan',
       description:
         locale === 'id'
           ? 'Listing Lajukan belum tersedia atau sudah tidak aktif.'

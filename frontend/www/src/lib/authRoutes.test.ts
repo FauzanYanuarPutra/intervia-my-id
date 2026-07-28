@@ -22,8 +22,12 @@ describe('authRoutes', () => {
     expect(isProtectedRoutePath('/id/create')).toBe(true);
     expect(isProtectedRoutePath('/en/transactions/123/review')).toBe(true);
     expect(isProtectedRoutePath('/id/payments')).toBe(true);
+    expect(isProtectedRoutePath('/id/manage')).toBe(true);
+    expect(isProtectedRoutePath('/en/manage/community')).toBe(true);
+    expect(isProtectedRoutePath('/id/manage/reels?filter=draft')).toBe(true);
     expect(isProtectedRoutePath('/id/content/listing-123/edit')).toBe(true);
     expect(isProtectedRoutePath('/id/home')).toBe(false);
+    expect(isProtectedRoutePath('/id/management')).toBe(false);
     expect(isProtectedRoutePath('/id/search?type=umkm')).toBe(false);
     expect(isProtectedRoutePath('/id/reels?video=6')).toBe(false);
     expect(isProtectedRoutePath('/id/profile/dapur-kawan')).toBe(false);

@@ -1246,7 +1246,7 @@ export default function EditProfilePage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden ui-surface-muted pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 dark:bg-[color:var(--app-surface-strong)] sm:pt-6">
-      <div className="page-shell max-w-5xl overflow-x-hidden px-3 sm:px-4 lg:px-6">
+      <div className="page-shell page-shell-readable overflow-x-hidden">
         <section className="ui-panel mb-5 overflow-hidden p-0">
           <div className="border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

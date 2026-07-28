@@ -74,6 +74,33 @@ const contentItems = [
     created_at: '2026-05-02T08:00:00.000Z',
     updated_at: '2026-05-20T08:00:00.000Z',
   },
+  {
+    id: 'e2e-sealer-001',
+    title: 'Mesin sealer meja untuk produksi harian',
+    summary: 'Ukuran ringkas untuk membantu pengemasan produk UMKM.',
+    content_type: 'product',
+    category: 'product',
+    content_status: 'active',
+    price_cents: 78000000,
+    image_url: seedImages.packaging,
+    metadata: {
+      city: 'Surabaya',
+      location: 'Surabaya',
+      unit: 'unit',
+      entity_kind: 'listing',
+      market_side: 'supply',
+      image_credit: {
+        provider: 'Unsplash',
+        source_url: 'https://unsplash.com/s/photos/packaging-machine',
+      },
+    },
+    seller_stats: {
+      rating: 4.6,
+      review_count: 11,
+    },
+    created_at: '2026-05-03T08:00:00.000Z',
+    updated_at: '2026-05-19T08:00:00.000Z',
+  },
 ];
 
 const communityGroup = {
@@ -191,6 +218,56 @@ const reels = {
       productHref: '/explore?q=kemasan',
       createdAt: '2026-05-21T08:00:00.000Z',
     },
+    {
+      id: 'e2e-reel-002',
+      title: 'Foto katalog sederhana dengan cahaya jendela',
+      caption: 'Setup ringan untuk menampilkan produk lebih jelas.',
+      videoSrc:
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      sourceUrl:
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      mediaType: 'video',
+      mediaSource: 'external_direct_video',
+      thumbnail: seedImages.productStudio,
+      author: {
+        id: 'e2e-user-003',
+        name: 'Studio UMKM',
+        avatarUrl: '/default-avatar.svg',
+      },
+      metadata: {
+        external: true,
+        sourceKind: 'direct_browser_playable_video',
+        seedPack: 'e2e_external_video',
+      },
+      stats: { likes: 18, comments: 2, shares: 1, views: 840 },
+      productHref: '/explore?q=foto%20produk',
+      createdAt: '2026-05-20T08:00:00.000Z',
+    },
+    {
+      id: 'e2e-reel-003',
+      title: 'Susun stok kemasan agar mudah dihitung',
+      caption: 'Cara cepat merapikan area persediaan kecil.',
+      videoSrc:
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      sourceUrl:
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      mediaType: 'video',
+      mediaSource: 'external_direct_video',
+      thumbnail: seedImages.packaging,
+      author: {
+        id: 'e2e-user-004',
+        name: 'Operasional Ringkas',
+        avatarUrl: '/default-avatar.svg',
+      },
+      metadata: {
+        external: true,
+        sourceKind: 'direct_browser_playable_video',
+        seedPack: 'e2e_external_video',
+      },
+      stats: { likes: 15, comments: 1, shares: 2, views: 690 },
+      productHref: '/explore?q=kemasan',
+      createdAt: '2026-05-19T08:00:00.000Z',
+    },
   ],
 };
 
@@ -213,6 +290,7 @@ export async function installStableApiFixtures(page: Page) {
     fulfillJson(route, communitySearch),
   );
   await page.route('**/api/reels?**', route => fulfillJson(route, reels));
+  await page.route('**/api/reels/feed?**', route => fulfillJson(route, reels));
   await page.route('**/api/reels/*/comments?**', route =>
     fulfillJson(route, { data: [] }),
   );

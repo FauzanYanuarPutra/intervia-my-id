@@ -198,17 +198,17 @@ export default function ClientLayoutWrapper({
       >
         <div
           className={cn(
-            'lajukan-route-surface',
+            'lajukan-route-surface flex flex-col',
             isImmersiveRoute &&
-            'flex h-[var(--app-visual-viewport-height)] min-h-0 flex-col overflow-hidden',
+              'h-[var(--app-visual-viewport-height)] min-h-0 overflow-hidden',
             !isImmersiveRoute &&
-            'min-h-screen min-h-[var(--app-document-viewport-height)] overflow-x-hidden',
+              'min-h-screen min-h-[var(--app-document-viewport-height)] overflow-x-hidden',
             showTopBarMobile &&
-            !isImmersiveRoute &&
-            'pt-[calc(2.75rem+env(safe-area-inset-top))] lg:pt-0',
+              !isImmersiveRoute &&
+              'pt-[calc(2.75rem+env(safe-area-inset-top))] lg:pt-0',
             showBottomNavMobile &&
-            !isImmersiveRoute &&
-            'pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0',
+              !isImmersiveRoute &&
+              'pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0',
           )}
           data-route-intent={routeIntent}
           data-route-immersive={isImmersiveRoute ? 'true' : 'false'}

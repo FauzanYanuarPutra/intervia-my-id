@@ -75,6 +75,36 @@ describe('GET /api/search', () => {
     expect(payload.groups.businesses.error).toBe('businesses_unavailable');
   });
 
+  it('links business results to the canonical storefront route', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input));
+      if (url.pathname === '/api/super-app/umkm/stores') {
+        return Response.json({
+          data: {
+            items: [
+              {
+                id: 'store-1',
+                slug: 'warung-kopi-nusantara',
+                name: 'Warung Kopi Nusantara',
+              },
+            ],
+          },
+        });
+      }
+      throw new TypeError('unexpected source');
+    });
+
+    const response = await GET(
+      searchRequest('q=kopi&tab=businesses&side=supply'),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.groups.businesses.items[0].href).toBe(
+      '/toko/warung-kopi-nusantara',
+    );
+  });
+
   it('separates kebutuhan from penawaran using side=demand', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

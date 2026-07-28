@@ -1,5 +1,9 @@
 :root {
-  --app-max-width: 1240px;
+  --app-content-max-width: 1280px;
+  --app-wide-max-width: 1440px;
+  --app-reading-max-width: 920px;
+  --app-form-max-width: 1180px;
+  --app-max-width: var(--app-content-max-width);
   --app-bottom-nav-height: 0px;
   --app-safe-area-top: env(safe-area-inset-top, 0px);
   --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -21,8 +25,8 @@
   --app-thumb-zone-offset: calc(
     var(--app-bottom-nav-height) + var(--app-thumb-zone-gap)
   );
-  --app-page-x-base: clamp(10px, 1.8vw, 20px);
-  --app-mobile-page-x: 0.25rem;
+  --app-page-x-base: clamp(16px, 2.4vw, 32px);
+  --app-mobile-page-x: clamp(0.75rem, 3.5vw, 1rem);
   --app-section-y-base: clamp(10px, 1.8vw, 22px);
   --app-radius-base: 16px;
   --app-radius-sm-base: 10px;
@@ -765,8 +769,8 @@ button,
 .lajukan-route-surface:not([data-route-intent='home']):not(
     [data-route-intent='chat']
   ):not([data-route-intent='reels']) {
-  --app-max-width: 1180px;
-  --app-page-x-base: clamp(10px, 1.6vw, 18px);
+  --app-max-width: var(--app-content-max-width);
+  --app-page-x-base: clamp(16px, 2vw, 28px);
   --app-section-y-base: clamp(8px, 1.35vw, 16px);
   --app-radius-base: 18px;
   --app-radius-sm-base: 12px;
@@ -964,7 +968,7 @@ button,
       [data-route-intent='chat']
     ):not([data-route-intent='reels'])
     .page-shell {
-    padding-inline: 0.5rem;
+    padding-inline: var(--app-mobile-page-x);
     padding-top: 0.5rem;
   }
 
@@ -985,8 +989,8 @@ button,
 .lajukan-route-surface:not([data-route-intent='home']):not(
     [data-route-intent='chat']
   ):not([data-route-intent='reels']) {
-  --app-max-width: 1440px;
-  --app-page-x-base: clamp(8px, 1.2vw, 16px);
+  --app-max-width: var(--app-content-max-width);
+  --app-page-x-base: clamp(16px, 2vw, 28px);
   --app-section-y-base: clamp(7px, 1vw, 14px);
   --app-radius-base: 16px;
   --app-radius-lg-base: 20px;
@@ -1003,12 +1007,8 @@ button,
     [data-route-intent='super'],
     [data-route-intent='create']
   )
-  :where(
-    [class*='max-w-7xl'],
-    [class*='max-w-6xl'],
-    [class*='max-w-[var(--app-max-width)]']
-  ) {
-  max-width: min(1500px, calc(100vw - 12px)) !important;
+  :where([class*='max-w-7xl'], [class*='max-w-[var(--app-max-width)]']) {
+  max-width: var(--app-content-max-width) !important;
 }
 
 .lajukan-route-surface:not([data-route-intent='home']):not(
@@ -1259,6 +1259,22 @@ canvas {
   max-width: var(--app-max-width);
   padding-inline: var(--app-page-x);
   scroll-margin-bottom: var(--app-thumb-zone-offset);
+}
+
+.page-shell-wide {
+  max-width: var(--app-wide-max-width);
+}
+
+.page-shell-readable {
+  max-width: var(--app-reading-max-width);
+}
+
+.page-shell-form {
+  max-width: var(--app-form-max-width);
+}
+
+.page-shell-full {
+  max-width: none;
 }
 
 .page-shell-inset {
@@ -2169,14 +2185,31 @@ canvas {
 
 .ui-skeleton {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
-  background-color: var(--app-skeleton);
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--app-skeleton) 94%, transparent),
+    color-mix(in srgb, var(--app-skeleton-strong) 72%, var(--app-skeleton)) 48%,
+    color-mix(in srgb, var(--app-skeleton) 94%, transparent)
+  );
   contain: paint;
 }
 
-.ui-skeleton-pulse {
-  animation: ui-skeleton-pulse 1.65s ease-in-out infinite;
-  will-change: opacity;
+.ui-skeleton-pulse::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--app-surface-strong) 62%, transparent) 48%,
+    transparent 76%
+  );
+  content: '';
+  transform: translate3d(-110%, 0, 0);
+  animation: ui-skeleton-shimmer 1.8s ease-in-out infinite;
+  will-change: transform;
 }
 
 .ui-skeleton-strong {
@@ -2309,14 +2342,9 @@ canvas {
   }
 }
 
-@keyframes ui-skeleton-pulse {
-  0%,
+@keyframes ui-skeleton-shimmer {
   100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.58;
+    transform: translate3d(110%, 0, 0);
   }
 }
 
@@ -2598,6 +2626,7 @@ canvas {
   .ui-button-secondary,
   .ui-button-danger,
   .ui-skeleton-pulse,
+  .ui-skeleton-pulse::after,
   .ui-shimmer::after,
   .ui-pressable,
   .lajukan-route-surface * {
@@ -2612,8 +2641,8 @@ canvas {
 .lajukan-route-surface:not([data-route-intent='home']):not(
     [data-route-intent='chat']
   ):not([data-route-intent='reels']) {
-  --app-max-width: 1560px;
-  --app-page-x-base: clamp(6px, 0.9vw, 13px);
+  --app-max-width: var(--app-content-max-width);
+  --app-page-x-base: clamp(16px, 2vw, 28px);
   --app-section-y-base: clamp(6px, 0.8vw, 11px);
   --app-radius-base: 14px;
   --app-radius-sm-base: 9px;
@@ -2624,7 +2653,7 @@ canvas {
 
 .lajukan-route-surface[data-mobile-bottom-nav='true'] {
   --app-bottom-nav-height: var(--app-mobile-bottom-nav-height);
-  padding-bottom: var(--app-mobile-bottom-nav-height) !important;
+  padding-bottom: calc(var(--app-mobile-bottom-nav-height) + 0.5rem) !important;
 }
 
 .lajukan-route-surface[data-mobile-topbar='true'] {
@@ -2641,7 +2670,8 @@ canvas {
 .lajukan-route-surface[data-mobile-bottom-nav='true']
   [data-lajukan-mobile-nav='true'],
 .lajukan-route-surface[data-mobile-bottom-nav='true']
-  [data-lajukan-mobile-nav='true'] * {
+  [data-lajukan-mobile-nav='true']
+  * {
   box-sizing: border-box;
 }
 
@@ -2896,7 +2926,7 @@ canvas {
   .lajukan-route-surface:not([data-route-intent='home']):not(
       [data-route-intent='chat']
     ):not([data-route-intent='reels']) {
-    --app-page-x-base: 0.375rem;
+    --app-page-x-base: var(--app-mobile-page-x);
     --app-section-y-base: 0.375rem;
     font-size: 0.875rem;
   }
@@ -3051,8 +3081,8 @@ canvas {
     [data-route-intent='chat']
   ):not([data-route-intent='reels'])
   .lajukan-header-shell.page-shell {
-  max-width: min(1700px, 100vw) !important;
-  padding-inline: clamp(0.75rem, 1.35vw, 1.125rem) !important;
+  max-width: var(--app-content-max-width) !important;
+  padding-inline: var(--app-page-x) !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
@@ -3458,7 +3488,11 @@ canvas {
   background:
     radial-gradient(
       circle at top left,
-      color-mix(in srgb, var(--route-accent, var(--app-accent)) 6%, transparent),
+      color-mix(
+        in srgb,
+        var(--route-accent, var(--app-accent)) 6%,
+        transparent
+      ),
       transparent 28%
     ),
     radial-gradient(
@@ -3476,7 +3510,11 @@ canvas {
   background:
     radial-gradient(
       circle at top left,
-      color-mix(in srgb, var(--route-accent, var(--app-accent)) 5%, transparent),
+      color-mix(
+        in srgb,
+        var(--route-accent, var(--app-accent)) 5%,
+        transparent
+      ),
       transparent 28%
     ),
     radial-gradient(
@@ -3788,4 +3826,504 @@ canvas {
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
+}
+
+/* One field, one border.
+   Controls own their visual boundary. Generic label/div/form wrappers must not
+   receive a second auto-generated rectangle around the field. */
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):not([class*='bg-transparent']):not(
+    [class*='border-0']
+  ):not(
+    :where(
+      .ui-field-shell *,
+      .ui-input-shell *,
+      .ui-navbar-search-field *,
+      .ui-search-form *,
+      .ui-control *,
+      .ui-feed-row *
+    )
+  ) {
+  border: 1.5px solid var(--app-field-border) !important;
+  border-radius: 14px !important;
+  background-color: var(--app-field-bg) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.56),
+    0 1px 2px rgba(15, 23, 42, 0.035) !important;
+  outline: none !important;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):not([class*='bg-transparent']):not(
+    [class*='border-0']
+  ):not(
+    :where(
+      .ui-field-shell *,
+      .ui-input-shell *,
+      .ui-navbar-search-field *,
+      .ui-search-form *,
+      .ui-control *,
+      .ui-feed-row *
+    )
+  ):hover:not(:disabled) {
+  border-color: var(--app-field-border-hover) !important;
+  background-color: var(--app-surface-strong) !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):not([class*='bg-transparent']):not(
+    [class*='border-0']
+  ):not(
+    :where(
+      .ui-field-shell *,
+      .ui-input-shell *,
+      .ui-navbar-search-field *,
+      .ui-search-form *,
+      .ui-control *,
+      .ui-feed-row *
+    )
+  ):is(:focus, :focus-visible) {
+  border-color: var(--app-field-focus) !important;
+  background-color: var(--app-surface-strong) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-field-focus) 32%, transparent),
+    0 0 0 3px var(--app-field-focus-ring) !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(input, textarea, select):not([class*='bg-transparent']):not(
+    [class*='border-0']
+  )[aria-invalid='true'] {
+  border-color: var(--app-danger) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-danger) 12%, transparent) !important;
+}
+
+/* Content Studio is intentionally more visual than canonical document panels.
+   Keep the exception scoped so surface normalization cannot erase channel
+   identity or dark-surface contrast. */
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  [data-visual-surface='dark'].manage-studio-hero,
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  [data-visual-surface='dark'].profile-content-studio {
+  border-color: rgba(52, 211, 153, 0.36) !important;
+  background: linear-gradient(
+    135deg,
+    #052e25 0%,
+    #065f46 54%,
+    #0f766e 100%
+  ) !important;
+  color: #fff !important;
+}
+
+.lajukan-route-surface .manage-studio-hero h1,
+.lajukan-route-surface .manage-studio-hero p,
+.lajukan-route-surface .profile-content-studio h2,
+.lajukan-route-surface .profile-content-studio p {
+  color: #ecfdf5 !important;
+}
+
+.lajukan-route-surface .manage-studio-hero .manage-studio-metric {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.11) !important;
+}
+
+.lajukan-route-surface
+  .manage-studio-hero
+  .manage-studio-metric[data-emphasis='true'] {
+  border-color: rgba(253, 230, 138, 0.56) !important;
+  background: rgba(251, 191, 36, 0.18) !important;
+}
+
+.app-cohesive-theme .lajukan-route-surface .manage-studio-create,
+.app-cohesive-theme .lajukan-route-surface .profile-content-studio-cta {
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  background: #fff !important;
+  color: #065f46 !important;
+}
+
+.lajukan-route-surface .manage-studio-hero .manage-studio-refresh,
+.lajukan-route-surface .profile-content-studio .profile-content-channel {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+.lajukan-route-surface .profile-content-channel > span:last-child > span {
+  color: #ecfdf5 !important;
+}
+
+.lajukan-route-surface
+  .profile-content-channel[data-content-channel='listing']
+  > span:first-child {
+  background: #a7f3d0 !important;
+  color: #064e3b !important;
+}
+
+.lajukan-route-surface
+  .profile-content-channel[data-content-channel='community']
+  > span:first-child {
+  background: #bae6fd !important;
+  color: #0c4a6e !important;
+}
+
+.lajukan-route-surface
+  .profile-content-channel[data-content-channel='reel']
+  > span:first-child {
+  background: #fecdd3 !important;
+  color: #881337 !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-attention-panel[data-attention-state='needs-action'] {
+  border-color: #fde68a !important;
+  background: linear-gradient(135deg, #fffbeb, #fff7ed) !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-attention-panel[data-attention-state='clear'] {
+  border-color: #a7f3d0 !important;
+  background: linear-gradient(135deg, #ecfdf5, #f0fdfa) !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-channel-card[data-manage-channel='listing'] {
+  border-color: #a7f3d0 !important;
+  background: linear-gradient(180deg, #ecfdf5 0%, #f8fffc 100%) !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-channel-card[data-manage-channel='community'] {
+  border-color: #bae6fd !important;
+  background: linear-gradient(180deg, #f0f9ff 0%, #fbfdff 100%) !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-channel-card[data-manage-channel='reel'] {
+  border-color: #fecdd3 !important;
+  background: linear-gradient(180deg, #fff1f2 0%, #fffafb 100%) !important;
+}
+
+.lajukan-route-surface
+  .manage-channel-card[data-manage-channel='community']
+  .manage-channel-icon {
+  background: #0369a1 !important;
+  color: #fff !important;
+}
+
+.lajukan-route-surface
+  .manage-channel-card[data-manage-channel='community']
+  .manage-channel-primary {
+  background: #075985 !important;
+  color: #fff !important;
+}
+
+.lajukan-route-surface .manage-community-preview {
+  background: #082f49 !important;
+}
+
+.dark
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-channel-card[data-manage-channel='listing'] {
+  border-color: rgba(52, 211, 153, 0.28) !important;
+  background: linear-gradient(180deg, #052e25 0%, #10201d 100%) !important;
+}
+
+.dark
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-channel-card[data-manage-channel='community'] {
+  border-color: rgba(56, 189, 248, 0.28) !important;
+  background: linear-gradient(180deg, #082f49 0%, #101f29 100%) !important;
+}
+
+.dark
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .manage-channel-card[data-manage-channel='reel'] {
+  border-color: rgba(251, 113, 133, 0.28) !important;
+  background: linear-gradient(180deg, #4c0519 0%, #24131a 100%) !important;
+}
+
+/* Canonical document layout contract.
+   Regular pages, the desktop header, and the site footer share one content
+   width and one responsive gutter. Narrow and wide layouts must opt into a
+   semantic page-shell variant; immersive canvases keep their own geometry. */
+.lajukan-route-surface:not([data-route-immersive='true']) {
+  --app-max-width: var(--app-content-max-width);
+  --app-page-x-base: clamp(16px, 2vw, 28px);
+}
+
+.lajukan-route-surface:not([data-route-immersive='true']) .page-shell {
+  max-width: var(--app-content-max-width) !important;
+  padding-inline: var(--app-page-x) !important;
+}
+
+.lajukan-route-surface:not([data-route-immersive='true'])
+  .page-shell.page-shell-wide {
+  max-width: var(--app-wide-max-width) !important;
+}
+
+.lajukan-route-surface:not([data-route-immersive='true'])
+  .page-shell.page-shell-readable {
+  max-width: var(--app-reading-max-width) !important;
+}
+
+.lajukan-route-surface:not([data-route-immersive='true'])
+  .page-shell.page-shell-form {
+  max-width: var(--app-form-max-width) !important;
+}
+
+.lajukan-route-surface:not([data-route-immersive='true'])
+  .page-shell.page-shell-full {
+  max-width: none !important;
+}
+
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']):not([data-route-immersive='true'])
+  :where(
+    [class*='max-w-[1700px]'],
+    [class*='max-w-[1600px]'],
+    [class*='max-w-[1560px]'],
+    [class*='max-w-[1500px]'],
+    [class*='max-w-[1480px]'],
+    [class*='max-w-[1440px]']
+  ) {
+  max-width: var(--app-content-max-width) !important;
+}
+
+.lajukan-route-surface[data-route-intent='home'] .lajukan-home-desktop-grid {
+  width: 100%;
+  max-width: var(--app-content-max-width) !important;
+  padding-inline: var(--app-page-x);
+}
+
+.site-footer .page-shell {
+  padding-block: clamp(2rem, 4vw, 3rem) !important;
+}
+
+.site-footer a {
+  min-height: 40px !important;
+}
+
+@media (max-width: 1023.98px) {
+  .lajukan-route-surface:not([data-route-immersive='true'])
+    :is(.lajukan-home-compact, .lajukan-search-compact) {
+    padding-inline: var(--app-mobile-page-x) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .lajukan-route-surface:not([data-route-immersive='true']) {
+    --app-page-x-base: var(--app-mobile-page-x);
+  }
+
+  .lajukan-route-surface:not([data-route-immersive='true']) .page-shell {
+    padding-inline: var(--app-mobile-page-x) !important;
+  }
+
+  .site-footer .page-shell {
+    padding-block: 2rem !important;
+  }
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(input, textarea, select):not([class*='bg-transparent']):not(
+    [class*='border-0']
+  ):disabled {
+  cursor: not-allowed;
+  border-color: color-mix(
+    in srgb,
+    var(--app-field-border) 68%,
+    transparent
+  ) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--app-surface-muted) 82%,
+    transparent
+  ) !important;
+  box-shadow: none !important;
+  opacity: 0.72;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(input, textarea)::placeholder {
+  color: color-mix(in srgb, var(--app-text-soft) 76%, transparent);
+  opacity: 1;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(input, textarea, select):-webkit-autofill {
+  -webkit-text-fill-color: var(--app-text);
+  box-shadow: 0 0 0 1000px var(--app-field-bg) inset !important;
+  caret-color: var(--app-text);
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ):not([class*='border']):not([class*='ring-']):not([class*='rounded']):not(
+    [class*='shadow']
+  ):not([class*='bg-']):not(.ui-field-shell):not(.ui-input-shell):not(
+    .ui-navbar-search-field
+  ):not(.ui-search-form):not(.ui-control):not(.ui-feed-row) {
+  border: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Search/composer controls intentionally put the single field boundary on
+   their shell because icons and action buttons live beside the plain input. */
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ) {
+  border: 1.5px solid var(--app-field-border) !important;
+  background-color: var(--app-field-bg) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 10px 26px -22px rgba(15, 23, 42, 0.34) !important;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ):hover {
+  border-color: var(--app-field-border-hover) !important;
+  background-color: var(--app-surface-strong) !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ):focus-within {
+  border-color: var(--app-field-focus) !important;
+  background-color: var(--app-surface-strong) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-field-focus) 28%, transparent),
+    0 0 0 3px var(--app-field-focus-ring),
+    0 14px 30px -24px rgba(15, 23, 42, 0.4) !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    label,
+    div,
+    form
+  ):has(
+    > :where(
+        input,
+        textarea,
+        select
+      )[aria-invalid='true'][class*='bg-transparent'],
+    > :where(input, textarea, select)[aria-invalid='true'][class*='border-0']
+  ) {
+  border-color: var(--app-danger) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-danger) 12%, transparent) !important;
 }

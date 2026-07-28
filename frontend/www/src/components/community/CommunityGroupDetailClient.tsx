@@ -216,17 +216,15 @@ function MemberRow({
   );
 }
 
-function GroupSettingsModal({
+export function CommunityGroupSettingsForm({
   group,
   isId,
-  open,
-  onClose,
+  onCancel,
   onSaved,
 }: {
   group: CommunityGroup;
   isId: boolean;
-  open: boolean;
-  onClose: () => void;
+  onCancel: () => void;
   onSaved: (group: CommunityGroup) => void;
 }) {
   const { authFetch } = useAuth();
@@ -246,8 +244,6 @@ function GroupSettingsModal({
     group.rules.length ? group.rules : [''],
   );
   const [saving, setSaving] = useState(false);
-
-  if (!open) return null;
 
   const updateRule = (index: number, value: string) => {
     setRules(current =>
@@ -291,14 +287,13 @@ function GroupSettingsModal({
       title: isId ? 'Group diperbarui' : 'Group updated',
       variant: 'success',
     });
-    onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 px-2 py-2 sm:items-center">
+    <div className="mx-auto w-full max-w-4xl">
       <form
         onSubmit={submit}
-        className="flex max-h-[min(780px,calc(100dvh-24px))] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_24px_70px_-34px_rgba(15,23,42,0.42)]"
+        className="w-full overflow-hidden rounded-none bg-white shadow-none sm:rounded-[28px] sm:border sm:border-[color:var(--app-border)] sm:shadow-[0_24px_70px_-46px_rgba(15,23,42,0.3)]"
       >
         <header className="flex min-h-[62px] items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4">
           <div className="min-w-0">
@@ -313,7 +308,7 @@ function GroupSettingsModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onCancel}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-50"
             aria-label={isId ? 'Tutup' : 'Close'}
           >
@@ -321,7 +316,7 @@ function GroupSettingsModal({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="space-y-5 p-4 sm:p-6">
           <label className="block">
             <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Nama group' : 'Group name'}
@@ -507,7 +502,6 @@ export default function CommunityGroupDetailClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selectedThreadId = searchParams.get('thread');
   const loginHref = buildLoginHref(pathname, searchParams.toString());
@@ -895,7 +889,9 @@ export default function CommunityGroupDetailClient({
           {group.viewerCanManage ? (
             <button
               type="button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() =>
+                router.push(`/community/groups/${encodeURIComponent(slug)}/settings`)
+              }
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[color:var(--app-text)]"
               aria-label={isId ? 'Edit group' : 'Edit group'}
             >
@@ -985,7 +981,9 @@ export default function CommunityGroupDetailClient({
             {group.viewerCanManage ? (
               <button
                 type="button"
-                onClick={() => setSettingsOpen(true)}
+                onClick={() =>
+                  router.push(`/community/groups/${encodeURIComponent(slug)}/settings`)
+                }
                 className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-[15px] bg-[color:var(--app-accent-soft)] text-sm font-bold text-[color:var(--app-accent)]"
               >
                 <Settings className="h-4 w-4" />
@@ -1348,7 +1346,9 @@ export default function CommunityGroupDetailClient({
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSettingsOpen(true)}
+                      onClick={() =>
+                        router.push(`/community/groups/${encodeURIComponent(slug)}/settings`)
+                      }
                       className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
                     >
                       <Settings className="h-4 w-4" />
@@ -1476,19 +1476,6 @@ export default function CommunityGroupDetailClient({
         onClose={() => setMembersModalGroup(null)}
         onChanged={() => setRefreshKey(value => value + 1)}
       />
-      {settingsOpen ? (
-        <GroupSettingsModal
-          key={`${group.id}:${group.name}`}
-          group={group}
-          isId={isId}
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          onSaved={nextGroup => {
-            setGroup(nextGroup);
-            setRefreshKey(value => value + 1);
-          }}
-        />
-      ) : null}
     </main>
   );
 }

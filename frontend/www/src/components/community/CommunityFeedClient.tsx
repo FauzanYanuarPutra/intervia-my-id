@@ -27,6 +27,7 @@ import {
   Loader2,
   Lock,
   MessageCircle,
+  MoreHorizontal,
   Plus,
   PlayCircle,
   Search,
@@ -46,7 +47,6 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
-import { Footer } from '@/components/layout/Footer';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
@@ -56,6 +56,11 @@ import {
 } from '@/lib/content/catalog';
 import { prepareUploadFiles } from '@/lib/media/prepareUploadMedia';
 import { cn } from '@/lib/utils';
+import {
+  Skeleton,
+  SkeletonAvatar,
+  SkeletonStack,
+} from '@/components/ui/Skeleton';
 import type {
   CommunityFeedItem,
   CommunityFeedMedia,
@@ -601,21 +606,42 @@ function createdThreadToFeedItem(
 
 export function CommunityFeedSkeleton() {
   return (
-    <div className="space-y-3">
+    <div
+      className="space-y-3"
+      aria-busy="true"
+      aria-label="Memuat komunitas"
+      data-skeleton-route="true"
+    >
       {Array.from({ length: 3 }).map((_, index) => (
-        <div
+        <article
           key={index}
-          className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4"
+          className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]"
         >
-          <div className="flex gap-3">
-            <div className="ui-skeleton ui-skeleton-pulse h-10 w-10 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <div className="ui-skeleton ui-skeleton-pulse h-3 w-1/2 rounded-full" />
-              <div className="ui-skeleton ui-skeleton-pulse h-3 w-1/3 rounded-full" />
-              <div className="ui-skeleton ui-skeleton-pulse h-32 rounded-[18px]" />
+          <div className="p-4">
+            <div className="flex items-start gap-3">
+              <SkeletonAvatar className="h-11 w-11 shrink-0" />
+              <div className="min-w-0 flex-1 pt-0.5">
+                <Skeleton variant="line" className="h-4 w-36" />
+                <Skeleton variant="line" className="mt-2 h-3 w-24" />
+              </div>
+              <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
             </div>
+            <Skeleton variant="line" className="mt-4 h-5 w-4/5" />
+            <SkeletonStack lines={2} className="mt-3" />
           </div>
-        </div>
+          <Skeleton
+            variant="media"
+            className={cn(
+              'w-full rounded-none',
+              index === 1 ? 'aspect-[16/10]' : 'aspect-[4/3] sm:aspect-video',
+            )}
+          />
+          <div className="grid grid-cols-3 gap-2 border-t border-[color:var(--app-border)] px-4 py-3">
+            <Skeleton variant="line" className="mx-auto h-4 w-16" />
+            <Skeleton variant="line" className="mx-auto h-4 w-20" />
+            <Skeleton variant="line" className="mx-auto h-4 w-16" />
+          </div>
+        </article>
       ))}
     </div>
   );
@@ -1776,6 +1802,9 @@ export function CommunityPostCard({
   const { notify } = useToast();
   const [localVote, setLocalVote] = useState(item.viewerVote || 0);
   const [reactionCount, setReactionCount] = useState(item.stats.reactions);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const loginHref = buildLoginHref(pathname, searchParams.toString());
   const poll = useMemo(
     () => parseCommunityPoll(item.title, item.body, item.tags),
@@ -1867,6 +1896,17 @@ export function CommunityPostCard({
     }
   };
 
+  const copyPostLink = async () => {
+    const url = `${window.location.origin}${item.href}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 1600);
+    } catch {
+      setLinkCopied(false);
+    }
+  };
+
   const openDetail = () => {
     if (item.kind === 'discussion' && item.threadId) {
       onOpenDetail(item.threadId);
@@ -1875,8 +1915,10 @@ export function CommunityPostCard({
     }
   };
 
+  if (hidden) return null;
+
   return (
-    <article className="overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white shadow-[0_18px_36px_-32px_rgba(15,23,42,0.18)]">
+    <article className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_30px_-28px_rgba(15,23,42,0.16)] transition hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.2)]">
       <div className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -1897,13 +1939,79 @@ export function CommunityPostCard({
                 onClick={openDetail}
                 className="block truncate text-left text-[0.95rem] font-bold leading-[1.08] tracking-[-0.02em] text-[color:var(--app-text)]"
               >
-                {item.group?.name || item.communityName}
+                {item.author.name}
               </button>
-              <p className="mt-[2px] flex items-center gap-1 text-xs leading-none text-[color:var(--app-text-soft)]">
+              <p className="hidden">
+                <span className="truncate">
+                  {item.group?.name || item.communityName} ·{' '}
+                  {timeAgo(item.createdAt, isId)}
+                </span>
+                <Earth className="h-3.5 w-3.5" />
+              </p>
+              <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-[color:var(--app-text-soft)]">
+                <span className="truncate">
+                  {item.group?.name || item.communityName}
+                  <span aria-hidden="true"> &middot; </span>
+                  {timeAgo(item.createdAt, isId)}
+                </span>
+                <Earth className="h-3.5 w-3.5" />
+              </p>
+              <p className="hidden">
                 {item.author.name} Â· {timeAgo(item.createdAt, isId)}
                 <Earth className="h-3.5 w-3.5" />
               </p>
             </div>
+          </div>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setLinkCopied(false);
+                setOptionsOpen(open => !open);
+              }}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--app-text-soft)] transition hover:bg-slate-100 hover:text-[color:var(--app-text)]"
+              aria-label={isId ? 'Buka opsi posting' : 'Open post options'}
+              aria-expanded={optionsOpen}
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+            {optionsOpen ? (
+              <div className="absolute right-0 top-10 z-20 w-56 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-white p-1.5 text-left shadow-[0_20px_44px_-26px_rgba(15,23,42,0.3)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOptionsOpen(false);
+                    openDetail();
+                  }}
+                  className="flex min-h-[40px] w-full items-center justify-between gap-2 rounded-[12px] px-3 text-left text-xs font-bold text-[color:var(--app-text)] hover:bg-slate-50"
+                >
+                  {isId ? 'Buka detail posting' : 'Open post detail'}
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copyPostLink()}
+                  className="flex min-h-[40px] w-full items-center justify-between gap-2 rounded-[12px] px-3 text-left text-xs font-bold text-[color:var(--app-text)] hover:bg-slate-50"
+                >
+                  {linkCopied
+                    ? isId
+                      ? 'Link tersalin'
+                      : 'Link copied'
+                    : isId
+                      ? 'Salin link'
+                      : 'Copy link'}
+                  <Share2 className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHidden(true)}
+                  className="flex min-h-[40px] w-full items-center justify-between gap-2 rounded-[12px] px-3 text-left text-xs font-bold text-[color:var(--app-text-soft)] hover:bg-slate-50"
+                >
+                  {isId ? 'Sembunyikan posting' : 'Hide post'}
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
         <button
@@ -2574,15 +2682,13 @@ export function CommunityDetailModal({
   );
 }
 
-function GroupCreateModal({
+export function CommunityGroupCreateForm({
   isId,
-  open,
-  onClose,
+  onCancel,
   onCreated,
 }: {
   isId: boolean;
-  open: boolean;
-  onClose: () => void;
+  onCancel: () => void;
   onCreated: () => void;
 }) {
   const { isAuthenticated, authFetch } = useAuth();
@@ -2616,8 +2722,6 @@ function GroupCreateModal({
   >(null);
   const [saving, setSaving] = useState(false);
   const loginHref = buildLoginHref(pathname, searchParams.toString());
-
-  if (!open) return null;
 
   const uploadGroupImage = async (file: File, target: 'avatar' | 'cover') => {
     if (!isAuthenticated) {
@@ -2717,19 +2821,16 @@ function GroupCreateModal({
     setAvatarUrl('');
     setCoverUrl('');
     onCreated();
-    onClose();
   };
 
   return (
     <div
-      className={COMMUNITY_MODAL_SHELL_CLASS}
-      role="dialog"
-      aria-modal="true"
-      data-testid="community-group-create-modal"
+      className="mx-auto w-full max-w-4xl"
+      data-testid="community-group-create-page"
     >
       <form
         onSubmit={submit}
-        className={cn(COMMUNITY_MODAL_SURFACE_CLASS, 'bg-white sm:max-w-lg')}
+        className="overflow-hidden rounded-none bg-white shadow-none sm:rounded-[28px] sm:border sm:border-[color:var(--app-border)] sm:shadow-[0_24px_70px_-46px_rgba(15,23,42,0.3)]"
         data-testid="community-group-create-surface"
       >
         <header className="flex min-h-[58px] items-center justify-between border-b border-[color:var(--app-border)] px-4">
@@ -2738,13 +2839,14 @@ function GroupCreateModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onCancel}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-50"
+            aria-label={isId ? 'Kembali' : 'Back'}
           >
             <X className="h-5 w-5" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="space-y-5 p-4 sm:p-6">
           <div className="relative overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-slate-50">
             <div className="relative h-36 bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_55%,#fff7ed_100%)]">
               {coverUrl ? (
@@ -4609,7 +4711,7 @@ function LeftRail({
   return (
     <aside className="hidden lg:block lg:h-full lg:min-h-0 lg:overflow-hidden px-2">
       <div
-        className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pr-1"
+        className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pr-1 pt-2"
         data-auto-scrollbar
       >
         <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
@@ -4720,7 +4822,7 @@ function RightRail({
   return (
     <aside className="hidden xl:block xl:h-full xl:min-h-0 xl:overflow-hidden">
       <div
-        className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pl-1"
+        className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pl-1 pt-2"
         data-auto-scrollbar
       >
         <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
@@ -4820,7 +4922,6 @@ export default function CommunityFeedClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
   const [dismissedThreadId, setDismissedThreadId] = useState<string | null>(
@@ -5106,7 +5207,7 @@ export default function CommunityFeedClient({
             activeTab={activeTab}
             onTabChange={setActiveTab}
             overview={overview}
-            onCreateGroup={() => setGroupModalOpen(true)}
+            onCreateGroup={() => router.push('/community/groups/new')}
             searchMode={isSearchMode}
             searchKind={searchKind}
             searchCounts={searchResults?.counts}
@@ -5260,7 +5361,7 @@ export default function CommunityFeedClient({
                   isId={isId}
                   overview={overview}
                   onChanged={() => setRefreshKey(value => value + 1)}
-                  onCreateGroup={() => setGroupModalOpen(true)}
+                  onCreateGroup={() => router.push('/community/groups/new')}
                   onOpenMembers={setMembersModalGroup}
                 />
 
@@ -5341,20 +5442,11 @@ export default function CommunityFeedClient({
           <RightRail isId={isId} overview={overview} />
         </div>
       </div>
-      <div className="mt-4">
-        <Footer />
-      </div>
       <CommunityDetailModal
         isId={isId}
         threadId={selectedThreadId}
         onClose={closeThreadDetail}
         onChanged={() => setRefreshKey(value => value + 1)}
-      />
-      <GroupCreateModal
-        isId={isId}
-        open={groupModalOpen}
-        onClose={() => setGroupModalOpen(false)}
-        onCreated={() => setRefreshKey(value => value + 1)}
       />
       <GroupMembersModal
         group={membersModalGroup}

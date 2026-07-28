@@ -183,7 +183,10 @@
 
 @layer utilities {
   .content-width {
-    @apply mx-auto w-full max-w-7xl px-3 sm:px-5 lg:px-6;
+    margin-inline: auto;
+    width: 100%;
+    max-width: var(--app-content-max-width, 1280px);
+    padding-inline: var(--app-page-x, clamp(16px, 2.4vw, 32px));
   }
 
   .app-surface {
@@ -1320,13 +1323,9 @@ html[data-keyboard-open='true'] .ui-layer-modal {
 .lajukan-route-surface:not([data-route-intent='home']):not(
     [data-route-intent='chat']
   ):not([data-route-intent='reels'])
-  :where(
-    .container,
-    [class*='max-w-7xl'],
-    [class*='max-w-6xl'],
-    [class*='max-w-5xl']
-  ) {
-  width: min(100%, 1180px);
+  :where(.container, [class*='max-w-7xl']) {
+  width: 100%;
+  max-width: var(--app-content-max-width, 1280px);
 }
 
 .lajukan-route-surface:not([data-route-intent='home']):not(

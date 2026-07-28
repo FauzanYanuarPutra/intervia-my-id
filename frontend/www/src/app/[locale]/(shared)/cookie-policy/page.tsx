@@ -41,7 +41,7 @@ export default async function CookiePolicyPage({ params }: PageProps) {
   ];
 
   return (
-    <main className="page-shell page-rhythm pb-6 pt-4 lg:pb-10">
+    <main className="page-shell page-shell-readable page-rhythm pb-6 pt-4 lg:pb-10">
       <SummaryCard
         title={isId ? 'Cookie di Lajukan' : 'Cookies at Lajukan'}
         description={

@@ -4,7 +4,7 @@ import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
-import { haversineKm } from '@/lib/super-app/location-guard';
+import { haversineKm, isCoordinateValid } from '@/lib/super-app/location-guard';
 import { getUmkmBusinessCategoryLabel } from '@/lib/super-app/umkm-taxonomy';
 import {
   createUmkmStore,
@@ -13,8 +13,15 @@ import {
   listUmkmTables,
   listUmkmStoresForActor,
   listUmkmStores,
+  type UmkmStore,
   upsertUmkmTables,
 } from '@/lib/super-app/umkm-commerce';
+import {
+  getUmkmStoreCollectionSummary,
+  projectPublicUmkmStore,
+} from '@/lib/super-app/umkm-public-store';
+import { isPublicUmkmStoreVisible } from '@/lib/super-app/umkm-public-discovery';
+import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-metadata';
 
 function parseCoord(value: string | null): number | null {
   if (!value) return null;
@@ -27,6 +34,25 @@ function parseRadiusKm(value: string | null): number | null {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return Math.min(parsed, 200);
+}
+
+async function resolveCollectionSummary(
+  store: UmkmStore,
+  includeLiveTables: boolean,
+) {
+  if (!includeLiveTables) return getUmkmStoreCollectionSummary(store);
+
+  const tables = await listUmkmTables(store.id);
+  const availableTables = tables.filter(table => table.status === 'available');
+  const maxTableCapacity =
+    tables.length > 0 ? Math.max(...tables.map(table => table.capacity)) : 0;
+
+  return {
+    table_count: tables.length,
+    available_table_count: availableTables.length,
+    max_table_capacity: maxTableCapacity,
+    reservation_enabled: store.offline_order_enabled && tables.length > 0,
+  };
 }
 
 const CreateStoreSchema = z.object({
@@ -66,7 +92,9 @@ export async function GET(req: NextRequest) {
     if (!rl.ok) return rl.response;
 
     const url = new URL(req.url);
-    const mine = url.searchParams.get('mine') === '1' || url.searchParams.get('mine') === 'true';
+    const mine =
+      url.searchParams.get('mine') === '1' ||
+      url.searchParams.get('mine') === 'true';
     let actorUserId: string | undefined;
     let actorEmail: string | undefined;
     if (mine) {
@@ -82,12 +110,22 @@ export async function GET(req: NextRequest) {
     const backendOnly =
       url.searchParams.get('backend_only') === '1' ||
       url.searchParams.get('backend_only') === 'true';
-    const requestedLimit = Number.parseInt(url.searchParams.get('limit') || '80', 10) || 80;
+    const requestedLimit =
+      Number.parseInt(url.searchParams.get('limit') || '80', 10) || 80;
     const limit = Math.max(1, Math.min(500, requestedLimit));
     const viewerLat = parseCoord(url.searchParams.get('viewer_lat'));
     const viewerLng = parseCoord(url.searchParams.get('viewer_lng'));
     const radiusKm = parseRadiusKm(url.searchParams.get('radius_km'));
-    const hasViewer = viewerLat !== null && viewerLng !== null;
+    const hasViewer =
+      viewerLat !== null &&
+      viewerLng !== null &&
+      isCoordinateValid({ lat: viewerLat, lng: viewerLng });
+    const candidateLimit = mine
+      ? limit
+      : Math.min(
+          500,
+          Math.max(120, limit * (hasViewer || radiusKm !== null ? 6 : 2)),
+        );
 
     const stores = mine
       ? await listUmkmStoresForActor({
@@ -96,7 +134,7 @@ export async function GET(req: NextRequest) {
           query: query || undefined,
           city: city || undefined,
           slug: slug || undefined,
-          limit: 500,
+          limit: candidateLimit,
         })
       : await listUmkmStores({
           query: query || undefined,
@@ -104,53 +142,51 @@ export async function GET(req: NextRequest) {
           slug: slug || undefined,
           backendOnly,
           activeOnly: true,
-          limit: 500,
+          limit: candidateLimit,
         });
 
-    const items = stores
-      .map(async (store) => {
+    const visibleStores = mine
+      ? stores
+      : stores.filter(isPublicUmkmStoreVisible);
+
+    const items = await Promise.all(
+      visibleStores.map(async store => {
         const distanceKm = hasViewer
           ? haversineKm(
               { lat: viewerLat as number, lng: viewerLng as number },
               { lat: store.lat, lng: store.lng },
             )
           : null;
-        const tables = await listUmkmTables(store.id);
-        const availableTables = tables.filter((table) => table.status === 'available');
-        const maxTableCapacity =
-          tables.length > 0 ? Math.max(...tables.map((table) => table.capacity)) : 0;
+        const collectionSummary = await resolveCollectionSummary(store, mine);
         return {
-          ...store,
-          distance_km: distanceKm !== null ? Number(distanceKm.toFixed(2)) : null,
+          ...(mine ? store : projectPublicUmkmStore(store)),
+          distance_km:
+            distanceKm !== null ? Number(distanceKm.toFixed(2)) : null,
           recommended_qr: getStoreRecommendedQr(store),
-          table_count: tables.length,
-          available_table_count: availableTables.length,
-          max_table_capacity: maxTableCapacity,
-          reservation_enabled: store.offline_order_enabled && tables.length > 0,
+          ...collectionSummary,
         };
-      });
-    const resolvedItems = await Promise.all(items);
-    const visibleItems = (mine
-      ? resolvedItems
-      : resolvedItems.filter((item) => {
-          if (item.metadata?.source === 'usaha_portal') {
-            return item.is_active !== false;
-          }
-          return item.metadata?.outlet_active !== false;
-        }))
-      .filter((item) => {
-        if (!hasViewer || radiusKm === null) return true;
-        if (typeof item.distance_km !== 'number' || !Number.isFinite(item.distance_km)) return false;
-        return item.distance_km <= radiusKm;
-      });
+      }),
+    );
+    const filteredItems = items.filter(item => {
+      if (!hasViewer || radiusKm === null) return true;
+      if (
+        typeof item.distance_km !== 'number' ||
+        !Number.isFinite(item.distance_km)
+      )
+        return false;
+      return item.distance_km <= radiusKm;
+    });
 
-    const sortedItems = visibleItems
-      .sort((a, b) => {
-        if (a.distance_km !== null && b.distance_km !== null) return a.distance_km - b.distance_km;
-        if (a.distance_km !== null) return -1;
-        if (b.distance_km !== null) return 1;
-        return b.updated_at.localeCompare(a.updated_at);
-      });
+    const sortedItems = hasViewer
+      ? [...filteredItems].sort((a, b) => {
+          if (a.distance_km !== null && b.distance_km !== null) {
+            return a.distance_km - b.distance_km;
+          }
+          if (a.distance_km !== null) return -1;
+          if (b.distance_km !== null) return 1;
+          return b.updated_at.localeCompare(a.updated_at);
+        })
+      : filteredItems;
     const limitedItems = sortedItems.slice(0, limit);
 
     return NextResponse.json(
@@ -164,7 +200,10 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     console.error('[UMKM_STORES_GET_ERROR]', error);
-    return NextResponse.json({ error: 'Failed to load UMKM stores' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to load UMKM stores' },
+      { status: 500 },
+    );
   }
 }
 
@@ -217,28 +256,30 @@ export async function POST(req: NextRequest) {
             }
           : {}),
         recommended_qr: (payload.table_count || 0) > 0 ? 'offline' : 'online',
-        ...(payload.metadata || {}),
+        ...(sanitizeOwnerWritableUmkmMetadata(payload.metadata) || {}),
       },
     });
 
     let tables = [] as Awaited<ReturnType<typeof upsertUmkmTables>>;
     if ((payload.table_count || 0) > 0) {
       const prefix = (payload.table_prefix || 'T').toUpperCase();
-      const tableRows = Array.from({ length: payload.table_count || 0 }).map((_, idx) => {
-        const number = String(idx + 1).padStart(2, '0');
-        return {
-          table_code: `${prefix}${number}`,
-          capacity: payload.default_capacity || 2,
-          status: 'available' as const,
-          metadata: {},
-        };
-      });
+      const tableRows = Array.from({ length: payload.table_count || 0 }).map(
+        (_, idx) => {
+          const number = String(idx + 1).padStart(2, '0');
+          return {
+            table_code: `${prefix}${number}`,
+            capacity: payload.default_capacity || 2,
+            status: 'available' as const,
+            metadata: {},
+          };
+        },
+      );
       tables = await upsertUmkmTables({
         storeId: store.id,
         tables: tableRows,
       });
       await Promise.all(
-        tables.map((table) =>
+        tables.map(table =>
           ensureUmkmQrToken({
             storeId: store.id,
             mode: 'offline',
@@ -268,7 +309,12 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('[UMKM_STORES_CREATE_ERROR]', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create UMKM store' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create UMKM store',
+      },
       { status: 400 },
     );
   }

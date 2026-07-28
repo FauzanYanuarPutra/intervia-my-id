@@ -8,7 +8,7 @@ import {
   MediaPreviewCarousel,
   type MediaPreviewItem,
 } from '@/components/common/MediaPreviewCarousel';
-import { ExploreCardMedia } from '@/components/explore/cards/ExploreCardMedia';
+import { ExploreListingCard } from '@/components/explore/cards/ExploreListingCard';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
@@ -16,7 +16,6 @@ import { usePathname } from 'next/navigation';
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -44,7 +43,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  Store,
   Target,
   ThumbsUp,
   TrendingUp,
@@ -65,7 +63,6 @@ import {
   CubeIcon,
   BuildingStorefrontIcon,
   BriefcaseIcon,
-  MapPinIcon,
   UserGroupIcon,
   ChatBubbleLeftRightIcon,
   PlayCircleIcon,
@@ -73,9 +70,13 @@ import {
 } from '@heroicons/react/24/solid';
 import { HomeUmkmMapPreview } from '@/components/home/HomeUmkmMapPreview';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
-import { Footer } from '@/components/layout/Footer';
 import { DailyLoginRewardCard } from '@/components/rewards/DailyLoginRewardCard';
 import { SearchInput } from '@/components/ui/SearchInput';
+import {
+  Skeleton,
+  SkeletonAvatar,
+  SkeletonStack,
+} from '@/components/ui/Skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { useChatInbox } from '@/context/ChatInboxContext';
@@ -97,6 +98,7 @@ import {
 } from '@/lib/content/catalog';
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
+import { resolveListingSide } from '@/lib/content/listingSide';
 import { MarketplacePageFrame } from '@/components/layout/MarketplacePageFrame';
 import type {
   CommunityFeedItem,
@@ -113,6 +115,7 @@ import {
 } from '@/lib/discovery/lajukanCategories';
 import { cn } from '@/lib/utils';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
+import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import useEmblaCarousel from 'embla-carousel-react';
 
 type HomeContentSimpleProps = {
@@ -185,6 +188,7 @@ let trendingSearchRequest: Promise<TrendingSearchItem[]> | null = null;
 type RecommendationItem = {
   id: string;
   title: string;
+  summary: string;
   vendor: string;
   location: string;
   rating: string;
@@ -204,6 +208,10 @@ type RecommendationItem = {
   secondaryEventName?: string;
   distanceKm?: number | null;
   distanceLabel?: string | null;
+  contentType: string;
+  verified: boolean;
+  side: 'supply' | 'demand';
+  imageAttribution?: string;
 };
 
 type CommunityTab = 'for-you' | 'following' | 'community';
@@ -733,6 +741,20 @@ function metadataText(item: ContentItem, ...keys: string[]): string {
   return '';
 }
 
+function contentImageAttribution(item: ContentItem): string {
+  const directAttribution = metadataText(item, 'image_attribution');
+  if (directAttribution) return directAttribution;
+  const imageCredit = item.metadata?.image_credit;
+  if (
+    !imageCredit ||
+    typeof imageCredit !== 'object' ||
+    Array.isArray(imageCredit)
+  ) {
+    return '';
+  }
+  return readText((imageCredit as Record<string, unknown>).provider);
+}
+
 function readContentDistanceKm(
   item: ContentItem,
   allowViewerDistance: boolean,
@@ -869,6 +891,12 @@ function mapContentToRecommendation(
   const statsRating = item.seller_stats?.rating ?? item.rating;
   const statsReviews = item.seller_stats?.review_count ?? item.review_count;
   const type = item.content_type || item.category;
+  const side = resolveListingSide({
+    type,
+    metadata: item.metadata,
+    title: item.title,
+    summary: item.summary,
+  });
   const vendor =
     readText(item.owner_profile?.full_name) ||
     metadataText(item, 'brand', 'company', 'company_name', 'store_name');
@@ -889,6 +917,7 @@ function mapContentToRecommendation(
   return {
     id: item.id,
     title: item.title,
+    summary: readText(item.summary) || readText(item.body),
     vendor,
     location,
     rating:
@@ -910,6 +939,10 @@ function mapContentToRecommendation(
     createHref: createHrefForContentType(type),
     distanceKm,
     distanceLabel: formatRecommendationDistance(distanceKm),
+    contentType: type || 'listing',
+    verified: item.owner_profile?.identity_verified === true,
+    side,
+    imageAttribution: contentImageAttribution(item) || undefined,
   };
 }
 
@@ -1828,7 +1861,7 @@ function HeroVisualStage({
             event.preventDefault();
             onSubmit(query);
           }}
-          className="relative z-20 flex h-12 items-center gap-2 rounded-2xl border border-zinc-100 bg-white px-3 shadow-lg shadow-zinc-900/5"
+          className="ui-search-form ui-field-shell relative z-20 flex h-12 items-center gap-2 rounded-2xl border bg-white px-3 shadow-[0_14px_34px_-24px_rgba(15,23,42,0.28)]"
         >
           <Search className="h-4 w-4 shrink-0 text-emerald-600" />
 
@@ -2341,6 +2374,11 @@ export function RecommendationsSection({
     <section
       className="space-y-4 py-4"
       data-testid="home-recommendations-section"
+      aria-label={
+        isId
+          ? 'Rekomendasi penawaran untuk usahamu'
+          : 'Recommended offers for your business'
+      }
     >
       {/* HEADER SECTION */}
       <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
@@ -2351,35 +2389,33 @@ export function RecommendationsSection({
               className="h-4 w-4 text-emerald-600 animate-spin-slow"
               style={{ animationDuration: '10s' }}
             />
-            {isId ? 'Rekomendasi Usaha' : 'Recommended'}
+            {isId
+              ? 'Rekomendasi untuk Usahamu'
+              : 'Recommended for your business'}
           </h2>
           <p className="text-[11px] font-medium text-zinc-400">
             {isId
-              ? 'Pilihan supplier, jasa, dan alat terbaik.'
-              : 'Best handpicked options for your business.'}
+              ? 'Penawaran supplier, jasa, dan alat yang relevan.'
+              : 'Relevant supplier, service, and equipment offers.'}
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <CompactSeeAllLink
-            href={UMKM_DISCOVERY_PATH}
+            href="/explore?side=supply"
             isId={isId}
-            ariaLabel={
-              isId
-                ? 'Lihat semua rekomendasi usaha'
-                : 'View all recommendations'
-            }
+            ariaLabel={isId ? 'Jelajahi semua penawaran' : 'Explore all offers'}
           />
           <EmblaDesktopControls api={emblaApi} isId={isId} compact />
         </div>
       </div>
 
       {items.length === 0 ? (
-        <div className="mx-4 sm:mx-6 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 px-4 py-8 text-center text-sm font-medium text-zinc-500">
+        <p className="mx-4 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 px-4 py-8 text-center text-sm font-medium text-zinc-500 sm:mx-6">
           {isId
-            ? 'Belum ada rekomendasi aktif saat ini.'
-            : 'No active recommendations yet.'}
-        </div>
+            ? 'Belum ada penawaran yang dapat direkomendasikan saat ini.'
+            : 'There are no offers to recommend right now.'}
+        </p>
       ) : (
         /* FIX HEIGHT DISINI: Gunakan 'overflow-visible' agar kartu tidak terpotong */
         <div className="w-full relative overflow-visible">
@@ -2393,7 +2429,7 @@ export function RecommendationsSection({
               {items.map(item => (
                 <div
                   key={item.id}
-                  className="w-[82vw] max-w-[330px] shrink-0 select-none sm:w-[320px] lg:w-[340px]"
+                  className="w-[44vw] min-w-[164px] max-w-[210px] shrink-0 select-none sm:w-[220px] sm:max-w-[220px] lg:w-[232px] lg:max-w-[232px]"
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <RecommendationCard item={item} isId={isId} />
@@ -2407,18 +2443,6 @@ export function RecommendationsSection({
   );
 }
 
-const CATEGORY_STYLES: Record<string, string> = {
-  supplier: 'bg-amber-50 text-amber-800 border-amber-200',
-  jasa: 'bg-blue-50 text-blue-800 border-blue-200',
-  lokasi: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-  talent: 'bg-pink-50 text-pink-800 border-pink-200',
-  loker: 'bg-cyan-50 text-cyan-800 border-cyan-200',
-  sewa: 'bg-violet-50 text-violet-800 border-violet-200',
-  'oper usaha': 'bg-orange-50 text-orange-800 border-orange-200',
-  usaha: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  default: 'bg-zinc-50 text-zinc-700 border-zinc-200',
-};
-
 function RecommendationCard({
   item,
   isId,
@@ -2426,90 +2450,39 @@ function RecommendationCard({
   item: RecommendationItem;
   isId: boolean;
 }) {
-  const badgeStyle = useMemo(() => {
-    const label = item.typeLabel.toLowerCase();
-    const categoryKey = Object.keys(CATEGORY_STYLES).find(key =>
-      label.includes(key),
-    );
-    return categoryKey ? CATEGORY_STYLES[categoryKey] : CATEGORY_STYLES.default;
-  }, [item.typeLabel]);
   const mediaSrc = item.image || item.images?.[0] || null;
   const priceLabel =
-    item.unit && item.unit !== 'item' ? `${item.price} / ${item.unit}` : item.price;
+    item.unit && item.unit !== 'item'
+      ? `${item.price} / ${item.unit}`
+      : item.price;
+  const exploreItem: GlobalSearchItem = {
+    id: item.id,
+    kind: item.contentType === 'service' ? 'services' : 'products',
+    title: item.title,
+    summary: item.summary,
+    href: item.href,
+    image: mediaSrc,
+    label: item.typeLabel,
+    location: item.distanceLabel || item.location,
+    priceLabel,
+    ownerName: item.vendor,
+    verified: item.verified,
+    side: item.side,
+    memberCount: null,
+    viewCount: null,
+    durationLabel: '',
+    metadata: {
+      contentType: item.contentType,
+      ...(item.imageAttribution
+        ? { imageAttribution: item.imageAttribution }
+        : {}),
+    },
+  };
 
   return (
-    <article
-      className={cn(
-        'group relative grid h-full min-h-[176px] cursor-pointer grid-cols-[104px_minmax(0,1fr)] overflow-hidden rounded-lg border border-teal-100 bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)] sm:grid-cols-[116px_minmax(0,1fr)]',
-      )}
-      data-testid="home-recommendation-card"
-    >
-      <Link
-        href={item.href}
-        className="absolute inset-0 z-10 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
-      >
-        <span className="sr-only">{item.title}</span>
-      </Link>
-      <ExploreCardMedia
-        src={mediaSrc}
-        alt={item.title}
-        className="h-full min-h-[176px] w-full"
-      />
-      <div className="flex min-w-0 flex-col p-2.5">
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-teal-700">
-            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-50 !p-1 text-teal-700">
-              <Store className="h-3 w-3" />
-            </span>
-            <span className="truncate">{item.typeLabel}</span>
-          </p>
-          {item.badge ? (
-            <span
-              className={cn(
-                'shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-bold',
-                badgeStyle,
-              )}
-            >
-              {item.badge}
-            </span>
-          ) : null}
-        </div>
-
-        <h3 className="mt-1.5 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)]">
-          {item.title}
-        </h3>
-        <p className="mt-1 line-clamp-1 text-xs leading-4 text-[color:var(--app-text-soft)]">
-          {item.vendor || item.location || (isId ? 'Usaha Lajukan' : 'Lajukan business')}
-        </p>
-
-        <div
-          className="mt-2 flex flex-wrap gap-1.5 border-t border-[color:var(--app-border)] pt-2 text-[11px]"
-          aria-label={isId ? 'Info utama' : 'Key info'}
-        >
-          {priceLabel ? (
-            <span className="min-w-0 max-w-full truncate rounded-full bg-teal-50 px-2 py-1 font-bold text-teal-700">
-              {priceLabel}
-            </span>
-          ) : null}
-          {item.distanceLabel || item.location ? (
-            <span className="inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded-full bg-[color:var(--app-surface-muted)] px-2 py-1 font-semibold text-[color:var(--app-text)]">
-              <MapPinIcon className="h-3 w-3 shrink-0 text-[color:var(--app-text-soft)]" />
-              <span className="truncate">
-                {item.distanceLabel || item.location}
-              </span>
-            </span>
-          ) : null}
-        </div>
-
-        <span
-          className="mt-auto inline-flex min-h-8 w-fit items-center justify-center gap-1 rounded-md bg-[color:var(--app-surface-muted)] px-3 text-xs font-bold text-teal-700"
-          aria-hidden="true"
-        >
-          {isId ? 'Lihat usaha' : 'View business'}
-          <ArrowRight className="h-3.5 w-3.5" />
-        </span>
-      </div>
-    </article>
+    <div className="h-full" data-testid="home-recommendation-card">
+      <ExploreListingCard item={exploreItem} locale={isId ? 'id' : 'en'} />
+    </div>
   );
 }
 
@@ -2567,22 +2540,24 @@ function CommunityPanel({
     ? post.mediaItems
     : post?.mediaUrl
       ? [
-        {
-          src: post.mediaUrl,
-          type: post.mediaType === 'video' ? 'video' : 'image',
-          alt: post.title,
-        } satisfies MediaPreviewItem,
-      ]
+          {
+            src: post.mediaUrl,
+            type: post.mediaType === 'video' ? 'video' : 'image',
+            alt: post.title,
+          } satisfies MediaPreviewItem,
+        ]
       : [];
   const postMediaUrl =
     postMediaItems.length > 0 ? post?.mediaUrl || post?.image : null;
   const postIsVideo = post?.mediaType === 'video';
   const postStatsLabel = post
     ? post.kind === 'reel'
-      ? `${post.views} ${isId ? 'tayangan' : 'views'} - ${post.comments} ${isId ? 'komentar' : 'comments'
-      }`
-      : `${post.comments} ${isId ? 'komentar' : 'comments'} - ${post.shares
-      } ${isId ? 'bagikan' : 'shares'}`
+      ? `${post.views} ${isId ? 'tayangan' : 'views'} - ${post.comments} ${
+          isId ? 'komentar' : 'comments'
+        }`
+      : `${post.comments} ${isId ? 'komentar' : 'comments'} - ${
+          post.shares
+        } ${isId ? 'bagikan' : 'shares'}`
     : '';
 
   const copyPostLink = async () => {
@@ -2842,7 +2817,7 @@ function CommunityPanel({
           {postMediaItems.length > 0 ? (
             <Link
               href={communityPostHref}
-              className="relative block aspect-[16/9] overflow-hidden rounded-3xl bg-slate-100"
+              className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-100 sm:aspect-[16/9]"
             >
               {postIsVideo && postMediaItems.length === 1 ? (
                 <video
@@ -2921,12 +2896,12 @@ function CommunityPanel({
               ? item.mediaItems
               : item.mediaUrl
                 ? [
-                  {
-                    src: item.mediaUrl,
-                    type: item.mediaType === 'video' ? 'video' : 'image',
-                    alt: item.title,
-                  } satisfies MediaPreviewItem,
-                ]
+                    {
+                      src: item.mediaUrl,
+                      type: item.mediaType === 'video' ? 'video' : 'image',
+                      alt: item.title,
+                    } satisfies MediaPreviewItem,
+                  ]
                 : [];
             return (
               <Link
@@ -3303,14 +3278,119 @@ function HomeLoadingState() {
         className="mt-4 grid min-h-0 gap-4 lg:h-[calc(100%-5rem)] lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_288px] 2xl:grid-cols-[280px_minmax(0,1fr)_320px]"
         data-skeleton-route="true"
       >
-        <div className="ui-skeleton ui-skeleton-pulse hidden h-[540px] rounded-[24px] lg:block" />
+        <aside className="hidden space-y-3 rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 lg:block">
+          <div className="flex items-center gap-3">
+            <SkeletonAvatar className="h-12 w-12" />
+            <div className="min-w-0 flex-1">
+              <Skeleton variant="line" className="h-4 w-28" />
+              <Skeleton variant="line" className="mt-2 h-3 w-20" />
+            </div>
+          </div>
+          <SkeletonStack lines={2} className="py-2" />
+          {Array.from({ length: 7 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-3 py-2">
+              <Skeleton className="h-9 w-9 rounded-xl" />
+              <Skeleton variant="line" className="h-4 flex-1" />
+            </div>
+          ))}
+        </aside>
         <div className="min-h-0 space-y-4 overflow-hidden">
-          <div className="ui-skeleton ui-skeleton-pulse h-[248px] rounded-[24px]" />
-          <div className="ui-skeleton ui-skeleton-pulse h-[142px] rounded-[24px]" />
-          <div className="ui-skeleton ui-skeleton-pulse h-[260px] rounded-[24px]" />
-          <div className="ui-skeleton ui-skeleton-pulse h-[420px] rounded-[24px]" />
+          <section className="mx-auto w-full max-w-7xl px-3 py-4">
+            <div className="relative min-h-[155px] overflow-hidden rounded-3xl bg-emerald-50/70 px-4 py-5 sm:px-6 sm:py-7">
+              <div className="grid grid-cols-3 items-center gap-3">
+                <div className="col-span-2 flex min-h-[110px] flex-col justify-center sm:min-h-[140px]">
+                  <Skeleton
+                    variant="line"
+                    className="h-7 w-4/5 max-w-[360px] sm:h-9"
+                  />
+                  <Skeleton
+                    variant="line"
+                    className="mt-2 h-7 w-3/5 max-w-[280px] sm:h-9"
+                  />
+                  <SkeletonStack
+                    lines={2}
+                    className="mt-4 max-w-[500px]"
+                    lineClassName="h-3"
+                  />
+                </div>
+                <div className="relative col-span-1 h-[110px] sm:h-[140px]">
+                  <Skeleton className="absolute right-0 top-1/2 h-[96px] w-[96px] -translate-y-1/2 rounded-[28px] sm:h-[124px] sm:w-[124px]" />
+                </div>
+              </div>
+            </div>
+            <div className="-mt-5 px-2">
+              <div className="relative z-20 flex h-12 items-center gap-3 rounded-2xl border border-[color:var(--app-border)] bg-white px-3 shadow-[0_14px_34px_-24px_rgba(15,23,42,0.28)]">
+                <Skeleton className="h-4 w-4 shrink-0 rounded-full" />
+                <Skeleton variant="line" className="h-4 flex-1" />
+                <Skeleton className="h-8 w-8 shrink-0 rounded-xl" />
+              </div>
+            </div>
+          </section>
+          <section className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <Skeleton variant="line" className="h-5 w-36" />
+              <Skeleton variant="chip" className="w-20" />
+            </div>
+            <div className="mt-4 flex gap-3 overflow-hidden">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="w-24 shrink-0 text-center">
+                  <Skeleton className="mx-auto h-14 w-14 rounded-2xl" />
+                  <Skeleton variant="line" className="mx-auto mt-2 w-16" />
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+            <div className="flex items-start gap-3 p-4">
+              <SkeletonAvatar />
+              <div className="min-w-0 flex-1">
+                <Skeleton variant="line" className="h-4 w-32" />
+                <Skeleton variant="line" className="mt-2 h-3 w-20" />
+              </div>
+              <Skeleton className="h-9 w-9 rounded-full" />
+            </div>
+            <div className="px-4 pb-4">
+              <Skeleton variant="line" className="h-5 w-4/5" />
+              <SkeletonStack lines={2} className="mt-3" />
+            </div>
+            <Skeleton
+              variant="media"
+              className="w-full rounded-none sm:aspect-video"
+            />
+            <div className="grid grid-cols-3 gap-3 border-t border-[color:var(--app-border)] p-4">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton key={index} variant="line" className="mx-auto w-16" />
+              ))}
+            </div>
+          </section>
+          <section className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4">
+            <Skeleton variant="line" className="h-5 w-44" />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex gap-3 rounded-[18px] border border-[color:var(--app-border)] p-3"
+                >
+                  <Skeleton className="h-16 w-20 shrink-0 rounded-xl" />
+                  <div className="min-w-0 flex-1">
+                    <Skeleton variant="line" className="h-4 w-3/4" />
+                    <SkeletonStack lines={2} className="mt-2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
-        <div className="ui-skeleton ui-skeleton-pulse hidden h-[430px] rounded-[24px] xl:block" />
+        <aside className="hidden space-y-4 rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 xl:block">
+          <Skeleton variant="line" className="h-5 w-36" />
+          <SkeletonStack lines={3} />
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-20 rounded-[18px]" />
+            ))}
+          </div>
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </aside>
       </div>
     </MarketplacePageFrame>
   );
@@ -3465,6 +3545,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         const params = new URLSearchParams({
           limit: '16',
           status: 'active',
+          side: 'supply',
           include_owner: '1',
           database_only: '1',
         });
@@ -3486,7 +3567,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           .map(item =>
             mapContentToRecommendation(item, isId, Boolean(viewerLocation)),
           )
-          .filter((item): item is RecommendationItem => Boolean(item));
+          .filter((item): item is RecommendationItem => Boolean(item))
+          .filter(item => item.side === 'supply');
         if (!active) return;
         setRecommendations(
           listingItems
@@ -3553,7 +3635,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         );
         const rawNextCursor =
           typeof payload?.nextCursor === 'number' &&
-            Number.isFinite(payload.nextCursor)
+          Number.isFinite(payload.nextCursor)
             ? payload.nextCursor
             : null;
         const responseItemCount = payload?.items?.length || 0;
@@ -3649,13 +3731,13 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       setCommunityOverview(current =>
         current
           ? {
-            ...current,
-            stats: {
-              ...current.stats,
-              totalThreads: current.stats.totalThreads + 1,
-              totalPosts: current.stats.totalPosts + 1,
-            },
-          }
+              ...current,
+              stats: {
+                ...current.stats,
+                totalThreads: current.stats.totalThreads + 1,
+                totalPosts: current.stats.totalPosts + 1,
+              },
+            }
           : current,
       );
     },
@@ -3694,27 +3776,27 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   const text = isId
     ? {
-      help: 'Bantuan',
-      login: 'Masuk',
-      register: 'Daftar Sekarang',
-      inviteTitle: 'Masuk dulu, peluangnya ikut nempel',
-      inviteDescription:
-        'Login untuk simpan favorit, lanjut chat, dan dapat rekomendasi yang makin relevan.',
-      inviteButton: 'Daftar Sekarang',
-      searchPlaceholder: 'Cari supplier, jasa, lokasi...',
-      searchButton: 'Cari',
-    }
+        help: 'Bantuan',
+        login: 'Masuk',
+        register: 'Daftar Sekarang',
+        inviteTitle: 'Masuk dulu, peluangnya ikut nempel',
+        inviteDescription:
+          'Login untuk simpan favorit, lanjut chat, dan dapat rekomendasi yang makin relevan.',
+        inviteButton: 'Daftar Sekarang',
+        searchPlaceholder: 'Cari supplier, jasa, lokasi...',
+        searchButton: 'Cari',
+      }
     : {
-      help: 'Help',
-      login: 'Login',
-      register: 'Register Now',
-      inviteTitle: 'Log in first, then the best leads follow you',
-      inviteDescription:
-        'Save favorites, continue chats, and get recommendations that feel more personal.',
-      inviteButton: 'Register Now',
-      searchPlaceholder: 'Search suppliers, services, places...',
-      searchButton: 'Search',
-    };
+        help: 'Help',
+        login: 'Login',
+        register: 'Register Now',
+        inviteTitle: 'Log in first, then the best leads follow you',
+        inviteDescription:
+          'Save favorites, continue chats, and get recommendations that feel more personal.',
+        inviteButton: 'Register Now',
+        searchPlaceholder: 'Search suppliers, services, places...',
+        searchButton: 'Search',
+      };
 
   const avatarSrc = profileAvatarSrc(
     user?.avatarUrl || user?.avatar_url,
@@ -3752,173 +3834,173 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   const sidebarItems = isAuthenticated
     ? {
-      primary: [
-        {
-          id: 'home',
-          label: isId ? 'Beranda' : 'Home',
-          caption: isId ? 'Ringkasan' : 'Main business overview',
-          href: '/home',
-          icon: Home,
-        },
-        {
-          id: 'explore',
-          label: isId ? 'Peta Usaha' : 'Business Map',
-          caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
-          href: UMKM_DISCOVERY_PATH,
-          icon: MapPin,
-        },
-        {
-          id: 'community',
-          label: isId ? 'Komunitas' : 'Community',
-          caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
-          href: '/community',
-          icon: Sparkles,
-        },
-        {
-          id: 'reels',
-          label: isId ? 'Reels Bisnis' : 'Business Reels',
-          caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
-          href: '/reels',
-          icon: PlayCircle,
-        },
-        ...(!PROMO_ONLY_MODE
-          ? [
-            {
-              id: 'requests',
-              label: isId ? 'Permintaan' : 'My Requests',
-              caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
-              href: '/my-projects',
-              icon: ClipboardList,
-            },
-            {
-              id: 'transactions',
-              label: isId ? 'Transaksi' : 'Transactions',
-              caption: isId ? 'Status & bayar' : 'Progress and payments',
-              href: '/transactions',
-              icon: CreditCard,
-            },
-          ]
-          : []),
-      ],
-      secondary: [
-        {
-          id: 'chat',
-          label: 'Chat',
-          caption: isId ? 'Nego & follow-up' : 'Negotiation and follow-up',
-          href: '/chat',
-          icon: MessageCircle,
-          badge:
-            totalUnread > 0
-              ? totalUnread > 99
-                ? '99+'
-                : totalUnread
-              : undefined,
-        },
-        {
-          id: 'account',
-          label: isId ? 'Akun' : 'My Account',
-          caption: isId ? 'Profil' : 'Profile and preferences',
-          href: '/profile',
-          icon: UserRound,
-        },
-        {
-          id: 'support',
-          label: isId ? 'Bantuan' : 'Help',
-          caption: isId ? 'Support' : 'Guides and support',
-          href: '/support',
-          icon: CircleHelp,
-        },
-      ],
-    }
+        primary: [
+          {
+            id: 'home',
+            label: isId ? 'Beranda' : 'Home',
+            caption: isId ? 'Ringkasan' : 'Main business overview',
+            href: '/home',
+            icon: Home,
+          },
+          {
+            id: 'explore',
+            label: isId ? 'Peta Usaha' : 'Business Map',
+            caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
+            href: UMKM_DISCOVERY_PATH,
+            icon: MapPin,
+          },
+          {
+            id: 'community',
+            label: isId ? 'Komunitas' : 'Community',
+            caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
+            href: '/community',
+            icon: Sparkles,
+          },
+          {
+            id: 'reels',
+            label: isId ? 'Reels Bisnis' : 'Business Reels',
+            caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
+            href: '/reels',
+            icon: PlayCircle,
+          },
+          ...(!PROMO_ONLY_MODE
+            ? [
+                {
+                  id: 'requests',
+                  label: isId ? 'Permintaan' : 'My Requests',
+                  caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
+                  href: '/my-projects',
+                  icon: ClipboardList,
+                },
+                {
+                  id: 'transactions',
+                  label: isId ? 'Transaksi' : 'Transactions',
+                  caption: isId ? 'Status & bayar' : 'Progress and payments',
+                  href: '/transactions',
+                  icon: CreditCard,
+                },
+              ]
+            : []),
+        ],
+        secondary: [
+          {
+            id: 'chat',
+            label: 'Chat',
+            caption: isId ? 'Nego & follow-up' : 'Negotiation and follow-up',
+            href: '/chat',
+            icon: MessageCircle,
+            badge:
+              totalUnread > 0
+                ? totalUnread > 99
+                  ? '99+'
+                  : totalUnread
+                : undefined,
+          },
+          {
+            id: 'account',
+            label: isId ? 'Akun' : 'My Account',
+            caption: isId ? 'Profil' : 'Profile and preferences',
+            href: '/profile',
+            icon: UserRound,
+          },
+          {
+            id: 'support',
+            label: isId ? 'Bantuan' : 'Help',
+            caption: isId ? 'Support' : 'Guides and support',
+            href: '/support',
+            icon: CircleHelp,
+          },
+        ],
+      }
     : {
-      primary: [
-        {
-          id: 'home',
-          label: isId ? 'Beranda' : 'Home',
-          caption: isId ? 'Peluang terbaru' : 'Latest opportunity overview',
-          href: '/home',
-          icon: Home,
-        },
-        {
-          id: 'explore',
-          label: isId ? 'Peta Usaha' : 'Business Map',
-          caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
-          href: UMKM_DISCOVERY_PATH,
-          icon: MapPin,
-        },
-        {
-          id: 'supplier',
-          label: isId ? 'Supplier' : 'Suppliers',
-          caption: isId ? 'Siap respon' : 'Trusted suppliers',
-          href: '/explore?type=product&q=supplier',
-          icon: ShoppingBag,
-        },
-        {
-          id: 'service',
-          label: isId ? 'Jasa' : 'Services',
-          caption: isId ? 'Operasional' : 'Business services',
-          href: '/explore?type=service&q=jasa%20usaha',
-          icon: BriefcaseBusiness,
-        },
-        {
-          id: 'location',
-          label: isId ? 'Lokasi' : 'Places',
-          caption: isId ? 'Titik jual' : 'Strategic places',
-          href: '/explore?type=property&q=lokasi%20usaha',
-          icon: MapPin,
-        },
-        {
-          id: 'talent',
-          label: 'Talent',
-          caption: isId ? 'Siap bantu' : 'Qualified talent',
-          href: '/explore?type=freelancer&q=talent',
-          icon: UserRound,
-        },
-        // {
-        //   id: 'opportunity',
-        //   label: isId ? 'Peluang' : 'Business Opportunities',
-        //   caption: isId ? 'Ide tumbuh' : 'Growth and expansion ideas',
-        //   href: '/learn',
-        //   icon: TrendingUp,
-        // },
-      ],
-      secondary: [
-        {
-          id: 'community',
-          label: isId ? 'Komunitas' : 'Community',
-          caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
-          href: '/community',
-          icon: Sparkles,
-        },
-        {
-          id: 'reels',
-          label: isId ? 'Reels' : 'Business Reels',
-          caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
-          href: '/reels',
-          icon: PlayCircle,
-        },
-        ...(!PROMO_ONLY_MODE
-          ? [
-            {
-              id: 'requests',
-              label: isId ? 'Permintaan Saya' : 'My Requests',
-              caption: isId ? 'Login untuk akses' : 'Login to access',
-              href: '/login',
-              icon: ClipboardList,
-              locked: true,
-            },
-            {
-              id: 'transactions',
-              label: isId ? 'Transaksi' : 'Transactions',
-              caption: isId ? 'Login untuk akses' : 'Login to access',
-              href: '/login',
-              icon: CreditCard,
-              locked: true,
-            },
-          ]
-          : []),
-      ],
-    };
+        primary: [
+          {
+            id: 'home',
+            label: isId ? 'Beranda' : 'Home',
+            caption: isId ? 'Peluang terbaru' : 'Latest opportunity overview',
+            href: '/home',
+            icon: Home,
+          },
+          {
+            id: 'explore',
+            label: isId ? 'Peta Usaha' : 'Business Map',
+            caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
+            href: UMKM_DISCOVERY_PATH,
+            icon: MapPin,
+          },
+          {
+            id: 'supplier',
+            label: isId ? 'Supplier' : 'Suppliers',
+            caption: isId ? 'Siap respon' : 'Trusted suppliers',
+            href: '/explore?type=product&q=supplier',
+            icon: ShoppingBag,
+          },
+          {
+            id: 'service',
+            label: isId ? 'Jasa' : 'Services',
+            caption: isId ? 'Operasional' : 'Business services',
+            href: '/explore?type=service&q=jasa%20usaha',
+            icon: BriefcaseBusiness,
+          },
+          {
+            id: 'location',
+            label: isId ? 'Lokasi' : 'Places',
+            caption: isId ? 'Titik jual' : 'Strategic places',
+            href: '/explore?type=property&q=lokasi%20usaha',
+            icon: MapPin,
+          },
+          {
+            id: 'talent',
+            label: 'Talent',
+            caption: isId ? 'Siap bantu' : 'Qualified talent',
+            href: '/explore?type=freelancer&q=talent',
+            icon: UserRound,
+          },
+          // {
+          //   id: 'opportunity',
+          //   label: isId ? 'Peluang' : 'Business Opportunities',
+          //   caption: isId ? 'Ide tumbuh' : 'Growth and expansion ideas',
+          //   href: '/learn',
+          //   icon: TrendingUp,
+          // },
+        ],
+        secondary: [
+          {
+            id: 'community',
+            label: isId ? 'Komunitas' : 'Community',
+            caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
+            href: '/community',
+            icon: Sparkles,
+          },
+          {
+            id: 'reels',
+            label: isId ? 'Reels' : 'Business Reels',
+            caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
+            href: '/reels',
+            icon: PlayCircle,
+          },
+          ...(!PROMO_ONLY_MODE
+            ? [
+                {
+                  id: 'requests',
+                  label: isId ? 'Permintaan Saya' : 'My Requests',
+                  caption: isId ? 'Login untuk akses' : 'Login to access',
+                  href: '/login',
+                  icon: ClipboardList,
+                  locked: true,
+                },
+                {
+                  id: 'transactions',
+                  label: isId ? 'Transaksi' : 'Transactions',
+                  caption: isId ? 'Login untuk akses' : 'Login to access',
+                  href: '/login',
+                  icon: CreditCard,
+                  locked: true,
+                },
+              ]
+            : []),
+        ],
+      };
 
   if (authLoading) {
     return <HomeLoadingState />;
@@ -3975,7 +4057,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           onLoadMore={loadMoreCommunityPosts}
           onCreated={handleCommunityComposerCreated}
         />
-        <Footer />
       </main>
 
       <div className="lajukan-home-desktop-shell hidden min-h-0 min-w-0 lg:flex lg:flex-1 lg:flex-col">
@@ -4062,7 +4143,6 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   onCreated={handleCommunityComposerCreated}
                 />
               </div>
-              <Footer />
             </div>
           </main>
           <RightRail

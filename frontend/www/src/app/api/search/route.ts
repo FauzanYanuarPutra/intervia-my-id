@@ -20,6 +20,7 @@ import {
 } from '@/lib/search/socialSearchMappers';
 import { getExploreCategoryBySlug } from '@/lib/discovery/lajukanCategories';
 import { getInternalWwwOrigin } from '@/lib/server/internalWwwOrigin';
+import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -304,7 +305,7 @@ function mapBusiness(item: JsonRecord): GlobalSearchItem | null {
     kind: 'businesses',
     title: firstString(item.name, 'Usaha'),
     summary: firstString(item.description, metadata?.tagline, item.address),
-    href: `/umkm/${encodeURIComponent(slug)}`,
+    href: buildUmkmStorefrontPath(slug),
     image: firstImage(item, metadata),
     label: firstString(metadata?.category_label, metadata?.category, 'Usaha'),
     location: firstString(item.city, item.address, 'Indonesia'),

@@ -57,8 +57,8 @@ describe('search result card preview mode', () => {
 
     expect(html).toContain('Mencari');
     expect(html).toContain('Budget fleksibel');
-    expect(html).toContain('Brief teks cukup');
     expect(html).not.toContain('LAJUKAN');
+    expect(html).not.toContain('Buka brief');
   });
 
   it('renders demand explore listings as need briefs even when kind is products', () => {
@@ -77,8 +77,20 @@ describe('search result card preview mode', () => {
 
     expect(html).toContain('Mencari');
     expect(html).toContain('Budget fleksibel');
-    expect(html).toContain('Brief teks cukup');
     expect(html).not.toContain('Menawarkan');
+  });
+
+  it('keeps supply listings scan-first without duplicate summary or CTA', () => {
+    const html = renderToStaticMarkup(
+      <ExploreListingCard item={baseItem} locale="id" interactive={false} />,
+    );
+
+    expect(html).toContain('data-testid="canonical-listing-card"');
+    expect(html).toContain('Kemasan kopi lokal');
+    expect(html).toContain('Rp 25.000');
+    expect(html).toContain('Bandung');
+    expect(html).not.toContain('Ringkasan postingan');
+    expect(html).not.toContain('Lihat detail');
   });
 
   it('renders kebutuhan metadata as brief facts', () => {
@@ -105,8 +117,9 @@ describe('search result card preview mode', () => {
 
     expect(html).toContain('Terbuka');
     expect(html).toContain('Rp 2 juta');
-    expect(html).toContain('500 pcs');
-    expect(html).toContain('Bulanan');
-    expect(html).toContain('Ada gambar referensi');
+    expect(html).toContain('Bandung');
+    expect(html).toContain('2026-08-15');
+    expect(html).not.toContain('Bulanan');
+    expect(html).not.toContain('Ada gambar referensi');
   });
 });

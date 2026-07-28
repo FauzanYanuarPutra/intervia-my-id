@@ -1,7 +1,14 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import {
+  ArrowUpRight,
+  ChevronRight,
+  MessageCircle,
+  Search,
+} from 'lucide-react';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
+import LajukanLogo from '@/components/logo/LajuloLogo';
 import {
   UMKM_DISCOVERY_PATH,
   UMKM_OWNER_PATH,
@@ -20,17 +27,18 @@ type FooterLink = {
 function FooterLinks({ title, links }: { title: string; links: FooterLink[] }) {
   return (
     <nav aria-label={title} className="min-w-0">
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
         {title}
       </p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-3 grid gap-1">
         {links.map(item => (
           <Link
             key={`${item.href}-${item.label}`}
             href={item.href}
-            className="inline-flex min-h-[34px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[12px] font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+            className="group -mx-2 inline-flex min-h-10 items-center justify-between gap-3 rounded-xl px-2 text-[13px] font-semibold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent-border)]"
           >
-            {item.label}
+            <span>{item.label}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
           </Link>
         ))}
       </div>
@@ -45,14 +53,14 @@ export function Footer() {
   const year = new Date().getFullYear();
   const surfaceCopy = getUmkmSurfaceCopy(locale);
 
-  const mainLinks: FooterLink[] = [
+  const discoveryLinks: FooterLink[] = [
     {
       href: '/explore',
-      label: isId ? 'Jelajahi' : 'Explore',
+      label: isId ? 'Cari kebutuhan' : 'Search business needs',
     },
     {
-      href: '/create',
-      label: isId ? 'Buat posting' : 'Create post',
+      href: '/create?side=demand',
+      label: isId ? 'Pasang kebutuhan' : 'Post a requirement',
     },
     {
       href: UMKM_DISCOVERY_PATH,
@@ -62,9 +70,32 @@ export function Footer() {
       href: '/community',
       label: isId ? 'Komunitas' : 'Community',
     },
+  ];
+
+  const businessLinks: FooterLink[] = [
+    {
+      href: '/create?side=supply',
+      label: isId ? 'Tawarkan produk atau jasa' : 'Offer a product or service',
+    },
     {
       href: UMKM_OWNER_PATH,
       label: surfaceCopy.owner,
+    },
+    {
+      href: '/manage',
+      label: isId ? 'Kelola konten' : 'Manage content',
+    },
+    {
+      href: '/my-listings',
+      label: isId ? 'Kelola postingan' : 'Manage posts',
+    },
+    {
+      href: '/about',
+      label: isId ? 'Tentang Lajukan' : 'About Lajukan',
+    },
+    {
+      href: '/blog',
+      label: isId ? 'Artikel usaha' : 'Business articles',
     },
   ];
 
@@ -76,6 +107,10 @@ export function Footer() {
     {
       href: '/contact',
       label: isId ? 'Kontak' : 'Contact',
+    },
+    {
+      href: '/trust',
+      label: isId ? 'Keamanan & kepercayaan' : 'Safety and trust',
     },
     {
       href: '/privacy',
@@ -92,59 +127,90 @@ export function Footer() {
   ];
 
   return (
-    <footer className="mt-8 border-t border-[color:color-mix(in_srgb,_var(--app-border)_82%,_transparent)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_74%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-      <div className="page-shell page-shell-inset py-5 sm:py-6 px-2">
-        <div className="mx-auto grid max-w-[1120px] gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:items-start">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-              {isId ? 'Lajukan UMKM' : 'Lajukan'}
-            </p>
-            <h2 className="mt-1 text-[1.1rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
-              {isId
-                ? 'Cari, posting, dan kelola usaha tanpa ribet.'
-                : 'Search, post, and manage business without friction.'}
-            </h2>
-            <p className="mt-2 max-w-xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
-              {isId
-                ? 'Saat beta, pengguna terhubung lewat listing dan chat langsung. Pembayaran aman sedang disiapkan bertahap.'
-                : 'During beta, users connect through listings and direct chat. Secure payments are being prepared gradually.'}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <a
-                href="https://wa.me/6282117148623"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-[36px] items-center rounded-full bg-[color:var(--app-accent)] px-3.5 text-[12px] font-bold text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_70%,transparent)]"
-              >
-                WhatsApp Lajukan
-              </a>
+    <footer
+      data-testid="site-footer"
+      className="site-footer mt-8 shrink-0 overflow-hidden border-t border-[color:color-mix(in_srgb,_var(--app-border)_82%,_transparent)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_74%,_transparent)] dark:text-[color:var(--app-text-soft)]"
+    >
+      <div className="page-shell">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.45fr)_repeat(3,minmax(0,0.72fr))] lg:gap-10">
+          <div className="min-w-0 lg:pr-4">
+            <div className="flex flex-wrap items-center gap-3">
               <Link
-                href="/support"
-                className="inline-flex min-h-[36px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-3.5 text-[12px] font-bold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-white/5"
+                href="/home"
+                aria-label={isId ? 'Beranda Lajukan' : 'Lajukan home'}
+                className="inline-flex rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent-border)]"
               >
-                {isId ? 'Pusat bantuan' : 'Help center'}
+                <LajukanLogo compact />
+              </Link>
+              <span className="inline-flex min-h-7 items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent-strong)]">
+                Beta
+              </span>
+            </div>
+            <h2 className="mt-4 max-w-xl text-xl font-black leading-tight tracking-[-0.04em] text-[color:var(--app-text)] sm:text-2xl">
+              {isId
+                ? 'Cari kebutuhan usaha dan mitra yang tepat.'
+                : 'Find the right business needs and partners.'}
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Cari supplier, bahan, mesin, jasa, tempat usaha, dan peluang bisnis dalam satu alur yang jelas.'
+                : 'Search suppliers, materials, equipment, services, business places, and opportunities in one clear flow.'}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <Link
+                href="/explore"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[color:var(--app-accent)] px-4 text-[13px] font-black text-white shadow-[0_16px_30px_-22px_color-mix(in_srgb,var(--app-accent)_70%,transparent)] transition hover:-translate-y-0.5 hover:bg-[color:var(--app-accent-strong)]"
+              >
+                <Search className="h-4 w-4" />
+                {isId ? 'Mulai mencari' : 'Start searching'}
+              </Link>
+              <Link
+                href="/create?side=demand"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[color:var(--app-border)] bg-white px-4 text-[13px] font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent-strong)] dark:border-[color:var(--app-border-strong)] dark:bg-white/5"
+              >
+                {isId ? 'Pasang kebutuhan' : 'Post a requirement'}
               </Link>
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FooterLinks
-              title={isId ? 'Menu utama' : 'Main menu'}
-              links={mainLinks}
-            />
-            <FooterLinks
-              title={isId ? 'Bantuan & legal' : 'Help and legal'}
-              links={helpLinks}
-            />
-          </div>
+          <FooterLinks
+            title={isId ? 'Temukan' : 'Discover'}
+            links={discoveryLinks}
+          />
+          <FooterLinks
+            title={isId ? 'Untuk usaha' : 'For business'}
+            links={businessLinks}
+          />
+          <FooterLinks
+            title={isId ? 'Bantuan & legal' : 'Help and legal'}
+            links={helpLinks}
+          />
         </div>
 
-        <div className="mx-auto mt-5 flex max-w-[1120px] flex-col gap-1.5 border-t border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] pt-3 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_72%,_transparent)] sm:flex-row sm:items-center sm:justify-between">
-          <span>&copy; {year} Lajukan.</span>
+        <div className="mt-8 grid gap-4 border-t border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] pt-5 text-xs text-[color:var(--app-text-soft)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_72%,_transparent)] lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="max-w-3xl leading-5">
+            {isId
+              ? 'Saat ini transaksi dilakukan langsung dengan penyedia melalui chat. Fitur pembayaran dan perlindungan transaksi akan tersedia bertahap.'
+              : 'Transactions currently happen directly with providers through chat. Payment and transaction protection will be introduced gradually.'}
+          </div>
+          <a
+            href="https://wa.me/6282117148623"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-10 w-fit items-center gap-2 rounded-xl font-bold text-[color:var(--app-accent-strong)] transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent-border)]"
+          >
+            <MessageCircle className="h-4 w-4" />
+            WhatsApp Lajukan
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2 border-t border-[color:color-mix(in_srgb,_var(--app-border)_55%,_transparent)] pt-4 text-[11px] text-[color:var(--app-text-soft)] sm:flex-row sm:items-center sm:justify-between">
+          <span>&copy; {year} Lajukan Indonesia.</span>
           <span>
             {isId
-              ? 'Dibuat agar pengguna Indonesia cepat paham dan cepat jalan.'
-              : 'Built for clear and fast business workflows.'}
+              ? 'Jelas kebutuhannya, tepat mitranya.'
+              : 'Clear needs, better-matched partners.'}
           </span>
         </div>
       </div>

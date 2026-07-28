@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJwtSubject } from '@/lib/server/jwtPayload';
+import { requireAuth } from '@/lib/serverAuth';
 
-const MARKETPLACE_URL = process.env.INTERNAL_MARKETPLACE_URL || process.env.MARKETPLACE_URL || 'http://localhost:8081';
+const MARKETPLACE_URL =
+  process.env.INTERNAL_MARKETPLACE_URL ||
+  process.env.MARKETPLACE_URL ||
+  'http://localhost:8081';
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 100;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function normalizeContentList(payload: unknown): Array<Record<string, unknown>> {
+function readLimit(value: string | null): number {
+  if (!value || !/^\d+$/.test(value.trim())) return DEFAULT_LIMIT;
+
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) return DEFAULT_LIMIT;
+  return Math.min(Math.max(parsed, 1), MAX_LIMIT);
+}
+
+function readStatus(value: string | null): string {
+  return value?.trim().toLowerCase() || 'active';
+}
+
+function isValidOwnerId(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
+
+function normalizeContentList(
+  payload: unknown,
+): Array<Record<string, unknown>> {
   if (Array.isArray(payload)) return payload as Array<Record<string, unknown>>;
   if (payload && typeof payload === 'object') {
     const objectPayload = payload as Record<string, unknown>;
@@ -21,30 +46,36 @@ function normalizeContentList(payload: unknown): Array<Record<string, unknown>> 
 }
 
 export async function GET(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
-    request.cookies.get('access_token')?.value;
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.res;
 
-  if (!token) {
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get('type')?.trim() || '';
+  const status = readStatus(searchParams.get('status'));
+  const limit = readLimit(searchParams.get('limit'));
+  const ownerId = auth.ctx.payload.sub?.trim() || '';
+
+  // Never call the public content endpoint without a concrete owner filter.
+  // Its unfiltered response is the global marketplace catalogue.
+  if (!isValidOwnerId(ownerId)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const type = searchParams.get('type') || '';
-  const status = searchParams.get('status') || 'active';
-  const ownerId = getJwtSubject(token);
-
   try {
     const params = new URLSearchParams();
-    params.set('limit', '200');
+    params.set('limit', String(limit));
     params.set('offset', '0');
     if (type) params.set('type', type);
-    if (status) params.set('status', status);
-    if (ownerId) params.set('owner_id', ownerId);
+    params.set('status', status);
+    params.set('owner_id', ownerId);
 
-    const res = await fetch(`${MARKETPLACE_URL}/v1/content?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
+    const res = await fetch(
+      `${MARKETPLACE_URL}/v1/content?${params.toString()}`,
+      {
+        headers: { Authorization: `Bearer ${auth.ctx.token}` },
+        cache: 'no-store',
+      },
+    );
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       return NextResponse.json(
@@ -55,28 +86,18 @@ export async function GET(request: NextRequest) {
 
     const data = await res.json().catch(() => []);
     const list = normalizeContentList(data);
-    let results = list;
-
-    // Fallback filtering only if upstream cannot apply it (ownerId/status missing from query).
-    if (ownerId && !params.has('owner_id')) {
-      results = results.filter((item) => String(item.owner_id ?? '') === ownerId);
-    }
-
-    const normalizedStatus = status.trim().toLowerCase();
-    if (normalizedStatus && !params.has('status')) {
-      results = results.filter((item) => {
-        const current = String(item.content_status ?? item.status ?? '').toLowerCase();
-        return current === normalizedStatus;
-      });
-    }
+    // Keep the BFF fail-closed even if an upstream implementation ignores the
+    // owner filter. This also protects compatibility with older service builds.
+    const results = list.filter(
+      item => String(item.owner_id ?? '') === ownerId,
+    );
 
     return NextResponse.json({ results, total: results.length });
   } catch (e) {
     console.error('[my-listings]', e);
     return NextResponse.json(
       { results: [], total: 0, error: 'Service unavailable' },
-      { status: 503 }
+      { status: 503 },
     );
   }
 }
-

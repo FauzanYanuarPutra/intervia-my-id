@@ -1,9 +1,4 @@
 import {
-  localContentImageForTopic,
-  localProductImageForCategory,
-  localUmkmStoreVisual,
-} from '@/lib/media/localSeedMedia';
-import {
   getUmkmBusinessCategoryLabel,
   getUmkmSectorFromBusinessCategory,
   inferPublishServicesFromUmkmBusiness,
@@ -63,7 +58,14 @@ export type UmkmPlacePresentation = {
   categoryLabel: string;
   kindLabel: string;
   shortKindLabel: string;
-  markerTone: 'food' | 'retail' | 'service' | 'craft' | 'agri' | 'workshop' | 'general';
+  markerTone:
+    | 'food'
+    | 'retail'
+    | 'service'
+    | 'craft'
+    | 'agri'
+    | 'workshop'
+    | 'general';
   ratingNumber: number;
   ratingLabel: string;
   ratingCount: number;
@@ -90,6 +92,7 @@ export type UmkmPlacePresentation = {
 };
 
 type PublishService = 'food' | 'mart';
+const DEFAULT_UMKM_IMAGE = '/images/placeholders/business-default.svg';
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -181,7 +184,10 @@ function readMetaText(place: UmkmPlaceLike, ...keys: string[]): string {
   return '';
 }
 
-function readMetaNumber(place: UmkmPlaceLike, ...keys: string[]): number | null {
+function readMetaNumber(
+  place: UmkmPlaceLike,
+  ...keys: string[]
+): number | null {
   const metadata = asRecord(place.metadata);
   for (const key of keys) {
     const value = readNumber(metadata[key]);
@@ -198,7 +204,9 @@ function normalizePublishServices(value: unknown): PublishService[] {
       : [];
   return tokens
     .map(item => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
-    .filter((item): item is PublishService => item === 'food' || item === 'mart');
+    .filter(
+      (item): item is PublishService => item === 'food' || item === 'mart',
+    );
 }
 
 function getBusinessHint(place: UmkmPlaceLike): string {
@@ -245,7 +253,9 @@ function getUmkmPlacePublishServices(place: UmkmPlaceLike): PublishService[] {
   if (metadata.publish_mart === true) toggles.push('mart');
   if (toggles.length > 0) return toggles;
 
-  return inferPublishServicesFromUmkmBusiness(getBusinessHint(place)) as PublishService[];
+  return inferPublishServicesFromUmkmBusiness(
+    getBusinessHint(place),
+  ) as PublishService[];
 }
 
 export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
@@ -264,22 +274,37 @@ export function getUmkmPlaceKind(place: UmkmPlaceLike): UmkmPlaceKind {
   const hint = getBusinessHint(place);
   if (publishServices.includes('food')) return 'food';
   if (publishServices.includes('mart')) return 'retail';
-  if (/(jasa|service|salon|barber|desain|design|printing|laundry|studio|foto|fotografi|admin|konsultan|repair|kelas|kursus)/.test(hint)) {
+  if (
+    /(jasa|service|salon|barber|desain|design|printing|laundry|studio|foto|fotografi|admin|konsultan|repair|kelas|kursus)/.test(
+      hint,
+    )
+  ) {
     return 'service';
   }
-  if (/(craft|kriya|souvenir|fashion|boutique|tas|gift|artisan|batik)/.test(hint)) {
+  if (
+    /(craft|kriya|souvenir|fashion|boutique|tas|gift|artisan|batik)/.test(hint)
+  ) {
     return 'craft';
   }
-  if (/(agri|agro|farm|tani|petani|buah|sayur|bibit|pupuk|nelayan)/.test(hint)) {
+  if (
+    /(agri|agro|farm|tani|petani|buah|sayur|bibit|pupuk|nelayan)/.test(hint)
+  ) {
     return 'agri';
   }
-  if (/(bengkel|workshop|machining|bubut|las|konveksi|furniture|manufaktur|produksi)/.test(hint)) {
+  if (
+    /(bengkel|workshop|machining|bubut|las|konveksi|furniture|manufaktur|produksi)/.test(
+      hint,
+    )
+  ) {
     return 'workshop';
   }
   return 'general';
 }
 
-function getKindMeta(kind: UmkmPlaceKind, isId: boolean): {
+function getKindMeta(
+  kind: UmkmPlaceKind,
+  isId: boolean,
+): {
   kindLabel: string;
   shortKindLabel: string;
   markerTone: UmkmPlacePresentation['markerTone'];
@@ -348,7 +373,9 @@ function parseOpenNow(openHours: string): boolean | null {
   if (!normalized) return null;
   if (/(24\s*jam|24\s*hours|24\/7)/.test(normalized)) return true;
 
-  const match = normalized.match(/(\d{1,2})[:.](\d{2})\s*[-–]\s*(\d{1,2})[:.](\d{2})/);
+  const match = normalized.match(
+    /(\d{1,2})[:.](\d{2})\s*[-–]\s*(\d{1,2})[:.](\d{2})/,
+  );
   if (!match) return null;
 
   const openMinutes = Number(match[1]) * 60 + Number(match[2]);
@@ -362,7 +389,10 @@ function parseOpenNow(openHours: string): boolean | null {
   return currentMinutes >= openMinutes || currentMinutes <= closeMinutes;
 }
 
-function getOpenStatusLabel(openHours: string, isId: boolean): {
+function getOpenStatusLabel(
+  openHours: string,
+  isId: boolean,
+): {
   openNow: boolean | null;
   statusLabel: string;
   statusTone: UmkmPlacePresentation['statusTone'];
@@ -420,7 +450,10 @@ function getManagedPresenceStatus(
 } {
   const meta = asRecord(place.metadata);
   const presence = getUmkmLivePresence(meta);
-  const locationModeLabel = getUmkmLocationModeLabel(presence.locationMode, isId);
+  const locationModeLabel = getUmkmLocationModeLabel(
+    presence.locationMode,
+    isId,
+  );
   const scheduleSummary = formatUmkmLiveScheduleSummary(
     {
       days: presence.scheduleDays,
@@ -431,10 +464,12 @@ function getManagedPresenceStatus(
   );
 
   if (!presence.hasPresenceControls) {
-    const openHours = readMetaText(place, 'open_hours') || (isId ? 'Buka hari ini' : 'Open today');
-    const openStatus = getOpenStatusLabel(openHours, isId);
+    const configuredOpenHours = readMetaText(place, 'open_hours');
+    const openStatus = getOpenStatusLabel(configuredOpenHours, isId);
     return {
-      openHours,
+      openHours:
+        configuredOpenHours ||
+        (isId ? 'Jam buka belum diisi' : 'Hours not listed'),
       openNow: openStatus.openNow,
       liveNow: null,
       statusLabel: openStatus.statusLabel,
@@ -447,7 +482,8 @@ function getManagedPresenceStatus(
 
   if (!presence.outletActive) {
     return {
-      openHours: scheduleSummary || (isId ? 'Belum dinyalain' : 'Not activated'),
+      openHours:
+        scheduleSummary || (isId ? 'Belum dinyalain' : 'Not activated'),
       openNow: false,
       liveNow: false,
       statusLabel: isId ? 'Belum mulai jualan' : 'Not active yet',
@@ -552,13 +588,16 @@ function getServiceBadges(
 
   if (place.online_order_enabled !== false) {
     if (kind === 'food') badges.push(isId ? 'Bisa dipesan online' : 'Delivery');
-    else if (kind === 'service') badges.push(isId ? 'Booking online' : 'Book online');
+    else if (kind === 'service')
+      badges.push(isId ? 'Booking online' : 'Book online');
     else badges.push(isId ? 'Order online' : 'Order online');
   }
 
   if (place.offline_order_enabled !== false) {
-    if (supportsUmkmTableFlow(place)) badges.push(isId ? 'Makan di tempat' : 'Dine-in');
-    else if (kind === 'service') badges.push(isId ? 'Janji temu' : 'Appointments');
+    if (supportsUmkmTableFlow(place))
+      badges.push(isId ? 'Makan di tempat' : 'Dine-in');
+    else if (kind === 'service')
+      badges.push(isId ? 'Janji temu' : 'Appointments');
     else badges.push(isId ? 'Datang langsung' : 'Visit');
   }
 
@@ -587,70 +626,24 @@ function getCoverImage(place: UmkmPlaceLike): string {
       'menu_photo_url',
     ) || '';
   if (explicit) return explicit;
-  return localUmkmStoreVisual(
-    `${place.id || place.slug || place.name}-store`,
-    `${place.name} ${place.description || ''} ${readMetaText(place, 'segment', 'store_type', 'business_type')}`,
+  return DEFAULT_UMKM_IMAGE;
+}
+
+function getGalleryImages(place: UmkmPlaceLike): string[] {
+  const cover = getCoverImage(place);
+  const galleryValues = readTextArray(
+    asRecord(place.metadata).gallery_images,
+  ).slice(0, 3);
+  return Array.from(new Set([cover, ...galleryValues].filter(Boolean))).slice(
+    0,
+    3,
   );
 }
 
-function getGalleryImages(place: UmkmPlaceLike, kind: UmkmPlaceKind): string[] {
-  const seed = place.slug || place.id || place.name || 'umkm';
-  const cover = getCoverImage(place);
-  const galleryValues = readTextArray(asRecord(place.metadata).gallery_images).slice(0, 3);
-  if (galleryValues.length >= 3) return galleryValues;
-
-  if (kind === 'food') {
-    return [
-      cover,
-      localProductImageForCategory('main_course', `${seed}-main`),
-      localProductImageForCategory('beverage', `${seed}-drink`),
-    ];
-  }
-  if (kind === 'retail') {
-    return [
-      cover,
-      localProductImageForCategory('souvenir', `${seed}-retail`),
-      localProductImageForCategory('staples', `${seed}-stock`),
-    ];
-  }
-  if (kind === 'service') {
-    return [
-      cover,
-      localContentImageForTopic('service', `${seed}-service`),
-      localContentImageForTopic('listing', `${seed}-workflow`),
-    ];
-  }
-  if (kind === 'craft') {
-    return [
-      cover,
-      localProductImageForCategory('souvenir', `${seed}-craft`),
-      localContentImageForTopic('listing', `${seed}-studio`),
-    ];
-  }
-  if (kind === 'agri') {
-    return [
-      cover,
-      localProductImageForCategory('fresh', `${seed}-agri`),
-      localProductImageForCategory('fruit', `${seed}-produce`),
-    ];
-  }
-  if (kind === 'workshop') {
-    return [
-      cover,
-      localContentImageForTopic('listing', `${seed}-workshop`),
-      localContentImageForTopic('service', `${seed}-ops`),
-    ];
-  }
-
-  return [
-    cover,
-    localUmkmStoreVisual(`${seed}-alt-a`, `${place.name} ${place.description || ''}`),
-    localUmkmStoreVisual(`${seed}-alt-b`, `${place.address || ''}`),
-  ];
-}
-
 function buildMapsLabel(place: UmkmPlaceLike): string {
-  return [place.name, place.address || '', place.city || ''].filter(Boolean).join(', ');
+  return [place.name, place.address || '', place.city || '']
+    .filter(Boolean)
+    .join(', ');
 }
 
 export function buildUmkmPlacePresentation(
@@ -669,16 +662,17 @@ export function buildUmkmPlacePresentation(
   const ratingCount =
     rawRatingCount === null ? 0 : Math.max(0, Math.round(rawRatingCount));
   const responseMinutes =
-    rawResponseMinutes === null ? 0 : Math.max(0, Math.round(rawResponseMinutes));
+    rawResponseMinutes === null
+      ? 0
+      : Math.max(0, Math.round(rawResponseMinutes));
   const presenceStatus = getManagedPresenceStatus(place, isId);
-  const categoryLabel =
-    businessCategory
-      ? getUmkmBusinessCategoryLabel(businessCategory, isId)
-      : kindMeta.kindLabel === 'UMKM'
-        ? isId
-          ? 'UMKM aktif'
-          : 'Active UMKM'
-        : kindMeta.kindLabel;
+  const categoryLabel = businessCategory
+    ? getUmkmBusinessCategoryLabel(businessCategory, isId)
+    : kindMeta.kindLabel === 'UMKM'
+      ? isId
+        ? 'UMKM aktif'
+        : 'Active UMKM'
+      : kindMeta.kindLabel;
   const effectiveDistanceKm =
     typeof place.distance_km === 'number' && Number.isFinite(place.distance_km)
       ? place.distance_km
@@ -692,24 +686,61 @@ export function buildUmkmPlacePresentation(
   const destination = { lat: place.lat, lng: place.lng };
   const origin = viewerLocation || undefined;
   const googleMapsDirectionsByMode = {
-    driving: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'driving'),
-    'two-wheeler': buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'two-wheeler'),
-    transit: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'transit'),
-    walking: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'walking'),
-    bicycling: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'bicycling'),
+    driving: buildGoogleMapsDirectionsUrl(
+      destination,
+      origin,
+      undefined,
+      'driving',
+    ),
+    'two-wheeler': buildGoogleMapsDirectionsUrl(
+      destination,
+      origin,
+      undefined,
+      'two-wheeler',
+    ),
+    transit: buildGoogleMapsDirectionsUrl(
+      destination,
+      origin,
+      undefined,
+      'transit',
+    ),
+    walking: buildGoogleMapsDirectionsUrl(
+      destination,
+      origin,
+      undefined,
+      'walking',
+    ),
+    bicycling: buildGoogleMapsDirectionsUrl(
+      destination,
+      origin,
+      undefined,
+      'bicycling',
+    ),
   } satisfies Record<GoogleMapsTravelMode, string>;
   const openStatus = {
-    statusLabel: [presenceStatus.statusLabel, presenceStatus.scheduleSummary || '']
+    statusLabel: [
+      presenceStatus.statusLabel,
+      presenceStatus.scheduleSummary || '',
+    ]
       .filter(Boolean)
       .join(' · '),
   };
   const whatsappPhone =
-    readMetaText(place, 'whatsapp_phone', 'whatsapp_number', 'whatsapp_contact') ||
+    readMetaText(
+      place,
+      'whatsapp_phone',
+      'whatsapp_number',
+      'whatsapp_contact',
+    ) ||
     place.phone ||
     '';
   const whatsappMessage =
-    readMetaText(place, 'whatsapp_message', 'whatsapp_text', 'contact_message') ||
-    '';
+    readMetaText(
+      place,
+      'whatsapp_message',
+      'whatsapp_text',
+      'contact_message',
+    ) || '';
 
   return {
     kind,
@@ -721,10 +752,7 @@ export function buildUmkmPlacePresentation(
     shortKindLabel: kindMeta.shortKindLabel,
     markerTone: kindMeta.markerTone,
     ratingNumber,
-    ratingLabel:
-      rawRating === null
-        ? '0.0'
-        : ratingNumber.toFixed(1),
+    ratingLabel: rawRating === null ? '0.0' : ratingNumber.toFixed(1),
     ratingCount,
     reviewCountLabel: formatCount(ratingCount),
     responseMinutes,
@@ -734,14 +762,23 @@ export function buildUmkmPlacePresentation(
     statusLabel: presenceStatus.statusLabel,
     statusTone: presenceStatus.statusTone,
     coverImage: getCoverImage(place),
-    gallery: getGalleryImages(place, kind)
+    gallery: getGalleryImages(place)
       .map(image => image.trim())
       .filter(Boolean),
     distanceLabel,
     priceLabel: inferPriceLabel(place, isId),
     serviceBadges: getServiceBadges(place, isId, presenceStatus),
-    addressLine: place.address || place.city || (isId ? 'Alamatnya belum lengkap' : 'Address unavailable'),
-    secondaryLine: [openStatus.statusLabel, place.city || '', distanceLabel || ''].filter(Boolean).join(' · '),
+    addressLine:
+      place.address ||
+      place.city ||
+      (isId ? 'Alamatnya belum lengkap' : 'Address unavailable'),
+    secondaryLine: [
+      openStatus.statusLabel,
+      place.city || '',
+      distanceLabel || '',
+    ]
+      .filter(Boolean)
+      .join(' · '),
     mapsLabel,
     googleMapsPlaceUrl: buildGoogleMapsPlaceUrl(destination, mapsLabel),
     googleMapsDirectionsUrl: googleMapsDirectionsByMode.driving,

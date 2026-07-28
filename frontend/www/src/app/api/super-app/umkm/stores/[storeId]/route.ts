@@ -5,7 +5,11 @@ import { enforceRateLimit } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { hasUmkmStorePermission } from '@/lib/super-app/umkm-authorization';
-import { getUmkmStoreById, updateUmkmStoreMetadata } from '@/lib/super-app/umkm-commerce';
+import {
+  getUmkmStoreById,
+  updateUmkmStoreMetadata,
+} from '@/lib/super-app/umkm-commerce';
+import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-metadata';
 
 const UpdateStoreSchema = z.object({
   name: z.string().min(3).max(120).optional(),
@@ -46,7 +50,8 @@ export async function PATCH(
 
     const resolvedParams = await params;
     const store = await getUmkmStoreById(resolvedParams.storeId);
-    if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
+    if (!store)
+      return NextResponse.json({ error: 'Store not found' }, { status: 404 });
     if (
       !hasUmkmStorePermission({
         storeId: store.id,
@@ -65,7 +70,7 @@ export async function PATCH(
 
     const updated = await updateUmkmStoreMetadata({
       storeId: store.id,
-      metadataPatch: parsed.data.metadata,
+      metadataPatch: sanitizeOwnerWritableUmkmMetadata(parsed.data.metadata),
       name: parsed.data.name,
       city: parsed.data.city,
       address: parsed.data.address,
@@ -81,7 +86,12 @@ export async function PATCH(
   } catch (error) {
     console.error('[UMKM_STORE_UPDATE_ERROR]', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update UMKM store' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update UMKM store',
+      },
       { status: 400 },
     );
   }

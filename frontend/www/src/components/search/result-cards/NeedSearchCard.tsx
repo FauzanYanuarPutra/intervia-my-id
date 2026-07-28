@@ -1,8 +1,6 @@
 import {
   CalendarClock,
   Clock3,
-  FileText,
-  ListChecks,
   MapPin,
   Package,
   WalletCards,
@@ -10,17 +8,12 @@ import {
 } from 'lucide-react';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import {
-  getListingCardCtaLabel,
   getListingSideActorLabel,
   getListingSideVerbLabel,
   getListingValueFallback,
 } from '@/lib/content/listingSide';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
-import {
-  SearchCardCta,
-  SearchCardEyebrow,
-  searchCardBorderClass,
-} from './SearchCardParts';
+import { SearchCardEyebrow, searchCardBorderClass } from './SearchCardParts';
 import { cn } from '@/lib/utils';
 
 function readMetadataText(
@@ -58,25 +51,6 @@ function humanizeMetadataValue(value: string, locale: 'id' | 'en'): string {
   const label = labels[normalized];
   if (label) return locale === 'id' ? label.id : label.en;
   return value.replace(/[_-]+/g, ' ').trim();
-}
-
-function readMetadataList(
-  item: GlobalSearchItem,
-  locale: 'id' | 'en',
-  ...keys: string[]
-): string {
-  for (const key of keys) {
-    const value = item.metadata?.[key];
-    if (Array.isArray(value)) {
-      const label = value
-        .map(entry => humanizeMetadataValue(String(entry || '').trim(), locale))
-        .filter(Boolean)
-        .slice(0, 3)
-        .join(', ');
-      if (label) return label;
-    }
-  }
-  return '';
 }
 
 function requestStatusLabel(item: GlobalSearchItem, locale: 'id' | 'en') {
@@ -125,36 +99,6 @@ export function NeedSearchCard({
   ]
     .filter(Boolean)
     .join(' ');
-  const criteriaLabel =
-    readMetadataList(
-      item,
-      locale,
-      'required_certifications',
-      'required_facilities',
-      'output_needed',
-      'support_needed',
-    ) ||
-    readMetadataText(
-      item,
-      locale,
-      'required_certifications',
-      'required_facilities',
-      'output_needed',
-      'support_needed',
-      'provider_criteria',
-      'minimum_capacity',
-      'traffic_note',
-      'experience',
-    );
-  const frequencyLabel = readMetadataText(
-    item,
-    locale,
-    'need_frequency',
-    'preferred_period',
-    'buy_or_rent',
-    'rent_or_buy',
-    'partnership_type',
-  );
   const factItems = [
     {
       key: 'budget',
@@ -168,13 +112,6 @@ export function NeedSearchCard({
           label: item.location,
         }
       : null,
-    quantityLabel
-      ? {
-          key: 'quantity',
-          icon: Package,
-          label: quantityLabel,
-        }
-      : null,
     deadlineLabel
       ? {
           key: 'deadline',
@@ -182,18 +119,11 @@ export function NeedSearchCard({
           label: deadlineLabel,
         }
       : null,
-    frequencyLabel
+    quantityLabel
       ? {
-          key: 'frequency',
-          icon: Clock3,
-          label: frequencyLabel,
-        }
-      : null,
-    criteriaLabel
-      ? {
-          key: 'criteria',
-          icon: ListChecks,
-          label: criteriaLabel,
+          key: 'quantity',
+          icon: Package,
+          label: quantityLabel,
         }
       : null,
   ].filter(Boolean) as Array<{
@@ -201,7 +131,7 @@ export function NeedSearchCard({
     icon: LucideIcon;
     label: string;
   }>;
-  const visibleFactItems = factItems.slice(0, 5);
+  const visibleFactItems = factItems.slice(0, 3);
   const statusLabel = requestStatusLabel(item, locale);
   const sideStatusLabel = `${getListingSideVerbLabel('demand', locale)} - ${statusLabel}`;
   const actorLabel = getListingSideActorLabel('demand', locale).toLowerCase();
@@ -220,9 +150,9 @@ export function NeedSearchCard({
   const card = (
     <article
       className={cn(
-        'flex h-full min-h-[168px] flex-col rounded-lg border bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
+        'flex h-full min-h-[152px] flex-col rounded-xl border bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
         interactive &&
-          'cursor-pointer transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)]',
+          'cursor-pointer transition motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)]',
         searchCardBorderClass('blue'),
       )}
     >
@@ -236,7 +166,7 @@ export function NeedSearchCard({
         sideLabel={sideStatusLabel}
       />
       {title}
-      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+      <p className="mt-1 line-clamp-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
         {item.summary ||
           (locale === 'id'
             ? 'Pembeli belum menulis detail panjang. Buka brief untuk cek konteks dan tawarkan bantuan yang relevan.'
@@ -259,38 +189,6 @@ export function NeedSearchCard({
           );
         })}
       </div>
-      {!item.image ? (
-        <div className="mt-2 inline-flex min-w-0 items-start gap-1.5 rounded-md bg-[color:var(--app-surface-muted)] px-2 py-1.5 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
-          <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1d4ed8]" />
-          <span className="line-clamp-2">
-            {locale === 'id'
-              ? 'Brief teks cukup; foto atau dokumen bisa menyusul saat ngobrol.'
-              : 'A text brief is enough; photos or documents can follow in chat.'}
-          </span>
-        </div>
-      ) : (
-        <div className="mt-2 inline-flex min-w-0 items-start gap-1.5 rounded-md bg-[#eff6ff] px-2 py-1.5 text-[11px] font-semibold leading-4 text-[#1d4ed8]">
-          <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span className="line-clamp-2">
-            {locale === 'id'
-              ? 'Ada gambar referensi untuk membantu memahami kebutuhan.'
-              : 'Includes a reference image to clarify the need.'}
-          </span>
-        </div>
-      )}
-      {interactive ? (
-        <SearchCardCta
-          href={item.href}
-          locale={locale}
-          tone="blue"
-          label={getListingCardCtaLabel(
-            'demand',
-            item.metadata.contentType || item.kind,
-            locale,
-          )}
-          as="span"
-        />
-      ) : null}
     </article>
   );
 
@@ -299,7 +197,7 @@ export function NeedSearchCard({
   return (
     <Link
       href={item.href}
-      className="group block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
+      className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
     >
       {card}
     </Link>

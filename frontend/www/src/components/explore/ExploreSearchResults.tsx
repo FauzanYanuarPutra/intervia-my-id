@@ -90,7 +90,7 @@ function SearchSkeleton() {
       aria-hidden="true"
     >
       <div className="h-5 w-40 animate-pulse rounded bg-[color:var(--app-border)]" />
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={index}
@@ -109,7 +109,8 @@ function renderSearchCard(item: GlobalSearchItem, locale: LajukanLocale) {
     return <ServiceSearchCard item={item} locale={locale} />;
   if (item.kind === 'businesses')
     return <BusinessSearchCard item={item} locale={locale} />;
-  if (item.kind === 'needs') return <NeedSearchCard item={item} locale={locale} />;
+  if (item.kind === 'needs')
+    return <NeedSearchCard item={item} locale={locale} />;
   if (item.kind === 'communities')
     return <CommunitySearchCard item={item} locale={locale} />;
   if (item.kind === 'videos') return <VideoSearchCard item={item} />;
@@ -154,9 +155,7 @@ function SearchGroupSection({
             isId={isId}
             onClick={() => onSelectTab(groupKey)}
             aria-label={
-              isId
-                ? `Lihat semua ${copy.labelId}`
-                : `View all ${copy.labelEn}`
+              isId ? `Lihat semua ${copy.labelId}` : `View all ${copy.labelEn}`
             }
           />
         ) : null}
@@ -174,7 +173,13 @@ function SearchGroupSection({
             'mt-4 grid gap-3',
             groupKey === 'videos'
               ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
-              : 'sm:grid-cols-2 xl:grid-cols-3',
+              : groupKey === 'products' || groupKey === 'services'
+                ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
+                : groupKey === 'needs'
+                  ? 'sm:grid-cols-2 xl:grid-cols-3'
+                  : groupKey === 'businesses' || groupKey === 'communities'
+                    ? 'sm:grid-cols-2 lg:grid-cols-3'
+                    : 'sm:grid-cols-2 xl:grid-cols-3',
           )}
         >
           {items.map(item => (

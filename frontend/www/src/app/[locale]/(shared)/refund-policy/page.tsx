@@ -51,7 +51,9 @@ export default async function RefundPolicyPage({ params }: PageProps) {
   const refundRules = [
     {
       icon: RotateCcw,
-      title: isId ? 'Pembatalan sebelum diproses' : 'Cancellation before processing',
+      title: isId
+        ? 'Pembatalan sebelum diproses'
+        : 'Cancellation before processing',
       body: isId
         ? 'Jika pesanan atau permintaan belum diproses oleh penyedia, pengguna dapat meminta pembatalan lewat chat atau support.'
         : 'If an order or request has not been processed by the provider, users may request cancellation through chat or support.',
@@ -81,20 +83,20 @@ export default async function RefundPolicyPage({ params }: PageProps) {
 
   const evidenceItems = isId
     ? [
-      'Nomor akun atau nomor HP yang dipakai.',
-      'Link listing, room chat, atau ID transaksi bila ada.',
-      'Kronologi singkat dan bukti foto/video jika relevan.',
-      'Nominal pembayaran dalam Rupiah (IDR) bila transaksi sudah aktif.',
-    ]
+        'Nomor akun atau nomor HP yang dipakai.',
+        'Link listing, room chat, atau ID transaksi bila ada.',
+        'Kronologi singkat dan bukti foto/video jika relevan.',
+        'Nominal pembayaran dalam Rupiah (IDR) bila transaksi sudah aktif.',
+      ]
     : [
-      'Account number or phone number used.',
-      'Listing link, chat room, or transaction ID if available.',
-      'Short chronology and photo/video proof when relevant.',
-      'Payment amount in Indonesian Rupiah (IDR) when a transaction is active.',
-    ];
+        'Account number or phone number used.',
+        'Listing link, chat room, or transaction ID if available.',
+        'Short chronology and photo/video proof when relevant.',
+        'Payment amount in Indonesian Rupiah (IDR) when a transaction is active.',
+      ];
 
   return (
-    <main className="page-shell page-rhythm pb-10 pt-6">
+    <main className="page-shell page-shell-readable page-rhythm pb-10 pt-6">
       <section className="ui-panel ui-hero-panel overflow-hidden rounded-[28px] p-5 sm:p-7">
         <p className="ui-page-eyebrow">
           {isId ? 'Kebijakan transaksi' : 'Transaction policy'}
@@ -161,7 +163,9 @@ export default async function RefundPolicyPage({ params }: PageProps) {
 
       <section className="ui-panel rounded-[24px] p-5 sm:p-6">
         <h2 className="text-lg font-bold text-[color:var(--app-text)]">
-          {isId ? 'Kapan refund atau retur bisa diajukan?' : 'When can refunds or returns be requested?'}
+          {isId
+            ? 'Kapan refund atau retur bisa diajukan?'
+            : 'When can refunds or returns be requested?'}
         </h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {refundRules.map(item => {
@@ -231,7 +235,9 @@ export default async function RefundPolicyPage({ params }: PageProps) {
 
       <section className="ui-panel rounded-[24px] p-5 text-center sm:p-6">
         <h2 className="text-lg font-bold text-[color:var(--app-text)]">
-          {isId ? 'Butuh bantuan soal refund atau retur?' : 'Need help with a refund or return?'}
+          {isId
+            ? 'Butuh bantuan soal refund atau retur?'
+            : 'Need help with a refund or return?'}
         </h2>
         <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
           {isId
@@ -239,13 +245,22 @@ export default async function RefundPolicyPage({ params }: PageProps) {
             : 'Start from the business contact or create a support ticket. Include the listing link, chat room, and relevant proof so the team can review faster.'}
         </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <Link href="/contact" className="ui-button-primary inline-flex items-center px-5 text-sm">
+          <Link
+            href="/contact"
+            className="ui-button-primary inline-flex items-center px-5 text-sm"
+          >
             {isId ? 'Hubungi Lajukan' : 'Contact Lajukan'}
           </Link>
-          <Link href="/support" className="ui-button-secondary inline-flex items-center px-5 text-sm">
+          <Link
+            href="/support"
+            className="ui-button-secondary inline-flex items-center px-5 text-sm"
+          >
             {isId ? 'Buat tiket support' : 'Create support ticket'}
           </Link>
-          <Link href="/terms" className="ui-button-secondary inline-flex items-center px-5 text-sm">
+          <Link
+            href="/terms"
+            className="ui-button-secondary inline-flex items-center px-5 text-sm"
+          >
             {isId ? 'Baca ketentuan' : 'Read terms'}
           </Link>
         </div>

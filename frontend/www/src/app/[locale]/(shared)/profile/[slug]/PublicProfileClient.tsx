@@ -66,6 +66,8 @@ import {
 type PublicProfileClientProps = {
   locale: string;
   slug: string;
+  initialProfile?: unknown;
+  initialSocial?: unknown;
 };
 
 type ProfileRecord = Record<string, unknown>;
@@ -1338,6 +1340,8 @@ function SectionTitle({
 export default function PublicProfileClient({
   locale,
   slug,
+  initialProfile,
+  initialSocial,
 }: PublicProfileClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1369,7 +1373,7 @@ export default function PublicProfileClient({
             chat: 'Chat',
             opening: 'Membuka...',
             editProfile: 'Edit Profil',
-            managePosts: 'Kelola Postingan',
+            managePosts: 'Studio Konten',
 
             verified: 'Akun Terverifikasi',
             joined: 'Bergabung',
@@ -1460,7 +1464,7 @@ export default function PublicProfileClient({
             chat: 'Chat',
             opening: 'Opening...',
             editProfile: 'Edit Profile',
-            managePosts: 'Manage Posts',
+            managePosts: 'Content Studio',
 
             verified: 'Verified Account',
             joined: 'Joined',
@@ -1534,15 +1538,23 @@ export default function PublicProfileClient({
     [localeCode],
   );
 
-  const [profile, setProfile] = useState<PublicUserProfile | null>(null);
+  const initialProfileRef = useRef<PublicUserProfile | null>(
+    normalizePublicUserProfile(initialProfile),
+  );
+  const initialSocialRef = useRef<ProfileSocialSummary | null>(
+    normalizeProfileSocialSummary(initialSocial),
+  );
+  const [profile, setProfile] = useState<PublicUserProfile | null>(
+    initialProfileRef.current,
+  );
   const [listings, setListings] = useState<PublicListing[]>([]);
   const [profileSocial, setProfileSocial] =
-    useState<ProfileSocialSummary | null>(null);
+    useState<ProfileSocialSummary | null>(initialSocialRef.current);
   const [isFollowingProfile, setIsFollowingProfile] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followError, setFollowError] = useState('');
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialProfileRef.current);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState('');
 
@@ -1565,20 +1577,24 @@ export default function PublicProfileClient({
     const controller = new AbortController();
 
     async function load() {
-      setLoading(true);
+      const serverProfile = initialProfileRef.current;
+      if (!serverProfile) setLoading(true);
       setNotFound(false);
       setError('');
-      setProfile(null);
+      if (!serverProfile) setProfile(null);
       setListings([]);
-      setProfileSocial(null);
-      setIsFollowingProfile(false);
+      if (!initialSocialRef.current) setProfileSocial(null);
+      setIsFollowingProfile(Boolean(initialSocialRef.current?.viewerFollowing));
       setFollowError('');
 
       try {
-        let nextProfile: PublicUserProfile | null = null;
+        let nextProfile: PublicUserProfile | null = serverProfile
+          ? (await fetchProfileById(serverProfile.id, controller.signal)) ||
+            serverProfile
+          : null;
         const directId = extractPublicProfileIdFromSlug(slug);
 
-        if (directId) {
+        if (!nextProfile && directId) {
           nextProfile = await fetchProfileById(directId, controller.signal);
         }
 
@@ -2639,7 +2655,7 @@ export default function PublicProfileClient({
 
                   {isOwnProfile ? (
                     <Link
-                      href="/my-listings"
+                      href="/manage"
                       className="col-span-2 inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700"
                     >
                       <Wrench className="h-4 w-4" />
@@ -2982,7 +2998,7 @@ export default function PublicProfileClient({
                           </Link>
 
                           <Link
-                            href="/my-listings"
+                            href="/manage"
                             className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
                           >
                             <BriefcaseBusiness className="h-5 w-5 text-emerald-600" />
@@ -3354,7 +3370,7 @@ export default function PublicProfileClient({
                           </Link>
 
                           <Link
-                            href="/my-listings"
+                            href="/manage"
                             className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
                           >
                             <BriefcaseBusiness className="h-5 w-5 text-emerald-600" />

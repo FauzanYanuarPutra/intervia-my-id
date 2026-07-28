@@ -33,6 +33,10 @@ P0 findings in the implemented slice:
 5. The WWW request BFF did not forward the access token.
 6. The create landing showed unverified user, post, interaction, and response statistics.
 7. Several public copy surfaces implied secure payment or escrow readiness beyond verified operational evidence.
+8. Community and reels had public page metadata and public GET behavior but were marked authenticated in the route catalog.
+9. Public profile, listing detail, and UMKM discovery depended on hydration for primary reader content.
+10. Listing detail returned a visual not-found state inside a successful page and the marketplace detail endpoint exposed inactive rows publicly.
+11. The legacy search client carried a Bandung fallback that could conflict with account, query, or viewer location.
 
 ## C. Economic Logic
 
@@ -88,6 +92,32 @@ Current request workspace contract:
 - Database migration: none.
 - API contract: none.
 
+### Public Read And Server Rendering
+
+- Problem: public discovery routes either redirected guests or exposed only loading placeholders in initial HTML.
+- Business impact: weak indexability, broken shared links, and lower trust for users opening Community, Reels, profiles, listings, or UMKM pages from search/social channels.
+- User impact: guests could not read Community/Reels and profile followers, avatars, listing owners, or UMKM results arrived late after hydration.
+- Cause: authenticated route flags and browser-only initial fetches.
+- Solution: public read route flags with write actions still gated, server profile resolution with social summary, server-validated listing data, a semantic home loading shell, and initial UMKM store data.
+- Services: WWW, identity service public API, community service public social API, and marketplace service.
+- Database migration: none.
+- API contract: existing public GET contracts are reused.
+
+### Dead Listing Status
+
+- Problem: draft or inactive listing detail remained fetchable and missing listings rendered an HTTP 200 client empty state.
+- Business impact: stale or private inventory could stay indexable and confuse marketplace liquidity.
+- User impact: dead links looked like broken application state instead of a real not-found page.
+- Cause: marketplace detail had no content-status access rule and Next.js could not call `notFound()` from the client page.
+- Solution: active-or-owner authorization in marketplace service plus a server page wrapper that returns Next.js 404 for missing or inactive public content.
+- Sitemap impact: the existing sitemap remains active-only; no duplicate sitemap source was added.
+
+### Location Consistency
+
+- Problem: a legacy search surface used Bandung as a fallback even when no explicit location was selected.
+- Impact: location labels could disagree with account or business-summary location.
+- Solution: no city is inferred from a hardcoded fallback; the neutral label is `Semua lokasi` / `All locations`.
+
 ## F. Test Report
 
 Required validation for this slice:
@@ -97,6 +127,9 @@ Required validation for this slice:
 - Rust unit: public/owner request filter behavior.
 - Rust format/check/test: marketplace service targeted tests.
 - Contract review: `mine=true` returns 401 without authentication and scopes by `owner_id` with authentication.
+- Frontend route contract: Community, group detail, Reels, reel detail, and public profiles resolve as shared routes.
+- Frontend type/build: server/client boundaries for profile, listing, home, and UMKM.
+- Rust detail contract: active content is public; inactive content is hidden from guests and remains available to its owner.
 
 Runtime, E2E, accessibility, Lighthouse, load, and search relevance remain separate validation work. They must not be reported as passed until executed against a running stack.
 
@@ -146,7 +179,7 @@ Runtime, E2E, accessibility, Lighthouse, load, and search relevance remain separ
 - Production payment, refund, and escrow operations are not yet proven end to end.
 - Detailed project view/profile/chat analytics are not yet backed by reviewed aggregate queries.
 - Supplier and buyer density is not yet established for every category and region.
-- Public SSR and correct 404/410 behavior still need route-by-route verification.
+- Runtime HTTP verification is still needed after deployment for profile/listing/UMKM HTML and stale production URLs.
 - Legal, export, sanction, restricted-product, and cross-border wording still requires professional review.
 - Full moderation coverage across listings, chat, community, and reels remains incomplete.
 - Meilisearch synchronization recovery and chat realtime behavior still need runtime evidence.

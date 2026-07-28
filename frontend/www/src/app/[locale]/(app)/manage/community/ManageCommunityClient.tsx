@@ -1,19 +1,34 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import {
   AlertCircle,
+  Archive,
   ArrowRight,
   Clapperboard,
   Edit3,
+  Eye,
   ExternalLink,
+  Heart,
+  ImageIcon,
+  LayoutGrid,
   Loader2,
   MessageCircle,
+  Play,
   Plus,
   RefreshCw,
   Save,
+  Share2,
+  Tag,
   Trash2,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -124,6 +139,7 @@ export default function ManageCommunityClient({
   const [reels, setReels] = useState<ReelItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [failedTabs, setFailedTabs] = useState<ManageTab[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingThread, setEditingThread] = useState<EditingThread | null>(
     null,
@@ -158,6 +174,8 @@ export default function ManageCommunityClient({
               : 'Edit or delete community posts and reels you created.',
       community: isId ? 'Postingan komunitas' : 'Community posts',
       reels: isId ? 'Reels saya' : 'My reels',
+      listings: isId ? 'Listing' : 'Listings',
+      contentNavigator: isId ? 'Pilih jenis konten' : 'Choose content type',
       refresh: isId ? 'Muat ulang' : 'Refresh',
       loading: isId ? 'Memuat konten...' : 'Loading content...',
       signIn: isId
@@ -171,16 +189,21 @@ export default function ManageCommunityClient({
       save: isId ? 'Simpan' : 'Save',
       cancel: isId ? 'Batal' : 'Cancel',
       delete: isId ? 'Hapus' : 'Delete',
+      archive: isId ? 'Arsipkan' : 'Archive',
       open: isId ? 'Buka' : 'Open',
       failed: isId ? 'Aksi gagal. Coba lagi.' : 'Action failed. Try again.',
       loadFailed: isId
         ? 'Data milik saya belum bisa dimuat.'
         : 'Could not load your content.',
+      partialLoadFailed: isId
+        ? 'Sebagian data belum bisa dimuat. Konten lain tetap bisa dikelola.'
+        : 'Some data could not be loaded. Other content remains manageable.',
       loadHint: isId
         ? 'Cek sesi login atau koneksi community service, lalu muat ulang.'
         : 'Check your login session or community service connection, then refresh.',
       saved: isId ? 'Perubahan disimpan.' : 'Changes saved.',
       deleted: isId ? 'Konten dihapus.' : 'Content deleted.',
+      archived: isId ? 'Reels diarsipkan.' : 'Reel archived.',
       totalEngagement: isId ? 'Interaksi' : 'Engagement',
       manageable: isId ? 'Bisa dikelola' : 'Manageable',
     }),
@@ -199,28 +222,72 @@ export default function ManageCommunityClient({
     }
     setLoading(true);
     setLoadError(null);
-    try {
-      const [threadRes, reelRes] = await Promise.all([
+    setFailedTabs([]);
+
+    const requests: Array<Promise<{ tab: ManageTab; items: unknown[] }>> = [];
+
+    if (mode !== 'reels') {
+      requests.push(
         authFetch('/api/forum/threads?mine=true&sort=new&page_size=50', {
           cache: 'no-store',
+        }).then(async response => {
+          if (!response.ok) throw new Error(`threads:${response.status}`);
+          const payload = await readJson<ForumThreadsResponse>(response);
+          return {
+            tab: 'community',
+            items: Array.isArray(payload.data) ? payload.data : [],
+          };
         }),
-        authFetch('/api/reels?mine=true&limit=50', { cache: 'no-store' }),
-      ]);
-      if (!threadRes.ok || !reelRes.ok) {
-        throw new Error(`manage-load:${threadRes.status}:${reelRes.status}`);
-      }
-      const [threadPayload, reelPayload] = await Promise.all([
-        readJson<ForumThreadsResponse>(threadRes),
-        readJson<ReelsResponse>(reelRes),
-      ]);
-      setThreads(Array.isArray(threadPayload.data) ? threadPayload.data : []);
-      setReels(extractReels(reelPayload));
-    } catch {
-      setLoadError(copy.loadFailed);
-      notify({ title: copy.failed, variant: 'error' });
-    } finally {
-      setLoading(false);
+      );
     }
+
+    if (mode !== 'community') {
+      requests.push(
+        authFetch('/api/reels?mine=true&limit=50', {
+          cache: 'no-store',
+        }).then(async response => {
+          if (!response.ok) throw new Error(`reels:${response.status}`);
+          const payload = await readJson<ReelsResponse>(response);
+          return { tab: 'reels', items: extractReels(payload) };
+        }),
+      );
+    }
+
+    const results = await Promise.allSettled(requests);
+    const failures: ManageTab[] = [];
+
+    results.forEach((result, index) => {
+      const requestedTab: ManageTab =
+        mode === 'community'
+          ? 'community'
+          : mode === 'reels'
+            ? 'reels'
+            : index === 0
+              ? 'community'
+              : 'reels';
+
+      if (result.status === 'rejected') {
+        failures.push(requestedTab);
+        return;
+      }
+
+      if (result.value.tab === 'community') {
+        setThreads(result.value.items as ForumThread[]);
+      } else {
+        setReels(result.value.items as ReelItem[]);
+      }
+    });
+
+    setFailedTabs(failures);
+    if (failures.length > 0) {
+      setLoadError(
+        failures.length === requests.length
+          ? copy.loadFailed
+          : copy.partialLoadFailed,
+      );
+      notify({ title: copy.failed, variant: 'error' });
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -282,9 +349,7 @@ export default function ManageCommunityClient({
   const deleteThread = async (threadId: string) => {
     if (
       !window.confirm(
-        isId
-          ? 'Hapus postingan komunitas ini?'
-          : 'Delete this community post?',
+        isId ? 'Hapus postingan komunitas ini?' : 'Delete this community post?',
       )
     ) {
       return;
@@ -329,16 +394,27 @@ export default function ManageCommunityClient({
     }
   };
 
-  const deleteReel = async (reelId: string) => {
-    if (!window.confirm(isId ? 'Hapus reels ini?' : 'Delete this reel?')) return;
+  const archiveReel = async (reelId: string) => {
+    if (
+      !window.confirm(
+        isId
+          ? 'Arsipkan reels ini? Reels tidak akan tampil di feed.'
+          : 'Archive this reel? It will no longer appear in the feed.',
+      )
+    ) {
+      return;
+    }
     setBusyId(reelId);
     try {
-      const response = await authFetch(`/api/reels/${encodeURIComponent(reelId)}`, {
-        method: 'DELETE',
-      });
+      const response = await authFetch(
+        `/api/reels/${encodeURIComponent(reelId)}`,
+        {
+          method: 'DELETE',
+        },
+      );
       if (!response.ok) throw new Error('failed');
       setReels(current => current.filter(item => item.id !== reelId));
-      notify({ title: copy.deleted, variant: 'success' });
+      notify({ title: copy.archived, variant: 'success' });
     } catch {
       notify({ title: copy.failed, variant: 'error' });
     } finally {
@@ -366,7 +442,7 @@ export default function ManageCommunityClient({
           {
             label: copy.totalEngagement,
             value: totalCommunityEngagement,
-            hint: isId ? 'views + balasan' : 'views + replies',
+            hint: isId ? 'dilihat + balasan' : 'views + replies',
           },
         ]
       : [
@@ -378,9 +454,12 @@ export default function ManageCommunityClient({
           {
             label: copy.totalEngagement,
             value: totalReelEngagement,
-            hint: 'likes + comments + shares',
+            hint: isId
+              ? 'suka + komentar + dibagikan'
+              : 'likes + comments + shares',
           },
         ];
+  const activeTabFailed = failedTabs.includes(activeTab);
 
   if (!authLoading && !isAuthenticated) {
     return (
@@ -412,14 +491,14 @@ export default function ManageCommunityClient({
           <Edit3 className="h-3.5 w-3.5" />
           {mode === 'reels'
             ? isId
-              ? 'Manage reels'
+              ? 'Studio reels'
               : 'Reels management'
             : mode === 'community'
               ? isId
-                ? 'Manage community posting'
+                ? 'Ruang komunitas'
                 : 'Community post management'
               : isId
-                ? 'Manage postingan'
+                ? 'Studio konten'
                 : 'Post management'}
         </p>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -437,7 +516,7 @@ export default function ManageCommunityClient({
               className="ui-button-secondary inline-flex items-center gap-2 px-4 text-sm font-semibold"
             >
               <ArrowRight className="h-4 w-4" />
-              {isId ? 'Semua manage' : 'All manage'}
+              {isId ? 'Pusat kelola' : 'Manage hub'}
             </Link>
             {mode !== 'reels' ? (
               <Link
@@ -445,7 +524,7 @@ export default function ManageCommunityClient({
                 className="ui-button-secondary inline-flex items-center gap-2 px-4 text-sm font-semibold"
               >
                 <Plus className="h-4 w-4" />
-                {isId ? 'Buat komunitas' : 'New post'}
+                {isId ? 'Buat postingan' : 'New post'}
               </Link>
             ) : null}
             {mode !== 'community' ? (
@@ -461,68 +540,37 @@ export default function ManageCommunityClient({
         </div>
       </section>
 
+      <ManageContentNavigator
+        isId={isId}
+        activeTab={activeTab}
+        communityCount={threads.length}
+        reelsCount={reels.length}
+        label={copy.contentNavigator}
+      />
+
       <section className="ui-panel rounded-3xl p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {mode === 'all' ? (
-            <div className="inline-flex rounded-2xl bg-[color:var(--app-surface-muted)] p-1">
-              {[
-                {
-                  id: 'community' as const,
-                  label: copy.community,
-                  count: threads.length,
-                  icon: MessageCircle,
-                },
-                {
-                  id: 'reels' as const,
-                  label: copy.reels,
-                  count: reels.length,
-                  icon: Clapperboard,
-                },
-              ].map(tab => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      'inline-flex min-h-[40px] items-center gap-2 rounded-xl px-3 text-sm font-semibold',
-                      activeTab === tab.id
-                        ? 'bg-white text-[color:var(--app-text)] shadow-sm'
-                        : 'text-[color:var(--app-text-soft)]',
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {tab.label}
-                    <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-xs">
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div>
-              <h2 className="text-base font-bold text-[color:var(--app-text)]">
-                {activeTab === 'community' ? copy.community : copy.reels}
-              </h2>
-              <p className="text-sm text-[color:var(--app-text-soft)]">
-                {activeTab === 'community'
-                  ? isId
-                    ? `${threads.length} postingan ditemukan`
-                    : `${threads.length} posts found`
-                  : isId
-                    ? `${reels.length} reels ditemukan`
-                    : `${reels.length} reels found`}
-              </p>
-            </div>
-          )}
+          <div>
+            <h2 className="text-lg font-bold text-[color:var(--app-text)]">
+              {activeTab === 'community' ? copy.community : copy.reels}
+            </h2>
+            <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+              {activeTab === 'community'
+                ? isId
+                  ? `${threads.length} postingan ditemukan`
+                  : `${threads.length} posts found`
+                : isId
+                  ? `${reels.length} reels ditemukan`
+                  : `${reels.length} reels found`}
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => void loadContent()}
-            className="ui-button-secondary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold"
+            disabled={loading}
+            className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-semibold disabled:opacity-60"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             {copy.refresh}
           </button>
         </div>
@@ -547,14 +595,20 @@ export default function ManageCommunityClient({
         </div>
 
         {loading ? (
-          <div className="mt-6 flex items-center gap-2 text-sm text-[color:var(--app-text-soft)]">
+          <div
+            role="status"
+            className="mt-6 flex items-center gap-2 text-sm text-[color:var(--app-text-soft)]"
+          >
             <Loader2 className="h-4 w-4 animate-spin" />
             {copy.loading}
           </div>
         ) : null}
 
         {!loading && loadError ? (
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div
+            role="alert"
+            className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+          >
             <div className="flex items-start gap-2">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
@@ -565,8 +619,8 @@ export default function ManageCommunityClient({
           </div>
         ) : null}
 
-        {!loading && !loadError && activeTab === 'community' ? (
-          <div className="mt-5 space-y-3">
+        {!loading && !activeTabFailed && activeTab === 'community' ? (
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
             {threads.length === 0 ? (
               <EmptyState
                 text={copy.emptyCommunity}
@@ -577,64 +631,125 @@ export default function ManageCommunityClient({
             {threads.map(thread => (
               <article
                 key={thread.id}
-                className="rounded-2xl border border-[color:var(--app-border)] bg-white p-4"
+                className="group overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-[color:var(--app-surface)]"
               >
-                {editingThread?.id === thread.id ? (
-                  <form onSubmit={saveThread} className="space-y-3">
-                    <input
-                      value={editingThread.title}
-                      onChange={event =>
-                        setEditingThread(current =>
-                          current
-                            ? { ...current, title: event.target.value }
-                            : current,
-                        )
-                      }
-                      className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-2 text-sm font-semibold"
-                    />
-                    <textarea
-                      value={editingThread.content}
-                      onChange={event =>
-                        setEditingThread(current =>
-                          current
-                            ? { ...current, content: event.target.value }
-                            : current,
-                        )
-                      }
-                      rows={5}
-                      className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-2 text-sm"
-                    />
-                    <EditActions
-                      busy={busyId === thread.id}
-                      save={copy.save}
-                      cancel={copy.cancel}
-                      onCancel={() => setEditingThread(null)}
-                    />
-                  </form>
-                ) : (
-                  <ContentRow
-                    title={thread.title}
-                    meta={`${formatDate(thread.createdAt, locale)} / ${metric(
-                      thread.replyCount,
-                    )} ${isId ? 'balasan' : 'replies'} / ${metric(
-                      thread.views,
-                    )} views`}
-                    href={`/community?thread=${encodeURIComponent(thread.id)}`}
-                    busy={busyId === thread.id}
-                    open={copy.open}
-                    edit={copy.edit}
-                    deleteLabel={copy.delete}
-                    onEdit={() => void startThreadEdit(thread)}
-                    onDelete={() => void deleteThread(thread.id)}
-                  />
-                )}
+                <VisualPreview
+                  title={thread.title}
+                  source={thread.imageUrls?.find(Boolean)}
+                  kind="community"
+                  status={statusLabel(thread.status, isId)}
+                  statusTone={statusTone(thread.status)}
+                />
+                <div className="p-4">
+                  {editingThread?.id === thread.id ? (
+                    <form onSubmit={saveThread} className="space-y-4">
+                      <LabeledField
+                        label={isId ? 'Judul postingan' : 'Post title'}
+                      >
+                        <input
+                          value={editingThread.title}
+                          onChange={event =>
+                            setEditingThread(current =>
+                              current
+                                ? { ...current, title: event.target.value }
+                                : current,
+                            )
+                          }
+                          required
+                          className="min-h-11 w-full rounded-2xl border border-[color:var(--app-border)] bg-transparent px-3 py-2 text-sm font-semibold outline-none focus:border-[color:var(--app-accent)]"
+                        />
+                      </LabeledField>
+                      <LabeledField
+                        label={isId ? 'Isi postingan' : 'Post content'}
+                      >
+                        <textarea
+                          value={editingThread.content}
+                          onChange={event =>
+                            setEditingThread(current =>
+                              current
+                                ? { ...current, content: event.target.value }
+                                : current,
+                            )
+                          }
+                          rows={5}
+                          className="w-full rounded-2xl border border-[color:var(--app-border)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[color:var(--app-accent)]"
+                        />
+                      </LabeledField>
+                      <EditActions
+                        busy={busyId === thread.id}
+                        save={copy.save}
+                        cancel={copy.cancel}
+                        onCancel={() => setEditingThread(null)}
+                      />
+                    </form>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          {isId ? 'Diskusi komunitas' : 'Community discussion'}
+                        </span>
+                        <time
+                          dateTime={thread.createdAt}
+                          className="shrink-0 text-xs text-[color:var(--app-text-soft)]"
+                        >
+                          {formatDate(thread.createdAt, locale)}
+                        </time>
+                      </div>
+                      <h3 className="mt-2 line-clamp-2 min-h-12 text-base font-bold leading-6 text-[color:var(--app-text)]">
+                        {thread.title}
+                      </h3>
+                      {thread.tags?.length ? (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {thread.tags.slice(0, 3).map(tagItem => (
+                            <span
+                              key={tagItem.slug}
+                              className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]"
+                            >
+                              <Tag className="h-3 w-3" />
+                              {tagItem.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div
+                        className="mt-4 flex flex-wrap gap-2"
+                        aria-label={
+                          isId ? 'Statistik postingan' : 'Post statistics'
+                        }
+                      >
+                        <MetricBadge
+                          icon={Eye}
+                          value={thread.views}
+                          label={isId ? 'dilihat' : 'views'}
+                        />
+                        <MetricBadge
+                          icon={MessageCircle}
+                          value={thread.replyCount}
+                          label={isId ? 'balasan' : 'replies'}
+                        />
+                      </div>
+                      <ContentActions
+                        title={thread.title}
+                        href={`/community?thread=${encodeURIComponent(thread.id)}`}
+                        busy={busyId === thread.id}
+                        open={copy.open}
+                        edit={copy.edit}
+                        destructiveLabel={copy.delete}
+                        destructiveIcon="delete"
+                        onEdit={() => void startThreadEdit(thread)}
+                        onDestructive={() => void deleteThread(thread.id)}
+                      />
+                    </>
+                  )}
+                </div>
               </article>
             ))}
           </div>
         ) : null}
 
-        {!loading && !loadError && activeTab === 'reels' ? (
-          <div className="mt-5 space-y-3">
+        {!loading && !activeTabFailed && activeTab === 'reels' ? (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {reels.length === 0 ? (
               <EmptyState
                 text={copy.emptyReels}
@@ -645,71 +760,143 @@ export default function ManageCommunityClient({
             {reels.map(reel => (
               <article
                 key={reel.id}
-                className="rounded-2xl border border-[color:var(--app-border)] bg-white p-4"
+                className="group overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-[color:var(--app-surface)]"
               >
-                {editingReel?.id === reel.id ? (
-                  <form onSubmit={saveReel} className="space-y-3">
-                    <input
-                      value={editingReel.title}
-                      onChange={event =>
-                        setEditingReel(current =>
-                          current
-                            ? { ...current, title: event.target.value }
-                            : current,
-                        )
-                      }
-                      className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-2 text-sm font-semibold"
-                    />
-                    <input
-                      value={editingReel.tag}
-                      onChange={event =>
-                        setEditingReel(current =>
-                          current ? { ...current, tag: event.target.value } : current,
-                        )
-                      }
-                      className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-2 text-sm"
-                    />
-                    <textarea
-                      value={editingReel.caption}
-                      onChange={event =>
-                        setEditingReel(current =>
-                          current
-                            ? { ...current, caption: event.target.value }
-                            : current,
-                        )
-                      }
-                      rows={4}
-                      className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-2 text-sm"
-                    />
-                    <EditActions
-                      busy={busyId === reel.id}
-                      save={copy.save}
-                      cancel={copy.cancel}
-                      onCancel={() => setEditingReel(null)}
-                    />
-                  </form>
-                ) : (
-                  <ContentRow
-                    title={reel.title}
-                    meta={`${reel.tag} / ${metric(reel.likesCount)} likes / ${metric(
-                      reel.commentsCount,
-                    )} ${isId ? 'komentar' : 'comments'}`}
-                    href={`/reels?reel=${encodeURIComponent(reel.id)}`}
-                    busy={busyId === reel.id}
-                    open={copy.open}
-                    edit={copy.edit}
-                    deleteLabel={copy.delete}
-                    onEdit={() =>
-                      setEditingReel({
-                        id: reel.id,
-                        title: reel.title,
-                        caption: reel.caption,
-                        tag: reel.tag,
-                      })
-                    }
-                    onDelete={() => void deleteReel(reel.id)}
-                  />
-                )}
+                <VisualPreview
+                  title={reel.title}
+                  source={reel.videoSrc || reel.sourceUrl}
+                  poster={getImagePoster(reel.sourceUrl, reel.videoSrc)}
+                  kind={
+                    reel.mediaType === 'image' ? 'reel-image' : 'reel-video'
+                  }
+                  status={isId ? 'Tayang' : 'Published'}
+                />
+                <div className="p-4">
+                  {editingReel?.id === reel.id ? (
+                    <form onSubmit={saveReel} className="space-y-4">
+                      <LabeledField label={isId ? 'Judul reels' : 'Reel title'}>
+                        <input
+                          value={editingReel.title}
+                          onChange={event =>
+                            setEditingReel(current =>
+                              current
+                                ? { ...current, title: event.target.value }
+                                : current,
+                            )
+                          }
+                          required
+                          className="min-h-11 w-full rounded-2xl border border-[color:var(--app-border)] bg-transparent px-3 py-2 text-sm font-semibold outline-none focus:border-[color:var(--app-accent)]"
+                        />
+                      </LabeledField>
+                      <LabeledField label={isId ? 'Tag' : 'Tag'}>
+                        <input
+                          value={editingReel.tag}
+                          onChange={event =>
+                            setEditingReel(current =>
+                              current
+                                ? { ...current, tag: event.target.value }
+                                : current,
+                            )
+                          }
+                          className="min-h-11 w-full rounded-2xl border border-[color:var(--app-border)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[color:var(--app-accent)]"
+                        />
+                      </LabeledField>
+                      <LabeledField label={isId ? 'Caption' : 'Caption'}>
+                        <textarea
+                          value={editingReel.caption}
+                          onChange={event =>
+                            setEditingReel(current =>
+                              current
+                                ? { ...current, caption: event.target.value }
+                                : current,
+                            )
+                          }
+                          rows={4}
+                          className="w-full rounded-2xl border border-[color:var(--app-border)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[color:var(--app-accent)]"
+                        />
+                      </LabeledField>
+                      <EditActions
+                        busy={busyId === reel.id}
+                        save={copy.save}
+                        cancel={copy.cancel}
+                        onCancel={() => setEditingReel(null)}
+                      />
+                    </form>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                          <Clapperboard className="h-3.5 w-3.5" />
+                          {reel.mediaType === 'image'
+                            ? isId
+                              ? 'Reel foto'
+                              : 'Photo reel'
+                            : isId
+                              ? 'Reel video'
+                              : 'Video reel'}
+                        </span>
+                        {reel.tag ? (
+                          <span className="max-w-[50%] truncate rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                            #{reel.tag.replace(/^#/, '')}
+                          </span>
+                        ) : null}
+                      </div>
+                      <h3 className="mt-2 line-clamp-2 text-base font-bold leading-6 text-[color:var(--app-text)]">
+                        {reel.title ||
+                          (isId ? 'Reels tanpa judul' : 'Untitled reel')}
+                      </h3>
+                      <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-[color:var(--app-text-soft)]">
+                        {reel.caption ||
+                          (isId
+                            ? 'Belum ada caption untuk reels ini.'
+                            : 'This reel does not have a caption yet.')}
+                      </p>
+                      <div
+                        className="mt-4 flex flex-wrap gap-2"
+                        aria-label={
+                          isId ? 'Statistik reels' : 'Reel statistics'
+                        }
+                      >
+                        <MetricBadge
+                          icon={Heart}
+                          value={reel.likesCount}
+                          label={isId ? 'suka' : 'likes'}
+                        />
+                        <MetricBadge
+                          icon={MessageCircle}
+                          value={reel.commentsCount}
+                          label={isId ? 'komentar' : 'comments'}
+                        />
+                        <MetricBadge
+                          icon={Share2}
+                          value={reel.sharesCount}
+                          label={isId ? 'dibagikan' : 'shares'}
+                        />
+                      </div>
+                      <ContentActions
+                        title={
+                          reel.title ||
+                          (isId ? 'Reels tanpa judul' : 'Untitled reel')
+                        }
+                        href={`/reels?reel=${encodeURIComponent(reel.id)}`}
+                        busy={busyId === reel.id}
+                        open={copy.open}
+                        edit={copy.edit}
+                        destructiveLabel={copy.archive}
+                        destructiveIcon="archive"
+                        onEdit={() =>
+                          setEditingReel({
+                            id: reel.id,
+                            title: reel.title,
+                            caption: reel.caption,
+                            tag: reel.tag,
+                          })
+                        }
+                        onDestructive={() => void archiveReel(reel.id)}
+                      />
+                    </>
+                  )}
+                </div>
               </article>
             ))}
           </div>
@@ -717,6 +904,273 @@ export default function ManageCommunityClient({
       </section>
     </main>
   );
+}
+
+function ManageContentNavigator({
+  isId,
+  activeTab,
+  communityCount,
+  reelsCount,
+  label,
+}: {
+  isId: boolean;
+  activeTab: ManageTab;
+  communityCount: number;
+  reelsCount: number;
+  label: string;
+}) {
+  const items = [
+    {
+      id: 'listings',
+      href: '/my-listings',
+      label: isId ? 'Listing' : 'Listings',
+      description: isId ? 'Produk & kebutuhan' : 'Products & requests',
+      icon: LayoutGrid,
+      count: null,
+      active: false,
+    },
+    {
+      id: 'community',
+      href: '/manage/community',
+      label: isId ? 'Komunitas' : 'Community',
+      description: isId ? 'Thread & diskusi' : 'Threads & discussions',
+      icon: MessageCircle,
+      count: communityCount,
+      active: activeTab === 'community',
+    },
+    {
+      id: 'reels',
+      href: '/manage/reels',
+      label: 'Reels',
+      description: isId ? 'Video & foto singkat' : 'Short videos & photos',
+      icon: Clapperboard,
+      count: reelsCount,
+      active: activeTab === 'reels',
+    },
+  ];
+
+  return (
+    <nav aria-label={label} className="ui-panel rounded-3xl p-2 sm:p-3">
+      <div className="grid grid-cols-3 gap-2">
+        {items.map(item => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-current={item.active ? 'page' : undefined}
+              className={cn(
+                'group relative flex min-h-[74px] min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-3 transition sm:min-h-[82px] sm:gap-3 sm:px-4',
+                item.active
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-50'
+                  : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)] hover:bg-white dark:hover:bg-[color:var(--app-surface)]',
+              )}
+            >
+              <span
+                className={cn(
+                  'grid h-10 w-10 shrink-0 place-items-center rounded-xl',
+                  item.active
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white text-[color:var(--app-text-soft)] shadow-sm dark:bg-white/10',
+                )}
+              >
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5">
+                  <span className="truncate text-xs font-bold sm:text-sm">
+                    {item.label}
+                  </span>
+                  {item.count !== null ? (
+                    <span className="hidden rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-bold sm:inline dark:bg-white/10">
+                      {metric(item.count)}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="mt-0.5 hidden truncate text-xs opacity-70 sm:block">
+                  {item.description}
+                </span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function VisualPreview({
+  title,
+  source,
+  poster,
+  kind,
+  status,
+  statusTone = 'active',
+}: {
+  title: string;
+  source?: string;
+  poster?: string;
+  kind: 'community' | 'reel-image' | 'reel-video';
+  status: string;
+  statusTone?: 'active' | 'pending' | 'inactive';
+}) {
+  const [mediaFailed, setMediaFailed] = useState(false);
+  const isVideo = kind === 'reel-video';
+  const isReel = kind !== 'community';
+
+  return (
+    <div
+      className={cn(
+        'relative isolate overflow-hidden bg-gradient-to-br from-emerald-950 via-emerald-800 to-cyan-600',
+        isReel ? 'aspect-[4/5]' : 'aspect-video',
+      )}
+    >
+      {source && !mediaFailed ? (
+        isVideo ? (
+          <video
+            src={source}
+            poster={poster}
+            muted
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+            onError={() => setMediaFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          />
+        ) : (
+          // Arbitrary community media URLs are provided by the API.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={source}
+            alt=""
+            loading="lazy"
+            onError={() => setMediaFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          />
+        )
+      ) : (
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="text-center text-white/90">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/15 shadow-lg backdrop-blur-sm">
+              {isReel ? (
+                <Clapperboard className="h-7 w-7" />
+              ) : (
+                <ImageIcon className="h-7 w-7" />
+              )}
+            </span>
+            <span className="mt-3 block text-xs font-semibold text-white/75">
+              {isReel ? 'Reels' : 'Community'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-black/30" />
+      <span
+        className={cn(
+          'absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold text-white shadow-sm',
+          statusTone === 'active'
+            ? 'bg-emerald-500'
+            : statusTone === 'pending'
+              ? 'bg-amber-500'
+              : 'bg-slate-600',
+        )}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+        {status}
+      </span>
+      <span className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+        {kind === 'community'
+          ? 'Post'
+          : kind === 'reel-image'
+            ? 'Foto'
+            : 'Video'}
+      </span>
+      {isVideo ? (
+        <span
+          className="absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-slate-950 shadow-xl"
+          aria-hidden="true"
+        >
+          <Play className="ml-0.5 h-5 w-5 fill-current" />
+        </span>
+      ) : null}
+      <p className="absolute inset-x-3 bottom-3 line-clamp-2 text-sm font-bold leading-5 text-white drop-shadow">
+        {title}
+      </p>
+    </div>
+  );
+}
+
+function LabeledField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text-soft)]">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function MetricBadge({
+  icon: Icon,
+  value,
+  label,
+}: {
+  icon: LucideIcon;
+  value: number;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+      <Icon className="h-3.5 w-3.5" />
+      <span className="font-bold text-[color:var(--app-text)]">
+        {metric(value)}
+      </span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function statusLabel(status: string, isId: boolean) {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'pending' || normalized === 'review') {
+    return isId ? 'Ditinjau' : 'In review';
+  }
+  if (
+    normalized === 'blocked' ||
+    normalized === 'archived' ||
+    normalized === 'inactive'
+  ) {
+    return isId ? 'Tidak aktif' : 'Inactive';
+  }
+  return isId ? 'Aktif' : 'Active';
+}
+
+function statusTone(status: string): 'active' | 'pending' | 'inactive' {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'pending' || normalized === 'review') return 'pending';
+  if (
+    normalized === 'blocked' ||
+    normalized === 'archived' ||
+    normalized === 'inactive'
+  ) {
+    return 'inactive';
+  }
+  return 'active';
+}
+
+function getImagePoster(sourceUrl: string, videoSrc: string) {
+  if (!sourceUrl || sourceUrl === videoSrc) return undefined;
+  return /\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])/i.test(sourceUrl)
+    ? sourceUrl
+    : undefined;
 }
 
 function EmptyState({
@@ -729,7 +1183,7 @@ function EmptyState({
   label: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-sm text-[color:var(--app-text-soft)]">
+    <div className="col-span-full rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-sm text-[color:var(--app-text-soft)]">
       <p>{text}</p>
       <Link
         href={href}
@@ -758,7 +1212,7 @@ function EditActions({
       <button
         type="submit"
         disabled={busy}
-        className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm font-semibold disabled:opacity-60"
+        className="ui-button-primary inline-flex min-h-11 items-center gap-2 px-4 text-sm font-semibold disabled:opacity-60"
       >
         {busy ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -770,7 +1224,7 @@ function EditActions({
       <button
         type="button"
         onClick={onCancel}
-        className="ui-button-secondary inline-flex items-center gap-2 px-4 text-sm font-semibold"
+        className="ui-button-secondary inline-flex min-h-11 items-center gap-2 px-4 text-sm font-semibold"
       >
         <X className="h-4 w-4" />
         {cancel}
@@ -779,66 +1233,68 @@ function EditActions({
   );
 }
 
-function ContentRow({
+function ContentActions({
   title,
-  meta,
   href,
   busy,
   open,
   edit,
-  deleteLabel,
+  destructiveLabel,
+  destructiveIcon,
   onEdit,
-  onDelete,
+  onDestructive,
 }: {
   title: string;
-  meta: string;
   href: string;
   busy: boolean;
   open: string;
   edit: string;
-  deleteLabel: string;
+  destructiveLabel: string;
+  destructiveIcon: 'archive' | 'delete';
   onEdit: () => void;
-  onDelete: () => void;
+  onDestructive: () => void;
 }) {
+  const DestructiveIcon = destructiveIcon === 'archive' ? Archive : Trash2;
+
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div className="min-w-0">
-        <h2 className="truncate text-base font-semibold text-[color:var(--app-text)]">
-          {title}
-        </h2>
-        <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{meta}</p>
-      </div>
-      <div className="flex shrink-0 flex-wrap gap-2">
-        <Link
-          href={href}
-          className="ui-button-secondary inline-flex items-center gap-2 px-3 text-sm font-semibold"
-        >
-          <ExternalLink className="h-4 w-4" />
-          {open}
-        </Link>
-        <button
-          type="button"
-          onClick={onEdit}
-          disabled={busy}
-          className="ui-button-secondary inline-flex items-center gap-2 px-3 text-sm font-semibold disabled:opacity-60"
-        >
-          {busy ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Edit3 className="h-4 w-4" />
-          )}
-          {edit}
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={busy}
-          className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 text-sm font-semibold text-rose-700 disabled:opacity-60"
-        >
-          <Trash2 className="h-4 w-4" />
-          {deleteLabel}
-        </button>
-      </div>
+    <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[color:var(--app-border)] pt-4">
+      <Link
+        href={href}
+        aria-label={`${open}: ${title}`}
+        className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-1.5 px-2 text-xs font-semibold"
+      >
+        <ExternalLink className="h-4 w-4" />
+        {open}
+      </Link>
+      <button
+        type="button"
+        onClick={onEdit}
+        disabled={busy}
+        aria-label={`${edit}: ${title}`}
+        className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-1.5 px-2 text-xs font-semibold disabled:opacity-60"
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Edit3 className="h-4 w-4" />
+        )}
+        {edit}
+      </button>
+      <button
+        type="button"
+        onClick={onDestructive}
+        disabled={busy}
+        aria-label={`${destructiveLabel}: ${title}`}
+        className={cn(
+          'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-2 text-xs font-semibold disabled:opacity-60',
+          destructiveIcon === 'archive'
+            ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200'
+            : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200',
+        )}
+      >
+        <DestructiveIcon className="h-4 w-4" />
+        {destructiveLabel}
+      </button>
     </div>
   );
 }

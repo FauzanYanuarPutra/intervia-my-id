@@ -49,4 +49,54 @@ describe('umkm place distance presentation', () => {
     });
     expect(ui.distanceLabel).toMatch(/m|km/);
   });
+
+  it('keeps opening status unknown when business hours are not provided', () => {
+    const ui = buildUmkmPlacePresentation(buildPlace(), true, null);
+
+    expect(ui.openNow).toBeNull();
+    expect(ui.openHours).toBe('Jam buka belum diisi');
+    expect(ui.statusLabel).toBe('Jam buka belum diisi');
+  });
+
+  it('uses configured business hours without claiming a live status', () => {
+    const ui = buildUmkmPlacePresentation(
+      buildPlace({ metadata: { open_hours: 'Senin–Jumat' } }),
+      true,
+      null,
+    );
+
+    expect(ui.openHours).toBe('Senin–Jumat');
+    expect(ui.openNow).toBeNull();
+    expect(ui.statusLabel).toBe('Senin–Jumat');
+  });
+
+  it('uses a neutral placeholder instead of category imagery when media is missing', () => {
+    const ui = buildUmkmPlacePresentation(buildPlace(), true, null);
+
+    expect(ui.coverImage).toBe('/images/placeholders/business-default.svg');
+    expect(ui.gallery).toEqual(['/images/placeholders/business-default.svg']);
+  });
+
+  it('keeps owner-provided storefront media', () => {
+    const ui = buildUmkmPlacePresentation(
+      buildPlace({
+        metadata: {
+          cover_image_url: 'https://cdn.example.test/store.jpg',
+          gallery_images: [
+            'https://cdn.example.test/product-1.jpg',
+            'https://cdn.example.test/product-2.jpg',
+          ],
+        },
+      }),
+      true,
+      null,
+    );
+
+    expect(ui.coverImage).toBe('https://cdn.example.test/store.jpg');
+    expect(ui.gallery).toEqual([
+      'https://cdn.example.test/store.jpg',
+      'https://cdn.example.test/product-1.jpg',
+      'https://cdn.example.test/product-2.jpg',
+    ]);
+  });
 });

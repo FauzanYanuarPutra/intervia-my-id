@@ -13,6 +13,7 @@ import {
   Home,
   LayoutGrid,
   Languages,
+  LayoutDashboard,
   LogIn,
   LogOut,
   MapPinned,
@@ -201,6 +202,16 @@ export function Header() {
             matchers: ['/profile$', '/profile/edit'],
           },
           {
+            href: '/manage',
+            label: localeKey === 'id' ? 'Pusat Kelola' : 'Manage content',
+            caption:
+              localeKey === 'id'
+                ? 'Listing, komunitas, dan reels'
+                : 'Listings, community, and reels',
+            icon: LayoutDashboard,
+            matchers: ['/manage'],
+          },
+          {
             href: '/my-listings',
             label: localeKey === 'id' ? 'Postingan' : 'Posts',
             caption:
@@ -369,6 +380,15 @@ export function Header() {
             caption: isId ? 'Kabar penting' : 'Updates',
             icon: Bell,
             matchers: ['/notifications'],
+          },
+          {
+            href: guarded('/manage'),
+            label: isId ? 'Pusat Kelola' : 'Manage content',
+            caption: isId
+              ? 'Listing, komunitas, dan reels'
+              : 'Listings, community, and reels',
+            icon: LayoutDashboard,
+            matchers: ['/manage'],
           },
           {
             href: guarded('/my-listings?filter=favorites'),
@@ -545,6 +565,16 @@ export function Header() {
         matchers: ['/chat'],
       },
       {
+        href: isAuthenticated ? '/manage' : '/login',
+        label: localeKey === 'id' ? 'Pusat Kelola' : 'Manage content',
+        caption:
+          localeKey === 'id'
+            ? 'Semua konten dalam satu tempat'
+            : 'All content in one place',
+        icon: LayoutDashboard,
+        matchers: ['/manage'],
+      },
+      {
         href: manageHref,
         label: localeKey === 'id' ? 'Kelola Usaha' : 'Manage business',
         caption:
@@ -555,7 +585,7 @@ export function Header() {
         matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
       },
     ],
-    [chatHref, localeKey, manageHref],
+    [chatHref, isAuthenticated, localeKey, manageHref],
   );
 
   const closeAll = useCallback(() => {
@@ -757,7 +787,7 @@ export function Header() {
               </div>
 
               <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain bg-[color:var(--app-surface-muted)] p-3 pb-4">
-                <section className="grid grid-cols-3 gap-1.5">
+                <section className="grid grid-cols-2 gap-1.5">
                   {drawerQuickLinks.map(item => {
                     const Icon = item.icon;
                     const active = (
@@ -1015,7 +1045,7 @@ export function Header() {
         data-tour="www-header"
       >
         <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
-        <div className="lajukan-header-shell page-shell page-shell-inset flex h-12 items-center gap-2 sm:h-14">
+        <div className="lajukan-header-shell page-shell flex h-12 items-center gap-2 sm:h-14">
           <div className="flex shrink-0 items-center gap-2">
             <Link
               href="/home"
@@ -1162,6 +1192,7 @@ export function Header() {
                     'ui-pressable inline-flex h-11 min-h-11 items-center gap-0 rounded-full border px-2 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition xl:gap-2 xl:px-2 xl:pr-3',
                     matchesRoute(cleanPath, '/profile$') ||
                       matchesRoute(cleanPath, '/profile/edit') ||
+                      matchesRoute(cleanPath, '/manage') ||
                       matchesRoute(cleanPath, '/usaha') ||
                       matchesRoute(cleanPath, LEGACY_UMKM_OWNER_PATH) ||
                       matchesRoute(cleanPath, '/settings') ||

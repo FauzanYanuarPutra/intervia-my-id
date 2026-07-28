@@ -221,7 +221,7 @@ export default function NotificationsPage() {
       : 'Payment, security, transaction, and key activity updates appear here.';
 
   return (
-    <section className="page-shell max-w-[920px] pb-8 pt-3 lg:pb-10">
+    <section className="page-shell page-shell-readable pb-8 pt-3 lg:pb-10">
       <div className="ui-panel p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">

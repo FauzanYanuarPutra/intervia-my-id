@@ -22,6 +22,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import useEmblaCarousel from 'embla-carousel-react';
 import { useInView } from 'react-intersection-observer';
 import { Modal } from '@/components/common/Modal';
+import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
 import { AuthCtaLink } from '@/components/home/AuthCtaLink';
 import { useAuth } from '@/context/AuthContext';
 import { useAppBack } from '@/lib/navigation/useAppBack';
@@ -78,6 +79,40 @@ import {
   formatPriceWithUnit,
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
+
+function SearchResultSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Memuat hasil pencarian">
+      {Array.from({ length: count }).map((_, index) => (
+        <article
+          key={index}
+          className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4"
+        >
+          <div className="flex gap-3 sm:gap-4">
+            <Skeleton
+              variant="media"
+              className="aspect-square h-24 w-24 shrink-0 rounded-[16px] sm:h-32 sm:w-32"
+            />
+            <div className="min-w-0 flex-1 py-0.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <Skeleton variant="line" className="h-3 w-20" />
+                  <Skeleton variant="line" className="mt-2 h-5 w-4/5" />
+                </div>
+                <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+              </div>
+              <SkeletonStack lines={2} className="mt-3 hidden sm:block" />
+              <div className="mt-3 flex gap-2">
+                <Skeleton variant="chip" className="h-7 w-20" />
+                <Skeleton variant="chip" className="h-7 w-16" />
+              </div>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
 import { resolveSupplierListingBadges } from '@/lib/content/supplierInfo';
 import { buildPublicProfileHrefFromContent } from '@/lib/profile/publicProfileLink';
 import {
@@ -3202,9 +3237,7 @@ export default function SearchPageClient({
     ? `${resultCountLabel}+`
     : resultCountLabel;
   const selectedLocationLabel =
-    location ||
-    locationInput ||
-    (isId ? 'Bandung, Jawa Barat' : 'Bandung, West Java');
+    location || locationInput || (isId ? 'Semua lokasi' : 'All locations');
   const popularCities = useMemo(() => {
     const citySet = new Set<string>();
     [
@@ -3584,14 +3617,7 @@ export default function SearchPageClient({
 
           {shouldShowResultCards ? (
             loading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={`mobile-loading-${index}`}
-                    className="ui-skeleton ui-skeleton-pulse h-[190px] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:h-[210px]"
-                  />
-                ))}
-              </div>
+              <SearchResultSkeleton count={4} />
             ) : error ? (
               <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-5 text-sm text-rose-700">
                 <p>{error}</p>
@@ -4140,14 +4166,7 @@ export default function SearchPageClient({
 
                 {shouldShowResultCards ? (
                   loading ? (
-                    <div className="space-y-3">
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <div
-                          key={`desktop-loading-${index}`}
-                          className="ui-skeleton ui-skeleton-pulse h-[196px] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]"
-                        />
-                      ))}
-                    </div>
+                    <SearchResultSkeleton count={5} />
                   ) : error ? (
                     <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-5 text-sm text-rose-700">
                       <p>{error}</p>

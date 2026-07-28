@@ -81,9 +81,18 @@ const privacyTopicSections: LegalSection[] = [
       en: 'Every new feature should pass a data review: what data is collected, why, who can access it, how long it stays, and when it must be deleted or anonymized.',
     },
     bullets: [
-      { id: 'Data sensitif harus dibatasi aksesnya.', en: 'Sensitive data should have restricted access.' },
-      { id: 'Ekspor data dan hapus akun harus punya jalur yang jelas.', en: 'Data export and account deletion need a clear path.' },
-      { id: 'Bukti persetujuan, perubahan, dan aktivitas sensitif perlu audit trail.', en: 'Consent, changes, and sensitive actions need audit trails.' },
+      {
+        id: 'Data sensitif harus dibatasi aksesnya.',
+        en: 'Sensitive data should have restricted access.',
+      },
+      {
+        id: 'Ekspor data dan hapus akun harus punya jalur yang jelas.',
+        en: 'Data export and account deletion need a clear path.',
+      },
+      {
+        id: 'Bukti persetujuan, perubahan, dan aktivitas sensitif perlu audit trail.',
+        en: 'Consent, changes, and sensitive actions need audit trails.',
+      },
     ],
   },
   {
@@ -192,8 +201,8 @@ const paymentsTopicSections: LegalSection[] = [
     id: 'what',
     title: { id: 'Apa ini', en: 'What this is' },
     body: {
-      id: 'Topik ini membahas saldo, pembayaran, top up, escrow, uang jaminan, refund, dan pemisahan dana operasional platform dari dana transaksi user.',
-      en: 'This topic covers balance, payments, top-ups, escrow, security deposits, refunds, and separating platform operating funds from user transaction funds.',
+      id: 'Topik ini menjelaskan standar kesiapan untuk saldo, pembayaran, top up, escrow, uang jaminan, dan refund. Fitur yang belum diberi status aktif di produk belum dapat dianggap tersedia.',
+      en: 'This topic explains readiness standards for wallet, payments, top-ups, escrow, deposits, and refunds. A feature is not available until the product explicitly marks it as active.',
     },
   },
   {
@@ -214,26 +223,29 @@ const paymentsTopicSections: LegalSection[] = [
   },
   {
     id: 'operations',
-    title: { id: 'Flow operasional Lajukan', en: 'Lajukan operational flow' },
+    title: {
+      id: 'Standar sebelum diaktifkan',
+      en: 'Standards before activation',
+    },
     body: {
-      id: 'Nominal, status, pihak penerima, dasar pelepasan dana, dan bukti refund harus dicatat. Untuk rental, pelepasan deposit idealnya menunggu inspeksi akhir.',
-      en: 'Amounts, status, receiving party, release conditions, and refund evidence must be recorded. For rentals, deposit release should ideally wait for final inspection.',
+      id: 'Sebelum fitur dana diaktifkan, nominal, status, pihak penerima, dasar pelepasan dana, serta bukti refund harus dapat dicatat dan diaudit.',
+      en: 'Before any fund-handling feature is activated, amounts, statuses, recipients, release conditions, and refund evidence must be recordable and auditable.',
     },
   },
   {
     id: 'controls',
-    title: { id: 'Kontrol yang dipakai', en: 'Controls in use' },
+    title: { id: 'Kontrol yang diwajibkan', en: 'Required controls' },
     body: {
-      id: 'Gunakan partner pembayaran yang tepat, status transaksi yang eksplisit, audit trail, dan jalur mediasi jika ada selisih atau chargeback.',
-      en: 'Use the right payment partner, explicit transaction states, audit trails, and a mediation path for mismatches or chargebacks.',
+      id: 'Aktivasi membutuhkan partner pembayaran yang sesuai, status transaksi eksplisit, audit trail, dan prosedur penanganan selisih atau chargeback.',
+      en: 'Activation requires a suitable payment partner, explicit transaction states, audit trails, and procedures for mismatches or chargebacks.',
     },
   },
   {
     id: 'rights',
     title: { id: 'Hak user', en: 'User rights' },
     body: {
-      id: 'User berhak melihat status dana, alasan hold, alasan gagal bayar, dasar pemotongan, dan status refund mereka.',
-      en: 'Users should be able to see fund status, hold reasons, payment failure reasons, deduction basis, and refund status.',
+      id: 'Jika fitur dana sudah aktif untuk suatu transaksi, user berhak melihat status dana, alasan hold atau gagal bayar, dasar pemotongan, dan status refund.',
+      en: 'When a fund-handling feature is active for a transaction, users are entitled to see fund status, hold or payment-failure reasons, deduction basis, and refund status.',
     },
   },
   {
@@ -248,8 +260,8 @@ const paymentsTopicSections: LegalSection[] = [
     id: 'help',
     title: { id: 'Jika ada masalah', en: 'If something goes wrong' },
     body: {
-      id: 'Pilih support kategori transaksi, lampirkan ID transaksi, nominal, waktu, dan bukti pembayaran atau refund yang relevan.',
-      en: 'Choose the transaction support category and attach the transaction ID, amount, time, and the relevant payment or refund evidence.',
+      id: 'Pilih kategori support yang sesuai dan lampirkan ID percakapan atau transaksi, nominal, waktu, serta bukti yang relevan. Support tidak menggantikan bank, penyedia pembayaran, atau penegak hukum.',
+      en: 'Choose the relevant support category and attach the conversation or transaction ID, amount, time, and supporting evidence. Support does not replace banks, payment providers, or law enforcement.',
     },
   },
 ];
@@ -487,10 +499,22 @@ const regulationsTopicSections: LegalSection[] = [
       en: 'New features should be checked against a regulation map: what data is touched, which countries are affected, what partners are involved, and what evidence must be stored.',
     },
     bullets: [
-      { id: 'Privasi: GDPR, UU PDP, PDPA, CCPA atau aturan serupa.', en: 'Privacy: GDPR, PDP Law, PDPA, CCPA, or similar laws.' },
-      { id: 'Keamanan: OWASP, secure SDLC, audit, dan kontrol akses.', en: 'Security: OWASP, secure SDLC, audits, and access controls.' },
-      { id: 'Pembayaran: partner dan scope kepatuhan yang tepat.', en: 'Payments: the right partner and compliance scope.' },
-      { id: 'Aksesibilitas dan reliability juga harus masuk dari awal.', en: 'Accessibility and reliability also need to be built in from the start.' },
+      {
+        id: 'Privasi: GDPR, UU PDP, PDPA, CCPA atau aturan serupa.',
+        en: 'Privacy: GDPR, PDP Law, PDPA, CCPA, or similar laws.',
+      },
+      {
+        id: 'Keamanan: OWASP, secure SDLC, audit, dan kontrol akses.',
+        en: 'Security: OWASP, secure SDLC, audits, and access controls.',
+      },
+      {
+        id: 'Pembayaran: partner dan scope kepatuhan yang tepat.',
+        en: 'Payments: the right partner and compliance scope.',
+      },
+      {
+        id: 'Aksesibilitas dan reliability juga harus masuk dari awal.',
+        en: 'Accessibility and reliability also need to be built in from the start.',
+      },
     ],
   },
   {
@@ -566,15 +590,15 @@ export const TRUST_TOPICS: TrustTopic[] = [
   },
   {
     slug: 'payments',
-    badge: { id: 'Pembayaran & escrow', en: 'Payments & escrow' },
+    badge: { id: 'Kesiapan pembayaran', en: 'Payment readiness' },
     shortTitle: { id: 'Pembayaran', en: 'Payments' },
     title: {
-      id: 'Pembayaran, saldo, escrow, refund, dan uang jaminan',
-      en: 'Payments, wallet, escrow, refunds, and deposits',
+      id: 'Status kesiapan pembayaran, saldo, escrow, dan refund',
+      en: 'Readiness status for payments, wallet, escrow, and refunds',
     },
     summary: {
-      id: 'Penjelasan singkat flow dana, hold, refund, dan bukti transaksi.',
-      en: 'A concise explanation of fund flow, holds, refunds, and transaction evidence.',
+      id: 'Standar yang harus dipenuhi sebelum fitur dana ditandai aktif pada transaksi.',
+      en: 'Standards that must be met before fund-handling features are marked active for a transaction.',
     },
     audience: {
       id: 'Untuk buyer, seller, owner alat, borrower, dan tim operasional dana.',
@@ -657,13 +681,16 @@ export const TRUST_TOPICS: TrustTopic[] = [
 ];
 
 export function getTrustTopic(slug: string): TrustTopic | undefined {
-  return TRUST_TOPICS.find((topic) => topic.slug === slug);
+  return TRUST_TOPICS.find(topic => topic.slug === slug);
 }
 
 export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
   {
     id: 'scope',
-    title: { id: 'Lingkup & data yang kami kumpulkan', en: 'Scope & data we collect' },
+    title: {
+      id: 'Lingkup & data yang kami kumpulkan',
+      en: 'Scope & data we collect',
+    },
     body: {
       id: 'Kami mengumpulkan data yang dibutuhkan untuk akun, transaksi, keamanan, support, dan peningkatan layanan. Jenis data bisa meliputi identitas, kontak, riwayat transaksi, dan bukti komunikasi.',
       en: 'We collect data needed for accounts, transactions, security, support, and service improvement. Data types may include identity, contact, transaction history, and communication evidence.',
@@ -677,8 +704,14 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
       en: 'Processing is based on consent, service contracts, legal obligations, or legitimate interests. We show clear notices when sensitive data is requested.',
     },
     bullets: [
-      { id: 'Persetujuan bisa ditarik lewat pengaturan akun.', en: 'Consent can be withdrawn via account settings.' },
-      { id: 'Data sensitif hanya diminta saat benar-benar perlu.', en: 'Sensitive data is only requested when necessary.' },
+      {
+        id: 'Persetujuan bisa ditarik lewat pengaturan akun.',
+        en: 'Consent can be withdrawn via account settings.',
+      },
+      {
+        id: 'Data sensitif hanya diminta saat benar-benar perlu.',
+        en: 'Sensitive data is only requested when necessary.',
+      },
     ],
   },
   {
@@ -697,8 +730,14 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
       en: 'We may share data with vendors that support payments, verification, storage, or analytics under clear access limits.',
     },
     bullets: [
-      { id: 'Kami meninjau vendor sebelum data dibagikan.', en: 'We review vendors before sharing data.' },
-      { id: 'Transfer lintas negara mengikuti aturan yang berlaku.', en: 'Cross-border transfers follow applicable rules.' },
+      {
+        id: 'Kami meninjau vendor sebelum data dibagikan.',
+        en: 'We review vendors before sharing data.',
+      },
+      {
+        id: 'Transfer lintas negara mengikuti aturan yang berlaku.',
+        en: 'Cross-border transfers follow applicable rules.',
+      },
     ],
   },
   {
@@ -732,8 +771,8 @@ export const TERMS_SECTIONS: LegalSection[] = [
     id: 'transactions',
     title: { id: 'Transaksi & pembayaran', en: 'Transactions & payments' },
     body: {
-      id: 'Transaksi, escrow, dan pembayaran mengikuti aturan platform. Pengguna wajib mematuhi ketentuan harga, jadwal, serta proses penyelesaian transaksi.',
-      en: 'Transactions, escrow, and payments follow platform rules. Users must comply with pricing, schedules, and transaction completion processes.',
+      id: 'Saat ini Lajukan membantu pencarian, listing, chat, dan pencatatan kesepakatan. Pembayaran atau escrow hanya berlaku bila halaman transaksi secara eksplisit menandainya aktif; selain itu pembayaran berlangsung langsung antar pihak dengan risiko masing-masing.',
+      en: 'Lajukan currently supports discovery, listings, chat, and agreement records. Payments or escrow apply only when the transaction page explicitly marks them active; otherwise payment happens directly between the parties at their own risk.',
     },
   },
   {
@@ -748,8 +787,8 @@ export const TERMS_SECTIONS: LegalSection[] = [
     id: 'dispute',
     title: { id: 'Sengketa & penyelesaian', en: 'Disputes & resolution' },
     body: {
-      id: 'Sengketa ditangani melalui alur mediasi, bukti transaksi, dan keputusan platform sesuai kebijakan yang berlaku.',
-      en: 'Disputes are handled through mediation, transaction evidence, and platform decisions per policy.',
+      id: 'Lajukan dapat menerima laporan dan membantu merangkum bukti yang tersimpan di platform. Bantuan tersebut bukan jaminan mediasi, refund, atau keputusan yang mengikat kecuali dinyatakan khusus pada transaksi terkait.',
+      en: 'Lajukan may receive reports and help summarize evidence stored on the platform. This assistance does not guarantee mediation, refunds, or a binding decision unless explicitly stated for the relevant transaction.',
     },
   },
   {
@@ -830,8 +869,14 @@ export const LEGAL_SUMMARIES: LegalSummary[] = [
       en: 'A summary of how Lajukan manages data, consent, retention, and user rights.',
     },
     bullets: [
-      { id: 'Hak akses, koreksi, ekspor, dan penghapusan data.', en: 'Rights to access, correct, export, and delete data.' },
-      { id: 'Aturan retensi dan pemrosesan data sensitif.', en: 'Retention and sensitive data handling rules.' },
+      {
+        id: 'Hak akses, koreksi, ekspor, dan penghapusan data.',
+        en: 'Rights to access, correct, export, and delete data.',
+      },
+      {
+        id: 'Aturan retensi dan pemrosesan data sensitif.',
+        en: 'Retention and sensitive data handling rules.',
+      },
     ],
     href: '/privacy',
   },
@@ -843,8 +888,14 @@ export const LEGAL_SUMMARIES: LegalSummary[] = [
       en: 'Rules for platform usage, transactions, moderation, and liability limits.',
     },
     bullets: [
-      { id: 'Aturan akun, transaksi, dan penyelesaian sengketa.', en: 'Account, transaction, and dispute rules.' },
-      { id: 'Moderasi konten dan kebijakan perubahan.', en: 'Content moderation and policy updates.' },
+      {
+        id: 'Aturan akun, transaksi, dan penyelesaian sengketa.',
+        en: 'Account, transaction, and dispute rules.',
+      },
+      {
+        id: 'Moderasi konten dan kebijakan perubahan.',
+        en: 'Content moderation and policy updates.',
+      },
     ],
     href: '/terms',
   },
@@ -856,8 +907,14 @@ export const LEGAL_SUMMARIES: LegalSummary[] = [
       en: 'Cookie information, usage purposes, and user controls.',
     },
     bullets: [
-      { id: 'Jenis cookie dan masa simpan.', en: 'Cookie types and retention periods.' },
-      { id: 'Cara menghapus atau memblokir cookie.', en: 'How to delete or block cookies.' },
+      {
+        id: 'Jenis cookie dan masa simpan.',
+        en: 'Cookie types and retention periods.',
+      },
+      {
+        id: 'Cara menghapus atau memblokir cookie.',
+        en: 'How to delete or block cookies.',
+      },
     ],
     href: '/cookie-policy',
   },

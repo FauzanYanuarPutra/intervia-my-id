@@ -27,6 +27,7 @@ import {
   type ProfileContentTab,
 } from '@/lib/profile/profileContentTabs';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+import { buildUmkmDiscoveryPath, UMKM_OWNER_PATH } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 import {
   BadgeCheck,
@@ -345,7 +346,7 @@ function buildNotificationTargetHref(notification: InboxNotification): string {
     return `/content/${encodeURIComponent(entityId)}`;
   }
   if ((entityType === 'map' || entityType === 'maps') && entityId) {
-    return `/umkm?item=${encodeURIComponent(entityId)}`;
+    return buildUmkmDiscoveryPath({ storeId: entityId });
   }
   return '/notifications';
 }
@@ -1058,7 +1059,6 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   const pathname = usePathname();
   const { items: inboxNotifications } = useNotificationInbox();
   const [activeHubTab, setActiveHubTab] = useState<HubTab>('ringkas');
-  const [quickEditOpen, setQuickEditOpen] = useState(false);
   const [socialModal, setSocialModal] = useState<SocialModalTab | null>(null);
   const [followedIds, setFollowedIds] = useState<string[]>([]);
   const [reelsSignalCount, setReelsSignalCount] = useState(0);
@@ -1691,7 +1691,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         key: 'umkm',
         title: copy.storeAction,
         description: copy.storeDesc,
-        href: '/home',
+        href: UMKM_OWNER_PATH,
         icon: Store,
         metric: PROMO_ONLY_MODE
           ? isId
@@ -2661,14 +2661,13 @@ transition  "
                 </div>
 
                 <div className="grid w-full shrink-0 grid-cols-2 gap-2 lg:w-[330px] xl:w-[370px]">
-                  <button
-                    type="button"
-                    onClick={() => setQuickEditOpen(true)}
+                  <LocalizedLink
+                    href="/profile/edit?focus=identity"
                     className={PRIMARY_ACTION_CLASS}
                   >
                     <User2 className="h-4 w-4" />
                     {isId ? 'Edit profil' : 'Edit profile'}
-                  </button>
+                  </LocalizedLink>
                   <a
                     href={publicProfileUrl}
                     target="_blank"
@@ -3538,14 +3537,13 @@ transition  "
                   <ProgressBar value={setupPercent} />
                 </div>
                 <div className="mt-2.5 grid gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setQuickEditOpen(true)}
+                  <LocalizedLink
+                    href="/profile/edit?focus=identity"
                     className={PRIMARY_ACTION_CLASS}
                   >
                     <User2 className="h-4 w-4" />
                     {copy.editQuick}
-                  </button>
+                  </LocalizedLink>
                   <button
                     type="button"
                     onClick={copyPublicProfileUrl}
@@ -3741,119 +3739,6 @@ transition  "
               ))}
             </div>
           )}
-        </div>
-      </Modal>
-
-      <Modal
-        open={quickEditOpen}
-        title={isId ? 'Edit profil singkat' : 'Quick profile edit'}
-        onClose={() => setQuickEditOpen(false)}
-        footer={
-          <>
-            <LocalizedLink
-              href="/profile/edit?focus=identity"
-              className={SECONDARY_ACTION_CLASS}
-            >
-              {copy.editFull}
-              <ChevronRight className="h-4 w-4" />
-            </LocalizedLink>
-            <button
-              type="button"
-              onClick={() => setQuickEditOpen(false)}
-              className={SECONDARY_ACTION_CLASS}
-            >
-              {copy.close}
-            </button>
-            <button
-              type="button"
-              onClick={onSaveProfile}
-              disabled={saving}
-              className={PRIMARY_ACTION_CLASS}
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              {copy.save}
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          {avatarBuilder ? avatarBuilder : null}
-
-          <label className="block space-y-1.5">
-            <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-              {isId ? 'Nama tampil' : 'Display name'}
-            </span>
-            <input
-              value={fullNameInput}
-              onChange={event => onFullNameChange(event.target.value)}
-              className={INPUT_CLASS}
-              placeholder={
-                isId ? 'Nama yang ingin ditampilkan' : 'Name shown publicly'
-              }
-            />
-          </label>
-
-          <label className="block space-y-1.5">
-            <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-              {isId ? 'URL profil publik' : 'Public profile URL'}
-            </span>
-            <input
-              value={usernameInput}
-              onChange={event => onUsernameChange(event.target.value)}
-              className={INPUT_CLASS}
-              placeholder="nama-profil"
-            />
-            <p className="break-all text-xs text-[color:var(--app-text-soft)]">
-              {publicProfileUrl}
-            </p>
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1.5">
-              <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {isId ? 'Nomor telepon' : 'Phone'}
-              </span>
-              <input
-                value={phoneInput}
-                onChange={event => onPhoneChange(event.target.value)}
-                className={INPUT_CLASS}
-                placeholder="08xxxxxxxxxx"
-              />
-            </label>
-
-            <label className="block space-y-1.5">
-              <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {isId ? 'Lokasi' : 'Location'}
-              </span>
-              <input
-                value={locationInput}
-                onChange={event => onLocationChange(event.target.value)}
-                className={INPUT_CLASS}
-                placeholder="Jakarta, Bandung, Surabaya"
-              />
-            </label>
-          </div>
-
-          <label className="block space-y-1.5">
-            <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-              {isId ? 'Ringkasan singkat' : 'Short summary'}
-            </span>
-            <textarea
-              value={bioInput}
-              onChange={event => onBioChange(event.target.value)}
-              rows={3}
-              className={INPUT_CLASS}
-              placeholder={
-                isId
-                  ? 'Siapa kamu atau usaha kamu?'
-                  : 'Who are you or what is your business?'
-              }
-            />
-          </label>
         </div>
       </Modal>
     </div>

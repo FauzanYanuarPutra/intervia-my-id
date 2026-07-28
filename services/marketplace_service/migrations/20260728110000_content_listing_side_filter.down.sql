@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_content_items_status_listing_side_updated_at;

@@ -24,7 +24,7 @@ import {
 export const metadata: Metadata = {
   title: 'Syarat & Ketentuan | Lajukan',
   description:
-    'Aturan penggunaan platform Lajukan, hak dan kewajiban pengguna, serta standar transaksi aman.',
+    'Aturan penggunaan Lajukan, hak dan kewajiban pengguna, serta status layanan transaksi dan pembayaran.',
   keywords: [
     'syarat ketentuan',
     'terms of service',
@@ -44,8 +44,8 @@ export default async function TermsPage({ params }: PageProps) {
     {
       icon: ShieldCheck,
       text: isId
-        ? 'Keamanan transaksi jadi prioritas.'
-        : 'Transaction safety comes first.',
+        ? 'Status setiap fitur harus dijelaskan dengan jujur.'
+        : 'Every feature status must be explained clearly.',
     },
     {
       icon: Handshake,
@@ -70,13 +70,13 @@ export default async function TermsPage({ params }: PageProps) {
     ? [
         'Kamu boleh mencari, menawarkan, dan menghubungi kebutuhan usaha.',
         'Transaksi terbaik dilakukan dengan bukti dan komunikasi yang jelas.',
-        'Kesepakatan di luar platform punya risiko lebih tinggi.',
+        'Simpan bukti harga, jadwal, dan kesepakatan di chat.',
         'Pelanggaran dapat membuat konten atau akun dibatasi.',
       ]
     : [
         'You can search, offer, and contact business needs.',
         'Good transactions use clear proof and communication.',
-        'Off-platform deals carry higher risk.',
+        'Keep price, schedule, and agreement evidence in chat.',
         'Violations may restrict content or accounts.',
       ];
   const related = [
@@ -84,8 +84,8 @@ export default async function TermsPage({ params }: PageProps) {
       icon: CreditCard,
       title: isId ? 'Pembayaran' : 'Payments',
       body: isId
-        ? 'Harga, refund, dan transaksi memakai Rupiah (IDR).'
-        : 'Prices, refunds, and transactions use Indonesian Rupiah (IDR).',
+        ? 'Fitur pembayaran atau escrow hanya berlaku bila status aktif tampil jelas pada transaksi.'
+        : 'Payment or escrow applies only when an active status is clearly shown on the transaction.',
       href: '/trust/payments',
       cta: isId ? 'Baca pembayaran' : 'Read payments',
     },
@@ -93,8 +93,8 @@ export default async function TermsPage({ params }: PageProps) {
       icon: RotateCcw,
       title: isId ? 'Refund & retur' : 'Refunds & returns',
       body: isId
-        ? 'Pembatalan, komplain, dan retur mengikuti kebijakan Lajukan.'
-        : 'Cancellations, complaints, and returns follow Lajukan policy.',
+        ? 'Saat pembayaran platform belum aktif, pembatalan, komplain, dan retur mengikuti kesepakatan antar pihak.'
+        : 'When platform payment is not active, cancellations, complaints, and returns follow the parties’ agreement.',
       href: '/refund-policy',
       cta: isId ? 'Buka kebijakan' : 'Open policy',
     },
@@ -110,13 +110,13 @@ export default async function TermsPage({ params }: PageProps) {
   ];
 
   return (
-    <main className="page-shell page-rhythm pb-10 pt-4">
+    <main className="page-shell page-shell-readable page-rhythm pb-10 pt-4">
       <SummaryCard
         title={isId ? 'Aturan penggunaan Lajukan' : 'Lajukan Terms of Service'}
         description={
           isId
-            ? 'Aturan ini menjaga pencarian, listing, chat, dan transaksi tetap aman untuk semua pihak.'
-            : 'These terms keep search, listings, chat, and transactions safe for everyone.'
+            ? 'Aturan ini menjelaskan penggunaan pencarian, listing, chat, kesepakatan, serta batas layanan pembayaran Lajukan.'
+            : 'These terms explain search, listings, chat, agreements, and the limits of Lajukan payment services.'
         }
         meta={isId ? 'Syarat & ketentuan' : 'Terms'}
       >
@@ -236,8 +236,8 @@ export default async function TermsPage({ params }: PageProps) {
         </h3>
         <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
           {isId
-            ? 'Transaksi paling aman terjadi saat kedua pihak mengikuti aturan yang sama.'
-            : 'The safest transactions happen when both sides follow the same rules.'}
+            ? 'Periksa status fitur pada halaman transaksi dan simpan bukti kesepakatan sebelum membayar.'
+            : 'Check the feature status on the transaction page and keep agreement evidence before paying.'}
         </p>
       </section>
     </main>

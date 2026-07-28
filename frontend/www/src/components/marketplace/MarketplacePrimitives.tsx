@@ -25,7 +25,7 @@ export function MarketPageFrame({
         className,
       )}
     >
-      <div className={cn('mx-auto w-full max-w-[1560px] px-2.5 py-2.5 sm:px-4', contentClassName)}>
+      <div className={cn('page-shell py-2.5', contentClassName)}>
         {children}
       </div>
     </div>

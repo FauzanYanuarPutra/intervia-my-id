@@ -61,7 +61,7 @@ export default async function PrivacyPage({ params }: PageProps) {
       ];
 
   return (
-    <main className="page-shell page-rhythm pb-10 pt-4">
+    <main className="page-shell page-shell-readable page-rhythm pb-10 pt-4">
       <SummaryCard
         title={isId ? 'Privasi kamu di Lajukan' : 'Your privacy at Lajukan'}
         description={

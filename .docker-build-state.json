@@ -1,10 +1,10 @@
 {
-    "updated_at":  "2026-07-26T22:47:53.8726966+07:00",
+    "updated_at":  "2026-07-28T23:45:50.2663343+07:00",
     "services":  {
                      "chat_service":  {
                                           "input_paths":  "docker-compose.yml|services/chat_service",
-                                          "input_ticks":  639206771877824309,
-                                          "built_at":  "2026-07-26T22:47:53.8716245+07:00"
+                                          "input_ticks":  639208536976819985,
+                                          "built_at":  "2026-07-28T23:45:50.2658121+07:00"
                                       },
                      "identity_service":  {
                                               "input_paths":  "docker-compose.yml|services/identity_service",
@@ -13,13 +13,13 @@
                                           },
                      "www":  {
                                  "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/shared|frontend/www",
-                                 "input_ticks":  639206753505044972,
-                                 "built_at":  "2026-07-26T22:38:56.1860374+07:00"
+                                 "input_ticks":  639208375734223180,
+                                 "built_at":  "2026-07-28T19:42:15.1681699+07:00"
                              },
                      "marketplace_service":  {
                                                  "input_paths":  "docker-compose.yml|services/marketplace_service",
-                                                 "input_ticks":  639206745102170282,
-                                                 "built_at":  "2026-07-26T22:38:56.1865920+07:00"
+                                                 "input_ticks":  639208224344753665,
+                                                 "built_at":  "2026-07-28T19:42:15.1687470+07:00"
                                              },
                      "usaha":  {
                                    "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/shared|frontend/usaha",

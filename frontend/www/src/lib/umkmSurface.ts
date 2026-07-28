@@ -25,10 +25,7 @@ type BuildDiscoveryPathOptions = {
   storeId?: string | null;
 };
 
-export type SurfaceSearchParams = Record<
-  string,
-  string | string[] | undefined
->;
+export type SurfaceSearchParams = Record<string, string | string[] | undefined>;
 
 type BuildWorkspacePathOptions = BuildPathOptions & {
   setupView?: 'list' | 'create' | 'detail';
@@ -145,7 +142,10 @@ function appendStoreId(
   }
   const queryString = params.toString();
   const hash = options?.hash?.trim();
-  return appendHash(queryString ? `${pathname}?${queryString}` : pathname, hash);
+  return appendHash(
+    queryString ? `${pathname}?${queryString}` : pathname,
+    hash,
+  );
 }
 
 export function getUmkmSurfaceCopy(locale: string) {
@@ -172,11 +172,13 @@ export function buildUmkmDiscoveryPath(
   if (storeId) params.set('storeId', storeId);
 
   const queryString = params.toString();
-  return queryString ? `${UMKM_DISCOVERY_PATH}?${queryString}` : UMKM_DISCOVERY_PATH;
+  return queryString
+    ? `${UMKM_DISCOVERY_PATH}?${queryString}`
+    : UMKM_DISCOVERY_PATH;
 }
 
 export function buildUmkmProfilePath(slug: string): string {
-  return `/umkm/${encodeURIComponent(slug)}`;
+  return buildUmkmStorefrontPath(slug);
 }
 
 export function buildUmkmStorefrontPath(slug: string): string {
@@ -276,7 +278,11 @@ function buildUsahaInternalPath(
 ): string {
   switch (route) {
     case 'dashboard':
-      return buildScopedUsahaPath(UMKM_OWNER_DASHBOARD_PATH, 'dashboard', options);
+      return buildScopedUsahaPath(
+        UMKM_OWNER_DASHBOARD_PATH,
+        'dashboard',
+        options,
+      );
     case 'assistant':
       return appendStoreId(UMKM_OWNER_ASSISTANT_PATH, options);
     case 'onboarding':
@@ -298,7 +304,11 @@ function buildUsahaInternalPath(
         options,
       );
     case 'analytics':
-      return buildScopedUsahaPath(UMKM_OWNER_ANALYTICS_PATH, 'analytics', options);
+      return buildScopedUsahaPath(
+        UMKM_OWNER_ANALYTICS_PATH,
+        'analytics',
+        options,
+      );
     case 'home':
     default:
       return appendStoreId(UMKM_OWNER_PATH, options);

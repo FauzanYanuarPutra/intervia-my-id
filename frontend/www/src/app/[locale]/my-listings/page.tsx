@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { EmptyState } from '@/components/system/feedback/EmptyState';
+import { useDialog } from '@/components/system/feedback/DialogProvider';
 import {
   MyListingsListSkeleton,
   MyListingsSkeleton,
@@ -398,6 +399,7 @@ export default function MyListingsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, loading: authLoading, authFetch } = useAuth();
+  const { confirm } = useDialog();
   const currentSearch = searchParams?.toString() || '';
   const filterParam = (searchParams?.get('filter') || '').toLowerCase();
   const isFavoritesMode = filterParam === 'favorites';
@@ -419,6 +421,7 @@ export default function MyListingsPage() {
   >([]);
   const [updatingActivityId, setUpdatingActivityId] = useState('');
   const [updatingStatusId, setUpdatingStatusId] = useState('');
+  const [deletingDraftId, setDeletingDraftId] = useState('');
   const [activityNotice, setActivityNotice] = useState('');
   const createHref = '/create';
   const createLabel = locale === 'id' ? 'Buat baru' : 'Create new';
@@ -747,6 +750,56 @@ export default function MyListingsPage() {
       );
     } finally {
       setUpdatingStatusId('');
+    }
+  };
+
+  const deleteDraft = async (item: ListingItem) => {
+    const id = parseId(item.id);
+    if (!id || deletingDraftId) return;
+
+    const approved = await confirm({
+      title: locale === 'id' ? 'Hapus draft?' : 'Delete draft?',
+      description:
+        locale === 'id'
+          ? 'Draft ini akan dihapus permanen dari daftar kamu. Tindakan ini tidak bisa dibatalkan.'
+          : 'This draft will be permanently removed from your list. This action cannot be undone.',
+      confirmLabel: locale === 'id' ? 'Hapus draft' : 'Delete draft',
+      cancelLabel: locale === 'id' ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+
+    setDeletingDraftId(item.id);
+    setError('');
+    try {
+      const response = await authFetch(
+        `/api/content/${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === 'string'
+            ? payload.error
+            : locale === 'id'
+              ? 'Draft belum berhasil dihapus'
+              : 'Draft could not be deleted',
+        );
+      }
+      setItems(current => current.filter(entry => entry.id !== item.id));
+      setActivityNotice(
+        locale === 'id' ? 'Draft berhasil dihapus.' : 'Draft deleted.',
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : locale === 'id'
+            ? 'Draft belum berhasil dihapus'
+            : 'Draft could not be deleted',
+      );
+    } finally {
+      setDeletingDraftId('');
     }
   };
 
@@ -1452,15 +1505,35 @@ export default function MyListingsPage() {
 
                       <div className={`mt-2 grid gap-1.5 ${actionGridClass}`}>
                         {cardStatus === 'draft' ? (
-                          <Link
-                            href={`/create?draft=${id}`}
-                            className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-bold text-white transition hover:bg-amber-700"
-                          >
-                            <PencilLine className="h-4 w-4" />
-                            {locale === 'id'
-                              ? 'Lanjut isi draft'
-                              : 'Continue draft'}
-                          </Link>
+                          <>
+                            <Link
+                              href={`/create?draft=${id}`}
+                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-bold text-white transition hover:bg-amber-700"
+                            >
+                              <PencilLine className="h-4 w-4" />
+                              {locale === 'id'
+                                ? 'Lanjut isi draft'
+                                : 'Continue draft'}
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => void deleteDraft(item)}
+                              disabled={deletingDraftId === item.id}
+                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-red-50 px-3 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60 dark:bg-red-400/10 dark:text-red-200 dark:hover:bg-red-400/15"
+                              aria-label={
+                                locale === 'id' ? 'Hapus draft' : 'Delete draft'
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              {deletingDraftId === item.id
+                                ? locale === 'id'
+                                  ? 'Menghapus...'
+                                  : 'Deleting...'
+                                : locale === 'id'
+                                  ? 'Hapus'
+                                  : 'Delete'}
+                            </button>
+                          </>
                         ) : (
                           <>
                             <Link
@@ -1930,12 +2003,29 @@ export default function MyListingsPage() {
 
                     <div className={`mt-3 grid gap-2 ${actionGridClass}`}>
                       {activeStatus === 'draft' ? (
-                        <Link
-                          href={`/create?draft=${id}`}
-                          className="col-span-2 inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-warning)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)]"
-                        >
-                          {locale === 'id' ? 'Lanjut isi' : 'Continue Draft'}
-                        </Link>
+                        <>
+                          <Link
+                            href={`/create?draft=${id}`}
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-warning)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)]"
+                          >
+                            {locale === 'id' ? 'Lanjut isi' : 'Continue Draft'}
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => void deleteDraft(item)}
+                            disabled={deletingDraftId === item.id}
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] bg-[color:var(--app-danger-soft)] px-3 text-sm font-bold text-[color:var(--app-danger)] transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-red-400/15"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            {deletingDraftId === item.id
+                              ? locale === 'id'
+                                ? 'Menghapus...'
+                                : 'Deleting...'
+                              : locale === 'id'
+                                ? 'Hapus'
+                                : 'Delete'}
+                          </button>
+                        </>
                       ) : (
                         <>
                           <Link

@@ -242,7 +242,10 @@ export function AuthPageSkeleton() {
 
 export function HomePageSkeleton() {
   return (
-    <div className="page-shell page-rhythm py-4 sm:py-6" data-skeleton-route="true">
+    <div
+      className="page-shell page-rhythm py-4 sm:py-6"
+      data-skeleton-route="true"
+    >
       <section className="ui-panel ui-hero-panel rounded-[32px] p-5 sm:p-6">
         <div className="flex flex-wrap gap-2">
           <Pulse className="h-9 w-28 rounded-full" />
@@ -364,6 +367,95 @@ export function HomePageSkeleton() {
         </div>
       </section>
     </div>
+  );
+}
+
+export function CommunityPageSkeleton() {
+  return (
+    <main
+      className="page-shell py-3 sm:py-5"
+      data-skeleton-route="true"
+      aria-busy="true"
+    >
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[220px_minmax(0,680px)_280px] lg:justify-center">
+        <aside className="hidden space-y-3 lg:block">
+          <div className="ui-panel rounded-[24px] p-4">
+            <Pulse className="h-5 w-32" />
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="mt-4 flex items-center gap-3">
+                <Pulse className="h-9 w-9 rounded-xl" />
+                <Pulse className="h-4 flex-1 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="min-w-0 space-y-3">
+          <section className="ui-panel rounded-[24px] p-4">
+            <div className="flex items-center gap-3">
+              <Pulse className="h-11 w-11 shrink-0 rounded-full" />
+              <Pulse className="h-11 flex-1 rounded-full" />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Pulse key={index} className="h-8 rounded-full" />
+              ))}
+            </div>
+          </section>
+
+          {Array.from({ length: 3 }).map((_, index) => (
+            <article
+              key={index}
+              className="ui-panel overflow-hidden rounded-[24px]"
+            >
+              <div className="p-4">
+                <div className="flex items-start gap-3">
+                  <Pulse className="h-11 w-11 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1">
+                    <Pulse className="h-4 w-36 rounded-full" />
+                    <Pulse className="mt-2 h-3 w-24 rounded-full" />
+                  </div>
+                  <Pulse className="h-9 w-9 rounded-full" />
+                </div>
+                <Pulse className="mt-4 h-5 w-4/5 rounded-full" />
+                <SkeletonBlock lines={2} className="mt-3" />
+              </div>
+              <Pulse
+                className={cn(
+                  'w-full rounded-none',
+                  index === 1
+                    ? 'aspect-[16/10]'
+                    : 'aspect-[4/3] sm:aspect-video',
+                )}
+              />
+              <div className="grid grid-cols-3 gap-3 border-t border-[color:var(--app-border)] p-4">
+                {Array.from({ length: 3 }).map((_, actionIndex) => (
+                  <Pulse
+                    key={actionIndex}
+                    className="mx-auto h-4 w-16 rounded-full"
+                  />
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <aside className="hidden space-y-3 lg:block">
+          <div className="ui-panel rounded-[24px] p-4">
+            <Pulse className="h-5 w-32" />
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="mt-4 flex items-center gap-3">
+                <Pulse className="h-10 w-10 shrink-0 rounded-xl" />
+                <div className="min-w-0 flex-1">
+                  <Pulse className="h-4 w-4/5 rounded-full" />
+                  <Pulse className="mt-2 h-3 w-2/3 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </main>
   );
 }
 
@@ -939,7 +1031,10 @@ export function TrackerPageSkeleton() {
 
 export function SearchPageSkeleton() {
   return (
-    <div className="min-h-screen ui-surface-muted ui-text" data-skeleton-route="true">
+    <div
+      className="min-h-screen ui-surface-muted ui-text"
+      data-skeleton-route="true"
+    >
       <div className="page-shell py-4 sm:py-6">
         <section className="ui-panel ui-hero-panel p-4 sm:p-6">
           <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
@@ -1681,7 +1776,7 @@ export function PaymentsPageSkeleton() {
 export function ProfileEditSkeleton() {
   return (
     <div className="min-h-screen ui-surface-muted pb-12 pt-4 dark:bg-[color:var(--app-surface-strong)] sm:pt-6">
-      <div className="page-shell max-w-5xl">
+      <div className="page-shell page-shell-readable">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <Pulse className="h-7 w-48 rounded-full" />
