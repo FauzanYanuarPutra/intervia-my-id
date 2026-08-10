@@ -4973,7 +4973,7 @@ export default function ChatRoomPage() {
     return (
       <div className="lajukan-visual-viewport-shell flex min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]">
         <header className="sticky top-0 z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
-          <div className="flex min-w-0 items-center gap-3 px-2.5 py-2 sm:px-4 sm:py-2.5">
+          <div className="flex min-w-0 items-center gap-3 px-2.5 py-2 sm:px-2 sm:py-2.5">
             <div className="h-10 w-10 shrink-0 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942]" />
             <div className="min-w-0 flex-1">
               <div className="h-4 w-36 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942]" />
@@ -5025,7 +5025,7 @@ export default function ChatRoomPage() {
       }}
     >
       <header className="sticky top-0 z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
-        <div className="min-w-0 px-2.5 py-2 sm:px-4 sm:py-2.5">
+        <div className="min-w-0 px-2.5 py-2 sm:px-2 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               onClick={handleBack}
@@ -5175,7 +5175,7 @@ export default function ChatRoomPage() {
       </header>
 
       {!PROMO_ONLY_MODE && roomSummaryTransaction ? (
-        <div className="shrink-0 border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
+        <div className="shrink-0 border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-2">
           <div className="mx-auto w-full max-w-[920px]">
             <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)]  dark:border-white/8 dark:bg-[#202c33]/90">
               <button

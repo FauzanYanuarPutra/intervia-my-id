@@ -147,6 +147,18 @@ if ($PullAiModels) {
     $shouldPullAiModels = $true
 }
 
+$profiles = @()
+if (-not [string]::IsNullOrWhiteSpace($env:COMPOSE_PROFILES)) {
+    $profiles += @($env:COMPOSE_PROFILES -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+}
+if ($profiles -notcontains "tunnel") {
+    $profiles += "tunnel"
+}
+if ($aiEnabled -and $profiles -notcontains "ai") {
+    $profiles += "ai"
+}
+$env:COMPOSE_PROFILES = (($profiles | Select-Object -Unique) -join ",")
+
 $imageAiAssistSetting = $env:IMAGE_AI_ASSIST_ENABLED
 if ([string]::IsNullOrWhiteSpace($imageAiAssistSetting)) {
     $imageAiAssistSetting = Get-EnvFileValue -Path $EnvFile -Name "IMAGE_AI_ASSIST_ENABLED"
@@ -175,14 +187,6 @@ if (
 }
 
 if ($aiEnabled) {
-    $profiles = @()
-    if (-not [string]::IsNullOrWhiteSpace($env:COMPOSE_PROFILES)) {
-        $profiles += @($env:COMPOSE_PROFILES -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
-    }
-    if ($profiles -notcontains "ai") {
-        $profiles += "ai"
-    }
-    $env:COMPOSE_PROFILES = (($profiles | Select-Object -Unique) -join ",")
     $env:USE_OLLAMA = "true"
     $env:OLLAMA_URL = "http://ollama:11434"
     $env:OLLAMA_MODEL = $AiBusinessModel
@@ -296,6 +300,55 @@ function Invoke-ComposeQuietExitCode {
         }
         $ErrorActionPreference = $previousErrorActionPreference
     }
+}
+
+function Ensure-MinIOBucket {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EnvFilePath
+    )
+
+    $bucketName = $env:MINIO_BUCKET
+    if ([string]::IsNullOrWhiteSpace($bucketName)) {
+        $bucketName = Get-EnvFileValue -Path $EnvFilePath -Name "MINIO_BUCKET"
+    }
+    if ([string]::IsNullOrWhiteSpace($bucketName)) {
+        $bucketName = "laju-chat"
+    }
+    $bucketName = $bucketName.Trim()
+    if (
+        $bucketName.Length -lt 3 -or
+        $bucketName.Length -gt 63 -or
+        $bucketName -notmatch '^[a-z0-9][a-z0-9.-]*[a-z0-9]$'
+    ) {
+        throw "MINIO_BUCKET is invalid."
+    }
+
+    Write-Host "Ensuring MinIO bucket '$bucketName' exists..." -ForegroundColor Cyan
+    $ready = $false
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        $exitCode = Invoke-ComposeQuietExitCode -Args @(
+            "--env-file", $EnvFilePath,
+            "exec", "-T", "minio", "sh", "-lc",
+            'mc alias set local http://localhost:9002 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 && mc ready local >/dev/null 2>&1'
+        )
+        if ($exitCode -eq 0) {
+            $ready = $true
+            break
+        }
+        Start-Sleep -Seconds 1
+    }
+    if (-not $ready) {
+        throw "MinIO did not become ready for bucket initialization."
+    }
+
+    Invoke-Compose @(
+        "--env-file", $EnvFilePath,
+        "exec", "-T",
+        "-e", "MINIO_TARGET_BUCKET=$bucketName",
+        "minio", "sh", "-lc",
+        'mc alias set local http://localhost:9002 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null && mc mb --ignore-existing "local/$MINIO_TARGET_BUCKET" >/dev/null && mc stat "local/$MINIO_TARGET_BUCKET" >/dev/null'
+    )
 }
 
 function Ensure-OllamaServiceRunning {
@@ -850,6 +903,106 @@ function Start-ComposeServicesFast {
     return Start-ContainerIdsFast -ProjectName $ProjectName -ContainerIds @($containerIds)
 }
 
+function Wait-ComposeServicesReady {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Services,
+        [int]$CloudflareMetricsPort = 20241,
+        [int]$TimeoutSeconds = 180
+    )
+
+    $oneShotServices = @{
+        scylla_keyspace_setup = $true
+    }
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    Write-Host "Verifying requested container readiness..."
+
+    while ((Get-Date) -lt $deadline) {
+        $pending = New-Object 'System.Collections.Generic.List[string]'
+        $terminalFailures = New-Object 'System.Collections.Generic.List[string]'
+
+        foreach ($serviceName in $Services) {
+            $containerIds = Get-ComposeServiceContainerIds -ProjectName $ProjectName -Services @($serviceName)
+            if ($containerIds.Count -eq 0) {
+                $pending.Add("${serviceName}: container not created")
+                continue
+            }
+
+            foreach ($containerId in $containerIds) {
+                $stateLine = (& docker inspect --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{.State.ExitCode}}|{{.RestartCount}}' $containerId).Trim()
+                if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($stateLine)) {
+                    $pending.Add("${serviceName}: inspect unavailable")
+                    continue
+                }
+
+                $stateParts = @($stateLine -split '\|', 4)
+                $containerState = if ($stateParts.Count -gt 0) { $stateParts[0] } else { "" }
+                $healthState = if ($stateParts.Count -gt 1) { $stateParts[1] } else { "" }
+                $exitCode = if ($stateParts.Count -gt 2) { $stateParts[2] } else { "" }
+                $restartCount = if ($stateParts.Count -gt 3) { [int]$stateParts[3] } else { 0 }
+
+                if ($oneShotServices.ContainsKey($serviceName)) {
+                    if ($containerState -eq "exited" -and $exitCode -eq "0") {
+                        continue
+                    }
+                    if ($containerState -in @("exited", "dead")) {
+                        $terminalFailures.Add("${serviceName}: state=$containerState exit=$exitCode")
+                    }
+                    else {
+                        $pending.Add("${serviceName}: state=$containerState")
+                    }
+                    continue
+                }
+
+                if ($containerState -eq "running" -and $healthState -in @("", "healthy")) {
+                    if ($serviceName -eq "cloudflare_tunnel") {
+                        try {
+                            $tunnelReady = Invoke-WebRequest `
+                                -Uri "http://127.0.0.1:${CloudflareMetricsPort}/ready" `
+                                -UseBasicParsing `
+                                -TimeoutSec 2 `
+                                -ErrorAction Stop
+                            if ($tunnelReady.StatusCode -ne 200) {
+                                $pending.Add("${serviceName}: Cloudflare edge readiness returned HTTP $($tunnelReady.StatusCode)")
+                            }
+                        }
+                        catch {
+                            $pending.Add("${serviceName}: waiting for a live Cloudflare edge connection")
+                        }
+                        if ($pending | Where-Object { $_ -like "${serviceName}:*" }) {
+                            continue
+                        }
+                    }
+                    continue
+                }
+                if ($containerState -in @("exited", "dead")) {
+                    $terminalFailures.Add("${serviceName}: state=$containerState exit=$exitCode")
+                }
+                elseif ($containerState -eq "restarting" -and $restartCount -ge 3) {
+                    $terminalFailures.Add("${serviceName}: restart loop count=$restartCount")
+                }
+                else {
+                    $pending.Add("${serviceName}: state=$containerState health=$healthState")
+                }
+            }
+        }
+
+        if ($terminalFailures.Count -gt 0) {
+            throw "Requested service failed: $($terminalFailures -join '; ')"
+        }
+        if ($pending.Count -eq 0) {
+            Write-Host "All requested containers are running/healthy; one-shot setup completed successfully." -ForegroundColor Green
+            return
+        }
+
+        Start-Sleep -Seconds 3
+    }
+
+    throw "Timed out waiting for requested services: $($pending -join '; ')"
+}
+
 function Save-StateFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -900,17 +1053,17 @@ if (Test-Path $stateFile) {
 }
 
 $serviceInputs = @{
-    identity_service    = @("services/identity_service", "docker-compose.yml")
-    marketplace_service = @("services/marketplace_service", "docker-compose.yml")
-    community_service   = @("services/community_service", "docker-compose.yml")
-    ai_service          = @("services/ai_service", "docker-compose.yml")
-    chat_service        = @("services/chat_service", "docker-compose.yml")
-    ocr_service         = @("ai/ocr_paddle", "docker-compose.yml")
-    liveness_service    = @("ai/liveness", "docker-compose.yml")
-    www                 = @("frontend/www", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
-    usaha               = @("frontend/usaha", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
-    cms                 = @("frontend/cms", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
-    crm                 = @("frontend/crm", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
+    identity_service    = @("services/identity_service")
+    marketplace_service = @("services/marketplace_service")
+    community_service   = @("services/community_service")
+    ai_service          = @("services/ai_service")
+    chat_service        = @("services/chat_service")
+    ocr_service         = @("ai/ocr_paddle")
+    liveness_service    = @("ai/liveness")
+    www                 = @("frontend/www", "frontend/shared", "frontend/.dockerignore")
+    usaha               = @("frontend/usaha", "frontend/shared", "frontend/.dockerignore")
+    cms                 = @("frontend/cms", "frontend/shared", "frontend/.dockerignore")
+    crm                 = @("frontend/crm", "frontend/shared", "frontend/.dockerignore")
 }
 
 $composeProjectName = if ($env:COMPOSE_PROJECT_NAME) {
@@ -956,16 +1109,21 @@ $defaultDevServices = @(
     "rabbitmq",
     "meilisearch",
     "minio",
+    "scylla_db",
+    "scylla_keyspace_setup",
     "identity_service",
     "marketplace_service",
     "community_service",
     "chat_service",
     "www",
+    "usaha",
     "cms",
     "crm",
+    "caddy",
+    "cloudflare_tunnel",
     "mailhog",
     "pgadmin",
-    "dbgate"
+    "db_ui"
 )
 
 if ($Mode -eq "prod") {
@@ -1103,6 +1261,21 @@ if (-not $NoBuild) {
             }
         }
 
+        $legacyComposeSignature = Get-ServiceInputSignature -Paths (
+            @($serviceInputs[$serviceName]) + @("docker-compose.yml")
+        )
+        if (
+            $imageExists -and
+            $previousSignature -eq $legacyComposeSignature
+        ) {
+            # The watcher used to include the whole Compose file, which made
+            # any infrastructure-only edit rebuild every application image.
+            # Migrate that watcher definition without hiding a newer source
+            # mtime, which is still checked below.
+            $previousSignature = $currentSignature
+            $state.services[$serviceName].input_paths = $currentSignature
+        }
+
         $watcherChanged = $previousSignature -eq "" -or $previousSignature -ne $currentSignature
         $needsBuild = $BuildAll -or (-not $imageExists) -or $watcherChanged -or ($currentTicksByService[$serviceName] -gt $previousTicks)
         if ($needsBuild) {
@@ -1163,42 +1336,41 @@ Write-Host "Starting services..."
 Write-StartupState -Active $true -Status "starting_services" -Phase "starting_services" -Message "Starting Docker services." -ServiceNames $startupServices
 if ($servicesToBuild.Count -gt 0) {
     Remove-LegacyComposeContainers -ProjectName $composeProjectName -Services $servicesToBuild
-    Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build") + $servicesToBuild)
-    try {
-        if ($startupServices.Count -gt 0) {
-            Invoke-Compose (@("--env-file", $EnvFile, "start") + $startupServices)
-        }
-        else {
-            Invoke-Compose @("--env-file", $EnvFile, "start")
-        }
-    }
-    catch {
-        if ($startupServices.Count -gt 0) {
-            Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate") + $startupServices)
-        }
-        else {
-            Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate")
-        }
-    }
+}
+
+# Compose reconciliation is intentionally retained even on the fast path.
+# It applies changed ports, commands, environment, profiles, and health
+# configuration without rebuilding images whose source did not change.
+if ($startupServices.Count -gt 0) {
+    Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build") + $startupServices)
 }
 else {
-    if ($startupServices.Count -gt 0) {
-        if (-not (Start-ComposeServicesFast -ProjectName $composeProjectName -Services $startupServices)) {
-            Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate") + $startupServices)
-        }
+    Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build")
+}
+
+if ($startupServices -contains "minio") {
+    Write-StartupState -Active $true -Status "starting_services" -Phase "initializing_storage" -Message "Ensuring MinIO storage bucket exists." -ServiceNames $startupServices
+    Ensure-MinIOBucket -EnvFilePath $EnvFile
+}
+
+$cloudflareMetricsPort = 20241
+if ($startupServices -contains "cloudflare_tunnel") {
+    $configuredCloudflareMetricsPort = if ($env:PORT_CLOUDFLARE_METRICS) {
+        $env:PORT_CLOUDFLARE_METRICS
     }
     else {
-        # Fastest path: gunakan docker native start agar tidak menunggu dependency
-        # health checks dari compose setiap kali.
-        $allProjectContainerIds = Get-ProjectContainerIds -ProjectName $composeProjectName
-        if ($allProjectContainerIds.Count -gt 0) {
-            Start-ContainerIdsFast -ProjectName $composeProjectName -ContainerIds $allProjectContainerIds *> $null
+        Get-EnvFileValue -Path $EnvFile -Name "PORT_CLOUDFLARE_METRICS"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($configuredCloudflareMetricsPort)) {
+        if ($configuredCloudflareMetricsPort -notmatch '^[0-9]+$') {
+            throw "PORT_CLOUDFLARE_METRICS must be a valid TCP port."
         }
-        else {
-            # Jika belum pernah ada container untuk project ini, baru lakukan up.
-            Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate")
+        $cloudflareMetricsPort = [int]$configuredCloudflareMetricsPort
+        if ($cloudflareMetricsPort -lt 1 -or $cloudflareMetricsPort -gt 65535) {
+            throw "PORT_CLOUDFLARE_METRICS must be between 1 and 65535."
         }
     }
+
 }
 
 if ($aiEnabled) {
@@ -1227,5 +1399,9 @@ if ($aiEnabled) {
         }
     }
 }
+Wait-ComposeServicesReady `
+    -ProjectName $composeProjectName `
+    -Services $startupServices `
+    -CloudflareMetricsPort $cloudflareMetricsPort
 Invoke-Compose @("--env-file", $EnvFile, "ps")
 Write-StartupState -Active $false -Status "ready" -Phase "ready" -Message "All requested services are ready." -ServiceNames $startupServices

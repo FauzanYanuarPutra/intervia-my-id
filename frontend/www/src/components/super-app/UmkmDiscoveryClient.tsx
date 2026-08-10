@@ -112,7 +112,7 @@ const MAP_LANES: MapLane[] = [
     icon: Wrench,
   },
 ];
-const DISCOVERY_STORE_LIMIT = 120;
+const DISCOVERY_STORE_LIMIT = 10;
 
 function normalizeText(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -253,16 +253,16 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
         title={
           activeLane === 'all'
             ? isId
-              ? 'Usaha yang ditemukan'
-              : 'Businesses found'
+              ? 'Usaha & referensi publik'
+              : 'Businesses & public references'
             : isId
-              ? `${activeCategoryLabel} yang ditemukan`
-              : `${activeCategoryLabel} found`
+              ? `${activeCategoryLabel} & referensi publik`
+              : `${activeCategoryLabel} & public references`
         }
         description={
           isId
-            ? 'Pilih kartu untuk melihat detail usaha, menghubungi penyedia, atau membuka rute.'
-            : 'Choose a card to view business details, contact the provider, or open directions.'
+            ? 'Toko terdaftar dan titik referensi dari sumber terbuka ditampilkan terpisah; referensi publik tidak memiliki klaim stok, harga, atau verifikasi.'
+            : 'Registered stores and open-source reference points are kept distinct; public references do not imply stock, prices, or verification.'
         }
         selectedSlug={initialStoreSlug}
         selectedStoreIdInitial={initialStoreId}
@@ -273,7 +273,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
         variant="immersive"
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1400] px-3 pt-[calc(env(safe-area-inset-top)+0.65rem)] sm:px-4 lg:inset-x-auto lg:left-3 lg:w-[486px] lg:px-0 lg:pt-[calc(env(safe-area-inset-top)+0.9rem)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1400] px-3 pt-[calc(env(safe-area-inset-top)+0.65rem)] sm:px-2 lg:inset-x-auto lg:left-3 lg:w-[486px] lg:px-0 lg:pt-[calc(env(safe-area-inset-top)+0.9rem)]">
         <div className="mx-auto flex w-full max-w-[760px] flex-col gap-1.5 lg:mx-0 lg:max-w-none">
           <form
             onSubmit={handleSearch}

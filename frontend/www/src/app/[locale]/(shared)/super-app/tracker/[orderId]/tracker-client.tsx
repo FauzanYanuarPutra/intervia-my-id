@@ -457,7 +457,7 @@ export default function TrackerClient({ locale, orderId }: TrackerClientProps) {
   }
 
   return (
-    <main className="mx-auto max-w-[1120px] px-3 py-4 sm:px-4">
+    <main className="mx-auto max-w-[1120px] px-3 py-4 sm:px-2">
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.7fr)]">
         <div className="overflow-hidden rounded-[32px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
           <div className="relative h-[min(560px,calc(var(--app-viewport-height)-12rem))] min-h-[360px] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">

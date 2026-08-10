@@ -16,6 +16,23 @@ export function isPublicUmkmStoreVisible(
 ): boolean {
   if (store.is_active !== true) return false;
 
+  const recordKind =
+    typeof store.metadata?.record_kind === 'string'
+      ? store.metadata.record_kind.trim().toLowerCase()
+      : '';
+  const marketSide =
+    typeof store.metadata?.market_side === 'string'
+      ? store.metadata.market_side.trim().toLowerCase()
+      : '';
+
+  if (
+    store.metadata?.is_transactional === false ||
+    marketSide === 'reference' ||
+    recordKind.includes('reference')
+  ) {
+    return false;
+  }
+
   if (store.metadata?.source === 'usaha_portal') {
     return true;
   }

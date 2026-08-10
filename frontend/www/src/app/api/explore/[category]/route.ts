@@ -113,6 +113,7 @@ async function loadSocialExploreGroups(req: NextRequest): Promise<{
       products: unavailableExploreGroup(),
       services: unavailableExploreGroup(),
       businesses: unavailableExploreGroup(),
+      references: unavailableExploreGroup(),
       needs: unavailableExploreGroup(),
       communities: exploreGroup(
         [
@@ -330,6 +331,7 @@ export async function GET(
     products: unavailableExploreGroup(),
     services: unavailableExploreGroup(),
     businesses: unavailableExploreGroup(),
+    references: unavailableExploreGroup(),
     needs: unavailableExploreGroup(),
     communities: unavailableExploreGroup(),
     videos: unavailableExploreGroup(),

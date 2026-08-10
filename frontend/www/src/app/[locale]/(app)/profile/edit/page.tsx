@@ -1,6 +1,12 @@
 'use client';
 
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import {
+  type ChangeEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Modal } from '@/components/common/Modal';
 import { LocalizedLink } from '@/components/ui-kit';
@@ -26,13 +32,30 @@ import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import {
   ArrowLeft,
+  AtSign,
+  Award,
+  BriefcaseBusiness,
+  Camera,
   CheckCircle2,
   CircleAlert,
+  FileText,
   Globe2,
+  GraduationCap,
+  ImagePlus,
+  Images,
+  Link2,
   Loader2,
+  MapPin,
+  Phone,
+  Plus,
   Save,
-  Upload,
+  Search,
+  Store,
+  Trash2,
+  UserRound,
+  WandSparkles,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type UserDetail = {
   id: string;
@@ -131,6 +154,145 @@ function normalizeEntry(value: unknown): ProfileEntry | null {
     meta: meta || undefined,
     url: url || undefined,
   };
+}
+
+
+function FormField({
+  label,
+  hint,
+  required = false,
+  className,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className={cn('flex min-w-0 flex-col', className)}>
+      <span className="flex min-h-[58px] flex-col justify-end">
+        <span className="flex min-h-5 flex-wrap items-center gap-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <span>{label}</span>
+          <span
+            className={cn(
+              'shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide',
+              required
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:bg-white/10',
+            )}
+          >
+            {required ? 'Disarankan' : 'Opsional'}
+          </span>
+        </span>
+
+        {hint ? (
+          <span className="mt-1 line-clamp-2 min-h-5 text-xs leading-5 text-[color:var(--app-text-soft)]">
+            {hint}
+          </span>
+        ) : (
+          <span className="mt-1 block min-h-5" aria-hidden="true" />
+        )}
+      </span>
+
+      <span className="mt-2 block">{children}</span>
+    </label>
+  );
+}
+
+function SectionHeading({
+  step,
+  title,
+  description,
+  icon,
+  optional = false,
+  action,
+}: {
+  step: string;
+  title: string;
+  description: string;
+  icon: ReactNode;
+  optional?: boolean;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="grid gap-4 border-b border-[color:var(--app-border)] pb-5 dark:border-[color:var(--app-border-strong)] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+          {icon}
+        </span>
+
+        <div className="min-w-0">
+          <div className="flex min-h-5 flex-wrap items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+              {step}
+            </span>
+            {optional ? (
+              <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-[color:var(--app-text-soft)] dark:bg-white/10">
+                Isi bila relevan
+              </span>
+            ) : null}
+          </div>
+
+          <h2 className="mt-1 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            {title}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+            {description}
+          </p>
+        </div>
+      </div>
+
+      {action ? (
+        <div className="w-full shrink-0 sm:w-auto [&>*]:w-full sm:[&>*]:w-auto">
+          {action}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EmptyEditorState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-5 py-8 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+      <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        {title}
+      </p>
+      <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-[color:var(--app-text-soft)]">
+        {description}
+      </p>
+      <button
+        type="button"
+        onClick={onAction}
+        className="ui-button-secondary mt-4 inline-flex min-h-10 items-center justify-center gap-2 px-3 text-xs font-black"
+      >
+        <Plus className="h-4 w-4" />
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
+function getFileName(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const name = parsed.pathname.split('/').filter(Boolean).pop();
+    return decodeURIComponent(name || 'Dokumen profil');
+  } catch {
+    const name = url.split('/').filter(Boolean).pop();
+    return decodeURIComponent(name || 'Dokumen profil');
+  }
 }
 
 export default function EditProfilePage() {
@@ -403,19 +565,19 @@ export default function EditProfilePage() {
     () => [
       {
         key: 'fullName',
-        label: 'Nama jelas',
+        label: 'Nama yang ditampilkan',
         focus: 'identity',
         done: Boolean(fullName.trim()),
       },
       {
         key: 'location',
-        label: 'Kota / area',
+        label: 'Kota atau area',
         focus: 'identity',
         done: Boolean(location.trim()),
       },
       {
         key: 'bio',
-        label: 'Bio singkat',
+        label: 'Perkenalan singkat',
         focus: 'identity',
         done: Boolean(bio.trim()),
       },
@@ -427,31 +589,31 @@ export default function EditProfilePage() {
       },
       {
         key: 'headline',
-        label: 'Judul keahlian',
+        label: 'Judul keahlian profesional',
         focus: 'work',
         done: Boolean(headline.trim()),
       },
       {
         key: 'skills',
-        label: 'Skill / layanan',
+        label: 'Keahlian utama',
         focus: 'work',
         done: Boolean(skills.trim()),
       },
       {
         key: 'provider',
-        label: 'Judul usaha',
+        label: 'Nama usaha atau layanan',
         focus: 'work',
         done: Boolean(providerHeadline.trim()),
       },
       {
         key: 'buyerIntent',
-        label: 'Kebutuhan buyer',
+        label: 'Barang atau jasa yang dicari',
         focus: 'work',
         done: Boolean(buyerIntent.trim()),
       },
       {
         key: 'gallery',
-        label: 'Galeri usaha',
+        label: 'Foto galeri',
         focus: 'media',
         done: galleryImages.length > 0,
       },
@@ -527,20 +689,20 @@ export default function EditProfilePage() {
     () => [
       {
         key: 'identity' as const,
-        title: 'Dasar',
-        description: 'Nama, kontak, bio, dan identitas utama.',
+        title: 'Informasi utama',
+        description: 'Nama, lokasi, kontak, dan perkenalan singkat.',
         targetId: 'profile-edit-identity',
       },
       {
         key: 'work' as const,
-        title: 'Kerja & usaha',
-        description: 'Skill, layanan, buyer intent, dan info usaha.',
+        title: 'Keahlian & kebutuhan',
+        description: 'Yang kamu tawarkan atau sedang kamu cari.',
         targetId: 'profile-edit-talent',
       },
       {
         key: 'media' as const,
-        title: 'Media',
-        description: 'Avatar, cover, gallery, dan dokumen.',
+        title: 'Foto & dokumen',
+        description: 'Foto profil, sampul, galeri, dan dokumen pendukung.',
         targetId: 'profile-edit-media',
       },
     ],
@@ -648,9 +810,9 @@ export default function EditProfilePage() {
   const sectionCardClass = (
     focus: 'identity' | 'talent' | 'seller' | 'buyer' | 'media',
   ) =>
-    `ui-panel p-5 transition sm:p-6 ${
+    `ui-panel scroll-mt-24 p-4 transition sm:p-5 lg:p-6 ${
       isFocusVisible(focus)
-        ? 'border-[color:var(--app-accent-border)] shadow-[0_20px_45px_-32px_rgba(16,185,129,0.55)]'
+        ? 'border-emerald-300 shadow-[0_20px_45px_-32px_rgba(16,185,129,0.35)] dark:border-emerald-900/70'
         : 'hidden'
     }`;
 
@@ -663,7 +825,7 @@ export default function EditProfilePage() {
 
   const sendPhoneOtp = async () => {
     if (phoneDigits.length < 8) {
-      setPhoneOtpError('Masukkan nomor telepon yang valid dulu.');
+      setPhoneOtpError('Masukkan nomor WhatsApp yang valid terlebih dahulu.');
       return;
     }
     if (phoneOtpResendAt > Date.now()) {
@@ -695,7 +857,7 @@ export default function EditProfilePage() {
       setPhoneOtp('');
       setPhoneOtpResendAt(Date.now() + 30_000);
       setPhoneOtpMessage(
-        'OTP telepon sudah dikirim. Masukkan 6 digit kode untuk verifikasi.',
+        'Kode OTP sudah dikirim. Masukkan 6 digit kode untuk verifikasi.',
       );
     } catch (err) {
       setPhoneOtpError(
@@ -708,7 +870,7 @@ export default function EditProfilePage() {
 
   const verifyPhoneOtp = async () => {
     if (phoneDigits.length < 8) {
-      setPhoneOtpError('Nomor telepon belum valid.');
+      setPhoneOtpError('Nomor WhatsApp belum valid.');
       return;
     }
     if (!/^\d{6}$/.test(phoneOtp)) {
@@ -736,10 +898,10 @@ export default function EditProfilePage() {
         error?: string;
       };
       if (!verifyRes.ok) {
-        throw new Error(verifyData.error || 'OTP telepon tidak valid');
+        throw new Error(verifyData.error || 'Kode OTP tidak valid');
       }
       if (!verifyData.token) {
-        throw new Error('Token verifikasi telepon tidak ditemukan');
+        throw new Error('Data verifikasi nomor tidak ditemukan');
       }
 
       const confirmRes = await authFetch('/api/auth/verify-phone', {
@@ -755,7 +917,7 @@ export default function EditProfilePage() {
       };
       if (!confirmRes.ok) {
         throw new Error(
-          confirmData.error || 'Gagal menyimpan verifikasi telepon',
+          confirmData.error || 'Gagal menyimpan verifikasi nomor',
         );
       }
 
@@ -763,11 +925,11 @@ export default function EditProfilePage() {
       setVerifiedPhoneDigits(phoneDigits);
       setPhoneVerified(true);
       setPhoneOtp('');
-      setPhoneOtpMessage('Nomor telepon berhasil diverifikasi.');
+      setPhoneOtpMessage('Nomor WhatsApp berhasil diverifikasi.');
       await refreshUser();
     } catch (err) {
       setPhoneOtpError(
-        err instanceof Error ? err.message : 'Verifikasi telepon gagal',
+        err instanceof Error ? err.message : 'Verifikasi nomor gagal',
       );
     } finally {
       setConfirmingPhoneOtp(false);
@@ -791,13 +953,13 @@ export default function EditProfilePage() {
         urls?: string[];
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error || 'Upload image gagal');
+      if (!res.ok) throw new Error(data.error || 'Gagal mengunggah gambar');
       const next = Array.from(
         new Set([...(galleryImages || []), ...extractUploadedImageUrls(data)]),
       );
       setGalleryImages(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload image gagal');
+      setError(err instanceof Error ? err.message : 'Gagal mengunggah gambar');
     } finally {
       setUploadingImages(false);
       event.target.value = '';
@@ -819,9 +981,9 @@ export default function EditProfilePage() {
         urls?: string[];
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error || 'Upload cover gagal');
+      if (!res.ok) throw new Error(data.error || 'Gagal mengunggah foto sampul');
       const url = extractFirstUploadedImageUrl(data) || '';
-      if (!url) throw new Error('Cover URL tidak ditemukan');
+      if (!url) throw new Error('Alamat foto sampul tidak ditemukan');
       setCoverImageUrl(url);
       await persistPartialUpdate(
         {
@@ -833,7 +995,7 @@ export default function EditProfilePage() {
         'Cover berhasil diperbarui.',
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload cover gagal');
+      setError(err instanceof Error ? err.message : 'Gagal mengunggah foto sampul');
     } finally {
       setUploadingCover(false);
     }
@@ -854,9 +1016,9 @@ export default function EditProfilePage() {
         urls?: string[];
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error || 'Upload foto profil gagal');
+      if (!res.ok) throw new Error(data.error || 'Gagal mengunggah foto profil');
       const url = extractFirstUploadedImageUrl(data) || '';
-      if (!url) throw new Error('Avatar URL tidak ditemukan');
+      if (!url) throw new Error('Alamat foto profil tidak ditemukan');
       setAvatarUrl(url);
       await persistPartialUpdate(
         {
@@ -868,7 +1030,7 @@ export default function EditProfilePage() {
         'Foto profil berhasil diperbarui.',
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload foto profil gagal');
+      setError(err instanceof Error ? err.message : 'Gagal mengunggah foto profil');
     } finally {
       setUploadingAvatar(false);
     }
@@ -928,7 +1090,7 @@ export default function EditProfilePage() {
         urls?: string[];
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error || 'Upload dokumen gagal');
+      if (!res.ok) throw new Error(data.error || 'Gagal mengunggah dokumen');
       const next = Array.from(
         new Set([
           ...(documentUrls || []),
@@ -937,7 +1099,7 @@ export default function EditProfilePage() {
       );
       setDocumentUrls(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload dokumen gagal');
+      setError(err instanceof Error ? err.message : 'Gagal mengunggah dokumen');
     } finally {
       setUploadingDocs(false);
       event.target.value = '';
@@ -955,12 +1117,12 @@ export default function EditProfilePage() {
         body: JSON.stringify(partial),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Gagal memperbarui profile');
+      if (!res.ok) throw new Error(data.error || 'Gagal memperbarui profil');
       setMessage(successMessage);
       await refreshUser();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Gagal memperbarui profile',
+        err instanceof Error ? err.message : 'Gagal memperbarui profil',
       );
     }
   };
@@ -1014,8 +1176,8 @@ export default function EditProfilePage() {
     });
     setMessage(
       educationEditorIndex === null
-        ? 'Education berhasil ditambahkan.'
-        : 'Education berhasil diperbarui.',
+        ? 'Pendidikan berhasil ditambahkan.'
+        : 'Pendidikan berhasil diperbarui.',
     );
     setError(null);
     closeEducationEditor();
@@ -1219,12 +1381,12 @@ export default function EditProfilePage() {
         body: JSON.stringify(payload),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan profile');
+      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan profil');
       setMessage('Profil berhasil disimpan.');
       setBaseMetadata(metadataPayload);
       await refreshUser();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan profile');
+      setError(err instanceof Error ? err.message : 'Gagal menyimpan profil');
     } finally {
       setSaving(false);
     }
@@ -1236,7 +1398,7 @@ export default function EditProfilePage() {
 
   if (!user) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-0 py-10 sm:px-4">
+      <div className="mx-auto w-full max-w-2xl px-0 py-10 sm:px-2">
         <p className="ui-panel-muted rounded-none border-x-0 border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] p-4 text-sm ui-warning-text sm:rounded-[var(--app-radius)] sm:border-x">
           Login diperlukan untuk edit profile.
         </p>
@@ -1245,179 +1407,249 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden ui-surface-muted pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 dark:bg-[color:var(--app-surface-strong)] sm:pt-6">
-      <div className="page-shell page-shell-readable overflow-x-hidden">
-        <section className="ui-panel mb-5 overflow-hidden p-0">
-          <div className="border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] ui-accent-text">
-                  Profil
-                </p>
-                <h1 className="mt-1 text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
-                  Rapikan profil
-                </h1>
-                <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                  Buat profil gampang dipahami orang Indonesia: siapa kamu, apa
-                  yang ditawarkan, area mana, dan tombol mana yang bisa mereka
-                  klik.
-                </p>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end">
-                <LocalizedLink
-                  href="/profile"
-                  className="ui-button-secondary inline-flex w-full items-center justify-center gap-2 px-3 text-sm font-semibold"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Kembali
-                </LocalizedLink>
-                <LocalizedLink
-                  href={publicProfilePath}
-                  className="ui-button-secondary inline-flex w-full items-center justify-center gap-2 px-3 text-sm font-semibold"
-                >
-                  <Globe2 className="h-4 w-4" />
-                  Lihat publik
-                </LocalizedLink>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saveDisabled}
-                  className="ui-button-primary inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Simpan
-                </button>
+    <div className="min-h-screen overflow-x-hidden bg-[color:var(--app-surface-muted)] pb-[calc(8rem+env(safe-area-inset-bottom))] pt-3 dark:bg-[color:var(--app-surface-strong)] sm:pt-5">
+      <div className="page-shell page-shell-readable mx-auto max-w-6xl overflow-x-hidden">
+        <section className="ui-panel mb-4 overflow-hidden p-0">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
+            <div className="relative overflow-hidden border-b border-[color:var(--app-border)] bg-[linear-gradient(135deg,rgba(16,185,129,0.14),transparent_44%),linear-gradient(180deg,var(--app-surface-strong),var(--app-surface-strong))] p-4 dark:border-[color:var(--app-border-strong)] sm:p-6 lg:border-b-0 lg:border-r">
+              <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-emerald-300/15 blur-2xl" />
+
+              <div className="relative flex h-full flex-col justify-between">
+                <div>
+                  <LocalizedLink
+                    href="/profile"
+                    className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-text-soft)] transition hover:border-emerald-300 hover:text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Kembali ke profil
+                  </LocalizedLink>
+
+                  <div className="mt-5 max-w-2xl">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                      Pengaturan profil
+                    </p>
+                    <h1 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                      Buat profil yang langsung dipahami
+                    </h1>
+                    <p className="mt-3 max-w-xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+                      Isi informasi penting saja. Jelaskan siapa kamu, apa yang kamu
+                      tawarkan atau cari, dan bagaimana orang bisa menghubungimu.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-2 sm:grid-cols-2 lg:max-w-md">
+                  <LocalizedLink
+                    href={publicProfilePath}
+                    className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold"
+                  >
+                    <Globe2 className="h-4 w-4" />
+                    Lihat sebagai pengunjung
+                  </LocalizedLink>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saveDisabled}
+                    className="ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Simpan perubahan
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-sm font-semibold ui-accent-text">
-                  Progress {profileScore}%
-                </span>
-                <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-sm font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-                  {completedProfileItems}/{profileChecklist.length} selesai
-                </span>
-                <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-sm font-semibold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
-                  Fokus {activeFocusSection.title}
-                </span>
+            <aside className="flex h-full min-h-[280px] flex-col bg-[color:var(--app-surface-strong)]">
+              <div className="border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-[color:var(--app-text-soft)]">
+                      Pratinjau singkat
+                    </p>
+                    <p className="mt-0.5 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      Tampilan profilmu
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    {profileScore}%
+                  </span>
+                </div>
               </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
-                <div
-                  className="h-full rounded-full bg-[color:var(--app-accent)] transition-[width] duration-500"
-                  style={{ width: `${profileScore}%` }}
-                />
-              </div>
-              <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                {activeFocusSection.description} Tab ini sudah{' '}
-                {activeFocusProgress.complete}/{activeFocusProgress.total} item.
-              </p>
-            </div>
 
-            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                  {nextProfileTask ? (
-                    <CircleAlert className="h-5 w-5" />
-                  ) : (
-                    <CheckCircle2 className="h-5 w-5" />
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {nextProfileTask
-                      ? 'Langkah berikutnya'
-                      : 'Profil sudah rapi'}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                    {nextProfileTask
-                      ? nextProfileTask.label
-                      : 'Cek tampilan publik dan simpan perubahan terbaru.'}
+              <div className="flex flex-1 flex-col justify-between p-4">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-white bg-[color:var(--app-surface-muted)] shadow-sm dark:border-slate-800">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={profileAvatarSrc(
+                          avatarUrl,
+                          readProfileAvatarStyle(baseMetadata) ||
+                            readProfileAvatarStyle(user),
+                          fullName || user?.full_name || user?.email,
+                        )}
+                        alt="Pratinjau foto profil"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {fullName.trim() || 'Nama kamu'}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                        @{username || 'alamat-profil'}
+                      </p>
+                      <p className="mt-1 flex items-center gap-1 truncate text-xs text-[color:var(--app-text-soft)]">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        {location.trim() || 'Kota atau area belum diisi'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 line-clamp-3 min-h-[60px] text-sm leading-5 text-[color:var(--app-text-soft)]">
+                    {bio.trim() ||
+                      'Tulis penjelasan singkat tentang usaha, layanan, keahlian, atau kebutuhanmu.'}
                   </p>
                 </div>
+
+                <div className="mt-5">
+                  <div className="h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-[width] duration-500"
+                      style={{ width: `${profileScore}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
+                    {completedProfileItems} dari {profileChecklist.length} informasi
+                    penting sudah diisi.
+                  </p>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        {error ? (
+          <div className="mb-4 flex items-start gap-3 rounded-2xl border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] p-4 text-sm ui-danger-text">
+            <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        ) : null}
+
+        {message ? (
+          <div className="mb-4 flex items-start gap-3 rounded-2xl border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] p-4 text-sm font-semibold text-[color:var(--app-success)]">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+            <span>{message}</span>
+          </div>
+        ) : null}
+
+        <section className="ui-panel mb-4 overflow-hidden p-0">
+          <div className="border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  Lengkapi dalam 3 langkah
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                  Kamu tidak harus mengisi semuanya sekaligus. Mulai dari bagian
+                  yang paling penting.
+                </p>
               </div>
               {nextProfileTask ? (
                 <button
                   type="button"
                   onClick={() => focusAndScrollSection(nextProfileTask.focus)}
-                  className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-bold ui-accent-text transition hover:bg-[color:var(--app-accent-soft)]"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-amber-50 px-3 text-xs font-black text-amber-800 transition hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200"
                 >
-                  Isi bagian ini
+                  <CircleAlert className="h-4 w-4" />
+                  Berikutnya: {nextProfileTask.label}
                 </button>
-              ) : null}
+              ) : (
+                <span className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Informasi utama sudah lengkap
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="border-t border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)] sm:p-4">
-            <div className="grid gap-2 sm:grid-cols-3">
-              {focusSections.map(section => {
-                const progress = focusProgress[section.key];
-                const active = activeFocus === section.key;
+          <div className="grid auto-rows-fr gap-3 p-3 sm:grid-cols-3 sm:p-4">
+            {focusSections.map((section, index) => {
+              const progress = focusProgress[section.key];
+              const active = activeFocus === section.key;
 
-                return (
-                  <button
-                    key={section.key}
-                    type="button"
-                    onClick={() => focusAndScrollSection(section.key)}
-                    className={`min-h-[74px] rounded-2xl border px-4 py-3 text-left transition ${
-                      active
-                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] shadow-sm'
-                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]'
-                    }`}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {section.title}
-                      </span>
-                      <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/10">
-                        {progress.complete}/{progress.total}
-                      </span>
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => focusAndScrollSection(section.key)}
+                  className={`group flex h-full min-h-[112px] flex-col rounded-2xl border p-4 text-left transition ${
+                    active
+                      ? 'border-emerald-500 bg-emerald-50 shadow-sm dark:bg-emerald-500/10'
+                      : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-emerald-300 hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]'
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-black ${
+                        active
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:bg-white/10'
+                      }`}
+                    >
+                      {index + 1}
                     </span>
-                    <span className="mt-1 block line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                      {section.description}
+                    <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[color:var(--app-text-soft)] dark:bg-white/10">
+                      {progress.complete}/{progress.total}
                     </span>
-                  </button>
-                );
-              })}
-            </div>
+                  </span>
+                  <span className="mt-3 block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {section.title}
+                  </span>
+                  <span className="mt-1 block min-h-10 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    {section.description}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+        </section>
 
-          <div className="border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] sm:p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 grid auto-rows-fr gap-4 md:grid-cols-2">
+          <section className="ui-panel flex h-full flex-col p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Checklist {activeFocusSection.title}
+                <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  Checklist langkah aktif
                 </p>
-                <p className="mt-0.5 text-xs text-[color:var(--app-text-soft)]">
+                <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
                   {activeFocusMissingCount > 0
-                    ? `${activeFocusMissingCount} item masih perlu diisi.`
-                    : 'Bagian ini sudah siap ditampilkan.'}
+                    ? `${activeFocusMissingCount} informasi masih perlu diisi.`
+                    : 'Semua informasi pada langkah ini sudah diisi.'}
                 </p>
               </div>
               <span
-                className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-bold ${
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-[10px] font-black',
                   activeFocusMissingCount > 0
-                    ? 'bg-[color:var(--app-warning-soft)] ui-warning-text'
-                    : 'bg-[color:var(--app-success-soft)] text-[color:var(--app-success)]'
-                }`}
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
+                    : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+                )}
               >
-                {activeFocusProgress.complete}/{activeFocusProgress.total}{' '}
-                selesai
+                {activeFocusProgress.complete}/{activeFocusProgress.total}
               </span>
             </div>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid flex-1 gap-2 sm:grid-cols-2">
               {activeFocusChecklist.map(item =>
                 item.done ? (
                   <div
                     key={item.key}
-                    className="flex min-h-11 items-center gap-2 rounded-xl border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] px-3 text-sm font-semibold text-[color:var(--app-success)]"
+                    className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
                     <span className="min-w-0 truncate">{item.label}</span>
@@ -1427,115 +1659,224 @@ export default function EditProfilePage() {
                     key={item.key}
                     type="button"
                     onClick={() => focusAndScrollSection(item.focus)}
-                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3 text-left text-sm font-semibold ui-warning-text transition hover:-translate-y-0.5 hover:shadow-sm"
+                    className="flex min-h-11 w-full items-center gap-2 rounded-xl bg-amber-50 px-3 text-left text-xs font-bold text-amber-800 transition hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-200"
                   >
                     <CircleAlert className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">
-                      {item.label}
-                    </span>
-                    <span className="shrink-0 rounded-lg bg-white/80 px-2 py-1 text-[10px] font-bold dark:bg-white/10">
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    <span className="rounded-lg bg-white px-2 py-1 text-[9px] font-black dark:bg-white/10">
                       Isi
                     </span>
                   </button>
                 ),
               )}
             </div>
-          </div>
-        </section>
+          </section>
 
-        <div className="grid gap-4">
-          <section
-            id="profile-edit-identity"
-            className={sectionCardClass('identity')}
-          >
-            <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Informasi Dasar
-            </h2>
-            <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-              Dipakai untuk identitas utama akun, tampilan public profile, dan
-              hasil Jelajahi.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                className={inputClass}
-                placeholder="Nama lengkap"
-                value={fullName}
-                onChange={e => setFullName(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="URL profil publik"
-                value={username}
-                onChange={e =>
-                  setUsername(normalizePublicProfileHandleInput(e.target.value))
-                }
-              />
-              <input
-                className={inputClass}
-                placeholder="Nomor telepon / WhatsApp"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Kota / area"
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Peran, contoh: buyer, seller"
-                value={roles}
-                onChange={e => setRoles(e.target.value)}
-              />
-            </div>
-            <div className="mt-3 rounded-2xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] p-3 dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_16%,transparent)]">
-              <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                URL profil publik
-              </p>
-              <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                Pakai huruf kecil, angka, dan tanda minus.
-              </p>
-              <div className="mt-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm font-semibold text-[color:var(--app-text)] break-all dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]">
-                {publicProfileDisplayUrl}
+          <section className="ui-panel flex h-full flex-col p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-950 text-emerald-300">
+                <WandSparkles className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  Profil yang mudah dipercaya
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                  Gunakan foto jelas, bahasa sederhana, lokasi nyata, dan jelaskan
+                  manfaat yang bisa kamu berikan.
+                </p>
               </div>
             </div>
-            <div className="mt-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Verifikasi nomor telepon
-                  </p>
-                  <p className="text-xs text-[color:var(--app-text-soft)]">
-                    Dipakai untuk membuka transaksi dan memperjelas identitas
-                    akun.
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                    phoneVerificationReady
-                      ? 'bg-[color:var(--app-success-soft)] text-[color:var(--app-success)]'
-                      : phoneNeedsVerification
-                        ? 'bg-[color:var(--app-warning-soft)] ui-warning-text'
-                        : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-muted)]'
-                  }`}
+
+            <div className="mt-4 grid flex-1 gap-2 sm:grid-cols-2">
+              <LocalizedLink
+                href={publicProfilePath}
+                className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-black"
+              >
+                <Globe2 className="h-4 w-4" />
+                Periksa profil
+              </LocalizedLink>
+              {nextProfileTask ? (
+                <button
+                  type="button"
+                  onClick={() => focusAndScrollSection(nextProfileTask.focus)}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 text-sm font-black text-amber-800 transition hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200"
                 >
-                  {phoneVerificationReady
-                    ? 'Terverifikasi'
-                    : phoneNeedsVerification
-                      ? 'Perlu OTP'
-                      : 'Isi nomor dulu'}
-                </span>
+                  <CircleAlert className="h-4 w-4" />
+                  Isi berikutnya
+                </button>
+              ) : (
+                <div className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Profil sudah rapi
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="min-w-0">
+          <div className="min-w-0 space-y-4">
+            <section
+              id="profile-edit-identity"
+              className={sectionCardClass('identity')}
+            >
+              <SectionHeading
+                step="Langkah 1"
+                title="Informasi utama"
+                description="Informasi ini muncul paling awal ketika orang membuka profilmu."
+                icon={<UserRound className="h-5 w-5" />}
+              />
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <FormField
+                  label="Nama yang ditampilkan"
+                  hint="Gunakan nama asli atau nama usaha yang mudah dikenali."
+                  required
+                >
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: Fauzan Yanuar"
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Alamat profil"
+                  hint="Akan menjadi alamat khusus profilmu."
+                  required
+                >
+                  <div className="relative">
+                    <AtSign className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
+                    <input
+                      className={`${inputClass} pl-9`}
+                      placeholder="fauzan-yanuar"
+                      value={username}
+                      onChange={e =>
+                        setUsername(
+                          normalizePublicProfileHandleInput(e.target.value),
+                        )
+                      }
+                    />
+                  </div>
+                </FormField>
+
+                <FormField
+                  label="Nomor WhatsApp aktif"
+                  hint="Digunakan untuk verifikasi dan kebutuhan transaksi."
+                >
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
+                    <input
+                      className={`${inputClass} pl-9`}
+                      inputMode="tel"
+                      placeholder="Contoh: 081234567890"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                    />
+                  </div>
+                </FormField>
+
+                <FormField
+                  label="Kota atau area"
+                  hint="Bantu orang menemukanmu berdasarkan lokasi."
+                  required
+                >
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
+                    <input
+                      className={`${inputClass} pl-9`}
+                      placeholder="Contoh: Bandung, Jawa Barat"
+                      value={location}
+                      onChange={e => setLocation(e.target.value)}
+                    />
+                  </div>
+                </FormField>
+
+                <FormField
+                  label="Kamu menggunakan Lajukan sebagai"
+                  hint="Boleh lebih dari satu, pisahkan dengan koma."
+                  className="sm:col-span-2"
+                >
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: penjual, pembeli, penyedia jasa"
+                    value={roles}
+                    onChange={e => setRoles(e.target.value)}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Perkenalan singkat"
+                  hint="Cukup 1–3 kalimat: siapa kamu dan apa yang bisa kamu bantu."
+                  required
+                  className="sm:col-span-2"
+                >
+                  <textarea
+                    className={`${textareaClass} min-h-[120px]`}
+                    placeholder="Contoh: Saya menyediakan jasa pembuatan website untuk UMKM di Bandung. Bisa konsultasi online dan pengerjaan mulai dari 7 hari."
+                    value={bio}
+                    onChange={e => setBio(e.target.value)}
+                  />
+                </FormField>
               </div>
 
-              {phoneNeedsVerification ? (
-                <div className="mt-3 space-y-3">
-                  <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-500/10">
+                <div className="flex items-start gap-3">
+                  <Globe2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-emerald-900 dark:text-emerald-100">
+                      Alamat profilmu
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-emerald-800/75 dark:text-emerald-200/75">
+                      Bagikan alamat ini agar orang bisa melihat profil, penawaran,
+                      dan informasi usahamu.
+                    </p>
+                    <div className="mt-3 break-all rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-bold text-emerald-800 dark:border-emerald-900/70 dark:bg-white/10 dark:text-emerald-200">
+                      {publicProfileDisplayUrl}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        Verifikasi nomor WhatsApp
+                      </p>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+                          phoneVerificationReady
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                            : phoneNeedsVerification
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
+                              : 'bg-white text-[color:var(--app-text-soft)] dark:bg-white/10'
+                        }`}
+                      >
+                        {phoneVerificationReady
+                          ? 'Sudah terverifikasi'
+                          : phoneNeedsVerification
+                            ? 'Perlu verifikasi'
+                            : 'Nomor belum diisi'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                      Verifikasi membuat akun lebih dipercaya dan dapat membuka
+                      fitur transaksi tertentu.
+                    </p>
+                  </div>
+                </div>
+
+                {phoneNeedsVerification ? (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                     <input
                       className={inputClass}
                       inputMode="numeric"
                       maxLength={6}
-                      placeholder="OTP 6 digit"
+                      placeholder="Masukkan kode OTP 6 digit"
                       value={phoneOtp}
                       onChange={e =>
                         setPhoneOtp(
@@ -1547,527 +1888,618 @@ export default function EditProfilePage() {
                       type="button"
                       onClick={sendPhoneOtp}
                       disabled={sendingPhoneOtp}
-                      className="ui-button-secondary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                      className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold disabled:opacity-60"
                     >
                       {sendingPhoneOtp ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Mengirim OTP
-                        </>
-                      ) : (
-                        'Kirim OTP'
-                      )}
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : null}
+                      Kirim kode
                     </button>
                     <button
                       type="button"
                       onClick={verifyPhoneOtp}
                       disabled={confirmingPhoneOtp}
-                      className="ui-button-primary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                      className="ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-black disabled:opacity-60"
                     >
                       {confirmingPhoneOtp ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Memverifikasi
-                        </>
-                      ) : (
-                        'Verifikasi nomor'
-                      )}
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : null}
+                      Verifikasi
                     </button>
                   </div>
-                  {phoneOtpMessage ? (
-                    <p className="text-xs text-[color:var(--app-accent)]">
-                      {phoneOtpMessage}
-                    </p>
-                  ) : null}
-                  {phoneOtpError ? (
-                    <p className="text-xs ui-warning-text">{phoneOtpError}</p>
-                  ) : null}
+                ) : null}
+
+                {phoneOtpMessage ? (
+                  <p className="mt-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    {phoneOtpMessage}
+                  </p>
+                ) : null}
+                {phoneOtpError ? (
+                  <p className="mt-3 text-xs font-semibold ui-danger-text">
+                    {phoneOtpError}
+                  </p>
+                ) : null}
+              </div>
+            </section>
+
+            <section
+              id="profile-edit-talent"
+              className={sectionCardClass('talent')}
+            >
+              <SectionHeading
+                step="Langkah 2A"
+                title="Keahlian profesional"
+                description="Isi bagian ini jika kamu menawarkan kemampuan, pekerjaan freelance, atau jasa profesional."
+                icon={<BriefcaseBusiness className="h-5 w-5" />}
+                optional
+              />
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <FormField
+                  label="Judul keahlian"
+                  hint="Gunakan istilah yang biasa dicari orang."
+                  required
+                >
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: Web Developer untuk UMKM"
+                    value={headline}
+                    onChange={e => setHeadline(e.target.value)}
+                  />
+                </FormField>
+                <FormField
+                  label="Keahlian utama"
+                  hint="Pisahkan dengan koma."
+                  required
+                >
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: React, Laravel, desain website"
+                    value={skills}
+                    onChange={e => setSkills(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Bahasa yang dikuasai">
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: Indonesia, Inggris"
+                    value={languages}
+                    onChange={e => setLanguages(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Lama pengalaman" hint="Isi angka dalam tahun.">
+                  <input
+                    type="number"
+                    min="0"
+                    className={inputClass}
+                    placeholder="Contoh: 3"
+                    value={experienceYears}
+                    onChange={e => setExperienceYears(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Tarif per jam" hint="Isi angka tanpa titik atau Rp.">
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    className={inputClass}
+                    placeholder="Contoh: 150000"
+                    value={hourlyRate}
+                    onChange={e => setHourlyRate(e.target.value)}
+                  />
+                </FormField>
+                <FormField
+                  label="Link portofolio tambahan"
+                  hint="Boleh beberapa link, pisahkan dengan koma atau baris baru."
+                  className="sm:col-span-2"
+                >
+                  <textarea
+                    className={`${textareaClass} min-h-[90px]`}
+                    placeholder="Contoh: https://portfolio.com, https://behance.net/..."
+                    value={portfolioUrls}
+                    onChange={e => setPortfolioUrls(e.target.value)}
+                  />
+                </FormField>
+              </div>
+            </section>
+
+            <section className={sectionCardClass('talent')}>
+              <SectionHeading
+                step="Tambahan"
+                title="Pendidikan"
+                description="Tambahkan pendidikan yang membantu orang memahami latar belakangmu."
+                icon={<GraduationCap className="h-5 w-5" />}
+                optional
+                action={
+                  <button
+                    type="button"
+                    onClick={addEducation}
+                    className="ui-button-secondary inline-flex min-h-10 items-center justify-center gap-2 px-3 text-xs font-black"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Tambah pendidikan
+                  </button>
+                }
+              />
+
+              <div className="mt-4">
+                {educationEntries.length === 0 ? (
+                  <EmptyEditorState
+                    title="Belum ada pendidikan"
+                    description="Bagian ini opsional. Tambahkan sekolah, kampus, jurusan, atau pelatihan utama."
+                    actionLabel="Tambah pendidikan"
+                    onAction={addEducation}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {educationEntries.map((entry, idx) => (
+                      <div
+                        key={`${entry.title}-${idx}`}
+                        className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              {entry.title}
+                            </p>
+                            {entry.subtitle ? (
+                              <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+                                {entry.subtitle}
+                              </p>
+                            ) : null}
+                            {entry.meta ? (
+                              <p className="mt-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                                {entry.meta}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editEducation(idx)}
+                              className="rounded-lg px-2.5 py-1.5 text-xs font-black text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                            >
+                              Ubah
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeEducation(idx)}
+                              aria-label="Hapus pendidikan"
+                              className="grid h-8 w-8 place-items-center rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className={sectionCardClass('talent')}>
+              <SectionHeading
+                step="Tambahan"
+                title="Sertifikat dan pelatihan"
+                description="Tampilkan bukti kemampuan yang paling relevan."
+                icon={<Award className="h-5 w-5" />}
+                optional
+                action={
+                  <button
+                    type="button"
+                    onClick={addCertificate}
+                    className="ui-button-secondary inline-flex min-h-10 items-center justify-center gap-2 px-3 text-xs font-black"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Tambah sertifikat
+                  </button>
+                }
+              />
+
+              <div className="mt-4">
+                {certificateEntries.length === 0 ? (
+                  <EmptyEditorState
+                    title="Belum ada sertifikat"
+                    description="Tambahkan sertifikat, lisensi, atau pelatihan yang membuat profilmu lebih dipercaya."
+                    actionLabel="Tambah sertifikat"
+                    onAction={addCertificate}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {certificateEntries.map((entry, idx) => (
+                      <div
+                        key={`${entry.title}-${idx}`}
+                        className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                      >
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormField label="Nama sertifikat" required>
+                            <input
+                              className={inputClass}
+                              placeholder="Contoh: Google UX Design"
+                              value={entry.title}
+                              onChange={e =>
+                                updateCertificate(idx, 'title', e.target.value)
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Penerbit">
+                            <input
+                              className={inputClass}
+                              placeholder="Contoh: Google / Coursera"
+                              value={entry.subtitle || ''}
+                              onChange={e =>
+                                updateCertificate(idx, 'subtitle', e.target.value)
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Tahun atau tingkat">
+                            <input
+                              className={inputClass}
+                              placeholder="Contoh: 2026"
+                              value={entry.meta || ''}
+                              onChange={e =>
+                                updateCertificate(idx, 'meta', e.target.value)
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Link bukti">
+                            <input
+                              className={inputClass}
+                              placeholder="https://..."
+                              value={entry.url || ''}
+                              onChange={e =>
+                                updateCertificate(idx, 'url', e.target.value)
+                              }
+                            />
+                          </FormField>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeCertificate(idx)}
+                          className="mt-3 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-black text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Hapus sertifikat
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className={sectionCardClass('talent')}>
+              <SectionHeading
+                step="Tambahan"
+                title="Pengalaman kerja atau proyek"
+                description="Masukkan pengalaman yang paling menunjukkan kemampuanmu."
+                icon={<BriefcaseBusiness className="h-5 w-5" />}
+                optional
+                action={
+                  <button
+                    type="button"
+                    onClick={addExperience}
+                    className="ui-button-secondary inline-flex min-h-10 items-center justify-center gap-2 px-3 text-xs font-black"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Tambah pengalaman
+                  </button>
+                }
+              />
+
+              <div className="mt-4">
+                {experienceEntries.length === 0 ? (
+                  <EmptyEditorState
+                    title="Belum ada pengalaman"
+                    description="Tambahkan pekerjaan, proyek, atau pencapaian yang paling relevan."
+                    actionLabel="Tambah pengalaman"
+                    onAction={addExperience}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {experienceEntries.map((entry, idx) => (
+                      <div
+                        key={`${entry.title}-${idx}`}
+                        className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                      >
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormField label="Posisi atau nama proyek" required>
+                            <input
+                              className={inputClass}
+                              placeholder="Contoh: Fullstack Developer"
+                              value={entry.title}
+                              onChange={e =>
+                                updateExperience(idx, 'title', e.target.value)
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Perusahaan atau klien">
+                            <input
+                              className={inputClass}
+                              placeholder="Contoh: PT Contoh Indonesia"
+                              value={entry.subtitle || ''}
+                              onChange={e =>
+                                updateExperience(idx, 'subtitle', e.target.value)
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Periode">
+                            <input
+                              className={inputClass}
+                              placeholder="Contoh: 2024–2026"
+                              value={entry.meta || ''}
+                              onChange={e =>
+                                updateExperience(idx, 'meta', e.target.value)
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Link hasil kerja">
+                            <input
+                              className={inputClass}
+                              placeholder="https://..."
+                              value={entry.url || ''}
+                              onChange={e =>
+                                updateExperience(idx, 'url', e.target.value)
+                              }
+                            />
+                          </FormField>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeExperience(idx)}
+                          className="mt-3 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-black text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Hapus pengalaman
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className={sectionCardClass('talent')}>
+              <SectionHeading
+                step="Tambahan"
+                title="Link profesional"
+                description="Tambahkan website, LinkedIn, GitHub, Behance, atau portofolio lainnya."
+                icon={<Link2 className="h-5 w-5" />}
+                optional
+                action={
+                  <button
+                    type="button"
+                    onClick={addLink}
+                    className="ui-button-secondary inline-flex min-h-10 items-center justify-center gap-2 px-3 text-xs font-black"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Tambah link
+                  </button>
+                }
+              />
+
+              <div className="mt-4">
+                {linkEntries.length === 0 ? (
+                  <EmptyEditorState
+                    title="Belum ada link"
+                    description="Link membantu orang memeriksa hasil kerja dan identitas profesionalmu."
+                    actionLabel="Tambah link"
+                    onAction={addLink}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {linkEntries.map((entry, idx) => (
+                      <div
+                        key={`${entry.label}-${idx}`}
+                        className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                      >
+                        <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+                          <FormField label="Nama link">
+                            <input
+                              className={inputClass}
+                              placeholder="Contoh: LinkedIn"
+                              value={entry.label}
+                              onChange={e =>
+                                updateLink(idx, 'label', e.target.value)
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Alamat link" required>
+                            <input
+                              className={inputClass}
+                              placeholder="https://..."
+                              value={entry.url}
+                              onChange={e =>
+                                updateLink(idx, 'url', e.target.value)
+                              }
+                            />
+                          </FormField>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeLink(idx)}
+                          className="mt-3 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-black text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Hapus link
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section
+              id="profile-edit-seller"
+              className={sectionCardClass('seller')}
+            >
+              <SectionHeading
+                step="Langkah 2B"
+                title="Usaha atau jasa yang kamu tawarkan"
+                description="Isi bagian ini agar calon pembeli cepat memahami layanan, area, dan kisaran hargamu."
+                icon={<Store className="h-5 w-5" />}
+                optional
+              />
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <FormField label="Nama usaha atau layanan" required>
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: Jasa Pembuatan Website UMKM"
+                    value={providerHeadline}
+                    onChange={e => setProviderHeadline(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Keahlian atau jenis layanan" hint="Pisahkan dengan koma.">
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: website toko, landing page, maintenance"
+                    value={providerSkills}
+                    onChange={e => setProviderSkills(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Cara layanan diberikan">
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: online, datang ke lokasi, keduanya"
+                    value={workMode}
+                    onChange={e => setWorkMode(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Perkiraan waktu membalas">
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: kurang dari 2 jam"
+                    value={responseTime}
+                    onChange={e => setResponseTime(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Harga mulai" hint="Isi angka tanpa titik atau Rp.">
+                  <input
+                    type="number"
+                    min="0"
+                    className={inputClass}
+                    placeholder="Contoh: 500000"
+                    value={priceMin}
+                    onChange={e => setPriceMin(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Harga tertinggi" hint="Boleh dikosongkan jika harga menyesuaikan.">
+                  <input
+                    type="number"
+                    min="0"
+                    className={inputClass}
+                    placeholder="Contoh: 5000000"
+                    value={priceMax}
+                    onChange={e => setPriceMax(e.target.value)}
+                  />
+                </FormField>
+                <FormField
+                  label="Area layanan"
+                  hint="Pisahkan beberapa kota atau area dengan koma."
+                  className="sm:col-span-2"
+                >
+                  <textarea
+                    className={`${textareaClass} min-h-[90px]`}
+                    placeholder="Contoh: Bandung, Cimahi, seluruh Indonesia untuk layanan online"
+                    value={serviceCoverage}
+                    onChange={e => setServiceCoverage(e.target.value)}
+                  />
+                </FormField>
+              </div>
+            </section>
+
+            <section
+              id="profile-edit-buyer"
+              className={sectionCardClass('buyer')}
+            >
+              <SectionHeading
+                step="Langkah 2C"
+                title="Barang atau jasa yang sedang kamu cari"
+                description="Bagian ini membantu Lajukan mencocokkan kebutuhanmu dengan penjual atau penyedia jasa yang tepat."
+                icon={<Search className="h-5 w-5" />}
+                optional
+              />
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <FormField
+                  label="Apa yang sedang kamu butuhkan?"
+                  hint="Tulis kebutuhan dengan bahasa sehari-hari."
+                  required
+                  className="sm:col-span-2"
+                >
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: mencari vendor konten TikTok untuk UMKM"
+                    value={buyerIntent}
+                    onChange={e => setBuyerIntent(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Lokasi yang diinginkan">
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: Bandung atau bisa online"
+                    value={preferredLocation}
+                    onChange={e => setPreferredLocation(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Bidang usaha">
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: pemasaran digital"
+                    value={preferredSector}
+                    onChange={e => setPreferredSector(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Jenis yang lebih spesifik">
+                  <input
+                    className={inputClass}
+                    placeholder="Contoh: video pendek dan iklan"
+                    value={preferredSubSector}
+                    onChange={e => setPreferredSubSector(e.target.value)}
+                  />
+                </FormField>
+                <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+                  <FormField label="Anggaran minimum">
+                    <input
+                      type="number"
+                      min="0"
+                      className={inputClass}
+                      placeholder="Contoh: 500000"
+                      value={buyerBudgetMin}
+                      onChange={e => setBuyerBudgetMin(e.target.value)}
+                    />
+                  </FormField>
+                  <FormField label="Anggaran maksimum">
+                    <input
+                      type="number"
+                      min="0"
+                      className={inputClass}
+                      placeholder="Contoh: 3000000"
+                      value={buyerBudgetMax}
+                      onChange={e => setBuyerBudgetMax(e.target.value)}
+                    />
+                  </FormField>
                 </div>
-              ) : phoneVerificationReady ? (
-                <p className="mt-3 text-xs text-[color:var(--app-success)]">
-                  Nomor ini sudah siap dipakai untuk transaksi.
-                </p>
-              ) : (
-                <p className="mt-3 text-xs text-[color:var(--app-text-soft)]">
-                  Tambahkan nomor aktif dulu, lalu kirim OTP dari sini.
-                </p>
-              )}
-            </div>
-            <textarea
-              className={`${textareaClass} mt-3 min-h-[96px]`}
-              placeholder="Bio ringkas"
-              value={bio}
-              onChange={e => setBio(e.target.value)}
-            />
-          </section>
-
-          <section
-            id="profile-edit-talent"
-            className={sectionCardClass('talent')}
-          >
-            <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Keahlian & Freelancer
-            </h2>
-            <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-              Bagian ini memengaruhi jobs, talent discovery, dan cara buyer
-              menilai skill profesional Anda.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                className={inputClass}
-                placeholder="Judul keahlian / profesi"
-                value={headline}
-                onChange={e => setHeadline(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Tarif per jam (IDR)"
-                value={hourlyRate}
-                onChange={e => setHourlyRate(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Keahlian, pisahkan dengan koma"
-                value={skills}
-                onChange={e => setSkills(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Bahasa"
-                value={languages}
-                onChange={e => setLanguages(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Lama pengalaman, contoh: 3"
-                value={experienceYears}
-                onChange={e => setExperienceYears(e.target.value)}
-              />
-            </div>
-            <textarea
-              className={`${textareaClass} mt-3 min-h-[80px]`}
-              placeholder="Link portofolio, pisahkan koma atau baris baru"
-              value={portfolioUrls}
-              onChange={e => setPortfolioUrls(e.target.value)}
-            />
-          </section>
-
-          <section className={sectionCardClass('talent')}>
-            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Pendidikan
-                </h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  Tampilkan sekolah, gelar, atau jurusan penting tanpa memenuhi
-                  halaman dengan form panjang.
-                </p>
               </div>
-              <button
-                type="button"
-                onClick={addEducation}
-                className="ui-button-secondary ui-button-compact inline-flex w-full items-center gap-2 text-xs font-semibold sm:w-auto"
-              >
-                <Upload className="h-4 w-4" />
-                Tambah
-              </button>
-            </div>
-            {educationEntries.length === 0 ? (
-              <p className="text-sm text-[color:var(--app-text-soft)]">
-                Belum ada data pendidikan.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {educationEntries.map((entry, idx) => (
-                  <div
-                    key={`${entry.title}-${idx}`}
-                    className="rounded-xl border border-[color:var(--app-border)] p-3"
-                  >
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-[color:var(--app-text)]">
-                        {entry.title}
-                      </p>
-                      {entry.subtitle ? (
-                        <p className="text-sm text-[color:var(--app-text-soft)]">
-                          {entry.subtitle}
-                        </p>
-                      ) : null}
-                      {entry.meta ? (
-                        <p className="text-xs text-[color:var(--app-text-soft)]">
-                          {entry.meta}
-                        </p>
-                      ) : null}
-                      {entry.url ? (
-                        <p className="break-all text-xs text-[color:var(--app-text-soft)]">
-                          {entry.url}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="mt-3 flex justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => editEducation(idx)}
-                        className="text-xs font-semibold text-[color:var(--app-accent)]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeEducation(idx)}
-                        className="ui-danger-text text-xs font-semibold"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+            </section>
 
-          <section className={sectionCardClass('talent')}>
-            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Sertifikat
-                </h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  Cocok untuk sertifikasi, lisensi, atau pelatihan yang bikin
-                  profile lebih kredibel.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={addCertificate}
-                className="ui-button-secondary ui-button-compact inline-flex w-full items-center gap-2 text-xs font-semibold sm:w-auto"
-              >
-                <Upload className="h-4 w-4" />
-                Tambah
-              </button>
-            </div>
-            {certificateEntries.length === 0 ? (
-              <p className="text-sm text-[color:var(--app-text-soft)]">
-                Belum ada data sertifikat.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {certificateEntries.map((entry, idx) => (
-                  <div
-                    key={`${entry.title}-${idx}`}
-                    className="rounded-xl border border-[color:var(--app-border)] p-3"
-                  >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <input
-                        className={inputClass}
-                        placeholder="Nama sertifikat"
-                        value={entry.title}
-                        onChange={e =>
-                          updateCertificate(idx, 'title', e.target.value)
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        placeholder="Institusi / issuer"
-                        value={entry.subtitle || ''}
-                        onChange={e =>
-                          updateCertificate(idx, 'subtitle', e.target.value)
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        placeholder="Tahun / level"
-                        value={entry.meta || ''}
-                        onChange={e =>
-                          updateCertificate(idx, 'meta', e.target.value)
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        placeholder="Link sertifikat (optional)"
-                        value={entry.url || ''}
-                        onChange={e =>
-                          updateCertificate(idx, 'url', e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeCertificate(idx)}
-                        className="ui-danger-text text-xs font-semibold"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+            <section
+              id="profile-edit-media"
+              className={sectionCardClass('media')}
+            >
+              <SectionHeading
+                step="Langkah 3"
+                title="Foto dan dokumen"
+                description="Gunakan foto yang jelas agar profil terlihat lebih terpercaya dan mudah dikenali."
+                icon={<Images className="h-5 w-5" />}
+              />
 
-          <section className={sectionCardClass('talent')}>
-            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Pengalaman
-                </h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  Isi pengalaman atau proyek penting.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={addExperience}
-                className="ui-button-secondary ui-button-compact inline-flex w-full items-center gap-2 text-xs font-semibold sm:w-auto"
-              >
-                <Upload className="h-4 w-4" />
-                Tambah
-              </button>
-            </div>
-            {experienceEntries.length === 0 ? (
-              <p className="text-sm text-[color:var(--app-text-soft)]">
-                Belum ada pengalaman kerja.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {experienceEntries.map((entry, idx) => (
-                  <div
-                    key={`${entry.title}-${idx}`}
-                    className="rounded-xl border border-[color:var(--app-border)] p-3"
-                  >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <input
-                        className={inputClass}
-                        placeholder="Posisi / role"
-                        value={entry.title}
-                        onChange={e =>
-                          updateExperience(idx, 'title', e.target.value)
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        placeholder="Perusahaan / tim"
-                        value={entry.subtitle || ''}
-                        onChange={e =>
-                          updateExperience(idx, 'subtitle', e.target.value)
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        placeholder="Durasi / periode"
-                        value={entry.meta || ''}
-                        onChange={e =>
-                          updateExperience(idx, 'meta', e.target.value)
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        placeholder="Link portfolio (optional)"
-                        value={entry.url || ''}
-                        onChange={e =>
-                          updateExperience(idx, 'url', e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeExperience(idx)}
-                        className="ui-danger-text text-xs font-semibold"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className={sectionCardClass('talent')}>
-            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Link & Portofolio
-                </h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  Tambah LinkedIn, website, GitHub, atau portfolio.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={addLink}
-                className="ui-button-secondary ui-button-compact inline-flex w-full items-center gap-2 text-xs font-semibold sm:w-auto"
-              >
-                <Upload className="h-4 w-4" />
-                Tambah
-              </button>
-            </div>
-            {linkEntries.length === 0 ? (
-              <p className="text-sm text-[color:var(--app-text-soft)]">
-                Belum ada link profesional.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {linkEntries.map((entry, idx) => (
-                  <div
-                    key={`${entry.label}-${idx}`}
-                    className="rounded-xl border border-[color:var(--app-border)] p-3"
-                  >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <input
-                        className={inputClass}
-                        placeholder="Label (LinkedIn, Portfolio, Website)"
-                        value={entry.label}
-                        onChange={e => updateLink(idx, 'label', e.target.value)}
-                      />
-                      <input
-                        className={inputClass}
-                        placeholder="URL"
-                        value={entry.url}
-                        onChange={e => updateLink(idx, 'url', e.target.value)}
-                      />
-                    </div>
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeLink(idx)}
-                        className="ui-danger-text text-xs font-semibold"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section
-            id="profile-edit-seller"
-            className={sectionCardClass('seller')}
-          >
-            <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Penyedia Jasa / Penjual
-            </h2>
-            <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-              Dipakai saat Anda tampil sebagai seller/provider, termasuk
-              coverage, pricing, dan response expectation.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                className={inputClass}
-                placeholder="Judul usaha / layanan"
-                value={providerHeadline}
-                onChange={e => setProviderHeadline(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Cara kerja, contoh: datang ke lokasi / online"
-                value={workMode}
-                onChange={e => setWorkMode(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Keahlian layanan"
-                value={providerSkills}
-                onChange={e => setProviderSkills(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Response time (ex: < 2 jam)"
-                value={responseTime}
-                onChange={e => setResponseTime(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Harga mulai"
-                value={priceMin}
-                onChange={e => setPriceMin(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Harga maksimal"
-                value={priceMax}
-                onChange={e => setPriceMax(e.target.value)}
-              />
-            </div>
-            <textarea
-              className={`${textareaClass} mt-3 min-h-[80px]`}
-              placeholder="Service coverage (kota/area), pisahkan koma"
-              value={serviceCoverage}
-              onChange={e => setServiceCoverage(e.target.value)}
-            />
-          </section>
-
-          <section
-            id="profile-edit-buyer"
-            className={sectionCardClass('buyer')}
-          >
-            <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Kebutuhan Pembeli
-            </h2>
-            <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-              Bantu matching kebutuhan, budget, dan vendor.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                className={inputClass}
-                placeholder="Intent kebutuhan (contoh: cari vendor konten)"
-                value={buyerIntent}
-                onChange={e => setBuyerIntent(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Lokasi yang dicari"
-                value={preferredLocation}
-                onChange={e => setPreferredLocation(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Budget min"
-                value={buyerBudgetMin}
-                onChange={e => setBuyerBudgetMin(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Budget max"
-                value={buyerBudgetMax}
-                onChange={e => setBuyerBudgetMax(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Sektor yang diminati"
-                value={preferredSector}
-                onChange={e => setPreferredSector(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Sub sektor yang diminati"
-                value={preferredSubSector}
-                onChange={e => setPreferredSubSector(e.target.value)}
-              />
-            </div>
-          </section>
-
-          <section
-            id="profile-edit-media"
-            className={sectionCardClass('media')}
-          >
-            <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Media Profil
-            </h2>
-            <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-              Avatar, cover, gallery, dan dokumen akan dipakai di profile
-              public, quick apply, dan showcase pekerjaan.
-            </p>
-            <div className="mb-4 grid gap-4 md:grid-cols-[1fr_2fr]">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  Foto Profil
-                </label>
-                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-                  <div className="h-16 w-16 overflow-hidden rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]">
+              <div className="mt-5 grid items-stretch gap-4 md:grid-cols-2">
+                <div className="flex min-h-[330px] flex-col justify-between rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                  <div className="mx-auto h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={profileAvatarSrc(
@@ -2076,180 +2508,235 @@ export default function EditProfilePage() {
                           readProfileAvatarStyle(user),
                         fullName || user?.full_name || user?.email,
                       )}
-                      alt="Avatar preview"
+                      alt="Foto profil"
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="ui-button-secondary ui-button-compact inline-flex w-full cursor-pointer items-center justify-center gap-2 text-xs font-semibold sm:w-auto">
-                      {uploadingAvatar ? (
+                  <p className="mt-3 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    Foto profil
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    Gunakan foto wajah, logo usaha, atau identitas yang jelas.
+                  </p>
+                  <label className="ui-button-secondary mt-4 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 px-3 text-xs font-black">
+                    {uploadingAvatar ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                    Ganti foto profil
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                      disabled={uploadingAvatar || saving}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex min-h-[330px] flex-col overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                  <div className="relative min-h-[220px] flex-1 bg-[color:var(--app-surface)]">
+                    {coverImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={coverImageUrl}
+                        alt="Foto sampul"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center px-5 text-center">
+                        <ImagePlus className="h-8 w-8 text-[color:var(--app-text-soft)]" />
+                        <p className="mt-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          Belum ada foto sampul
+                        </p>
+                        <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                          Tambahkan foto tempat usaha, produk, tim, atau hasil kerja.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-auto flex min-h-[96px] flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        Foto sampul
+                      </p>
+                      <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                        Rasio lebar akan dipotong otomatis sebelum diunggah.
+                      </p>
+                    </div>
+                    <label className="ui-button-secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 px-3 text-xs font-black">
+                      {uploadingCover ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Upload className="h-4 w-4" />
+                        <ImagePlus className="h-4 w-4" />
                       )}
-                      Upload foto
+                      {coverImageUrl ? 'Ganti sampul' : 'Tambah sampul'}
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={handleAvatarChange}
-                        disabled={uploadingAvatar || saving}
+                        onChange={handleCoverChange}
+                        disabled={uploadingCover || saving}
                       />
                     </label>
-                    <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                      Foto akan di-crop sebelum upload.
-                    </p>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  Foto Sampul
-                </label>
-                {coverImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={coverImageUrl}
-                    alt="Cover preview"
-                    className="mb-2 h-32 w-full rounded-xl object-cover"
-                  />
-                ) : (
-                  <div className="mb-2 flex h-32 items-center justify-center rounded-xl border border-dashed border-[color:var(--app-border)] text-xs text-[color:var(--app-text-soft)]">
-                    Belum ada cover image
+              <div className="mt-4 grid auto-rows-fr items-stretch gap-4 md:grid-cols-2">
+                <div className="flex h-full min-h-[320px] flex-col rounded-2xl border border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)]">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        Galeri usaha atau hasil kerja
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        Unggah beberapa foto produk, tempat usaha, proyek, atau hasil pekerjaan.
+                      </p>
+                    </div>
+                    <label className="ui-button-secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 px-3 text-xs font-black">
+                      {uploadingImages ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                      Tambah foto
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={uploadImages}
+                        disabled={uploadingImages || saving}
+                      />
+                    </label>
                   </div>
-                )}
-                <label className="ui-button-secondary ui-button-compact inline-flex w-full cursor-pointer items-center justify-center gap-2 text-xs font-semibold sm:w-auto">
-                  {uploadingCover ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  Upload cover
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleCoverChange}
-                    disabled={uploadingCover || saving}
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  Gallery Images
-                </label>
-                <label className="ui-button-secondary ui-button-compact inline-flex w-full cursor-pointer items-center justify-center gap-2 text-xs font-semibold sm:w-auto">
-                  {uploadingImages ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  Upload images
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={uploadImages}
-                    disabled={uploadingImages || saving}
-                  />
-                </label>
-                <div className="mt-3 space-y-2">
-                  {galleryImages.map(url => (
-                    <div
-                      key={url}
-                      className="ui-panel-muted flex flex-col items-start gap-2 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <span className="min-w-0 break-all">{url}</span>
-                      <button
-                        type="button"
-                        className="ui-danger-text shrink-0"
-                        onClick={() => removeImage(url)}
-                      >
-                        Hapus
-                      </button>
+
+                  {galleryImages.length > 0 ? (
+                    <div className="mt-4 grid flex-1 grid-cols-2 content-start gap-2 sm:grid-cols-3">
+                      {galleryImages.map(url => (
+                        <div
+                          key={url}
+                          className="group relative aspect-square overflow-hidden rounded-xl bg-[color:var(--app-surface-muted)]"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt="Galeri profil"
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(url)}
+                            aria-label="Hapus foto"
+                            className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/65 text-white shadow-sm backdrop-blur transition hover:bg-rose-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="mt-4 grid flex-1 place-items-center rounded-xl border border-dashed border-[color:var(--app-border)] px-4 py-8 text-center text-xs text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                      Belum ada foto galeri.
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex h-full min-h-[320px] flex-col rounded-2xl border border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)]">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        Dokumen pendukung
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        Misalnya CV, katalog, proposal, sertifikat, atau dokumen usaha.
+                      </p>
+                    </div>
+                    <label className="ui-button-secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 px-3 text-xs font-black">
+                      {uploadingDocs ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                      Tambah dokumen
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*"
+                        multiple
+                        className="hidden"
+                        onChange={uploadDocuments}
+                        disabled={uploadingDocs || saving}
+                      />
+                    </label>
+                  </div>
+
+                  {documentUrls.length > 0 ? (
+                    <div className="mt-4 flex-1 space-y-2">
+                      {documentUrls.map(url => (
+                        <div
+                          key={url}
+                          className="flex min-w-0 items-center gap-3 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                        >
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 dark:bg-white/10 dark:text-emerald-300">
+                            <FileText className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              {getFileName(url)}
+                            </p>
+                            <p className="mt-0.5 truncate text-[10px] text-[color:var(--app-text-soft)]">
+                              Dokumen profil
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeDoc(url)}
+                            aria-label="Hapus dokumen"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 grid flex-1 place-items-center rounded-xl border border-dashed border-[color:var(--app-border)] px-4 py-8 text-center text-xs text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                      Belum ada dokumen pendukung.
+                    </div>
+                  )}
                 </div>
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  Documents / CV
-                </label>
-                <label className="ui-button-secondary ui-button-compact inline-flex w-full cursor-pointer items-center justify-center gap-2 text-xs font-semibold sm:w-auto">
-                  {uploadingDocs ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  Upload documents
-                  <input
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={uploadDocuments}
-                    disabled={uploadingDocs || saving}
-                  />
-                </label>
-                <div className="mt-3 space-y-2">
-                  {documentUrls.map(url => (
-                    <div
-                      key={url}
-                      className="ui-panel-muted flex flex-col items-start gap-2 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <span className="min-w-0 break-all">{url}</span>
-                      <button
-                        type="button"
-                        className="ui-danger-text shrink-0"
-                        onClick={() => removeDoc(url)}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
+            </section>
+          </div>
+
         </div>
 
-        {error ? (
-          <p className="ui-panel-muted mt-4 border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3 py-2 text-sm ui-danger-text">
-            {error}
-          </p>
-        ) : null}
-        {message ? (
-          <p className="ui-panel-muted mt-4 border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2 text-sm ui-accent-text">
-            {message}
-          </p>
-        ) : null}
-
-        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 mt-6 rounded-t-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_-18px_40px_-32px_rgba(15,23,42,0.55)] dark:border-[color:var(--app-border-strong)] sm:bottom-4 sm:mx-0 sm:rounded-2xl">
+        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 mt-6 rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] p-3 shadow-[0_-18px_40px_-32px_rgba(15,23,42,0.55)] backdrop-blur-xl dark:border-[color:var(--app-border-strong)] sm:bottom-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                Simpan perubahan profil
+              <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                Jangan lupa simpan perubahan
               </p>
               <p className="mt-0.5 text-xs text-[color:var(--app-text-soft)]">
-                Progress {profileScore}% - fokus {activeFocusSection.title}
+                Profil {profileScore}% lengkap · langkah aktif:{' '}
+                {activeFocusSection.title}
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="grid gap-2 sm:flex">
               <LocalizedLink
                 href={publicProfilePath}
-                className="ui-button-secondary inline-flex w-full items-center justify-center gap-2 px-3 text-sm font-semibold sm:w-auto"
+                className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold"
               >
                 <Globe2 className="h-4 w-4" />
-                Profil publik
+                Lihat profil
               </LocalizedLink>
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saveDisabled}
-                className="ui-button-primary inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                className="ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -2266,7 +2753,9 @@ export default function EditProfilePage() {
       <Modal
         open={educationEditorOpen}
         title={
-          educationEditorIndex === null ? 'Tambah Education' : 'Edit Education'
+          educationEditorIndex === null
+            ? 'Tambah pendidikan'
+            : 'Ubah pendidikan'
         }
         onClose={closeEducationEditor}
         footer={
@@ -2274,68 +2763,77 @@ export default function EditProfilePage() {
             <button
               type="button"
               onClick={closeEducationEditor}
-              className="inline-flex flex-1 items-center justify-center rounded-full border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-[color:var(--app-border)] px-4 text-xs font-black text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
             >
               Batal
             </button>
             <button
               type="button"
               onClick={saveEducationDraft}
-              className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)]"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl bg-[color:var(--app-accent)] px-4 text-xs font-black text-white"
             >
               {educationEditorIndex === null ? 'Tambahkan' : 'Simpan perubahan'}
             </button>
           </div>
         }
       >
-        <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-          Isi yang penting saja. Satu card cukup singkat.
+        <p className="mb-4 text-sm leading-6 text-[color:var(--app-text-soft)]">
+          Isi pendidikan yang paling relevan. Tidak perlu memasukkan semua
+          riwayat sekolah.
         </p>
-        <div className="grid gap-3">
-          <input
-            className={inputClass}
-            placeholder="Nama institusi / gelar"
-            value={educationDraft.title}
-            onChange={e =>
-              setEducationDraft(current => ({
-                ...current,
-                title: e.target.value,
-              }))
-            }
-          />
-          <input
-            className={inputClass}
-            placeholder="Bidang / jurusan"
-            value={educationDraft.subtitle || ''}
-            onChange={e =>
-              setEducationDraft(current => ({
-                ...current,
-                subtitle: e.target.value,
-              }))
-            }
-          />
-          <input
-            className={inputClass}
-            placeholder="Tahun / status"
-            value={educationDraft.meta || ''}
-            onChange={e =>
-              setEducationDraft(current => ({
-                ...current,
-                meta: e.target.value,
-              }))
-            }
-          />
-          <input
-            className={inputClass}
-            placeholder="Link sertifikat (optional)"
-            value={educationDraft.url || ''}
-            onChange={e =>
-              setEducationDraft(current => ({
-                ...current,
-                url: e.target.value,
-              }))
-            }
-          />
+        <div className="grid gap-4">
+          <FormField label="Sekolah, kampus, atau gelar" required>
+            <input
+              className={inputClass}
+              placeholder="Contoh: Universitas Budi Luhur"
+              value={educationDraft.title}
+              onChange={e =>
+                setEducationDraft(current => ({
+                  ...current,
+                  title: e.target.value,
+                }))
+              }
+            />
+          </FormField>
+          <FormField label="Jurusan atau bidang">
+            <input
+              className={inputClass}
+              placeholder="Contoh: Teknik Informatika"
+              value={educationDraft.subtitle || ''}
+              onChange={e =>
+                setEducationDraft(current => ({
+                  ...current,
+                  subtitle: e.target.value,
+                }))
+              }
+            />
+          </FormField>
+          <FormField label="Tahun atau status">
+            <input
+              className={inputClass}
+              placeholder="Contoh: 2024–sekarang"
+              value={educationDraft.meta || ''}
+              onChange={e =>
+                setEducationDraft(current => ({
+                  ...current,
+                  meta: e.target.value,
+                }))
+              }
+            />
+          </FormField>
+          <FormField label="Link pendukung">
+            <input
+              className={inputClass}
+              placeholder="https://..."
+              value={educationDraft.url || ''}
+              onChange={e =>
+                setEducationDraft(current => ({
+                  ...current,
+                  url: e.target.value,
+                }))
+              }
+            />
+          </FormField>
         </div>
       </Modal>
 
@@ -2344,7 +2842,7 @@ export default function EditProfilePage() {
         imageSrc={cropSource}
         aspect={cropTarget === 'cover' ? 16 / 9 : 1}
         maxOutputSize={cropTarget === 'cover' ? 1600 : 512}
-        title={cropTarget === 'cover' ? 'Crop Cover Image' : 'Crop Foto Profil'}
+        title={cropTarget === 'cover' ? 'Atur foto sampul' : 'Atur foto profil'}
         shape={cropTarget === 'avatar' ? 'round' : 'rect'}
         onCancel={closeCropper}
         onConfirm={handleCropConfirm}

@@ -19,6 +19,11 @@ import {
   mapVideo,
 } from '@/lib/search/socialSearchMappers';
 import { getExploreCategoryBySlug } from '@/lib/discovery/lajukanCategories';
+import type { ContentItem } from '@/lib/content/catalog';
+import {
+  isPublicReferenceMetadata,
+  readPublicReference,
+} from '@/lib/content/publicReference';
 import { getInternalWwwOrigin } from '@/lib/server/internalWwwOrigin';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 
@@ -31,6 +36,7 @@ const GROUP_KEYS: GlobalSearchGroupKey[] = [
   'products',
   'services',
   'businesses',
+  'references',
   'needs',
   'communities',
   'videos',
@@ -52,6 +58,16 @@ function readString(value: unknown): string {
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   return '';
+}
+
+function readReferenceCursor(value: unknown): string {
+  const cursor = readString(value);
+  return cursor.length <= 96 &&
+    /^\d{1,19}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+      cursor,
+    )
+    ? cursor
+    : '';
 }
 
 function readNumber(value: unknown): number | null {
@@ -172,6 +188,7 @@ function mapContentItem(item: JsonRecord): GlobalSearchItem | null {
   const id = readString(item.id);
   if (!id) return null;
   const metadata = asRecord(item.metadata);
+  if (isPublicReferenceMetadata(metadata)) return null;
   const owner = asRecord(item.owner_profile);
   const kind = contentKind(item, metadata);
   const side = inferSide(item, metadata);
@@ -294,6 +311,121 @@ function mapContentItem(item: JsonRecord): GlobalSearchItem | null {
   };
 }
 
+function boundedText(value: unknown, maxLength: number): string {
+  return readString(value).replace(/\s+/g, ' ').slice(0, maxLength);
+}
+
+function safeContentHref(value: unknown, fallbackId: string): string {
+  const candidate = readString(value);
+  if (candidate.startsWith('/content/') && !candidate.startsWith('//')) {
+    try {
+      const parsed = new URL(candidate, 'https://www.lajukan.com');
+      if (
+        parsed.origin === 'https://www.lajukan.com' &&
+        parsed.pathname.startsWith('/content/')
+      ) {
+        return `${parsed.pathname}${parsed.search}`;
+      }
+    } catch {
+      // Fall back to the canonical local detail path below.
+    }
+  }
+  return `/content/${encodeURIComponent(fallbackId)}`;
+}
+
+function safeInternalReferenceImage(
+  item: JsonRecord,
+  metadata: JsonRecord,
+): string | null {
+  const image = firstImage(item, metadata);
+  if (!image || image.length > 2048) return null;
+  return image.startsWith('/') && !image.startsWith('//') ? image : null;
+}
+
+function mapPublicReferenceItem(item: JsonRecord): GlobalSearchItem | null {
+  const id = readString(item.id);
+  const metadata = asRecord(item.metadata);
+  if (!id || !metadata) return null;
+
+  const declaredSourceTitle = firstString(
+    asRecord(metadata.source)?.title,
+    metadata.source_title,
+  );
+  const reference = readPublicReference({ id, metadata } as ContentItem);
+  if (
+    !reference ||
+    !declaredSourceTitle ||
+    !reference.sourceLicense ||
+    !reference.sourceLicenseUrl ||
+    reference.sourceUrl.length > 2048 ||
+    reference.sourceLicenseUrl.length > 2048
+  ) {
+    return null;
+  }
+
+  const contentId = id.startsWith('reference:')
+    ? id.slice('reference:'.length)
+    : id;
+  const distanceKm = readNumber(item.distance_km);
+  const imageAttribution = firstString(
+    metadata.image_attribution,
+    metadata.image_source_provider,
+    reference.imageAttribution,
+  );
+
+  return {
+    id,
+    kind: 'references',
+    title: boundedText(firstString(item.name, item.title, 'Referensi lokasi'), 180),
+    summary: boundedText(
+      firstString(item.description, item.summary, 'Referensi lokasi publik.'),
+      320,
+    ),
+    href: safeContentHref(item.public_path, contentId),
+    image: safeInternalReferenceImage(item, metadata),
+    label: boundedText(
+      firstString(
+        metadata.category_label,
+        metadata.category,
+        'Referensi lokasi',
+      ),
+      100,
+    ),
+    location: boundedText(
+      firstString(item.address, item.city, metadata.location, 'Indonesia'),
+      180,
+    ),
+    priceLabel: '',
+    ownerName: '',
+    verified: false,
+    side: null,
+    memberCount: null,
+    viewCount: null,
+    durationLabel: '',
+    metadata: {
+      recordKind: boundedText(reference.recordKind, 80),
+      sourceTitle: boundedText(declaredSourceTitle, 140),
+      sourceUrl: reference.sourceUrl,
+      sourceLicense: boundedText(reference.sourceLicense, 180),
+      sourceLicenseUrl: reference.sourceLicenseUrl,
+      trustNote: boundedText(reference.trustNote, 320),
+      imageAttribution: boundedText(imageAttribution, 220),
+      imageSourceUrl:
+        reference.imageSourceUrl.length <= 2048
+          ? reference.imageSourceUrl
+          : '',
+      imageLicense: boundedText(reference.imageLicense, 160),
+      imageLicenseUrl:
+        reference.imageLicenseUrl.length <= 2048
+          ? reference.imageLicenseUrl
+          : '',
+      distanceKm,
+      isTransactional: false,
+      updatedAt: boundedText(item.updated_at, 64),
+    },
+  };
+}
+
 function mapBusiness(item: JsonRecord): GlobalSearchItem | null {
   const id = readString(item.id);
   if (!id) return null;
@@ -364,6 +496,7 @@ function mapUser(item: JsonRecord): GlobalSearchItem | null {
 type SearchSource =
   | 'content'
   | 'businesses'
+  | 'references'
   | 'communities'
   | 'videos'
   | 'users';
@@ -436,6 +569,7 @@ function requestedGroupsForState(
   tab: GlobalSearchTab,
   side: GlobalSearchSide,
 ): Set<GlobalSearchGroupKey> {
+  if (tab === 'references') return new Set(['references']);
   if (side === 'demand') return new Set(['needs']);
   if (side === 'supply') {
     if (['products', 'services', 'businesses'].includes(tab)) {
@@ -444,7 +578,7 @@ function requestedGroupsForState(
     return new Set(['products', 'services', 'businesses']);
   }
   if (tab !== 'all') return new Set([tab]);
-  return new Set(GROUP_KEYS);
+  return new Set(GROUP_KEYS.filter(key => key !== 'references'));
 }
 
 export async function GET(req: NextRequest) {
@@ -464,7 +598,8 @@ export async function GET(req: NextRequest) {
   const derivedQuery =
     activeSubcategory?.query || activeCategory?.searchQuery || '';
   const effectiveQuery = state.query.length >= 2 ? state.query : derivedQuery;
-  if (effectiveQuery.length < 2) {
+  const isReferenceBrowse = state.tab === 'references';
+  if (effectiveQuery.length < 2 && !isReferenceBrowse) {
     return NextResponse.json(emptyGlobalSearchResponse(state.query), {
       headers: { 'Cache-Control': 'private, max-age=0' },
     });
@@ -475,11 +610,11 @@ export async function GET(req: NextRequest) {
     requested.has(key as GlobalSearchGroupKey),
   );
   const params = new URLSearchParams({
-    q: effectiveQuery,
     status: 'active',
     include_owner: '1',
     limit: state.side === 'all' ? '24' : '48',
   });
+  if (effectiveQuery) params.set('q', effectiveQuery);
   if (state.category) params.set('category', state.category);
   if (state.subcategory) params.set('subcategory', state.subcategory);
   if (state.location) params.set('location', state.location);
@@ -507,9 +642,29 @@ export async function GET(req: NextRequest) {
   }
   if (state.side !== 'all') params.set('side', state.side);
 
+  const referenceParams = new URLSearchParams({
+    references_only: '1',
+    limit: '10',
+  });
+  if (effectiveQuery) referenceParams.set('q', effectiveQuery);
+  if (state.location) referenceParams.set('city', state.location);
+  const canUseReferenceCursor =
+    !effectiveQuery &&
+    !(state.distanceKm !== null && viewerLat !== null && viewerLng !== null);
+  const referenceCursor = readReferenceCursor(state.cursor);
+  if (referenceCursor && canUseReferenceCursor) {
+    referenceParams.set('cursor', referenceCursor);
+  }
+  if (state.distanceKm !== null && viewerLat !== null && viewerLng !== null) {
+    referenceParams.set('viewer_lat', viewerLat.toFixed(3));
+    referenceParams.set('viewer_lng', viewerLng.toFixed(3));
+    referenceParams.set('radius_km', String(state.distanceKm));
+  }
+
   const [
     contentResult,
     businessesResult,
+    referencesResult,
     communityResult,
     reelsResult,
     usersResult,
@@ -527,6 +682,13 @@ export async function GET(req: NextRequest) {
             limit: '12',
           }).toString()}`,
           'businesses',
+        )
+      : Promise.resolve({ ok: true, payload: null, status: null }),
+    requested.has('references')
+      ? fetchJson(
+          req,
+          `/api/super-app/umkm/stores?${referenceParams.toString()}`,
+          'references',
         )
       : Promise.resolve({ ok: true, payload: null, status: null }),
     requested.has('communities')
@@ -566,6 +728,7 @@ export async function GET(req: NextRequest) {
   const requestedSourceResults = [
     contentNeeded ? contentResult : null,
     requested.has('businesses') ? businessesResult : null,
+    requested.has('references') ? referencesResult : null,
     requested.has('communities') ? communityResult : null,
     requested.has('videos') ? reelsResult : null,
     requested.has('users') ? usersResult : null,
@@ -616,6 +779,7 @@ export async function GET(req: NextRequest) {
       return true;
     });
   const businessPayload = asRecord(asRecord(businessesResult.payload)?.data);
+  const referencePayload = asRecord(asRecord(referencesResult.payload)?.data);
   const communityPayload = asRecord(communityResult.payload);
   const reelsPayload = asRecord(reelsResult.payload);
   const userPayload = asRecord(usersResult.payload);
@@ -639,6 +803,23 @@ export async function GET(req: NextRequest) {
     contentNeeded && !contentResult.ok ? 'needs_unavailable' : null,
     relevanceQuery,
   );
+  response.groups.references = group(
+    requested.has('references')
+      ? asArray(referencePayload?.items).map(mapPublicReferenceItem)
+      : [],
+    requested.has('references'),
+    requested.has('references') && !referencesResult.ok
+      ? 'references_unavailable'
+      : null,
+    relevanceQuery,
+  );
+  const referenceNextCursor = readReferenceCursor(
+    referencePayload?.next_cursor,
+  );
+  response.groups.references.nextCursor =
+    requested.has('references') && referenceNextCursor
+      ? referenceNextCursor
+      : null;
   const verifiedOnly = req.nextUrl.searchParams.get('verified') === '1';
   const privacy = readString(
     req.nextUrl.searchParams.get('privacy'),
@@ -687,7 +868,9 @@ export async function GET(req: NextRequest) {
     0,
   );
   const availableTabs = new Set<GlobalSearchTab>();
-  if (state.side === 'demand') {
+  if (requested.has('references')) {
+    availableTabs.add('references');
+  } else if (state.side === 'demand') {
     availableTabs.add('needs');
   } else if (state.side === 'supply') {
     availableTabs.add('all');
@@ -696,7 +879,9 @@ export async function GET(req: NextRequest) {
     if (state.tab !== 'all') availableTabs.add(state.tab);
   }
   const allowedTabs =
-    state.side === 'demand'
+    requested.has('references')
+      ? new Set<GlobalSearchTab>(['references'])
+      : state.side === 'demand'
       ? new Set<GlobalSearchTab>(['needs'])
       : state.side === 'supply'
         ? new Set<GlobalSearchTab>([

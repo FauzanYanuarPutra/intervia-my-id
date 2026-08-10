@@ -1090,7 +1090,7 @@ function RequestDetailDialog({
         aria-labelledby="request-detail-title"
         className="relative z-10 flex max-h-[calc(var(--app-viewport-height)-1.5rem)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_80px_-38px_rgba(15,23,42,0.55)] sm:max-h-[calc(var(--app-viewport-height)-2.5rem)] sm:rounded-[26px]"
       >
-        <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] px-3 py-2.5  sm:px-4 sm:py-3">
+        <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] px-3 py-2.5  sm:px-2 sm:py-3">
           <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
             <ProjectThumbnail item={request} variant="detail" />
             <div className="min-w-0 flex-1">
@@ -1129,7 +1129,7 @@ function RequestDetailDialog({
           </div>
         </div>
 
-        <div className="min-w-0 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4">
+        <div className="min-w-0 overflow-y-auto px-3 py-3 sm:px-2 sm:py-4">
           <div className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2">
             <Link
               href="/chat"
@@ -1620,7 +1620,7 @@ export default function MyProjectsPage() {
 
   return (
     <MyProjectsPageChrome>
-      <div className="mx-auto grid w-full min-w-0 max-w-[1480px] gap-4 overflow-x-hidden px-3 py-3 sm:px-4 lg:px-5">
+      <div className="mx-auto grid w-full min-w-0 max-w-[1480px] gap-4 overflow-x-hidden px-3 py-3 sm:px-2 lg:px-5">
         <section className="min-w-0 overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-surface-strong)_94%,white)_0%,color-mix(in_srgb,var(--app-info-soft)_28%,var(--app-surface-strong))_54%,color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong))_100%)] p-4 shadow-[0_22px_48px_-42px_rgba(15,23,42,0.36)] sm:p-5">
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
             <div className="min-w-0">

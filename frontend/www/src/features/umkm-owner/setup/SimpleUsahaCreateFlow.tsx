@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, Loader2, MapPin, Store, UploadCloud } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  ImageIcon,
+  Loader2,
+  MapPin,
+  Store,
+  UploadCloud,
+} from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
@@ -398,54 +407,97 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
   };
 
   return (
-    <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.18)] sm:p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-2xl">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
-            {isId ? 'Buka usaha' : 'Open business'}
-          </p>
-          <h2 className="mt-1 text-[1.2rem] font-bold ui-text sm:text-[1.45rem]">
-            {isId ? 'Isi yang penting saja' : 'Fill only the essentials'}
-          </h2>
-          <p className="mt-1 text-sm leading-6 ui-text-soft">
-            {isId
-              ? 'Nama, jenis, lokasi, lalu simpan. Detail lain bisa menyusul.'
-              : 'Name, type, location, then save. The rest can come later.'}
-          </p>
-        </div>
+    <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm dark:border-[color:var(--app-border-strong)]">
+      <div className="border-b border-[color:var(--app-border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-accent-soft)_82%,transparent),transparent_58%)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,560px)] xl:items-center">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+              <Store className="h-3.5 w-3.5" />
+              {isId ? 'Daftarkan usaha' : 'Register business'}
+            </div>
 
-        <div className="flex flex-wrap gap-2">
-          {SIMPLE_CREATE_STEPS.map((item, index) => {
-            const active = item.id === step;
-            const done = stepState[index]?.done;
+            <h2 className="mt-3 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
+              {isId ? 'Buat profil usaha di Lajukan' : 'Create your business profile'}
+            </h2>
 
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => goStep(item.id)}
-                className={cn(
-                  'inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-left text-[11px] font-bold transition',
-                  active
-                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.3)]'
-                    : done
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]',
-                )}
-              >
-                <span className="grid h-5 w-5 place-items-center rounded-full bg-white/20 text-[10px]">
-                  {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}
-                </span>
-                <span>{isId ? item.titleId : item.titleEn}</span>
-              </button>
-            );
-          })}
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Cukup isi foto, nama, jenis usaha, dan lokasi. Detail lainnya bisa dilengkapi setelah usaha dibuat.'
+                : 'Add a photo, business name, category, and location. You can complete the remaining details later.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {SIMPLE_CREATE_STEPS.map((item, index) => {
+              const active = item.id === step;
+              const done = Boolean(stepState[index]?.done);
+              const StepIcon =
+                item.id === 'basic'
+                  ? Store
+                  : item.id === 'location'
+                    ? MapPin
+                    : CheckCircle2;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => goStep(item.id)}
+                  aria-current={active ? 'step' : undefined}
+                  className={cn(
+                    'group min-w-0 rounded-[18px] border p-2.5 text-left transition sm:p-3',
+                    active
+                      ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-[0_14px_28px_-20px_rgba(5,150,105,0.65)]'
+                      : done
+                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]',
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'grid h-7 w-7 shrink-0 place-items-center rounded-xl border text-[11px] font-black',
+                        active
+                          ? 'border-white/25 bg-white/15 text-white'
+                          : done
+                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]'
+                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]',
+                      )}
+                    >
+                      {done && !active ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <StepIcon className="h-4 w-4" />
+                      )}
+                    </span>
+
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-black sm:text-sm">
+                        {isId ? item.titleId : item.titleEn}
+                      </span>
+                      <span
+                        className={cn(
+                          'mt-0.5 hidden truncate text-[10px] leading-4 sm:block',
+                          active ? 'text-white/75' : 'text-[color:var(--app-text-soft)]',
+                        )}
+                      >
+                        {isId ? item.descId : item.descEn}
+                      </span>
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {error ? (
-        <div className="mt-4 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3.5 py-2.5 text-sm text-[color:var(--app-danger)]">
-          {error}
+        <div className="mx-3 mt-3 flex items-start gap-2 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3.5 py-3 text-sm font-semibold text-[color:var(--app-danger)] sm:mx-5 sm:mt-4">
+          <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/70 text-xs font-black dark:bg-white/10">
+            !
+          </span>
+          <span>{error}</span>
         </div>
       ) : null}
 
@@ -458,28 +510,42 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
           }
           void submit();
         }}
-        className="mt-4 space-y-4"
+        className="p-3 sm:p-5"
       >
         {step === 'basic' ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.18)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
-                      {isId ? 'Foto usaha' : 'Business photo'}
-                    </p>
-                    <h3 className="mt-1 text-[1rem] font-bold ui-text">
-                      {isId ? 'Wajib dipakai di maps dan daftar' : 'Required for maps and lists'}
-                    </h3>
+              <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
+                <div className="flex flex-col gap-3 border-b border-[color:var(--app-border)] pb-4 dark:border-[color:var(--app-border-strong)] sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                      <ImageIcon className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {isId ? 'Foto utama usaha' : 'Main business photo'}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {isId
+                          ? 'Foto ini akan tampil di kartu usaha, peta, dan halaman profil.'
+                          : 'This photo appears on business cards, maps, and the profile page.'}
+                      </p>
+                    </div>
                   </div>
-                  <label className="ui-button-secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 px-4 text-sm font-semibold">
+
+                  <label className="ui-button-secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 px-4 text-sm font-bold">
                     {uploadingPhoto ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <UploadCloud className="h-4 w-4" />
                     )}
-                    <span>{isId ? 'Upload foto' : 'Upload photo'}</span>
+                    {isId
+                      ? form.photoUrl
+                        ? 'Ganti foto'
+                        : 'Pilih foto'
+                      : form.photoUrl
+                        ? 'Change photo'
+                        : 'Choose photo'}
                     <input
                       type="file"
                       accept="image/*"
@@ -488,8 +554,9 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
                     />
                   </label>
                 </div>
-                <div className="mt-4 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-                  <div className="flex min-h-[180px] items-center justify-center overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]">
+
+                <div className="mt-4 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-stretch">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]">
                     {form.photoUrl ? (
                       <img
                         src={form.photoUrl}
@@ -497,98 +564,188 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="px-4 text-center text-sm leading-6 ui-text-soft">
-                        {isId
-                          ? 'Upload satu foto utama dulu.'
-                          : 'Upload one main photo first.'}
+                      <div className="grid h-full place-items-center p-5 text-center">
+                        <div>
+                          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] shadow-sm">
+                            <ImageIcon className="h-6 w-6" />
+                          </span>
+                          <p className="mt-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {isId ? 'Belum ada foto' : 'No photo yet'}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                            {isId ? 'Gunakan foto yang terang dan jelas.' : 'Use a bright and clear photo.'}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
-                  <div className="space-y-3">
-                    <p className="text-sm leading-6 ui-text-soft">
-                      {isId
-                        ? 'Foto ini dipakai di kartu usaha, peta, dan storefront supaya orang langsung kenal.'
-                        : 'This photo powers the business card, map, and storefront so people recognize it fast.'}
-                    </p>
-                    <div className="rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-sm leading-6 ui-text-soft">
-                      {form.photoUrl ? (
-                        <span className="inline-flex items-center gap-2 text-[color:var(--app-accent)]">
-                          <CheckCircle2 className="h-4 w-4" />
-                          {isId ? 'Foto sudah siap.' : 'Photo is ready.'}
-                        </span>
-                      ) : isId ? (
-                        'Foto wajib diisi sebelum simpan.'
-                      ) : (
-                        'Photo is required before saving.'
-                      )}
+
+                  <div className="flex min-w-0 flex-col justify-between rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                    <div>
+                      <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {isId ? 'Tips foto yang bagus' : 'Tips for a good photo'}
+                      </p>
+                      <ul className="mt-3 space-y-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        <li>• {isId ? 'Tampilkan produk, tempat, atau aktivitas utama.' : 'Show the main product, place, or activity.'}</li>
+                        <li>• {isId ? 'Hindari gambar buram dan tulisan terlalu kecil.' : 'Avoid blurry images and tiny text.'}</li>
+                        <li>• {isId ? 'Gunakan satu foto yang paling mewakili usaha.' : 'Use one photo that best represents the business.'}</li>
+                      </ul>
                     </div>
+
+                    <div
+                      className={cn(
+                        'mt-4 inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black',
+                        form.photoUrl
+                          ? 'bg-[color:var(--app-success-soft)] text-[color:var(--app-success)]'
+                          : 'bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
+                      )}
+                    >
+                      {form.photoUrl ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <UploadCloud className="h-4 w-4" />
+                      )}
+                      {form.photoUrl
+                        ? isId
+                          ? 'Foto siap digunakan'
+                          : 'Photo is ready'
+                        : isId
+                          ? 'Foto wajib diisi'
+                          : 'Photo is required'}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
+                <div className="flex items-start gap-3 border-b border-[color:var(--app-border)] pb-4 dark:border-[color:var(--app-border-strong)]">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                    <Store className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {isId ? 'Informasi utama' : 'Main information'}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                      {isId
+                        ? 'Gunakan nama yang biasa dikenal pelanggan dan pilih kategori terdekat.'
+                        : 'Use the name customers know and choose the closest category.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <TextInput
+                    label={isId ? 'Nama usaha' : 'Business name'}
+                    value={form.name}
+                    onChange={event =>
+                      setForm(current => ({ ...current, name: event.target.value }))
+                    }
+                    required
+                    maxLength={120}
+                    placeholder={isId ? 'Contoh: Warung Maju Jaya' : 'Example: Rising Store'}
+                  />
+
+                  <SelectInput
+                    label={isId ? 'Jenis usaha' : 'Business type'}
+                    value={form.category}
+                    onChange={event =>
+                      setForm(current => ({
+                        ...current,
+                        category: event.target.value as UmkmBusinessCategoryId,
+                      }))
+                    }
+                  >
+                    {categoryOptions.map(option => (
+                      <option key={option.id} value={option.id}>
+                        {isId ? option.labelId : option.labelEn}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </div>
+
+                <div className="mt-4 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-xs leading-5 text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                  {isId
+                    ? 'Kategori dapat diubah lagi dari halaman pengelolaan usaha.'
+                    : 'The category can be changed later from business management.'}
+                </div>
+              </section>
+            </div>
+
+            <aside className="h-fit rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)] xl:sticky xl:top-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-[color:var(--app-text-soft)]">
+                    {isId ? 'Pratinjau' : 'Preview'}
+                  </p>
+                  <p className="mt-0.5 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {isId ? 'Kartu usaha' : 'Business card'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-[11px] font-black text-[color:var(--app-accent)]">
+                  {canContinueBasic ? (isId ? 'Siap' : 'Ready') : isId ? 'Belum lengkap' : 'Incomplete'}
+                </span>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]">
+                <div className="aspect-[16/10] bg-[color:var(--app-surface)]">
+                  {form.photoUrl ? (
+                    <img
+                      src={form.photoUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-full place-items-center text-[color:var(--app-text-soft)]">
+                      <Store className="h-12 w-12" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4">
+                  <p className="line-clamp-2 text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {name || (isId ? 'Nama usaha kamu' : 'Your business name')}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[color:var(--app-accent)]">
+                    {categoryLabel}
+                  </p>
+                  <div className="mt-4 flex items-center gap-2 text-xs text-[color:var(--app-text-soft)]">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {city || (isId ? 'Lokasi belum dipilih' : 'Location not selected')}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <TextInput
-                label={isId ? 'Nama usaha' : 'Business name'}
-                value={form.name}
-                onChange={event =>
-                  setForm(current => ({ ...current, name: event.target.value }))
-                }
-                required
-                maxLength={120}
-                placeholder={isId ? 'Contoh: Warung Maju' : 'Example: Rising Store'}
-              />
-
-              <SelectInput
-                label={isId ? 'Jenis usaha' : 'Business type'}
-                value={form.category}
-                onChange={event =>
-                  setForm(current => ({
-                    ...current,
-                    category: event.target.value as UmkmBusinessCategoryId,
-                  }))
-                }
-              >
-                {categoryOptions.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {isId ? option.labelId : option.labelEn}
-                  </option>
-                ))}
-              </SelectInput>
-
-              <div className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-sm leading-6 ui-text-soft">
+              <p className="mt-3 text-xs leading-5 text-[color:var(--app-text-soft)]">
                 {isId
-                  ? 'Pilih yang paling dekat. Nanti bisa diganti dari profil usaha.'
-                  : 'Choose the closest match. You can change it later in the business profile.'}
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.18)]">
-              <p className="text-sm font-bold ui-text">
-                {isId ? 'Ringkasannya' : 'Quick preview'}
+                  ? 'Ini gambaran singkat bagaimana usaha muncul di Lajukan.'
+                  : 'This is a quick preview of how the business appears on Lajukan.'}
               </p>
-              <div className="mt-4 rounded-[20px] bg-[linear-gradient(135deg,#f8fffb_0%,#f7f8f4_100%)] p-4 ring-1 ring-[color:var(--app-border)]">
-                <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
-                  <Store className="h-8 w-8" />
-                </div>
-                <p className="mt-4 text-center text-lg font-bold ui-text">
-                  {name || (isId ? 'Nama usaha' : 'Business name')}
-                </p>
-                <p className="mt-1 text-center text-xs font-semibold text-[color:var(--app-text-soft)]">
-                  {categoryLabel}
-                </p>
-              </div>
-            </div>
+            </aside>
           </div>
         ) : null}
 
         {step === 'location' ? (
-          <div className="grid gap-4">
-            <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.18)]">
-              <div className="flex items-center gap-2 px-1 pb-3">
-                <MapPin className="h-4 w-4 text-[color:var(--app-accent)]" />
-                <p className="text-sm font-bold ui-text">
-                  {isId ? 'Lokasi usaha' : 'Business location'}
-                </p>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:var(--app-border-strong)] sm:p-4">
+              <div className="flex items-start gap-3 px-1 pb-4">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <MapPin className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {isId ? 'Pilih lokasi usaha' : 'Choose business location'}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    {isId
+                      ? 'Cari nama tempat atau alamat, lalu pilih hasil yang paling sesuai.'
+                      : 'Search for a place or address, then choose the closest result.'}
+                  </p>
+                </div>
               </div>
+
               <UmkmLocationPicker
                 value={point}
                 onChange={nextPoint =>
@@ -615,68 +772,160 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
                   }))
                 }
                 isId={isId}
-                markerLabel={isId ? 'Geser pin untuk usaha' : 'Move the business pin'}
+                markerLabel={isId ? 'Geser pin ke lokasi usaha' : 'Move pin to the business'}
               />
-              <div className="mt-4 rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-sm leading-6 ui-text-soft">
-                {form.selectedLocation
-                  ? form.selectedLocation.formattedAddress
-                  : isId
-                    ? 'Pilih lokasi dari hasil pencarian. Kota, alamat, dan koordinat akan terisi otomatis.'
-                    : 'Pick a search result. City, address, and coordinates will be filled automatically.'}
-              </div>
-            </div>
+            </section>
+
+            <aside className="h-fit space-y-3 xl:sticky xl:top-4">
+              <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)]">
+                <p className="text-xs font-semibold text-[color:var(--app-text-soft)]">
+                  {isId ? 'Lokasi terpilih' : 'Selected location'}
+                </p>
+                <div className="mt-3 flex items-start gap-3 rounded-[18px] bg-[color:var(--app-surface-muted)] p-3 dark:bg-[color:var(--app-surface)]">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                    <MapPin className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {city || (isId ? 'Belum dipilih' : 'Not selected')}
+                    </p>
+                    <p className="mt-1 break-words text-xs leading-5 text-[color:var(--app-text-soft)]">
+                      {address ||
+                        (isId
+                          ? 'Alamat lengkap akan muncul setelah kamu memilih hasil pencarian.'
+                          : 'The full address appears after choosing a search result.')}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)]">
+                <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {isId ? 'Kenapa lokasi harus tepat?' : 'Why location accuracy matters'}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                  {isId
+                    ? 'Lokasi dipakai agar calon pelanggan mudah menemukan usaha di peta dan pencarian sekitar.'
+                    : 'The location helps nearby customers find the business on maps and local search.'}
+                </p>
+              </section>
+            </aside>
           </div>
         ) : null}
 
         {step === 'review' ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="grid gap-3 md:grid-cols-2">
-              {[
-                { label: isId ? 'Nama' : 'Name', value: name },
-                { label: isId ? 'Jenis' : 'Type', value: categoryLabel },
-                { label: isId ? 'Kota' : 'City', value: city },
-                { label: isId ? 'Alamat' : 'Address', value: address },
-                {
-                  label: isId ? 'Data peta' : 'Map data',
-                  value: form.selectedLocation
-                    ? form.selectedLocation.placeId
-                    : `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`,
-                },
-              ].map(card => (
-                <div
-                  key={card.label}
-                  className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-4"
-                >
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] ui-accent-text">
-                    {card.label}
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)] sm:p-5">
+              <div className="flex items-start gap-3 border-b border-[color:var(--app-border)] pb-4 dark:border-[color:var(--app-border-strong)]">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <CheckCircle2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {isId ? 'Periksa sebelum dibuat' : 'Review before creating'}
                   </p>
-                  <p className="mt-2 text-sm font-semibold leading-6 ui-text">
-                    {card.value || '-'}
+                  <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    {isId
+                      ? 'Pastikan nama, kategori, foto, dan lokasi sudah benar.'
+                      : 'Make sure the name, category, photo, and location are correct.'}
                   </p>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(247,250,247,0.94))] p-4">
-              <p className="text-sm font-bold ui-text">
-                {isId ? 'Siap simpan' : 'Ready to save'}
-              </p>
-              <p className="mt-2 text-sm leading-6 ui-text-soft">
-                {isId
-                  ? 'Kalau sudah benar, klik simpan. Setelah itu kamu masuk ke halaman usaha.'
-                  : 'If everything looks right, save it. You will land on the business page next.'}
-              </p>
-            </div>
+              <div className="mt-4 grid auto-rows-fr gap-3 sm:grid-cols-2">
+                {[
+                  { label: isId ? 'Nama usaha' : 'Business name', value: name },
+                  { label: isId ? 'Jenis usaha' : 'Business type', value: categoryLabel },
+                  { label: isId ? 'Kota / area' : 'City / area', value: city },
+                  { label: isId ? 'Alamat' : 'Address', value: address },
+                  {
+                    label: isId ? 'Status foto' : 'Photo status',
+                    value: form.photoUrl
+                      ? isId
+                        ? 'Sudah diunggah'
+                        : 'Uploaded'
+                      : isId
+                        ? 'Belum diunggah'
+                        : 'Not uploaded',
+                  },
+                  {
+                    label: isId ? 'Titik peta' : 'Map point',
+                    value: form.selectedLocation
+                      ? form.selectedLocation.placeId
+                      : `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`,
+                  },
+                ].map(card => (
+                  <div
+                    key={card.label}
+                    className="min-h-[96px] rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                      {card.label}
+                    </p>
+                    <p className="mt-2 break-words text-sm font-bold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {card.value || '-'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <aside className="h-fit space-y-3 xl:sticky xl:top-4">
+              <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
+                <div className="aspect-[16/10] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
+                  {form.photoUrl ? (
+                    <img
+                      src={form.photoUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-full place-items-center text-[color:var(--app-text-soft)]">
+                      <Store className="h-12 w-12" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-4">
+                  <p className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {name || (isId ? 'Nama usaha' : 'Business name')}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[color:var(--app-accent)]">
+                    {categoryLabel}
+                  </p>
+                  <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{address || (isId ? 'Alamat belum dipilih' : 'Address not selected')}</span>
+                  </p>
+                </div>
+              </section>
+
+              <section className="rounded-[22px] border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[color:var(--app-success)]" />
+                  <div>
+                    <p className="text-sm font-black text-[color:var(--app-success)]">
+                      {isId ? 'Siap dibuat' : 'Ready to create'}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                      {isId
+                        ? 'Setelah dibuat, kamu langsung masuk ke halaman profil usaha untuk melengkapi detail lainnya.'
+                        : 'After creation, you will go to the business profile to complete the remaining details.'}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            </aside>
           </div>
         ) : null}
 
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-5 flex flex-col-reverse gap-2 border-t border-[color:var(--app-border)] pt-4 dark:border-[color:var(--app-border-strong)] sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={goBack}
             disabled={step === 'basic' || saving}
-            className="ui-button-secondary inline-flex min-h-11 items-center justify-center px-4 text-sm font-semibold disabled:opacity-50"
+            className="ui-button-secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45"
           >
+            <ArrowLeft className="h-4 w-4" />
             {isId ? 'Kembali' : 'Back'}
           </button>
 
@@ -686,20 +935,26 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
               onClick={goNext}
               disabled={saving}
               className={cn(
-                'ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-semibold',
+                'ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60',
                 step === 'review' && 'hidden',
               )}
             >
-              {isId ? 'Lanjut' : 'Next'}
+              {step === 'basic'
+                ? isId
+                  ? 'Lanjut pilih lokasi'
+                  : 'Continue to location'
+                : isId
+                  ? 'Lanjut periksa data'
+                  : 'Continue to review'}
+              <ArrowRight className="h-4 w-4" />
             </button>
 
             <button
               type="submit"
               disabled={saving}
               className={cn(
-                'ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-semibold',
+                'ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60',
                 step !== 'review' && 'hidden',
-                saving && 'opacity-60',
               )}
             >
               {saving ? (
@@ -707,7 +962,13 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              {isId ? 'Buat usaha' : 'Create business'}
+              {saving
+                ? isId
+                  ? 'Membuat usaha...'
+                  : 'Creating business...'
+                : isId
+                  ? 'Buat usaha sekarang'
+                  : 'Create business now'}
             </button>
           </div>
         </div>

@@ -2083,7 +2083,7 @@ export default function PersonalAiStudio() {
 
                 <div
                   ref={messagesViewportRef}
-                  className="min-h-0 flex-1 touch-pan-y overflow-y-auto px-2 py-4 [-webkit-overflow-scrolling:touch] sm:px-4"
+                  className="min-h-0 flex-1 touch-pan-y overflow-y-auto px-2 py-4 [-webkit-overflow-scrolling:touch] sm:px-2"
                   data-auto-scrollbar
                 >
                   {messages.length === 0 ? (

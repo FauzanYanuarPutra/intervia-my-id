@@ -10,6 +10,7 @@ import {
   Lock,
   LockOpen,
   Heart,
+  ImageOff,
   MapPin,
   Route,
   ShoppingBag,
@@ -22,6 +23,7 @@ import { Link } from '@/i18n/navigation';
 import type { UmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import { cn } from '@/lib/utils';
 import type { UmkmMapStore } from './UmkmStoreMap';
+import type { ViewerLocationState } from './useViewerLocation';
 
 export type PreparedUmkmPlace<T extends UmkmMapStore = UmkmMapStore> = {
   store: T;
@@ -89,9 +91,7 @@ export function RatingStars({
       <span
         className={cn(
           'inline-flex shrink-0 items-center justify-center rounded-full p-1',
-          hasLikes
-            ? 'bg-rose-50 text-rose-500'
-            : 'bg-slate-100 text-slate-400',
+          hasLikes ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-400',
         )}
       >
         <Heart
@@ -128,7 +128,7 @@ export function FilterChip({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-[36px] shrink-0 items-center rounded-full border px-3.5 text-[11px] font-semibold transition sm:min-h-[40px] sm:px-4 sm:text-[12px]',
+        'inline-flex min-h-[36px] shrink-0 items-center rounded-full border px-3.5 text-[11px] font-semibold transition sm:min-h-[40px] sm:px-2 sm:text-[12px]',
         active
           ? 'border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_44%,transparent)]'
           : 'border-transparent bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,white)] hover:text-[color:var(--app-accent)]',
@@ -150,6 +150,11 @@ export function PlaceThumb({
   className?: string;
   overlayLabel?: string;
 }) {
+  const hasImage =
+    Boolean(src.trim()) &&
+    !src.toLowerCase().includes('/images/placeholders/') &&
+    !src.toLowerCase().includes('business-default.svg');
+
   return (
     <div
       className={cn(
@@ -157,13 +162,23 @@ export function PlaceThumb({
         className,
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        className="h-full w-full object-cover"
-        loading="lazy"
-      />
+      {hasImage ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={src}
+          alt={alt}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div
+          className="flex h-full min-h-16 w-full items-center justify-center bg-[linear-gradient(145deg,#f1f5f9,#ecfdf5)] text-emerald-700"
+          role="img"
+          aria-label={`${alt}: photo unavailable`}
+        >
+          <ImageOff className="h-5 w-5" aria-hidden="true" />
+        </div>
+      )}
       {overlayLabel ? (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-950/54 text-lg font-bold text-white ">
           {overlayLabel}
@@ -203,6 +218,9 @@ export function MapQuickControls({
   distanceLabel,
   locating = false,
   locationError,
+  locationReady = false,
+  locationAccuracyMeters,
+  locationState = 'idle',
   themeLabel,
   onToggleInteractive,
   onFocusViewer,
@@ -216,6 +234,9 @@ export function MapQuickControls({
   distanceLabel?: string | null;
   locating?: boolean;
   locationError?: string | null;
+  locationReady?: boolean;
+  locationAccuracyMeters?: number | null;
+  locationState?: ViewerLocationState;
   themeLabel?: string | null;
   onToggleInteractive: () => void | Promise<void>;
   onFocusViewer: () => void | Promise<void>;
@@ -231,12 +252,29 @@ export function MapQuickControls({
   );
   const iconButtonClassName = cn(
     'pointer-events-auto inline-flex shrink-0 items-center justify-center border shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)]  transition',
-    compact
-      ? 'h-10 w-10 rounded-full'
-      : 'h-8 w-8 rounded-[14px] sm:h-8 sm:w-8',
+    compact ? 'h-10 w-10 rounded-full' : 'h-8 w-8 rounded-[14px] sm:h-8 sm:w-8',
   );
   const statusChipClassName =
-    'pointer-events-none inline-flex min-h-[28px] items-center rounded-[14px] border px-2.5 py-1 text-[10px] font-semibold shadow-[0_12px_24px_-18px_rgba(15,23,42,0.3)] ';
+    'pointer-events-auto inline-flex min-h-[32px] max-w-[min(76vw,300px)] items-center gap-1.5 rounded-[14px] border px-3 py-1.5 text-left text-[10px] font-semibold leading-[1.35] shadow-[0_12px_24px_-18px_rgba(15,23,42,0.3)] transition hover:brightness-105';
+  const accuracyMeters =
+    typeof locationAccuracyMeters === 'number' &&
+    Number.isFinite(locationAccuracyMeters) &&
+    locationAccuracyMeters > 0
+      ? Math.round(locationAccuracyMeters)
+      : null;
+  const locationStatusLabel = locationError
+    ? locationError
+    : locating || locationState === 'locating'
+      ? isId
+        ? 'Mencari lokasi saya...'
+        : 'Finding my location...'
+      : locationReady || locationState === 'ready'
+        ? isId
+          ? 'Lokasi saya'
+          : 'My location'
+        : isId
+          ? 'Tampilkan lokasi saya'
+          : 'Show my location';
   const runAction = (action: () => void | Promise<void>, label: string) => {
     try {
       const result = action();
@@ -255,20 +293,44 @@ export function MapQuickControls({
       className={cn(
         'relative z-[1100] flex flex-col gap-1.5 sm:max-w-none sm:items-end',
         compact
-          ? 'max-w-[44px] items-end'
+          ? 'max-w-[min(76vw,300px)] items-end'
           : 'max-w-[min(84vw,250px)] items-start',
       )}
     >
-      {locationError ? (
-        <span
-          className={cn(
-            statusChipClassName,
-            'border-rose-200/90 bg-[linear-gradient(180deg,rgba(255,241,242,0.95),rgba(255,228,230,0.88))] text-rose-700',
-          )}
-        >
-          {isId ? 'GPS belum nyala' : 'GPS unavailable'}
-        </span>
-      ) : null}
+      <button
+        type="button"
+        data-testid="umkm-location-status"
+        onClick={() => runAction(onFocusViewer, 'FOCUS_VIEWER_STATUS')}
+        disabled={locating}
+        aria-busy={locating}
+        aria-live="polite"
+        className={cn(
+          statusChipClassName,
+          locationError
+            ? 'border-rose-200/90 bg-[linear-gradient(180deg,rgba(255,241,242,0.97),rgba(255,228,230,0.92))] text-rose-700'
+            : locationReady || locationState === 'ready'
+              ? 'border-blue-200/90 bg-[linear-gradient(180deg,rgba(239,246,255,0.98),rgba(219,234,254,0.94))] text-blue-700'
+              : 'border-white/90 bg-white/95 text-slate-700',
+          locating && 'cursor-wait opacity-90',
+        )}
+      >
+        {locating || locationState === 'locating' ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+        ) : (
+          <LocateFixed className="h-3.5 w-3.5 shrink-0" />
+        )}
+        <span>{locationStatusLabel}</span>
+        {accuracyMeters !== null &&
+        !locationError &&
+        (locationReady || locationState === 'ready') ? (
+          <span
+            data-testid="umkm-location-accuracy"
+            className="shrink-0 font-bold"
+          >
+            ±{accuracyMeters} m
+          </span>
+        ) : null}
+      </button>
       {routeEnabled && distanceLabel ? (
         <span
           className={cn(
@@ -314,18 +376,25 @@ export function MapQuickControls({
         </button>
         <button
           type="button"
+          data-testid="umkm-locate-me"
           onClick={() => runAction(onFocusViewer, 'FOCUS_VIEWER')}
+          disabled={locating}
+          aria-busy={locating}
+          aria-pressed={locationReady || locationState === 'ready'}
           className={cn(
             iconButtonClassName,
-            'border-white/80 bg-white/92 text-[color:var(--app-accent)] hover:brightness-105',
+            locationReady || locationState === 'ready'
+              ? 'border-blue-200 bg-blue-600 text-white hover:bg-blue-700'
+              : 'border-white/80 bg-white/92 text-blue-600 hover:brightness-105',
+            locating && 'cursor-wait opacity-80',
           )}
           title={isId ? 'Lokasi saya' : 'My location'}
           aria-label={isId ? 'Lokasi saya' : 'My location'}
         >
           {locating ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <LocateFixed className="h-3 w-3" />
+            <LocateFixed className="h-4 w-4" />
           )}
         </button>
         <button
@@ -599,9 +668,7 @@ export function PlaceListButton<T extends UmkmMapStore>({
           </p>
           <p className="mt-1 inline-flex max-w-full items-center gap-1 text-[11px] text-[color:var(--app-text-soft)]">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
-            <span className="line-clamp-1">
-              {item.ui.secondaryLine}
-            </span>
+            <span className="line-clamp-1">{item.ui.secondaryLine}</span>
           </p>
           <p className="mt-1 line-clamp-1 text-[10px] text-[color:var(--app-text-soft)]">
             {item.ui.categoryLabel}

@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "slug": "batik-pekalongan-referensi-media-bebas",
+      "commons_file": "File:Batik Khas Pekalongan.jpg",
+      "context_only": true,
+      "curated_by": "Lajukan open-data seed 20260723093000",
+      "curated_at": "2026-07-23T00:00:00.000Z",
+      "evidence_url": "https://commons.wikimedia.org/wiki/File:Batik_Khas_Pekalongan.jpg",
+      "note": "The image is contextual media for the documented Batik Pekalongan reference, not a photo of an individual seller."
+    },
+    {
+      "slug": "kampung-batik-laweyan-surakarta-open-data",
+      "commons_file": "File:Becak Kampung Batik Laweyan.jpg",
+      "context_only": true,
+      "curated_by": "Lajukan open-data seed 20260723093000",
+      "curated_at": "2026-07-23T00:00:00.000Z",
+      "evidence_url": "https://commons.wikimedia.org/wiki/File:Becak_Kampung_Batik_Laweyan.jpg",
+      "note": "The Commons file is curated as contextual media for the Laweyan batik-area reference and does not represent a registered Lajukan shop."
+    },
+    {
+      "slug": "pasar-beringharjo-yogyakarta-open-data",
+      "commons_file": "File:Jalan-jalan ke Pasar Beringharjo-12.jpg",
+      "context_only": true,
+      "curated_by": "Lajukan open-data seed 20260723093000",
+      "curated_at": "2026-07-23T00:00:00.000Z",
+      "evidence_url": "https://commons.wikimedia.org/wiki/File:Jalan-jalan_ke_Pasar_Beringharjo-12.jpg",
+      "note": "The exact Commons file is contextual media for the Pasar Beringharjo public reference, not an offer from an individual market stall."
+    },
+    {
+      "slug": "pasar-klewer-surakarta-open-data",
+      "commons_file": "File:Pasar Klewer.jpg",
+      "context_only": true,
+      "curated_by": "Lajukan open-data seed 20260723093000",
+      "curated_at": "2026-07-23T00:00:00.000Z",
+      "evidence_url": "https://commons.wikimedia.org/wiki/File:Pasar_Klewer.jpg",
+      "note": "The exact Commons file is contextual media for the Pasar Klewer public reference and is not evidence of current stall availability."
+    },
+    {
+      "slug": "pasar-tanah-abang-jakarta-open-data",
+      "commons_file": "File:Flood Canal Bisecting Pasar Tanah Abang.jpg",
+      "context_only": true,
+      "curated_by": "Lajukan open-data seed 20260723093000",
+      "curated_at": "2026-07-23T00:00:00.000Z",
+      "evidence_url": "https://commons.wikimedia.org/wiki/File:Flood_Canal_Bisecting_Pasar_Tanah_Abang.jpg",
+      "note": "The image supplies contextual media for the Tanah Abang area reference and does not depict or verify an individual seller."
+    },
+    {
+      "slug": "pasar-terapung-lok-baintan-banjar-open-data",
+      "commons_file": "File:Lokbaintan.jpg",
+      "context_only": true,
+      "curated_by": "Lajukan open-data seed 20260723093000",
+      "curated_at": "2026-07-23T00:00:00.000Z",
+      "evidence_url": "https://commons.wikimedia.org/wiki/File:Lokbaintan.jpg",
+      "note": "The exact Commons file is contextual media for the Lok Baintan floating-market reference, not an individual merchant listing."
+    }
+  ]
+}

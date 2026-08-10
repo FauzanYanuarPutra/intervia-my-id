@@ -19,6 +19,7 @@ import {
   ExternalLink,
   FileText,
   Gift,
+  Globe2,
   Heart,
   MapPin,
   MessageCircle,
@@ -52,6 +53,7 @@ import {
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
 import { buildContentHref, extractContentId } from '@/lib/content/routes';
+import { readPublicReference } from '@/lib/content/publicReference';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
@@ -973,6 +975,8 @@ export default function ContentDetailClient({
           : null,
       storeName: item.owner_profile?.full_name || null,
     });
+
+    if (readPublicReference(catalogItem)) return;
 
     const targetUserId = String(
       item.owner_id || item.owner_profile?.id || '',
@@ -2118,6 +2122,7 @@ export default function ContentDetailClient({
   }
 
   const meta = (item.metadata as Record<string, unknown> | null) || {};
+  const publicReference = readPublicReference(item as CatalogContentItem);
   const localeCode = locale === 'id' ? 'id' : 'en';
   const ownerCandidateIds = [
     item.owner_id,
@@ -2195,25 +2200,42 @@ export default function ContentDetailClient({
     title: item.title,
     summary: item.summary,
   });
-  const listingSideLabel = getListingSideVerbLabel(listingSide, localeCode);
+  const listingSideLabel = publicReference
+    ? locale === 'id'
+      ? 'Referensi publik'
+      : 'Public reference'
+    : getListingSideVerbLabel(listingSide, localeCode);
   const isDemandListing = listingSide === 'demand';
-  const ListingSideIcon = isDemandListing ? Target : Package;
-  const listingSideVisual = isDemandListing
+  const ListingSideIcon = publicReference
+    ? Globe2
+    : isDemandListing
+      ? Target
+      : Package;
+  const listingSideVisual = publicReference
     ? {
         chip: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/12 dark:text-blue-200 dark:ring-blue-400/20',
         price: 'text-blue-600 dark:text-blue-300',
       }
-    : {
-        chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
-        price: 'text-emerald-600 dark:text-emerald-300',
-      };
-  const listingSideDescription = isDemandListing
+    : isDemandListing
+      ? {
+          chip: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/12 dark:text-blue-200 dark:ring-blue-400/20',
+          price: 'text-blue-600 dark:text-blue-300',
+        }
+      : {
+          chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
+          price: 'text-emerald-600 dark:text-emerald-300',
+        };
+  const listingSideDescription = publicReference
     ? locale === 'id'
-      ? 'Pemilik listing sedang mencari pemasok, jasa, lokasi, atau partner yang bisa memenuhi kebutuhan ini.'
-      : 'This listing owner is looking for a provider, service, place, or partner to fulfill this need.'
-    : locale === 'id'
-      ? 'Pemilik listing menawarkan produk, jasa, lokasi, atau aset yang bisa langsung ditanyakan.'
-      : 'This listing owner is offering a product, service, place, or asset that can be contacted directly.';
+      ? 'Data ini adalah rujukan non-transaksi. Ketersediaan, harga, kontak, dan status verifikasi tidak dinyatakan oleh Lajukan.'
+      : 'This is a non-transactional reference. Lajukan does not imply availability, price, contact details, or verification.'
+    : isDemandListing
+      ? locale === 'id'
+        ? 'Pemilik listing sedang mencari pemasok, jasa, lokasi, atau partner yang bisa memenuhi kebutuhan ini.'
+        : 'This listing owner is looking for a provider, service, place, or partner to fulfill this need.'
+      : locale === 'id'
+        ? 'Pemilik listing menawarkan produk, jasa, lokasi, atau aset yang bisa langsung ditanyakan.'
+        : 'This listing owner is offering a product, service, place, or asset that can be contacted directly.';
   const listingHref = buildContentHref(
     resolvedContentId || item.id,
     item.title,
@@ -2257,6 +2279,7 @@ export default function ContentDetailClient({
       : undefined);
   const hasPrice =
     !PROMO_ONLY_MODE &&
+    !publicReference &&
     pricingMode === 'fixed' &&
     typeof item.price_cents === 'number' &&
     item.price_cents > 0;
@@ -2297,77 +2320,89 @@ export default function ContentDetailClient({
     : '';
   const flexibleBudgetLabel =
     locale === 'id' ? 'Budget fleksibel' : 'Flexible budget';
-  const priceLabel = PROMO_ONLY_MODE
+  const priceLabel = publicReference
     ? locale === 'id'
-      ? 'Tanya detail'
-      : 'Ask details'
-    : hasPrice
-      ? formatCurrency(item.price_cents as number, item.currency || 'IDR')
-      : isDemandListing
-        ? demandBudgetLabel || flexibleBudgetLabel
-        : locale === 'id'
-          ? 'Harga menyesuaikan'
-          : 'Price on request';
+      ? 'Bukan penawaran'
+      : 'Not an offer'
+    : PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Tanya detail'
+        : 'Ask details'
+      : hasPrice
+        ? formatCurrency(item.price_cents as number, item.currency || 'IDR')
+        : isDemandListing
+          ? demandBudgetLabel || flexibleBudgetLabel
+          : locale === 'id'
+            ? 'Harga menyesuaikan'
+            : 'Price on request';
   const priceLabelWithUnit = hasPrice
     ? formatPriceWithUnit(priceLabel, priceUnitLabel)
     : priceLabel;
   const salaryRange =
     typeof meta.salary_range === 'string' ? meta.salary_range.trim() : '';
-  const priceHeading = PROMO_ONLY_MODE
+  const priceHeading = publicReference
     ? locale === 'id'
-      ? 'Info promosi'
-      : 'Promo info'
-    : displayType === 'job'
+      ? 'Status data'
+      : 'Data status'
+    : PROMO_ONLY_MODE
       ? locale === 'id'
-        ? 'Kompensasi'
-        : 'Compensation'
-      : !isDemandListing && displayType === 'tool_rental'
+        ? 'Info promosi'
+        : 'Promo info'
+      : displayType === 'job'
         ? locale === 'id'
-          ? 'Tarif sewa'
-          : 'Rental rate'
-        : displayType === 'company'
+          ? 'Kompensasi'
+          : 'Compensation'
+        : !isDemandListing && displayType === 'tool_rental'
           ? locale === 'id'
-            ? 'Profil perusahaan'
-            : 'Company profile'
-          : isDemandListing
+            ? 'Tarif sewa'
+            : 'Rental rate'
+          : displayType === 'company'
             ? locale === 'id'
-              ? 'Budget acuan'
-              : 'Reference budget'
-            : displayType === 'service'
+              ? 'Profil perusahaan'
+              : 'Company profile'
+            : isDemandListing
               ? locale === 'id'
-                ? 'Mulai dari'
-                : 'Starting from'
-              : displayType === 'profile'
+                ? 'Budget acuan'
+                : 'Reference budget'
+              : displayType === 'service'
                 ? locale === 'id'
-                  ? 'Rate'
-                  : 'Rate'
-                : locale === 'id'
-                  ? 'Harga'
-                  : 'Price';
-  const primaryPrice = PROMO_ONLY_MODE
+                  ? 'Mulai dari'
+                  : 'Starting from'
+                : displayType === 'profile'
+                  ? locale === 'id'
+                    ? 'Rate'
+                    : 'Rate'
+                  : locale === 'id'
+                    ? 'Harga'
+                    : 'Price';
+  const primaryPrice = publicReference
     ? locale === 'id'
-      ? 'Tanya detail'
-      : 'Ask details'
-    : displayType === 'job'
-      ? salaryRange ||
-        (hasPrice
-          ? priceLabelWithUnit
-          : locale === 'id'
-            ? 'Nego'
-            : 'Negotiable')
-      : displayType === 'company'
-        ? (typeof meta.industry_focus === 'string' && meta.industry_focus) ||
-          (typeof meta.company_size === 'string' && meta.company_size) ||
-          (locale === 'id' ? 'Profil publik' : 'Public profile')
-        : isDemandListing
-          ? demandBudgetLabel || flexibleBudgetLabel
-          : displayType === 'tool_rental'
-            ? hasPrice
-              ? priceLabelWithUnit
-              : locale === 'id'
-                ? 'Tarif menyesuaikan'
-                : 'Rate on request'
-            : priceLabelWithUnit;
+      ? 'Referensi saja'
+      : 'Reference only'
+    : PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Tanya detail'
+        : 'Ask details'
+      : displayType === 'job'
+        ? salaryRange ||
+          (hasPrice
+            ? priceLabelWithUnit
+            : locale === 'id'
+              ? 'Nego'
+              : 'Negotiable')
+        : displayType === 'company'
+          ? (typeof meta.industry_focus === 'string' && meta.industry_focus) ||
+            (typeof meta.company_size === 'string' && meta.company_size) ||
+            (locale === 'id' ? 'Profil publik' : 'Public profile')
+          : isDemandListing
+            ? demandBudgetLabel || flexibleBudgetLabel
+            : displayType === 'tool_rental'
+              ? hasPrice
+                ? priceLabelWithUnit
+                : locale === 'id'
+                  ? 'Tarif menyesuaikan'
+                  : 'Rate on request'
+              : priceLabelWithUnit;
   const displayPriceHeading = PROMO_ONLY_MODE
     ? locale === 'id'
       ? 'Mulai dari chat'
@@ -3721,7 +3756,7 @@ export default function ContentDetailClient({
   const detailPageShellClass =
     'lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden bg-[color:var(--app-bg)] py-0 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:py-2 lg:pb-8';
   const detailShellStackClass =
-    'mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-3 md:px-4 xl:px-0';
+    'mx-auto flex w-full max-w-[1200px] flex-col gap-3 !px-0';
   const detailSectionClass =
     'relative overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3.5 py-3.5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)] sm:rounded-[22px] sm:p-4';
   const detailInsetClass =
@@ -3742,7 +3777,7 @@ export default function ContentDetailClient({
     : `text-4xl font-bold leading-none tracking-tight sm:text-5xl ${listingSideVisual.price}`;
   const detailChatButtonClass =
     '!inline-flex !min-h-[44px] !items-center !justify-center !gap-2 !rounded-full !bg-emerald-800 !px-4 !text-sm !font-bold !text-white !shadow-[0_18px_34px_-24px_rgba(16,185,129,0.6)] !ring-1 !ring-transparent !transition !duration-200 hover:!-translate-y-0.5 hover:!bg-emerald-700 active:!translate-y-0 active:!scale-[0.98] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-emerald-500 focus-visible:!ring-offset-2 disabled:!cursor-not-allowed disabled:!opacity-60';
-  const canStartChat = !isOwner && Boolean(peerUserId);
+  const canStartChat = !publicReference && !isOwner && Boolean(peerUserId);
   const typeLabel = ct
     ? getContentTypeName(ct, locale)
     : humanizeToken(displayType);
@@ -3754,7 +3789,17 @@ export default function ContentDetailClient({
       ? 'Chat penyedia'
       : 'Chat provider';
 
-  const actionButtons = (
+  const actionButtons = publicReference ? (
+    <a
+      href={publicReference.sourceUrl}
+      target="_blank"
+      rel="noreferrer"
+      className={detailPrimaryButtonClass}
+    >
+      <ExternalLink className="mr-2 h-4 w-4" />
+      {locale === 'id' ? 'Buka sumber asli' : 'Open original source'}
+    </a>
+  ) : (
     <div className="grid w-full grid-cols-2 gap-2 lg:grid-cols-1 [&>*:only-child]:col-span-2 lg:[&>*:only-child]:col-span-1">
       {isOwner && (
         <Link
@@ -3825,7 +3870,7 @@ export default function ContentDetailClient({
   );
 
   const ownerProfileCard =
-    ownerProfileHref && ownerDisplayName ? (
+    !publicReference && ownerProfileHref && ownerDisplayName ? (
       <section className={detailSectionClass}>
         <div className="flex items-start gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900">
@@ -3920,6 +3965,47 @@ export default function ContentDetailClient({
       <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
         {listingSideDescription}
       </p>
+      {publicReference ? (
+        <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-950 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100">
+          <p className="font-bold">{publicReference.sourceTitle}</p>
+          <p className="mt-1">
+            {locale === 'id' ? 'Izin/sumber' : 'License/source'}:{' '}
+            {publicReference.sourceLicense}
+          </p>
+          {publicReference.trustNote ? (
+            <p className="mt-2 leading-5">{publicReference.trustNote}</p>
+          ) : null}
+          {publicReference.imageSourceUrl ? (
+            <div className="mt-3 border-t border-blue-200/70 pt-2 dark:border-blue-300/20">
+              <p className="font-semibold">
+                {locale === 'id' ? 'Kredit foto' : 'Photo credit'}:{' '}
+                {publicReference.imageAttribution}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                <a
+                  href={publicReference.imageSourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-bold underline underline-offset-2"
+                >
+                  {locale === 'id' ? 'Sumber foto' : 'Photo source'}
+                </a>
+                {publicReference.imageLicenseUrl ? (
+                  <a
+                    href={publicReference.imageLicenseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold underline underline-offset-2"
+                  >
+                    {publicReference.imageLicense ||
+                      (locale === 'id' ? 'Lisensi foto' : 'Photo license')}
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {hasOriginalPrice && (
         <div className="mt-1 flex items-center gap-2 text-xs">
@@ -4010,123 +4096,129 @@ export default function ContentDetailClient({
           {shareError}
         </p>
       )}
-      {!PROMO_ONLY_MODE && user && !isOwner && displayType !== 'company' && (
-        <div
-          className={`mt-4 ${detailInsetClass} border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.18)]`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-              {locale === 'id'
-                ? 'Status transaksi realtime'
-                : 'Realtime transaction status'}
-            </p>
-            {relatedTxLoading ? (
-              <span className="text-[11px] text-[color:var(--app-text)]">
-                {locale === 'id' ? 'Memuat...' : 'Loading...'}
-              </span>
-            ) : relatedTx ? (
-              <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
-                {relatedTxStatus}
-              </span>
+      {!publicReference &&
+        !PROMO_ONLY_MODE &&
+        user &&
+        !isOwner &&
+        displayType !== 'company' && (
+          <div
+            className={`mt-4 ${detailInsetClass} border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.18)]`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                {locale === 'id'
+                  ? 'Status transaksi realtime'
+                  : 'Realtime transaction status'}
+              </p>
+              {relatedTxLoading ? (
+                <span className="text-[11px] text-[color:var(--app-text)]">
+                  {locale === 'id' ? 'Memuat...' : 'Loading...'}
+                </span>
+              ) : relatedTx ? (
+                <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
+                  {relatedTxStatus}
+                </span>
+              ) : (
+                <span className="text-[11px] text-[color:var(--app-text)]">
+                  {locale === 'id'
+                    ? 'Belum ada transaksi'
+                    : 'No transaction yet'}
+                </span>
+              )}
+            </div>
+
+            {relatedTx && showRealtimeDeadline && (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <Clock3 className="h-3.5 w-3.5 text-[color:var(--app-warning)]" />
+                <span
+                  className={
+                    deadlineExpired
+                      ? 'font-semibold text-[color:var(--app-danger)] dark:text-[color:var(--app-danger)]'
+                      : 'font-semibold text-[color:var(--app-warning)] dark:text-[color:var(--app-warning)]'
+                  }
+                >
+                  {deadlineExpired
+                    ? locale === 'id'
+                      ? 'Waktu bayar/konfirmasi sudah habis'
+                      : 'Payment/confirmation window expired'
+                    : locale === 'id'
+                      ? `Batas bayar/konfirmasi: ${formatRemainingDuration(remainingMs, locale)}`
+                      : `Payment/confirmation deadline: ${formatRemainingDuration(remainingMs, locale)}`}
+                </span>
+              </div>
+            )}
+
+            {relatedTx ? (
+              <>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <div className={detailInsetCompactClass}>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                      {locale === 'id' ? 'Nominal' : 'Amount'}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      {formatCurrency(
+                        relatedTx.amount_cents || 0,
+                        relatedTx.currency || baseCurrency,
+                      )}
+                    </p>
+                  </div>
+                  <div className={detailInsetCompactClass}>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                      {locale === 'id' ? 'Proteksi' : 'Protection'}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      {humanizeValue(
+                        relatedTx.protection_status || 'awaiting_funding',
+                      )}
+                    </p>
+                  </div>
+                  <div className={detailInsetCompactClass}>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                      {locale === 'id' ? 'Pembayaran' : 'Payment'}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      {humanizeValue(relatedTxPaymentStatus)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_48%,white)] p-3 dark:bg-[color:color-mix(in_srgb,var(--app-accent)_20%,rgba(15,23,42,0.96))]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                    {locale === 'id' ? 'Langkah berikutnya' : 'Next step'}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)]">
+                    {relatedTxGuidance}
+                  </p>
+                  <p className="mt-2 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                    {locale === 'id'
+                      ? `Update terakhir: ${relatedTxUpdatedLabel}`
+                      : `Last update: ${relatedTxUpdatedLabel}`}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href={relatedTxWorkspaceHref}
+                    className={detailPrimaryButtonClass}
+                  >
+                    {locale === 'id'
+                      ? 'Buka workspace order'
+                      : 'Open order workspace'}
+                  </Link>
+                  <Link href="/support" className={detailSecondaryButtonClass}>
+                    {locale === 'id' ? 'Butuh bantuan' : 'Need help'}
+                  </Link>
+                </div>
+              </>
             ) : (
-              <span className="text-[11px] text-[color:var(--app-text)]">
-                {locale === 'id' ? 'Belum ada transaksi' : 'No transaction yet'}
-              </span>
+              <div
+                className={`mt-3 ${detailInsetCompactClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
+              >
+                {relatedTxGuidance}
+              </div>
             )}
           </div>
-
-          {relatedTx && showRealtimeDeadline && (
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              <Clock3 className="h-3.5 w-3.5 text-[color:var(--app-warning)]" />
-              <span
-                className={
-                  deadlineExpired
-                    ? 'font-semibold text-[color:var(--app-danger)] dark:text-[color:var(--app-danger)]'
-                    : 'font-semibold text-[color:var(--app-warning)] dark:text-[color:var(--app-warning)]'
-                }
-              >
-                {deadlineExpired
-                  ? locale === 'id'
-                    ? 'Waktu bayar/konfirmasi sudah habis'
-                    : 'Payment/confirmation window expired'
-                  : locale === 'id'
-                    ? `Batas bayar/konfirmasi: ${formatRemainingDuration(remainingMs, locale)}`
-                    : `Payment/confirmation deadline: ${formatRemainingDuration(remainingMs, locale)}`}
-              </span>
-            </div>
-          )}
-
-          {relatedTx ? (
-            <>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <div className={detailInsetCompactClass}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {locale === 'id' ? 'Nominal' : 'Amount'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {formatCurrency(
-                      relatedTx.amount_cents || 0,
-                      relatedTx.currency || baseCurrency,
-                    )}
-                  </p>
-                </div>
-                <div className={detailInsetCompactClass}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {locale === 'id' ? 'Proteksi' : 'Protection'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {humanizeValue(
-                      relatedTx.protection_status || 'awaiting_funding',
-                    )}
-                  </p>
-                </div>
-                <div className={detailInsetCompactClass}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {locale === 'id' ? 'Pembayaran' : 'Payment'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {humanizeValue(relatedTxPaymentStatus)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_48%,white)] p-3 dark:bg-[color:color-mix(in_srgb,var(--app-accent)_20%,rgba(15,23,42,0.96))]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                  {locale === 'id' ? 'Langkah berikutnya' : 'Next step'}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)]">
-                  {relatedTxGuidance}
-                </p>
-                <p className="mt-2 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {locale === 'id'
-                    ? `Update terakhir: ${relatedTxUpdatedLabel}`
-                    : `Last update: ${relatedTxUpdatedLabel}`}
-                </p>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link
-                  href={relatedTxWorkspaceHref}
-                  className={detailPrimaryButtonClass}
-                >
-                  {locale === 'id'
-                    ? 'Buka workspace order'
-                    : 'Open order workspace'}
-                </Link>
-                <Link href="/support" className={detailSecondaryButtonClass}>
-                  {locale === 'id' ? 'Butuh bantuan' : 'Need help'}
-                </Link>
-              </div>
-            </>
-          ) : (
-            <div
-              className={`mt-3 ${detailInsetCompactClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-            >
-              {relatedTxGuidance}
-            </div>
-          )}
-        </div>
-      )}
+        )}
     </section>
   );
 

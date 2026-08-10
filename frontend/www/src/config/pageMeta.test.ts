@@ -24,6 +24,21 @@ describe('page meta', () => {
     expect(getPageMeta('/id/home').immersive).toBeUndefined();
   });
 
+  it('hides the global footer on contained three-column feeds', () => {
+    expect(getPageMeta('/id/home').footer).toEqual({
+      isVisibleOnWeb: false,
+      isVisibleOnMobile: false,
+    });
+    expect(getPageMeta('/en/community').footer).toEqual({
+      isVisibleOnWeb: false,
+      isVisibleOnMobile: false,
+    });
+    expect(getPageMeta('/id/community/groups/reseller').footer).toEqual({
+      isVisibleOnWeb: false,
+      isVisibleOnMobile: false,
+    });
+  });
+
   it('keeps manage routes document-scrollable', () => {
     expect(getPageMeta('/id/manage').immersive).toBeUndefined();
     expect(getPageMeta('/id/manage/community').immersive).toBeUndefined();

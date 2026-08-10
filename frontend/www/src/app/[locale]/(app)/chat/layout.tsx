@@ -635,7 +635,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
   if (!user) {
     return (
       <div className="lajukan-visual-viewport-shell min-h-0 overflow-hidden bg-gradient-to-br from-[color:var(--app-accent-soft)] via-[color:var(--app-surface-strong)] to-[color:var(--app-info-soft)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)]">
-        <div className="flex h-full min-h-0 items-center justify-center px-0 sm:px-4">
+        <div className="flex h-full min-h-0 items-center justify-center px-0 sm:px-2">
           <div className="w-full max-w-sm rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-6 text-center shadow-sm  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] sm:rounded-3xl sm:border-x">
             <MessageCircle className="mx-auto mb-4 h-14 w-14 text-[color:var(--app-accent)]" />
             <p className="mb-4 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -663,7 +663,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
             className={`h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden border-r border-black/5 bg-white dark:border-white/6 dark:bg-[#111b21] lg:w-[390px] lg:shrink-0 ${activeRoomId ? 'hidden lg:flex' : 'flex'
               }`}
           >
-            <div className="sticky top-0 z-20 shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 py-3 dark:border-white/6 dark:bg-[#202c33] sm:px-4">
+            <div className="sticky top-0 z-20 shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 py-3 dark:border-white/6 dark:bg-[#202c33] sm:px-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <button
@@ -825,7 +825,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                         onClick={() =>
                           safeGoToRoom(room.id || room.room_id || '')
                         }
-                        className={`group flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left transition sm:px-4 ${isActive
+                        className={`group flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left transition sm:px-2 ${isActive
                             ? 'bg-[#f0f2f5] dark:bg-[#202c33]'
                             : 'hover:bg-[#f5f6f6] dark:hover:bg-[#182229]'
                           }`}
@@ -927,7 +927,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] px-0 sm:items-center sm:px-4"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] px-0 sm:items-center sm:px-2"
             onClick={() => setShowNewChat(false)}
           >
             <motion.div

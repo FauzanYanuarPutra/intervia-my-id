@@ -7907,7 +7907,7 @@ export function UmkmHubClient({
                 }
               />
             ) : (
-              <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-3.5 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.14)] sm:px-4 sm:py-4 dark:border-[color:var(--app-border-strong)]">
+              <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-3.5 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.14)] sm:px-2 sm:py-4 dark:border-[color:var(--app-border-strong)]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div className="min-w-0 max-w-3xl">
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
@@ -9593,7 +9593,7 @@ export function UmkmHubClient({
                             ) : null}
 
                             {storeCreateStep === 'operations' ? (
-                              <div className="rounded-[20px] border border-emerald-100/90 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_72%)] px-3 py-3 text-[color:var(--app-accent)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.24)] dark:border-emerald-400/14 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.2),rgba(2,6,23,0.94))] sm:px-4 sm:py-4">
+                              <div className="rounded-[20px] border border-emerald-100/90 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_72%)] px-3 py-3 text-[color:var(--app-accent)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.24)] dark:border-emerald-400/14 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.2),rgba(2,6,23,0.94))] sm:px-2 sm:py-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
@@ -10226,7 +10226,7 @@ export function UmkmHubClient({
                               ) : null
                             ) : null}
 
-                            <div className="sticky bottom-2 z-20 rounded-[20px] border border-emerald-100/90 bg-white/96 px-3 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.44)]  dark:border-emerald-400/14 dark:bg-slate-950/92 sm:px-4">
+                            <div className="sticky bottom-2 z-20 rounded-[20px] border border-emerald-100/90 bg-white/96 px-3 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.44)]  dark:border-emerald-400/14 dark:bg-slate-950/92 sm:px-2">
                               <div
                                 className={cn(
                                   'flex gap-3',

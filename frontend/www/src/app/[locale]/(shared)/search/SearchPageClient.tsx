@@ -79,10 +79,15 @@ import {
   formatPriceWithUnit,
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
+import { readPublicReference } from '@/lib/content/publicReference';
 
 function SearchResultSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="space-y-3" aria-busy="true" aria-label="Memuat hasil pencarian">
+    <div
+      className="space-y-3"
+      aria-busy="true"
+      aria-label="Memuat hasil pencarian"
+    >
       {Array.from({ length: count }).map((_, index) => (
         <article
           key={index}
@@ -368,7 +373,7 @@ const SEARCH_FILTER_TABS: Array<{
   },
   {
     value: 'service',
-    labelId: 'Cari Jasa',
+    labelId: 'Jasa Usaha',
     labelEn: 'Find Services',
     badgeId: 'Expert',
     badgeEn: 'Expert',
@@ -707,6 +712,7 @@ function normalizeSort(value: string | null): SortKey {
 function normalizeSideFilter(value: string | null): SideFilter {
   if (value === 'demand') return 'demand';
   if (value === 'supply') return 'supply';
+  if (value === 'reference') return 'reference';
   return 'all';
 }
 
@@ -991,6 +997,7 @@ function mapContentItem(
   if (!id) return null;
 
   const meta = item.metadata || {};
+  const publicReference = readPublicReference(item);
   const title = item.title || item.summary || asString(meta.name) || 'Untitled';
   if (isLegacySearchNoise(item, meta, title)) return null;
 
@@ -1009,8 +1016,11 @@ function mapContentItem(
     asString(meta.salary_range) ||
     asString(meta.budget_range) ||
     asString(meta.rate_label);
-  const priceLabel =
-    price !== '-'
+  const priceLabel = publicReference
+    ? locale === 'id'
+      ? 'Referensi publik'
+      : 'Public reference'
+    : price !== '-'
       ? formatPriceWithUnit(price, priceUnitLabel)
       : fallbackPriceLabel
         ? formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
@@ -1038,8 +1048,14 @@ function mapContentItem(
     title: item.title,
     summary: item.summary,
   });
-  const sideLabel = getListingSideLabel(side, locale);
-  const sideContextLabel = resolveSearchSideContextLabel(side, typeKey, locale);
+  const sideLabel = publicReference
+    ? locale === 'id'
+      ? 'Referensi'
+      : 'Reference'
+    : getListingSideLabel(side, locale);
+  const sideContextLabel = publicReference
+    ? publicReference.sourceTitle
+    : resolveSearchSideContextLabel(side, typeKey, locale);
   const businessCategory = resolveBusinessCategory(meta);
   const supplierBadges = resolveSupplierListingBadges(item, locale);
   const gallery = parseImages(item);
@@ -1140,6 +1156,10 @@ function mapContentItem(
     storeSlug,
     storeName,
     productId,
+    isPublicReference: Boolean(publicReference),
+    sourceTitle: publicReference?.sourceTitle || null,
+    sourceUrl: publicReference?.sourceUrl || null,
+    sourceLicense: publicReference?.sourceLicense || null,
   };
 }
 
@@ -1441,6 +1461,7 @@ function SearchResultScopeCard({
     all: Compass,
     supply: Store,
     demand: Target,
+    reference: Layers3,
   };
 
   const Icon = iconMap[value];
@@ -1826,7 +1847,15 @@ function SearchResultListingCard({
 
   const images =
     item.images?.length > 0 ? item.images : item.image ? [item.image] : [];
-  const sideVisual = getListingSideVisual(item.side);
+  const sideVisual = item.isPublicReference
+    ? {
+        badgeClass:
+          'bg-amber-600 text-white shadow-[0_10px_24px_-16px_rgba(217,119,6,0.75)]',
+        chipClass: 'bg-amber-50 text-amber-800 ring-1 ring-amber-200',
+        priceClass: 'text-amber-700',
+        Icon: Layers3,
+      }
+    : getListingSideVisual(item.side);
   const SideIcon = sideVisual.Icon;
   const detailBadges = [item.sideContextLabel, ...item.supplierBadges].filter(
     Boolean,
@@ -1935,42 +1964,49 @@ function SearchResultListingCard({
             {item.sideLabel}
           </span>
 
-          {/* BOOKMARK */}
-          <button
-            onClick={toggleSave}
-            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm  hover:bg-white"
-          >
-            <Bookmark
-              size={16}
-              className={isSaved ? 'fill-black text-black' : 'text-gray-500'}
-            />
-          </button>
+          {!item.isPublicReference ? (
+            <>
+              <button
+                onClick={toggleSave}
+                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm hover:bg-white"
+              >
+                <Bookmark
+                  size={16}
+                  className={
+                    isSaved ? 'fill-black text-black' : 'text-gray-500'
+                  }
+                />
+              </button>
 
-          <button
-            type="button"
-            onClick={toggleLike}
-            disabled={likeBusy}
-            className="absolute bottom-2 left-2 inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white/92 px-2.5 text-[11px] font-bold text-slate-700 shadow-sm  transition hover:bg-white disabled:opacity-70"
-            aria-label={
-              liked
-                ? locale === 'id'
-                  ? 'Batal suka'
-                  : 'Unlike'
-                : locale === 'id'
-                  ? 'Suka'
-                  : 'Like'
-            }
-          >
-            <Heart
-              className={cn(
-                'h-3.5 w-3.5 text-rose-500',
-                liked ? 'fill-rose-500' : '',
-              )}
-            />
-            <span>
-              {likeCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US')}
-            </span>
-          </button>
+              <button
+                type="button"
+                onClick={toggleLike}
+                disabled={likeBusy}
+                className="absolute bottom-2 left-2 inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white/92 px-2.5 text-[11px] font-bold text-slate-700 shadow-sm transition hover:bg-white disabled:opacity-70"
+                aria-label={
+                  liked
+                    ? locale === 'id'
+                      ? 'Batal suka'
+                      : 'Unlike'
+                    : locale === 'id'
+                      ? 'Suka'
+                      : 'Like'
+                }
+              >
+                <Heart
+                  className={cn(
+                    'h-3.5 w-3.5 text-rose-500',
+                    liked ? 'fill-rose-500' : '',
+                  )}
+                />
+                <span>
+                  {likeCount.toLocaleString(
+                    locale === 'id' ? 'id-ID' : 'en-US',
+                  )}
+                </span>
+              </button>
+            </>
+          ) : null}
         </div>
 
         {/* CONTENT */}
@@ -2774,6 +2810,7 @@ export default function SearchPageClient({
 
   const addSearchCardToCart = useCallback(
     (item: SearchCard) => {
+      if (item.isPublicReference) return;
       const currentCart = readSearchCartSession();
       if (currentCart.items.some(existing => existing.id === item.id)) {
         setSearchCart(currentCart);
@@ -2949,6 +2986,7 @@ export default function SearchPageClient({
           params.set('viewer_lat', String(viewerLocation.lat));
           params.set('viewer_lng', String(viewerLocation.lng));
         }
+        if (sideFilter !== 'all') params.set('side', sideFilter);
         params.set('status', 'active');
         params.set('include_owner', '1');
         params.set('limit', String(PAGE_SIZE));
@@ -3013,6 +3051,7 @@ export default function SearchPageClient({
       nearbyEnabled,
       query,
       selectedSubcategory,
+      sideFilter,
       type,
       usedOnly,
       viewerLocation,
@@ -3110,7 +3149,11 @@ export default function SearchPageClient({
         nearbyEnabled ? withViewerDistance(item, viewerLocation) : item,
       )
       .filter(item => {
-        if (sideFilter !== 'all' && item.side !== sideFilter) return false;
+        if (sideFilter === 'reference') return item.isPublicReference;
+        if (sideFilter === 'supply')
+          return !item.isPublicReference && item.side === 'supply';
+        if (sideFilter === 'demand')
+          return !item.isPublicReference && item.side === 'demand';
         return true;
       });
 
@@ -3148,7 +3191,9 @@ export default function SearchPageClient({
             ? 'Produk, jasa, alat, tempat, dan peluang.'
             : 'Products, services, tools, places, and opportunities.',
           badge: isId ? 'Tersedia' : 'Available',
-          items: visibleItems.filter(item => item.side === 'supply'),
+          items: visibleItems.filter(
+            item => !item.isPublicReference && item.side === 'supply',
+          ),
           typeKey: 'all',
         },
         {
@@ -3158,7 +3203,19 @@ export default function SearchPageClient({
             ? 'Permintaan dari orang atau usaha.'
             : 'Requests from people or businesses.',
           badge: isId ? 'Dicari' : 'Wanted',
-          items: visibleItems.filter(item => item.side === 'demand'),
+          items: visibleItems.filter(
+            item => !item.isPublicReference && item.side === 'demand',
+          ),
+          typeKey: 'all',
+        },
+        {
+          id: 'references',
+          title: isId ? 'Referensi publik' : 'Public references',
+          subtitle: isId
+            ? 'Data sumber terbuka untuk riset awal; bukan penawaran atau verifikasi Lajukan.'
+            : 'Open-source data for initial research; not offers or Lajukan verification.',
+          badge: isId ? 'Bersumber' : 'Sourced',
+          items: visibleItems.filter(item => item.isPublicReference),
           typeKey: 'all',
         },
       ];
@@ -3252,13 +3309,43 @@ export default function SearchPageClient({
   const sideCounts = useMemo(
     () => ({
       all: categoryFilteredItems.length,
-      supply: categoryFilteredItems.filter(item => item.side === 'supply')
-        .length,
-      demand: categoryFilteredItems.filter(item => item.side === 'demand')
+      supply: categoryFilteredItems.filter(
+        item => !item.isPublicReference && item.side === 'supply',
+      ).length,
+      demand: categoryFilteredItems.filter(
+        item => !item.isPublicReference && item.side === 'demand',
+      ).length,
+      reference: categoryFilteredItems.filter(item => item.isPublicReference)
         .length,
     }),
     [categoryFilteredItems],
   );
+  const sideFilterOptions: Array<{
+    value: SideFilter;
+    label: string;
+    count: number;
+  }> = [
+    {
+      value: 'all',
+      label: isId ? 'Semua' : 'All',
+      count: sideCounts.all,
+    },
+    {
+      value: 'supply',
+      label: isId ? 'Penawaran' : 'Offers',
+      count: sideCounts.supply,
+    },
+    {
+      value: 'demand',
+      label: isId ? 'Kebutuhan' : 'Needs',
+      count: sideCounts.demand,
+    },
+    {
+      value: 'reference',
+      label: isId ? 'Referensi' : 'References',
+      count: sideCounts.reference,
+    },
+  ];
   const activeFilterCount =
     Number(Boolean(query)) +
     Number(Boolean(location)) +
@@ -3278,16 +3365,16 @@ export default function SearchPageClient({
         ? activeResultCategory.labelId
         : activeResultCategory.labelEn
       : isId
-        ? 'Cari penawaran atau kebutuhan'
-        : 'Find offers or needs';
+        ? 'Cari penawaran, kebutuhan, atau referensi'
+        : 'Find offers, needs, or references';
   const resultsSubheading =
     loading && visibleItems.length === 0
       ? isId
         ? 'Memuat hasil...'
         : 'Loading results...'
       : isId
-        ? `${sideCounts.supply} penawaran · ${sideCounts.demand} kebutuhan`
-        : `${sideCounts.supply} offers · ${sideCounts.demand} needs`;
+        ? `${sideCounts.supply} penawaran · ${sideCounts.demand} kebutuhan · ${sideCounts.reference} referensi`
+        : `${sideCounts.supply} offers · ${sideCounts.demand} needs · ${sideCounts.reference} references`;
   const activeSortLabel =
     SORT_OPTIONS.find(option => option.value === sort)?.[
       isId ? 'labelId' : 'labelEn'
@@ -3390,7 +3477,7 @@ export default function SearchPageClient({
   );
 
   return (
-    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen min-h-[100svh] w-full max-w-full overflow-x-hidden px-1 pb-6 pt-0 sm:px-4 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen min-h-[100svh] w-full max-w-full overflow-x-hidden px-1 pb-6 pt-0 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell lajukan-search-shell mx-auto h-full w-full max-w-full overflow-x-hidden lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
         <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden lg:hidden">
           <div className="ui-layer-local-topbar fixed inset-x-0 top-0 z-[80] flex items-center gap-2 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)]  sm:px-3">
@@ -3541,26 +3628,10 @@ export default function SearchPageClient({
               </div>
 
               <div
-                className="grid grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
+                className="grid grid-cols-4 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
                 aria-label={isId ? 'Mode hasil' : 'Result mode'}
               >
-                {[
-                  {
-                    value: 'all' as SideFilter,
-                    label: isId ? 'Semua' : 'All',
-                    count: sideCounts.all,
-                  },
-                  {
-                    value: 'supply' as SideFilter,
-                    label: isId ? 'Penawaran' : 'Offers',
-                    count: sideCounts.supply,
-                  },
-                  {
-                    value: 'demand' as SideFilter,
-                    label: isId ? 'Kebutuhan' : 'Needs',
-                    count: sideCounts.demand,
-                  },
-                ].map(option => {
+                {sideFilterOptions.map(option => {
                   const active = sideFilter === option.value;
                   return (
                     <button
@@ -3716,7 +3787,7 @@ export default function SearchPageClient({
         </div>
 
         <div className="lajukan-home-desktop-shell lajukan-search-desktop-shell hidden min-h-0 w-full max-w-full overflow-hidden lg:flex lg:flex-1 lg:flex-col">
-          <div className="lajukan-home-desktop-grid lajukan-search-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1700px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+          <div className="lajukan-home-desktop-grid lajukan-search-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[2000px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[280px_minmax(0,1fr)_280px]">
             <aside className="hidden lg:block lg:h-full lg:min-h-0 lg:overflow-hidden">
               <div
                 className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pr-1"
@@ -3927,6 +3998,17 @@ export default function SearchPageClient({
                           active={sideFilter === 'demand'}
                           onSelect={setSideFilter}
                         />
+
+                        <SearchResultScopeCard
+                          value="reference"
+                          label={isId ? 'Referensi' : 'References'}
+                          hint={
+                            isId ? 'Data sumber terbuka' : 'Open-source data'
+                          }
+                          count={sideCounts.reference}
+                          active={sideFilter === 'reference'}
+                          onSelect={setSideFilter}
+                        />
                       </div>
                     </div>
 
@@ -4028,26 +4110,10 @@ export default function SearchPageClient({
                   />
 
                   <div
-                    className="mt-2 grid max-w-[520px] grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
+                    className="mt-2 grid max-w-[680px] grid-cols-4 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
                     aria-label={isId ? 'Mode hasil' : 'Result mode'}
                   >
-                    {[
-                      {
-                        value: 'all' as SideFilter,
-                        label: isId ? 'Semua' : 'All',
-                        count: sideCounts.all,
-                      },
-                      {
-                        value: 'supply' as SideFilter,
-                        label: isId ? 'Penawaran' : 'Offers',
-                        count: sideCounts.supply,
-                      },
-                      {
-                        value: 'demand' as SideFilter,
-                        label: isId ? 'Kebutuhan' : 'Needs',
-                        count: sideCounts.demand,
-                      },
-                    ].map(option => {
+                    {sideFilterOptions.map(option => {
                       const active = sideFilter === option.value;
                       return (
                         <button
@@ -4131,9 +4197,13 @@ export default function SearchPageClient({
                             ? isId
                               ? 'Kebutuhan'
                               : 'Needs'
-                            : isId
-                              ? 'Penawaran'
-                              : 'Offers'
+                            : sideFilter === 'reference'
+                              ? isId
+                                ? 'Referensi'
+                                : 'References'
+                              : isId
+                                ? 'Penawaran'
+                                : 'Offers'
                         }
                         onRemove={() => setSideFilter('all')}
                       />
@@ -4495,23 +4565,7 @@ export default function SearchPageClient({
               {isId ? 'Mode' : 'Mode'}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {[
-                {
-                  value: 'all' as SideFilter,
-                  label: isId ? 'Semua' : 'All',
-                  count: sideCounts.all,
-                },
-                {
-                  value: 'supply' as SideFilter,
-                  label: isId ? 'Penawaran' : 'Offers',
-                  count: sideCounts.supply,
-                },
-                {
-                  value: 'demand' as SideFilter,
-                  label: isId ? 'Kebutuhan' : 'Needs',
-                  count: sideCounts.demand,
-                },
-              ].map(option => {
+              {sideFilterOptions.map(option => {
                 const active = sideFilter === option.value;
                 return (
                   <button

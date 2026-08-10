@@ -265,9 +265,9 @@ const STAT_TONE_CLASSES = [
   'border-rose-200/75 bg-[linear-gradient(135deg,#ffffff_0%,#fff7fb_62%,#ffe4e6_100%)] dark:border-rose-900/70 dark:bg-[linear-gradient(135deg,#16090f_0%,#25101a_100%)]',
 ];
 const PRIMARY_ACTION_CLASS =
-  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(4,120,87,0.65)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65 sm:min-h-[44px] sm:px-4';
+  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(4,120,87,0.65)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65 sm:min-h-[44px] sm:px-2';
 const SECONDARY_ACTION_CLASS =
-  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] sm:min-h-[44px] sm:px-4';
+  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] sm:min-h-[44px] sm:px-2';
 const TONAL_ACTION_CLASS =
   'inline-flex min-h-[40px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)] transition hover:brightness-105 sm:min-h-[42px] sm:px-3.5';
 const INPUT_CLASS =
@@ -2560,7 +2560,7 @@ transition  "
               />
             </div>
 
-            <div className="px-3 pb-4 sm:px-4 sm:pb-5">
+            <div className="px-3 pb-4 sm:px-2 sm:pb-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start lg:flex-1">
                   <div className="relative -mt-10 h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-[0_18px_34px_-24px_rgba(15,23,42,0.55)] sm:-mt-12 sm:h-24 sm:w-24">

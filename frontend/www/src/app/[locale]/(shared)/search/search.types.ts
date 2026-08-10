@@ -14,7 +14,7 @@ export type TypeKey =
   | 'business_transfer'
   | 'umkm';
 export type CardType = Exclude<TypeKey, 'all' | 'umkm'> | 'other';
-export type SideFilter = 'all' | 'demand' | 'supply';
+export type SideFilter = 'all' | 'demand' | 'supply' | 'reference';
 export type SearchResultsView = 'results' | 'umkm';
 export type SearchVisualKey = TypeKey | 'other';
 export type SearchFilterTabKey =
@@ -58,6 +58,10 @@ export type SearchCard = {
   storeSlug?: string | null;
   storeName?: string | null;
   productId?: string | null;
+  isPublicReference: boolean;
+  sourceTitle?: string | null;
+  sourceUrl?: string | null;
+  sourceLicense?: string | null;
 };
 
 export type CategoryVisual = {

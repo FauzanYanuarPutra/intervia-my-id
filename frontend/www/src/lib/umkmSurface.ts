@@ -185,6 +185,51 @@ export function buildUmkmStorefrontPath(slug: string): string {
   return `/toko/${encodeURIComponent(slug)}`;
 }
 
+type UmkmMapLinkTarget = {
+  slug?: string | null;
+  public_path?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+function readSafePublicPath(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const path = value.trim();
+  if (!path.startsWith('/') || path.startsWith('//')) return null;
+  return path;
+}
+
+export function isUmkmMapPublicReference(
+  place: Pick<UmkmMapLinkTarget, 'metadata'>,
+): boolean {
+  const metadata = place.metadata;
+  if (!metadata) return false;
+  const recordKind =
+    typeof metadata.record_kind === 'string'
+      ? metadata.record_kind.trim().toLowerCase()
+      : '';
+  const marketSide =
+    typeof metadata.market_side === 'string'
+      ? metadata.market_side.trim().toLowerCase()
+      : '';
+  return (
+    metadata.is_public_reference === true ||
+    marketSide === 'reference' ||
+    recordKind.includes('reference')
+  );
+}
+
+export function buildUmkmMapPlacePath(place: UmkmMapLinkTarget): string {
+  if (isUmkmMapPublicReference(place)) {
+    const metadataPath = place.metadata?.public_path;
+    const publicPath =
+      readSafePublicPath(place.public_path) ||
+      readSafePublicPath(metadataPath);
+    if (publicPath) return publicPath;
+  }
+
+  return buildUmkmStorefrontPath(place.slug?.trim() || '');
+}
+
 export function buildUmkmScanPath(token?: string | null): string {
   const cleanToken = token?.trim();
   if (!cleanToken) return UMKM_STORE_SCAN_PATH;

@@ -64,7 +64,7 @@ export default function ProfileView() {
       </div>
 
       {/* Profile Header */}
-      <div className="relative max-w-5xl mx-auto px-3 sm:px-4 lg:px-6 -mt-12 sm:-mt-14">
+      <div className="relative max-w-5xl mx-auto px-3 sm:px-2 lg:px-6 -mt-12 sm:-mt-14">
         <div className="bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] rounded-2xl shadow-xl p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Avatar */}

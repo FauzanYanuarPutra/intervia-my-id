@@ -24,7 +24,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use identity_service::config::{AppState, Config};
 use identity_service::db;
-use identity_service::dev_seed::ensure_development_ops_user;
 use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
     get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_users, login,
@@ -385,10 +384,6 @@ async fn main() -> Result<()> {
     }
 
     ensure_identity_runtime_schema(&db_pool).await?;
-
-    if ensure_development_ops_user(&db_pool, &cfg.env).await? {
-        tracing::info!("Development CRM agent is ready");
-    }
 
     println!("Initializing Redis...");
     let redis_pool = db::init_redis(&cfg).await;

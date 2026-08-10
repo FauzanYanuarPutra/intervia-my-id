@@ -320,84 +320,127 @@ export default function ClientBottomNav() {
       </nav>
 
       {sheetOpen ? (
-        <>
+  <>
+    {/* Backdrop */}
+    <button
+      type="button"
+      aria-label={isId ? 'Tutup menu pembuatan' : 'Close create menu'}
+      onClick={closeSheet}
+      className="ui-layer-popover fixed inset-0 bg-slate-950/55 backdrop-blur-[2px] lg:hidden"
+    />
+
+    {/* Bottom sheet */}
+    <div
+      ref={sheetRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mobile-create-title"
+      onKeyDown={handleFocusTrap}
+      onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
+        dragStartY.current = event.clientY;
+      }}
+      onPointerUp={(event: PointerEvent<HTMLDivElement>) => {
+        if (dragStartY.current === null) return;
+
+        const delta = event.clientY - dragStartY.current;
+        dragStartY.current = null;
+
+        if (delta > 64) closeSheet();
+      }}
+      className="ui-layer-drawer fixed inset-x-0 bottom-0 max-h-[min(88dvh,760px)] overflow-y-auto rounded-t-[28px] border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-[0_-30px_90px_-35px_rgba(15,23,42,0.55)] lg:hidden"
+    >
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] px-4 pb-4 pt-2 backdrop-blur-xl">
+        <div className="mx-auto h-1.5 w-12 rounded-full bg-[color:var(--app-border-strong)]" />
+
+        <div className="mx-auto mt-4 flex max-w-[680px] items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+              {isId ? 'Buat di Lajukan' : 'Create on Lajukan'}
+            </p>
+
+            <h2
+              id="mobile-create-title"
+              className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
+            >
+              {isId ? 'Mau membuat apa?' : 'What do you want to create?'}
+            </h2>
+
+            <p className="mt-1 max-w-md text-sm leading-5 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Pilih sesuai kebutuhanmu. Kamu akan diarahkan ke formulir yang tepat.'
+                : 'Choose what you need. We will take you to the right form.'}
+            </p>
+          </div>
+
           <button
             type="button"
-            aria-label={isId ? 'Tutup menu buat' : 'Close create menu'}
             onClick={closeSheet}
-            className="ui-layer-popover fixed inset-0 bg-slate-950/48 lg:hidden"
-          />
-          <div
-            ref={sheetRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mobile-create-title"
-            onKeyDown={handleFocusTrap}
-            onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
-              dragStartY.current = event.clientY;
-            }}
-            onPointerUp={(event: PointerEvent<HTMLDivElement>) => {
-              if (dragStartY.current === null) return;
-              const delta = event.clientY - dragStartY.current;
-              dragStartY.current = null;
-              if (delta > 64) closeSheet();
-            }}
-            className="ui-layer-drawer fixed inset-x-0 bottom-0 max-h-[min(82dvh,720px)] overflow-y-auto rounded-t-[24px] border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2 shadow-[0_-28px_80px_-34px_rgba(15,23,42,0.46)] lg:hidden"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
+            aria-label={isId ? 'Tutup' : 'Close'}
           >
-            <div className="mx-auto h-1 w-11 rounded-full bg-[color:var(--app-border-strong)]" />
-            <div className="mx-auto mt-3 flex max-w-[680px] items-start justify-between gap-4 px-1">
-              <div>
-                <h2
-                  id="mobile-create-title"
-                  className="text-lg font-bold text-[color:var(--app-text)]"
-                >
-                  {isId
-                    ? 'Apa yang ingin kamu buat?'
-                    : 'What do you want to create?'}
-                </h2>
-                <p className="text-xs text-[color:var(--app-text-soft)]">
-                  {isId
-                    ? 'Pilih alur yang paling sesuai.'
-                    : 'Choose the most relevant flow.'}
-                </p>
-              </div>
-              <button
-                type="button"
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Action list */}
+      <div className="mx-auto max-w-[680px] px-4 py-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {createActions.map((action, index) => {
+            const Icon = action.icon;
+
+            return (
+              <Link
+                key={action.key}
+                href={action.href}
                 onClick={closeSheet}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--app-border)]"
-                aria-label={isId ? 'Tutup' : 'Close'}
+                className="group relative flex min-h-[92px] items-center gap-3 overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:shadow-[0_16px_36px_-28px_rgba(16,185,129,0.7)] active:translate-y-0"
               >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mx-auto mt-3 grid max-w-[680px] gap-2 sm:grid-cols-2">
-              {createActions.map(action => {
-                const Icon = action.icon;
-                return (
-                  <Link
-                    key={action.key}
-                    href={action.href}
-                    onClick={closeSheet}
-                    className="flex min-h-[72px] items-center gap-3 rounded-[8px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]"
-                  >
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[color:var(--app-accent)]">
-                      <Icon className="h-5 w-5" />
+                {/* Decorative background */}
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[color:var(--app-accent-soft)] opacity-0 transition group-hover:opacity-100"
+                />
+
+                {/* Icon */}
+                <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] shadow-sm transition group-hover:scale-105">
+                  <Icon className="h-5 w-5" />
+                </span>
+
+                {/* Content */}
+                <span className="relative min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="block text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {action.label}
                     </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-bold text-[color:var(--app-text)]">
-                        {action.label}
-                      </span>
-                      <span className="mt-0.5 line-clamp-2 block text-[11px] text-[color:var(--app-text-soft)]">
-                        {action.description}
-                      </span>
+
+                    <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2 py-1 text-[9px] font-black uppercase tracking-wide text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+                      {isId ? 'Pilih' : 'Select'}
                     </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      ) : null}
+                  </span>
+
+                  <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    {action.description}
+                  </span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Helper */}
+        <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-center">
+          <p className="text-xs leading-5 text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Belum yakin? Pilih yang paling mendekati. Informasinya masih bisa diubah nanti.'
+              : 'Not sure? Choose the closest option. You can change the information later.'}
+          </p>
+        </div>
+      </div>
+    </div>
+  </>
+) : null}
     </>
   );
 }

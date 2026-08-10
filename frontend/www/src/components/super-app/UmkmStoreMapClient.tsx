@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import {
+  Circle,
   MapContainer,
   Marker,
   Polyline,
@@ -23,9 +24,14 @@ import {
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import type { LatLng } from '@/lib/super-app/maps';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
-import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
+import {
+  buildUmkmMapPlacePath,
+  isUmkmMapPublicReference,
+} from '@/lib/umkmSurface';
 import type {
+  UmkmMapFocusOffset,
   UmkmMapRouteSummary,
+  UmkmMapBounds,
   UmkmMapStore,
   UmkmMapTheme,
 } from './UmkmStoreMap';
@@ -36,6 +42,7 @@ type UmkmStoreMapClientProps = {
   onSelectStore?: (storeId: string) => void;
   isId?: boolean;
   viewerLocation?: LatLng | null;
+  viewerAccuracyMeters?: number | null;
   className?: string;
   interactive?: boolean;
   theme?: UmkmMapTheme;
@@ -44,6 +51,8 @@ type UmkmStoreMapClientProps = {
   onRouteResolved?: (route: UmkmMapRouteSummary) => void;
   focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
   focusNonce?: number;
+  focusOffset?: UmkmMapFocusOffset;
+  onBoundsChange?: (bounds: UmkmMapBounds) => void;
 };
 
 type RoutingResponse = {
@@ -101,13 +110,13 @@ type StoreCluster = {
 
 type StoreMarkerLayerItem =
   | {
-    kind: 'single';
-    item: StorePresentation;
-  }
+      kind: 'single';
+      item: StorePresentation;
+    }
   | {
-    kind: 'cluster';
-    cluster: StoreCluster;
-  };
+      kind: 'cluster';
+      cluster: StoreCluster;
+    };
 
 const MAP_THEME_CONFIG: Record<
   UmkmMapTheme,
@@ -383,38 +392,25 @@ function buildStoreMarkerIcon(input: {
   });
 }
 
-function buildViewerMarkerIcon(): DivIcon {
-  const cacheKey = 'viewer';
+function buildViewerMarkerIcon(isId: boolean): DivIcon {
+  const cacheKey = `viewer:${isId ? 'id' : 'en'}`;
   const cached = STORE_MARKER_ICON_CACHE.get(cacheKey);
   if (cached) return cached;
 
   const icon = divIcon({
     className: 'leaflet-superapp-viewer-marker-host',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    tooltipAnchor: [0, -14],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    tooltipAnchor: [0, -20],
     html: `
       <span
-        style="
-          display:inline-flex;
-          width:24px;
-          height:24px;
-          align-items:center;
-          justify-content:center;
-          border-radius:999px;
-          background:rgba(66,133,244,0.18);
-        "
+        data-testid="umkm-current-location-marker"
+        class="leaflet-viewer-location-pulse"
+        role="img"
+        aria-label="${escapeHtml(isId ? 'Lokasi saya' : 'My location')}"
       >
         <span
-          style="
-            display:inline-flex;
-            width:12px;
-            height:12px;
-            border-radius:999px;
-            background:#4285f4;
-            border:3px solid #ffffff;
-            box-shadow:0 10px 18px rgba(66,133,244,0.32);
-          "
+          class="leaflet-viewer-location-dot"
         ></span>
       </span>
     `,
@@ -434,10 +430,11 @@ function StoreKindChip({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border font-semibold ${compact
+      className={`inline-flex items-center rounded-full border font-semibold ${
+        compact
           ? 'gap-1 px-1.5 py-1 text-[10px]'
           : 'gap-1.5 px-2 py-1 text-[11px]'
-        }`}
+      }`}
       style={{
         borderColor: palette.border,
         backgroundColor: 'rgba(255,255,255,0.92)',
@@ -446,8 +443,9 @@ function StoreKindChip({
       title={ui.kindLabel}
     >
       <span
-        className={`inline-flex items-center justify-center rounded-full ${compact ? 'h-4 w-4' : 'h-5 w-5'
-          }`}
+        className={`inline-flex items-center justify-center rounded-full ${
+          compact ? 'h-4 w-4' : 'h-5 w-5'
+        }`}
         style={{ backgroundColor: palette.badge, color: '#ffffff' }}
         dangerouslySetInnerHTML={{
           __html: buildMarkerSymbolSvg({ kind: ui.kind }),
@@ -478,11 +476,28 @@ function StorePreviewCard({
     store.city ||
     ui.addressLine ||
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
-  const isOpen = ui.openNow !== false;
-  const cardClass = `w-full rounded-2xl border p-1.5 text-left transition ${active
+  const isReference = isUmkmMapPublicReference(store);
+  const isOpen = ui.openNow === true;
+  const statusLabel = isReference
+    ? isId
+      ? 'Referensi'
+      : 'Reference'
+    : ui.openNow === true
+      ? isId
+        ? 'Buka'
+        : 'Open'
+      : ui.openNow === false
+        ? isId
+          ? 'Tutup'
+          : 'Closed'
+        : isId
+          ? 'Belum dicek'
+          : 'Not checked';
+  const cardClass = `w-full rounded-2xl border p-1.5 text-left transition ${
+    active
       ? 'border-emerald-500 bg-emerald-50/90 text-emerald-950'
       : 'border-slate-200 bg-white text-slate-800'
-    }`;
+  }`;
 
   return (
     <div className={cardClass}>
@@ -497,18 +512,19 @@ function StorePreviewCard({
           </div>
         </div>
         <span
-          className={`inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold ${isOpen
+          className={`inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold ${
+            isOpen
               ? 'bg-emerald-50 text-emerald-700'
               : 'bg-slate-100 text-slate-500'
-            }`}
+          }`}
         >
-          {isOpen ? (isId ? 'Buka' : 'Open') : isId ? 'Tutup' : 'Closed'}
+          {statusLabel}
         </span>
       </div>
 
       <div className="mt-1.5 grid grid-cols-2 gap-1">
         <a
-          href={buildUmkmStorefrontPath(store.slug)}
+          href={buildUmkmMapPlacePath(store)}
           className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700"
         >
           {isId ? 'Detail' : 'Details'}
@@ -518,10 +534,11 @@ function StorePreviewCard({
             type="button"
             onClick={onClick}
             disabled={!onClick}
-            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-bold transition ${active
+            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-bold transition ${
+              active
                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                 : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
-              }`}
+            }`}
           >
             {active
               ? isId
@@ -566,7 +583,23 @@ function StorePopupSummary({
     store.city ||
     ui.addressLine ||
     (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
-  const isOpen = ui.openNow !== false;
+  const isReference = isUmkmMapPublicReference(store);
+  const isOpen = ui.openNow === true;
+  const statusLabel = isReference
+    ? isId
+      ? 'Referensi'
+      : 'Reference'
+    : ui.openNow === true
+      ? isId
+        ? 'Buka'
+        : 'Open'
+      : ui.openNow === false
+        ? isId
+          ? 'Tutup'
+          : 'Closed'
+        : isId
+          ? 'Belum dicek'
+          : 'Not checked';
 
   return (
     <div className="w-[min(72vw,238px)] space-y-2">
@@ -581,12 +614,13 @@ function StorePopupSummary({
             <span className="truncate">{locationLabel}</span>
           </span>
           <span
-            className={`inline-flex min-h-[22px] items-center rounded-full px-2 text-[10px] font-bold ${isOpen
+            className={`inline-flex min-h-[22px] items-center rounded-full px-2 text-[10px] font-bold ${
+              isOpen
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-slate-100 text-slate-500'
-              }`}
+            }`}
           >
-            {isOpen ? (isId ? 'Buka' : 'Open') : isId ? 'Tutup' : 'Closed'}
+            {statusLabel}
           </span>
         </div>
 
@@ -599,7 +633,7 @@ function StorePopupSummary({
         className={`grid gap-1.5 ${selectable ? 'grid-cols-3' : 'grid-cols-2'}`}
       >
         <a
-          href={buildUmkmStorefrontPath(store.slug)}
+          href={buildUmkmMapPlacePath(store)}
           className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700"
         >
           {isId ? 'Detail' : 'Details'}
@@ -616,10 +650,11 @@ function StorePopupSummary({
           <button
             type="button"
             onClick={onSelect}
-            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-bold transition ${active
+            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-bold transition ${
+              active
                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                 : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
-              }`}
+            }`}
           >
             {active
               ? isId
@@ -733,12 +768,6 @@ function getMapFitBoundsOptions(
 
 function isValidRoutePoint(point: [number, number]): boolean {
   return isCoordinateValid({ lat: point[0], lng: point[1] });
-}
-
-function formatCoordKey(value: unknown): string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value.toFixed(3)
-    : 'invalid';
 }
 
 function projectLatLngToWorld(
@@ -925,62 +954,6 @@ function getClusterFocusZoom(
   );
 }
 
-function FitToStores({
-  stores,
-  viewerLocation,
-}: {
-  stores: UmkmMapStore[];
-  viewerLocation?: LatLng | null;
-}) {
-  const map = useMap();
-  const fittedRef = useRef<string>('');
-
-  const key = useMemo(() => {
-    const storeKey = stores
-      .map(
-        store =>
-          `${store.id}:${formatCoordKey(store.lat)}:${formatCoordKey(store.lng)}`,
-      )
-      .join('|');
-    const viewerKey = viewerLocation
-      ? `${formatCoordKey(viewerLocation.lat)}:${formatCoordKey(viewerLocation.lng)}`
-      : 'none';
-    return `${storeKey}::${viewerKey}`;
-  }, [stores, viewerLocation]);
-
-  useEffect(() => {
-    const validStores = stores.filter(hasValidLatLng);
-    const validViewerLocation = hasValidLatLng(viewerLocation)
-      ? viewerLocation
-      : null;
-    if (!validStores.length) return;
-    if (fittedRef.current === key) return;
-    const points: Array<[number, number]> = validStores.map(store =>
-      toMapPoint(store),
-    );
-    if (validViewerLocation) {
-      points.push(toMapPoint(validViewerLocation));
-    }
-    try {
-      if (points.length === 1) {
-        const [lat, lng] = points[0];
-        map.setView([lat, lng], 13);
-        fittedRef.current = key;
-        return;
-      }
-      map.fitBounds(
-        points as LatLngBoundsExpression,
-        getMapFitBoundsOptions(map.getSize().x, 14),
-      );
-      fittedRef.current = key;
-    } catch (error) {
-      console.error('[UMKM_MAP_FIT_TO_STORES_ERROR]', error, { points });
-    }
-  }, [key, map, stores, viewerLocation]);
-
-  return null;
-}
-
 function MapFocusController({
   stores,
   selectedStoreId,
@@ -989,6 +962,7 @@ function MapFocusController({
   routePoints,
   focusMode,
   focusNonce,
+  focusOffset,
 }: {
   stores: UmkmMapStore[];
   selectedStoreId?: string | null;
@@ -997,6 +971,7 @@ function MapFocusController({
   routePoints?: Array<[number, number]> | null;
   focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
   focusNonce?: number;
+  focusOffset?: UmkmMapFocusOffset;
 }) {
   const map = useMap();
   const handledFocusKeyRef = useRef<string | null>(null);
@@ -1029,13 +1004,19 @@ function MapFocusController({
       }
 
       if (focusMode === 'viewer' && validViewerLocation) {
-        map.flyTo(
+        const zoom = Math.max(map.getZoom(), 15);
+        const targetPoint = map.project(
           [validViewerLocation.lat, validViewerLocation.lng],
-          Math.max(map.getZoom(), 15),
-          {
-            duration: 0.55,
-          },
+          zoom,
         );
+        const offset = focusOffset || { x: 0, y: 0 };
+        const adjustedCenter = map.unproject(
+          targetPoint.subtract([offset.x, offset.y]),
+          zoom,
+        );
+        map.flyTo(adjustedCenter, zoom, {
+          duration: 0.55,
+        });
         handledFocusKeyRef.current = focusKey;
         return;
       }
@@ -1098,6 +1079,7 @@ function MapFocusController({
   }, [
     focusMode,
     focusNonce,
+    focusOffset,
     map,
     routeDestination,
     routePoints,
@@ -1135,6 +1117,30 @@ function MapInteractivityController({ interactive }: { interactive: boolean }) {
     container.style.cursor = interactive ? 'grab' : 'default';
   }, [interactive, map]);
 
+  return null;
+}
+
+function MapBoundsReporter({
+  onBoundsChange,
+}: {
+  onBoundsChange?: (bounds: UmkmMapBounds) => void;
+}) {
+  const map = useMap();
+  const reportBounds = useCallback(() => {
+    if (!onBoundsChange) return;
+    const bounds = map.getBounds();
+    onBoundsChange({
+      minLat: bounds.getSouth(),
+      maxLat: bounds.getNorth(),
+      minLng: bounds.getWest(),
+      maxLng: bounds.getEast(),
+    });
+  }, [map, onBoundsChange]);
+  useMapEvents({ moveend: reportBounds });
+
+  useEffect(() => {
+    map.whenReady(reportBounds);
+  }, [map, reportBounds]);
   return null;
 }
 
@@ -1284,9 +1290,9 @@ function StoreMarkersLayer({
                   onSelect={
                     onSelectStore
                       ? () => {
-                        focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
-                        onSelectStore(store.id);
-                      }
+                          focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
+                          onSelectStore(store.id);
+                        }
                       : undefined
                   }
                 />
@@ -1362,9 +1368,9 @@ function StoreMarkersLayer({
                           onClick={
                             onSelectStore
                               ? () => {
-                                focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
-                                onSelectStore(store.id);
-                              }
+                                  focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
+                                  onSelectStore(store.id);
+                                }
                               : undefined
                           }
                         />
@@ -1394,6 +1400,7 @@ export function UmkmStoreMapClient({
   onSelectStore,
   isId = true,
   viewerLocation,
+  viewerAccuracyMeters,
   className,
   interactive = true,
   theme = 'default',
@@ -1402,6 +1409,8 @@ export function UmkmStoreMapClient({
   onRouteResolved,
   focusMode = 'stores',
   focusNonce = 0,
+  focusOffset,
+  onBoundsChange,
 }: UmkmStoreMapClientProps) {
   const activeTheme = MAP_THEME_CONFIG[theme];
   const tileUrl =
@@ -1415,6 +1424,19 @@ export function UmkmStoreMapClient({
   const validViewerLocation = hasValidLatLng(viewerLocation)
     ? viewerLocation
     : null;
+  const routeOriginLat = validViewerLocation
+    ? Number(validViewerLocation.lat.toFixed(4))
+    : null;
+  const routeOriginLng = validViewerLocation
+    ? Number(validViewerLocation.lng.toFixed(4))
+    : null;
+  const routeOrigin = useMemo(
+    () =>
+      routeOriginLat !== null && routeOriginLng !== null
+        ? { lat: routeOriginLat, lng: routeOriginLng }
+        : null,
+    [routeOriginLat, routeOriginLng],
+  );
   const validStores = useMemo(
     () => stores.filter(store => hasValidLatLng(store)),
     [stores],
@@ -1430,9 +1452,9 @@ export function UmkmStoreMapClient({
   );
 
   const defaultCenter = useMemo<[number, number]>(() => {
-    if (validStores[0]) return [validStores[0].lat, validStores[0].lng];
     if (validViewerLocation)
       return [validViewerLocation.lat, validViewerLocation.lng];
+    if (validStores[0]) return [validStores[0].lat, validStores[0].lng];
     return [-6.2, 106.816666];
   }, [validStores, validViewerLocation]);
   const routeDestination =
@@ -1460,7 +1482,7 @@ export function UmkmStoreMapClient({
     const controller = new AbortController();
 
     async function loadRoute() {
-      if (!showRoute || !validViewerLocation || !routeDestination) {
+      if (!showRoute || !routeOrigin || !routeDestination) {
         setRoutePositions(null);
         onRouteResolved?.({
           distance_m: null,
@@ -1471,16 +1493,17 @@ export function UmkmStoreMapClient({
         return;
       }
 
-      const params = new URLSearchParams({
-        origin_lat: String(validViewerLocation.lat),
-        origin_lng: String(validViewerLocation.lng),
-        destination_lat: String(routeDestination.lat),
-        destination_lng: String(routeDestination.lng),
-        profile: 'driving',
-      });
-
       try {
-        const res = await fetch(`/api/super-app/routing?${params.toString()}`, {
+        const res = await fetch('/api/super-app/routing', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            origin_lat: routeOrigin.lat,
+            origin_lng: routeOrigin.lng,
+            destination_lat: routeDestination.lat,
+            destination_lng: routeDestination.lng,
+            profile: 'driving',
+          }),
           cache: 'no-store',
           credentials: 'include',
           signal: controller.signal,
@@ -1544,7 +1567,7 @@ export function UmkmStoreMapClient({
       active = false;
       controller.abort();
     };
-  }, [onRouteResolved, routeDestination, showRoute, validViewerLocation]);
+  }, [onRouteResolved, routeDestination, routeOrigin, showRoute]);
 
   return (
     <MapContainer
@@ -1560,10 +1583,10 @@ export function UmkmStoreMapClient({
       keyboard={interactive}
       zoomControl={false}
       className={`${className || 'h-[360px] w-full rounded-3xl'} max-w-full`}
-      attributionControl={false}
+      attributionControl
     >
       <MapInteractivityController interactive={interactive} />
-      <FitToStores stores={validStores} viewerLocation={validViewerLocation} />
+      <MapBoundsReporter onBoundsChange={onBoundsChange} />
       <MapFocusController
         stores={validStores}
         selectedStoreId={selectedStoreId}
@@ -1572,20 +1595,54 @@ export function UmkmStoreMapClient({
         routePoints={routePositions}
         focusMode={focusMode}
         focusNonce={focusNonce}
+        focusOffset={focusOffset}
       />
       <ManualMarkerFocusController target={manualMarkerFocus} />
       <TileLayer url={tileUrl} attribution={tileAttribution} />
       <ZoomControl position="bottomright" />
 
       {validViewerLocation ? (
-        <Marker
-          position={[validViewerLocation.lat, validViewerLocation.lng]}
-          icon={buildViewerMarkerIcon()}
-        >
-          <Tooltip direction="top" offset={[0, -8]}>
-            {isId ? 'Lokasi kamu' : 'Your location'}
-          </Tooltip>
-        </Marker>
+        <>
+          {typeof viewerAccuracyMeters === 'number' &&
+          Number.isFinite(viewerAccuracyMeters) &&
+          viewerAccuracyMeters > 0 ? (
+            <Circle
+              center={[validViewerLocation.lat, validViewerLocation.lng]}
+              radius={Math.min(Math.max(viewerAccuracyMeters, 5), 5_000)}
+              interactive={false}
+              pathOptions={{
+                className: 'umkm-viewer-location-accuracy-circle',
+                color: '#4285f4',
+                fillColor: '#4285f4',
+                fillOpacity: 0.12,
+                opacity: 0.42,
+                weight: 1.5,
+              }}
+            />
+          ) : null}
+          <Marker
+            position={[validViewerLocation.lat, validViewerLocation.lng]}
+            icon={buildViewerMarkerIcon(isId)}
+            interactive={false}
+            keyboard={false}
+            zIndexOffset={2_000}
+          >
+            <Tooltip
+              permanent
+              direction="top"
+              offset={[0, -13]}
+              opacity={0.96}
+              className="umkm-viewer-location-tooltip"
+            >
+              {isId ? 'Lokasi saya' : 'My location'}
+              {typeof viewerAccuracyMeters === 'number' &&
+              Number.isFinite(viewerAccuracyMeters) &&
+              viewerAccuracyMeters > 0
+                ? ` · ±${Math.round(viewerAccuracyMeters)} m`
+                : ''}
+            </Tooltip>
+          </Marker>
+        </>
       ) : null}
 
       <StoreMarkersLayer

@@ -2686,11 +2686,11 @@ export function UmkmStorefrontClient({
   const heroShellClass =
     'relative min-w-0 overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white shadow-[0_28px_70px_-48px_rgba(15,23,42,0.38)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[28px]';
   const heroContentCardClass =
-    'min-w-0 rounded-[20px] border border-[color:var(--app-border)] bg-white px-3.5 py-3.5 shadow-[0_16px_30px_-27px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] sm:rounded-[22px] sm:px-4 sm:py-4';
+    'min-w-0 rounded-[20px] border border-[color:var(--app-border)] bg-white px-3.5 py-3.5 shadow-[0_16px_30px_-27px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] sm:rounded-[22px] sm:px-2 sm:py-4';
   const heroStatCardClass =
     'min-w-0 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 dark:border-[color:var(--app-border-strong)]';
   const sectionCardClass =
-    'min-w-0 rounded-[22px] border border-[color:var(--app-border)] bg-white px-3.5 py-3.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.12)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:px-4 sm:py-4';
+    'min-w-0 rounded-[22px] border border-[color:var(--app-border)] bg-white px-3.5 py-3.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.12)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:px-2 sm:py-4';
   const fullMapHref = store
     ? buildUmkmDiscoveryPath({
       store: store.slug,
@@ -3210,7 +3210,7 @@ export function UmkmStorefrontClient({
 
   return (
     <main className="app-cohesive-theme min-h-screen min-h-[100svh] overflow-x-hidden pb-24 pt-1 sm:pb-10 sm:pt-2">
-      <div className="mx-auto flex w-full min-w-0 max-w-[var(--app-max-width)] flex-col gap-2.5 px-3 sm:gap-3 sm:px-4">
+      <div className="mx-auto flex w-full min-w-0 max-w-[var(--app-max-width)] flex-col gap-2.5 px-3 sm:gap-3 sm:px-2">
         <section>
           <div className={heroShellClass}>
             {store ? (
@@ -3657,7 +3657,7 @@ export function UmkmStorefrontClient({
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
                   className={cn(
-                    'ui-pressable ui-pressable-card inline-flex min-h-[36px] shrink-0 items-center justify-center rounded-[14px] px-3 text-[11px] font-bold transition sm:min-h-[38px] sm:rounded-[16px] sm:px-4',
+                    'ui-pressable ui-pressable-card inline-flex min-h-[36px] shrink-0 items-center justify-center rounded-[14px] px-3 text-[11px] font-bold transition sm:min-h-[38px] sm:rounded-[16px] sm:px-2',
                     isActive
                       ? 'bg-[color:var(--app-accent)] text-white shadow-[0_18px_30px_-24px_color-mix(in_srgb,var(--app-accent)_36%,transparent)]'
                       : 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-white hover:text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]',

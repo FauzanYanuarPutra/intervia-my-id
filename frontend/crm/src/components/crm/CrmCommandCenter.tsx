@@ -202,8 +202,7 @@ const NAV_ITEMS: Array<{
     },
   ];
 
-const CRM_DEMO_DATA_ENABLED =
-  process.env.NEXT_PUBLIC_CRM_ENABLE_DEMO_DATA === "true";
+const CRM_DEMO_DATA_ENABLED = false;
 
 const SAMPLE_LEADS: CrmLead[] = [
   {

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   enforceAuthRouteSecurityMock,
@@ -53,7 +53,61 @@ function publicRequest(query = '') {
   );
 }
 
+function publicStore(index: number) {
+  const suffix = String(index).padStart(2, '0');
+  return {
+    id: `store-${suffix}`,
+    owner_user_id: `private-owner-${suffix}`,
+    name: `Usaha ${suffix}`,
+    slug: `usaha-${suffix}`,
+    description: null,
+    city: 'Jakarta',
+    address: 'Jakarta',
+    lat: -6.2 - index * 0.001,
+    lng: 106.8,
+    phone: null,
+    is_active: true,
+    online_order_enabled: true,
+    offline_order_enabled: true,
+    metadata: {
+      source: 'marketplace',
+      outlet_active: true,
+    },
+    created_at: '2026-07-01T00:00:00.000Z',
+    updated_at: `2026-07-${String((index % 28) + 1).padStart(2, '0')}T00:00:00.000Z`,
+  };
+}
+
+function publicReference(index: number) {
+  const suffix = String(index).padStart(2, '0');
+  return {
+    id: `reference-source-${suffix}`,
+    slug: `reference-source-${suffix}`,
+    title: `Referensi ${suffix}`,
+    summary: `Referensi publik nomor ${suffix}.`,
+    metadata: {
+      record_kind: 'real_openstreetmap_reference',
+      source_dataset: 'openstreetmap',
+      marketplace_category_slug: 'business-places',
+      city: 'Jakarta',
+      address: 'Jakarta',
+      latitude: -6.2 - index * 0.001,
+      longitude: 106.8,
+      source_title: 'OpenStreetMap contributors',
+      source_url: `https://www.openstreetmap.org/node/${index + 1}`,
+      source_license: 'ODbL 1.0',
+      source_license_url:
+        'https://opendatacommons.org/licenses/odbl/1-0/',
+    },
+    updated_at: '2026-07-30T00:00:00.000Z',
+  };
+}
+
 describe('GET /api/super-app/umkm/stores', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     enforceAuthRouteSecurityMock.mockResolvedValue({
@@ -112,7 +166,7 @@ describe('GET /api/super-app/umkm/stores', () => {
       slug: undefined,
       backendOnly: true,
       activeOnly: true,
-      limit: 120,
+      limit: 3,
     });
     expect(listUmkmStoresForActorMock).not.toHaveBeenCalled();
 
@@ -130,6 +184,26 @@ describe('GET /api/super-app/umkm/stores', () => {
       reservation_enabled: true,
     });
     expect(listUmkmTablesMock).not.toHaveBeenCalled();
+  });
+
+  it('defaults public discovery to an initial batch of 10', async () => {
+    listUmkmStoresMock.mockResolvedValue(
+      Array.from({ length: 11 }, (_, index) => publicStore(index)),
+    );
+
+    const response = await GET(publicRequest());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(listUmkmStoresMock).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 11 }),
+    );
+    expect(payload.data.items).toHaveLength(10);
+    expect(payload.data).toMatchObject({
+      loaded_count: 10,
+      has_more: true,
+      next_offset: 10,
+    });
   });
 
   it('keeps owner data and live table summaries on the protected mine view', async () => {
@@ -237,7 +311,10 @@ describe('GET /api/super-app/umkm/stores', () => {
 
     expect(response.status).toBe(200);
     expect(listUmkmStoresMock).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 120 }),
+      expect.objectContaining({
+        limit: 3,
+        viewer: { lat: -6.2, lng: 106.8 },
+      }),
     );
     expect(payload.data.items.map((item: { id: string }) => item.id)).toEqual([
       'near',
@@ -246,5 +323,453 @@ describe('GET /api/super-app/umkm/stores', () => {
     expect(payload.data.items[0].distance_km).toBeLessThan(
       payload.data.items[1].distance_km,
     );
+  });
+
+  it('pushes validated map bounds to the marketplace query', async () => {
+    listUmkmStoresMock.mockResolvedValue([
+      publicStore(0),
+      { ...publicStore(1), id: 'outside-bounds', lat: -8 },
+    ]);
+
+    const response = await GET(
+      publicRequest(
+        'min_lat=-7&max_lat=-6&min_lng=106&max_lng=108&limit=25',
+      ),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(listUmkmStoresMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bounds: { minLat: -7, maxLat: -6, minLng: 106, maxLng: 108 },
+        viewer: { lat: -6.5, lng: 107 },
+      }),
+    );
+    expect(payload.data.items.map((item: { id: string }) => item.id)).toEqual([
+      'store-00',
+    ]);
+  });
+
+  it('rejects partial, reversed, and oversized public map queries', async () => {
+    for (const query of [
+      'min_lat=-7&max_lat=-6',
+      'min_lat=-6&max_lat=-7&min_lng=106&max_lng=108',
+      `q=${'x'.repeat(121)}`,
+      'limit=501',
+    ]) {
+      const response = await GET(publicRequest(query));
+      expect(response.status).toBe(400);
+    }
+    expect(listUmkmStoresMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects one-character reference searches before querying upstream', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+    const response = await GET(publicRequest('references_only=1&q=x'));
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(listUmkmStoresMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed reference cursor before querying upstream', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+    const response = await GET(
+      publicRequest('references_only=1&cursor=not-a-cursor'),
+    );
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(listUmkmStoresMock).not.toHaveBeenCalled();
+  });
+
+  it('drops reference rows whose source or license URL is unsafe', async () => {
+    const unsafeReference = publicReference(0);
+    unsafeReference.metadata.source_license_url = 'javascript:alert(1)';
+    const wrongSourceHostReference = publicReference(1);
+    wrongSourceHostReference.metadata.source_url =
+      'https://example.com/node/2';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [unsafeReference, wrongSourceHostReference],
+          has_more: false,
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(publicRequest('references_only=1&limit=10'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.data.items).toEqual([]);
+  });
+
+  it('loads only the bounded first reference candidate page for non-map discovery', async () => {
+    listUmkmStoresMock.mockResolvedValue([]);
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [
+            {
+              id: '9afa53eb-835c-4090-b8b1-538b77b6f0bf',
+              slug: 'osm-way-32388775',
+              title: 'Istana Plaza',
+              summary: 'Referensi tempat usaha.',
+              cover_image:
+                '/api/content/media/laju-chat/content/public-reference/photo.png',
+              metadata: {
+                external_id: 'way/32388775',
+                record_kind: 'real_openstreetmap_reference',
+                source_dataset: 'openstreetmap',
+                marketplace_category_slug: 'business-places',
+                city: 'Bandung',
+                address: 'Bandung',
+                latitude: -6.903,
+                longitude: 107.596,
+                source_url:
+                  'https://www.openstreetmap.org/way/32388775',
+                source_title: 'OpenStreetMap contributors',
+                source_license: 'ODbL 1.0',
+                source_license_url:
+                  'https://opendatacommons.org/licenses/odbl/1-0/',
+                source_accessed_at: '2026-07-30T00:00:00.000Z',
+                media_kind: 'neutral_reference_placeholder',
+                media_is_place_specific: false,
+                media_storage: 'minio',
+                image_credit: {
+                  provider: 'Wikimedia Commons',
+                  author: 'Kontributor',
+                  license: 'CC BY-SA 4.0',
+                  license_url:
+                    'https://creativecommons.org/licenses/by-sa/4.0/',
+                  source_url:
+                    'https://commons.wikimedia.org/wiki/File:Example.jpg',
+                  api_token: 'must-not-leak',
+                },
+                gallery_images: [
+                  '/api/content/media/laju-chat/content/public-reference/photo.png',
+                  'javascript:alert(1)',
+                  { api_token: 'must-not-leak' },
+                ],
+                owner_user_id: 'must-not-leak',
+                api_token: 'must-not-leak',
+              },
+              updated_at: '2026-07-30T00:00:00.000Z',
+            },
+          ],
+          has_more: true,
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      publicRequest('include_references=1&limit=2'),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const referenceUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(referenceUrl.pathname).toBe('/v1/map/references');
+    expect(Object.fromEntries(referenceUrl.searchParams)).toEqual({
+      limit: '3',
+    });
+    expect(payload.data).toMatchObject({
+      count: 1,
+      reference_count: 1,
+      reference_has_more: true,
+    });
+    expect(payload.data.items[0]).toMatchObject({
+      id: 'reference:9afa53eb-835c-4090-b8b1-538b77b6f0bf',
+      name: 'Istana Plaza',
+      phone: null,
+      online_order_enabled: false,
+      metadata: {
+        is_public_reference: true,
+        is_transactional: false,
+        source_title: 'OpenStreetMap contributors',
+        source_license: 'ODbL 1.0',
+        source_license_url:
+          'https://opendatacommons.org/licenses/odbl/1-0/',
+        media_kind: 'neutral_reference_placeholder',
+        media_is_place_specific: false,
+        media_storage: 'minio',
+        image_credit: {
+          provider: 'Wikimedia Commons',
+          author: 'Kontributor',
+          license: 'CC BY-SA 4.0',
+          license_url:
+            'https://creativecommons.org/licenses/by-sa/4.0/',
+          source_url:
+            'https://commons.wikimedia.org/wiki/File:Example.jpg',
+        },
+        gallery_images: [
+          '/api/content/media/laju-chat/content/public-reference/photo.png',
+        ],
+      },
+    });
+    expect(payload.data.items[0].metadata).not.toHaveProperty('owner_user_id');
+    expect(payload.data.items[0].metadata).not.toHaveProperty('api_token');
+    expect(payload.data.items[0].metadata.image_credit).not.toHaveProperty(
+      'api_token',
+    );
+  });
+
+  it('forwards map filters to the dedicated reference endpoint once', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [], has_more: false }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      publicRequest(
+        'references_only=1&q=kopi&city=Bandung&limit=10&viewer_lat=-6.2&viewer_lng=106.8&min_lat=-7&max_lat=-6&min_lng=106&max_lng=108',
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(listUmkmStoresMock).not.toHaveBeenCalled();
+    const referenceUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(referenceUrl.pathname).toBe('/v1/map/references');
+    expect(Object.fromEntries(referenceUrl.searchParams)).toEqual({
+      limit: '10',
+      q: 'kopi',
+      city: 'Bandung',
+      viewer_lat: '-6.2',
+      viewer_lng: '106.8',
+      min_lat: '-7',
+      max_lat: '-6',
+      min_lng: '106',
+      max_lng: '108',
+    });
+  });
+
+  it('forwards the native reference keyset cursor without prefix overfetch', async () => {
+    const cursor =
+      '1722470400123:9afa53eb-835c-4090-b8b1-538b77b6f0bf';
+    const nextCursor =
+      '1722470300123:9afa53eb-835c-4090-b8b1-538b77b6f0c0';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [publicReference(0)],
+          has_more: true,
+          next_cursor: nextCursor,
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      publicRequest(
+        `references_only=1&limit=1&cursor=${encodeURIComponent(cursor)}`,
+      ),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    const referenceUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(Object.fromEntries(referenceUrl.searchParams)).toEqual({
+      limit: '1',
+      cursor,
+    });
+    expect(payload.data).toMatchObject({
+      has_more: true,
+      next_cursor: nextCursor,
+    });
+  });
+
+  it('rejects a reference cursor combined with non-deterministic ranking', async () => {
+    const cursor =
+      '1722470400123:9afa53eb-835c-4090-b8b1-538b77b6f0bf';
+
+    for (const query of [
+      `references_only=1&cursor=${encodeURIComponent(cursor)}&q=kopi`,
+      `references_only=1&cursor=${encodeURIComponent(cursor)}&viewer_lat=-6.2&viewer_lng=106.8`,
+      `references_only=1&cursor=${encodeURIComponent(cursor)}&min_lat=-7&max_lat=-6&min_lng=106&max_lng=108`,
+    ]) {
+      const response = await GET(publicRequest(query));
+      expect(response.status, query).toBe(400);
+    }
+
+    expect(listUmkmStoresMock).not.toHaveBeenCalled();
+  });
+
+  it('loads enough reference candidates to serve a later merged page', async () => {
+    listUmkmStoresMock.mockResolvedValue([]);
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: Array.from({ length: 21 }, (_, index) =>
+            publicReference(index),
+          ),
+          has_more: true,
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      publicRequest('include_references=1&limit=10&offset=10'),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const referenceUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(referenceUrl.pathname).toBe('/v1/map/references');
+    expect(Object.fromEntries(referenceUrl.searchParams)).toEqual({
+      limit: '21',
+    });
+    expect(
+      payload.data.items.map((item: { id: string }) => item.id),
+    ).toEqual(
+      Array.from(
+        { length: 10 },
+        (_, index) => `reference:reference-source-${index + 10}`,
+      ),
+    );
+    expect(payload.data).toMatchObject({
+      reference_count: 21,
+      loaded_count: 20,
+      has_more: true,
+      next_offset: 20,
+    });
+  });
+
+  it('returns the requested progressive page with a sentinel-backed next offset', async () => {
+    listUmkmStoresMock.mockResolvedValue(
+      Array.from({ length: 21 }, (_, index) => publicStore(index)).reverse(),
+    );
+
+    const response = await GET(
+      publicRequest(
+        'limit=10&offset=10&viewer_lat=-6.2&viewer_lng=106.8&min_lat=-7&max_lat=-6&min_lng=106&max_lng=108',
+      ),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(listUmkmStoresMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: 21,
+        bounds: { minLat: -7, maxLat: -6, minLng: 106, maxLng: 108 },
+        viewer: { lat: -6.2, lng: 106.8 },
+      }),
+    );
+    expect(payload.data.items).toHaveLength(10);
+    expect(
+      payload.data.items.map((item: { id: string }) => item.id),
+    ).toEqual(Array.from({ length: 10 }, (_, index) => `store-${index + 10}`));
+    expect(payload.data).toMatchObject({
+      loaded_count: 20,
+      has_more: true,
+      next_offset: 20,
+    });
+  });
+
+  it('ends progressive pagination when fewer than offset plus limit candidates exist', async () => {
+    listUmkmStoresMock.mockResolvedValue(
+      Array.from({ length: 15 }, (_, index) => publicStore(index)),
+    );
+
+    const response = await GET(publicRequest('limit=10&offset=10'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(listUmkmStoresMock).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 21 }),
+    );
+    expect(
+      payload.data.items.map((item: { id: string }) => item.id),
+    ).toEqual(['store-10', 'store-11', 'store-12', 'store-13', 'store-14']);
+    expect(payload.data).toMatchObject({
+      loaded_count: 15,
+      has_more: false,
+      next_offset: null,
+    });
+  });
+
+  it('stops at the bounded public pagination cap without an unusable next offset', async () => {
+    listUmkmStoresMock.mockResolvedValue(
+      Array.from({ length: 500 }, (_, index) => publicStore(index)),
+    );
+
+    const response = await GET(publicRequest('limit=10&offset=490'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(listUmkmStoresMock).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 500 }),
+    );
+    expect(payload.data.items).toHaveLength(10);
+    expect(payload.data).toMatchObject({
+      loaded_count: 500,
+      has_more: false,
+      next_offset: null,
+    });
+  });
+
+  it('forwards viewer ordering before a map viewport is available', async () => {
+    listUmkmStoresMock.mockResolvedValue([]);
+
+    const response = await GET(
+      publicRequest('limit=10&viewer_lat=-6.2&viewer_lng=106.8'),
+    );
+
+    expect(response.status).toBe(200);
+    const options = listUmkmStoresMock.mock.calls[0]?.[0];
+    expect(options).toMatchObject({ viewer: { lat: -6.2, lng: 106.8 } });
+    expect(options).not.toHaveProperty('bounds');
+  });
+
+  it('rejects partial or invalid viewer coordinates and radius without a viewer', async () => {
+    for (const query of [
+      'limit=10&viewer_lat=-6.2',
+      'limit=10&viewer_lng=106.8',
+      'limit=10&viewer_lat=91&viewer_lng=106.8',
+      'limit=10&viewer_lat=-6.2&viewer_lng=181',
+      'limit=10&viewer_lat=invalid&viewer_lng=106.8',
+      'limit=10&radius_km=5',
+    ]) {
+      const response = await GET(publicRequest(query));
+      expect(response.status, query).toBe(400);
+    }
+
+    expect(listUmkmStoresMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe public batch sizes and offsets before querying storage', async () => {
+    for (const query of [
+      'limit=51',
+      'limit=10&offset=-1',
+      'limit=10&offset=491',
+      'limit=10&offset=1.5',
+      'limit=50&offset=490',
+    ]) {
+      const response = await GET(publicRequest(query));
+      expect(response.status, query).toBe(400);
+    }
+
+    expect(listUmkmStoresMock).not.toHaveBeenCalled();
   });
 });

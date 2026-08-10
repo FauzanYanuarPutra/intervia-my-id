@@ -23,7 +23,7 @@ describe('SearchCategoryRail', () => {
 
     for (const label of [
       'Bahan &amp; Supplier',
-      'Cari Jasa',
+      'Jasa Usaha',
       'Mesin &amp; Alat',
       'Tempat Usaha',
       'Peluang Usaha',

@@ -11,7 +11,7 @@ export default function CommunityGroupCreatePageClient({
   const router = useRouter();
 
   return (
-    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-0 py-3 sm:px-4 sm:py-8">
+    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-0 py-3 sm:px-2 sm:py-8">
       <CommunityGroupCreateForm
         isId={isId}
         onCancel={() => router.push('/community')}

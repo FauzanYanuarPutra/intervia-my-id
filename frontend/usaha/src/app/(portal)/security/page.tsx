@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { KeyRound, ShieldCheck, Smartphone } from 'lucide-react';
-import { businesses } from '@/lib/portal-data';
 import { readSingleParam } from '@/lib/portal-logic';
 import { resolvePortalHomeState } from '@/lib/portal-server';
 import { PortalShell } from '@/components/portal/PortalShell';
@@ -17,7 +16,7 @@ export default async function SecurityPage({ searchParams }: PageProps) {
     state === 'guest'
       ? { account: null, businesses: [], activeBusiness: null }
       : await resolvePortalHomeState(resolvedSearchParams);
-  const scopeBusiness = activeBusiness ?? businesses[0] ?? null;
+  const scopeBusiness = activeBusiness;
 
   return (
     <PortalShell

@@ -232,6 +232,16 @@ async function fetchMarketplaceStoreList(
   if (options?.ownerUserId?.trim()) params.set('owner_user_id', options.ownerUserId.trim());
   if (options?.activeOnly !== undefined) params.set('active_only', String(options.activeOnly));
   if (options?.limit) params.set('limit', String(options.limit));
+  if (options?.bounds) {
+    params.set('min_lat', String(options.bounds.minLat));
+    params.set('max_lat', String(options.bounds.maxLat));
+    params.set('min_lng', String(options.bounds.minLng));
+    params.set('max_lng', String(options.bounds.maxLng));
+  }
+  if (options?.viewer) {
+    params.set('viewer_lat', String(options.viewer.lat));
+    params.set('viewer_lng', String(options.viewer.lng));
+  }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
   const payload = await fetchMarketplaceReadJson<MarketplaceStoreListResponse>(
@@ -242,7 +252,6 @@ async function fetchMarketplaceStoreList(
     return undefined;
   }
 
-  items.forEach(cacheRuntimeStore);
   return items.map(cloneStore);
 }
 

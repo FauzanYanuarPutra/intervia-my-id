@@ -79,8 +79,27 @@ export function listStoreRecords(options?: ListUmkmStoresOptions): UmkmStore[] {
     .filter(({ store }) => (slug ? store.slug === slug : true))
     .filter(({ store }) => (ownerUserId ? store.owner_user_id === ownerUserId : true))
     .filter(({ store }) => (city ? store.city.toLowerCase().includes(city) : true))
+    .filter(({ store }) => {
+      if (!options?.bounds) return true;
+      return (
+        store.lat >= options.bounds.minLat &&
+        store.lat <= options.bounds.maxLat &&
+        store.lng >= options.bounds.minLng &&
+        store.lng <= options.bounds.maxLng
+      );
+    })
     .filter(({ haystack }) => (queryTokens.length > 0 ? queryTokens.every((token) => haystack.includes(token)) : true))
     .sort((left, right) => {
+      if (options?.viewer) {
+        const latitudeScale = Math.cos((options.viewer.lat * Math.PI) / 180);
+        const leftDistance =
+          (left.store.lat - options.viewer.lat) ** 2 +
+          ((left.store.lng - options.viewer.lng) * latitudeScale) ** 2;
+        const rightDistance =
+          (right.store.lat - options.viewer.lat) ** 2 +
+          ((right.store.lng - options.viewer.lng) * latitudeScale) ** 2;
+        if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+      }
       if (queryTokens.length > 0) {
         const scoreDiff = getStoreQueryScore(right.haystack, queryTokens) - getStoreQueryScore(left.haystack, queryTokens);
         if (scoreDiff !== 0) return scoreDiff;

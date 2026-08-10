@@ -19,6 +19,7 @@ import {
   type GoogleMapsTravelMode,
   type LatLng,
 } from './maps';
+import { isUmkmMapPublicReference } from '@/lib/umkmSurface';
 
 export type UmkmPlaceLike = {
   id?: string;
@@ -359,6 +360,9 @@ function getKindMeta(
 }
 
 function inferPriceLabel(place: UmkmPlaceLike, isId: boolean): string {
+  if (isUmkmMapPublicReference(place)) {
+    return isId ? 'Bukan penawaran harga' : 'Not a price offer';
+  }
   const explicit = readMetaText(place, 'price_band');
   if (explicit) return explicit;
   return isId ? 'Harga belum tersedia' : 'Price unavailable';
@@ -448,6 +452,21 @@ function getManagedPresenceStatus(
   locationModeLabel: string;
   scheduleSummary: string;
 } {
+  if (isUmkmMapPublicReference(place)) {
+    return {
+      openHours: isId
+        ? 'Jam operasional belum diverifikasi'
+        : 'Operating hours are not verified',
+      openNow: null,
+      liveNow: null,
+      statusLabel: isId ? 'Referensi publik' : 'Public reference',
+      statusTone: 'muted',
+      locationMode: 'fixed',
+      locationModeLabel: isId ? 'Titik referensi' : 'Reference point',
+      scheduleSummary: '',
+    };
+  }
+
   const meta = asRecord(place.metadata);
   const presence = getUmkmLivePresence(meta);
   const locationModeLabel = getUmkmLocationModeLabel(
@@ -565,6 +584,12 @@ function getServiceBadges(
   isId: boolean,
   presenceStatus: ReturnType<typeof getManagedPresenceStatus>,
 ): string[] {
+  if (isUmkmMapPublicReference(place)) {
+    return isId
+      ? ['Referensi publik', 'Cek sumber asli']
+      : ['Public reference', 'Check original source'];
+  }
+
   const kind = getUmkmPlaceKind(place);
   const badges: string[] = [];
 
@@ -651,6 +676,7 @@ export function buildUmkmPlacePresentation(
   isId: boolean,
   viewerLocation?: LatLng | null,
 ): UmkmPlacePresentation {
+  const isPublicReference = isUmkmMapPublicReference(place);
   const businessCategory = getUmkmPlaceBusinessCategory(place);
   const kind = getUmkmPlaceKind(place);
   const kindMeta = getKindMeta(kind, isId);
@@ -666,13 +692,17 @@ export function buildUmkmPlacePresentation(
       ? 0
       : Math.max(0, Math.round(rawResponseMinutes));
   const presenceStatus = getManagedPresenceStatus(place, isId);
-  const categoryLabel = businessCategory
-    ? getUmkmBusinessCategoryLabel(businessCategory, isId)
-    : kindMeta.kindLabel === 'UMKM'
-      ? isId
-        ? 'UMKM aktif'
-        : 'Active UMKM'
-      : kindMeta.kindLabel;
+  const categoryLabel = isPublicReference
+    ? isId
+      ? 'Referensi publik'
+      : 'Public reference'
+    : businessCategory
+      ? getUmkmBusinessCategoryLabel(businessCategory, isId)
+      : kindMeta.kindLabel === 'UMKM'
+        ? isId
+          ? 'UMKM aktif'
+          : 'Active UMKM'
+        : kindMeta.kindLabel;
   const effectiveDistanceKm =
     typeof place.distance_km === 'number' && Number.isFinite(place.distance_km)
       ? place.distance_km
@@ -748,8 +778,12 @@ export function buildUmkmPlacePresentation(
     locationMode: presenceStatus.locationMode,
     locationModeLabel: presenceStatus.locationModeLabel,
     categoryLabel,
-    kindLabel: kindMeta.kindLabel,
-    shortKindLabel: kindMeta.shortKindLabel,
+    kindLabel: isPublicReference
+      ? isId
+        ? 'Referensi'
+        : 'Reference'
+      : kindMeta.kindLabel,
+    shortKindLabel: isPublicReference ? 'R' : kindMeta.shortKindLabel,
     markerTone: kindMeta.markerTone,
     ratingNumber,
     ratingLabel: rawRating === null ? '0.0' : ratingNumber.toFixed(1),
@@ -783,12 +817,14 @@ export function buildUmkmPlacePresentation(
     googleMapsPlaceUrl: buildGoogleMapsPlaceUrl(destination, mapsLabel),
     googleMapsDirectionsUrl: googleMapsDirectionsByMode.driving,
     googleMapsDirectionsByMode,
-    telHref: buildTelHref(place.phone),
-    whatsappHref: buildWhatsAppHref(
-      whatsappPhone,
-      place.name,
-      isId,
-      whatsappMessage,
-    ),
+    telHref: isPublicReference ? null : buildTelHref(place.phone),
+    whatsappHref: isPublicReference
+      ? null
+      : buildWhatsAppHref(
+          whatsappPhone,
+          place.name,
+          isId,
+          whatsappMessage,
+        ),
   };
 }

@@ -109,7 +109,7 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
       query: resolvedSearchParams.q?.trim() || undefined,
       city: resolvedSearchParams.city?.trim() || undefined,
       activeOnly: true,
-      limit: 120,
+      limit: 10,
     }),
     getDeepLinkedStore(deepLinkedSlug, deepLinkedStoreId),
   ]);

@@ -105,8 +105,8 @@ const COMMON_MARKETPLACE_SECTIONS: ExploreSectionConfig[] = [
   },
   {
     key: 'featured-providers',
-    titleId: 'Penyedia pilihan',
-    titleEn: 'Featured providers',
+    titleId: 'Usaha dan penyedia terkait',
+    titleEn: 'Related businesses and providers',
     descriptionId: 'Usaha dan penyedia yang relevan untuk kategori ini.',
     descriptionEn: 'Relevant businesses and providers for this category.',
   },
@@ -249,7 +249,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES: LajukanExploreCategory[] = [
     })),
     sections: marketplaceSections({
       'latest-needs': { titleId: 'Kebutuhan pembeli terbaru' },
-      'featured-providers': { titleId: 'Supplier pilihan' },
+      'featured-providers': { titleId: 'Supplier terkait' },
       'latest-listings': { titleId: 'Produk dan stok terbaru' },
       guides: { titleId: 'Panduan memilih supplier' },
     }),
@@ -265,7 +265,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES: LajukanExploreCategory[] = [
     id: 'service',
     slug: 'services',
     aliases: ['service', 'jasa'],
-    labelId: 'Cari Jasa',
+    labelId: 'Jasa Usaha',
     labelEn: 'Services',
     shortLabelId: 'Jasa',
     shortLabelEn: 'Services',
@@ -325,7 +325,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES: LajukanExploreCategory[] = [
     })),
     sections: marketplaceSections({
       'latest-needs': { titleId: 'Permintaan jasa terbaru' },
-      'featured-providers': { titleId: 'Expert pilihan' },
+      'featured-providers': { titleId: 'Penyedia jasa terkait' },
       'latest-listings': { titleId: 'Jasa terbaru' },
       'nearby-businesses': { titleId: 'Jasa di sekitarmu' },
       guides: { titleId: 'Tips memilih penyedia jasa' },
@@ -381,7 +381,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES: LajukanExploreCategory[] = [
     })),
     sections: marketplaceSections({
       'latest-needs': { titleId: 'Kebutuhan mesin & alat' },
-      'featured-providers': { titleId: 'Dealer dan teknisi pilihan' },
+      'featured-providers': { titleId: 'Dealer dan teknisi terkait' },
       'latest-listings': { titleId: 'Mesin baru dan bekas' },
       guides: { titleId: 'Panduan membeli mesin' },
     }),
@@ -425,7 +425,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES: LajukanExploreCategory[] = [
     })),
     sections: marketplaceSections({
       'latest-needs': { titleId: 'Pencari tempat terbaru' },
-      'featured-providers': { titleId: 'Pengelola dan pemilik pilihan' },
+      'featured-providers': { titleId: 'Pengelola dan pemilik terkait' },
       'latest-listings': { titleId: 'Tempat tersedia' },
       'nearby-businesses': { titleId: 'Lokasi populer di sekitarmu' },
       guides: { titleId: 'Panduan memilih tempat usaha' },
@@ -475,7 +475,7 @@ export const LAJUKAN_EXPLORE_CATEGORIES: LajukanExploreCategory[] = [
     })),
     sections: marketplaceSections({
       'latest-needs': { titleId: 'Mitra yang sedang dicari' },
-      'featured-providers': { titleId: 'Pemilik peluang pilihan' },
+      'featured-providers': { titleId: 'Pemilik peluang terkait' },
       'latest-listings': { titleId: 'Peluang terbaru' },
       guides: { titleId: 'Panduan menilai peluang dan risiko' },
     }),

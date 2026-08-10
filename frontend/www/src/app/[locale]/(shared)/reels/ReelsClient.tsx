@@ -3589,7 +3589,7 @@ function ReelSlide({
   if (!shouldLoad) {
     return (
       <article
-        className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden bg-black px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
+        className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden bg-black px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-2 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
         style={REEL_SLIDE_PLACEHOLDER_STYLE}
         aria-hidden="true"
       >
@@ -3605,7 +3605,7 @@ function ReelSlide({
 
   return (
     <article
-      className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden !bg-black !text-white px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
+      className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden !bg-black !text-white px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-2 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
       style={REEL_SLIDE_LOADED_STYLE}
     >
       <video
@@ -3710,7 +3710,7 @@ function ReelSlide({
         </button>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 px-3 pb-[calc(env(safe-area-inset-bottom)+13px)] pr-[62px] text-white sm:px-4 sm:pr-[68px]">
+      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 px-3 pb-[calc(env(safe-area-inset-bottom)+13px)] pr-[62px] text-white sm:px-2 sm:pr-[68px]">
         <div className="flex min-w-0 items-center gap-1.5">
           <button
             type="button"
@@ -5610,230 +5610,248 @@ function CommentsSheet({
       />
 
       <section className="relative z-10 flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
-        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
-              {formatCompactMetric(metricCount(reel, 'comments'))} komentar
-            </p>
-            <h2 className="truncate text-base !text-black font-bold">
-              {reel.title}
-            </h2>
-          </div>
+  <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
 
-          <button
-            type="button"
-            onClick={() => onChatCreator(null)}
-            disabled={chatBusy}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-60 !text-black"
-          >
-            {chatBusy ? (
-              <Loader2 className="h-4 w-4 animate-spin !text-black" />
-            ) : (
-              <MessageSquareText className="h-4 w-4 !text-black" />
-            )}
-            Chat
-          </button>
+  <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+    <div className="min-w-0">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
+        {formatCompactMetric(metricCount(reel, 'comments'))} komentar
+      </p>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-white"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+      <h2 className="truncate text-base font-bold text-white">
+        {reel.title}
+      </h2>
+    </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          {bucket?.loading && comments.length === 0 ? (
-            <div className="grid h-44 place-items-center text-sm font-bold text-white/55">
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Memuat komentar...
-              </span>
-            </div>
-          ) : roots.length > 0 ? (
-            <div className="space-y-4">
-              {roots.map(comment => {
-                const replies = repliesByParent.get(comment.id) ?? [];
+    <button
+      type="button"
+      onClick={() => onChatCreator(null)}
+      disabled={chatBusy}
+      className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {chatBusy ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <MessageSquareText className="h-4 w-4" />
+      )}
 
-                return (
-                  <article key={comment.id} className="space-y-2">
-                    <div className="flex gap-2.5">
+      Chat
+    </button>
+
+    <button
+      type="button"
+      onClick={onClose}
+      className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/15"
+      aria-label="Tutup komentar"
+    >
+      <X className="h-5 w-5" />
+    </button>
+  </div>
+
+  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+    {bucket?.loading && comments.length === 0 ? (
+      <div className="grid h-44 place-items-center text-sm font-bold text-white/55">
+        <span className="inline-flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Memuat komentar...
+        </span>
+      </div>
+    ) : roots.length > 0 ? (
+      <div className="space-y-4">
+        {roots.map(comment => {
+          const replies = repliesByParent.get(comment.id) ?? [];
+
+          return (
+            <article key={comment.id} className="space-y-2">
+              <div className="flex gap-2.5">
+                <img
+                  src={profileAvatarSrc(
+                    comment.authorAvatarUrl,
+                    readProfileAvatarStyle(comment),
+                    comment.authorName,
+                  )}
+                  alt={comment.authorName}
+                  className="h-9 w-9 shrink-0 rounded-full object-cover"
+                />
+
+                <div className="min-w-0 flex-1">
+                  <div className="rounded-2xl bg-white/8 px-3 py-2 ring-1 ring-white/10">
+                    <p className="truncate text-xs font-bold text-white">
+                      {comment.authorName}
+                    </p>
+
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/78">
+                      {comment.body}
+                    </p>
+                  </div>
+
+                  <div className="mt-1 flex items-center gap-3 px-2 text-[11px] font-bold text-white/42">
+                    <span>
+                      {formatCommentTime(comment.createdAt, locale)}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => onReply(comment)}
+                      className="text-white/55 transition hover:text-emerald-300"
+                    >
+                      Balas
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onChatCreator(comment)}
+                      className="text-white/55 transition hover:text-emerald-300"
+                    >
+                      Chat creator
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {replies.length > 0 && (
+                <div className="ml-11 space-y-2 border-l border-white/10 pl-3">
+                  {replies.map(reply => (
+                    <div key={reply.id} className="flex gap-2">
                       <img
                         src={profileAvatarSrc(
-                          comment.authorAvatarUrl,
-                          readProfileAvatarStyle(comment),
-                          comment.authorName,
+                          reply.authorAvatarUrl,
+                          readProfileAvatarStyle(reply),
+                          reply.authorName,
                         )}
-                        alt={comment.authorName}
-                        className="h-9 w-9 shrink-0 rounded-full object-cover"
+                        alt={reply.authorName}
+                        className="h-7 w-7 shrink-0 rounded-full object-cover"
                       />
+
                       <div className="min-w-0 flex-1">
-                        <div className="rounded-2xl !text-black bg-white/8 px-3 py-2 ring-1 ring-white/10">
-                          <p className="truncate text-xs font-bold text-white">
-                            {comment.authorName}
+                        <div className="rounded-2xl bg-white/6 px-3 py-2 ring-1 ring-white/10">
+                          <p className="truncate text-[11px] font-bold text-white">
+                            {reply.authorName}
                           </p>
-                          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/78">
-                            {comment.body}
+
+                          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-white/75">
+                            {reply.body}
                           </p>
                         </div>
-                        <div className="!text-black mt-1 flex items-center gap-3 px-2 text-[11px] font-bold text-white/42">
-                          <span>
-                            {formatCommentTime(comment.createdAt, locale)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onReply(comment)}
-                            className="text-white/55 transition hover:text-emerald-300"
-                          >
-                            Balas
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onChatCreator(comment)}
-                            className="text-white/55 transition hover:text-emerald-300"
-                          >
-                            Chat creator
-                          </button>
-                        </div>
+
+                        <p className="mt-1 px-2 text-[10px] font-semibold text-white/40">
+                          {formatCommentTime(reply.createdAt, locale)}
+                        </p>
                       </div>
                     </div>
-
-                    {replies.length > 0 && (
-                      <div className="ml-11 space-y-2 border-l border-white/10 pl-3">
-                        {replies.map(reply => (
-                          <div key={reply.id} className="flex gap-2">
-                            <img
-                              src={profileAvatarSrc(
-                                reply.authorAvatarUrl,
-                                readProfileAvatarStyle(reply),
-                                reply.authorName,
-                              )}
-                              alt={reply.authorName}
-                              className="h-7 w-7 shrink-0 rounded-full object-cover"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="rounded-2xl bg-white/6 px-3 py-2 ring-1 ring-white/10">
-                                <p className="truncate text-[11px] font-bold text-white">
-                                  {reply.authorName}
-                                </p>
-                                <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-white/75">
-                                  {reply.body}
-                                </p>
-                              </div>
-                              <p className="mt-1 px-2 text-[10px] font-semibold text-white/40">
-                                {formatCommentTime(reply.createdAt, locale)}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="grid h-44 place-items-center text-center">
-              <div>
-                <MessageCircle className="mx-auto h-9 w-9 text-white/28" />
-                <p className="mt-2 text-sm font-bold text-white">
-                  Belum ada komentar
-                </p>
-                <p className="mt-1 text-xs font-medium text-white/50">
-                  Jadilah yang pertama kasih insight.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {bucket?.error && (
-            <div className="mt-3 rounded-2xl bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 ring-1 ring-rose-300/10">
-              {bucket.error}
-            </div>
-          )}
-
-          {bucket?.hasMore && comments.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onLoadMore(reel.id)}
-              disabled={bucket.loading}
-              className="mt-4 w-full rounded-full bg-white/10 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60"
-            >
-              {bucket.loading ? 'Memuat...' : 'Lihat komentar lainnya'}
-            </button>
-          )}
-        </div>
-
-        <form
-          onSubmit={event => {
-            event.preventDefault();
-            onSubmit();
-          }}
-          className="border-t border-white/10 bg-[#0b0f14] p-3"
-        >
-          {isAuthenticated ? (
-            <div className="space-y-2">
-              {replyTarget && (
-                <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">
-                  <span className="min-w-0 truncate">
-                    Membalas {replyTarget.authorName}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onCancelReply}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-white"
-                    aria-label="Batalkan balasan"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  ))}
                 </div>
               )}
+            </article>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="grid h-44 place-items-center text-center">
+        <div>
+          <MessageCircle className="mx-auto h-9 w-9 text-white/28" />
 
-              <div className="flex items-end gap-2">
-                <textarea
-                  value={body}
-                  onChange={event => onBodyChange(event.target.value)}
-                  placeholder={
-                    replyTarget ? 'Tulis balasan...' : 'Tulis komentar...'
-                  }
-                  maxLength={520}
-                  rows={1}
-                  className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[20px] bg-white/8 px-3 py-2.5 text-sm font-medium text-white outline-none ring-emerald-400/20 transition focus:ring-4 placeholder:text-white/35"
-                />
-                <button
-                  type="submit"
-                  disabled={submitting || !body.trim()}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-700/20 disabled:opacity-45"
-                >
-                  {submitting ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Send className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onRequireLogin}
-                className="min-w-0 flex-1 rounded-full bg-white/10 px-4 py-3 text-left text-sm font-bold text-white/70"
-              >
-                Masuk untuk komentar
-              </button>
-              <Link
-                href={loginHref}
-                className="rounded-full bg-emerald-500 px-4 py-3 text-sm font-bold text-white"
-              >
-                Masuk
-              </Link>
-            </div>
-          )}
-        </form>
-      </section>
+          <p className="mt-2 text-sm font-bold text-white">
+            Belum ada komentar
+          </p>
+
+          <p className="mt-1 text-xs font-medium text-white/50">
+            Jadilah yang pertama kasih insight.
+          </p>
+        </div>
+      </div>
+    )}
+
+    {bucket?.error && (
+      <div className="mt-3 rounded-2xl bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 ring-1 ring-rose-300/10">
+        {bucket.error}
+      </div>
+    )}
+
+    {bucket?.hasMore && comments.length > 0 && (
+      <button
+        type="button"
+        onClick={() => onLoadMore(reel.id)}
+        disabled={bucket.loading}
+        className="mt-4 w-full rounded-full bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {bucket.loading ? 'Memuat...' : 'Lihat komentar lainnya'}
+      </button>
+    )}
+  </div>
+
+  <form
+    onSubmit={event => {
+      event.preventDefault();
+      onSubmit();
+    }}
+    className="border-t border-white/10 bg-[#0b0f14] p-3"
+  >
+    {isAuthenticated ? (
+      <div className="space-y-2">
+        {replyTarget && (
+          <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">
+            <span className="min-w-0 truncate">
+              Membalas {replyTarget.authorName}
+            </span>
+
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/15"
+              aria-label="Batalkan balasan"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
+          <textarea
+            value={body}
+            onChange={event => onBodyChange(event.target.value)}
+            placeholder={
+              replyTarget ? 'Tulis balasan...' : 'Tulis komentar...'
+            }
+            maxLength={520}
+            rows={1}
+            className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[20px] bg-white/8 px-3 py-2.5 text-sm font-medium text-white outline-none ring-emerald-400/20 transition placeholder:text-white/35 focus:ring-4"
+          />
+
+          <button
+            type="submit"
+            disabled={submitting || !body.trim()}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-45"
+            aria-label={replyTarget ? 'Kirim balasan' : 'Kirim komentar'}
+          >
+            {submitting ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+      </div>
+    ) : (
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onRequireLogin}
+          className="min-w-0 flex-1 rounded-full bg-white/10 px-4 py-3 text-left text-sm font-bold text-white/70 transition hover:bg-white/15 hover:text-white"
+        >
+          Masuk untuk komentar
+        </button>
+
+        <Link
+          href={loginHref}
+          className="rounded-full bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-400"
+        >
+          Masuk
+        </Link>
+      </div>
+    )}
+  </form>
+</section>
     </div>
   );
 }
@@ -6939,7 +6957,7 @@ function UploadReelSheet({
         />
         <div
           className={cn(
-            'items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5 sm:px-4 dark:border-white/10',
+            'items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5 sm:px-2 dark:border-white/10',
             step === 'media' ? 'hidden' : 'flex',
           )}
         >

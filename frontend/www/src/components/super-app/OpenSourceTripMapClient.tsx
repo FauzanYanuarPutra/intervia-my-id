@@ -299,7 +299,9 @@ export function OpenSourceTripMapClient({
 
   const tileUrl =
     process.env.NEXT_PUBLIC_OSM_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const tileAttribution = process.env.NEXT_PUBLIC_OSM_TILE_ATTRIBUTION || '';
+  const tileAttribution =
+    process.env.NEXT_PUBLIC_OSM_TILE_ATTRIBUTION ||
+    '&copy; OpenStreetMap contributors';
 
   const query = useMemo(() => {
     if (!resolvedDestination) return null;
@@ -421,7 +423,7 @@ export function OpenSourceTripMapClient({
       zoom={14}
       scrollWheelZoom
       className={className || 'h-64 w-full'}
-      attributionControl={false}
+      attributionControl
       zoomControl={false}
     >
       <ZoomControl position="bottomleft" />

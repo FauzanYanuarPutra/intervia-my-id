@@ -38,9 +38,7 @@ type SeedGroupConfig = {
 };
 
 const ENABLE_UMKM_RUNTIME_SEED_DATA =
-  process.env.VITEST === 'true' ||
-  process.env.ENABLE_UMKM_RUNTIME_SEED_DATA === 'true' ||
-  process.env.NEXT_PUBLIC_ENABLE_UMKM_RUNTIME_SEED_DATA === 'true';
+  process.env.VITEST === 'true';
 
 const BASE_STORE_COUNT = 10;
 const STORE_ID_PREFIX = '50000000-0000-0000-0000-';

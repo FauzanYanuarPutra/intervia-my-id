@@ -182,7 +182,9 @@ export default function PropertyClient() {
 
   const initialSearch = searchParams.get('q') ?? '';
   const initialLocation = searchParams.get('location') ?? '';
-  const initialType = (searchParams.get('status') as Filters['type']) || 'All';
+  const legacyType = searchParams.get('status');
+  const initialType =
+    ((searchParams.get('deal') || legacyType) as Filters['type']) || 'All';
 
   const [tempSearch, setTempSearch] = useState(initialSearch);
   const [tempLocation, setTempLocation] = useState(initialLocation);
@@ -215,9 +217,10 @@ export default function PropertyClient() {
     if (appliedFilters.location.trim())
       params.set('location', appliedFilters.location.trim());
     else params.delete('location');
+    params.delete('status');
     if (appliedFilters.type !== 'All')
-      params.set('status', appliedFilters.type);
-    else params.delete('status');
+      params.set('deal', appliedFilters.type);
+    else params.delete('deal');
 
     const nextQuery = params.toString();
     const currentQuery = searchParams.toString();
@@ -260,10 +263,6 @@ export default function PropertyClient() {
         if (appliedFilters.location.trim()) {
           params.set('location', appliedFilters.location.trim());
         }
-        if (appliedFilters.type !== 'All') {
-          params.set('status', appliedFilters.type);
-        }
-
         const res = await fetch(`/api/content?${params.toString()}`, {
           cache: 'no-store',
         });

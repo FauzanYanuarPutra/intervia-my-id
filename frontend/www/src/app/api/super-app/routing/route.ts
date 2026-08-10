@@ -5,15 +5,37 @@ import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 
 type LatLng = { lat: number; lng: number };
 
-const QuerySchema = z.object({
-  origin_lat: z.coerce.number().min(-90).max(90),
-  origin_lng: z.coerce.number().min(-180).max(180),
-  destination_lat: z.coerce.number().min(-90).max(90),
-  destination_lng: z.coerce.number().min(-180).max(180),
-  via_lat: z.coerce.number().min(-90).max(90).optional(),
-  via_lng: z.coerce.number().min(-180).max(180).optional(),
-  profile: z.enum(['driving', 'cycling', 'walking']).default('driving'),
-});
+function coordinateSchema(min: number, max: number) {
+  return z.preprocess(
+    value =>
+      typeof value === 'string' && value.trim() ? Number(value) : value,
+    z.number().finite().min(min).max(max),
+  );
+}
+
+const RoutingSchema = z
+  .object({
+    origin_lat: coordinateSchema(-90, 90),
+    origin_lng: coordinateSchema(-180, 180),
+    destination_lat: coordinateSchema(-90, 90),
+    destination_lng: coordinateSchema(-180, 180),
+    via_lat: coordinateSchema(-90, 90).optional(),
+    via_lng: coordinateSchema(-180, 180).optional(),
+    profile: z.enum(['driving', 'cycling', 'walking']).default('driving'),
+  })
+  .superRefine((value, context) => {
+    const hasViaLat = value.via_lat !== undefined;
+    const hasViaLng = value.via_lng !== undefined;
+    if (hasViaLat === hasViaLng) return;
+
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'via_lat and via_lng must be provided together',
+      path: hasViaLat ? ['via_lng'] : ['via_lat'],
+    });
+  });
+
+type RoutingQuery = z.infer<typeof RoutingSchema>;
 
 type OsrmRouteResponse = {
   code?: string;
@@ -26,10 +48,6 @@ type OsrmRouteResponse = {
   }>;
 };
 
-function hasPair(lat: number | undefined, lng: number | undefined): boolean {
-  return Number.isFinite(lat) && Number.isFinite(lng);
-}
-
 function toLatLngPair(value: number[]): LatLng | null {
   if (!Array.isArray(value) || value.length < 2) return null;
   const lng = Number(value[0]);
@@ -41,7 +59,11 @@ function toLatLngPair(value: number[]): LatLng | null {
   };
 }
 
-function fallbackPath(origin: LatLng, destination: LatLng, via?: LatLng): LatLng[] {
+function fallbackPath(
+  origin: LatLng,
+  destination: LatLng,
+  via?: LatLng,
+): LatLng[] {
   if (via) {
     return [origin, via, destination];
   }
@@ -54,31 +76,41 @@ function getOsrmBaseUrl(): string {
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    const auth = await requireAuth(req);
+  const url = new URL(req.url);
+  return handleRoutingRequest(req, {
+    origin_lat: url.searchParams.get('origin_lat') ?? undefined,
+    origin_lng: url.searchParams.get('origin_lng') ?? undefined,
+    destination_lat: url.searchParams.get('destination_lat') ?? undefined,
+    destination_lng: url.searchParams.get('destination_lng') ?? undefined,
+    via_lat: url.searchParams.get('via_lat') ?? undefined,
+    via_lng: url.searchParams.get('via_lng') ?? undefined,
+    profile: url.searchParams.get('profile') || undefined,
+  });
+}
 
-    const url = new URL(req.url);
-    const parsed = QuerySchema.safeParse({
-      origin_lat: url.searchParams.get('origin_lat'),
-      origin_lng: url.searchParams.get('origin_lng'),
-      destination_lat: url.searchParams.get('destination_lat'),
-      destination_lng: url.searchParams.get('destination_lng'),
-      via_lat: url.searchParams.get('via_lat') || undefined,
-      via_lng: url.searchParams.get('via_lng') || undefined,
-      profile: url.searchParams.get('profile') || 'driving',
-    });
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => null);
+  return handleRoutingRequest(req, body);
+}
+
+async function handleRoutingRequest(req: NextRequest, input: unknown) {
+  try {
+    const parsed = RoutingSchema.safeParse(input);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid routing query' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid routing query' },
+        { status: 400 },
+      );
     }
 
     const query = parsed.data;
-    if (hasPair(query.via_lat, query.via_lng) !== (query.via_lat !== undefined || query.via_lng !== undefined)) {
-      return NextResponse.json({ error: 'via_lat and via_lng must be provided together' }, { status: 400 });
-    }
+    const auth = await requireAuth(req);
 
-    const requesterKey = auth.ok ? `user:${auth.ctx.userId}` : `ip:${getClientIp(req.headers)}`;
+    const requesterKey = auth.ok
+      ? `user:${auth.ctx.userId}`
+      : `ip:${getClientIp(req.headers)}`;
     const rl = await enforceRateLimit({
-      key: `superapp:routing:${requesterKey}:${query.profile}:${query.origin_lat}:${query.origin_lng}:${query.destination_lat}:${query.destination_lng}`,
+      key: `superapp:routing:${requesterKey}:${query.profile}`,
       limit: 1200,
       windowSeconds: 3600,
       message: 'Too many route calculations',
@@ -86,10 +118,11 @@ export async function GET(req: NextRequest) {
     if (!rl.ok) return rl.response;
 
     const origin: LatLng = { lat: query.origin_lat, lng: query.origin_lng };
-    const destination: LatLng = { lat: query.destination_lat, lng: query.destination_lng };
-    const via = hasPair(query.via_lat, query.via_lng)
-      ? { lat: query.via_lat!, lng: query.via_lng! }
-      : undefined;
+    const destination: LatLng = {
+      lat: query.destination_lat,
+      lng: query.destination_lng,
+    };
+    const via = toOptionalVia(query);
 
     const coords = [
       `${query.origin_lng},${query.origin_lat}`,
@@ -119,14 +152,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const osrmData = (await osrmRes.json().catch(() => ({}))) as OsrmRouteResponse;
+    const osrmData = (await osrmRes
+      .json()
+      .catch(() => ({}))) as OsrmRouteResponse;
     const topRoute = osrmData.routes?.[0];
     const coordinates = Array.isArray(topRoute?.geometry?.coordinates)
       ? topRoute!.geometry!.coordinates!
       : [];
 
     const points = coordinates
-      .map((coord) => toLatLngPair(coord))
+      .map(coord => toLatLngPair(coord))
       .filter((item): item is LatLng => Boolean(item));
 
     if (points.length === 0) {
@@ -148,8 +183,12 @@ export async function GET(req: NextRequest) {
       {
         data: {
           points,
-          distance_m: Number.isFinite(topRoute?.distance) ? Math.round(topRoute!.distance!) : null,
-          duration_s: Number.isFinite(topRoute?.duration) ? Math.round(topRoute!.duration!) : null,
+          distance_m: Number.isFinite(topRoute?.distance)
+            ? Math.round(topRoute!.distance!)
+            : null,
+          duration_s: Number.isFinite(topRoute?.duration)
+            ? Math.round(topRoute!.duration!)
+            : null,
           used_fallback: false,
           provider: 'osrm',
         },
@@ -158,6 +197,16 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     console.error('[SUPER_APP_ROUTING_ERROR]', error);
-    return NextResponse.json({ error: 'Failed to calculate route' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to calculate route' },
+      { status: 500 },
+    );
   }
+}
+
+function toOptionalVia(query: RoutingQuery): LatLng | undefined {
+  if (query.via_lat === undefined || query.via_lng === undefined) {
+    return undefined;
+  }
+  return { lat: query.via_lat, lng: query.via_lng };
 }

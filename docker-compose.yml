@@ -44,9 +44,6 @@ services:
       MAX_LOGIN_ATTEMPTS: "5"
       LOCKOUT_DURATION_MIN: "15"
       FAILED_LOGIN_DELAY_MS: "1000"
-      DEV_SEED_OPS_USER: ${DEV_SEED_OPS_USER:-true}
-      DEV_SEED_OPS_PASSWORD: ${DEV_SEED_OPS_PASSWORD:-}
-
       # --- Domain & CORS ---
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
@@ -277,7 +274,7 @@ services:
       context: ./services/marketplace_service
       dockerfile: Dockerfile
     ports:
-      - "${PORT_MARKETPLACE:-8081}:8081"
+      - "127.0.0.1:${PORT_MARKETPLACE:-8081}:8081"
     environment:
       APP_PORT: "8081"
       MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
@@ -839,7 +836,9 @@ services:
       - tunnel
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
-    command: tunnel --protocol http2 run
+    command: tunnel --metrics 0.0.0.0:20241 --protocol http2 run
+    ports:
+      - "127.0.0.1:${PORT_CLOUDFLARE_METRICS:-20241}:20241"
     networks:
       - web
 
@@ -853,6 +852,7 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${DB_PASS}
+      PGADMIN_CONFIG_ALLOW_SPECIAL_EMAIL_DOMAINS: '["local"]'
     ports:
       - "${PORT_PGADMIN:-5050}:80"
     networks:

@@ -2279,7 +2279,7 @@ export default function CreateListingWizard({
 
   if (!hydrated) {
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-[1700px] items-center justify-center px-4">
+      <main className="mx-auto flex min-h-[60vh] max-w-[2000px] items-center justify-center px-4">
         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
       </main>
     );
@@ -2322,7 +2322,7 @@ export default function CreateListingWizard({
 
   return (
     <main className="min-h-screen bg-transparent pb-32 text-slate-950 dark:text-slate-50 lg:pb-28">
-      <div className="mx-auto w-full max-w-[1180px] px-2 py-3 sm:px-4 lg:px-5 lg:py-4">
+      <div className="mx-auto w-full max-w-[1180px] px-2 py-3 sm:px-2 lg:px-5 lg:py-4">
         <div className="mb-3">
           <p className="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-300">
             {text(locale, 'Buat postingan usaha', 'Create business post')} -{' '}
@@ -3125,7 +3125,7 @@ export default function CreateListingWizard({
       ) : null}
 
       {!pendingStoredDraft ? (
-        <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-4">
+        <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-2">
           <div className="mx-auto flex max-w-[1180px] items-center gap-2 pb-[env(safe-area-inset-bottom)]">
             <button
               type="button"
@@ -3155,7 +3155,7 @@ export default function CreateListingWizard({
             <button
               type="button"
               onClick={currentStep === 9 ? publish : goNext}
-              className="ml-auto inline-flex min-h-[44px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white sm:flex-none sm:px-4"
+              className="ml-auto inline-flex min-h-[44px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white sm:flex-none sm:px-2"
               aria-label={nextButtonLabel}
             >
               <span className="min-w-0 truncate">{nextButtonLabel}</span>

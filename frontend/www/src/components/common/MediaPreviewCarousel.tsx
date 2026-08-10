@@ -379,7 +379,7 @@ export function MediaPreviewCarousel({
       {/* Fullscreen Lightbox Modal */}
       {lightboxOpen ? (
         <div
-          className="ui-layer-preview fixed inset-0 flex h-[var(--app-visual-viewport-height)] w-screen items-center justify-center overflow-hidden bg-black/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] animate-in fade-in duration-200 sm:px-4"
+          className="ui-layer-preview fixed inset-0 flex h-[var(--app-visual-viewport-height)] w-screen items-center justify-center overflow-hidden bg-black/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] animate-in fade-in duration-200 sm:px-2"
           role="dialog"
           aria-modal="true"
           aria-label="Preview media"

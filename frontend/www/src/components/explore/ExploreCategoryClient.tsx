@@ -53,6 +53,50 @@ function appendSearchParams(path: string, params: URLSearchParams) {
   return search ? `${path}?${search}` : path;
 }
 
+const CATEGORY_RESULT_PARAMS = new Set([
+  'q',
+  'subcategory',
+  'location',
+  'lat',
+  'lng',
+  'distance',
+  'sort',
+  'min_price',
+  'max_price',
+  'condition',
+  'service_mode',
+  'verified',
+  'status',
+  'privacy',
+]);
+
+function normalizeQuery(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+const CATEGORY_OVERVIEW_CACHE = new Map<string, ExploreCategoryResponse>();
+const CATEGORY_SEARCH_CACHE = new Map<string, GlobalSearchResponse>();
+const MAX_CATEGORY_CACHE_ENTRIES = 10;
+
+function rememberBounded<T>(cache: Map<string, T>, key: string, value: T) {
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > MAX_CATEGORY_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (!oldestKey) break;
+    cache.delete(oldestKey);
+  }
+}
+
+function hasCategoryResultState(params: URLSearchParams): boolean {
+  return Array.from(params.entries()).some(([key, value]) => {
+    if (!CATEGORY_RESULT_PARAMS.has(key) || !value.trim()) return false;
+    if (key === 'q') return normalizeQuery(value).length >= 2;
+    if (key === 'sort') return value !== 'relevance';
+    return true;
+  });
+}
+
 function SectionSkeleton() {
   return (
     <section
@@ -90,10 +134,7 @@ function EmptyPrimarySection({
       ? '/reels'
       : mode === 'demand'
         ? `/create?side=supply&category=${encodeURIComponent(category.slug)}`
-        : buildCategorySearchHref({
-            category,
-            side: 'supply',
-          });
+        : `/create?side=demand&category=${encodeURIComponent(category.slug)}`;
   return (
     <div className="flex flex-col items-start gap-4 rounded-[8px] border border-dashed border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -118,21 +159,21 @@ function EmptyPrimarySection({
                 ? 'Buka Komunitas untuk melihat diskusi terbaru.'
                 : mode === 'demand'
                   ? 'Pasang penawaran agar pembeli yang cocok bisa menemukanmu.'
-                  : 'Coba kategori atau kata kunci penawaran lain.'
+                  : 'Pasang kebutuhan agar penyedia yang cocok bisa menanggapi.'
             : isVideo
               ? 'Open Videos to see the latest uploads.'
               : isCommunity
                 ? 'Open Community to see the latest discussions.'
                 : mode === 'demand'
                   ? 'Post an offer so matching buyers can find you.'
-                  : 'Try another offer keyword or category.'}
+                  : 'Post your need so providers can respond.'}
         </p>
       </div>
       <Link
         href={actionHref}
         className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-[8px] bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2"
       >
-        {isCommunity || isVideo || mode === 'supply' ? (
+        {isCommunity || isVideo ? (
           <ArrowRight className="h-4 w-4" />
         ) : (
           <Plus className="h-4 w-4" />
@@ -144,14 +185,14 @@ function EmptyPrimarySection({
               ? 'Buka Komunitas'
               : mode === 'demand'
                 ? 'Pasang penawaran'
-                : 'Cari penawaran'
+                : 'Pasang kebutuhan'
           : isVideo
             ? 'Open Videos'
             : isCommunity
               ? 'Open Community'
               : mode === 'demand'
                 ? 'Post an offer'
-                : 'Find offers'}
+                : 'Post a need'}
       </Link>
     </div>
   );
@@ -185,15 +226,17 @@ function DataSection({
     if (kind === 'community') return '/community';
     if (kind === 'video') return '/reels';
     const params = new URLSearchParams();
-    params.set('category', category.slug);
     if (config.key === 'latest-needs') {
       params.set('side', 'demand');
       params.set('tab', 'needs');
-      params.set('sort', 'latest');
+    } else if (kind === 'business') {
+      params.set('side', 'supply');
+      params.set('tab', 'businesses');
     } else {
       params.set('side', 'supply');
     }
-    return `/explore?${params.toString()}`;
+    params.set('sort', 'latest');
+    return appendSearchParams(buildExploreCategoryHref(category), params);
   })();
 
   return (
@@ -345,12 +388,13 @@ export function ExploreCategoryClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
   const searchState = useMemo(
-    () => parseGlobalSearchState(new URLSearchParams(searchParams.toString())),
-    [searchParams],
+    () => parseGlobalSearchState(new URLSearchParams(searchKey)),
+    [searchKey],
   );
-  const requestedSide =
-    searchParams.get('side') === 'demand' ? 'demand' : 'supply';
+  const searchSide: 'supply' | 'demand' =
+    searchState.side === 'demand' ? 'demand' : 'supply';
   const [queryDraft, setQueryDraft] = useState({
     source: searchState.query,
     value: searchState.query,
@@ -362,38 +406,33 @@ export function ExploreCategoryClient({
   const setQueryInput = (value: string) => {
     setQueryDraft({ source: searchState.query, value });
   };
-  const [searchSide, setSearchSide] = useState<'supply' | 'demand'>(
-    requestedSide,
-  );
   const [payload, setPayload] = useState<ExploreCategoryResponse | null>(null);
   const [searchPayload, setSearchPayload] = useState<GlobalSearchResponse>(() =>
     emptyGlobalSearchResponse(searchState.query),
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [searchRetryKey, setSearchRetryKey] = useState(0);
   const isId = locale === 'id';
-  const isFilteredSearchMode =
-    searchState.query.length >= 2 || Boolean(searchState.subcategory);
-
-  useEffect(() => {
-    setSearchSide(requestedSide);
-  }, [requestedSide]);
+  const isFilteredSearchMode = useMemo(
+    () => hasCategoryResultState(new URLSearchParams(searchKey)),
+    [searchKey],
+  );
 
   const selectSearchSide = (side: 'supply' | 'demand') => {
-    setSearchSide(side);
     if (category.id === 'community' || category.id === 'video') return;
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchKey);
     if (side === 'demand') {
       params.set('side', 'demand');
+      params.set('tab', 'needs');
     } else {
       params.delete('side');
+      if (params.get('tab') === 'needs') params.delete('tab');
     }
-    params.delete('q');
-    params.delete('tab');
+    params.delete('cursor');
     router.replace(
       appendSearchParams(
         `/${locale}${buildExploreCategoryHref(category)}`,
@@ -405,6 +444,8 @@ export function ExploreCategoryClient({
 
   const load = useCallback(
     async (signal: AbortSignal) => {
+      const cachedPayload = CATEGORY_OVERVIEW_CACHE.get(category.slug);
+      if (cachedPayload) setPayload(cachedPayload);
       setLoading(true);
       setError(false);
       try {
@@ -416,7 +457,10 @@ export function ExploreCategoryClient({
           },
         );
         if (!response.ok) throw new Error('explore_failed');
-        setPayload((await response.json()) as ExploreCategoryResponse);
+        const nextPayload = (await response.json()) as ExploreCategoryResponse;
+        if (signal.aborted) return;
+        rememberBounded(CATEGORY_OVERVIEW_CACHE, category.slug, nextPayload);
+        setPayload(nextPayload);
       } catch {
         if (!signal.aborted) setError(true);
       } finally {
@@ -427,25 +471,35 @@ export function ExploreCategoryClient({
   );
 
   useEffect(() => {
+    if (isFilteredSearchMode) {
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
-  }, [load, retryKey]);
+  }, [isFilteredSearchMode, load, retryKey]);
 
   useEffect(() => {
     if (!isFilteredSearchMode) return;
     const controller = new AbortController();
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchKey);
     params.delete('type');
     params.set('category', category.slug);
     params.set('side', searchSide);
     if (searchSide === 'demand') params.set('tab', 'needs');
+    else if (params.get('tab') === 'needs') params.delete('tab');
+    const requestKey = params.toString();
+    const cachedPayload = CATEGORY_SEARCH_CACHE.get(requestKey);
+    if (cachedPayload) setSearchPayload(cachedPayload);
+    else setSearchPayload(emptyGlobalSearchResponse(searchState.query));
+
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
       setSearchLoading(true);
       setSearchError(false);
     });
-    void fetch(`/api/search?${params.toString()}`, {
+    void fetch(`/api/search?${requestKey}`, {
       cache: 'no-store',
       signal: controller.signal,
     })
@@ -453,12 +507,13 @@ export function ExploreCategoryClient({
         if (!response.ok) throw new Error('search_failed');
         return (await response.json()) as GlobalSearchResponse;
       })
-      .then(setSearchPayload)
+      .then(nextPayload => {
+        if (controller.signal.aborted) return;
+        rememberBounded(CATEGORY_SEARCH_CACHE, requestKey, nextPayload);
+        setSearchPayload(nextPayload);
+      })
       .catch(() => {
-        if (!controller.signal.aborted) {
-          setSearchPayload(emptyGlobalSearchResponse(searchState.query));
-          setSearchError(true);
-        }
+        if (!controller.signal.aborted) setSearchError(true);
       })
       .finally(() => {
         if (!controller.signal.aborted) setSearchLoading(false);
@@ -467,7 +522,7 @@ export function ExploreCategoryClient({
   }, [
     category.slug,
     isFilteredSearchMode,
-    searchParams,
+    searchKey,
     searchRetryKey,
     searchSide,
     searchState.query,
@@ -478,11 +533,11 @@ export function ExploreCategoryClient({
       properties: {
         locale,
         source: 'explore_category',
-        route: buildExploreCategoryHref(category),
+        route: buildExploreCategoryHref({ slug: category.slug }),
         category: category.slug,
       },
     });
-  }, [category, locale]);
+  }, [category.slug, locale]);
 
   const groups = payload?.groups;
   const listings = useMemo(
@@ -527,30 +582,32 @@ export function ExploreCategoryClient({
     return [
       'featured-providers',
       'latest-listings',
-      'nearby-businesses',
     ].includes(section.key);
   });
 
   const submitSearch = (nextQuery = queryInput) => {
-    const clean = nextQuery.replace(/\s+/g, ' ').trim();
+    const clean = normalizeQuery(nextQuery);
     if (clean.length < 2) return;
     if (category.id === 'community' || category.id === 'video') {
       const target = category.id === 'community' ? 'community' : 'reels';
       router.push(`/${locale}/${target}?q=${encodeURIComponent(clean)}`);
       return;
     }
-    const params = new URLSearchParams({
-      q: clean,
-      side: searchSide,
-    });
+    const params = new URLSearchParams(searchKey);
+    params.set('q', clean);
+    params.set('side', searchSide);
     if (searchSide === 'demand') params.set('tab', 'needs');
+    else if (params.get('tab') === 'needs') params.delete('tab');
+    params.delete('cursor');
+    params.delete('type');
+    params.delete('category');
     router.push(
       appendSearchParams(`/${locale}${buildExploreCategoryHref(category)}`, params),
     );
   };
 
   const selectSearchTab = (tab: GlobalSearchTab) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchKey);
     if (tab === 'all') {
       params.delete('tab');
     } else {
@@ -587,13 +644,13 @@ export function ExploreCategoryClient({
     );
 
   return (
-    <div className="min-h-[100svh] bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
+    <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
       <div className="lg:hidden">
         <Header />
         <div className="h-[calc(52px+env(safe-area-inset-top))]" />
       </div>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+      <main className="mx-auto w-full min-w-0 max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <nav
           aria-label={isId ? 'Breadcrumb' : 'Breadcrumb'}
           className="flex items-center gap-1.5 text-xs text-[color:var(--app-text-soft)]"
@@ -615,7 +672,7 @@ export function ExploreCategoryClient({
           </span>
         </nav>
 
-        <section className="mt-4 grid gap-6 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.5)] sm:p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:gap-10">
+        <section className="mt-4 grid min-w-0 gap-5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.5)] sm:p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:gap-10">
           <div className="flex min-w-0 items-start gap-3 sm:gap-4">
             <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] sm:h-14 sm:w-14">
               <Image
@@ -642,11 +699,11 @@ export function ExploreCategoryClient({
                       : 'Watch the latest business videos and ideas.'
                     : searchSide === 'demand'
                       ? isId
-                        ? 'Lihat kebutuhan pembeli terbaru dalam kategori ini, lalu pilih brief yang cocok untuk ditanggapi.'
+                        ? 'Lihat permintaan pembeli dalam kategori ini.'
                         : 'See the latest buyer requests in this category.'
                       : isId
-                        ? 'Bandingkan penawaran, penyedia, dan usaha yang relevan dalam kategori ini.'
-                        : 'Find products and providers in this category.'}
+                        ? 'Cari produk, jasa, dan usaha yang sesuai dalam kategori ini.'
+                        : 'Find relevant products, services, and businesses in this category.'}
               </p>
             </div>
           </div>
@@ -654,21 +711,19 @@ export function ExploreCategoryClient({
           <div className="min-w-0">
             {!isSocialCategory ? (
               <div
-                className="grid grid-cols-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-1"
-                aria-label={isId ? 'Pilih tujuan' : 'Choose a goal'}
-                role="tablist"
+                className="grid grid-cols-[repeat(2,minmax(0,1fr))] rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
+                aria-label={isId ? 'Pilih tujuan pencarian' : 'Choose a search goal'}
+                role="group"
               >
                 {[
                   {
                     value: 'supply' as const,
-                    label: isId ? 'Cari yang menawarkan' : 'Find Providers',
-                    shortLabel: isId ? 'Penyedia' : 'Providers',
+                    label: isId ? 'Produk & jasa' : 'Products & services',
                     icon: Search,
                   },
                   {
                     value: 'demand' as const,
-                    label: isId ? 'Lihat kebutuhan pembeli' : 'Find Buyers',
-                    shortLabel: isId ? 'Pembeli' : 'Buyers',
+                    label: isId ? 'Permintaan pembeli' : 'Buyer requests',
                     icon: ClipboardList,
                   },
                 ].map(option => {
@@ -679,18 +734,16 @@ export function ExploreCategoryClient({
                       key={option.value}
                       type="button"
                       onClick={() => selectSearchSide(option.value)}
-                      role="tab"
-                      aria-selected={active}
+                      aria-pressed={active}
                       className={cn(
-                        'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:text-sm',
+                        'inline-flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-center text-xs font-bold leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:text-sm',
                         active
                           ? 'cursor-default bg-[color:var(--app-accent)] text-white shadow-sm'
                           : 'cursor-pointer text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]',
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      <span className="sm:hidden">{option.shortLabel}</span>
-                      <span className="hidden sm:inline">{option.label}</span>
+                      <span className="min-w-0">{option.label}</span>
                     </button>
                   );
                 })}
@@ -710,39 +763,44 @@ export function ExploreCategoryClient({
               className={cn(!isSocialCategory && 'mt-2.5')}
               role="search"
             >
-              <label className="flex min-h-[52px] items-center gap-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.45)] focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)]">
+              <label htmlFor={`explore-category-search-${category.id}`} className="sr-only">
+                {isId ? `Cari di ${category.labelId}` : `Search ${category.labelEn}`}
+              </label>
+              <div className="flex min-h-[52px] min-w-0 items-center gap-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.45)] focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)]">
                 <Search className="h-5 w-5 shrink-0 text-[color:var(--app-text-soft)]" />
                 <input
                   type="search"
+                  id={`explore-category-search-${category.id}`}
                   name="q"
                   value={queryInput}
                   onChange={event => setQueryInput(event.target.value)}
                   placeholder={
                     searchSide === 'demand' && !isSocialCategory
                       ? isId
-                        ? `Cari pembeli ${category.shortLabelId.toLowerCase()}`
-                        : `Search ${category.shortLabelEn.toLowerCase()} buyers`
+                        ? `Contoh: pembeli butuh ${category.shortLabelId.toLowerCase()}`
+                        : `Example: buyers need ${category.shortLabelEn.toLowerCase()}`
                       : isId
                         ? `Cari di ${category.labelId}`
                         : `Search ${category.labelEn}`
                   }
                   className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)]"
+                  aria-label={isId ? `Cari di ${category.labelId}` : `Search ${category.labelEn}`}
+                  autoComplete="off"
+                  enterKeyHint="search"
                 />
                 <button
                   type="submit"
                   disabled={queryInput.trim().length < 2}
                   className={cn(
-                    'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none',
+                    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none',
                     queryInput.trim().length < 2 &&
                       'cursor-not-allowed opacity-40',
                   )}
                 >
-                  <span className="hidden sm:inline">
-                    {isId ? 'Cari' : 'Search'}
-                  </span>
+                  <span>{isId ? 'Cari' : 'Search'}</span>
                   <ArrowRight className="h-4 w-4" />
                 </button>
-              </label>
+              </div>
               {!isSocialCategory ? (
                 <>
                   {searchSide === 'demand' ? (
@@ -758,22 +816,22 @@ export function ExploreCategoryClient({
         </section>
 
         <details className="group my-5 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:p-5">
-          <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-bold text-[color:var(--app-text)] marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-bold text-[color:var(--app-text)] marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]">
             <span>
               {isId
-                ? 'Ganti kategori atau pilih detail'
-                : 'Switch category or choose detail'}
+                ? 'Pilih kategori atau jenis yang lebih spesifik'
+                : 'Choose a category or a more specific type'}
             </span>
             <ChevronDown className="h-4 w-4 text-[color:var(--app-text-soft)] transition group-open:rotate-180" />
           </summary>
           <div
-            className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+            className="mt-4 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:grid-cols-3 lg:grid-cols-6"
             aria-label={isId ? 'Kategori Jelajahi' : 'Explore categories'}
           >
             {!isSocialCategory ? (
               <Link
                 href={buildCategorySearchHref({
-                  query: searchParams.get('q') || undefined,
+                  query: new URLSearchParams(searchKey).get('q') || undefined,
                   side: searchSide,
                 })}
                 className="inline-flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-1.5 pl-2.5 pr-2.5 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
@@ -863,7 +921,7 @@ export function ExploreCategoryClient({
                     },
                   });
                 }}
-                className="inline-flex min-h-9 max-w-full cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+                className="inline-flex min-h-11 max-w-full cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
               >
                 <span className="truncate">
                   {isId ? subcategory.labelId : subcategory.labelEn}
@@ -886,8 +944,8 @@ export function ExploreCategoryClient({
           />
         ) : null}
 
-        {!isFilteredSearchMode && loading ? <SectionSkeleton /> : null}
-        {!isFilteredSearchMode && error ? (
+        {!isFilteredSearchMode && loading && !payload ? <SectionSkeleton /> : null}
+        {!isFilteredSearchMode && error && !payload ? (
           <section className="border-t border-[color:var(--app-border)] py-8">
             <div className="flex flex-col items-start gap-4 rounded-[8px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -914,7 +972,7 @@ export function ExploreCategoryClient({
           </section>
         ) : null}
 
-        {!isFilteredSearchMode && !loading && !error && payload ? (
+        {!isFilteredSearchMode && payload ? (
           <>
             {!payload.degraded
               ? dataSections.map(section => {
@@ -929,10 +987,7 @@ export function ExploreCategoryClient({
                         kind="listing"
                       />
                     );
-                  if (
-                    section.key === 'featured-providers' ||
-                    section.key === 'nearby-businesses'
-                  )
+                  if (section.key === 'featured-providers')
                     return (
                       <DataSection
                         key={section.key}

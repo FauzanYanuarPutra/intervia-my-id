@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  ExternalLink,
   FileCheck2,
   Flag,
   List,
@@ -21,7 +22,10 @@ import {
   X,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
+import {
+  buildUmkmMapPlacePath,
+  isUmkmMapPublicReference,
+} from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 import {
   MapQuickControls,
@@ -80,13 +84,24 @@ type StoresResponse = {
   data?: {
     items: DiscoveryStore[];
     count: number;
+    loaded_count?: number;
+    has_more?: boolean;
+    next_offset?: number | null;
+    reference_has_more?: boolean;
+    next_cursor?: string | null;
   };
   error?: string;
 };
 
-const DISCOVERY_REFRESH_INTERVAL_MS = 25000;
-const LIST_PAGE_SIZE = 4;
+const LIST_PAGE_SIZE = 10;
 const REPORT_EMAIL = 'support@lajukan.com';
+
+type DiscoveryScope = 'all' | 'registered' | 'references';
+
+function readDiscoveryScope(value: string | null): DiscoveryScope {
+  if (value === 'registered' || value === 'references') return value;
+  return 'all';
+}
 
 type UmkmTrustTier =
   | 'unverified'
@@ -108,14 +123,29 @@ type UmkmRiskProfile = {
   description: string;
 };
 
+export type UmkmPublicReferenceProvenance = {
+  sourceTitle: string;
+  sourceLicense: string;
+  sourceUrl: string | null;
+  sourceLicenseUrl: string | null;
+};
+
 function getOpenStatusProfile(
   openNow: boolean | null,
   isId: boolean,
+  isPublicReference = false,
 ): {
   label: string;
   dotClassName: string;
   textClassName: string;
 } {
+  if (isPublicReference) {
+    return {
+      label: isId ? 'Referensi publik' : 'Public reference',
+      dotClassName: 'bg-blue-400',
+      textClassName: 'text-blue-700 dark:text-blue-300',
+    };
+  }
   if (openNow === true) {
     return {
       label: isId ? 'Buka sekarang' : 'Open now',
@@ -185,6 +215,77 @@ function readMetaBoolean(
     }
     return value === 1;
   });
+}
+
+function readSafeExternalUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (!raw || raw.length > 2048) return null;
+  try {
+    const parsed = new URL(raw);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    if (parsed.username || parsed.password) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+export function getUmkmPublicReferenceProvenance(
+  store: Pick<DiscoveryStore, 'metadata'>,
+): UmkmPublicReferenceProvenance | null {
+  if (!isUmkmMapPublicReference(store)) return null;
+  const metadata = store.metadata || {};
+  return {
+    sourceTitle: readMetaText(metadata, 'source_title').slice(0, 160),
+    sourceLicense: readMetaText(metadata, 'source_license').slice(0, 120),
+    sourceUrl: readSafeExternalUrl(metadata.source_url),
+    sourceLicenseUrl: readSafeExternalUrl(metadata.source_license_url),
+  };
+}
+
+export function normalizeUmkmReferenceCursor(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const cursor = value.trim();
+  if (
+    !cursor ||
+    cursor.length > 96 ||
+    !/^\d{1,19}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+      cursor,
+    )
+  ) {
+    return null;
+  }
+  return cursor;
+}
+
+export function normalizeUmkmReferenceOffset(value: unknown): number | null {
+  return typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value > 0 &&
+    value <= 40
+    ? value
+    : null;
+}
+
+export function mergeUmkmPublicReferencePage(
+  current: DiscoveryStore[],
+  incoming: DiscoveryStore[],
+  append: boolean,
+): DiscoveryStore[] {
+  const registeredStores = current.filter(
+    store => !isUmkmMapPublicReference(store),
+  );
+  const references = new Map<string, DiscoveryStore>();
+  if (append) {
+    for (const store of current) {
+      if (isUmkmMapPublicReference(store)) references.set(store.id, store);
+    }
+  }
+  for (const store of incoming) {
+    if (isUmkmMapPublicReference(store)) references.set(store.id, store);
+  }
+  return [...registeredStores, ...references.values()];
 }
 
 function normalizeTrustTier(value: string): UmkmTrustTier | null {
@@ -557,12 +658,235 @@ function SafetyNotice({
   );
 }
 
+function PublicReferenceBadge({ isId }: { isId: boolean }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9.5px] font-bold text-sky-800 dark:border-sky-900/70 dark:bg-sky-950/44 dark:text-sky-200">
+      <MapPinned className="h-3 w-3 shrink-0" />
+      <span className="truncate">
+        {isId ? 'Data publik · belum diklaim' : 'Public data · unclaimed'}
+      </span>
+    </span>
+  );
+}
+
+export function PublicReferenceNotice({
+  store,
+  isId,
+  compact = false,
+}: {
+  store: Pick<DiscoveryStore, 'metadata'>;
+  isId: boolean;
+  compact?: boolean;
+}) {
+  const provenance = getUmkmPublicReferenceProvenance(store);
+  if (!provenance) return null;
+
+  return (
+    <div
+      className={cn(
+        'rounded-[18px] border border-sky-200/82 bg-sky-50/88 text-sky-950 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100',
+        compact ? 'p-2.5' : 'p-3',
+      )}
+      data-testid="umkm-public-reference-notice"
+    >
+      <PublicReferenceBadge isId={isId} />
+      <p
+        className={cn(
+          'mt-1.5 font-semibold leading-5',
+          compact ? 'text-[11px]' : 'text-[12px]',
+        )}
+      >
+        {isId
+          ? 'Referensi lokasi non-transaksi. Belum diklaim pemilik dan belum diverifikasi Lajukan; periksa pembaruan di sumber asli.'
+          : 'A non-transactional location reference. It is unclaimed and not verified by Lajukan; check the original source for updates.'}
+      </p>
+      {provenance.sourceTitle || provenance.sourceLicense ? (
+        <p className="mt-1 text-[10px] font-semibold leading-4 text-sky-900/76 dark:text-sky-100/76">
+          {provenance.sourceTitle ? (
+            <span>
+              {isId ? 'Sumber' : 'Source'}: {provenance.sourceTitle}
+            </span>
+          ) : null}
+          {provenance.sourceTitle && provenance.sourceLicense ? ' · ' : null}
+          {provenance.sourceLicense ? (
+            provenance.sourceLicenseUrl ? (
+              <a
+                href={provenance.sourceLicenseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-sky-400/70 underline-offset-2 hover:text-sky-700 dark:hover:text-sky-200"
+              >
+                {isId ? 'Lisensi' : 'License'}: {provenance.sourceLicense}
+              </a>
+            ) : (
+              <span>
+                {isId ? 'Lisensi' : 'License'}: {provenance.sourceLicense}
+              </span>
+            )
+          ) : null}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function PublicReferenceResultCard({
+  place,
+  isId,
+  compact = false,
+  onSelect,
+}: {
+  place: {
+    store: DiscoveryStore;
+    ui: ReturnType<typeof buildUmkmPlacePresentation>;
+  };
+  isId: boolean;
+  compact?: boolean;
+  onSelect: () => void;
+}) {
+  const provenance = getUmkmPublicReferenceProvenance(place.store);
+  const routeHref =
+    place.ui.locationMode === 'fixed' &&
+    isCoordinateValid({ lat: place.store.lat, lng: place.store.lng })
+      ? place.ui.googleMapsDirectionsUrl
+      : null;
+  const provenanceText = [provenance?.sourceTitle, provenance?.sourceLicense]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <article
+      className={cn(
+        'min-w-0 overflow-hidden border border-sky-200/80 bg-white shadow-[0_12px_26px_-24px_rgba(14,116,144,0.24)] dark:border-sky-900/70 dark:bg-slate-900/82',
+        compact ? 'rounded-[18px]' : 'rounded-[16px] sm:rounded-[18px]',
+      )}
+      data-testid="umkm-public-reference-card"
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={`${isId ? 'Detail referensi' : 'Reference details'} ${place.store.name}`}
+        className={cn(
+          'group grid w-full min-w-0 items-center gap-2 text-left transition hover:bg-sky-50/54 dark:hover:bg-sky-950/18',
+          compact
+            ? 'grid-cols-[74px_minmax(0,1fr)_auto] p-2'
+            : 'grid-cols-[72px_minmax(0,1fr)_auto] p-2 sm:grid-cols-[82px_minmax(0,1fr)_auto] xl:grid-cols-[88px_minmax(0,1fr)_auto]',
+        )}
+      >
+        <PlaceThumb
+          src={place.ui.gallery[0] || place.ui.coverImage}
+          alt={place.store.name}
+          className={cn(
+            'rounded-[14px]',
+            compact ? 'h-[74px]' : 'h-[72px] sm:h-[82px] xl:h-[88px]',
+          )}
+        />
+        <span className="min-w-0">
+          <PublicReferenceBadge isId={isId} />
+          <span className="mt-1 line-clamp-2 text-[13px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[14px]">
+            {place.store.name}
+          </span>
+          {provenanceText ? (
+            <span className="mt-1 block truncate text-[10px] font-semibold text-sky-800/78 dark:text-sky-200/78">
+              {provenanceText}
+            </span>
+          ) : null}
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-[color:var(--app-text-soft)]">
+            <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
+            <span className="truncate">
+              {getPlaceLocationLabel(place, isId)}
+            </span>
+          </span>
+        </span>
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-700 transition group-hover:bg-sky-600 group-hover:text-white dark:bg-sky-950/60 dark:text-sky-200">
+          <ChevronDown className="-rotate-90 h-4 w-4" />
+        </span>
+      </button>
+      {provenance?.sourceUrl || routeHref ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-sky-100 px-2 py-1.5 dark:border-sky-900/50">
+          {provenance?.sourceUrl ? (
+            <a
+              href={provenance.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-sky-50 px-2.5 text-[10px] font-bold text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-200"
+            >
+              <ExternalLink className="h-3 w-3" />
+              {isId ? 'Sumber asli' : 'Original source'}
+            </a>
+          ) : null}
+          {routeHref ? (
+            <a
+              href={routeHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-slate-100 px-2.5 text-[10px] font-bold text-slate-700 transition hover:text-[color:var(--app-accent)] dark:bg-slate-800 dark:text-slate-100"
+            >
+              <Navigation className="h-3 w-3" />
+              {isId ? 'Rute' : 'Route'}
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function DiscoveryScopeControl({
+  scope,
+  isId,
+  compact = false,
+  onChange,
+}: {
+  scope: DiscoveryScope;
+  isId: boolean;
+  compact?: boolean;
+  onChange: (scope: DiscoveryScope) => void;
+}) {
+  const options: Array<{ value: DiscoveryScope; label: string }> = [
+    { value: 'all', label: isId ? 'Semua' : 'All' },
+    { value: 'registered', label: isId ? 'Usaha terdaftar' : 'Registered' },
+    { value: 'references', label: isId ? 'Referensi publik' : 'Public data' },
+  ];
+
+  return (
+    <div
+      role="group"
+      aria-label={isId ? 'Filter jenis lokasi' : 'Filter location type'}
+      data-testid="umkm-scope-filter"
+      className="flex min-w-0 gap-1 overflow-x-auto rounded-full border border-slate-200 bg-white/92 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800 dark:bg-slate-950/82"
+    >
+      {options.map(option => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={scope === option.value}
+          className={cn(
+            'shrink-0 rounded-full font-bold transition',
+            compact
+              ? 'min-h-[28px] px-2.5 text-[9.5px]'
+              : 'min-h-8 px-3 text-[10.5px]',
+            scope === option.value
+              ? option.value === 'references'
+                ? 'bg-sky-600 text-white'
+                : 'bg-[color:var(--app-accent)] text-white'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function UmkmDiscoveryPanel({
   isId,
   query,
   city,
   category,
-  limit = 240,
+  limit = 10,
   title,
   description,
   selectedSlug,
@@ -584,15 +908,52 @@ export function UmkmDiscoveryPanel({
     initialCount ?? (hasInitialStores ? initialStores.length : null),
   );
   const [listPage, setListPage] = useState(1);
+  const [discoveryScope, setDiscoveryScope] = useState<DiscoveryScope>('all');
+  const [hasMore, setHasMore] = useState(
+    () => (initialStores?.length || 0) >= Math.max(1, Math.min(limit, 50)),
+  );
+  const [nextOffset, setNextOffset] = useState(initialStores?.length || 0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [referenceHasMore, setReferenceHasMore] = useState(false);
+  const [referenceNextCursor, setReferenceNextCursor] = useState<string | null>(
+    null,
+  );
+  const [referenceNextOffset, setReferenceNextOffset] = useState<number | null>(
+    null,
+  );
+  const [loadingMoreReferences, setLoadingMoreReferences] = useState(false);
+  const activeStoresRequestRef = useRef<AbortController | null>(null);
+  const activeReferencesRequestRef = useRef<AbortController | null>(null);
   const selectedPreviewRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollStoreIdRef = useRef<string | null>(null);
   const mobileMapRef = useRef<HTMLDivElement | null>(null);
   const desktopMapRef = useRef<HTMLDivElement | null>(null);
-  const { viewerLocation, locating, locationError, requestViewerLocation } =
-    useViewerLocation({
-      isId,
-      autoRequest: false,
-    });
+  const autoFocusedViewerRef = useRef(false);
+  const {
+    viewerLocation,
+    viewerAccuracyMeters,
+    locating,
+    locationError,
+    locationState,
+    requestViewerLocation,
+  } = useViewerLocation({
+    isId,
+    autoRequest: false,
+    watch: true,
+  });
+  const viewerQueryLat = viewerLocation
+    ? Number(viewerLocation.lat.toFixed(3))
+    : null;
+  const viewerQueryLng = viewerLocation
+    ? Number(viewerLocation.lng.toFixed(3))
+    : null;
+  const queryViewerLocation = useMemo(
+    () =>
+      viewerQueryLat !== null && viewerQueryLng !== null
+        ? { lat: viewerQueryLat, lng: viewerQueryLng }
+        : null,
+    [viewerQueryLat, viewerQueryLng],
+  );
   const [mapInteractive, setMapInteractive] = useState(
     () => variant === 'immersive',
   );
@@ -614,7 +975,56 @@ export function UmkmDiscoveryPanel({
   );
   const [canUseDesktopMapPanel, setCanUseDesktopMapPanel] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
-  const requestLimit = Math.max(1, Math.min(limit, 160));
+  const [mapBounds, setMapBounds] = useState<{
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+  } | null>(null);
+  const handleMapBoundsChange = useCallback(
+    (nextBounds: {
+      minLat: number;
+      maxLat: number;
+      minLng: number;
+      maxLng: number;
+    }) => {
+      setMapBounds(current => {
+        if (
+          current &&
+          Math.abs(current.minLat - nextBounds.minLat) < 0.0001 &&
+          Math.abs(current.maxLat - nextBounds.maxLat) < 0.0001 &&
+          Math.abs(current.minLng - nextBounds.minLng) < 0.0001 &&
+          Math.abs(current.maxLng - nextBounds.maxLng) < 0.0001
+        ) {
+          return current;
+        }
+        return nextBounds;
+      });
+    },
+    [],
+  );
+  const requestLimit = Math.max(1, Math.min(limit, 50));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncScopeFromUrl = () => {
+      const url = new URL(window.location.href);
+      setDiscoveryScope(readDiscoveryScope(url.searchParams.get('scope')));
+    };
+    syncScopeFromUrl();
+    window.addEventListener('popstate', syncScopeFromUrl);
+    return () => window.removeEventListener('popstate', syncScopeFromUrl);
+  }, []);
+
+  const handleDiscoveryScopeChange = useCallback((scope: DiscoveryScope) => {
+    setDiscoveryScope(scope);
+    setListPage(1);
+    setSelectedStoreId(null);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('scope', scope);
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, []);
   const deepLinkedInitialStore = useMemo(() => {
     const targetSlug = selectedSlug?.trim();
     const targetStoreId = selectedStoreIdInitial?.trim();
@@ -629,30 +1039,46 @@ export function UmkmDiscoveryPanel({
     );
   }, [initialStores, selectedSlug, selectedStoreIdInitial]);
 
-  useEffect(() => {
-    let active = true;
-    let requestInFlight = false;
-    let hasLoadedOnce = hasInitialStores;
-    const controller = new AbortController();
-
-    const load = async (options?: { silent?: boolean }) => {
-      await Promise.resolve();
-      if (!active || requestInFlight) return;
-      requestInFlight = true;
-      if (!options?.silent) {
-        setLoading(true);
-        setError(null);
+  const loadStoresPage = useCallback(
+    async ({
+      offset,
+      append,
+      silent = false,
+    }: {
+      offset: number;
+      append: boolean;
+      silent?: boolean;
+    }) => {
+      activeStoresRequestRef.current?.abort();
+      const controller = new AbortController();
+      activeStoresRequestRef.current = controller;
+      if (append) {
+        setLoading(false);
+        setLoadingMore(true);
+      } else {
+        setLoadingMore(false);
+        setLoading(!silent);
       }
+      setError(null);
 
       try {
         const params = new URLSearchParams();
         if (query?.trim()) params.set('q', query.trim());
         if (city?.trim()) params.set('city', city.trim());
-        if (viewerLocation) {
-          params.set('viewer_lat', String(viewerLocation.lat));
-          params.set('viewer_lng', String(viewerLocation.lng));
+        if (queryViewerLocation) {
+          // ~110 m precision is sufficient for nearby ordering and avoids
+          // placing exact device coordinates in URLs and access logs.
+          params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
+          params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
         }
         params.set('limit', String(requestLimit));
+        params.set('offset', String(offset));
+        if (mapBounds) {
+          params.set('min_lat', mapBounds.minLat.toFixed(6));
+          params.set('max_lat', mapBounds.maxLat.toFixed(6));
+          params.set('min_lng', mapBounds.minLng.toFixed(6));
+          params.set('max_lng', mapBounds.maxLng.toFixed(6));
+        }
 
         const res = await fetch(
           `/api/super-app/umkm/stores?${params.toString()}`,
@@ -666,18 +1092,32 @@ export function UmkmDiscoveryPanel({
         if (!res.ok || !payload.data) {
           throw new Error(payload.error || 'Failed to load business discovery');
         }
-        if (!active) return;
+        if (controller.signal.aborted) return;
+        const pageItems = payload.data.items || [];
         const items = mergeDeepLinkedUmkmStore(
-          payload.data.items || [],
+          pageItems,
           deepLinkedInitialStore,
         );
-        setStores(items);
-        setTotalCount(
-          Math.max(payload.data.count ?? items.length, items.length),
-        );
+        setStores(current => {
+          if (!append) {
+            const merged = new Map(items.map(store => [store.id, store]));
+            for (const store of current) {
+              if (isUmkmMapPublicReference(store)) merged.set(store.id, store);
+            }
+            return Array.from(merged.values());
+          }
+          const merged = new Map(current.map(store => [store.id, store]));
+          for (const store of items) merged.set(store.id, store);
+          return Array.from(merged.values());
+        });
+        const loadedCount =
+          payload.data.loaded_count ?? offset + pageItems.length;
+        setTotalCount(loadedCount);
+        setHasMore(payload.data.has_more === true);
+        setNextOffset(payload.data.next_offset ?? loadedCount);
         setError(null);
-        hasLoadedOnce = true;
         setSelectedStoreId(current => {
+          if (append) return current;
           if (current && items.some(item => item.id === current)) {
             return current;
           }
@@ -696,58 +1136,185 @@ export function UmkmDiscoveryPanel({
           return null;
         });
       } catch {
-        if (!active || controller.signal.aborted) return;
-        if (!options?.silent || !hasLoadedOnce) {
-          setError(
-            isId
-              ? 'Daftar usaha belum bisa dimuat. Periksa koneksi lalu coba lagi.'
-              : 'Businesses could not be loaded. Check your connection and try again.',
-          );
-        }
+        if (controller.signal.aborted) return;
+        setError(
+          isId
+            ? 'Daftar usaha belum bisa dimuat. Periksa koneksi lalu coba lagi.'
+            : 'Businesses could not be loaded. Check your connection and try again.',
+        );
       } finally {
-        requestInFlight = false;
-        if (!active) return;
-        setLoading(false);
+        if (
+          controller.signal.aborted ||
+          activeStoresRequestRef.current !== controller
+        )
+          return;
+        activeStoresRequestRef.current = null;
+        if (append) setLoadingMore(false);
+        else setLoading(false);
       }
-    };
+    },
+    [
+      city,
+      deepLinkedInitialStore,
+      isId,
+      mapBounds,
+      query,
+      requestLimit,
+      selectedSlug,
+      selectedStoreIdInitial,
+      queryViewerLocation,
+    ],
+  );
 
-    void load({ silent: hasInitialStores });
+  useEffect(() => {
+    setListPage(1);
+    if (
+      hasInitialStores &&
+      !mapBounds &&
+      !queryViewerLocation &&
+      reloadNonce === 0
+    ) {
+      setHasMore((initialStores?.length || 0) >= requestLimit);
+      setNextOffset(initialStores?.length || 0);
+      return;
+    }
 
-    const refreshIfVisible = () => {
-      if (
-        typeof document !== 'undefined' &&
-        document.visibilityState === 'hidden'
-      ) {
-        return;
-      }
-      void load({ silent: true });
-    };
-    const intervalId = window.setInterval(() => {
-      refreshIfVisible();
-    }, DISCOVERY_REFRESH_INTERVAL_MS);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') refreshIfVisible();
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const timeoutId = window.setTimeout(
+      () => {
+        void loadStoresPage({
+          offset: 0,
+          append: false,
+          silent: hasInitialStores,
+        });
+      },
+      mapBounds ? 180 : 0,
+    );
 
     return () => {
-      active = false;
-      controller.abort();
-      window.clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.clearTimeout(timeoutId);
+      activeStoresRequestRef.current?.abort();
     };
   }, [
-    city,
-    deepLinkedInitialStore,
     hasInitialStores,
-    isId,
-    query,
+    initialStores,
+    loadStoresPage,
+    mapBounds,
     reloadNonce,
     requestLimit,
-    selectedSlug,
-    selectedStoreIdInitial,
-    viewerLocation,
+    queryViewerLocation,
   ]);
+
+  const loadReferencesPage = useCallback(
+    async ({
+      cursor,
+      offset,
+      append,
+    }: {
+      cursor?: string | null;
+      offset?: number | null;
+      append: boolean;
+    }): Promise<boolean> => {
+      const safeCursor = normalizeUmkmReferenceCursor(cursor);
+      const safeOffset = normalizeUmkmReferenceOffset(offset);
+      if (append && !safeCursor && safeOffset === null) return false;
+
+      activeReferencesRequestRef.current?.abort();
+      const controller = new AbortController();
+      activeReferencesRequestRef.current = controller;
+      if (append) {
+        setLoadingMoreReferences(true);
+      } else {
+        setLoadingMoreReferences(false);
+        setReferenceHasMore(false);
+        setReferenceNextCursor(null);
+        setReferenceNextOffset(null);
+        setStores(current => mergeUmkmPublicReferencePage(current, [], false));
+      }
+
+      const params = new URLSearchParams({
+        references_only: '1',
+        limit: String(LIST_PAGE_SIZE),
+        offset: String(safeCursor ? 0 : safeOffset || 0),
+      });
+      if (safeCursor) params.set('cursor', safeCursor);
+      if (query?.trim()) params.set('q', query.trim());
+      if (city?.trim()) params.set('city', city.trim());
+      if (queryViewerLocation) {
+        params.set('viewer_lat', queryViewerLocation.lat.toFixed(3));
+        params.set('viewer_lng', queryViewerLocation.lng.toFixed(3));
+      }
+      if (mapBounds) {
+        params.set('min_lat', mapBounds.minLat.toFixed(6));
+        params.set('max_lat', mapBounds.maxLat.toFixed(6));
+        params.set('min_lng', mapBounds.minLng.toFixed(6));
+        params.set('max_lng', mapBounds.maxLng.toFixed(6));
+      }
+
+      try {
+        const response = await fetch(
+          `/api/super-app/umkm/stores?${params.toString()}`,
+          {
+            cache: 'no-store',
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        );
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as StoresResponse;
+        if (!response.ok || !payload.data || controller.signal.aborted) {
+          return false;
+        }
+
+        const nextCursor = normalizeUmkmReferenceCursor(
+          payload.data.next_cursor,
+        );
+        const nextOffset = normalizeUmkmReferenceOffset(
+          payload.data.next_offset,
+        );
+        const sourceHasMore =
+          payload.data.has_more ?? payload.data.reference_has_more;
+        const canContinue =
+          sourceHasMore === true &&
+          (nextCursor !== null || nextOffset !== null);
+        const pageItems = payload.data.items || [];
+        setStores(current =>
+          mergeUmkmPublicReferencePage(current, pageItems, append),
+        );
+        setReferenceHasMore(canContinue);
+        setReferenceNextCursor(canContinue ? nextCursor : null);
+        setReferenceNextOffset(canContinue ? nextOffset : null);
+        return pageItems.some(isUmkmMapPublicReference);
+      } catch {
+        return false;
+      } finally {
+        if (activeReferencesRequestRef.current === controller) {
+          activeReferencesRequestRef.current = null;
+          if (append) setLoadingMoreReferences(false);
+        }
+      }
+    },
+    [city, mapBounds, query, queryViewerLocation],
+  );
+
+  useEffect(() => {
+    setLoadingMoreReferences(false);
+    setReferenceHasMore(false);
+    setReferenceNextCursor(null);
+    setReferenceNextOffset(null);
+    setStores(current => mergeUmkmPublicReferencePage(current, [], false));
+    const timeoutId = window.setTimeout(
+      () => {
+        void loadReferencesPage({ append: false });
+      },
+      mapBounds ? 450 : 350,
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      activeReferencesRequestRef.current?.abort();
+    };
+  }, [loadReferencesPage, mapBounds]);
 
   const preparedStores = useMemo(
     () =>
@@ -760,8 +1327,11 @@ export function UmkmDiscoveryPanel({
 
   const visibleStores = useMemo(
     () =>
-      preparedStores.filter(place =>
-        matchesUmkmDiscoveryCategory(
+      preparedStores.filter(place => {
+        const isReference = isUmkmMapPublicReference(place.store);
+        if (discoveryScope === 'registered' && isReference) return false;
+        if (discoveryScope === 'references' && !isReference) return false;
+        return matchesUmkmDiscoveryCategory(
           {
             kind: place.ui.kind,
             name: place.store.name,
@@ -770,9 +1340,9 @@ export function UmkmDiscoveryPanel({
             metadata: place.store.metadata,
           },
           category,
-        ),
-      ),
-    [category, preparedStores],
+        );
+      }),
+    [category, discoveryScope, preparedStores],
   );
 
   useEffect(() => {
@@ -792,12 +1362,23 @@ export function UmkmDiscoveryPanel({
     () => visibleStores.find(item => item.store.id === selectedStoreId) || null,
     [selectedStoreId, visibleStores],
   );
+  const selectedIsPublicReference = selectedPlace
+    ? isUmkmMapPublicReference(selectedPlace.store)
+    : false;
+  const selectedReferenceProvenance = selectedPlace
+    ? getUmkmPublicReferenceProvenance(selectedPlace.store)
+    : null;
   const selectedOpenStatus = selectedPlace
-    ? getOpenStatusProfile(selectedPlace.ui.openNow, isId)
+    ? getOpenStatusProfile(
+        selectedPlace.ui.openNow,
+        isId,
+        selectedIsPublicReference,
+      )
     : null;
   const selectedPlaceId = selectedPlace?.store.id || null;
-  const selectedContactHref =
-    selectedPlace?.ui.whatsappHref || selectedPlace?.ui.telHref || null;
+  const selectedContactHref = selectedIsPublicReference
+    ? null
+    : selectedPlace?.ui.whatsappHref || selectedPlace?.ui.telHref || null;
   const selectedContactLabel = selectedPlace?.ui.whatsappHref
     ? isId
       ? 'WhatsApp'
@@ -818,18 +1399,21 @@ export function UmkmDiscoveryPanel({
     })
       ? selectedPlace.ui.googleMapsDirectionsUrl
       : null;
+  const selectedSecondaryActionHref = selectedIsPublicReference
+    ? selectedReferenceProvenance?.sourceUrl || null
+    : selectedContactHref;
   const selectedCompactActionGrid =
-    selectedContactHref && selectedRouteHref
+    selectedSecondaryActionHref && selectedRouteHref
       ? 'grid-cols-[1fr_1fr_40px]'
-      : selectedContactHref
+      : selectedSecondaryActionHref
         ? 'grid-cols-2'
         : selectedRouteHref
           ? 'grid-cols-[minmax(0,1fr)_40px]'
           : 'grid-cols-1';
   const selectedActionGrid =
-    selectedContactHref && selectedRouteHref
+    selectedSecondaryActionHref && selectedRouteHref
       ? 'grid-cols-3'
-      : selectedContactHref || selectedRouteHref
+      : selectedSecondaryActionHref || selectedRouteHref
         ? 'grid-cols-2'
         : 'grid-cols-1';
   const selectedLocationLabel = selectedPlace
@@ -839,15 +1423,18 @@ export function UmkmDiscoveryPanel({
     selectedPlace?.ui.addressLine ||
     selectedPlace?.store.address ||
     selectedLocationLabel;
-  const selectedTrustProfile = selectedPlace
-    ? getUmkmTrustProfile(selectedPlace.store, isId)
-    : null;
-  const selectedRiskProfile = selectedPlace
-    ? getUmkmRiskProfile(selectedPlace, isId)
-    : null;
-  const selectedReportHref = selectedPlace
-    ? buildReportListingHref(selectedPlace.store, isId)
-    : '';
+  const selectedTrustProfile =
+    selectedPlace && !selectedIsPublicReference
+      ? getUmkmTrustProfile(selectedPlace.store, isId)
+      : null;
+  const selectedRiskProfile =
+    selectedPlace && !selectedIsPublicReference
+      ? getUmkmRiskProfile(selectedPlace, isId)
+      : null;
+  const selectedReportHref =
+    selectedPlace && !selectedIsPublicReference
+      ? buildReportListingHref(selectedPlace.store, isId)
+      : '';
 
   const listedPlaces = useMemo(
     () =>
@@ -858,7 +1445,59 @@ export function UmkmDiscoveryPanel({
     () => listedPlaces.slice(0, listPage * LIST_PAGE_SIZE),
     [listPage, listedPlaces],
   );
-  const canLoadMoreList = paginatedListedPlaces.length < listedPlaces.length;
+  const hasLocallyHiddenPlaces =
+    paginatedListedPlaces.length < listedPlaces.length;
+  const canLoadMoreReferences =
+    referenceHasMore &&
+    (referenceNextCursor !== null || referenceNextOffset !== null);
+  const canLoadMoreList =
+    hasLocallyHiddenPlaces ||
+    (discoveryScope === 'references' ? canLoadMoreReferences : hasMore);
+  const loadingMoreForScope =
+    discoveryScope === 'references' ? loadingMoreReferences : loadingMore;
+  const handleLoadMore = useCallback(() => {
+    if (hasLocallyHiddenPlaces) {
+      setListPage(current => current + 1);
+      return;
+    }
+    if (discoveryScope === 'references') {
+      if (
+        !canLoadMoreReferences ||
+        (referenceNextCursor === null && referenceNextOffset === null) ||
+        loadingMoreReferences
+      ) {
+        return;
+      }
+      void loadReferencesPage({
+        cursor: referenceNextCursor,
+        offset: referenceNextCursor ? 0 : referenceNextOffset,
+        append: true,
+      }).then(loaded => {
+        if (loaded) setListPage(current => current + 1);
+      });
+      return;
+    }
+    if (!hasMore || loadingMore || loading) return;
+    setListPage(current => current + 1);
+    void loadStoresPage({
+      offset: nextOffset,
+      append: true,
+      silent: true,
+    });
+  }, [
+    canLoadMoreReferences,
+    discoveryScope,
+    hasLocallyHiddenPlaces,
+    hasMore,
+    loadReferencesPage,
+    loadStoresPage,
+    loading,
+    loadingMore,
+    loadingMoreReferences,
+    nextOffset,
+    referenceNextCursor,
+    referenceNextOffset,
+  ]);
   useEffect(() => {
     const targetSlug = selectedSlug?.trim();
     const targetStoreId = selectedStoreIdInitial?.trim();
@@ -877,7 +1516,7 @@ export function UmkmDiscoveryPanel({
   useEffect(() => {
     setListPage(1);
     setSheetExpanded(variant === 'immersive');
-  }, [category, city, query, variant, visibleStores.length]);
+  }, [category, city, query, variant]);
 
   useEffect(() => {
     if (variant !== 'immersive') return;
@@ -984,18 +1623,30 @@ export function UmkmDiscoveryPanel({
   useBodyScrollLock(mobileMapOpen && variant !== 'immersive');
 
   const visibleTotal =
-    category && category !== 'all'
+    (category && category !== 'all') || discoveryScope !== 'registered'
       ? visibleStores.length
       : (totalCount ?? stores.length);
+  const totalUnit =
+    discoveryScope === 'references'
+      ? isId
+        ? 'referensi'
+        : 'references'
+      : discoveryScope === 'registered'
+        ? isId
+          ? 'usaha terdaftar'
+          : 'registered businesses'
+        : isId
+          ? 'lokasi'
+          : 'locations';
+  const resultHasMore =
+    discoveryScope === 'references' ? canLoadMoreReferences : hasMore;
   const totalLabel =
     loading && totalCount === null
       ? isId
         ? 'Memuat'
         : 'Loading'
-      : `${visibleTotal} ${isId ? 'usaha' : 'businesses'}`;
-  const mapResultLabel = `${visibleStores.length} ${
-    isId ? 'usaha' : 'businesses'
-  }`;
+      : `${visibleTotal}${resultHasMore ? '+' : ''} ${totalUnit}`;
+  const mapResultLabel = `${visibleStores.length} ${totalUnit}`;
   const routeDistanceLabel = useMemo(() => {
     if (!routeSummary?.distance_m || routeSummary.used_fallback) return null;
     return formatUmkmPlaceDistance(routeSummary.distance_m / 1000, isId);
@@ -1007,6 +1658,12 @@ export function UmkmDiscoveryPanel({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!viewerLocation || autoFocusedViewerRef.current) return;
+    autoFocusedViewerRef.current = true;
+    bumpMapFocus('viewer');
+  }, [bumpMapFocus, viewerLocation]);
   const cycleMapTheme = useCallback(() => {
     setMapTheme(current => getNextUmkmMapTheme(current));
   }, []);
@@ -1017,14 +1674,25 @@ export function UmkmDiscoveryPanel({
   }, [selectedPlaceId]);
 
   useEffect(() => {
-    if (showRoute && viewerLocation && selectedPlace) {
+    if (showRoute && selectedPlace) {
       bumpMapFocus('route');
     }
-  }, [bumpMapFocus, selectedPlace, showRoute, viewerLocation]);
+  }, [bumpMapFocus, selectedPlace, showRoute]);
 
   const renderDiscoveryMap = useCallback(
     (className: string, edgeToEdge = false) => {
       const activeSelectedStoreId = selectedPlace?.store.id || null;
+      const viewerFocusOffset = edgeToEdge
+        ? {
+            x: canUseDesktopMapPanel && !mapOnly ? 230 : 0,
+            y:
+              !canUseDesktopMapPanel && !mapOnly
+                ? sheetExpanded
+                  ? -190
+                  : -60
+                : 0,
+          }
+        : undefined;
 
       return (
         <div
@@ -1036,6 +1704,7 @@ export function UmkmDiscoveryPanel({
             stores={mapStores}
             selectedStoreId={activeSelectedStoreId}
             viewerLocation={viewerLocation}
+            viewerAccuracyMeters={viewerAccuracyMeters}
             isId={isId}
             interactive={mapInteractive}
             theme={mapTheme}
@@ -1044,6 +1713,8 @@ export function UmkmDiscoveryPanel({
             onRouteResolved={setRouteSummary}
             focusMode={mapFocusMode}
             focusNonce={mapFocusNonce}
+            focusOffset={viewerFocusOffset}
+            onBoundsChange={handleMapBoundsChange}
             onSelectStore={
               edgeToEdge ? handleEdgeMapSelectStore : handleMapSelectStore
             }
@@ -1062,6 +1733,9 @@ export function UmkmDiscoveryPanel({
               interactive={mapInteractive}
               locating={locating}
               locationError={locationError}
+              locationReady={Boolean(viewerLocation)}
+              locationAccuracyMeters={viewerAccuracyMeters}
+              locationState={locationState}
               routeEnabled={showRoute}
               distanceLabel={routeDistanceLabel}
               themeLabel={getUmkmMapThemeLabel(mapTheme, isId)}
@@ -1069,10 +1743,17 @@ export function UmkmDiscoveryPanel({
               compact={edgeToEdge}
               onToggleInteractive={() => setMapInteractive(current => !current)}
               onFocusViewer={async () => {
-                const nextLocation =
-                  viewerLocation || (await requestViewerLocation());
+                const previousLocation = viewerLocation;
+                if (previousLocation) bumpMapFocus('viewer');
+                const nextLocation = await requestViewerLocation();
                 if (!nextLocation) return;
-                bumpMapFocus('viewer');
+                if (
+                  !previousLocation ||
+                  Math.abs(previousLocation.lat - nextLocation.lat) > 0.0005 ||
+                  Math.abs(previousLocation.lng - nextLocation.lng) > 0.0005
+                ) {
+                  bumpMapFocus('viewer');
+                }
               }}
               onToggleRoute={async () => {
                 if (showRoute) {
@@ -1081,9 +1762,8 @@ export function UmkmDiscoveryPanel({
                   return;
                 }
 
-                const nextLocation =
-                  viewerLocation || (await requestViewerLocation());
-                if (!nextLocation) return;
+                const nextLocation = await requestViewerLocation();
+                if (!nextLocation && !viewerLocation) return;
                 setShowRoute(true);
                 bumpMapFocus('route');
               }}
@@ -1100,16 +1780,22 @@ export function UmkmDiscoveryPanel({
       isId,
       locating,
       locationError,
+      locationState,
       mapFocusMode,
       mapFocusNonce,
       mapInteractive,
+      mapOnly,
       mapTheme,
       requestViewerLocation,
       routeDistanceLabel,
+      canUseDesktopMapPanel,
       selectedPlace,
+      sheetExpanded,
       showRoute,
+      viewerAccuracyMeters,
       viewerLocation,
       mapStores,
+      handleMapBoundsChange,
     ],
   );
 
@@ -1154,7 +1840,7 @@ export function UmkmDiscoveryPanel({
               }}
               aria-pressed={!mapOnly}
               className={cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 rounded-full px-3 text-[11px] font-bold transition sm:min-h-[36px] sm:px-4 sm:text-[12px]',
+                'inline-flex min-h-[34px] items-center gap-1.5 rounded-full px-3 text-[11px] font-bold transition sm:min-h-[36px] sm:px-2 sm:text-[12px]',
                 !mapOnly
                   ? 'bg-[color:var(--app-accent)] text-white'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800',
@@ -1171,7 +1857,7 @@ export function UmkmDiscoveryPanel({
               }}
               aria-pressed={mapOnly}
               className={cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 rounded-full px-3 text-[11px] font-bold transition sm:min-h-[36px] sm:px-4 sm:text-[12px]',
+                'inline-flex min-h-[34px] items-center gap-1.5 rounded-full px-3 text-[11px] font-bold transition sm:min-h-[36px] sm:px-2 sm:text-[12px]',
                 mapOnly
                   ? 'bg-[color:var(--app-accent)] text-white'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800',
@@ -1260,20 +1946,35 @@ export function UmkmDiscoveryPanel({
               </div>
             </div>
 
+            <div className="shrink-0 px-1 pb-1.5">
+              <DiscoveryScopeControl
+                scope={discoveryScope}
+                isId={isId}
+                compact
+                onChange={handleDiscoveryScopeChange}
+              />
+            </div>
+
             {selectedPlace ? (
               <div
                 className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin]"
                 role="region"
                 tabIndex={0}
                 aria-label={
-                  isId
-                    ? `Detail usaha ${selectedPlace.store.name}`
-                    : `${selectedPlace.store.name} business details`
+                  selectedIsPublicReference
+                    ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                    : isId
+                      ? `Detail usaha ${selectedPlace.store.name}`
+                      : `${selectedPlace.store.name} business details`
                 }
               >
                 <article
                   className="rounded-[22px] border border-emerald-900/10 bg-[linear-gradient(135deg,#ffffff,#f7fef9)] p-2.5 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.3)] ring-1 ring-white/76 dark:border-slate-800 dark:bg-[linear-gradient(135deg,#0f172a,#061b16)] dark:ring-white/10"
-                  data-testid="umkm-selected-business"
+                  data-testid={
+                    selectedIsPublicReference
+                      ? 'umkm-selected-public-reference'
+                      : 'umkm-selected-business'
+                  }
                 >
                   <div className="grid min-w-0 grid-cols-[72px_minmax(0,1fr)] gap-2.5 sm:grid-cols-[78px_minmax(0,1fr)]">
                     <div className="relative">
@@ -1288,11 +1989,13 @@ export function UmkmDiscoveryPanel({
                       <span
                         className={cn(
                           'absolute -bottom-1 left-1/2 inline-flex -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-bold shadow-sm ',
-                          selectedPlace.ui.openNow === true
-                            ? 'bg-emerald-500/94 text-white'
-                            : selectedPlace.ui.openNow === false
-                              ? 'bg-slate-700/88 text-white'
-                              : 'bg-amber-100 text-amber-800',
+                          selectedIsPublicReference
+                            ? 'bg-sky-600/94 text-white'
+                            : selectedPlace.ui.openNow === true
+                              ? 'bg-emerald-500/94 text-white'
+                              : selectedPlace.ui.openNow === false
+                                ? 'bg-slate-700/88 text-white'
+                                : 'bg-amber-100 text-amber-800',
                         )}
                       >
                         {selectedOpenStatus?.label}
@@ -1303,7 +2006,9 @@ export function UmkmDiscoveryPanel({
                         <span className="truncate rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
                           {selectedPlace.ui.kindLabel}
                         </span>
-                        {selectedTrustProfile ? (
+                        {selectedIsPublicReference ? (
+                          <PublicReferenceBadge isId={isId} />
+                        ) : selectedTrustProfile ? (
                           <TrustStatusChip
                             profile={selectedTrustProfile}
                             compact
@@ -1332,15 +2037,39 @@ export function UmkmDiscoveryPanel({
                     )}
                   >
                     <Link
-                      href={buildUmkmStorefrontPath(selectedPlace.store.slug)}
+                      href={buildUmkmMapPlacePath(selectedPlace.store)}
+                      aria-label={
+                        selectedIsPublicReference
+                          ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                          : undefined
+                      }
                       className="inline-flex min-h-[38px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-[11px] font-bold text-white shadow-[0_12px_24px_-20px_color-mix(in_srgb,var(--app-accent)_42%,transparent)]"
                     >
                       <Store className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">
-                        {isId ? 'Lihat usaha' : 'View business'}
+                        {selectedIsPublicReference
+                          ? isId
+                            ? 'Lihat referensi'
+                            : 'View reference'
+                          : isId
+                            ? 'Lihat usaha'
+                            : 'View business'}
                       </span>
                     </Link>
-                    {selectedContactHref ? (
+                    {selectedIsPublicReference &&
+                    selectedReferenceProvenance?.sourceUrl ? (
+                      <a
+                        href={selectedReferenceProvenance.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-[38px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-sky-50 px-3 text-[11px] font-bold text-sky-700 dark:bg-sky-950/50 dark:text-sky-200"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">
+                          {isId ? 'Sumber asli' : 'Original source'}
+                        </span>
+                      </a>
+                    ) : selectedContactHref ? (
                       <a
                         href={selectedContactHref}
                         target={
@@ -1371,25 +2100,37 @@ export function UmkmDiscoveryPanel({
                   {sheetExpanded ? (
                     <div className="mt-2.5 space-y-1.5 border-t border-slate-200/72 pt-2.5 dark:border-slate-800">
                       <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        <span className="inline-flex min-h-[27px] shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
-                          <Store className="h-3.5 w-3.5" />
-                          {isId ? 'Belanja di toko' : 'In-store'}
-                        </span>
-                        {selectedPlace.ui.serviceBadges
-                          .filter(isVisibleMapServiceBadge)
-                          .slice(0, 2)
-                          .map(badge => (
-                            <span
-                              key={badge}
-                              className="inline-flex min-h-[27px] shrink-0 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                            >
-                              {badge}
+                        {selectedIsPublicReference ? (
+                          <PublicReferenceBadge isId={isId} />
+                        ) : (
+                          <>
+                            <span className="inline-flex min-h-[27px] shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
+                              <Store className="h-3.5 w-3.5" />
+                              {isId ? 'Belanja di toko' : 'In-store'}
                             </span>
-                          ))}
+                            {selectedPlace.ui.serviceBadges
+                              .filter(isVisibleMapServiceBadge)
+                              .slice(0, 2)
+                              .map(badge => (
+                                <span
+                                  key={badge}
+                                  className="inline-flex min-h-[27px] shrink-0 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                >
+                                  {badge}
+                                </span>
+                              ))}
+                          </>
+                        )}
                       </div>
 
                       <div className="grid gap-1.5 text-[12px] font-semibold leading-5 text-[color:var(--app-text)]">
-                        {selectedTrustProfile && selectedRiskProfile ? (
+                        {selectedIsPublicReference ? (
+                          <PublicReferenceNotice
+                            store={selectedPlace.store}
+                            isId={isId}
+                            compact
+                          />
+                        ) : selectedTrustProfile && selectedRiskProfile ? (
                           <SafetyNotice
                             isId={isId}
                             trustProfile={selectedTrustProfile}
@@ -1422,9 +2163,13 @@ export function UmkmDiscoveryPanel({
                             <span className="text-[color:var(--app-text-soft)]">
                               {' '}
                               ·{' '}
-                              {isId
-                                ? 'Chat dulu untuk memastikan jam dan stok.'
-                                : 'Chat first to confirm service hours.'}
+                              {selectedIsPublicReference
+                                ? isId
+                                  ? 'Cek sumber asli untuk pembaruan data lokasi.'
+                                  : 'Check the original source for location updates.'
+                                : isId
+                                  ? 'Chat dulu untuk memastikan jam dan stok.'
+                                  : 'Chat first to confirm service hours.'}
                             </span>
                           </span>
                         </div>
@@ -1460,6 +2205,17 @@ export function UmkmDiscoveryPanel({
                 ) : paginatedListedPlaces.length > 0 ? (
                   <div className="grid min-h-0 min-w-0 flex-1 auto-rows-min gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
                     {paginatedListedPlaces.map(item => {
+                      if (isUmkmMapPublicReference(item.store)) {
+                        return (
+                          <PublicReferenceResultCard
+                            key={item.store.id}
+                            place={item}
+                            isId={isId}
+                            compact
+                            onSelect={() => handleSelectStore(item.store.id)}
+                          />
+                        );
+                      }
                       const openStatus = getOpenStatusProfile(
                         item.ui.openNow,
                         isId,
@@ -1537,10 +2293,18 @@ export function UmkmDiscoveryPanel({
                     {canLoadMoreList ? (
                       <button
                         type="button"
-                        onClick={() => setListPage(current => current + 1)}
+                        data-testid="umkm-load-more"
+                        onClick={handleLoadMore}
+                        disabled={loadingMoreForScope}
                         className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                       >
-                        {isId ? 'Muat lagi' : 'Load more'}
+                        {loadingMoreForScope
+                          ? isId
+                            ? 'Memuat 10 berikutnya...'
+                            : 'Loading next 10...'
+                          : isId
+                            ? 'Muat 10 lagi'
+                            : 'Load 10 more'}
                       </button>
                     ) : null}
                   </div>
@@ -1613,7 +2377,12 @@ export function UmkmDiscoveryPanel({
           </span>
         </div>
 
-        <div className="flex min-w-0 justify-start lg:justify-end">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <DiscoveryScopeControl
+            scope={discoveryScope}
+            isId={isId}
+            onChange={handleDiscoveryScopeChange}
+          />
           <button
             type="button"
             onClick={handleOpenMapPreview}
@@ -1667,6 +2436,11 @@ export function UmkmDiscoveryPanel({
               <div className="min-w-0 space-y-3">
                 <article
                   ref={selectedPreviewRef}
+                  aria-label={
+                    selectedIsPublicReference
+                      ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                      : undefined
+                  }
                   className="min-w-0 overflow-hidden rounded-[18px] border border-slate-200/80 bg-white p-2.5 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950/82 sm:rounded-[22px] sm:p-3"
                 >
                   <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] gap-2.5 min-[420px]:grid-cols-[128px_minmax(0,1fr)] sm:grid-cols-[minmax(0,170px)_minmax(0,1fr)] sm:gap-3 lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)]">
@@ -1681,12 +2455,16 @@ export function UmkmDiscoveryPanel({
 
                     <div className="min-w-0 self-center">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold sm:text-[11px]">
-                        <RatingStars
-                          rating={selectedPlace.ui.ratingNumber}
-                          countLabel={selectedPlace.ui.reviewCountLabel}
-                          isId={isId}
-                          compact
-                        />
+                        {selectedIsPublicReference ? (
+                          <PublicReferenceBadge isId={isId} />
+                        ) : (
+                          <RatingStars
+                            rating={selectedPlace.ui.ratingNumber}
+                            countLabel={selectedPlace.ui.reviewCountLabel}
+                            isId={isId}
+                            compact
+                          />
+                        )}
                         <span className="text-[color:var(--app-text-soft)]">
                           {selectedPlace.ui.kindLabel}
                         </span>
@@ -1696,7 +2474,8 @@ export function UmkmDiscoveryPanel({
                             compact
                           />
                         ) : null}
-                        {getVisibleMapServiceBadges(
+                        {!selectedIsPublicReference &&
+                        getVisibleMapServiceBadges(
                           selectedPlace.ui.serviceBadges,
                         )[0] ? (
                           <span className="text-[color:var(--app-text-soft)]">
@@ -1711,9 +2490,12 @@ export function UmkmDiscoveryPanel({
 
                       <h3 className="mt-1.5 line-clamp-2 text-[1.02rem] font-bold leading-tight text-[color:var(--app-text)] sm:text-[1.35rem]">
                         <Link
-                          href={buildUmkmStorefrontPath(
-                            selectedPlace.store.slug,
-                          )}
+                          href={buildUmkmMapPlacePath(selectedPlace.store)}
+                          aria-label={
+                            selectedIsPublicReference
+                              ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                              : undefined
+                          }
                         >
                           {selectedPlace.store.name}
                         </Link>
@@ -1750,17 +2532,39 @@ export function UmkmDiscoveryPanel({
                         )}
                       >
                         <Link
-                          href={buildUmkmStorefrontPath(
-                            selectedPlace.store.slug,
-                          )}
+                          href={buildUmkmMapPlacePath(selectedPlace.store)}
+                          aria-label={
+                            selectedIsPublicReference
+                              ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                              : undefined
+                          }
                           className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-2.5 text-[12px] font-semibold text-white shadow-[0_16px_28px_-24px_color-mix(in_srgb,var(--app-accent)_40%,transparent)] transition hover:brightness-105 sm:px-3"
                         >
                           <Store className="h-3.5 w-3.5 shrink-0" />
                           <span className="truncate">
-                            {isId ? 'Lihat usaha' : 'View business'}
+                            {selectedIsPublicReference
+                              ? isId
+                                ? 'Lihat referensi'
+                                : 'View reference'
+                              : isId
+                                ? 'Lihat usaha'
+                                : 'View business'}
                           </span>
                         </Link>
-                        {selectedContactHref ? (
+                        {selectedIsPublicReference &&
+                        selectedReferenceProvenance?.sourceUrl ? (
+                          <a
+                            href={selectedReferenceProvenance.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-[12px] font-semibold text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/70 dark:bg-sky-950/50 dark:text-sky-200 sm:px-3"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">
+                              {isId ? 'Sumber asli' : 'Original source'}
+                            </span>
+                          </a>
+                        ) : selectedContactHref ? (
                           <a
                             href={selectedContactHref}
                             target={
@@ -1797,7 +2601,12 @@ export function UmkmDiscoveryPanel({
                   </div>
                 </article>
 
-                {selectedTrustProfile && selectedRiskProfile ? (
+                {selectedIsPublicReference ? (
+                  <PublicReferenceNotice
+                    store={selectedPlace.store}
+                    isId={isId}
+                  />
+                ) : selectedTrustProfile && selectedRiskProfile ? (
                   <SafetyNotice
                     isId={isId}
                     trustProfile={selectedTrustProfile}
@@ -1850,7 +2659,22 @@ export function UmkmDiscoveryPanel({
                               <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                                 {selectedLocationLabel}
                               </p>
-                              {selectedTrustProfile ? (
+                              {selectedIsPublicReference ? (
+                                <div className="mt-1">
+                                  <PublicReferenceBadge isId={isId} />
+                                  {selectedReferenceProvenance?.sourceTitle ||
+                                  selectedReferenceProvenance?.sourceLicense ? (
+                                    <p className="mt-0.5 truncate text-[9.5px] font-semibold text-sky-800/76 dark:text-sky-200/76">
+                                      {[
+                                        selectedReferenceProvenance.sourceTitle,
+                                        selectedReferenceProvenance.sourceLicense,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : selectedTrustProfile ? (
                                 <div className="mt-1">
                                   <TrustStatusChip
                                     profile={selectedTrustProfile}
@@ -1865,17 +2689,39 @@ export function UmkmDiscoveryPanel({
                             className={cn('grid gap-1.5', selectedActionGrid)}
                           >
                             <Link
-                              href={buildUmkmStorefrontPath(
-                                selectedPlace.store.slug,
-                              )}
+                              href={buildUmkmMapPlacePath(selectedPlace.store)}
+                              aria-label={
+                                selectedIsPublicReference
+                                  ? `${isId ? 'Detail referensi' : 'Reference details'} ${selectedPlace.store.name}`
+                                  : undefined
+                              }
                               className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-2 text-[11px] font-bold text-white"
                             >
                               <Store className="h-3.5 w-3.5" />
                               <span className="truncate">
-                                {isId ? 'Lihat usaha' : 'View business'}
+                                {selectedIsPublicReference
+                                  ? isId
+                                    ? 'Lihat referensi'
+                                    : 'View reference'
+                                  : isId
+                                    ? 'Lihat usaha'
+                                    : 'View business'}
                               </span>
                             </Link>
-                            {selectedContactHref ? (
+                            {selectedIsPublicReference &&
+                            selectedReferenceProvenance?.sourceUrl ? (
+                              <a
+                                href={selectedReferenceProvenance.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-sky-50 px-2 text-[11px] font-bold text-sky-700 dark:bg-sky-950/50 dark:text-sky-200"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                <span className="truncate">
+                                  {isId ? 'Sumber asli' : 'Original source'}
+                                </span>
+                              </a>
+                            ) : selectedContactHref ? (
                               <a
                                 href={selectedContactHref}
                                 target={
@@ -1941,6 +2787,20 @@ export function UmkmDiscoveryPanel({
                 {paginatedListedPlaces.length > 0 ? (
                   <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {paginatedListedPlaces.map(item => {
+                      if (isUmkmMapPublicReference(item.store)) {
+                        return (
+                          <PublicReferenceResultCard
+                            key={item.store.id}
+                            place={item}
+                            isId={isId}
+                            onSelect={() =>
+                              handleSelectStore(item.store.id, {
+                                scrollToPreview: true,
+                              })
+                            }
+                          />
+                        );
+                      }
                       const openStatus = getOpenStatusProfile(
                         item.ui.openNow,
                         isId,
@@ -2032,10 +2892,18 @@ export function UmkmDiscoveryPanel({
                   <div className="flex justify-center">
                     <button
                       type="button"
-                      onClick={() => setListPage(current => current + 1)}
+                      data-testid="umkm-load-more"
+                      onClick={handleLoadMore}
+                      disabled={loadingMoreForScope}
                       className="inline-flex min-h-[34px] items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
                     >
-                      {isId ? 'Muat lagi' : 'Load more'}
+                      {loadingMoreForScope
+                        ? isId
+                          ? 'Memuat 10 berikutnya...'
+                          : 'Loading next 10...'
+                        : isId
+                          ? 'Muat 10 lagi'
+                          : 'Load 10 more'}
                     </button>
                   </div>
                 ) : null}

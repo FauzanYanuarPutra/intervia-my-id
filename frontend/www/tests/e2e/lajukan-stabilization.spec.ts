@@ -155,6 +155,16 @@ test.describe('Lajukan stabilization regression smoke', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/id/explore', { waitUntil: 'domcontentloaded' });
 
+    await expect(
+      page.getByRole('heading', { name: 'Cari kebutuhan usahamu' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Cari untuk usaha' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Cari calon pembeli' }),
+    ).toBeVisible();
+
     const input = page
       .locator(
         '[data-testid="search-mobile-input"]:visible, input[type="search"]:visible, input[name="q"]:visible',
@@ -165,6 +175,26 @@ test.describe('Lajukan stabilization regression smoke', () => {
     await input.press('Enter');
 
     await expect(page).toHaveURL(/\/id\/explore\?q=supplier(\+|%20)kemasan/);
+    await expect(
+      page.getByRole('heading', { name: 'Hasil pencarian' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Cari', exact: true }),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page, 6);
+  });
+
+  test('Explore keeps Indonesian goals readable at 320px', async ({ page }) => {
+    await installStabilizationFixtures(page);
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/id/explore', { waitUntil: 'domcontentloaded' });
+
+    await expect(
+      page.getByRole('button', { name: 'Cari untuk usaha' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Cari calon pembeli' }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page, 6);
   });
 

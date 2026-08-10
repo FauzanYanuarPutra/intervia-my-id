@@ -26,6 +26,7 @@ import {
   resolveListingSide,
   type ListingSide,
 } from '@/lib/content/listingSide';
+import { isPublicReferenceMetadata } from '@/lib/content/publicReference';
 import {
   buildPublicProfileHrefFromContent,
   resolveOwnerUserIdFromContent,
@@ -385,6 +386,7 @@ function mapContentItem(
     return null;
 
   const meta = item.metadata || {};
+  if (isPublicReferenceMetadata(meta)) return null;
   const entityKind = asString(meta.entity_kind);
   const title = item.title || item.summary || asString(meta.name) || 'Untitled';
   const summary =

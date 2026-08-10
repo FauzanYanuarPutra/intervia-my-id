@@ -1,5 +1,6 @@
-# Akses lokal langsung tanpa hostname www
-http://localhost, http://127.0.0.1 {
+# Akses lokal langsung tanpa hostname www. Gunakan alamat IP agar blok ini
+# tidak bentrok ketika APP_DOMAIN=localhost.
+http://127.0.0.1 {
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
     reverse_proxy www:3000

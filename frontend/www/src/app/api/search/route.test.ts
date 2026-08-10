@@ -75,6 +75,218 @@ describe('GET /api/search', () => {
     expect(payload.groups.businesses.error).toBe('businesses_unavailable');
   });
 
+  it('does not turn public map references into product offers', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input));
+      if (url.pathname === '/api/content') {
+        return Response.json({
+          items: [
+            {
+              id: 'reference-1',
+              type: 'product',
+              title: 'Alfamart',
+              metadata: {
+                record_kind: 'real_openstreetmap_reference',
+                is_transactional: false,
+                market_side: 'reference',
+              },
+            },
+            {
+              id: 'offer-1',
+              type: 'product',
+              title: 'Supplier kemasan berizin',
+              metadata: { market_side: 'provider' },
+            },
+          ],
+        });
+      }
+      throw new TypeError('source unavailable');
+    });
+
+    const response = await GET(searchRequest('q=kemasan&tab=products'));
+    const payload = await response.json();
+
+    expect(payload.groups.products.items).toHaveLength(1);
+    expect(payload.groups.products.items[0].id).toBe('offer-1');
+  });
+
+  it('browses a bounded, separately projected reference group without a query', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async input => {
+        const url = new URL(String(input));
+        if (
+          url.pathname === '/api/super-app/umkm/stores' &&
+          url.searchParams.get('references_only') === '1'
+        ) {
+          return Response.json({
+            data: {
+              items: [
+                {
+                  id: 'reference:reference-1',
+                  public_path: '/content/warung-kopi-reference-1',
+                  name: 'Warung Kopi Nusantara',
+                  city: 'Bandung',
+                  address: 'Bandung, Jawa Barat',
+                  description: 'Referensi lokasi publik dari OpenStreetMap.',
+                  lat: -6.9,
+                  lng: 107.6,
+                  phone: null,
+                  distance_km: null,
+                  metadata: {
+                    record_kind: 'real_openstreetmap_reference',
+                    market_side: 'reference',
+                    is_transactional: false,
+                    source_title: 'OpenStreetMap contributors',
+                    source_url: 'https://www.openstreetmap.org/node/123',
+                    source_license:
+                      'Open Data Commons Open Database License (ODbL) 1.0',
+                    source_license_url:
+                      'https://opendatacommons.org/licenses/odbl/1-0/',
+                    category_label: 'Kuliner',
+                    cover_image: '/images/placeholders/business-default.svg',
+                    private_phone: '+62 812 0000 0000',
+                  },
+                },
+              ],
+              next_cursor:
+                '1785581000000000:11111111-2222-4333-8444-555555555555',
+            },
+          });
+        }
+        throw new TypeError('unexpected source');
+      });
+
+    const response = await GET(searchRequest('tab=references&side=supply'));
+    const payload = await response.json();
+    const item = payload.groups.references.items[0];
+    const target = new URL(String(fetchMock.mock.calls[0]?.[0]));
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(target.pathname).toBe('/api/super-app/umkm/stores');
+    expect(target.searchParams.get('references_only')).toBe('1');
+    expect(target.searchParams.get('limit')).toBe('10');
+    expect(target.searchParams.has('q')).toBe(false);
+    expect(target.searchParams.has('backend_only')).toBe(false);
+    expect(payload.total).toBe(1);
+    expect(payload.availableTabs).toEqual(['references']);
+    expect(payload.groups.references.nextCursor).toBe(
+      '1785581000000000:11111111-2222-4333-8444-555555555555',
+    );
+    expect(item).toMatchObject({
+      id: 'reference:reference-1',
+      kind: 'references',
+      title: 'Warung Kopi Nusantara',
+      href: '/content/warung-kopi-reference-1',
+      priceLabel: '',
+      ownerName: '',
+      verified: false,
+      side: null,
+      metadata: {
+        sourceTitle: 'OpenStreetMap contributors',
+        sourceUrl: 'https://www.openstreetmap.org/node/123',
+        sourceLicense:
+          'Open Data Commons Open Database License (ODbL) 1.0',
+        sourceLicenseUrl:
+          'https://opendatacommons.org/licenses/odbl/1-0/',
+        isTransactional: false,
+      },
+    });
+    expect(item.metadata).not.toHaveProperty('private_phone');
+    expect(item.metadata).not.toHaveProperty('latitude');
+    expect(payload.groups.products.total).toBe(0);
+    expect(payload.groups.businesses.total).toBe(0);
+  });
+
+  it('forwards a keyset cursor only for the explicit reference tab', async () => {
+    const requestedUrls: URL[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input));
+      requestedUrls.push(url);
+      if (url.pathname === '/api/super-app/umkm/stores') {
+        return Response.json({ data: { items: [], next_cursor: null } });
+      }
+      if (url.pathname === '/api/content') {
+        return Response.json({ items: [] });
+      }
+      throw new TypeError('unexpected source');
+    });
+    const cursor =
+      '1785581000000000:11111111-2222-4333-8444-555555555555';
+
+    await GET(
+      searchRequest(
+        `tab=references&cursor=${encodeURIComponent(cursor)}`,
+      ),
+    );
+    await GET(
+      searchRequest(
+        `q=kopi&tab=products&side=supply&cursor=${encodeURIComponent(cursor)}`,
+      ),
+    );
+    await GET(
+      searchRequest(
+        `q=kopi&tab=references&cursor=${encodeURIComponent(cursor)}`,
+      ),
+    );
+
+    expect(requestedUrls).toHaveLength(3);
+    expect(requestedUrls[0].searchParams.get('references_only')).toBe('1');
+    expect(requestedUrls[0].searchParams.get('cursor')).toBe(cursor);
+    expect(requestedUrls[1].pathname).toBe('/api/content');
+    expect(requestedUrls[1].searchParams.has('cursor')).toBe(false);
+    expect(requestedUrls[2].searchParams.get('references_only')).toBe('1');
+    expect(requestedUrls[2].searchParams.has('cursor')).toBe(false);
+  });
+
+  it('drops reference rows without an explicit source license and safe license link', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        data: {
+          items: [
+            {
+              id: 'reference:licensed',
+              public_path: '/content/licensed',
+              name: 'Pasar Berlisensi',
+              city: 'Surabaya',
+              metadata: {
+                record_kind: 'real_openstreetmap_reference',
+                market_side: 'reference',
+                is_transactional: false,
+                source_title: 'OpenStreetMap contributors',
+                source_url: 'https://www.openstreetmap.org/way/456',
+                source_license: 'ODbL 1.0',
+                source_license_url:
+                  'https://opendatacommons.org/licenses/odbl/1-0/',
+              },
+            },
+            {
+              id: 'reference:unlicensed',
+              public_path: '/content/unlicensed',
+              name: 'Data tanpa izin jelas',
+              city: 'Surabaya',
+              metadata: {
+                record_kind: 'legacy_public_reference',
+                market_side: 'reference',
+                is_transactional: false,
+                source_title: 'Sumber lama',
+                source_url: 'https://example.com/legacy-record',
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    const response = await GET(searchRequest('tab=references&q=pasar'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.groups.references.items).toHaveLength(1);
+    expect(payload.groups.references.items[0].id).toBe('reference:licensed');
+  });
+
   it('links business results to the canonical storefront route', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = new URL(String(input));

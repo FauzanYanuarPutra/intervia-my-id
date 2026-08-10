@@ -54,7 +54,7 @@ export default function CommunityGroupSettingsPageClient({
   const detailHref = `/community/groups/${encodeURIComponent(slug)}`;
 
   return (
-    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-0 py-3 sm:px-4 sm:py-8">
+    <main className="min-h-[100svh] bg-[color:var(--app-surface-muted)] px-0 py-3 sm:px-2 sm:py-8">
       {error ? (
         <div className="mx-auto max-w-xl rounded-2xl bg-[color:var(--app-danger-soft)] p-5 text-sm text-[color:var(--app-danger)]">
           <p>{error}</p>

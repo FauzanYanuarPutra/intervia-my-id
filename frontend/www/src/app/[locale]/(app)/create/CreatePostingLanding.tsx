@@ -396,8 +396,8 @@ export default function CreatePostingLanding() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent px-3 py-3 sm:px-4 lg:px-6 lg:py-4">
-      <div className="mx-auto max-w-[1700px]">
+    <div className="min-h-screen bg-transparent px-3 py-3 sm:px-2 lg:px-6 lg:py-4">
+      <div className="mx-auto max-w-[2000px]">
         <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_50px_-44px_rgba(15,23,42,0.22)]">
           <div className="grid grid-cols-1 gap-0 border-b border-slate-100 px-4 py-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)_auto] lg:px-6 lg:py-5">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-3 lg:border-b-0 lg:border-r lg:pr-6">

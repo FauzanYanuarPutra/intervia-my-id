@@ -1,5 +1,5 @@
-import { HomePageSkeleton } from '@/components/system/feedback/RouteSkeletons';
+import { HomeLoadingState } from '@/components/home/HomeResponsiveMarketplace';
 
 export default function HomeLoading() {
-  return <HomePageSkeleton />;
+  return <HomeLoadingState />;
 }

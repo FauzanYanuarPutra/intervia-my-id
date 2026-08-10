@@ -30,7 +30,7 @@ function categoryLabel(slug?: string) {
   return (
     {
       'materials-suppliers': 'Bahan & Supplier',
-      services: 'Cari Jasa',
+      services: 'Jasa Usaha',
       'machines-tools': 'Mesin & Alat',
       'business-places': 'Tempat Usaha',
       'business-opportunities': 'Peluang Usaha',

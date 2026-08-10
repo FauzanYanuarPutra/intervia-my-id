@@ -640,7 +640,7 @@ function CreateFormSectionCard({
   return (
     <section
       className={cn(
-        'ui-section-shell relative overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-white px-3 py-3 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[18px] sm:px-4 sm:py-4',
+        'ui-section-shell relative overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-white px-3 py-3 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[18px] sm:px-2 sm:py-4',
         className,
       )}
     >

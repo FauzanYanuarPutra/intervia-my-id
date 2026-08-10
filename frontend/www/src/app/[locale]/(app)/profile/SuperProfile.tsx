@@ -1,10 +1,8 @@
 'use client';
 
 import {
-  Children,
   type ChangeEvent,
   type ComponentType,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -14,14 +12,12 @@ import NextImage from 'next/image';
 import { usePathname } from 'next/navigation';
 import useEmblaCarousel from 'embla-carousel-react';
 import {
-  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   BarChart3,
   CalendarDays,
   Camera,
   Check,
-  Clapperboard,
   Circle,
   ClipboardList,
   Eye,
@@ -29,7 +25,6 @@ import {
   Heart,
   Loader2,
   MapPin,
-  Megaphone,
   MessageCircle,
   MoreVertical,
   Package,
@@ -226,18 +221,18 @@ function buildCopy(isId: boolean) {
         retry: 'Coba lagi',
         refresh: 'Muat ulang',
         refreshing: 'Memuat...',
-        profileReady: 'Kelengkapan profil',
+        profileReady: 'Siapkan profil usahamu',
         profileHint:
-          'Lengkapi profil agar orang lebih cepat percaya dan menghubungi kamu.',
-        needAttention: 'Perlu diisi',
-        alreadyNeat: 'Sudah rapi',
-        openTask: 'Isi',
-        completeProfile: 'Lengkapi Profil',
+          'Profil yang jelas membuat calon pembeli lebih yakin untuk menghubungi kamu.',
+        needAttention: 'belum diisi',
+        alreadyNeat: 'Profil siap digunakan',
+        openTask: 'Lengkapi',
+        completeProfile: 'Lengkapi profil usaha',
         completeLabel: 'Lengkap',
         missingLabel: 'Belum lengkap',
-        nextStep: 'Langkah berikutnya',
-        improveNow: 'Perbaiki sekarang',
-        publicProfile: 'Lihat Profil Publik',
+        nextStep: 'Lengkapi berikutnya',
+        improveNow: 'Lengkapi sekarang',
+        publicProfile: 'Lihat sebagai pengunjung',
         editProfile: 'Edit Profil',
         verified: 'Akun Terverifikasi',
         joined: 'Bergabung',
@@ -251,55 +246,55 @@ function buildCopy(isId: boolean) {
         noFollowers: 'Belum ada pengikut yang terekam.',
         noFollowing: 'Kamu belum mengikuti akun lain.',
         openPublicProfile: 'Buka profil publik',
-        viewed: 'Dilihat',
-        favorites: 'Favorit',
+        viewed: 'Kunjungan',
+        favorites: 'Disimpan',
         unreadChats: 'Chat belum dibalas',
-        activePosts: 'Postingan Aktif',
-        totalViews: 'Total kunjungan',
-        savedByUsers: 'Disimpan pengguna',
-        unreadHint: 'Segera balas prospek',
-        inboxClean: 'Inbox sedang bersih',
+        activePosts: 'Posting aktif',
+        totalViews: 'Total orang yang melihat',
+        savedByUsers: 'Disimpan calon pembeli',
+        unreadHint: 'Ada pesan yang perlu dibalas',
+        inboxClean: 'Semua pesan sudah dibalas',
         currentlyActive: 'Sedang tayang',
-        quickActions: 'Aksi Cepat',
-        createPost: 'Buat Posting',
-        managePosts: 'Studio Konten',
-        manageListings: 'Listing Saya',
-        contentStudio: 'Pusat kontenmu',
+        quickActions: 'Apa yang ingin kamu lakukan?',
+        createPost: 'Buat penawaran',
+        managePosts: 'Kelola konten',
+        manageListings: 'Produk & jasa saya',
+        contentStudio: 'Pusat aktivitas usaha',
         contentStudioHint:
-          'Listing, komunitas, dan reels sekarang bisa dikelola dari satu tempat yang mudah dibaca.',
-        openContentStudio: 'Buka Studio Konten',
-        communityChannel: 'Komunitas',
-        reelsChannel: 'Reels',
+          'Kelola produk, jasa, komunitas, dan video dari satu tempat.',
+        openContentStudio: 'Kelola aktivitas',
+        communityChannel: 'Komunitas saya',
+        reelsChannel: 'Video saya',
         activeChannel: 'Aktif',
-        draftChannel: 'Draft',
+        draftChannel: 'Belum diterbitkan',
         manageChannel: 'Kelola',
-        drafts: 'Draft',
-        promotion: 'Promosi',
-        insights: 'Insight',
-        myPosts: 'Postingan Saya',
+        drafts: 'Belum diterbitkan',
+        promotion: 'Promosikan usaha',
+        insights: 'Statistik',
+        myPosts: 'Sudah tayang',
         all: 'Semua',
         products: 'Produk',
         services: 'Jasa',
         suppliers: 'Supplier',
         places: 'Tempat Usaha',
-        newest: 'Terbaru',
-        oldest: 'Terlama',
-        mostViewed: 'Paling Dilihat',
+        newest: 'Paling baru',
+        oldest: 'Paling lama',
+        mostViewed: 'Paling banyak dilihat',
         active: 'Aktif',
-        viewAll: 'Lihat Semua Postingan',
-        noPostsTitle: 'Belum ada postingan aktif',
+        viewAll: 'Buka halaman pengelolaan',
+        noPostsTitle: 'Belum ada penawaran yang tayang',
         noPostsDescription:
-          'Buat postingan pertama untuk menawarkan produk, jasa, bahan usaha, atau tempat usaha.',
-        makePost: 'Buat Postingan',
-        noDraftTitle: 'Belum ada draft',
+          'Mulai tawarkan produk, jasa, bahan usaha, atau tempat usaha kepada calon pembeli.',
+        makePost: 'Buat penawaran pertama',
+        noDraftTitle: 'Tidak ada penawaran yang belum diterbitkan',
         noDraftDescription:
-          'Postingan yang belum diterbitkan akan muncul di sini.',
-        manageDrafts: 'Kelola Draft',
+          'Penawaran yang kamu simpan sebelum diterbitkan akan muncul di sini.',
+        manageDrafts: 'Kelola yang belum diterbitkan',
         photoProfile: 'Foto profil',
-        bioBusiness: 'Bio usaha',
+        bioBusiness: 'Tentang usaha atau keahlian',
         businessLocation: 'Lokasi usaha',
         contact: 'Kontak',
-        businessPhoto: 'Foto usaha',
+        businessPhoto: 'Foto sampul usaha',
         identityVerification: 'Verifikasi identitas',
         updateSuccess: 'Foto profil berhasil diperbarui.',
         coverSuccess: 'Sampul profil berhasil diperbarui.',
@@ -308,9 +303,9 @@ function buildCopy(isId: boolean) {
         coverLabel: 'Ubah sampul',
         avatarLabel: 'Ubah foto profil',
         profileFallback:
-          'Ceritakan usaha, layanan, atau keahlian yang kamu tawarkan.',
-        locationFallback: 'Lokasi belum ditambahkan',
-        manage: 'Kelola postingan',
+          'Jelaskan produk, jasa, usaha, atau keahlian yang kamu tawarkan.',
+        locationFallback: 'Tambahkan lokasi usaha',
+        manage: 'Kelola penawaran',
         profileApiPartial:
           'Sebagian data statistik belum tersedia dari server.',
         emptyPrice: 'Hubungi penjual',
@@ -365,7 +360,7 @@ function buildCopy(isId: boolean) {
           'Listings, community posts, and reels can now be managed from one clear place.',
         openContentStudio: 'Open Content Studio',
         communityChannel: 'Community',
-        reelsChannel: 'Reels',
+        reelsChannel: 'Video saya',
         activeChannel: 'Live',
         draftChannel: 'Drafts',
         manageChannel: 'Manage',
@@ -822,102 +817,6 @@ function getTypePresentation(type: ListingFilter, isId: boolean) {
   }
 }
 
-type EmblaApi = ReturnType<typeof useEmblaCarousel>[1];
-
-function useEmblaControls(api: EmblaApi) {
-  const [canPrev, setCanPrev] = useState(false);
-  const [canNext, setCanNext] = useState(false);
-
-  const sync = useCallback(() => {
-    if (!api) return;
-    setCanPrev(api.canScrollPrev());
-    setCanNext(api.canScrollNext());
-  }, [api]);
-
-  useEffect(() => {
-    if (!api) return;
-    const timer = window.setTimeout(sync, 0);
-    api.on('select', sync);
-    api.on('reInit', sync);
-    return () => {
-      window.clearTimeout(timer);
-      api.off('select', sync);
-      api.off('reInit', sync);
-    };
-  }, [api, sync]);
-
-  return {
-    canPrev,
-    canNext,
-    scrollPrev: () => api?.scrollPrev(),
-    scrollNext: () => api?.scrollNext(),
-  };
-}
-
-function EmblaRail({
-  children,
-  ariaLabel,
-  itemClassName,
-  className,
-  showControls = true,
-}: {
-  children: ReactNode;
-  ariaLabel: string;
-  itemClassName: string;
-  className?: string;
-  showControls?: boolean;
-}) {
-  const items = useMemo(() => Children.toArray(children), [children]);
-  const [viewportRef, api] = useEmblaCarousel({
-    align: 'start',
-    containScroll: 'trimSnaps',
-    dragFree: true,
-  });
-  useEmblaWheelGestures(api);
-  const { canPrev, canNext, scrollPrev, scrollNext } = useEmblaControls(api);
-
-  return (
-    <div className={cn('relative min-w-0 max-w-full pt-4', className)}>
-      <div
-        ref={viewportRef}
-        className="cursor-grab overflow-hidden active:cursor-grabbing"
-        aria-label={ariaLabel}
-      >
-        <div className="flex touch-pan-y gap-3">
-          {items.map((child, index) => (
-            <div key={index} className={cn('min-w-0', itemClassName)}>
-              {child}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {showControls && (canPrev || canNext) ? (
-        <div className="mt-3 hidden justify-end gap-2 sm:flex">
-          <button
-            type="button"
-            onClick={scrollPrev}
-            disabled={!canPrev}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-35 dark:text-[color:var(--app-text-inverse)]"
-            aria-label="Previous"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={scrollNext}
-            disabled={!canNext}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-35 dark:text-[color:var(--app-text-inverse)]"
-            aria-label="Next"
-          >
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function ProfileTabRail({
   activeTab,
   items,
@@ -940,7 +839,7 @@ function ProfileTabRail({
   }, [activeTab, api, items]);
 
   return (
-    <div className="px-2.5 pt-2.5 sm:px-4 sm:pt-4">
+    <div className="px-2.5 pt-2.5 sm:px-2 sm:pt-4">
       <div className="flex min-w-0 items-center gap-2">
         <div className="min-w-0 flex-1 rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]">
           <div
@@ -1067,43 +966,6 @@ function StatCard({ item }: { item: StatItem }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function SocialMetricButton({
-  label,
-  value,
-  hint,
-  onClick,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group min-w-0 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 sm:p-3"
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600 transition group-hover:bg-white dark:bg-sky-500/15 dark:text-sky-300">
-          <Users className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
-            {label}
-          </p>
-          <p className="mt-0.5 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            {value}
-          </p>
-          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-            {hint}
-          </p>
-        </div>
-      </div>
-    </button>
   );
 }
 
@@ -2186,29 +2048,30 @@ export default function SuperProfile() {
       icon: Plus,
     },
     {
-      key: 'manage',
-      label: copy.managePosts,
-      href: ROUTES.manage,
-      icon: Clapperboard,
-    },
-    {
       key: 'manage-listings',
       label: copy.manageListings,
       href: ROUTES.manageListings,
       icon: ClipboardList,
-    },
-    {
-      key: 'drafts',
-      label: copy.drafts,
-      href: ROUTES.drafts,
-      icon: FileText,
       badge: draftListings.length,
     },
     {
-      key: 'promotion',
-      label: copy.promotion,
-      href: ROUTES.promotion,
-      icon: Megaphone,
+      key: 'chat',
+      label: isId ? 'Pesan masuk' : 'Inbox',
+      href: ROUTES.chat,
+      icon: MessageCircle,
+      badge: unreadChats,
+    },
+    {
+      key: 'community',
+      label: copy.communityChannel,
+      href: ROUTES.manageCommunity,
+      icon: Users,
+    },
+    {
+      key: 'reels',
+      label: copy.reelsChannel,
+      href: ROUTES.manageReels,
+      icon: Play,
     },
     {
       key: 'insights',
@@ -2217,6 +2080,37 @@ export default function SuperProfile() {
       icon: BarChart3,
     },
   ];
+
+  const quickActionDescriptions: Record<string, string> = isId
+    ? {
+        create: 'Tawarkan produk, jasa, bahan, atau tempat usaha.',
+        'manage-listings': 'Lihat yang sudah tayang dan belum diterbitkan.',
+        chat: 'Balas calon pembeli dan calon mitra usaha.',
+        community: 'Kelola grup dan diskusi yang kamu ikuti.',
+        reels: 'Kelola video pendek untuk menarik perhatian.',
+        insights: 'Lihat kunjungan, simpan, dan respons pengguna.',
+      }
+    : {
+        create: 'Offer a product, service, supply, or business place.',
+        'manage-listings': 'Review published and unpublished offers.',
+        chat: 'Reply to potential buyers and business partners.',
+        community: 'Manage your groups and discussions.',
+        reels: 'Manage short videos that attract attention.',
+        insights: 'Review visits, saves, and user responses.',
+      };
+
+  const quickActionTone: Record<string, string> = {
+    create:
+      'bg-emerald-600 text-white shadow-emerald-900/15 group-hover:bg-emerald-700',
+    'manage-listings':
+      'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+    chat: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+    community:
+      'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+    reels: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+    insights:
+      'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+  };
 
   const tabItems: Array<{ key: OwnerTab; label: string; count: number }> = [
     { key: 'posts', label: copy.myPosts, count: activeListings.length },
@@ -2231,27 +2125,44 @@ export default function SuperProfile() {
     { key: 'place', label: copy.places },
   ];
 
-  const sortLabel =
-    sortMode === 'oldest'
-      ? copy.oldest
-      : sortMode === 'most_viewed'
-        ? copy.mostViewed
-        : copy.newest;
-
-  const cycleSort = () => {
-    setSortMode(current => {
-      if (current === 'newest') return 'most_viewed';
-      if (current === 'most_viewed') return 'oldest';
-      return 'newest';
-    });
-  };
+  const sortOptions: Array<{ value: SortMode; label: string }> = [
+    { value: 'newest', label: copy.newest },
+    { value: 'most_viewed', label: copy.mostViewed },
+    { value: 'oldest', label: copy.oldest },
+  ];
 
   return (
     <>
-      <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-1 sm:pb-8 sm:pt-3">
-        <div className="page-shell min-w-0 space-y-3 overflow-x-clip">
-          <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
-            <div className="relative h-28 overflow-hidden sm:h-36 lg:h-40">
+      <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-2 sm:pb-10 sm:pt-5">
+        <div className="page-shell min-w-0 space-y-4 overflow-x-clip sm:space-y-5">
+          {/* <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                {isId ? 'Profil Saya' : 'My Profile'}
+              </p>
+              <h1 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
+                {isId
+                  ? 'Kelola identitas dan aktivitas usahamu'
+                  : 'Manage your identity and business activity'}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Pastikan informasi usahamu jelas, balas calon pembeli, lalu pantau penawaran yang sudah tayang.'
+                  : 'Keep your business information clear, reply to prospects, and monitor published offers.'}
+              </p>
+            </div>
+
+            <LocalizedLink
+              href={ROUTES.create}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-lg shadow-emerald-900/10 transition hover:-translate-y-0.5 hover:bg-emerald-700"
+            >
+              <Plus className="h-5 w-5" />
+              {copy.createPost}
+            </LocalizedLink>
+          </header> */}
+
+          <section className="min-w-0 overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
+            <div className="relative h-36 overflow-hidden sm:h-44 lg:h-52">
               {effectiveCoverUrl ? (
                 <NextImage
                   src={effectiveCoverUrl}
@@ -2263,28 +2174,27 @@ export default function SuperProfile() {
                   className="object-cover"
                 />
               ) : (
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.24),transparent_32%),radial-gradient(circle_at_78%_36%,rgba(52,211,153,0.2),transparent_28%),linear-gradient(135deg,#ecfdf5_0%,#f8fafc_48%,#dcfce7_100%)] dark:bg-[radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.18),transparent_32%),radial-gradient(circle_at_78%_36%,rgba(52,211,153,0.14),transparent_28%),linear-gradient(135deg,#0f172a_0%,#111827_48%,#052e25_100%)]">
-                  <div className="absolute bottom-0 left-[8%] h-12 w-12 rounded-t-[26px] bg-emerald-200/60 dark:bg-emerald-900/40 sm:h-14 sm:w-14" />
-                  <div className="absolute bottom-0 left-[18%] h-16 w-20 rounded-t-[30px] bg-white/70 dark:bg-slate-800/70 sm:h-20 sm:w-24" />
-                  <div className="absolute bottom-0 right-[8%] h-14 w-32 rounded-t-2xl border-x border-t border-emerald-200/80 bg-white/80 dark:border-emerald-900/70 dark:bg-slate-800/80 sm:right-[12%] sm:h-16 sm:w-40" />
-                  <div className="absolute bottom-8 right-[13%] rounded-md bg-emerald-700 px-4 py-1 text-[10px] font-black tracking-wide text-white shadow-lg sm:bottom-10 sm:right-[17%] sm:px-5 sm:text-xs">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.34),transparent_30%),radial-gradient(circle_at_76%_24%,rgba(14,165,233,0.2),transparent_28%),linear-gradient(135deg,#d1fae5_0%,#f8fafc_48%,#dcfce7_100%)] dark:bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.2),transparent_30%),radial-gradient(circle_at_76%_24%,rgba(14,165,233,0.14),transparent_28%),linear-gradient(135deg,#052e25_0%,#0f172a_52%,#022c22_100%)]">
+                  <div className="absolute -bottom-12 left-[8%] h-28 w-28 rounded-full bg-white/70 blur-sm dark:bg-white/5" />
+                  <div className="absolute bottom-0 right-[12%] h-20 w-44 rounded-t-[36px] border-x border-t border-emerald-200/80 bg-white/75 dark:border-white/10 dark:bg-white/5" />
+                  <div className="absolute bottom-8 right-[18%] rounded-xl bg-emerald-700 px-5 py-2 text-xs font-black tracking-[0.16em] text-white shadow-lg">
                     LAJUKAN
                   </div>
                 </div>
               )}
 
-              <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/15" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/30" />
 
               <label
                 htmlFor="owner-cover-upload"
-                className="absolute right-2 top-2 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-white/70 bg-black/45 px-2.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md transition hover:bg-black/60"
+                className="absolute right-3 top-3 inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-white/50 bg-slate-950/55 px-3 text-xs font-bold text-white shadow-sm backdrop-blur-md transition hover:bg-slate-950/70"
               >
                 {coverUploading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Camera className="h-4 w-4" />
                 )}
-                <span className="hidden sm:inline">{copy.coverLabel}</span>
+                <span>{copy.coverLabel}</span>
               </label>
 
               <input
@@ -2297,9 +2207,9 @@ export default function SuperProfile() {
               />
             </div>
 
-            <div className="relative min-w-0 px-3 pb-4 sm:px-5 sm:pb-5">
-              <div className="-mt-9 flex items-end justify-between gap-3 sm:-mt-11">
-                <div className="relative h-20 w-20 shrink-0 rounded-full border-4 border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:h-24 sm:w-24">
+            <div className="relative min-w-0 px-4 pb-5 sm:px-6 sm:pb-6">
+              <div className="-mt-12 flex min-w-0 items-end justify-between gap-3 sm:-mt-14">
+                <div className="relative h-24 w-24 shrink-0 rounded-full border-4 border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:h-28 sm:w-28">
                   <div className="absolute inset-0 overflow-hidden rounded-full">
                     <NextImage
                       src={effectiveAvatarUrl}
@@ -2308,14 +2218,14 @@ export default function SuperProfile() {
                       priority
                       unoptimized
                       sizes="128px"
-                      className="object-contain"
+                      className="object-cover"
                     />
                   </div>
 
                   <label
                     htmlFor="owner-avatar-upload"
                     aria-label={copy.avatarLabel}
-                    className="absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-[3px] border-[color:var(--app-surface-strong)] bg-white text-slate-900 shadow-sm transition hover:scale-105 dark:bg-slate-800 dark:text-white"
+                    className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-[3px] border-[color:var(--app-surface-strong)] bg-emerald-600 text-white shadow-md transition hover:scale-105 hover:bg-emerald-700"
                   >
                     {avatarUploading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -2339,17 +2249,18 @@ export default function SuperProfile() {
                     type="button"
                     onClick={() => void loadProfile('refresh')}
                     disabled={refreshing}
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60 dark:text-[color:var(--app-text-inverse)]"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60"
+                    aria-label={refreshing ? copy.refreshing : copy.refresh}
+                    title={refreshing ? copy.refreshing : copy.refresh}
                   >
                     <RefreshCw
                       className={cn('h-4 w-4', refreshing && 'animate-spin')}
                     />
-                    {refreshing ? copy.refreshing : copy.refresh}
                   </button>
 
                   <LocalizedLink
                     href={publicProfileHref}
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
                   >
                     <Eye className="h-4 w-4" />
                     {copy.publicProfile}
@@ -2357,7 +2268,7 @@ export default function SuperProfile() {
 
                   <LocalizedLink
                     href={ROUTES.editProfile}
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700"
                   >
                     <PencilLine className="h-4 w-4" />
                     {copy.editProfile}
@@ -2365,13 +2276,12 @@ export default function SuperProfile() {
                 </div>
               </div>
 
-              <div className="mt-3 min-w-0">
+              <div className="mt-4 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
                 <div className="min-w-0">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <h1 className="min-w-0 max-w-full break-words text-xl font-black leading-tight tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
+                    <h2 className="min-w-0 max-w-full break-words text-2xl font-black leading-tight tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
                       {displayName}
-                    </h1>
-
+                    </h2>
                     {verified ? (
                       <BadgeCheck
                         className="h-6 w-6 shrink-0 fill-emerald-600 text-white"
@@ -2381,29 +2291,27 @@ export default function SuperProfile() {
                   </div>
 
                   <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="max-w-full break-all text-sm font-medium text-[color:var(--app-text-soft)]">
+                    <span className="max-w-full break-all text-sm font-semibold text-[color:var(--app-text-soft)]">
                       @{handle || 'user'}
                     </span>
-
                     {verified ? (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
                         {copy.verified}
                       </span>
                     ) : null}
                   </div>
 
-                  <p className="mt-2 max-w-2xl break-words text-[13px] leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  <p className="mt-3 max-w-3xl break-words text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                     {bio}
                   </p>
 
-                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-medium text-[color:var(--app-text-soft)]">
+                  <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-[color:var(--app-text-soft)]">
                     <span className="inline-flex min-w-0 items-center gap-1.5">
                       <MapPin className="h-4 w-4 shrink-0" />
                       <span className="truncate">
                         {location || copy.locationFallback}
                       </span>
                     </span>
-
                     {joinedDate ? (
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarDays className="h-4 w-4 shrink-0" />
@@ -2411,314 +2319,251 @@ export default function SuperProfile() {
                       </span>
                     ) : null}
                   </div>
-
-                  <div className="mt-3 grid max-w-xl grid-cols-2 gap-1.5 sm:grid-cols-3">
-                    <SocialMetricButton
-                      label={copy.followers}
-                      value={formatCompactNumber(followersCount, numberLocale)}
-                      hint={copy.followersHint}
-                      onClick={() => setSocialModalTab('followers')}
-                    />
-                    <SocialMetricButton
-                      label={copy.following}
-                      value={formatCompactNumber(followingCount, numberLocale)}
-                      hint={copy.followingHint}
-                      onClick={() => setSocialModalTab('following')}
-                    />
-                    <LocalizedLink
-                      href={`/reels?creator=${encodeURIComponent(user.id)}`}
-                      className="col-span-2 min-w-0 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 sm:col-span-1 sm:p-3"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
-                          <Clapperboard className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
-                            {copy.reels}
-                          </p>
-                          <p className="mt-0.5 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {formatCompactNumber(reelsCount, numberLocale)}
-                          </p>
-                          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                            {copy.reelsHint}
-                          </p>
-                        </div>
-                      </div>
-                    </LocalizedLink>
-                  </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-1.5 md:hidden">
-                  <LocalizedLink
-                    href={publicProfileHref}
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] px-2.5 text-[11px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
-                  >
-                    <Eye className="h-4 w-4" />
-                    <span className="truncate">{copy.publicProfile}</span>
-                  </LocalizedLink>
-
-                  <LocalizedLink
-                    href={ROUTES.editProfile}
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-600 px-2.5 text-[11px] font-black text-white shadow-sm"
-                  >
-                    <PencilLine className="h-4 w-4" />
-                    {copy.editProfile}
-                  </LocalizedLink>
-
+                <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[color:var(--app-surface-muted)] p-2.5">
                   <button
                     type="button"
-                    onClick={() => void loadProfile('refresh')}
-                    disabled={refreshing}
-                    className="col-span-2 inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--app-border)] text-[11px] font-bold text-[color:var(--app-text-soft)] disabled:opacity-60"
+                    onClick={() => setSocialModalTab('followers')}
+                    className="rounded-xl px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-strong)]"
                   >
-                    <RefreshCw
-                      className={cn('h-4 w-4', refreshing && 'animate-spin')}
-                    />
-                    {refreshing ? copy.refreshing : copy.refresh}
+                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {formatCompactNumber(followersCount, numberLocale)}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
+                      {copy.followers}
+                    </span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setSocialModalTab('following')}
+                    className="rounded-xl px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-strong)]"
+                  >
+                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {formatCompactNumber(followingCount, numberLocale)}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
+                      {copy.following}
+                    </span>
+                  </button>
+                  <LocalizedLink
+                    href={`/reels?creator=${encodeURIComponent(user.id)}`}
+                    className="rounded-xl px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-strong)]"
+                  >
+                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {formatCompactNumber(reelsCount, numberLocale)}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
+                      {copy.reelsChannel}
+                    </span>
+                  </LocalizedLink>
                 </div>
               </div>
 
-              {saveMessage ? (
-                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200">
-                  {saveMessage}
-                </div>
-              ) : null}
+              <div className="mt-4 grid grid-cols-2 gap-2 md:hidden">
+                <LocalizedLink
+                  href={publicProfileHref}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] px-3 text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span className="truncate">{copy.publicProfile}</span>
+                </LocalizedLink>
+                <LocalizedLink
+                  href={ROUTES.editProfile}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-black text-white"
+                >
+                  <PencilLine className="h-4 w-4" />
+                  {copy.editProfile}
+                </LocalizedLink>
+              </div>
+            </div>
+          </section>
 
-              {profileError ? (
-                <div className="mt-4 flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200 sm:flex-row sm:items-center sm:justify-between">
-                  <span>{profileError}</span>
-                  <button
-                    type="button"
-                    onClick={() => void loadProfile('refresh')}
-                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-rose-300 px-3 font-bold dark:border-rose-800"
-                  >
-                    {copy.retry}
-                  </button>
-                </div>
-              ) : null}
+          {saveMessage ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200">
+              {saveMessage}
+            </div>
+          ) : null}
 
-              <section className="mt-4 min-w-0 rounded-2xl border border-emerald-200/80 bg-[color:var(--app-surface-muted)] p-3 dark:border-emerald-900/70 sm:p-3.5">
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {copy.profileReady}
-                      </h2>
-                      <span className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:border-emerald-900/70 dark:bg-white/10 dark:text-emerald-300">
-                        {incompleteCompletionItems.length === 0
-                          ? copy.alreadyNeat
-                          : `${incompleteCompletionItems.length} ${copy.needAttention}`}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex min-w-0 items-center gap-2 sm:gap-3">
-                      <span className="shrink-0 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
-                        {profilePercent}%
-                      </span>
-                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-emerald-600 transition-[width] duration-500 !p-0"
-                          style={{ width: `${profilePercent}%` }}
-                        />
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                      {copy.profileHint}
-                    </p>
-                  </div>
+          {profileError ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200 sm:flex-row sm:items-center sm:justify-between">
+              <span>{profileError}</span>
+              <button
+                type="button"
+                onClick={() => void loadProfile('refresh')}
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-rose-300 px-4 font-bold dark:border-rose-800"
+              >
+                {copy.retry}
+              </button>
+            </div>
+          ) : null}
 
-                  <LocalizedLink
-                    href={nextCompletionItem?.href || ROUTES.editProfile}
-                    className="hidden min-h-10 shrink-0 items-center justify-center rounded-xl border border-emerald-700 bg-emerald-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 sm:inline-flex"
-                  >
-                    {nextCompletionItem ? copy.improveNow : copy.editProfile}
-                  </LocalizedLink>
-                </div>
-
-                {nextCompletionItem ? (
-                  <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-900/60 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
-                    <span>
-                      {copy.nextStep}: {nextCompletionItem.label}
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+            <section className="min-w-0 rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:p-5">
+              <div className="flex min-w-0 items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {copy.profileReady}
+                    </h2>
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                      {profilePercent}%
                     </span>
-                    <LocalizedLink
-                      href={nextCompletionItem.href}
-                      className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-xl bg-white px-3 font-black text-amber-800 shadow-sm transition hover:bg-amber-100 dark:bg-white/10 dark:text-amber-100"
-                    >
-                      {copy.improveNow}
-                    </LocalizedLink>
                   </div>
-                ) : null}
-
-                <div className="mt-3 grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                  {completionItems.map(item => (
-                    <CompletionItem
-                      key={item.key}
-                      label={item.label}
-                      href={item.href}
-                      complete={item.complete}
-                      completeLabel={copy.completeLabel}
-                      missingLabel={copy.missingLabel}
-                      actionLabel={copy.openTask}
-                    />
-                  ))}
+                  <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                    {copy.profileHint}
+                  </p>
                 </div>
 
                 <LocalizedLink
                   href={nextCompletionItem?.href || ROUTES.editProfile}
-                  className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-emerald-700 bg-emerald-600 text-xs font-black text-white shadow-sm sm:hidden"
+                  className="hidden min-h-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-black text-white transition hover:bg-emerald-700 sm:inline-flex"
                 >
                   {nextCompletionItem ? copy.improveNow : copy.editProfile}
                 </LocalizedLink>
-              </section>
+              </div>
 
-              <section className="min-w-0">
-                <EmblaRail
-                  ariaLabel={copy.swipe}
-                  itemClassName="flex-[0_0_78%] xs:flex-[0_0_64%] sm:flex-[0_0_46%] lg:flex-[0_0_calc(25%-0.6rem)]"
-                >
-                  {stats.map(item => (
-                    <StatCard key={item.key} item={item} />
-                  ))}
-                </EmblaRail>
-
-                {statsPartial ? (
-                  <p className="mt-2 text-[11px] text-[color:var(--app-text-soft)]">
-                    {copy.profileApiPartial}
-                  </p>
-                ) : null}
-              </section>
-
-              <section
-                data-testid="profile-content-studio"
-                data-visual-surface="dark"
-                className="profile-content-studio relative mt-6 overflow-hidden rounded-2xl border border-emerald-800 bg-emerald-950 p-4 text-white shadow-[0_20px_46px_-32px_rgba(5,46,37,0.9)] sm:p-5"
-              >
+              <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
                 <div
-                  aria-hidden="true"
-                  className="absolute -right-10 -top-14 h-36 w-36 rounded-full bg-emerald-300/20 blur-2xl"
+                  className="h-full rounded-full bg-emerald-600 transition-[width] duration-500"
+                  style={{ width: `${profilePercent}%` }}
                 />
-                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="max-w-2xl">
-                    <p className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">
-                      <Clapperboard className="h-3.5 w-3.5" />
-                      {copy.contentStudio}
-                    </p>
-                    <h2 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">
-                      {copy.openContentStudio}
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-emerald-50/85">
-                      {copy.contentStudioHint}
-                    </p>
+              </div>
+
+              {incompleteCompletionItems.length > 0 ? (
+                <div className="mt-4">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300">
+                    {isId ? 'Yang masih perlu dilengkapi' : 'Still needs attention'}
+                  </p>
+                  <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+                    {incompleteCompletionItems.map(item => (
+                      <CompletionItem
+                        key={item.key}
+                        label={item.label}
+                        href={item.href}
+                        complete={false}
+                        completeLabel={copy.completeLabel}
+                        missingLabel={copy.missingLabel}
+                        actionLabel={copy.openTask}
+                      />
+                    ))}
                   </div>
-                  <LocalizedLink
-                    href={ROUTES.manage}
-                    className="profile-content-studio-cta inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-emerald-800 shadow-lg transition hover:-translate-y-0.5 hover:bg-emerald-50"
-                  >
-                    {copy.openContentStudio}
-                    <ArrowRight className="h-4 w-4" />
-                  </LocalizedLink>
                 </div>
-
-                <div className="relative mt-4 grid gap-2 sm:grid-cols-3">
-                  <LocalizedLink
-                    href={ROUTES.manageListings}
-                    data-content-channel="listing"
-                    className="profile-content-channel group flex min-h-20 items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur transition hover:bg-white/15"
-                  >
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-200 text-emerald-900">
-                      <ClipboardList className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-black">
-                        {copy.manageListings}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-emerald-50/75">
-                        {activeListings.length} {copy.activeChannel} ·{' '}
-                        {draftListings.length} {copy.draftChannel}
-                      </span>
-                    </span>
-                  </LocalizedLink>
-                  <LocalizedLink
-                    href={ROUTES.manageCommunity}
-                    data-content-channel="community"
-                    className="profile-content-channel group flex min-h-20 items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur transition hover:bg-white/15"
-                  >
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-200 text-sky-900">
-                      <MessageCircle className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-black">
-                        {copy.communityChannel}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-emerald-50/75">
-                        {copy.manageChannel}
-                      </span>
-                    </span>
-                  </LocalizedLink>
-                  <LocalizedLink
-                    href={ROUTES.manageReels}
-                    data-content-channel="reel"
-                    className="profile-content-channel group flex min-h-20 items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur transition hover:bg-white/15"
-                  >
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-200 text-rose-900">
-                      <Play className="h-5 w-5 fill-current" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-black">
-                        {copy.reelsChannel}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-emerald-50/75">
-                        {formatCompactNumber(reelsCount, numberLocale)}{' '}
-                        {copy.reelsChannel}
-                      </span>
-                    </span>
-                  </LocalizedLink>
+              ) : (
+                <div className="mt-4 flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                    <Check className="h-4 w-4" strokeWidth={3} />
+                  </span>
+                  {isId
+                    ? 'Profilmu sudah siap dilihat calon pembeli.'
+                    : 'Your profile is ready for potential buyers.'}
                 </div>
-              </section>
+              )}
 
-              <section className="mt-6 min-w-0">
+              <LocalizedLink
+                href={nextCompletionItem?.href || ROUTES.editProfile}
+                className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-black text-white sm:hidden"
+              >
+                {nextCompletionItem ? copy.improveNow : copy.editProfile}
+              </LocalizedLink>
+            </section>
+
+            <section className="min-w-0 rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:p-5">
+              <div>
                 <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {isId ? 'Ringkasan perkembangan' : 'Performance summary'}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                  {isId
+                    ? 'Lihat respons orang terhadap profil dan penawaranmu.'
+                    : 'See how people respond to your profile and offers.'}
+                </p>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
+                {stats.map(item => (
+                  <StatCard key={item.key} item={item} />
+                ))}
+              </div>
+
+              {statsPartial ? (
+                <p className="mt-3 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                  {copy.profileApiPartial}
+                </p>
+              ) : null}
+            </section>
+          </div>
+
+          <section className="min-w-0 rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {copy.quickActions}
                 </h2>
+                <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                  {isId
+                    ? 'Pilih satu langkah. Setiap menu menjelaskan hasil yang akan kamu dapatkan.'
+                    : 'Choose one next step. Each menu explains what it helps you do.'}
+                </p>
+              </div>
+              <LocalizedLink
+                href={ROUTES.manage}
+                className="inline-flex min-h-9 items-center gap-1.5 text-xs font-black text-emerald-700 hover:underline dark:text-emerald-300"
+              >
+                {copy.managePosts}
+                <ArrowRight className="h-4 w-4" />
+              </LocalizedLink>
+            </div>
 
-                <div className="mt-4">
-                  <EmblaRail
-                    ariaLabel={copy.quickActions}
-                    itemClassName="flex-[0_0_25%] xs:flex-[0_0_21%] sm:flex-[0_0_16%] lg:flex-[0_0_calc(16.666%-0.6rem)]"
-                    showControls={false}
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {quickActions.map(action => {
+                const Icon = action.icon;
+                return (
+                  <LocalizedLink
+                    key={action.key}
+                    href={action.href}
+                    className="group flex min-w-0 items-center gap-3 rounded-2xl border border-[color:var(--app-border)] p-3.5 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm"
                   >
-                    {quickActions.map(action => {
-                      const Icon = action.icon;
-
-                      return (
-                        <LocalizedLink
-                          key={action.key}
-                          href={action.href}
-                          className="group flex h-full min-w-0 cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-transparent bg-white/60 p-2 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 dark:bg-white/[0.04] dark:hover:border-emerald-900/70 dark:hover:bg-emerald-500/10"
-                        >
-                          <span className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-emerald-700 transition group-hover:-translate-y-0.5 group-hover:border-emerald-300 group-hover:bg-emerald-50 dark:text-emerald-300 dark:group-hover:bg-emerald-500/10 sm:h-11 sm:w-11">
-                            <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
-                            {typeof action.badge === 'number' &&
-                            action.badge > 0 ? (
-                              <span className="absolute -right-2 -top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white">
-                                {action.badge > 99 ? '99+' : action.badge}
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="line-clamp-2 text-[10px] font-bold leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-xs">
-                            {action.label}
-                          </span>
-                        </LocalizedLink>
-                      );
-                    })}
-                  </EmblaRail>
-                </div>
-              </section>
+                    <span
+                      className={cn(
+                        'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm transition',
+                        quickActionTone[action.key],
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {typeof action.badge === 'number' && action.badge > 0 ? (
+                        <span className="absolute -right-2 -top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white ring-2 ring-[color:var(--app-surface-strong)]">
+                          {action.badge > 99 ? '99+' : action.badge}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {action.label}
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {quickActionDescriptions[action.key]}
+                      </span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5 group-hover:text-emerald-600" />
+                  </LocalizedLink>
+                );
+              })}
             </div>
           </section>
 
-          <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
+          <section className="min-w-0 overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
+            <div className="border-b border-[color:var(--app-border)] px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
+              <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {isId ? 'Penawaran yang kamu kelola' : 'Offers you manage'}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Periksa produk, jasa, supplier, atau tempat usaha yang sudah tayang maupun belum diterbitkan.'
+                  : 'Review published and unpublished products, services, suppliers, or business places.'}
+              </p>
+            </div>
+
             <ProfileTabRail
               activeTab={activeTab}
               items={tabItems}
@@ -2728,29 +2573,36 @@ export default function SuperProfile() {
               }}
             />
 
-            <div className="flex min-w-0 items-center gap-2 px-2.5 py-2.5 sm:px-4 sm:py-3">
+            <div className="flex min-w-0 flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:px-5">
               <FilterRail
                 activeFilter={activeFilter}
                 items={filterItems}
                 onChange={setActiveFilter}
               />
 
-              <button
-                type="button"
-                onClick={cycleSort}
-                aria-label={sortLabel}
-                title={sortLabel}
-                className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] px-2.5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:px-3"
-              >
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden text-xs font-bold sm:inline">
-                  {sortLabel}
+              <label className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[color:var(--app-border)] px-3 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <Settings2 className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                <span className="sr-only">
+                  {isId ? 'Urutkan berdasarkan' : 'Sort by'}
                 </span>
-              </button>
+                <select
+                  value={sortMode}
+                  onChange={event =>
+                    setSortMode(event.target.value as SortMode)
+                  }
+                  className="min-w-0 bg-transparent text-xs font-bold outline-none"
+                >
+                  {sortOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             {visibleListings.length > 0 ? (
-              <div className="space-y-2 px-2.5 pb-2.5 sm:px-4 sm:pb-4">
+              <div className="space-y-2.5 px-3 pb-3 sm:px-5 sm:pb-5">
                 {visibleListings.map(item => (
                   <ListingCard
                     key={item.id}
@@ -2779,14 +2631,14 @@ export default function SuperProfile() {
             )}
 
             {visibleListings.length > 0 ? (
-              <div className="px-2.5 pb-3 sm:px-4 sm:pb-4">
+              <div className="border-t border-[color:var(--app-border)] px-3 py-3 sm:px-5">
                 <LocalizedLink
                   href={
                     activeTab === 'drafts'
                       ? ROUTES.drafts
                       : ROUTES.manageListings
                   }
-                  className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
                 >
                   {copy.viewAll}
                   <ArrowRight className="h-4 w-4" />

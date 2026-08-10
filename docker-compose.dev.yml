@@ -43,9 +43,6 @@ services:
       MAX_LOGIN_ATTEMPTS: "5"
       LOCKOUT_DURATION_MIN: "15"
       FAILED_LOGIN_DELAY_MS: "1000"
-      DEV_SEED_OPS_USER: ${DEV_SEED_OPS_USER:-true}
-      DEV_SEED_OPS_PASSWORD: ${DEV_SEED_OPS_PASSWORD:-}
-
       # --- Domain & CORS ---
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
@@ -287,7 +284,7 @@ services:
       context: ./services/marketplace_service
       dockerfile: Dockerfile
     ports:
-      - "${PORT_MARKETPLACE:-8081}:8081"
+      - "127.0.0.1:${PORT_MARKETPLACE:-8081}:8081"
     environment:
       APP_PORT: "8081"
       MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db

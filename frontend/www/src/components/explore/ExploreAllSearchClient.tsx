@@ -1,13 +1,12 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  CheckCircle2,
   ChevronRight,
   ClipboardList,
-  Layers3,
+  ExternalLink,
+  MapPinned,
   Search,
   Store,
 } from 'lucide-react';
@@ -36,16 +35,54 @@ function appendSearchParams(path: string, params: URLSearchParams) {
   return search ? `${path}?${search}` : path;
 }
 
+type ExploreSearchMode = 'supply' | 'demand' | 'references';
+
+const SEARCH_RESPONSE_CACHE = new Map<string, GlobalSearchResponse>();
+const MAX_SEARCH_CACHE_ENTRIES = 12;
+const EXPLORE_ADVANCED_FILTER_KEYS = [
+  'location',
+  'lat',
+  'lng',
+  'distance',
+  'sort',
+  'min_price',
+  'max_price',
+  'condition',
+  'service_mode',
+  'verified',
+  'status',
+  'privacy',
+] as const;
+
+function rememberSearchResponse(key: string, payload: GlobalSearchResponse) {
+  SEARCH_RESPONSE_CACHE.delete(key);
+  SEARCH_RESPONSE_CACHE.set(key, payload);
+  while (SEARCH_RESPONSE_CACHE.size > MAX_SEARCH_CACHE_ENTRIES) {
+    const oldestKey = SEARCH_RESPONSE_CACHE.keys().next().value;
+    if (!oldestKey) break;
+    SEARCH_RESPONSE_CACHE.delete(oldestKey);
+  }
+}
+
+function normalizeQuery(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
 export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
   const state = useMemo(
-    () => parseGlobalSearchState(new URLSearchParams(searchParams.toString())),
-    [searchParams],
+    () => parseGlobalSearchState(new URLSearchParams(searchKey)),
+    [searchKey],
   );
   const isId = locale === 'id';
+  const referenceMode = state.tab === 'references';
   const searchSide: Exclude<GlobalSearchSide, 'all'> =
     state.side === 'demand' ? 'demand' : 'supply';
+  const searchMode: ExploreSearchMode = referenceMode
+    ? 'references'
+    : searchSide;
   const [queryDraft, setQueryDraft] = useState({
     source: state.query,
     value: state.query,
@@ -58,19 +95,39 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
   const [payload, setPayload] = useState<GlobalSearchResponse>(() =>
     emptyGlobalSearchResponse(state.query),
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchKey);
     let changed = false;
-    if (state.side === 'all') {
+    const rawQuery = params.get('q') || '';
+    const cleanQuery = normalizeQuery(rawQuery);
+
+    if (rawQuery !== cleanQuery || cleanQuery.length === 1) {
+      if (cleanQuery.length >= 2) params.set('q', cleanQuery);
+      else params.delete('q');
+      changed = true;
+    }
+    if (referenceMode && params.has('side')) {
+      params.delete('side');
+      changed = true;
+    } else if (!referenceMode && state.side === 'all') {
       params.set('side', 'supply');
       changed = true;
     }
-    if (params.has('type')) {
-      params.delete('type');
+    if (!referenceMode && params.get('tab') === 'references') {
+      params.delete('tab');
+      changed = true;
+    }
+    for (const key of ['type', 'category', 'subcategory']) {
+      if (!params.has(key)) continue;
+      params.delete(key);
+      changed = true;
+    }
+    if (!referenceMode && params.has('cursor')) {
+      params.delete('cursor');
       changed = true;
     }
     if (changed) {
@@ -78,22 +135,35 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
         scroll: false,
       });
     }
-  }, [locale, router, searchParams, state.side]);
+  }, [locale, referenceMode, router, searchKey, state.side]);
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchKey);
     params.delete('category');
+    params.delete('subcategory');
     params.delete('type');
-    params.set('side', searchSide);
-    if (searchSide === 'demand') params.set('tab', 'needs');
+    if (referenceMode) {
+      params.delete('side');
+      params.set('tab', 'references');
+    } else {
+      params.set('side', searchSide);
+      if (searchSide === 'demand') params.set('tab', 'needs');
+      else if (params.get('tab') === 'needs') params.delete('tab');
+      params.delete('cursor');
+    }
+
+    const requestKey = params.toString();
+    const cachedPayload = SEARCH_RESPONSE_CACHE.get(requestKey);
 
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
+      if (cachedPayload) setPayload(cachedPayload);
+      else setPayload(emptyGlobalSearchResponse(state.query));
       setLoading(true);
       setError(false);
     });
-    void fetch(`/api/search?${params.toString()}`, {
+    void fetch(`/api/search?${requestKey}`, {
       cache: 'no-store',
       signal: controller.signal,
     })
@@ -101,24 +171,25 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
         if (!response.ok) throw new Error('search_failed');
         return (await response.json()) as GlobalSearchResponse;
       })
-      .then(setPayload)
+      .then(nextPayload => {
+        if (controller.signal.aborted) return;
+        rememberSearchResponse(requestKey, nextPayload);
+        setPayload(nextPayload);
+      })
       .catch(() => {
-        if (!controller.signal.aborted) {
-          setPayload(emptyGlobalSearchResponse(state.query));
-          setError(true);
-        }
+        if (!controller.signal.aborted) setError(true);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [searchParams, searchSide, retryKey, state.query]);
+  }, [referenceMode, retryKey, searchKey, searchSide, state.query]);
 
   const updateParams = (
     changes: Record<string, string | null>,
     mode: 'push' | 'replace' = 'push',
   ) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchKey);
     Object.entries(changes).forEach(([key, value]) => {
       if (!value || value === 'all' || value === 'relevance') {
         params.delete(key);
@@ -135,46 +206,104 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
   };
 
   const submitSearch = (nextQuery = queryInput) => {
-    const clean = nextQuery.replace(/\s+/g, ' ').trim();
-    if (clean.length < 2) return;
-    void trackLajukanEvent('navbar_search_submit', {
-      properties: {
-        locale,
-        source: 'explore_all',
-        route: '/explore',
-        query: clean,
-        side: searchSide,
-      },
-    });
+    const clean = normalizeQuery(nextQuery);
+    if (clean.length === 1 || (clean.length < 2 && !referenceMode)) return;
+    if (clean.length >= 2) {
+      void trackLajukanEvent('navbar_search_submit', {
+        properties: {
+          locale,
+          source: 'explore_all',
+          route: '/explore',
+          query: clean,
+          side: referenceMode ? 'reference' : searchSide,
+        },
+      });
+    }
     updateParams({
-      q: clean,
-      side: searchSide,
-      tab: searchSide === 'demand' ? 'needs' : null,
+      q: clean || null,
+      side: referenceMode ? null : searchSide,
+      tab: referenceMode
+        ? 'references'
+        : searchSide === 'demand'
+          ? 'needs'
+          : null,
     });
   };
 
-  const selectSide = (side: Exclude<GlobalSearchSide, 'all'>) => {
+  const selectMode = (mode: ExploreSearchMode) => {
     updateParams(
       {
-        side,
-        tab: side === 'demand' ? 'needs' : null,
+        side: mode === 'references' ? null : mode,
+        tab:
+          mode === 'references'
+            ? 'references'
+            : mode === 'demand'
+              ? 'needs'
+              : null,
+        subcategory: null,
       },
       'replace',
     );
   };
 
   const selectTab = (tab: GlobalSearchTab) => {
+    if (tab === 'references') {
+      selectMode('references');
+      return;
+    }
     updateParams({ tab: tab === 'all' ? null : tab });
   };
 
+  const loadNextReferenceBatch = (cursor: string) => {
+    const cleanCursor = cursor.trim();
+    if (
+      !referenceMode ||
+      !cleanCursor ||
+      cleanCursor.length > 96 ||
+      !/^\d{1,19}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+        cleanCursor,
+      )
+    ) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchKey);
+    params.set('tab', 'references');
+    params.set('cursor', cleanCursor);
+    params.delete('side');
+    params.delete('category');
+    params.delete('subcategory');
+    params.delete('type');
+    router.push(appendSearchParams(`/${locale}/explore`, params), {
+      scroll: false,
+    });
+  };
+
+  const normalizedQueryLength = queryInput.trim().length;
+  const canSubmit = referenceMode
+    ? normalizedQueryLength === 0 || normalizedQueryLength >= 2
+    : normalizedQueryLength >= 2;
+  const advancedFilterCount = EXPLORE_ADVANCED_FILTER_KEYS.filter(key => {
+    const value = new URLSearchParams(searchKey).get(key);
+    return Boolean(value && value.trim());
+  }).length;
+  const clearAdvancedFilters = () => {
+    updateParams(
+      Object.fromEntries(
+        EXPLORE_ADVANCED_FILTER_KEYS.map(key => [key, null]),
+      ),
+      'replace',
+    );
+  };
+
   return (
-    <div className="min-h-[100svh] bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
+    <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
       <div className="lg:hidden">
         <Header />
         <div className="h-[calc(52px+env(safe-area-inset-top))]" />
       </div>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+      <main className="mx-auto w-full min-w-0 max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <nav
           aria-label={isId ? 'Breadcrumb' : 'Breadcrumb'}
           className="flex items-center gap-1.5 text-xs text-[color:var(--app-text-soft)]"
@@ -190,74 +319,110 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
             aria-current="page"
             className="truncate font-semibold text-[color:var(--app-text)]"
           >
-            {isId ? 'Semua' : 'All'}
+            {referenceMode
+              ? isId
+                ? 'Referensi tempat'
+                : 'Place references'
+              : searchSide === 'demand'
+                ? isId
+                  ? 'Permintaan pembeli'
+                  : 'Buyer requests'
+                : isId
+                  ? 'Hasil pencarian'
+                  : 'Search results'}
           </span>
         </nav>
 
-        <section className="mt-4 grid gap-6 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.5)] sm:p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:gap-10">
-          <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] sm:h-14 sm:w-14">
-              <Layers3 className="h-6 w-6" />
-            </span>
-            <div className="min-w-0">
+        <section className="mt-4 grid min-w-0 gap-5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.5)] sm:p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:gap-10">
+          <div className="min-w-0">
               <h1 className="text-2xl font-bold leading-tight text-[color:var(--app-text)] sm:text-3xl">
-                {isId ? 'Semua kategori' : 'All categories'}
+                {referenceMode
+                  ? isId
+                    ? 'Referensi tempat usaha'
+                    : 'Business place references'
+                  : searchSide === 'demand'
+                    ? isId
+                      ? 'Permintaan dari calon pembeli'
+                      : 'Requests from potential buyers'
+                    : isId
+                      ? 'Hasil pencarian'
+                      : 'Search results'}
               </h1>
               <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-                {searchSide === 'demand'
+                {referenceMode
                   ? isId
-                    ? 'Lihat kebutuhan pembeli dari semua kategori, lalu persempit ke kategori atau subkategori yang paling cocok.'
-                    : 'Browse buyer needs across every category, then narrow to the best category or subcategory.'
+                    ? 'Data lokasi untuk acuan. Ini bukan daftar toko atau penawaran aktif.'
+                    : 'Location data for reference. These are not active stores or offers.'
+                  : searchSide === 'demand'
+                  ? isId
+                    ? 'Cari orang yang sedang membutuhkan produk atau jasa seperti milikmu.'
+                    : 'Find people looking for products or services like yours.'
                   : isId
-                    ? 'Cari penyedia dari semua kategori, lalu pilih kategori saat sudah tahu arah kebutuhanmu.'
-                    : 'Search providers across every category, then choose a category when the need is clearer.'}
+                    ? 'Cari produk, jasa, supplier, dan usaha dari semua kategori.'
+                    : 'Find products, services, suppliers, and businesses across all categories.'}
               </p>
-            </div>
           </div>
 
           <div className="min-w-0">
-            <div
-              className="grid grid-cols-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-1"
-              aria-label={isId ? 'Pilih tujuan' : 'Choose a goal'}
-              role="tablist"
-            >
-              {[
-                {
-                  value: 'supply' as const,
-                  label: isId ? 'Cari yang menawarkan' : 'Find Providers',
-                  short: isId ? 'Penyedia' : 'Providers',
-                  icon: Store,
-                },
-                {
-                  value: 'demand' as const,
-                  label: isId ? 'Lihat kebutuhan pembeli' : 'Find Buyers',
-                  short: isId ? 'Pembeli' : 'Buyers',
-                  icon: ClipboardList,
-                },
-              ].map(option => {
-                const Icon = option.icon;
-                const active = searchSide === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => selectSide(option.value)}
-                    role="tab"
-                    aria-selected={active}
-                    className={cn(
-                      'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:text-sm',
-                      active
-                        ? 'cursor-default bg-[color:var(--app-accent)] text-white shadow-sm'
-                        : 'cursor-pointer text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]',
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="sm:hidden">{option.short}</span>
-                    <span className="hidden sm:inline">{option.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {referenceMode ? (
+              <button
+                type="button"
+                onClick={() => selectMode('supply')}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+              >
+                <Store className="h-4 w-4" />
+                {isId ? 'Kembali ke produk & jasa' : 'Back to products & services'}
+              </button>
+            ) : (
+              <>
+                <div
+                  className="grid grid-cols-[repeat(2,minmax(0,1fr))] rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
+                  aria-label={isId ? 'Pilih tujuan pencarian' : 'Choose a search goal'}
+                  role="group"
+                >
+                  {[
+                    {
+                      value: 'supply' as const,
+                      label: isId ? 'Produk & jasa' : 'Products & services',
+                      icon: Store,
+                    },
+                    {
+                      value: 'demand' as const,
+                      label: isId ? 'Permintaan pembeli' : 'Buyer requests',
+                      icon: ClipboardList,
+                    },
+                  ].map(option => {
+                    const Icon = option.icon;
+                    const active = searchMode === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => selectMode(option.value)}
+                        aria-pressed={active}
+                        className={cn(
+                          'inline-flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-center text-xs font-bold leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:text-sm',
+                          active
+                            ? 'cursor-default bg-[color:var(--app-accent)] text-white shadow-sm'
+                            : 'cursor-pointer text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-strong)] hover:text-[color:var(--app-text)]',
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => selectMode('references')}
+                  className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[color:var(--app-text-soft)] transition hover:bg-amber-50 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+                >
+                  <MapPinned className="h-4 w-4" />
+                  {isId ? 'Cari referensi tempat usaha' : 'Find business place references'}
+                </button>
+              </>
+            )}
 
             <form
               action={`/${locale}/explore`}
@@ -270,61 +435,141 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
               className="mt-2.5"
               role="search"
             >
-              <label className="flex min-h-[52px] items-center gap-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.45)] focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)]">
+              <label htmlFor="explore-results-search" className="sr-only">
+                {isId ? 'Cari di Lajukan' : 'Search Lajukan'}
+              </label>
+              <div className="flex min-h-[52px] min-w-0 items-center gap-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.45)] focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)]">
                 <Search className="h-5 w-5 shrink-0 text-[color:var(--app-text-soft)]" />
                 <input
                   type="search"
+                  id="explore-results-search"
                   name="q"
                   value={queryInput}
                   onChange={event => setQueryInput(event.target.value)}
                   placeholder={
-                    searchSide === 'demand'
+                    referenceMode
                       ? isId
-                        ? 'Contoh: butuh supplier kemasan'
-                        : 'Example: needs packaging supplier'
+                        ? 'Contoh: warung makan Bandung'
+                        : 'Example: restaurants in Bandung'
+                      : searchSide === 'demand'
+                      ? isId
+                        ? 'Contoh: pembeli butuh kemasan'
+                        : 'Example: buyers need packaging'
                       : isId
-                        ? 'Contoh: supplier kemasan'
-                        : 'Example: packaging supplier'
+                        ? 'Contoh: kemasan standing pouch'
+                        : 'Example: standing pouch packaging'
                   }
                   className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)]"
+                  aria-label={isId ? 'Cari di seluruh Lajukan' : 'Search all of Lajukan'}
                 />
-                <input type="hidden" name="side" value={searchSide} />
-                {searchSide === 'demand' ? (
+                {referenceMode ? (
+                  <input type="hidden" name="tab" value="references" />
+                ) : (
+                  <input type="hidden" name="side" value={searchSide} />
+                )}
+                {!referenceMode && searchSide === 'demand' ? (
                   <input type="hidden" name="tab" value="needs" />
                 ) : null}
                 <button
                   type="submit"
-                  disabled={queryInput.trim().length < 2}
+                  disabled={!canSubmit}
                   className={cn(
-                    'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none',
-                    queryInput.trim().length < 2 &&
-                      'cursor-not-allowed opacity-40',
+                    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none',
+                    !canSubmit && 'cursor-not-allowed opacity-40',
                   )}
                 >
-                  <span className="hidden sm:inline">
-                    {isId ? 'Cari' : 'Search'}
+                  <span>
+                    {referenceMode && !queryInput.trim()
+                      ? isId
+                        ? 'Muat'
+                        : 'Load'
+                      : isId
+                        ? 'Cari'
+                        : 'Search'}
                   </span>
                   <ArrowRight className="h-4 w-4" />
                 </button>
-              </label>
+              </div>
             </form>
           </div>
         </section>
 
-        <section className="my-5 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:p-5">
-          <div className="flex min-h-9 items-center justify-between gap-3 text-sm font-bold text-[color:var(--app-text)]">
-            <span>{isId ? 'Pilih kategori' : 'Choose category'}</span>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {referenceMode ? (
+          <section className="my-5 rounded-lg border border-amber-200 bg-amber-50/70 p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-white text-amber-800">
+                  <MapPinned className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-black text-amber-950">
+                    {isId
+                      ? 'Data lokasi untuk acuan, bukan toko aktif'
+                      : 'Location data for reference, not active stores'}
+                  </h2>
+                  <p className="mt-1 max-w-3xl text-xs leading-5 text-amber-950/80">
+                    {isId
+                      ? 'Gunakan untuk menemukan nama dan lokasi tempat usaha. Data ini tidak menunjukkan stok, harga, kontak, atau status verifikasi.'
+                      : 'Use this to find business names and locations. It does not show stock, prices, contact details, or verification status.'}
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/umkm?scope=references"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 text-xs font-black text-amber-950 transition hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+              >
+                <MapPinned className="h-4 w-4" aria-hidden="true" />
+                {isId ? 'Lihat di peta UMKM' : 'View on the MSME map'}
+              </Link>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-amber-200 pt-4 text-[11px] font-bold">
+              <a
+                href="https://www.openstreetmap.org/copyright"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 text-amber-950 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+              >
+                {isId ? 'Sumber: OpenStreetMap' : 'Source: OpenStreetMap'}
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+              <a
+                href="https://opendatacommons.org/licenses/odbl/1-0/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 text-amber-950 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+              >
+                {isId ? 'Lisensi data: ODbL 1.0' : 'Data license: ODbL 1.0'}
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            </div>
+          </section>
+        ) : (
+          <section className="my-4 min-w-0" aria-labelledby="explore-result-category-title">
+            <div className="flex min-h-9 items-center justify-between gap-3">
+              <h2
+                id="explore-result-category-title"
+                className="text-sm font-bold text-[color:var(--app-text)]"
+              >
+                {isId ? 'Pilih kategori' : 'Choose a category'}
+              </h2>
+              {advancedFilterCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={clearAdvancedFilters}
+                  className="min-h-11 rounded-lg px-2 text-xs font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+                >
+                  {isId
+                    ? `Hapus ${advancedFilterCount} filter tambahan`
+                    : `Clear ${advancedFilterCount} extra filters`}
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-2 flex min-w-0 gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span
               aria-current="page"
-              className="inline-flex min-h-11 min-w-0 cursor-default items-center gap-2 rounded-lg border border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] py-1.5 pl-2.5 pr-2.5 text-xs font-bold text-[color:var(--app-accent)]"
+              className="inline-flex min-h-11 shrink-0 cursor-default items-center rounded-full border border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] px-4 text-xs font-bold text-[color:var(--app-accent)]"
             >
-              <Layers3 className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                {isId ? 'Semua' : 'All'}
-              </span>
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              {isId ? 'Semua' : 'All'}
             </span>
             {MARKETPLACE_EXPLORE_CATEGORIES.map(category => (
               <Link
@@ -334,46 +579,14 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
                   query: state.query,
                   side: searchSide,
                 })}
-                className="inline-flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-1.5 pl-1.5 pr-2.5 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+                className="inline-flex min-h-11 shrink-0 cursor-pointer items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
               >
-                <span className="relative h-7 w-7 overflow-hidden rounded-full bg-white">
-                  <Image
-                    src={category.image}
-                    alt=""
-                    fill
-                    sizes="28px"
-                    className="object-contain"
-                  />
-                </span>
-                <span className="min-w-0 flex-1 truncate">
-                  {isId ? category.shortLabelId : category.shortLabelEn}
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)]" />
+                {isId ? category.shortLabelId : category.shortLabelEn}
               </Link>
             ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-[color:var(--app-border)] pt-4">
-            {MARKETPLACE_EXPLORE_CATEGORIES.flatMap(category =>
-              category.subcategories.slice(0, 4).map(subcategory => (
-                <Link
-                  key={`${category.slug}-${subcategory.slug}`}
-                  href={buildCategorySearchHref({
-                    category,
-                    query: state.query || subcategory.query,
-                    side: searchSide,
-                    subcategory: subcategory.slug,
-                  })}
-                  className="inline-flex min-h-9 max-w-full cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
-                >
-                  <span className="truncate">
-                    {isId ? subcategory.labelId : subcategory.labelEn}
-                  </span>
-                  <ChevronRight className="h-3 w-3 shrink-0 text-[color:var(--app-text-soft)]" />
-                </Link>
-              )),
-            )}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
 
         <ExploreSearchResults
           payload={payload}
@@ -382,6 +595,7 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
           locale={locale}
           activeTab={state.tab}
           onSelectTab={selectTab}
+          onNextCursor={loadNextReferenceBatch}
           onRetry={() => setRetryKey(value => value + 1)}
         />
       </main>

@@ -101,3 +101,16 @@ This is not a Web Vitals baseline. It only verifies layout stability and control
 3. Add bundle analyzer only if needed and documented.
 4. Capture safe DB `EXPLAIN` for hottest search/listing queries in a dev database.
 5. Measure Ollama response times separately from product request time.
+
+## 2026-08-01 UMKM Map Query Hardening
+
+- Added database-side viewport bounding-box filters to the canonical UMKM store query instead of loading a broad candidate set and filtering every store in Node/browser memory.
+- Added partial coordinate/recency indexes for active stores and trigram indexes for name, city, and normalized search text. The startup migration is transactional for SQLx compatibility; large production datasets require a separately operated concurrent-index rollout to avoid long write locks.
+- Added strict public query limits and coordinate validation at the BFF boundary.
+- Added map movement reporting so interactive discovery consumes the bounded query path.
+- Reduced the UMKM server-render seed from 120 records to 10, removed the 25-second full refresh loop, and changed the list to real 10-row network batches with cancellation of stale viewport requests.
+- Added a partial PostgreSQL point GiST index for nearest-neighbour ordering of active storefronts inside the current viewport.
+- Public-reference enrichment is deferred into a separately cancellable request with a 1.5-second upstream deadline, so it no longer delays the first registered-store batch.
+- Replaced the generic paged `/v1/content` reference scan with `/v1/map/references`: a 10-row default/50-row maximum projection with database viewport filtering, visible-map-center fallback ranking, `LIMIT + 1` pagination detection, safe coordinate parsing, and partial GiST/trigram indexes.
+- Dev-only verification after removing secondary sorting from the KNN branch: the measured bbox query changed from a 4,355-row scan/sort (`556.8 ms`, 30,154 shared-buffer hits) to a limit-stopping GiST KNN scan (`1.811 ms`, 110 shared-buffer hits). Across 25 warm direct-endpoint requests, observed p50/p95 was `16.52/18.74 ms` for the Jakarta viewer case and `26.30/38.15 ms` for the wider Indonesia bbox. These are local diagnostics, not production SLOs.
+- No billion-row throughput claim is made: production `EXPLAIN (ANALYZE, BUFFERS)`, p95/p99 latency, cache-hit ratio, index size, write amplification, and load tests remain required before choosing partitioning, read replicas, spatial tiles, or sharding.

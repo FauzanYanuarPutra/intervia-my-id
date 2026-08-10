@@ -1,0 +1,311 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Audit Menyeluruh Lajukan: Kesiapan Super-App",
+    "description": "Audit evidence-backed atas working tree Lajukan per 10 Agustus 2026, mencakup produk, UX, keamanan, privasi, trust and safety, chat, transaksi, arsitektur, performa, kualitas, operasional, aksesibilitas, dan maintainability.",
+    "generatedAt": "2026-08-10T14:39:13.4394557Z",
+    "cards": [
+      {
+        "id": "p0_card",
+        "dataset": "audit_summary",
+        "sourceId": "stop_ship_sql",
+        "metrics": [
+          { "label": "P0 stop-ship", "field": "p0", "format": "number" }
+        ]
+      },
+      {
+        "id": "lint_card",
+        "dataset": "audit_summary",
+        "sourceId": "evidence_summary_sql",
+        "metrics": [
+          { "label": "Error ESLint saat ini", "field": "eslint_errors", "format": "number" }
+        ]
+      },
+      {
+        "id": "typecheck_card",
+        "dataset": "audit_summary",
+        "sourceId": "evidence_summary_sql",
+        "metrics": [
+          { "label": "Error typecheck saat ini", "field": "typecheck_errors", "format": "number" }
+        ]
+      },
+      {
+        "id": "ci_card",
+        "dataset": "audit_summary",
+        "sourceId": "evidence_summary_sql",
+        "metrics": [
+          { "label": "File workflow CI", "field": "ci_workflow_files", "format": "number" }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "stop_ship_domain_chart",
+        "title": "Temuan stop-ship terkonfirmasi per domain",
+        "description": "Agregasi sebelas baris P0 yang memiliki evidence trail di stop-ship register.",
+        "type": "bar",
+        "dataset": "stop_ship_by_domain",
+        "sourceId": "evidence_summary_sql",
+        "encodings": {
+          "x": { "field": "domain_group", "type": "nominal" },
+          "y": { "field": "finding_count", "type": "quantitative" }
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "maturity_table",
+        "title": "Kesiapan per domain",
+        "description": "Status rilis kualitatif berdasarkan evidence repo dan runtime lokal yang terverifikasi.",
+        "dataset": "maturity_scorecard",
+        "sourceId": "scorecard_sql",
+        "columns": [
+          { "field": "domain", "label": "Domain" },
+          { "field": "status", "label": "Status" },
+          { "field": "release_gate", "label": "Gate rilis" },
+          { "field": "reason", "label": "Alasan" }
+        ]
+      },
+      {
+        "id": "stop_ship_table",
+        "title": "Register P0 stop-ship terkonfirmasi",
+        "description": "Setiap baris memiliki evidence trail langsung pada kode atau konfigurasi deployment.",
+        "dataset": "stop_ship_register",
+        "sourceId": "stop_ship_sql",
+        "columns": [
+          { "field": "id", "label": "ID" },
+          { "field": "domain", "label": "Domain" },
+          { "field": "finding", "label": "Temuan" },
+          { "field": "impact", "label": "Dampak" },
+          { "field": "evidence", "label": "Bukti" }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "evidence_summary_sql",
+        "label": "Ringkasan evidence audit terverifikasi",
+        "path": "docs/audits/lajukan-platform-audit-2026-08-10/audit-evidence-summary.sql"
+      },
+      {
+        "id": "scorecard_sql",
+        "label": "Scorecard kesiapan audit",
+        "path": "docs/audits/lajukan-platform-audit-2026-08-10/audit-scorecard.sql"
+      },
+      {
+        "id": "stop_ship_sql",
+        "label": "Register stop-ship audit",
+        "path": "docs/audits/lajukan-platform-audit-2026-08-10/audit-stop-ship.sql"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# Audit Menyeluruh Lajukan: Kesiapan Super-App\n\n**Snapshot:** 10 Agustus 2026 · branch `main` · commit dasar `3d8b3d009e47e8c07482d06115c13ba792228a26` · working tree aktif dengan 166 entri perubahan.\n\nBenchmark \"setara super-app besar\" diterjemahkan sebagai secure-by-default, aksi pengguna yang durable, state dan recovery yang jelas, operasi finansial yang dapat direkonsiliasi, aksesibilitas mobile, observability, serta deployment yang dapat dipulihkan. Ini bukan klaim mengenai sistem internal Gojek atau perusahaan lain."
+      },
+      {
+        "id": "executive_summary",
+        "type": "markdown",
+        "body": "## Executive Summary\n\n**Verdict: Lajukan belum production-ready untuk traffic publik yang membawa akun, chat, order, atau uang.** Fondasi produk sudah lebar dan beberapa surface—Explore, create yang disederhanakan, storefront UMKM, transaction UI, bottom navigation, serta BFF security controls—menunjukkan arah yang tepat. Namun kematangan saat ini adalah **feature-broad, trust-incomplete**.\n\nKesenjangan terberat bukan kosmetik. Ada jalur account takeover melalui login telepon backend, order engine tanpa principal/ownership enforcement, kebocoran metadata profil publik, pesan chat yang diakui sebelum durable, throttling chat yang memblokir permanen, inbox chat yang salah model, consumer identitas marketplace yang tidak ada, report moderasi yang palsu, dan production compose yang tetap membawa infrastruktur development.\n\nRekomendasi bisnis: **freeze fitur baru yang memperbesar attack surface**, matikan order/live payment yang belum melewati release gate, bentuk satu stabilization program lintas product-security-platform, dan jangan menyebut sistem public-launch-ready sampai seluruh P0 tertutup serta bukti staging/production untuk reliability tersedia."
+      },
+      {
+        "id": "priority_metrics",
+        "type": "metric-strip",
+        "cardIds": ["p0_card", "lint_card", "typecheck_card", "ci_card"]
+      },
+      {
+        "id": "priority_context",
+        "type": "markdown",
+        "body": "Angka di atas adalah snapshot pemeriksaan yang dapat diulang: jumlah baris P0 pada register, ESLint errors, typecheck errors, dan jumlah file workflow CI. Angka tersebut bukan peluang insiden atau perbandingan kualitas dengan produk lain. P0 berarti stop-ship; masalah lain tetap diprioritaskan sebagai P1 sebelum broad beta, P2 sebelum scale, dan P3 improvement."
+      },
+      {
+        "id": "stop_ship_domain_chart_block",
+        "type": "chart",
+        "chartId": "stop_ship_domain_chart"
+      },
+      {
+        "id": "strengths",
+        "type": "markdown",
+        "body": "## Fondasi yang Sudah Kuat\n\n- Product principles sudah memusatkan discovery pada Search/Explore, menjaga lima kategori marketplace, membedakan chat internal dari WhatsApp, dan menempatkan Community/Reels sebagai distribution layer. Ini keputusan produk yang sehat.\n- Public discovery dapat dibaca sebelum login; Explore memiliki intent `cari untuk usaha` versus `cari calon pembeli`, kategori ringkas, serta state loading/error/empty/results yang lebih jelas.\n- Mobile bottom navigation memiliki lima tujuan utama; create sheet sudah menangani Escape, focus trap, dan semantics dialog.\n- Create flow menyederhanakan state internal menjadi tiga fase terlihat, memiliki autosave/offline indicator, taxonomy no-results, dan preview canonical card.\n- Storefront UMKM memiliki consent projection, tidak mengarang jam/lokasi/rating, dan punya sticky mobile CTA.\n- BFF memiliki origin/CSRF gate, JWT verification, route RBAC, Redis rate limiting yang default fail-closed, cookie HttpOnly/SameSite/Secure-aware, OTP HMAC atomik, security headers, dan upload image checks.\n- Order/wallet internals sudah memiliki beberapa primitive yang benar: transaksi database, row lock, state history, idempotency, callback signature verification, dan atomic settlement. Masalahnya adalah boundary dan operasional di sekeliling primitive tersebut.\n- Local HTTP smoke check mengembalikan 200 untuk Home, Explore, Community, Reels, dan Login; warm server response lokal berada sekitar 90–118 ms. Ini sinyal dasar yang baik, tetapi bukan bukti performa produksi."
+      },
+      {
+        "id": "key_findings",
+        "type": "markdown",
+        "body": "## Key Findings & Evidence\n\nScorecard berikut memakai status kualitatif agar tidak memberi kesan presisi palsu. `Stop-ship` berarti ada failure mode yang dapat merusak akun, privasi, uang, pesan, authorization, atau kemampuan recovery. `Unproven` berarti implementasi mungkin bekerja lokal, tetapi bukti production-grade belum ada."
+      },
+      {
+        "id": "maturity_table_block",
+        "type": "table",
+        "tableId": "maturity_table"
+      },
+      {
+        "id": "stop_ship_intro",
+        "type": "markdown",
+        "body": "## P0 Stop-Ship\n\nSebelas isu berikut memiliki evidence trail langsung di handler, schema, atau deployment config. Mereka harus diperlakukan sebagai release blockers, bukan backlog polish."
+      },
+      {
+        "id": "stop_ship_table_block",
+        "type": "table",
+        "tableId": "stop_ship_table"
+      },
+      {
+        "id": "security_privacy",
+        "type": "markdown",
+        "body": "## Security, Identity, Privacy, and Trust\n\n### Mengapa risikonya tinggi\n\n- `POST /auth/login-phone` di identity mencari user dari nomor, menandai phone verified, lalu menerbitkan session/token tanpa memvalidasi OTP. OTP hanya divalidasi di WWW BFF, sementara identity dapat diproksikan langsung. Ini account takeover, bukan sekadar defense-in-depth.\n- `PUT /users/me` menerima metadata `verification` dari user dan public verification state diturunkan dari metadata tersebut. Pengguna dapat memalsukan badge/eligibility yang seharusnya server-owned.\n- Public profile mengembalikan raw metadata; metadata dapat berisi documents, KYC/risk internals, dan berbagai lokasi contact. UI kemudian mencari phone/WhatsApp dari beberapa subtree tanpa satu consent boundary.\n- Delete account menandai user, tetapi refresh flow tidak memastikan user masih active/not deleted; refresh token di perangkat lain dapat bertahan.\n- Direct backend exposure melewati CAPTCHA, OTP orchestration, dan rate limit BFF. Shared HS256 secret tanpa issuer/audience, token di response JSON/URL, public face-recognition route, fail-open webhook, dan document delivery memperluas blast radius.\n- `npm audit --omit=dev` pada lockfile snapshot melaporkan 22 vulnerable dependency nodes, termasuk 13 high; dependency langsung Next.js memiliki advisory high yang fix-nya tersedia.\n\n### Target state\n\nSemua auth proof harus diverifikasi pada authoritative identity service; public DTO harus allowlist-only; verification hanya dapat berubah lewat internal state machine ber-audit; contact harus ber-consent; delete harus revoke seluruh session; service internal tidak boleh public; token trust harus memiliki issuer/audience dan rotasi key; dependency high harus ditutup sebelum release."
+      },
+      {
+        "id": "chat_reliability",
+        "type": "markdown",
+        "body": "## Chat Reliability and Safety\n\nChat terlihat lengkap di UI, tetapi jalur data inti belum memenuhi janji pengguna. Handler WebSocket membroadcast dan mengembalikan sukses sebelum persistence async selesai; persistence error hanya dicatat. Counter ETS tidak memiliki window reset, sehingga user terkunci setelah delapan pesan. `user_rooms` memasukkan timestamp ke primary key, membuat satu baris inbox baru pada setiap pesan; reader hanya mengambil 500 terbaru lalu dedupe in-memory, sehingga satu room aktif dapat menenggelamkan room lain.\n\nID yang di-ack tidak sama dengan timeuuid yang disimpan; pagination REST/WS tidak konsisten; room/DM creation mengabaikan beberapa hasil database; group member addition tidak cukup membedakan owner/admin; inbox melakukan identity lookup serial. Deployment production masih memakai satu Scylla developer-mode 512 MB dengan RF=3 yang tidak mungkin dipenuhi, tanpa backup/restore yang terbukti.\n\nTarget state: persist satu stable timeuuid/idempotency key sebelum ack, durable outbox untuk unread/inbox projection, Redis token bucket, canonical `(user_id, room_id)` inbox state dengan ordering projection terpisah, cursor lintas bucket yang konsisten, authorization per aksi, multi-node/managed Scylla, quorum, capacity plan, backup, dan restore drill."
+      },
+      {
+        "id": "orders_finance",
+        "type": "markdown",
+        "body": "## Orders, Payments, and Financial Integrity\n\nOrder API adalah blocker terbesar kedua setelah account takeover. Route order tidak menurunkan actor dari principal terverifikasi; payload mengontrol `user_id`, `merchant_id`, harga item, `actor_type`, dan `actor_id`. List mengembalikan order terbaru secara global dan transition dapat mendorong state seperti PAID/REFUNDED. Host yang localhost-bound mengurangi reach dari internet, tetapi tidak membuat authorization boundary benar.\n\nDi wallet, signature verification, row locks, atomic settlement, dan unique external reference adalah kekuatan. Namun production mengaktifkan live payments/wallet by default; callback tidak membandingkan gross amount/currency dengan expected amount; reconciliation bergantung pada user membuka wallet, bukan scheduled global worker; late settlement dapat jatuh ke state expired tanpa operator queue yang jelas. UI/backend juga memiliki fallback environment development/mock bila config hilang.\n\nTarget state: disable order route sampai principal-scoped authorization dan server-side pricing selesai; live financial feature default OFF; startup fail-closed bila credentials/config incomplete; verify amount/currency/provider transaction identity; scheduled reconciliation; unmatched/late-payment queue; ledger invariant tests; audit trail dan operator runbook."
+      },
+      {
+        "id": "architecture_consistency",
+        "type": "markdown",
+        "body": "## Architecture, Data Consistency, and Maintainability\n\n- Marketplace membuat `users_read_model` dan transaction gate bergantung padanya, tetapi consumer identity tidak ditemukan. Setelah seed dihapus, user valid dapat selalu dianggap unverified atau memakai snapshot stale.\n- Outbox/inbox mengubah event menjadi `processing`/`publishing` sebelum publish tanpa lease, stale-claim recovery, atau reaper; crash dapat menahan event selamanya. Order engine punya outbox kedua tanpa publisher.\n- Community melakukan sampai 250 lookup identity secara serial sebelum listener bind; timeout teoritis sekitar 375 detik, melebihi start allowance. Projection juga tidak memiliki monotonic aggregate version, sehingga event lama dapat menimpa tombstone.\n- WWW memegang credential marketplace DB, menulis order/event/geospatial state, membuka pool sendiri, dan menjalankan runtime DDL untuk Personal AI. Ini melompati service authorization/audit boundary. Personal AI diam-diam pindah dari PostgreSQL ke JSON lokal `/tmp`, mengubah consistency model tanpa memberi tahu user.\n- Semua Rust replica menjalankan migration saat startup; marketplace juga menjalankan DDL/drop constraint di luar migration history. Meilisearch diwajibkan compose dan search event diproduksi, tetapi indexer/consumer tidak ada.\n- Source health menemukan 26 breach; beberapa client component mencapai ribuan baris dan `marketplace_service/main.rs` sekitar 798 KB. Monolith ini memperbesar regression surface dan membuat review/security reasoning sulit.\n\nTarget state: durable versioned projections plus backfill/reconciliation, leased outbox state, one-shot migrator, no runtime DDL, no direct WWW DB writes, one authoritative Personal AI store, dan pemecahan modul berdasar bounded context."
+      },
+      {
+        "id": "ux_flow",
+        "type": "markdown",
+        "body": "## UX, Flow, Accessibility, and Indonesian Usability\n\n### Yang sudah membaik\n\nExplore sekarang relatif mudah: satu search box, dua tujuan yang dapat dipahami pelaku UMKM, lima kategori usaha, dan Community/Video/References dipindah ke bagian opsional. Form posting juga lebih cocok sebagai modal/full-screen layer daripada card inline karena memberi fokus dan membuat header/footer tetap di belakang; pola create sheet mobile yang ada sudah membuktikan focus handling dapat dilakukan dengan benar.\n\n### Friction yang masih nyata\n\n- Home mobile menumpuk hero, gamification, reward, kategori, trending, map, references, recommendations, Reels, dan Community. Nilai inti `saya butuh apa / saya menjual apa` tenggelam.\n- `/profile` mencampur identity, business profile, listing, chat, Community, Reels, dan insights sementara owner juga mempunyai `/usaha` dan `/manage`. Ownership model sulit dipahami.\n- Home mengirim `filters=1` ke Explore, tetapi parameter itu tidak dikenali; CTA dapat terasa tidak melakukan apa pun. Storefront hanya menonjolkan WhatsApp/phone/maps/catalog, tidak menawarkan internal chat dan contact click tidak terinstrumentasi.\n- Login/register hanya menunjukkan Google flow dan otomatis membuat akun pada login pertama; fallback phone/email dan consent Terms/Privacy tidak terlihat.\n- Community/Reels/Home menelan upstream error menjadi empty state. Pengguna melihat `belum ada` padahal server gagal. Save-and-exit create tetap pindah ke draft setelah save gagal, menciptakan false success.\n- Shared modal tidak menangani Escape, focus trap, initial/return focus; new-chat overlay tidak memiliki dialog semantics; beberapa icon control tidak bernama; validation tidak memindahkan fokus ke field error; touch target sering 32–38 px; locale `/en` masih memuat copy Indonesia dan status transaksi Inggris muncul di UI Indonesia.\n- Support meminta screenshot tanpa upload input dan mengklaim realtime walaupun data hanya initial/manual refresh.\n\nTarget state: Home hanya memprioritaskan search, kategori, dan satu next-best action; profile dipisah jelas menjadi personal versus owner workspace; semua error dibedakan dari empty/offline/timeout; create mempertahankan input dan hanya mengonfirmasi setelah durable save; shared dialog primitive wajib memenuhi keyboard/screen-reader behavior; copy Indonesia diuji sebagai satu product surface, bukan string per komponen."
+      },
+      {
+        "id": "performance_ops",
+        "type": "markdown",
+        "body": "## Performance, Scalability, Observability, and DR\n\nLocal warm responses sekitar 90–118 ms dan optimasi DB UMKM yang terdokumentasi menunjukkan kemampuan tuning. Namun angka lokal tidak memodelkan jaringan Indonesia, low-end Android, cold cache, media, concurrency, p95/p99, atau saturation. Tidak ada production Core Web Vitals, error rate, search index lag, WebSocket reconnect success, DB pool saturation, outbox age, queue depth, resource profile, SLO, atau alert yang dapat digunakan untuk menyatakan siap scale.\n\nSearch database memakai broad `%q% ILIKE` pada body/slug/array/JSON dan OFFSET, sementara generated `search_vector` tidak dipakai. Search BFF fanout ke banyak sumber dengan deadline sampai 12 detik; Explore memanggil BFF lagi dengan 15 detik; beberapa proxy/dashboard tidak memiliki deadline. Health endpoint Rust/AI mengembalikan constant success dan chat mem-bypass controller yang benar-benar memeriksa Scylla. Prometheus/Grafana/Loki/OTel dikomentari.\n\nProduction images default ke `latest`/tag mutable, banyak runtime berjalan sebagai root, resource budgets tidak eksplisit, admin tools ikut merge, community media node-local, dan backup/PITR/restore automation tidak terbukti.\n\nTarget state: production RUM + tracing + RED/USE metrics, p95/p99 budgets per journey, dependency-aware readiness, circuit breakers/deadline propagation, production-like load tests, immutable digests/SBOM, non-root containers, resource limits, HA stores, PITR, dan restore/chaos drills."
+      },
+      {
+        "id": "quality_release",
+        "type": "markdown",
+        "body": "## Quality, Testing, and Release Discipline\n\nSnapshot quality gate saat audit:\n\n- ESLint programmatic scan: 92 errors dan 215 warnings; terdapat Rules of Hooks, state-in-effect, unused expressions, `any`, dependency array, dan image issues.\n- Typecheck gagal dengan sekitar 12 error pada Community, Home, dan Global Search. Production Docker build mengaktifkan `FAST_DOCKER_BUILD=true`, sehingga Next melewati TypeScript validation.\n- Vitest: 393 dari 394 test lulus; satu test Reels presentation gagal.\n- Source-health gate gagal dengan 26 breach pada file yang melampaui ceiling.\n- E2E banyak memakai route interception/mock dan belum membuktikan authenticated real-backend journeys.\n- Test density backend tidak seimbang: marketplace mempunyai puluhan unit test, Community sangat sedikit, Identity tidak menemukan unit test Rust. CMS/CRM/Usaha tidak mempunyai test script.\n- Tidak ada workflow CI di `.github/workflows`.\n\nRelease yang dapat mengabaikan type errors dan tidak memiliki CI tidak bisa mencapai bar super-app. Target state: required checks untuk format/lint/type/unit/integration/migration/security/SBOM, no-skip production build, contract test BFF-service, testcontainer untuk DB/broker/chat, staging E2E tanpa mock untuk critical journeys, serta canary/rollback gates."
+      },
+      {
+        "id": "recommended_next_steps",
+        "type": "markdown",
+        "body": "## Recommended Next Steps\n\n### 0–72 jam: contain\n\n1. Disable `/v1/orders` atau letakkan di belakang verified principal + ownership guard; matikan live payment/wallet default.\n2. Tutup direct identity exposure; wajibkan OTP proof di identity; revoke session phone-login mencurigakan.\n3. Hapus kemampuan user menulis verification; ganti public profile dengan allowlist DTO dan explicit contact consent.\n4. Sembunyikan affordance Report/Promote/Cast yang belum bekerja; implementasikan minimal report receipt dan admin queue sebelum social surface dibuka luas.\n5. Persist chat sebelum ack; hotfix permanent limiter; hentikan klaim bahwa chat reliable sampai inbox schema dan storage topology diperbaiki.\n6. Buat production-only deployment manifest: edge proxy saja yang public, admin/mail tools dev-only, database internal.\n7. Wajibkan build tanpa ignore type errors dan buat temporary release checklist sampai CI tersedia.\n\n### Hari 4–30: stabilize\n\n- Bangun identity event consumer versioned, backfill, tombstone, reconciliation, dan lag alert.\n- Tambah lease/reaper/DLQ/replay untuk outbox/inbox; satukan duplicate outbox.\n- Redesign inbox chat, stable cursor/timeuuid, authorization room, Redis limiter, managed/multi-node Scylla, backup dan restore test.\n- One-shot migrator; hapus runtime DDL dan direct WWW DB ownership; hilangkan silent file fallback Personal AI.\n- Financial reconciliation worker, expected amount/currency validation, unmatched-payment queue, ledger invariants.\n- Perbaiki error-versus-empty dan false-success draft; sederhanakan Home/profile IA; perbaiki broken filter dan auth consent/fallback.\n- Implementasikan shared accessible dialog/form-error primitive dan audit locale Indonesia/Inggris.\n\n### Hari 31–90: prove\n\n- CI required checks, real-backend E2E untuk auth→search→create→contact/chat→order/payment/dispute, dependency/secret/container scanning.\n- Production-like load test Search/Explore/Chat/Wallet; RUM Core Web Vitals pada perangkat Android kelas bawah dan jaringan lambat.\n- Liveness/readiness terpisah, metrics/traces/log correlation, SLO dan alerts, runbook on-call.\n- Putuskan Meilisearch secara eksplisit: implement indexer/rebuild/reconciliation atau hapus dependency sampai perlu.\n- Pecah mega-components dan service main files mengikuti ownership boundary.\n- Moderation end-to-end: report, block, mute, evidence retention, SLA, appeal, audit trail, abuse analytics.\n\n### 3–12 bulan: scale responsibly\n\n- HA multi-zone/managed data stores, PITR, disaster-recovery drill, capacity forecasting, immutable release manifests, canary dan automated rollback.\n- External penetration test dan privacy review setelah P0/P1 ditutup, bukan sebagai pengganti perbaikan dasar.\n- Continuous UMKM usability program: task completion, time-to-first-result, search-zero-result, create completion, contact success, chat delivery, payment success, dispute resolution, dan accessibility regression."
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## Further Questions\n\n- Apakah order engine memang aktif/terjangkau di deployment production, dan adakah gateway eksternal yang tidak ada di repo? Sampai terbukti, route harus dianggap unsafe.\n- Apakah ada firewall, Cloudflare policy, private network, managed database, backup, secret rotation, atau observability stack di luar repo? Bukti infra-as-code/runbook diperlukan agar dapat dihitung sebagai kontrol.\n- Siapa owner operasional moderation, fraud, payment reconciliation, incident response, dan data-subject request? UI tanpa owner/SLA bukan capability lengkap.\n- Apa tiga north-star journey Lajukan untuk enam bulan ke depan: mencari supplier, menerima kebutuhan pembeli, atau menjalankan toko? Prioritas ini diperlukan untuk memangkas Home/profile/create complexity.\n- Berapa target SLO dan error budget untuk login, Explore, create, chat delivery, order transition, payment settlement, dan support response?\n- Data apa yang benar-benar boleh publik: phone, WhatsApp, email, exact address, verification badge, documents, dan metadata provider? Consent matrix harus eksplisit.\n- Apakah target awal private beta, city launch, atau nationwide public launch? Release gate dan capacity plan berbeda."
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "body": "## Methodology and Evidence\n\nAudit membaca product/architecture/security/testing/performance docs yang diwajibkan repo; memetakan 934 file di `frontend/www/src`, 212 BFF route, 76 page, 193 migration SQL, dan 99 test files; menelusuri handler/auth/schema/deployment; menjalankan lint, typecheck, unit test, source-health, dependency audit, bundle inventory, serta local HTTP smoke/timing. Temuan P0 diverifikasi kembali pada code path spesifik.\n\nAudit ini menilai **working tree aktif**, bukan hanya commit terakhir. Perubahan yang belum di-commit dapat memperbaiki atau memperkenalkan perilaku. Report tidak mengubah product code, migration, config, atau data."
+      },
+      {
+        "id": "caveats",
+        "type": "markdown",
+        "body": "## Caveats and Assumptions\n\n- Ini static/code/config audit plus local runtime smoke check; bukan penetration test, production load test, compliance certification, atau disaster-recovery exercise.\n- Production traffic, logs, traces, dashboards, cloud firewall, secret manager, backup console, provider settlement data, dan real user research tidak tersedia. Kontrol eksternal yang tidak ada buktinya tidak dihitung.\n- Browser screenshot QA produk tidak selesai karena headless Edge gagal pada GPU sandbox di environment audit; UX findings berasal dari rendered HTML, component behavior, routes, semantics, and code paths. Portable report tetap diverifikasi terpisah oleh builder bila Chromium kompatibel tersedia, atau lewat structural verification bila tidak.\n- Local 90–118 ms response time tidak boleh diekstrapolasi menjadi latency produksi atau Core Web Vitals. Bundle totals lintas semua route bukan page-transfer size.\n- Priority adalah keputusan audit berbasis impact dan exploit/failure path, bukan probabilitas statistik. P0/P1 grouping dapat dipecah lagi saat remediation planning.\n- Target \"seperti Gojek\" dipakai sebagai quality bar umum; sistem internal, staffing, SLO, dan controls perusahaan lain tidak diperiksa atau dibandingkan."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-10T14:39:13.4394557Z",
+    "status": "partial",
+    "accessIssues": [
+      {
+        "scope": "Production telemetry",
+        "message": "No production traffic, logs, traces, SLO dashboards, or real-user performance data were available."
+      },
+      {
+        "scope": "External infrastructure",
+        "message": "Cloud firewall, managed data stores, backup consoles, secret rotation, and controls outside the repository were not verifiable."
+      },
+      {
+        "scope": "Dynamic assurance",
+        "message": "No penetration test, production-like load test, payment reconciliation drill, or disaster-recovery exercise was executed."
+      }
+    ],
+    "datasets": {
+      "audit_summary": [
+        { "p0": 11, "eslint_errors": 92, "typecheck_errors": 12, "ci_workflow_files": 0, "unit_tests_passed": 393, "unit_tests_total": 394, "source_health_breaches": 26 }
+      ],
+      "stop_ship_by_domain": [
+        { "domain_group": "Chat", "finding_count": 4 },
+        { "domain_group": "Identity dan privasi", "finding_count": 2 },
+        { "domain_group": "Order dan keuangan", "finding_count": 2 },
+        { "domain_group": "Platform dan data", "finding_count": 2 },
+        { "domain_group": "Trust dan safety", "finding_count": 1 }
+      ],
+      "maturity_scorecard": [
+        { "domain": "Tesis produk dan taksonomi", "status": "Fondasi kuat", "release_gate": "Pertahankan", "reason": "Posisi Indonesia-first, Explore canonical, dan lima kategori marketplace sudah terdokumentasi." },
+        { "domain": "Discovery dan Explore", "status": "Beta terbatas", "release_gate": "Validasi", "reason": "Pemisahan intent lebih jelas, tetapi relevansi search, latency produksi, dan hasil funnel belum terbukti." },
+        { "domain": "Create dan onboarding", "status": "Beta terbatas", "release_gate": "Perbaiki recovery", "reason": "Fase terlihat lebih sederhana, tetapi false-success draft dan celah aksesibilitas masih ada." },
+        { "domain": "Identity dan autentikasi", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Login telepon langsung dapat menerbitkan session tanpa bukti kepemilikan OTP." },
+        { "domain": "Privasi dan consent", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Profil publik dapat mengekspos raw metadata, dokumen, dan kontak tanpa allowlist ketat." },
+        { "domain": "Trust dan safety", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Flow report dan block hilang atau tidak berfungsi di Reels, Community, dan Chat." },
+        { "domain": "Chat dan messaging", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Pesan yang diakui belum durable dan throttling/storage inbox salah." },
+        { "domain": "Order dan pembayaran", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Authorization order tidak ada dan operasi finansial live belum memiliki reconciliation gate lengkap." },
+        { "domain": "Konsistensi data", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Sinkronisasi identity dan recovery outbox belum lengkap." },
+        { "domain": "Performa dan scale", "status": "Belum terbukti", "release_gate": "Ukur dahulu", "reason": "Response lokal sehat, tetapi Web Vitals produksi, p95/p99, load, dan saturation tidak tersedia." },
+        { "domain": "Quality dan release", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Gate lint/type/test/source-health sedang merah dan tidak ada workflow CI yang menegakkannya." },
+        { "domain": "Operasi, observability, dan DR", "status": "Stop-ship", "release_gate": "Blokir rilis", "reason": "Readiness dangkal, monitoring nonaktif, dan topology storage/backup produksi belum memadai." },
+        { "domain": "Aksesibilitas dan lokalisasi", "status": "Kesenjangan besar", "release_gate": "Perbaiki sebelum beta luas", "reason": "Dialog kritis, focus flow, touch target, error announcement, dan konsistensi locale belum lengkap." },
+        { "domain": "Maintainability", "status": "Utang tinggi", "release_gate": "Kurangi blast radius", "reason": "Client component besar dan entrypoint service monolitik membuat perubahan berisiko dan lambat diverifikasi." },
+        { "domain": "Analytics dan learning loop", "status": "Belum lengkap", "release_gate": "Instrumentasikan", "reason": "Aksi contact, moderation, recovery, dan conversion belum diukur konsisten." }
+      ],
+      "stop_ship_register": [
+        { "id": "P0-01", "domain": "Identity", "finding": "Backend login telepon menerbitkan token tanpa memvalidasi bukti OTP.", "impact": "Account takeover untuk nomor telepon yang diketahui.", "evidence": "services/identity_service/src/routes/auth.rs:1633-1853" },
+        { "id": "P0-02", "domain": "Order", "finding": "Route order tidak memiliki autentikasi principal dan ownership check, sementara payload mengontrol actor dan harga.", "impact": "Kebocoran order, price tampering, dan transisi state tanpa izin.", "evidence": "services/marketplace_service/src/order_engine.rs:101-130,550-858" },
+        { "id": "P0-03", "domain": "Privasi", "finding": "Profil publik mengembalikan raw metadata dan UI mencari kontak di luar consent projection eksplisit.", "impact": "Kebocoran metadata KYC/profil dan scraping kontak.", "evidence": "services/identity_service/src/routes/user_lookup.rs:493-604" },
+        { "id": "P0-04", "domain": "Trust dan safety", "finding": "Aksi Report di Reels hanya menutup sheet dan operasi report/block setara tidak ada di surface sosial lain.", "impact": "Konten berbahaya tidak memiliki jalur user-ke-moderator yang dapat diandalkan.", "evidence": "frontend/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx:5183-5198" },
+        { "id": "P0-05", "domain": "Chat", "finding": "Pesan WebSocket diakui dan dibroadcast sebelum persistence selesai.", "impact": "User dapat melihat pesan terkirim yang hilang permanen.", "evidence": "services/chat_service/lib/chat_service_web/channels/room_channels.ex:245-272" },
+        { "id": "P0-06", "domain": "Chat", "finding": "Counter rate WebSocket hanya bertambah dan tidak pernah reset.", "impact": "Setiap user diblokir setelah delapan pesan sampai service restart.", "evidence": "services/chat_service/lib/chat_service_web/channels/room_channels.ex:348-354" },
+        { "id": "P0-07", "domain": "Chat", "finding": "Primary key inbox membuat baris baru per pesan dan reader hanya mengambil 500 terbaru sebelum dedupe.", "impact": "Storage tumbuh tanpa batas dan room sibuk menenggelamkan percakapan lain.", "evidence": "services/chat_service/priv/scylladb/init.cql:68-82" },
+        { "id": "P0-08", "domain": "Infrastruktur chat", "finding": "Merge production mempertahankan satu node Scylla 512 MB developer-mode sementara keyspace mendeklarasikan RF=3.", "impact": "Tidak ada posture availability, quorum, backup, atau restore yang kredibel.", "evidence": "docker-compose.yml:193-210" },
+        { "id": "P0-09", "domain": "Konsistensi data", "finding": "Verifikasi transaksi marketplace bergantung pada user read model tanpa identity consumer.", "impact": "User valid dapat ditolak dan trust state stale dapat bertahan.", "evidence": "services/marketplace_service/src/main.rs:192-267,6225-6301" },
+        { "id": "P0-10", "domain": "Keamanan deployment", "finding": "Overlay production mewarisi identity, chat, community, database, object storage, mail, dan admin tools yang dipublish ke host.", "impact": "Attack surface langsung melewati kontrol BFF dan mengekspos infrastruktur privileged.", "evidence": "docker-compose.yml:67-873" },
+        { "id": "P0-11", "domain": "Operasi finansial", "finding": "Wallet/payment live aktif default sementara amount/currency check dan reconciliation terjadwal global belum lengkap.", "impact": "Uang dapat settle tanpa jalur credit/recovery yang lengkap.", "evidence": "docker-compose.prod.yml:18-25,77-78" }
+      ]
+    }
+  },
+  "sources": [
+    { "id": "evidence_summary_sql", "label": "Ringkasan evidence audit terverifikasi", "path": "docs/audits/lajukan-platform-audit-2026-08-10/audit-evidence-summary.sql" },
+    { "id": "scorecard_sql", "label": "Scorecard kesiapan audit", "path": "docs/audits/lajukan-platform-audit-2026-08-10/audit-scorecard.sql" },
+    { "id": "stop_ship_sql", "label": "Register stop-ship audit", "path": "docs/audits/lajukan-platform-audit-2026-08-10/audit-stop-ship.sql" },
+    { "id": "product_principles", "label": "Product principles", "path": "docs/product/product-principles.md" },
+    { "id": "current_capabilities", "label": "Current capabilities", "path": "docs/product/current-capabilities.md" },
+    { "id": "decision_log", "label": "Product decision log", "path": "docs/product/decision-log.md" },
+    { "id": "evidence_register", "label": "Research evidence register", "path": "docs/research/evidence-register.md" },
+    { "id": "security_review", "label": "Repository security review", "path": "docs/security/security-review.md" },
+    { "id": "known_risks", "label": "Known engineering risks", "path": "docs/engineering/known-risks.md" },
+    { "id": "testing_strategy", "label": "Testing strategy", "path": "docs/engineering/testing-strategy.md" },
+    { "id": "performance_baseline", "label": "Performance baseline", "path": "docs/performance/baseline.md" },
+    { "id": "identity_auth", "label": "Identity authentication handlers", "path": "services/identity_service/src/routes/auth.rs" },
+    { "id": "identity_users", "label": "Identity user mutation handlers", "path": "services/identity_service/src/routes/users.rs" },
+    { "id": "identity_lookup", "label": "Identity public lookup handlers", "path": "services/identity_service/src/routes/user_lookup.rs" },
+    { "id": "identity_verification", "label": "Identity verification derivation", "path": "services/identity_service/src/routes/verification.rs" },
+    { "id": "order_engine", "label": "Marketplace order engine", "path": "services/marketplace_service/src/order_engine.rs" },
+    { "id": "marketplace_main", "label": "Marketplace service runtime", "path": "services/marketplace_service/src/main.rs" },
+    { "id": "community_main", "label": "Community service runtime", "path": "services/community_service/src/main.rs" },
+    { "id": "chat_channel", "label": "Chat WebSocket room channel", "path": "services/chat_service/lib/chat_service_web/channels/room_channels.ex" },
+    { "id": "chat_inbox", "label": "Chat inbox controller", "path": "services/chat_service/lib/chat_service_web/controllers/inbox_controller.ex" },
+    { "id": "chat_schema", "label": "Chat ScyllaDB schema", "path": "services/chat_service/priv/scylladb/init.cql" },
+    { "id": "compose_base", "label": "Base runtime composition", "path": "docker-compose.yml" },
+    { "id": "compose_prod", "label": "Production compose overlay", "path": "docker-compose.prod.yml" },
+    { "id": "caddy", "label": "Edge proxy configuration", "path": "infrastructure/caddy/Caddyfile" },
+    { "id": "www_next_config", "label": "WWW Next.js build configuration", "path": "frontend/www/next.config.mjs" },
+    { "id": "www_dockerfile", "label": "WWW container build", "path": "frontend/www/Dockerfile" },
+    { "id": "www_package", "label": "WWW scripts and dependencies", "path": "frontend/www/package.json" },
+    { "id": "www_lockfile", "label": "WWW dependency lockfile", "path": "frontend/www/package-lock.json" },
+    { "id": "explore_hub", "label": "Explore hub UX", "path": "frontend/www/src/components/explore/ExploreHubPage.tsx" },
+    { "id": "home_client", "label": "Home marketplace UX", "path": "frontend/www/src/components/home/HomeResponsiveMarketplace.tsx" },
+    { "id": "create_wizard", "label": "Create listing flow", "path": "frontend/www/src/app/[locale]/(app)/create/CreateListingWizard.tsx" },
+    { "id": "reels_client", "label": "Reels UX and actions", "path": "frontend/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx" },
+    { "id": "community_feed", "label": "Community feed and composer", "path": "frontend/www/src/components/community/CommunityFeedClient.tsx" },
+    { "id": "public_profile", "label": "Public profile UX", "path": "frontend/www/src/app/[locale]/(shared)/profile/[slug]/PublicProfileClient.tsx" },
+    { "id": "shared_modal", "label": "Shared modal primitive", "path": "frontend/www/src/components/common/Modal.tsx" },
+    { "id": "critical_journeys", "label": "Critical user journeys", "path": "docs/qa/critical-user-journeys.md" },
+    { "id": "stabilization_report", "label": "QA stabilization report", "path": "docs/qa/stabilization-report.md" }
+  ]
+}

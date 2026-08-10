@@ -14,6 +14,7 @@ import {
   isCoordinateValid,
   type LatLng,
 } from '@/lib/super-app/location-guard';
+import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -1399,14 +1400,44 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const searchParams = url.searchParams;
+  const requestedStatus = (searchParams.get('status') || 'active')
+    .trim()
+    .toLowerCase();
+  if (requestedStatus !== 'active') {
+    return NextResponse.json(
+      { error: 'Public content only supports active status' },
+      { status: 400 },
+    );
+  }
+  searchParams.set('status', 'active');
   const queryText = (searchParams.get('q') || '').trim();
   const requestedLimit = parseSafeInt(searchParams.get('limit'), 20, 1, 100);
+  const rawOffsetText = (searchParams.get('offset') || '0').trim();
+  const rawOffset = Number(rawOffsetText);
+  if (
+    !/^\d+$/.test(rawOffsetText) ||
+    !Number.isSafeInteger(rawOffset) ||
+    rawOffset < 0 ||
+    rawOffset > 10_000
+  ) {
+    return NextResponse.json(
+      { error: 'Public content offset is outside the supported range' },
+      { status: 400 },
+    );
+  }
   const requestedOffset = parseSafeInt(
     searchParams.get('offset'),
     0,
     0,
-    Number.MAX_SAFE_INTEGER,
+    10_000,
   );
+  const rateLimit = await enforceRateLimit({
+    key: `public-content:${getClientIp(req)}`,
+    limit: 240,
+    windowSeconds: 60,
+    message: 'Too many content requests. Please retry shortly.',
+  });
+  if (!rateLimit.ok) return rateLimit.response;
   const requestedTypeRaw = (searchParams.get('type') || '')
     .trim()
     .toLowerCase();

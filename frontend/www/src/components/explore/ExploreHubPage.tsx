@@ -6,10 +6,12 @@ import {
   ArrowRight,
   ChevronDown,
   ClipboardList,
+  Database,
   MessageCircle,
   PlayCircle,
   Plus,
   Search,
+  ShieldCheck,
   Store,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -25,6 +27,10 @@ import {
   type LajukanLocale,
 } from '@/lib/discovery/lajukanCategories';
 import { cn } from '@/lib/utils';
+
+function normalizeQuery(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
 
 const CATEGORY_ACCENTS = [
   '#047857',
@@ -112,15 +118,14 @@ function ExploreCategoryCard({
       : isId
         ? copy?.supplyId
         : copy?.supplyEn;
-  const actionLabel = isId ? 'Tekan untuk buka' : 'Tap to open';
-  const modeLabel =
+  const actionLabel =
     mode === 'demand'
       ? isId
-        ? 'Kebutuhan pembeli'
-        : 'Buyer needs'
+        ? `Lihat permintaan pembeli untuk ${title}`
+        : `See buyer requests for ${title}`
       : isId
-        ? 'Penyedia'
-        : 'Providers';
+        ? `Cari ${title}`
+        : `Find ${title}`;
 
   return (
     <Link
@@ -137,8 +142,8 @@ function ExploreCategoryCard({
           },
         });
       }}
-      aria-label={`${actionLabel}: ${title}`}
-      className="group relative grid min-h-[124px] min-w-0 cursor-pointer grid-cols-[minmax(0,1fr)_38px] items-center gap-3 overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--category-accent)] hover:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--category-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
+      aria-label={actionLabel}
+      className="group relative grid min-h-[92px] min-w-0 cursor-pointer grid-cols-[44px_minmax(0,1fr)_36px] items-center gap-3 overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--category-accent)] hover:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--category-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
       style={
         {
           '--category-accent': accent,
@@ -150,35 +155,21 @@ function ExploreCategoryCard({
         className="absolute inset-x-0 top-0 h-1"
         style={{ backgroundColor: accent }}
       />
+      <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--category-soft)]">
+        <Image
+          src={category.image}
+          alt=""
+          fill
+          sizes="44px"
+          className="object-contain p-1 transition duration-300 group-hover:scale-105"
+        />
+      </span>
       <span className="min-w-0">
-        <span className="mb-2 flex min-w-0 items-center gap-2">
-          <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[color:var(--category-soft)]">
-            <Image
-              src={category.image}
-              alt=""
-              fill
-              sizes="40px"
-              className="object-contain p-1 transition duration-300 group-hover:scale-105"
-            />
-          </span>
-          <span
-            className="inline-flex min-w-0 items-center rounded-full px-2 py-1 text-[10px] font-bold"
-            style={{ backgroundColor: `${accent}14`, color: accent }}
-          >
-            <span className="truncate">{modeLabel}</span>
-          </span>
-        </span>
         <span className="block text-sm font-bold leading-5 text-[color:var(--app-text)] group-hover:text-[color:var(--category-accent)]">
           {title}
         </span>
         <span className="mt-0.5 line-clamp-2 block text-xs font-medium leading-4 text-[color:var(--app-text-soft)]">
           {subtitle || (isId ? category.descriptionId : category.descriptionEn)}
-        </span>
-        <span
-          className="mt-3 inline-flex min-h-8 items-center gap-1 rounded-md px-2.5 text-xs font-bold"
-          style={{ backgroundColor: `${accent}12`, color: accent }}
-        >
-          {actionLabel}
         </span>
       </span>
       <span
@@ -217,7 +208,7 @@ function ExploreChannelCard({
 
   return (
     <Link
-      href={buildExploreCategoryHref(category)}
+      href={category.id === 'video' ? '/reels' : '/community'}
       aria-label={`${actionLabel}: ${title}`}
       className="group grid min-h-[132px] cursor-pointer grid-cols-[56px_minmax(0,1fr)] gap-4 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.4)] transition hover:-translate-y-0.5 hover:border-[color:var(--channel-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--channel-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--app-surface-muted)]"
       style={
@@ -278,7 +269,7 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
   };
 
   const submitSearch = (nextQuery = query) => {
-    const clean = nextQuery.replace(/\s+/g, ' ').trim();
+    const clean = normalizeQuery(nextQuery);
     if (clean.length < 2) return;
     void trackLajukanEvent('navbar_search_submit', {
       properties: {
@@ -298,53 +289,51 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
   };
 
   return (
-    <div className="min-h-[100svh] bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
+    <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
       <div className="lg:hidden">
         <Header />
         <div className="h-[calc(52px+env(safe-area-inset-top))]" />
       </div>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-        <section className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.5)] sm:p-6 lg:p-7">
+      <main className="mx-auto w-full min-w-0 max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+        <section className="min-w-0 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.5)] sm:p-6 lg:p-7">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,480px)] lg:items-center lg:gap-10">
             <div className="max-w-2xl">
               <h1 className="text-2xl font-bold leading-tight text-[color:var(--app-text)] sm:text-3xl lg:text-4xl">
                 {isDemand
                   ? isId
-                    ? 'Cari kebutuhan pembeli'
-                    : 'Find buyer needs'
+                    ? 'Temukan calon pembeli'
+                    : 'Find potential buyers'
                   : isId
-                    ? 'Mau cari apa?'
-                    : 'What do you need?'}
+                    ? 'Cari kebutuhan usahamu'
+                    : 'Find what your business needs'}
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-[color:var(--app-text-soft)]">
                 {isDemand
                   ? isId
-                    ? 'Pilih kategori pembeli, lalu lihat brief yang bisa kamu tanggapi.'
-                    : 'Choose a buyer category, then open requests you can respond to.'
+                    ? 'Lihat orang yang sedang mencari produk atau jasa seperti milikmu.'
+                    : 'See people looking for products or services like yours.'
                   : isId
-                    ? 'Pilih kategori utama atau ketik kebutuhanmu di kolom pencarian.'
-                    : 'Choose a main category or search directly.'}
+                    ? 'Cari bahan baku, supplier, jasa, mesin, atau tempat usaha.'
+                    : 'Find materials, suppliers, services, tools, or business places.'}
               </p>
             </div>
 
             <div className="min-w-0">
               <div
-                className="grid grid-cols-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
-                role="tablist"
-                aria-label={isId ? 'Pilih tujuan' : 'Choose a goal'}
+                className="grid grid-cols-[repeat(2,minmax(0,1fr))] rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
+                role="group"
+                aria-label={isId ? 'Pilih tujuan pencarian' : 'Choose a search goal'}
               >
                 {[
                   {
                     value: 'supply' as const,
-                    label: isId ? 'Cari penyedia' : 'Find Providers',
-                    shortLabel: isId ? 'Penyedia' : 'Providers',
+                    label: isId ? 'Cari untuk usaha' : 'Find for my business',
                     icon: Store,
                   },
                   {
                     value: 'demand' as const,
-                    label: isId ? 'Cari pembeli' : 'Find Buyers',
-                    shortLabel: isId ? 'Pembeli' : 'Buyers',
+                    label: isId ? 'Cari calon pembeli' : 'Find potential buyers',
                     icon: ClipboardList,
                   },
                 ].map(option => {
@@ -355,24 +344,16 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
                       key={option.value}
                       type="button"
                       onClick={() => setSearchSide(option.value)}
-                      role="tab"
-                      aria-selected={active}
+                      aria-pressed={active}
                       className={cn(
-                        'flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2.5 text-left text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:justify-start sm:px-3',
+                        'flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-center text-xs font-bold leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:px-3',
                         active
                           ? 'cursor-default bg-[color:var(--app-accent)] text-white shadow-sm'
                           : 'cursor-pointer text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-strong)] hover:text-[color:var(--app-text)]',
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0">
-                        <span className="block truncate sm:hidden">
-                          {option.shortLabel}
-                        </span>
-                        <span className="hidden truncate sm:block">
-                          {option.label}
-                        </span>
-                      </span>
+                      <span className="min-w-0">{option.label}</span>
                     </button>
                   );
                 })}
@@ -391,40 +372,44 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
                   );
                 }}
               >
-                <label className="flex min-h-[52px] items-center gap-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.5)] focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)]">
+                <label htmlFor="explore-hub-search" className="sr-only">
+                  {isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
+                </label>
+                <div className="flex min-h-[52px] min-w-0 items-center gap-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.5)] focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)]">
                   <Search className="h-5 w-5 shrink-0 text-[color:var(--app-text-soft)]" />
                   <input
                     type="search"
+                    id="explore-hub-search"
                     name="q"
                     value={query}
                     onChange={event => setQuery(event.target.value)}
                     placeholder={
                       isDemand
                         ? isId
-                          ? 'Contoh: butuh supplier kemasan'
-                          : 'Example: needs packaging supplier'
+                          ? 'Contoh: pembeli butuh kemasan'
+                          : 'Example: buyers need packaging'
                         : isId
-                          ? 'Contoh: supplier kemasan'
-                          : 'Example: packaging supplier'
+                          ? 'Contoh: kemasan standing pouch'
+                          : 'Example: standing pouch packaging'
                     }
                     className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)]"
                     aria-label={isId ? 'Cari di Lajukan' : 'Search Lajukan'}
+                    autoComplete="off"
+                    enterKeyHint="search"
                   />
                   <button
                     type="submit"
                     disabled={query.trim().length < 2}
                     className={cn(
-                      'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none',
+                      'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none',
                       query.trim().length < 2 &&
                       'cursor-not-allowed opacity-40',
                     )}
                   >
-                    <span className="hidden sm:inline">
-                      {isId ? 'Cari' : 'Search'}
-                    </span>
+                    <span>{isId ? 'Cari' : 'Search'}</span>
                     <ArrowRight className="h-4 w-4" />
                   </button>
-                </label>
+                </div>
                 {searchSide === 'demand' ? (
                   <>
                     <input type="hidden" name="side" value="demand" />
@@ -446,21 +431,27 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
                 id="explore-categories-title"
                 className="text-lg font-bold text-[color:var(--app-text)] sm:text-xl"
               >
-                {isId ? 'Pilih kategori' : 'Choose a category'}
+                {isDemand
+                  ? isId
+                    ? 'Pembeli sedang mencari apa?'
+                    : 'What are buyers looking for?'
+                  : isId
+                    ? 'Cari berdasarkan kategori'
+                    : 'Browse by category'}
               </h2>
               <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
                 {isDemand
                   ? isId
-                    ? 'Pilih kategori kebutuhan pembeli yang paling cocok.'
-                    : 'Choose the buyer need category that fits.'
+                    ? 'Pilih jenis produk atau jasa yang kamu tawarkan.'
+                    : 'Choose the type of product or service you offer.'
                   : isId
-                    ? 'Pilih kategori utama yang paling dekat dengan kebutuhanmu.'
-                    : 'Choose the main category closest to your need.'}
+                    ? 'Pilih satu kategori, lalu cari lebih spesifik.'
+                    : 'Choose one category, then narrow your search.'}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {marketplaceCategories.map((category, index) => (
               <ExploreCategoryCard
                 key={category.id}
@@ -478,17 +469,17 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md text-left marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]">
             <span>
               <span className="block text-base font-bold text-[color:var(--app-text)] sm:text-lg">
-                {isId ? 'Komunitas dan video' : 'Community and videos'}
+                {isId ? 'Komunitas, video, dan referensi' : 'Community, videos, and references'}
               </span>
               <span className="mt-0.5 block text-sm text-[color:var(--app-text-soft)]">
                 {isId
-                  ? 'Opsional, untuk diskusi dan inspirasi usaha.'
-                  : 'Optional, for discussions and business ideas.'}
+                  ? 'Opsional, untuk belajar dan mencari informasi tambahan.'
+                  : 'Optional resources for learning and extra information.'}
               </span>
             </span>
             <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-open:rotate-180" />
           </summary>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
             {socialCategories.map((category, index) => (
               <ExploreChannelCard
                 key={category.id}
@@ -497,6 +488,32 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
                 locale={locale}
               />
             ))}
+            <Link
+              href="/explore?tab=references"
+              className="group grid min-h-[132px] cursor-pointer grid-cols-[56px_minmax(0,1fr)] gap-4 rounded-lg border border-amber-200 bg-amber-50/70 p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.4)] transition hover:-translate-y-0.5 hover:border-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2"
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-lg border border-amber-200 bg-white text-amber-800">
+                <Database className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-bold text-amber-900">
+                  <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                  {isId ? 'Data publik' : 'Public data'}
+                </span>
+                <span className="block text-sm font-bold text-amber-950">
+                  {isId ? 'Referensi tempat usaha' : 'Business place references'}
+                </span>
+                <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-amber-950/75">
+                  {isId
+                    ? 'Data lokasi untuk acuan, bukan toko atau penawaran aktif.'
+                    : 'Location data for reference, not active stores or offers.'}
+                </span>
+                <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-amber-900">
+                  {isId ? 'Lihat referensi' : 'View references'}
+                  <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                </span>
+              </span>
+            </Link>
           </div>
         </details>
 
@@ -509,25 +526,25 @@ export function ExploreHubPage({ locale }: { locale: LajukanLocale }) {
               <p className="text-sm font-bold text-[color:var(--app-text)] sm:text-base">
                 {isDemand
                   ? isId
-                    ? 'Punya yang mereka butuhkan?'
+                    ? 'Punya produk atau jasa yang cocok?'
                     : 'Have what buyers need?'
                   : isId
-                    ? 'Belum menemukan yang cocok?'
+                    ? 'Belum menemukan yang dibutuhkan?'
                     : 'Still not finding the right option?'}
               </p>
               <p className="mt-0.5 text-xs leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
                 {isDemand
                   ? isId
-                    ? 'Buat penawaran agar produk atau jasamu mudah ditemukan.'
+                    ? 'Pasang penawaran agar calon pembeli bisa menemukanmu.'
                     : 'Post an offer so your product or service can be found.'
                   : isId
-                    ? 'Tulis kebutuhanmu agar penyedia dapat menawarkan solusi.'
+                    ? 'Tulis kebutuhanmu agar penjual atau penyedia jasa bisa membantu.'
                     : 'Post your need so providers can offer a solution.'}
               </p>
             </div>
             <Link
               href={isDemand ? '/create?side=supply' : '/create?side=demand'}
-              className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2"
+              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2"
             >
               <Plus className="h-4 w-4" />
               {isDemand

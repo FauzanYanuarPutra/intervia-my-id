@@ -99,4 +99,33 @@ describe('umkm place distance presentation', () => {
       'https://cdn.example.test/product-2.jpg',
     ]);
   });
+
+  it('presents a public map reference without store or transaction claims', () => {
+    const ui = buildUmkmPlacePresentation(
+      buildPlace({
+        phone: '081234567890',
+        online_order_enabled: true,
+        offline_order_enabled: true,
+        metadata: {
+          record_kind: 'real_openstreetmap_reference',
+          market_side: 'reference',
+          image_url: '/images/hero/menu/bahan-01.png',
+        },
+      }),
+      true,
+      null,
+    );
+
+    expect(ui.categoryLabel).toBe('Referensi publik');
+    expect(ui.statusLabel).toBe('Referensi publik');
+    expect(ui.openNow).toBeNull();
+    expect(ui.priceLabel).toBe('Bukan penawaran harga');
+    expect(ui.serviceBadges).toEqual([
+      'Referensi publik',
+      'Cek sumber asli',
+    ]);
+    expect(ui.telHref).toBeNull();
+    expect(ui.whatsappHref).toBeNull();
+    expect(ui.coverImage).toBe('/images/hero/menu/bahan-01.png');
+  });
 });

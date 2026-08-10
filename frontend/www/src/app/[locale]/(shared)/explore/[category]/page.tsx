@@ -10,18 +10,83 @@ import {
 } from '@/lib/discovery/lajukanCategories';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
 type PageProps = {
   params: Promise<{ locale: string; category: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<SearchParams>;
 };
 
-function retainedSearch(
-  input: Record<string, string | string[] | undefined>,
-): string {
+const RETAINED_PARAMS = [
+  'q',
+  'side',
+  'tab',
+  'subcategory',
+  'location',
+  'lat',
+  'lng',
+  'distance',
+  'sort',
+  'min_price',
+  'max_price',
+  'condition',
+  'service_mode',
+  'verified',
+  'status',
+  'privacy',
+  'cursor',
+] as const;
+
+const FILTER_PARAMS = new Set([
+  'q',
+  'tab',
+  'subcategory',
+  'location',
+  'lat',
+  'lng',
+  'distance',
+  'sort',
+  'min_price',
+  'max_price',
+  'condition',
+  'service_mode',
+  'verified',
+  'status',
+  'privacy',
+  'cursor',
+]);
+
+function firstParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value.find(item => item.trim().length > 0)?.trim() || '';
+  }
+  return value?.trim() || '';
+}
+
+function isMeaningfulFilter(key: string, value: string): boolean {
+  if (!value) return false;
+  if (key === 'q') return value.length >= 2;
+  if (key === 'sort') return value !== 'relevance';
+  if (key === 'tab') return value !== 'all';
+  return true;
+}
+
+function hasFilteredState(input: SearchParams): boolean {
+  return Object.entries(input).some(([key, rawValue]) => {
+    if (!FILTER_PARAMS.has(key)) return false;
+    return isMeaningfulFilter(key, firstParam(rawValue));
+  });
+}
+
+function retainedSearch(input: SearchParams): string {
   const output = new URLSearchParams();
-  for (const key of ['subcategory', 'location', 'sort', 'side']) {
-    const value = input[key];
-    if (typeof value === 'string' && value.trim()) output.set(key, value);
+  for (const key of RETAINED_PARAMS) {
+    const value = firstParam(input[key]);
+    if (!value) continue;
+    if (key === 'q' && value.length < 2) continue;
+    if (key === 'sort' && value === 'relevance') continue;
+    if (key === 'tab' && value === 'all') continue;
+    output.set(key, value);
   }
   const query = output.toString();
   return query ? `?${query}` : '';
@@ -39,20 +104,25 @@ export default async function ExploreCategoryPage({
 }: PageProps) {
   const { locale, category: requestedCategory } = await params;
   if (locale !== 'id' && locale !== 'en') notFound();
+
   const category = getExploreCategoryBySlug(requestedCategory);
   if (!category) notFound();
 
   const resolvedSearchParams = await searchParams;
   if (
     requestedCategory !== category.slug ||
-    Boolean(resolvedSearchParams.category) ||
-    Boolean(resolvedSearchParams.type)
+    Boolean(firstParam(resolvedSearchParams.category)) ||
+    Boolean(firstParam(resolvedSearchParams.type))
   ) {
-    const query = retainedSearch(resolvedSearchParams);
-    permanentRedirect(`/${locale}/explore/${category.slug}${query}`);
+    permanentRedirect(
+      `/${locale}/explore/${category.slug}${retainedSearch(
+        resolvedSearchParams,
+      )}`,
+    );
   }
 
   const label = categoryLabel(category, locale);
+  const canonical = `https://www.lajukan.com/${locale}/explore/${category.slug}`;
   const breadcrumbJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -67,9 +137,21 @@ export default async function ExploreCategoryPage({
         '@type': 'ListItem',
         position: 2,
         name: label,
-        item: `https://www.lajukan.com/${locale}/explore/${category.slug}`,
+        item: canonical,
       },
     ],
+  };
+  const collectionJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: label,
+    description: categoryDescription(category, locale),
+    url: canonical,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'Lajukan',
+      url: 'https://www.lajukan.com',
+    },
   };
 
   return (
@@ -80,6 +162,14 @@ export default async function ExploreCategoryPage({
           __html: serializeJsonLd(breadcrumbJsonLd),
         }}
       />
+      {!hasFilteredState(resolvedSearchParams) ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: serializeJsonLd(collectionJsonLd),
+          }}
+        />
+      ) : null}
       <ExploreCategoryClient category={category} locale={locale} />
     </>
   );
@@ -87,16 +177,28 @@ export default async function ExploreCategoryPage({
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: PageProps): Promise<Metadata> {
   const { locale, category: requestedCategory } = await params;
   if (locale !== 'id' && locale !== 'en') notFound();
+
   const category = getExploreCategoryBySlug(requestedCategory);
   if (!category) notFound();
-  const title = `${categoryLabel(category, locale)} | ${
-    locale === 'id' ? 'Jelajahi Lajukan' : 'Explore Lajukan'
-  }`;
+
+  const resolvedSearchParams = await searchParams;
+  const query = firstParam(resolvedSearchParams.q);
+  const label = categoryLabel(category, locale);
+  const title =
+    query.length >= 2
+      ? locale === 'id'
+        ? `${query} di ${label} | Lajukan`
+        : `${query} in ${label} | Lajukan`
+      : `${label} | ${
+          locale === 'id' ? 'Jelajahi Lajukan' : 'Explore Lajukan'
+        }`;
   const description = categoryDescription(category, locale);
   const canonical = `https://www.lajukan.com/${locale}/explore/${category.slug}`;
+  const filtered = hasFilteredState(resolvedSearchParams);
 
   return {
     title,
@@ -106,6 +208,7 @@ export async function generateMetadata({
       languages: {
         'id-ID': `https://www.lajukan.com/id/explore/${category.slug}`,
         'en-US': `https://www.lajukan.com/en/explore/${category.slug}`,
+        'x-default': `https://www.lajukan.com/id/explore/${category.slug}`,
       },
     },
     openGraph: {
@@ -116,6 +219,13 @@ export async function generateMetadata({
       siteName: 'Lajukan',
       locale: locale === 'id' ? 'id_ID' : 'en_US',
     },
-    robots: { index: true, follow: true },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+    robots: filtered
+      ? { index: false, follow: true }
+      : { index: true, follow: true },
   };
 }

@@ -44,6 +44,25 @@ describe('isPublicUmkmStoreVisible', () => {
       }),
     ).toBe(false);
   });
+
+  it.each([
+    { record_kind: 'real_place_reference' },
+    { record_kind: 'REAL_OPENSTREETMAP_REFERENCE' },
+    { market_side: 'reference' },
+    { is_transactional: false },
+    {
+      source: 'usaha_portal',
+      outlet_active: true,
+      record_kind: 'real_place_reference',
+    },
+  ])('keeps non-transactional references out of the store layer', metadata => {
+    expect(
+      isPublicUmkmStoreVisible({
+        is_active: true,
+        metadata,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('mergeDeepLinkedUmkmStore', () => {

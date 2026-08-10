@@ -18,6 +18,8 @@ const marketplaceFrameClassName =
 const marketplaceShellClassName =
   'lajukan-home-shell mx-auto min-w-0 max-w-full overflow-x-hidden lg:flex lg:h-full lg:flex-col lg:overflow-hidden';
 
+export const homeDesktopGridClassName =
+  'lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 min-w-0 w-full max-w-[2200px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)_260px] 2xl:grid-cols-[280px_minmax(0,1fr)_340px]';
 export function MarketplaceHeaderSpacer() {
   return (
     <div

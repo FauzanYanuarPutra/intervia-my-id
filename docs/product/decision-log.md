@@ -4,6 +4,12 @@ Status: repo audit 2026-07-11.
 
 Use this file for approved product/architecture decisions. Do not record unapproved ideas as decisions.
 
+## 2026-08-10: Runtime And Database Bootstrap Are Seed-Free
+
+- Decision: Local/runtime startup and fresh database migration replay must finish without fictional accounts, demo listings, sample catalogs, community/reel examples, or open-reference seed rows. Additive cleanup migrations remove historical seed records; production-like runtime surfaces remain truthfully empty until genuine data is created. Test-only fixtures may remain isolated behind the test runner.
+- Evidence: Seed data had accumulated across identity, marketplace, community, WWW runtime state, Usaha portal state, and CRM sample fallbacks. The approved reset removed 11 identity users, 36,584 marketplace content/reference rows, 10 seeded stores, 51 legacy listings, 6 seeded catalog parents, 22 community users, 17 threads, and 18 reels from the active local databases.
+- Consequence: Structural RBAC roles/permissions, marketplace taxonomy, matching weights, and the public `c-fyp` category remain because they are required configuration rather than demo content. Public-reference imports are explicit data operations, not automatic bootstrap data. New demo data must use isolated test fixtures and must not appear in normal development or runtime builds.
+
 ## 2026-07-28: Regular WWW Pages Share One Layout Shell And Footer Owner
 
 - Decision: Non-immersive WWW pages use a 1280 px canonical content shell, with explicit 920 px readable, 1180 px form, and 1440 px wide variants only when the page purpose requires them. The global layout wrapper is the sole owner of the site footer.
@@ -52,6 +58,12 @@ Use this file for approved product/architecture decisions. Do not record unappro
 - External legal review for payment, escrow, refund, and dispute wording.
 - Canonical taxonomy registry location.
 - Required moderation coverage for community/reels/listings/chat.
+
+## 2026-07-30: Public Reference Data Is Not A Seller Listing
+
+- Decision: Licensed public/open-data seed records are rendered as non-transactional references with their original source, usage license, and media attribution. They must not show seller, price, stock, verification, chat, or transaction actions. Fictional Indonesia demo profiles are archived from identity and discovery read models instead of being presented as active users.
+- Evidence: The active local marketplace dataset contains sourced public references marked `is_transactional=false`, while the older `indonesia_demo_20260709` identities remained discoverable after their listings, threads, and reels were archived.
+- Consequence: Home may use public references to provide real, attributable context when live offers are unavailable, but transactional recommendation and latest-needs modules remain empty until genuine users publish them. Public references stay owned by the system curator; a personal account can curate or copy them only after a verified account exists and without changing source provenance.
 
 ## 2026-07-27: Public Content Uses Scan-First Visual Hierarchy
 
@@ -102,6 +114,20 @@ Use this file for approved product/architecture decisions. Do not record unappro
 - Consequence: Seed rows must store source/license/provenance metadata, avoid private phone/WhatsApp data unless consent is explicit, and label reference-only rows as non-transactional.
 - Implementation note: Bulk provider imports may use OpenStreetMap/Overpass or Geofabrik OSM extracts with ODbL attribution. Bulk buyer imports may use public RUP/SiRUP references as `request` rows, but they remain source-only demand references and must not create CRM leads or auto-connections.
 - Image note: Google images must not be scraped. Provider photo enrichment may use Google Places API only when an API key is configured, store `place_id`/proxy references instead of raw photo names or downloaded files, and display Google Maps attribution.
+
+## 2026-07-30: Bulk Open Data Is A Separate Reference Catalog
+
+- Decision: Large discovery imports from OpenStreetMap are stored as non-transactional public references, never as seller offers, buyer needs, verified businesses, or user-owned inventory.
+- Evidence: Product input requested at least 10,000 real records. OpenStreetMap provides named Indonesia business/location POIs under ODbL, while the source does not prove current activity, ownership, stock, pricing, contact consent, or Lajukan verification.
+- Consequence: Imports must be idempotent by source/external ID, retain element URLs and ODbL attribution, omit phone/email/contact fields, and keep price, rating, review, stock, and verification claims empty. Explore exposes a distinct `Referensi` filter and excludes these rows from offer/need counts, cart, and like actions. User-created demand remains separate and cannot be manufactured from map data.
+- Quality floor: Numeric targets are an upper bound, not permission to pad the catalog. Generic names, common consumer-retail chains, inactive lifecycle tags, unsupported shop types, or records carrying private-contact patterns are rejected or policy-archived even when that leaves fewer rows than requested.
+- Media and map presentation: Imported references use a neutral no-photo state until an exact, reuse-compatible source image has passed relationship and license checks and has been copied into Lajukan MinIO. A category illustration must not be presented as the photo of a specific business. UMKM Map may include reference coordinates only through the opt-in `include_references` discovery layer, with `Referensi publik` labeling, no store/order/contact claims, and a link to the source-backed content detail. Owner, transaction, and default store APIs remain reference-free.
+
+## 2026-07-30: Public Reference Photos Require Exact Evidence And Rehosted Provenance
+
+- Decision: Automatic media enrichment is limited to either an exact OSM `wikimedia_commons=File:*` link on the same source element or a versioned curator manifest that binds one stable source identifier (for OSM, `node|way|relation/id`) to one exact Commons file and explicitly records the match context. Commons categories and Wikidata P18 remain review-only inputs and do not independently authorize publication. Every accepted file must have an allowed CC0, Public Domain, CC BY, or CC BY-SA license. Google, social media, marketplaces, arbitrary websites, unknown licenses, NC, ND, and fair-use files are not downloaded into MinIO.
+- Evidence: The first 10,000 OSM references had no direct Commons file links; their few P18 candidates often represented a global headquarters, logo, or different branch. Repeating category illustrations made unrelated businesses look as if they shared the same real photo, while a mutable provider label or source URL alone could not prove that a contextual image had been reviewed for the referenced subject.
+- Consequence: Approved files are downloaded through an allowlisted, size/MIME/signature-checked pipeline, deduplicated by SHA-256, stored under immutable MinIO keys, and rendered only through the controlled content-media proxy. Provider URLs remain provenance rather than hotlinked display sources. Author, Commons source page, normalized license name and URL, match method, manifest version, reviewer, and review evidence remain auditable in asset/link metadata. Unmatched references display an explicit no-licensed-photo state rather than a random image.
 
 ## 2026-07-26: Owned Project Workspaces Must Not Use Synthetic Activity
 
@@ -192,3 +218,9 @@ Use this file for approved product/architecture decisions. Do not record unappro
 - Decision: Offer, request, and business-profile actions in `/profile/ai` start an owner-scoped guided creation state. Profile AI collects target-specific labeled facts across messages and creates an `AICreationCard` only after the minimum factual fields are present.
 - Evidence: Product input rejected draft cards generated from a generic intent sentence and requested chat-native form collection, contextual AI behavior, reply, reactions, and forwarding. The existing Personal AI message metadata and creation-draft bridge can support this without adding a duplicate creation flow.
 - Consequence: Generic creation intent remains `collecting`; partial answers and media survive reloads; cancellation prevents draft creation. Reply and forwarded-message context is included in AI history, while reactions remain interaction metadata. AI still cannot publish automatically or invent missing business facts.
+
+## 2026-08-01: UMKM Map Uses Viewport-Bounded Progressive Discovery
+
+- Decision: The canonical UMKM map loads registered businesses and public references in network batches of 10, ranks by viewer proximity or visible-map center, and fetches public-reference markers separately through a thin viewport-bounded endpoint. Public requests are capped at 50 rows and a 500-row progressive window rather than exposing an unbounded collection read.
+- Evidence: Product feedback identified slow first load and requested Google Maps-like nearby loading. The implementation audit found a 120-row server seed, a 160-row client refetch, periodic full polling, and public references fetched through a generic content query that reached its 1.5-second deadline.
+- Consequence: Map movement must query indexed bounds, stale requests must be cancelled, public projections must exclude private metadata, and user coordinates placed in URLs must remain coarse. Newest-first reference browsing uses keyset cursors; query, nearby, and viewport ranking use a bounded 10-at-a-time prefix window of at most 50 reference rows. A reference is publishable on these surfaces only with an explicit safe source URL and license URL. Larger windows, spatial tiles, replicas, partitioning, or sharding require production query plans and load evidence rather than row-count claims alone.

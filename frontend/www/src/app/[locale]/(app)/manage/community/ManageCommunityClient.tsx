@@ -960,7 +960,7 @@ function ManageContentNavigator({
               href={item.href}
               aria-current={item.active ? 'page' : undefined}
               className={cn(
-                'group relative flex min-h-[74px] min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-3 transition sm:min-h-[82px] sm:gap-3 sm:px-4',
+                'group relative flex min-h-[74px] min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-3 transition sm:min-h-[82px] sm:gap-3 sm:px-2',
                 item.active
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-50'
                   : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)] hover:bg-white dark:hover:bg-[color:var(--app-surface)]',

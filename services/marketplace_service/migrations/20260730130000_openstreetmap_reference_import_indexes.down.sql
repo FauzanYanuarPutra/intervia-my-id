@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS idx_content_items_osm_reference_category_updated;
+DROP INDEX IF EXISTS idx_content_items_osm_reference_external_id;
+

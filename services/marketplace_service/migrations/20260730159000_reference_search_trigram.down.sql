@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_content_items_reference_search_trgm;

@@ -965,7 +965,7 @@ const CREATE_BUSINESS_CATEGORY_DEFINITIONS: CreateBusinessCategory[] = [
     slugEn: 'services',
     aliases: ['services', 'jasa', 'cari-jasa', 'service'],
     contentType: 'service',
-    titleId: 'Cari Jasa',
+    titleId: 'Jasa Usaha',
     titleEn: 'Services',
     badgeId: 'Expert',
     badgeEn: 'Expert',

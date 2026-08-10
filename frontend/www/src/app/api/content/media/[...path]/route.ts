@@ -4,6 +4,7 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { NextRequest, NextResponse } from 'next/server';
 import { Buffer } from 'node:buffer';
+import { isPublicContentMediaKey } from '@/lib/server/publicMediaKey';
 
 const endpoint = process.env.MINIO_ENDPOINT;
 const accessKey = process.env.MINIO_ACCESS_KEY ?? process.env.MINIO_USER;
@@ -65,7 +66,11 @@ function isSafeObjectKey(key: string): boolean {
 
 function isMissingObjectError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
-  const value = error as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
+  const value = error as {
+    name?: string;
+    Code?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
   return (
     value.name === 'NoSuchKey' ||
     value.name === 'NotFound' ||
@@ -76,10 +81,21 @@ function isMissingObjectError(error: unknown): boolean {
 
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
+  context: { params: Promise<{ path: string[] }> },
 ) {
   const { path: pathSegments } = await context.params;
   if (!pathSegments || pathSegments.length < 2) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const bucket = decodeSafe(pathSegments[0]);
+  const key = pathSegments.slice(1).map(decodeSafe).join('/');
+  if (
+    bucket !== configuredBucket ||
+    !SAFE_BUCKET.test(bucket) ||
+    !isSafeObjectKey(key) ||
+    !isPublicContentMediaKey(key)
+  ) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
@@ -92,14 +108,19 @@ export async function GET(
       );
     }
     // Fallback to local file system
-    const key = pathSegments.slice(1).map(decodeSafe).join('/');
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     try {
-      const filePath = path.join(process.cwd(), 'public', 'uploads', 'content', path.basename(key));
+      const filePath = path.join(
+        process.cwd(),
+        'public',
+        'uploads',
+        'content',
+        path.basename(key),
+      );
       const fileBuffer = await fs.readFile(filePath);
       const contentType = contentTypeForPath(key);
-      
+
       return new NextResponse(fileBuffer, {
         headers: {
           'Content-Type': contentType,
@@ -112,19 +133,9 @@ export async function GET(
     }
   }
 
-  const bucket = decodeSafe(pathSegments[0]);
-  const key = pathSegments.slice(1).map(decodeSafe).join('/');
-  if (
-    bucket !== configuredBucket ||
-    !SAFE_BUCKET.test(bucket) ||
-    !isSafeObjectKey(key)
-  ) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
   try {
     const res = await client.send(
-      new GetObjectCommand({ Bucket: bucket, Key: key })
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
     );
 
     if (!res.Body) {

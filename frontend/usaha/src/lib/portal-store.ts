@@ -101,9 +101,7 @@ declare global {
   var __usahaPortalStore: PortalStore | undefined;
 }
 
-const ENABLE_PORTAL_SEED_DATA =
-  process.env.ENABLE_USAHA_SEED_DATA === 'true' ||
-  process.env.NEXT_PUBLIC_ENABLE_USAHA_SEED_DATA === 'true';
+const ENABLE_PORTAL_SEED_DATA = false;
 
 function normalizePhone(phone: string) {
   return phone.replace(/[^\d]/g, '');

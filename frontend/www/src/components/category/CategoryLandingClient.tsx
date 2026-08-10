@@ -702,7 +702,7 @@ export function CategoryLandingClient({
 
   return (
     <main className="lajukan-market-page lajukan-market-category page-shell max-lg:!px-1 overflow-x-hidden pb-5 pt-2 sm:pt-4 lg:pb-8">
-      <div className="mx-auto w-full max-w-[1500px] px-2 sm:px-4 lg:px-6">
+      <div className="mx-auto w-full max-w-[1500px] px-2 sm:px-2 lg:px-6">
         <div className="lg:hidden">
           <section
             className="ui-layer-local-topbar fixed inset-x-0 top-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)]  sm:px-3"

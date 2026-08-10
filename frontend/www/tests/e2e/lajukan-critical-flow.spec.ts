@@ -104,6 +104,9 @@ test.describe('Lajukan Indonesian critical journey', () => {
     const dialog = page.getByTestId('community-compose-modal');
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(/buat posting/i);
+    expect(
+      await dialog.evaluate(element => element.parentElement === document.body),
+    ).toBe(true);
 
     const modalZ = await getZIndex(dialog);
     const chromeMaxZ = await page.evaluate(() =>

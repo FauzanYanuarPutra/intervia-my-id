@@ -23,7 +23,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha512};
-use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres, Row};
+use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres, QueryBuilder, Row};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -106,6 +106,11 @@ const MAX_WITHDRAWAL_CENTS_LIVE: i64 = 5_000_000_000_000;
 const WALLET_MAX_FETCH_LIMIT: i64 = 200;
 const NOTIFICATION_WS_CHANNEL_CAP: usize = 2048;
 const NOTIFICATION_MAX_FETCH_LIMIT: i64 = 200;
+const MAP_REFERENCE_DEFAULT_LIMIT: i64 = 10;
+const MAP_REFERENCE_MAX_LIMIT: i64 = 50;
+const MAP_REFERENCE_MAX_QUERY_LEN: usize = 120;
+const MAP_REFERENCE_MAX_CITY_LEN: usize = 80;
+const PUBLIC_CONTENT_MAX_OFFSET: i64 = 10_000;
 
 #[derive(Debug, Clone)]
 struct RealtimeNotificationEnvelope {
@@ -357,6 +362,76 @@ struct ListContentQuery {
     owner_id: Option<Uuid>,
     limit: Option<i64>,
     offset: Option<i64>,
+}
+
+fn resolve_content_list_status(value: Option<String>) -> Result<String, &'static str> {
+    match clean_text(value).map(|status| status.to_ascii_lowercase()) {
+        None => Ok("active".to_string()),
+        Some(status) if matches!(status.as_str(), "active" | "draft" | "archived") => {
+            Ok(status)
+        }
+        Some(_) => Err("unsupported content status"),
+    }
+}
+
+fn can_list_content_status(
+    status: &str,
+    owner_id: Option<Uuid>,
+    actor_user_id: Option<Uuid>,
+    privileged: bool,
+) -> bool {
+    status == "active"
+        || privileged
+        || (owner_id.is_some() && owner_id == actor_user_id)
+}
+
+fn resolve_public_content_offset(value: Option<i64>) -> Result<i64, &'static str> {
+    match value.unwrap_or(0) {
+        offset if (0..=PUBLIC_CONTENT_MAX_OFFSET).contains(&offset) => Ok(offset),
+        _ => Err("public content offset is outside the supported range"),
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListMapReferencesQuery {
+    q: Option<String>,
+    city: Option<String>,
+    cursor: Option<String>,
+    limit: Option<i64>,
+    min_lat: Option<f64>,
+    max_lat: Option<f64>,
+    min_lng: Option<f64>,
+    max_lng: Option<f64>,
+    viewer_lat: Option<f64>,
+    viewer_lng: Option<f64>,
+}
+
+fn parse_map_reference_cursor(
+    value: Option<String>,
+) -> Result<Option<(DateTime<Utc>, Uuid)>, &'static str> {
+    let Some(cursor) = clean_text(value) else {
+        return Ok(None);
+    };
+    if cursor.len() > 96 || cursor.chars().any(char::is_control) {
+        return Err("invalid map reference cursor");
+    }
+    let Some((timestamp, id)) = cursor.split_once(':') else {
+        return Err("invalid map reference cursor");
+    };
+    let timestamp = timestamp
+        .parse::<i64>()
+        .ok()
+        .and_then(DateTime::<Utc>::from_timestamp_micros)
+        .ok_or("invalid map reference cursor")?;
+    let id = Uuid::parse_str(id).map_err(|_| "invalid map reference cursor")?;
+    Ok(Some((timestamp, id)))
+}
+
+fn encode_map_reference_cursor(updated_at: DateTime<Utc>, id: Uuid) -> String {
+    // PostgreSQL timestamptz retains microsecond precision. Truncating the
+    // cursor to milliseconds can skip rows that share the same millisecond
+    // but sort after the page boundary.
+    format!("{}:{}", updated_at.timestamp_micros(), id)
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -987,6 +1062,159 @@ struct SellerTxnAggRow {
     pending_transactions: i64,
 }
 
+fn is_public_reference_response_metadata(metadata: &Value) -> bool {
+    let record_kind = metadata
+        .get("record_kind")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let market_side = metadata
+        .get("market_side")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let explicitly_non_transactional = metadata
+        .get("is_transactional")
+        .and_then(|value| {
+            value
+                .as_bool()
+                .or_else(|| value.as_str().map(|raw| raw.eq_ignore_ascii_case("true")))
+        })
+        == Some(false);
+
+    record_kind.contains("reference")
+        && (market_side == "reference" || explicitly_non_transactional)
+}
+
+fn project_reference_scalar(value: &Value) -> Option<Value> {
+    match value {
+        Value::Null | Value::Bool(_) | Value::Number(_) => Some(value.clone()),
+        Value::String(text) => Some(Value::String(text.chars().take(4_096).collect())),
+        Value::Array(items) => Some(Value::Array(
+            items
+                .iter()
+                .filter_map(|item| item.as_str())
+                .take(12)
+                .map(|text| Value::String(text.chars().take(2_048).collect()))
+                .collect(),
+        )),
+        Value::Object(_) => None,
+    }
+}
+
+fn project_reference_object(value: Option<&Value>, allowed: &[&str]) -> Option<Value> {
+    let source = value?.as_object()?;
+    let mut projected = serde_json::Map::new();
+    for key in allowed {
+        if let Some(value) = source.get(*key).and_then(project_reference_scalar) {
+            projected.insert((*key).to_string(), value);
+        }
+    }
+    (!projected.is_empty()).then_some(Value::Object(projected))
+}
+
+fn project_public_reference_metadata(metadata: &Value) -> Value {
+    const ALLOWED_FIELDS: &[&str] = &[
+        "record_kind",
+        "market_side",
+        "listing_side",
+        "is_transactional",
+        "business_discovery_category",
+        "create_category",
+        "marketplace_category_slug",
+        "marketplace_subcategory_slug",
+        "category",
+        "category_label",
+        "sub_category",
+        "subcategory",
+        "city",
+        "location",
+        "address",
+        "latitude",
+        "longitude",
+        "external_id",
+        "source_dataset",
+        "source_url",
+        "source_title",
+        "source_license",
+        "source_license_url",
+        "source_accessed_at",
+        "trust_note",
+        "cover_image",
+        "image_url",
+        "image_urls",
+        "gallery_images",
+        "image_attribution",
+        "image_source_provider",
+        "media_kind",
+        "media_is_place_specific",
+        "media_storage",
+        "media_asset_id",
+        "media_downloaded_at",
+        "media_license_key",
+        "media_match_confidence",
+        "media_match_method",
+        "opening_hours",
+        "osm_id",
+        "osm_type",
+        "osm_primary_key",
+        "osm_primary_value",
+        "wikidata",
+        "wikimedia_commons",
+        "brand",
+        "brand_wikidata",
+        "operator",
+        "operator_wikidata",
+        "seed_pack",
+    ];
+    const SOURCE_FIELDS: &[&str] = &[
+        "title",
+        "url",
+        "license",
+        "license_url",
+        "accessed_at",
+        "attribution",
+        "author",
+    ];
+    const IMAGE_CREDIT_FIELDS: &[&str] = &[
+        "provider",
+        "author",
+        "license",
+        "license_name",
+        "license_url",
+        "source_url",
+        "original_url",
+        "attribution",
+    ];
+
+    let Some(source) = metadata.as_object() else {
+        return json!({});
+    };
+    let mut projected = serde_json::Map::new();
+    for key in ALLOWED_FIELDS {
+        if let Some(value) = source.get(*key).and_then(project_reference_scalar) {
+            projected.insert((*key).to_string(), value);
+        }
+    }
+    if let Some(value) = project_reference_object(source.get("source"), SOURCE_FIELDS) {
+        projected.insert("source".to_string(), value);
+    }
+    if let Some(value) =
+        project_reference_object(source.get("image_credit"), IMAGE_CREDIT_FIELDS)
+    {
+        projected.insert("image_credit".to_string(), value);
+    }
+    Value::Object(projected)
+}
+
+fn project_content_response_metadata(metadata: Value) -> Value {
+    if is_public_reference_response_metadata(&metadata) {
+        project_public_reference_metadata(&metadata)
+    } else {
+        metadata
+    }
+}
+
 #[derive(Debug, Default)]
 struct ContentActivityCounts {
     transaction_count: i64,
@@ -996,7 +1224,8 @@ struct ContentActivityCounts {
 #[derive(Debug, Serialize)]
 struct ContentResponse {
     id: Uuid,
-    owner_id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owner_id: Option<Uuid>,
     content_type: String,
     #[serde(rename = "type")]
     type_alias: String,
@@ -1013,7 +1242,8 @@ struct ContentResponse {
     category: Option<String>,
     content_status: String,
     status: String,
-    pricing_mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pricing_mode: Option<String>,
     original_price_cents: Option<i64>,
     seller_type: Option<String>,
     minimum_order: Option<String>,
@@ -1022,8 +1252,10 @@ struct ContentResponse {
     promo_end_at: Option<DateTime<Utc>>,
     rating: Option<f32>,
     review_count: Option<i32>,
-    liked: bool,
-    like_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    liked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    like_count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     seller_stats: Option<SellerStats>,
     metadata: Value,
@@ -1057,37 +1289,49 @@ impl ContentResponse {
             value.seller_type.as_deref(),
             value.minimum_order.as_deref(),
         );
+        let is_public_reference = is_public_reference_response_metadata(&metadata);
+        let metadata = project_content_response_metadata(metadata);
 
         Self {
             id: value.id,
-            owner_id: value.owner_id,
+            owner_id: (!is_public_reference).then_some(value.owner_id),
             type_alias: value.content_type.clone(),
             content_type: value.content_type,
             slug: value.slug,
             title: value.title,
             summary: value.summary,
             body: value.body,
-            price_cents: value.price_cents,
-            price_unit,
-            currency: value.currency,
+            price_cents: (!is_public_reference).then_some(value.price_cents).flatten(),
+            price_unit: (!is_public_reference).then_some(price_unit).flatten(),
+            currency: (!is_public_reference).then_some(value.currency).flatten(),
             tags: value.tags,
             cover_image,
             image_urls,
             category: value.category,
             status: value.content_status.clone(),
             content_status: value.content_status,
-            pricing_mode: value.pricing_mode,
-            original_price_cents: value.original_price_cents,
-            seller_type: value.seller_type,
-            minimum_order: value.minimum_order,
-            promo_label: value.promo_label,
-            promo_start_at: value.promo_start_at,
-            promo_end_at: value.promo_end_at,
-            rating: value.rating,
-            review_count: value.review_count,
-            liked,
-            like_count: value.like_count,
-            seller_stats,
+            pricing_mode: (!is_public_reference).then_some(value.pricing_mode),
+            original_price_cents: (!is_public_reference)
+                .then_some(value.original_price_cents)
+                .flatten(),
+            seller_type: (!is_public_reference).then_some(value.seller_type).flatten(),
+            minimum_order: (!is_public_reference)
+                .then_some(value.minimum_order)
+                .flatten(),
+            promo_label: (!is_public_reference).then_some(value.promo_label).flatten(),
+            promo_start_at: (!is_public_reference)
+                .then_some(value.promo_start_at)
+                .flatten(),
+            promo_end_at: (!is_public_reference)
+                .then_some(value.promo_end_at)
+                .flatten(),
+            rating: (!is_public_reference).then_some(value.rating).flatten(),
+            review_count: (!is_public_reference)
+                .then_some(value.review_count)
+                .flatten(),
+            liked: (!is_public_reference).then_some(liked),
+            like_count: (!is_public_reference).then_some(value.like_count),
+            seller_stats: (!is_public_reference).then_some(seller_stats).flatten(),
             metadata,
             created_at: value.created_at,
             updated_at: value.updated_at,
@@ -1103,6 +1347,26 @@ struct ListContentResponse {
     has_more: bool,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+struct MapReferenceRow {
+    id: Uuid,
+    slug: Option<String>,
+    title: String,
+    summary: Option<String>,
+    cover_image: Option<String>,
+    metadata: Value,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListMapReferencesResponse {
+    items: Vec<MapReferenceRow>,
+    limit: i64,
+    has_more: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next_cursor: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Default)]
 struct ListUmkmStoresQuery {
     q: Option<String>,
@@ -1112,6 +1376,12 @@ struct ListUmkmStoresQuery {
     limit: Option<i64>,
     active_only: Option<bool>,
     owner_user_id: Option<Uuid>,
+    min_lat: Option<f64>,
+    max_lat: Option<f64>,
+    min_lng: Option<f64>,
+    max_lng: Option<f64>,
+    viewer_lat: Option<f64>,
+    viewer_lng: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -2028,6 +2298,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health))
         .route("/", get(root))
+        .route("/v1/map/references", get(list_map_references))
         .route("/v1/content", get(list_content).post(create_content))
         .route(
             "/v1/content/{id}",
@@ -3920,6 +4191,71 @@ fn clean_text_limited(
     Ok(cleaned)
 }
 
+fn clean_map_reference_filter(
+    value: Option<String>,
+    max_len: usize,
+    error_message: &'static str,
+) -> Result<Option<String>, &'static str> {
+    let cleaned = clean_text(value);
+    if let Some(ref text) = cleaned {
+        if text.len() > max_len || text.chars().any(char::is_control) {
+            return Err(error_message);
+        }
+    }
+    Ok(cleaned)
+}
+
+fn escape_like_literal(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        if matches!(character, '\\' | '%' | '_') {
+            escaped.push('\\');
+        }
+        escaped.push(character);
+    }
+    escaped
+}
+
+fn validate_map_reference_bounds(
+    query: &ListMapReferencesQuery,
+) -> Result<Option<(f64, f64, f64, f64)>, &'static str> {
+    match (query.min_lat, query.max_lat, query.min_lng, query.max_lng) {
+        (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng))
+            if min_lat.is_finite()
+                && max_lat.is_finite()
+                && min_lng.is_finite()
+                && max_lng.is_finite()
+                && (-90.0..=90.0).contains(&min_lat)
+                && (-90.0..=90.0).contains(&max_lat)
+                && (-180.0..=180.0).contains(&min_lng)
+                && (-180.0..=180.0).contains(&max_lng)
+                && min_lat <= max_lat
+                && min_lng <= max_lng =>
+        {
+            Ok(Some((min_lat, max_lat, min_lng, max_lng)))
+        }
+        (None, None, None, None) => Ok(None),
+        _ => Err("invalid map bounds"),
+    }
+}
+
+fn validate_map_reference_viewer(
+    query: &ListMapReferencesQuery,
+) -> Result<Option<(f64, f64)>, &'static str> {
+    match (query.viewer_lat, query.viewer_lng) {
+        (Some(lat), Some(lng))
+            if lat.is_finite()
+                && lng.is_finite()
+                && (-90.0..=90.0).contains(&lat)
+                && (-180.0..=180.0).contains(&lng) =>
+        {
+            Ok(Some((lat, lng)))
+        }
+        (None, None) => Ok(None),
+        _ => Err("invalid viewer coordinates"),
+    }
+}
+
 fn normalize_reason_code_candidate(value: Option<String>) -> Option<String> {
     let raw = clean_text(value)?;
     if raw.len() > MAX_REASON_CODE_LEN {
@@ -4989,8 +5325,8 @@ fn normalize_listing_side_filter(value: Option<String>) -> Result<Option<String>
         return Ok(None);
     };
     match value.as_str() {
-        "supply" | "demand" => Ok(Some(value)),
-        _ => Err("side must be supply or demand"),
+        "supply" | "demand" | "reference" => Ok(Some(value)),
+        _ => Err("side must be supply, demand, or reference"),
     }
 }
 
@@ -8731,8 +9067,85 @@ async fn list_umkm_stores(
     let slug = clean_text(query.slug).map(|value| value.to_lowercase());
     let id = query.id;
     let owner_user_id = query.owner_user_id;
+    let bounds = match (query.min_lat, query.max_lat, query.min_lng, query.max_lng) {
+        (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng))
+            if (-90.0..=90.0).contains(&min_lat)
+                && (-90.0..=90.0).contains(&max_lat)
+                && (-180.0..=180.0).contains(&min_lng)
+                && (-180.0..=180.0).contains(&max_lng)
+                && min_lat <= max_lat
+                && min_lng <= max_lng =>
+        {
+            Some((min_lat, max_lat, min_lng, max_lng))
+        }
+        (None, None, None, None) => None,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid map bounds").into_response(),
+    };
+    let (min_lat, max_lat, min_lng, max_lng) = bounds
+        .map(|value| (Some(value.0), Some(value.1), Some(value.2), Some(value.3)))
+        .unwrap_or((None, None, None, None));
+    let viewer = match (query.viewer_lat, query.viewer_lng) {
+        (Some(lat), Some(lng))
+            if (-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lng) =>
+        {
+            Some((lat, lng))
+        }
+        (None, None) => None,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid viewer coordinates").into_response(),
+    };
+    let (viewer_lat, viewer_lng) = viewer
+        .map(|value| (Some(value.0), Some(value.1)))
+        .unwrap_or((None, None));
 
-    let rows = sqlx::query_as::<_, UmkmStoreRow>(
+    let use_nearest_index = viewer.is_some();
+    let visibility_filter = if active_only {
+        r#"
+          AND is_active = TRUE
+          AND lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
+          AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
+          AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
+          AND (
+            COALESCE(metadata->>'source', '') = 'usaha_portal'
+            OR lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
+          )
+        "#
+    } else {
+        r#"
+          AND (
+            NOT $6::bool OR (
+              is_active = TRUE
+              AND lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
+              AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
+              AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
+              AND (
+                COALESCE(metadata->>'source', '') = 'usaha_portal'
+                OR lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
+              )
+            )
+          )
+        "#
+    };
+    let ranking_order = if use_nearest_index {
+        // Keep KNN distance as the complete ORDER BY expression. Adding
+        // updated_at/id tie-breakers makes PostgreSQL scan and sort every
+        // point in the viewport instead of stopping at LIMIT through GiST.
+        "point(lng, lat) <-> point($13, $12) ASC"
+    } else if text_query.is_some() {
+        r#"
+          (
+            (CASE WHEN name ILIKE ($4 || '%') THEN 64 ELSE 0 END) +
+            (CASE WHEN name ILIKE ('%' || $4 || '%') THEN 36 ELSE 0 END) +
+            (CASE WHEN city ILIKE ('%' || $4 || '%') THEN 18 ELSE 0 END) +
+            (CASE WHEN COALESCE(metadata->>'segment', '') ILIKE ('%' || $4 || '%') THEN 16 ELSE 0 END) +
+            (CASE WHEN COALESCE(metadata->>'search_text', '') ILIKE ('%' || $4 || '%') THEN 10 ELSE 0 END)
+          ) DESC,
+          updated_at DESC,
+          id ASC
+        "#
+    } else {
+        "updated_at DESC, id ASC"
+    };
+    let store_sql = format!(
         r#"
         SELECT
           id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
@@ -8752,28 +9165,37 @@ async fn list_umkm_stores(
             COALESCE(metadata->>'keywords', '') ILIKE ('%' || $4 || '%')
           )
           AND ($5::text IS NULL OR city ILIKE ('%' || $5 || '%'))
-          AND (NOT $6::bool OR is_active = TRUE)
+          {visibility_filter}
+          AND ($8::float8 IS NULL OR lat >= $8)
+          AND ($9::float8 IS NULL OR lat <= $9)
+          AND ($10::float8 IS NULL OR lng >= $10)
+          AND ($11::float8 IS NULL OR lng <= $11)
+          AND ($6::bool = $6::bool)
+          AND (
+            ($12::float8 IS NULL AND $13::float8 IS NULL)
+            OR ($12::float8 IS NOT NULL AND $13::float8 IS NOT NULL)
+          )
         ORDER BY
-          CASE WHEN $4::text IS NULL THEN 0 ELSE
-            (CASE WHEN name ILIKE ($4 || '%') THEN 64 ELSE 0 END) +
-            (CASE WHEN name ILIKE ('%' || $4 || '%') THEN 36 ELSE 0 END) +
-            (CASE WHEN city ILIKE ('%' || $4 || '%') THEN 18 ELSE 0 END) +
-            (CASE WHEN COALESCE(metadata->>'segment', '') ILIKE ('%' || $4 || '%') THEN 16 ELSE 0 END) +
-            (CASE WHEN COALESCE(metadata->>'search_text', '') ILIKE ('%' || $4 || '%') THEN 10 ELSE 0 END)
-          END DESC,
-          updated_at DESC
+          {ranking_order}
         LIMIT $7
         "#,
-    )
-    .bind(id)
-    .bind(owner_user_id)
-    .bind(slug)
-    .bind(text_query)
-    .bind(city)
-    .bind(active_only)
-    .bind(limit)
-    .fetch_all(&state.db)
-    .await;
+    );
+    let rows = sqlx::query_as::<_, UmkmStoreRow>(&store_sql)
+        .bind(id)
+        .bind(owner_user_id)
+        .bind(slug)
+        .bind(text_query)
+        .bind(city)
+        .bind(active_only)
+        .bind(limit)
+        .bind(min_lat)
+        .bind(max_lat)
+        .bind(min_lng)
+        .bind(max_lng)
+        .bind(viewer_lat)
+        .bind(viewer_lng)
+        .fetch_all(&state.db)
+        .await;
 
     match rows {
         Ok(items) => (
@@ -10532,13 +10954,278 @@ async fn publish_listing_draft(
     }
 }
 
+async fn list_map_references(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListMapReferencesQuery>,
+) -> impl IntoResponse {
+    let limit = match query.limit {
+        Some(value) if (1..=MAP_REFERENCE_MAX_LIMIT).contains(&value) => value,
+        Some(_) => {
+            return err(StatusCode::BAD_REQUEST, "limit must be between 1 and 50").into_response()
+        }
+        None => MAP_REFERENCE_DEFAULT_LIMIT,
+    };
+    let text_query = match clean_map_reference_filter(
+        query.q.clone(),
+        MAP_REFERENCE_MAX_QUERY_LEN,
+        "invalid map reference query",
+    ) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if text_query
+        .as_ref()
+        .is_some_and(|value| value.chars().count() < 2)
+    {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "map reference query must contain at least 2 characters",
+        )
+        .into_response();
+    }
+    let city = match clean_map_reference_filter(
+        query.city.clone(),
+        MAP_REFERENCE_MAX_CITY_LEN,
+        "invalid map reference city",
+    ) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let bounds = match validate_map_reference_bounds(&query) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let viewer = match validate_map_reference_viewer(&query) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    // When browser geolocation is unavailable, rank around the visible map
+    // center. This affects retrieval order only; it is not returned as a user
+    // location or used to claim a viewer-specific distance.
+    let ranking_origin = viewer.or_else(|| {
+        bounds.map(|(min_lat, max_lat, min_lng, max_lng)| {
+            ((min_lat + max_lat) / 2.0, (min_lng + max_lng) / 2.0)
+        })
+    });
+    let cursor = match parse_map_reference_cursor(query.cursor.clone()) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if cursor.is_some() && (ranking_origin.is_some() || text_query.is_some()) {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "map reference cursor is only supported for newest-first browsing",
+        )
+        .into_response();
+    }
+
+    let mut statement = QueryBuilder::<Postgres>::new(
+        r#"
+        SELECT
+          id,
+          slug,
+          title,
+          summary,
+          cover_image,
+          jsonb_strip_nulls(jsonb_build_object(
+            'record_kind', metadata->'record_kind',
+            'marketplace_category_slug', metadata->'marketplace_category_slug',
+            'marketplace_subcategory_slug', metadata->'marketplace_subcategory_slug',
+            'category', metadata->'category',
+            'category_label', metadata->'category_label',
+            'city', metadata->'city',
+            'location', metadata->'location',
+            'address', metadata->'address',
+            'latitude', public.lajukan_safe_map_coordinate(metadata->>'latitude'),
+            'longitude', public.lajukan_safe_map_coordinate(metadata->>'longitude'),
+            'external_id', metadata->'external_id',
+            'source_dataset', metadata->'source_dataset',
+            'source_url', metadata->'source_url',
+            'source_title', metadata->'source_title',
+            'source_license', metadata->'source_license',
+            'source_license_url', metadata->'source_license_url',
+            'source_accessed_at', metadata->'source_accessed_at',
+            'image_attribution', metadata->'image_attribution',
+            'image_source_provider', metadata->'image_source_provider',
+            'image_credit', CASE
+              WHEN jsonb_typeof(metadata->'image_credit') = 'object'
+                THEN jsonb_strip_nulls(jsonb_build_object(
+                  'provider', metadata->'image_credit'->'provider',
+                  'author', metadata->'image_credit'->'author',
+                  'license', metadata->'image_credit'->'license',
+                  'license_name', metadata->'image_credit'->'license_name',
+                  'license_url', metadata->'image_credit'->'license_url',
+                  'source_url', metadata->'image_credit'->'source_url',
+                  'original_url', metadata->'image_credit'->'original_url',
+                  'attribution', metadata->'image_credit'->'attribution'
+                ))
+              ELSE NULL
+            END,
+            'media_kind', metadata->'media_kind',
+            'media_is_place_specific', metadata->'media_is_place_specific',
+            'media_storage', metadata->'media_storage',
+            'cover_image', metadata->'cover_image',
+            'image_url', metadata->'image_url',
+            'gallery_images', metadata->'gallery_images'
+          )) AS metadata,
+          updated_at
+        FROM content_items
+        WHERE content_status = 'active'
+          AND metadata->>'record_kind' = 'real_openstreetmap_reference'
+          AND metadata->>'source_dataset' = 'openstreetmap'
+          AND COALESCE(metadata->>'is_transactional', 'true') = 'false'
+          AND lower(COALESCE(metadata->>'market_side', '')) = 'reference'
+          AND lower(btrim(COALESCE(metadata->>'source_title', ''))) LIKE '%openstreetmap%'
+          AND lower(btrim(COALESCE(metadata->>'source_license', ''))) ~ '(odbl|open database license)'
+          AND lower(btrim(COALESCE(metadata->>'source_url', '')))
+            ~ '^https://(www[.])?openstreetmap[.]org/(node|way|relation)/[0-9]+/?([?#].*)?$'
+          AND lower(btrim(COALESCE(metadata->>'source_license_url', '')))
+            ~ '^https://(www[.])?opendatacommons[.]org/licenses/odbl/1-0(/|$|[?#])'
+          AND public.lajukan_safe_map_coordinate(metadata->>'latitude') BETWEEN -90.0 AND 90.0
+          AND public.lajukan_safe_map_coordinate(metadata->>'longitude') BETWEEN -180.0 AND 180.0
+        "#,
+    );
+
+    if let Some(value) = text_query.as_deref() {
+        statement
+            .push(
+                r#"
+                AND lower(
+                  COALESCE(title, '') || ' ' ||
+                  COALESCE(summary, '') || ' ' ||
+                  COALESCE(slug, '') || ' ' ||
+                  COALESCE(metadata->>'search_text', '') || ' ' ||
+                  COALESCE(metadata->>'city', '') || ' ' ||
+                  COALESCE(metadata->>'location', '') || ' ' ||
+                  COALESCE(metadata->>'address', '') || ' ' ||
+                  COALESCE(metadata->>'brand', '') || ' ' ||
+                  COALESCE(metadata->>'operator', '') || ' ' ||
+                  COALESCE(metadata->>'source_description', '') || ' ' ||
+                  COALESCE(metadata->>'marketplace_category_slug', '') || ' ' ||
+                  COALESCE(metadata->>'marketplace_subcategory_slug', '') || ' ' ||
+                  COALESCE(metadata->>'osm_primary_key', '') || ' ' ||
+                  COALESCE(metadata->>'osm_primary_value', '')
+                ) LIKE
+                "#,
+            )
+            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
+            .push(" ESCAPE '\\'");
+    }
+
+    if let Some(value) = city.as_deref() {
+        statement
+            .push(" AND lower(COALESCE(metadata->>'city', '')) LIKE ")
+            .push_bind(format!("%{}%", escape_like_literal(&value.to_lowercase())))
+            .push(" ESCAPE '\\'");
+    }
+
+    if let Some((min_lat, max_lat, min_lng, max_lng)) = bounds {
+        statement
+            .push(
+                r#"
+                AND point(
+                  public.lajukan_safe_map_coordinate(metadata->>'longitude'),
+                  public.lajukan_safe_map_coordinate(metadata->>'latitude')
+                ) <@ box(point(
+                "#,
+            )
+            .push_bind(min_lng)
+            .push(", ")
+            .push_bind(min_lat)
+            .push("), point(")
+            .push_bind(max_lng)
+            .push(", ")
+            .push_bind(max_lat)
+            .push("))");
+    }
+
+    if let Some((cursor_updated_at, cursor_id)) = cursor {
+        statement
+            .push(" AND (updated_at < ")
+            .push_bind(cursor_updated_at.clone())
+            .push(" OR (updated_at = ")
+            .push_bind(cursor_updated_at)
+            .push(" AND id > ")
+            .push_bind(cursor_id)
+            .push("))");
+    }
+
+    statement.push(" ORDER BY ");
+    if let Some((viewer_lat, viewer_lng)) = ranking_origin {
+        statement
+            .push(
+                r#"
+                point(
+                  public.lajukan_safe_map_coordinate(metadata->>'longitude'),
+                  public.lajukan_safe_map_coordinate(metadata->>'latitude')
+                ) <-> point(
+                "#,
+            )
+            .push_bind(viewer_lng)
+            .push(", ")
+            .push_bind(viewer_lat)
+            .push(") ASC");
+    } else {
+        if let Some(value) = text_query.as_deref() {
+            statement
+                .push("CASE WHEN lower(title) LIKE ")
+                .push_bind(format!("{}%", escape_like_literal(&value.to_lowercase())))
+                .push(" ESCAPE '\\' THEN 0 ELSE 1 END ASC, ");
+        }
+        statement.push("updated_at DESC, id ASC");
+    }
+    statement.push(" LIMIT ").push_bind(limit + 1);
+
+    let rows = statement
+        .build_query_as::<MapReferenceRow>()
+        .fetch_all(&state.db)
+        .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            let next_cursor = if has_more && ranking_origin.is_none() && text_query.is_none() {
+                items
+                    .last()
+                    .map(|item| encode_map_reference_cursor(item.updated_at.clone(), item.id))
+            } else {
+                None
+            };
+            (
+                StatusCode::OK,
+                Json(ListMapReferencesResponse {
+                    items,
+                    limit,
+                    has_more,
+                    next_cursor,
+                }),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!("list_map_references error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load map references",
+            )
+            .into_response()
+        }
+    }
+}
+
 async fn list_content(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<ListContentQuery>,
 ) -> impl IntoResponse {
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
-    let offset = query.offset.unwrap_or(0).max(0);
+    let offset = match resolve_public_content_offset(query.offset) {
+        Ok(offset) => offset,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
     let typ = normalize_content_type(query.r#type);
     let marketplace_category = clean_text(query.category).map(|s| make_slug(&s));
     let marketplace_subcategory = clean_text(query.subcategory).map(|s| make_slug(&s));
@@ -10565,11 +11252,22 @@ async fn list_content(
     let level = clean_text(query.level);
     let sector = clean_text(query.sector).map(|s| s.to_lowercase());
     let sub_sector = clean_text(query.sub_sector).map(|s| s.to_lowercase());
-    let status = clean_text(query.status)
-        .map(|s| s.to_lowercase())
-        .unwrap_or_else(|| "active".to_string());
+    let status = match resolve_content_list_status(query.status) {
+        Ok(status) => status,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
     let owner_id = query.owner_id;
-    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let actor_user_id = claims
+        .as_ref()
+        .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
+    let privileged = claims
+        .as_ref()
+        .is_some_and(|claims| has_cms_access(claims) || has_agent_access(claims));
+    if !can_list_content_status(&status, owner_id, actor_user_id, privileged) {
+        return err(StatusCode::FORBIDDEN, "content status is not publicly accessible")
+            .into_response();
+    }
 
     let rows = sqlx::query_as::<_, ContentRow>(
         r#"
@@ -10587,30 +11285,53 @@ async fn list_content(
         WHERE content_status <> 'deleted'
           AND ($1::text IS NULL OR content_type = $1)
           AND (
-              $2::text IS NULL OR
-              title ILIKE ('%' || $2 || '%') OR
-              coalesce(summary, '') ILIKE ('%' || $2 || '%') OR
-              body ILIKE ('%' || $2 || '%') OR
-              coalesce(slug, '') ILIKE ('%' || $2 || '%') OR
-              coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'location', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'address', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'brand', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'company', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'company_name', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(content_items.seller_type, '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'seller_type', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(content_items.minimum_order, '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'minimum_order', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'service_scope', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'skills', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'profession', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'property_type', '') ILIKE ('%' || $2 || '%') OR
-              coalesce(metadata->>'work_mode', '') ILIKE ('%' || $2 || '%')
+              $2::text IS NULL
+              OR (
+                $14::text = 'reference'
+                AND lower(
+                  coalesce(title, '') || ' ' ||
+                  coalesce(summary, '') || ' ' ||
+                  coalesce(body, '') || ' ' ||
+                  coalesce(slug, '') || ' ' ||
+                  coalesce(metadata->>'search_text', '') || ' ' ||
+                  coalesce(metadata->>'location', '') || ' ' ||
+                  coalesce(metadata->>'city', '') || ' ' ||
+                  coalesce(metadata->>'address', '') || ' ' ||
+                  coalesce(metadata->>'brand', '') || ' ' ||
+                  coalesce(metadata->>'operator', '') || ' ' ||
+                  coalesce(metadata->>'source_description', '') || ' ' ||
+                  coalesce(metadata->>'marketplace_category_slug', '') || ' ' ||
+                  coalesce(metadata->>'marketplace_subcategory_slug', '')
+                ) LIKE ('%' || lower($2) || '%')
+              )
+              OR (
+                $14::text IS DISTINCT FROM 'reference'
+                AND (
+                  title ILIKE ('%' || $2 || '%') OR
+                  coalesce(summary, '') ILIKE ('%' || $2 || '%') OR
+                  body ILIKE ('%' || $2 || '%') OR
+                  coalesce(slug, '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'location', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'address', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'brand', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'company', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'company_name', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(content_items.seller_type, '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'seller_type', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(content_items.minimum_order, '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'minimum_order', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'service_scope', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'skills', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'profession', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'property_type', '') ILIKE ('%' || $2 || '%') OR
+                  coalesce(metadata->>'work_mode', '') ILIKE ('%' || $2 || '%')
+                )
+              )
           )
           AND (
               $3::text IS NULL OR
@@ -10679,6 +11400,10 @@ async fn list_content(
               $14::text IS NULL OR
               (
                 CASE
+                  WHEN lower(btrim(coalesce(metadata->>'market_side', ''))) = 'reference'
+                    AND coalesce(metadata->>'is_transactional', 'true') = 'false'
+                    AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+                    THEN 'reference'
                   WHEN regexp_replace(lower(btrim(coalesce(metadata->>'market_side', ''))), '[_-]+', ' ', 'g')
                     IN ('demand', 'need', 'needs', 'needed', 'request', 'requested', 'wanted', 'looking', 'seeker', 'buyer request', 'buy request', 'pencari', 'mencari', 'dibutuhkan', 'butuh', 'minta')
                     THEN 'demand'
@@ -10699,6 +11424,22 @@ async fn list_content(
               ) = $14
           )
         ORDER BY
+          CASE
+            WHEN $14::text IS NULL
+              AND coalesce(metadata->>'is_transactional', 'true') = 'false'
+              AND lower(coalesce(metadata->>'record_kind', '')) LIKE '%reference%'
+              THEN 1
+            ELSE 0
+          END ASC,
+          CASE
+            WHEN $14::text = 'reference'
+              AND $2::text IS NULL
+              AND coalesce(metadata->>'media_storage', '') = 'minio'
+              THEN 0
+            WHEN $14::text = 'reference' AND $2::text IS NULL
+              THEN 1
+            ELSE 0
+          END ASC,
           CASE WHEN $2::text IS NULL THEN 0 ELSE
             (CASE WHEN title ILIKE ($2 || '%') THEN 80 ELSE 0 END) +
             (CASE WHEN title ILIKE ('%' || $2 || '%') THEN 48 ELSE 0 END) +
@@ -10710,7 +11451,8 @@ async fn list_content(
             (CASE WHEN coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') THEN 10 ELSE 0 END)
           END DESC,
           updated_at DESC,
-          created_at DESC
+          created_at DESC,
+          id ASC
         LIMIT $15 OFFSET $16
         "#,
     )
@@ -10744,6 +11486,9 @@ async fn list_content(
                 let mut seen = HashSet::new();
                 rows.iter()
                     .filter_map(|row| {
+                        if is_public_reference_response_metadata(&row.metadata) {
+                            return None;
+                        }
                         if seen.insert(row.owner_id) {
                             Some(row.owner_id)
                         } else {
@@ -10805,7 +11550,14 @@ async fn fetch_liked_content_ids(
         return Ok(HashSet::new());
     }
 
-    let content_ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+    let content_ids: Vec<Uuid> = rows
+        .iter()
+        .filter(|row| !is_public_reference_response_metadata(&row.metadata))
+        .map(|row| row.id)
+        .collect();
+    if content_ids.is_empty() {
+        return Ok(HashSet::new());
+    }
     let liked_ids = sqlx::query_scalar::<_, Uuid>(
         r#"
         SELECT content_id
@@ -22770,6 +23522,43 @@ mod tests {
     }
 
     #[test]
+    fn content_list_status_requires_owner_or_privileged_scope() {
+        assert_eq!(
+            resolve_content_list_status(None).as_deref(),
+            Ok("active")
+        );
+        assert_eq!(
+            resolve_content_list_status(Some("ARCHIVED".to_string())).as_deref(),
+            Ok("archived")
+        );
+        assert!(resolve_content_list_status(Some("deleted".to_string())).is_err());
+
+        let owner_id = Uuid::new_v4();
+        assert!(can_list_content_status("active", None, None, false));
+        assert!(!can_list_content_status(
+            "archived",
+            Some(owner_id),
+            None,
+            false
+        ));
+        assert!(can_list_content_status(
+            "archived",
+            Some(owner_id),
+            Some(owner_id),
+            false
+        ));
+        assert!(can_list_content_status("draft", None, None, true));
+    }
+
+    #[test]
+    fn public_content_offset_rejects_deep_offset_queries() {
+        assert_eq!(resolve_public_content_offset(None), Ok(0));
+        assert_eq!(resolve_public_content_offset(Some(10_000)), Ok(10_000));
+        assert!(resolve_public_content_offset(Some(-1)).is_err());
+        assert!(resolve_public_content_offset(Some(10_001)).is_err());
+    }
+
+    #[test]
     fn canonical_event_name_normalizes_master_prompt_aliases() {
         assert_eq!(canonical_event_name("homepage_view"), "home.viewed");
         assert_eq!(canonical_event_name("search_submitted"), "search.submitted");
@@ -22808,6 +23597,54 @@ mod tests {
                 .pointer("/items/0/surface")
                 .and_then(Value::as_str),
             Some("rfq")
+        );
+    }
+
+    #[test]
+    fn public_reference_response_metadata_removes_archives_and_contacts() {
+        let metadata = json!({
+            "record_kind": "real_openstreetmap_reference",
+            "market_side": "reference",
+            "is_transactional": false,
+            "source_url": "https://www.openstreetmap.org/node/1",
+            "source_license": "ODbL 1.0",
+            "legacy_osm_contact_cleanup": {
+                "metadata_fields": {
+                    "phone": { "value": "+62 812 0000 0000" }
+                }
+            },
+            "image_credit": {
+                "provider": "Wikimedia Commons",
+                "license": "CC BY 4.0",
+                "api_token": "must-not-leak",
+                "contact_phone": "+62 811 0000 0000"
+            },
+            "phone": "+62 812 0000 0000",
+            "source_website": "https://contact.example.com",
+            "contact_phone": "+62 813 0000 0000",
+            "apiKey": "must-not-leak",
+            "client_secret": "must-not-leak"
+        });
+
+        let projected = project_content_response_metadata(metadata);
+
+        assert!(projected.get("legacy_osm_contact_cleanup").is_none());
+        assert!(projected.get("phone").is_none());
+        assert!(projected.get("source_website").is_none());
+        assert!(projected.get("contact_phone").is_none());
+        assert!(projected.get("apiKey").is_none());
+        assert!(projected.get("client_secret").is_none());
+        assert!(projected.pointer("/image_credit/api_token").is_none());
+        assert!(projected.pointer("/image_credit/contact_phone").is_none());
+        assert_eq!(
+            projected.get("source_license").and_then(Value::as_str),
+            Some("ODbL 1.0")
+        );
+        assert_eq!(
+            projected
+                .pointer("/image_credit/provider")
+                .and_then(Value::as_str),
+            Some("Wikimedia Commons")
         );
     }
 
@@ -23399,6 +24236,10 @@ mod tests {
             normalize_listing_side_filter(Some("DEMAND".to_string())),
             Ok(Some("demand".to_string()))
         );
+        assert_eq!(
+            normalize_listing_side_filter(Some("Reference".to_string())),
+            Ok(Some("reference".to_string()))
+        );
         assert_eq!(normalize_listing_side_filter(None), Ok(None));
     }
 
@@ -23406,7 +24247,85 @@ mod tests {
     fn listing_side_filter_rejects_unknown_values() {
         assert_eq!(
             normalize_listing_side_filter(Some("all".to_string())),
-            Err("side must be supply or demand")
+            Err("side must be supply, demand, or reference")
+        );
+    }
+
+    #[test]
+    fn map_reference_filters_escape_like_wildcards() {
+        assert_eq!(escape_like_literal(r"50%_off\today"), r"50\%\_off\\today");
+    }
+
+    #[test]
+    fn map_reference_cursor_round_trips_and_rejects_invalid_values() {
+        let updated_at = DateTime::<Utc>::from_timestamp_micros(1_722_470_400_123_456)
+            .expect("valid timestamp");
+        let id = Uuid::new_v4();
+        let encoded = encode_map_reference_cursor(updated_at.clone(), id);
+
+        assert_eq!(
+            parse_map_reference_cursor(Some(encoded)),
+            Ok(Some((updated_at, id)))
+        );
+        assert!(parse_map_reference_cursor(Some("not-a-cursor".to_string())).is_err());
+        assert!(parse_map_reference_cursor(Some(format!("1:{}", Uuid::nil()))).is_ok());
+    }
+
+    #[test]
+    fn map_reference_bounds_require_a_complete_ordered_box() {
+        let valid = ListMapReferencesQuery {
+            min_lat: Some(-7.0),
+            max_lat: Some(-6.0),
+            min_lng: Some(106.0),
+            max_lng: Some(108.0),
+            ..Default::default()
+        };
+        assert_eq!(
+            validate_map_reference_bounds(&valid),
+            Ok(Some((-7.0, -6.0, 106.0, 108.0)))
+        );
+
+        let partial = ListMapReferencesQuery {
+            min_lat: Some(-7.0),
+            ..Default::default()
+        };
+        assert_eq!(
+            validate_map_reference_bounds(&partial),
+            Err("invalid map bounds")
+        );
+
+        let reversed = ListMapReferencesQuery {
+            min_lat: Some(-6.0),
+            max_lat: Some(-7.0),
+            min_lng: Some(106.0),
+            max_lng: Some(108.0),
+            ..Default::default()
+        };
+        assert_eq!(
+            validate_map_reference_bounds(&reversed),
+            Err("invalid map bounds")
+        );
+    }
+
+    #[test]
+    fn map_reference_viewer_rejects_partial_or_non_finite_coordinates() {
+        let partial = ListMapReferencesQuery {
+            viewer_lat: Some(-6.2),
+            ..Default::default()
+        };
+        assert_eq!(
+            validate_map_reference_viewer(&partial),
+            Err("invalid viewer coordinates")
+        );
+
+        let non_finite = ListMapReferencesQuery {
+            viewer_lat: Some(f64::NAN),
+            viewer_lng: Some(106.8),
+            ..Default::default()
+        };
+        assert_eq!(
+            validate_map_reference_viewer(&non_finite),
+            Err("invalid viewer coordinates")
         );
     }
 

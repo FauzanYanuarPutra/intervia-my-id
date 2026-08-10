@@ -9,10 +9,14 @@ export default async function UsahaOnboardingPage({
 }: PageProps) {
   const { locale } = await params;
   return (
-    <UsahaOwnerRouteView
-      locale={locale}
-      workspace="setup"
-      setupView="create"
-    />
+    <main className="min-h-0 w-full min-w-0">
+      <div className="page-shell w-full min-w-0 py-4 sm:py-5 lg:py-6">
+        <UsahaOwnerRouteView
+          locale={locale}
+          workspace="setup"
+          setupView="create"
+        />
+      </div>
+    </main>
   );
 }

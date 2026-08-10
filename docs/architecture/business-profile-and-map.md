@@ -44,3 +44,16 @@ UMKM discovery includes trust/status presentation and contact CTA patterns. Sour
 ## Risk
 
 There are two owner surfaces (`frontend/usaha` and `/usaha/*` in `www`). Keep canonical ownership clear to prevent duplicate UX.
+
+## Map Query Scalability
+
+- The canonical UMKM map reports its visible latitude/longitude bounds after map movement and sends those bounds to `/api/super-app/umkm/stores`.
+- The BFF validates complete, ordered, finite bounds and forwards them to marketplace `/v1/umkm/stores`; malformed, partial, reversed, or oversized public queries are rejected before backend work.
+- Marketplace applies the bounding box in PostgreSQL before limiting rows. Public projection remains mandatory so viewport reads do not expose owner identifiers, private phone fields, tokens, or private metadata.
+- Active-store coordinate and recency indexes, plus trigram indexes for public text search, are created by the additive `20260801100000_umkm_map_scale_indexes` migration. On an already large production table, operators should create equivalent indexes concurrently in a separate deployment operation before marking the transactional migration applied; the embedded SQLx startup migrator runs migrations inside a transaction.
+- Client marker clustering remains a presentation optimization. It is not a substitute for database-side viewport filtering.
+- Nearest-first storefront reads use PostgreSQL point distance and the partial GiST index from `20260801103000_umkm_nearest_point_index`; the browser requests only ten rows per progressive batch.
+- Registered storefronts and public-reference markers load through separate requests. A slow reference catalog cannot block the first storefront batch. References use the dedicated marketplace `/v1/map/references` contract, which returns at most 50 thin, allowlisted records instead of scanning the generic content response.
+- Public-reference bounding boxes, nearest-neighbour ordering, and text/city search are backed by the safe-coordinate, partial GiST, and trigram indexes in `20260801110000_osm_map_reference_scale_indexes`. When browser geolocation is unavailable, retrieval ranks around the visible map center without presenting that center as the user's location.
+- Viewer coordinates used for nearby ordering are rounded client-side to roughly 110-metre precision before entering a query URL. Exact device coordinates remain in browser memory for display-distance calculation and routing.
+- For datasets beyond a single PostgreSQL node, partitioning/sharding and pre-aggregated map tiles require measured production query plans and traffic evidence; row count alone is not approval to add infrastructure.

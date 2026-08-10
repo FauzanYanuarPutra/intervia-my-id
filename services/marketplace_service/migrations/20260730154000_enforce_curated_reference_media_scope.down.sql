@@ -1,0 +1,2 @@
+ALTER TABLE public_media_asset_links
+  DROP CONSTRAINT IF EXISTS public_media_asset_links_curated_scope_check;

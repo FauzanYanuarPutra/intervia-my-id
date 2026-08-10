@@ -59,6 +59,15 @@ describe('global search URL state', () => {
     expect(state.distanceKm).toBe(100);
   });
 
+  it('round-trips the distinct public reference tab', () => {
+    const state = parseGlobalSearchState(
+      new URLSearchParams('tab=references&q=kopi'),
+    );
+
+    expect(state.tab).toBe('references');
+    expect(serializeGlobalSearchState(state)).toBe('q=kopi&tab=references');
+  });
+
   it('prioritizes exact and prefix matches for short queries', () => {
     const item = (
       id: string,

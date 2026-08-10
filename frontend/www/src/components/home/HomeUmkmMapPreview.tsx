@@ -5,7 +5,8 @@ import type { UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
 import { Link } from '@/i18n/navigation';
 import {
   UMKM_DISCOVERY_PATH,
-  buildUmkmStorefrontPath,
+  buildUmkmMapPlacePath,
+  isUmkmMapPublicReference,
 } from '@/lib/umkmSurface';
 import { formatDistanceKm } from '@/lib/geo/distance';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
@@ -15,7 +16,7 @@ import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { useViewerLocation } from '@/components/super-app/useViewerLocation';
-import { ArrowRight, BadgeCheck, Target } from 'lucide-react';
+import { ArrowRight, BadgeCheck, ImageOff, Target, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 
@@ -106,16 +107,43 @@ export default function HomeUmkmCard({
   isId: boolean;
 }) {
   const { store, ui } = item;
-  const href = store.slug
-    ? buildUmkmStorefrontPath(store.slug)
-    : UMKM_DISCOVERY_PATH;
+  const isPublicReference = isUmkmMapPublicReference(store);
+  const metadata =
+    store.metadata &&
+    typeof store.metadata === 'object' &&
+    !Array.isArray(store.metadata)
+      ? store.metadata
+      : {};
+  const referenceMediaKind =
+    typeof metadata.media_kind === 'string' ? metadata.media_kind : '';
+  const isContextualReferencePhoto =
+    isPublicReference &&
+    metadata.media_storage === 'minio' &&
+    referenceMediaKind === 'licensed_reference_media';
+  const hasLicensedReferencePhoto =
+    !isPublicReference ||
+    (metadata.media_storage === 'minio' &&
+      (referenceMediaKind === 'licensed_source_photo' ||
+        referenceMediaKind === 'licensed_reference_media'));
+  const imageCredit =
+    metadata.image_credit &&
+    typeof metadata.image_credit === 'object' &&
+    !Array.isArray(metadata.image_credit)
+      ? (metadata.image_credit as Record<string, unknown>)
+      : {};
+  const imageProvider =
+    typeof imageCredit.provider === 'string' ? imageCredit.provider.trim() : '';
+  const href = store.slug ? buildUmkmMapPlacePath(store) : UMKM_DISCOVERY_PATH;
   const distanceLabel = formatDistance(store.distance_km);
   const locationLabel =
     store.city ||
     store.address ||
     (isId ? 'Lokasi belum tersedia' : 'Location unavailable');
-  const statusLabel =
-    ui.openNow === true
+  const statusLabel = isPublicReference
+    ? isId
+      ? 'Belum diverifikasi'
+      : 'Not verified'
+    : ui.openNow === true
       ? isId
         ? 'Buka'
         : 'Open'
@@ -140,15 +168,42 @@ export default function HomeUmkmCard({
         className="grid min-h-[132px] grid-cols-[104px_minmax(0,1fr)] overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)] transition motion-reduce:transform-none group-hover:-translate-y-0.5 group-hover:border-[color:var(--app-accent-border)] group-hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)] sm:grid-cols-[112px_minmax(0,1fr)]"
       >
         <div className="relative min-h-[132px] overflow-hidden bg-slate-100">
-          <LajukanImage
-            src={ui.coverImage}
-            alt={store.name}
-            fill
-            className="object-cover transition duration-300 motion-reduce:transform-none group-hover:scale-[1.03]"
-          />
+          {hasLicensedReferencePhoto ? (
+            <LajukanImage
+              src={ui.coverImage}
+              alt={
+                isContextualReferencePhoto
+                  ? isId
+                    ? `Foto kontekstual untuk referensi ${store.name}`
+                    : `Context photo for the ${store.name} reference`
+                  : store.name
+              }
+              fill
+              className="object-cover transition duration-300 motion-reduce:transform-none group-hover:scale-[1.03]"
+            />
+          ) : (
+            <div className="flex h-full min-h-[132px] flex-col items-center justify-center gap-2 bg-[linear-gradient(145deg,#f1f5f9,#ecfdf5)] px-3 text-center text-[10px] font-bold leading-4 text-slate-600">
+              <ImageOff className="h-5 w-5 text-emerald-700" />
+              <span>
+                {isId ? 'Belum ada foto berizin' : 'No licensed photo yet'}
+              </span>
+            </div>
+          )}
           <span className="absolute left-2 top-2 inline-flex min-h-6 items-center rounded-full border border-white/70 bg-white/90 px-2 text-[9px] font-black text-emerald-800 shadow-sm backdrop-blur">
-            UMKM
+            {isPublicReference ? (isId ? 'Referensi' : 'Reference') : 'UMKM'}
           </span>
+          {isPublicReference && hasLicensedReferencePhoto && imageProvider ? (
+            <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold text-white">
+              {isContextualReferencePhoto
+                ? isId
+                  ? 'Foto kontekstual'
+                  : 'Context photo'
+                : isId
+                  ? 'Foto sumber'
+                  : 'Source photo'}
+              : {imageProvider}
+            </span>
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col p-3">
@@ -178,9 +233,13 @@ export default function HomeUmkmCard({
 
           <p className="mt-1 line-clamp-1 text-xs leading-4 text-[color:var(--app-text-soft)]">
             {store.description ||
-              (isId
-                ? 'Lihat produk dan informasi usaha.'
-                : 'See products and business information.')}
+              (isPublicReference
+                ? isId
+                  ? 'Referensi peta publik; cek sumber asli.'
+                  : 'Public map reference; check the original source.'
+                : isId
+                  ? 'Lihat produk dan informasi usaha.'
+                  : 'See products and business information.')}
           </p>
 
           <div className="mt-auto flex min-w-0 items-center gap-1.5 pt-2 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -217,6 +276,7 @@ export function HomeUmkmMapPreview({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+
   const localViewerLocationState = useViewerLocation({
     isId,
     autoRequest: false,
@@ -224,13 +284,20 @@ export function HomeUmkmMapPreview({
 
   const viewerLocation =
     viewerLocationProp ?? localViewerLocationState.viewerLocation;
-  const locating = locatingProp ?? localViewerLocationState.locating;
+
+  const locating =
+    locatingProp ?? localViewerLocationState.locating;
+
   const locationError =
     locationErrorProp ?? localViewerLocationState.locationError;
+
   const requestViewerLocation =
-    requestViewerLocationProp ?? localViewerLocationState.requestViewerLocation;
+    requestViewerLocationProp ??
+    localViewerLocationState.requestViewerLocation;
+
   const dismissLocationPrompt =
-    dismissLocationPromptProp ?? localViewerLocationState.dismissLocationPrompt;
+    dismissLocationPromptProp ??
+    localViewerLocationState.dismissLocationPrompt;
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
@@ -238,18 +305,27 @@ export function HomeUmkmMapPreview({
     dragFree: true,
     skipSnaps: true,
   });
+
   useEmblaWheelGestures(emblaApi);
 
-  /* FETCH DATA */
+  /* ================= FETCH DATA ================= */
+
   useEffect(() => {
     let active = true;
 
     async function load(isInitial = false) {
       try {
-        if (isInitial) setLoading(true);
+        if (isInitial) {
+          setLoading(true);
+        }
+
         setError(null);
 
-        const params = new URLSearchParams({ limit: '18' });
+        const params = new URLSearchParams({
+          limit: '18',
+          include_references: '1',
+        });
+
         if (viewerLocation) {
           params.set('viewer_lat', String(viewerLocation.lat));
           params.set('viewer_lng', String(viewerLocation.lng));
@@ -263,23 +339,29 @@ export function HomeUmkmMapPreview({
           },
         );
 
-        const json = (await res.json().catch(() => ({}))) as StoresResponse;
+        const json = (await res
+          .json()
+          .catch(() => ({}))) as StoresResponse;
 
         if (!res.ok || !json.data?.items) {
           throw new Error(
             json.error ||
-              (isId ? 'Peta usaha belum siap.' : 'Business map unavailable.'),
+              (isId
+                ? 'Peta usaha belum siap.'
+                : 'Business map unavailable.'),
           );
         }
 
         if (!active) return;
+
         setStores(json.data.items);
-      } catch (e) {
+      } catch (loadError) {
         if (!active) return;
+
         if (isInitial) {
           setError(
-            e instanceof Error
-              ? e.message
+            loadError instanceof Error
+              ? loadError.message
               : isId
                 ? 'Peta usaha belum siap.'
                 : 'Business map unavailable.',
@@ -287,27 +369,37 @@ export function HomeUmkmMapPreview({
         }
       } finally {
         if (!active) return;
-        if (isInitial) setLoading(false);
+
+        if (isInitial) {
+          setLoading(false);
+        }
       }
     }
 
     void load(true);
 
-    const id = window.setInterval(() => load(false), REFRESH_MS);
+    const intervalId = window.setInterval(() => {
+      void load(false);
+    }, REFRESH_MS);
 
     return () => {
       active = false;
-      clearInterval(id);
+      window.clearInterval(intervalId);
     };
   }, [isId, viewerLocation]);
 
-  /* PREPARE UI */
+  /* ================= PREPARE UI ================= */
+
   const prepared = useMemo(
     () =>
       sortStores(
         stores.map(store => ({
           store,
-          ui: buildUmkmPlacePresentation(store, isId, viewerLocation),
+          ui: buildUmkmPlacePresentation(
+            store,
+            isId,
+            viewerLocation,
+          ),
         })),
         Boolean(viewerLocation),
       ),
@@ -320,19 +412,25 @@ export function HomeUmkmMapPreview({
   };
 
   const enableNearbyLocation = async () => {
-    const nextLocation = viewerLocation || (await requestViewerLocation());
+    const nextLocation =
+      viewerLocation ?? (await requestViewerLocation());
+
     if (!nextLocation) return;
+
     setLocationPromptOpen(false);
   };
 
   return (
     <>
-      <section className="space-y-4 py-3">
-        {/* HEADER SECTION */}
-        <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
-          <div className="space-y-0.5">
-            <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
-              <BuildingStorefrontIcon className="h-4 w-4 text-emerald-600" />
+      <section className="w-full py-1.5 sm:py-2">
+        {/* ================= HEADER ================= */}
+
+        <div className="flex h-6 items-center justify-between gap-2 px-1 sm:px-3 md:px-6">
+          {/* LEFT */}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <BuildingStorefrontIcon className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+
+            <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
               {viewerLocation
                 ? isId
                   ? 'Usaha di sekitarmu'
@@ -341,158 +439,279 @@ export function HomeUmkmMapPreview({
                   ? 'Rekomendasi usaha'
                   : 'Recommended businesses'}
             </h2>
-            <p className="text-[11px] font-medium text-zinc-400">
-              {viewerLocation
-                ? isId
-                  ? 'Diurutkan dari lokasi yang paling dekat.'
-                  : 'Sorted from the closest location.'
-                : isId
-                  ? 'Kenali usaha dan layanan yang tersedia di Lajukan.'
-                  : 'Discover businesses and services available on Lajukan.'}
-            </p>
+
+            {viewerLocation ? (
+              <span
+                title={
+                  isId
+                    ? 'Lokasi terdekat aktif'
+                    : 'Nearby location active'
+                }
+                className="hidden shrink-0 items-center gap-1 text-[9px] font-medium text-emerald-600 sm:inline-flex"
+              >
+                <BadgeCheck className="h-3 w-3" />
+                {isId ? 'Terdekat' : 'Nearby'}
+              </span>
+            ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {viewerLocation ? (
-              <span className="hidden items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 sm:inline-flex">
-                <BadgeCheck className="h-3.5 w-3.5" />
-                {isId ? 'Terdekat aktif' : 'Nearby on'}
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setLocationPromptOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700"
-              >
-                <Target className="h-3.5 w-3.5" />
-                {isId ? 'Aktifkan lokasi' : 'Enable location'}
-              </button>
-            )}
-            <CompactSeeAllLink
+          {/* RIGHT ACTION */}
+          {viewerLocation ? (
+            <Link
               href={UMKM_DISCOVERY_PATH}
-              isId={isId}
-              ariaLabel={
-                viewerLocation
-                  ? isId
-                    ? 'Lihat semua usaha sekitar'
-                    : 'View all nearby businesses'
-                  : isId
-                    ? 'Lihat semua rekomendasi usaha'
-                    : 'View all recommended businesses'
+              aria-label={
+                isId
+                  ? 'Buka peta usaha'
+                  : 'Open business map'
               }
-            />
-            <EmblaDesktopControls api={emblaApi} isId={isId} compact />
-          </div>
+              className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
+            >
+              {isId ? 'Peta' : 'Map'}
+
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setLocationPromptOpen(true)}
+              aria-label={
+                isId
+                  ? 'Aktifkan lokasi terdekat'
+                  : 'Enable nearby location'
+              }
+              className="
+                inline-flex h-6 shrink-0 items-center gap-1
+                rounded-full bg-emerald-50 px-2
+                text-[9px] font-semibold text-emerald-700
+                transition-colors hover:bg-emerald-100
+              "
+            >
+              <Target className="h-3 w-3 shrink-0" />
+
+              <span>
+                {isId ? 'Lokasi' : 'Location'}
+              </span>
+            </button>
+          )}
         </div>
 
-        {/* CAROUSEL CONTAINER */}
-        <div className="w-full">
-          {/* LOADING STATE */}
-          {loading && stores.length === 0 && (
-            <div className="flex gap-3 overflow-hidden px-1 sm:px-3 md:px-6">
-              {[1, 2, 3].map(i => (
+        {/* ================= CONTENT ================= */}
+
+        <div className="mt-1 w-full">
+          {/* LOADING */}
+
+          {loading && stores.length === 0 ? (
+            <div className="flex gap-2 overflow-hidden px-1 sm:px-3 md:px-6">
+              {[1, 2, 3].map(item => (
                 <div
-                  key={i}
-                  className="h-[132px] w-[min(84vw,21rem)] shrink-0 animate-pulse rounded-xl border border-slate-200 bg-slate-100"
+                  key={item}
+                  className="
+                    h-[104px]
+                    w-[min(76vw,18rem)]
+                    shrink-0 animate-pulse
+                    rounded-xl
+                    border border-slate-200
+                    bg-slate-100
+                  "
                 />
               ))}
             </div>
-          )}
+          ) : null}
 
-          {/* ERROR STATE */}
-          {!loading && error && stores.length === 0 && (
+          {/* ERROR */}
+
+          {!loading && error && stores.length === 0 ? (
             <div className="px-1 sm:px-3 md:px-6">
-              <p className="text-xs text-red-500 bg-red-50/50 p-3.5 rounded-xl border border-red-100 font-medium">
+              <p className="rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-2 text-[10px] font-medium text-red-500 sm:text-[11px]">
                 {error}
               </p>
             </div>
-          )}
+          ) : null}
+
+          {/* EMPTY */}
 
           {!loading && !error && stores.length === 0 ? (
             <div className="px-1 sm:px-3 md:px-6">
-              <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-5 text-center">
-                <p className="text-sm font-bold text-[color:var(--app-text)]">
-                  {isId
-                    ? 'Belum ada usaha yang bisa ditampilkan.'
-                    : 'No businesses to show yet.'}
-                </p>
-                <Link
-                  href={UMKM_DISCOVERY_PATH}
-                  className="mt-2 inline-flex min-h-9 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white"
-                >
-                  {isId ? 'Buka peta usaha' : 'Open business map'}
-                </Link>
+              <div
+                className="
+                  flex min-h-[64px] items-center justify-between
+                  gap-2 rounded-xl
+                  border border-dashed border-[color:var(--app-border)]
+                  bg-[color:var(--app-surface-muted)]
+                  px-3 py-2
+                "
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-bold text-[color:var(--app-text)]">
+                    {viewerLocation
+                      ? isId
+                        ? 'Belum ada usaha di sekitar.'
+                        : 'No nearby businesses found.'
+                      : isId
+                        ? 'Temukan usaha terdekat.'
+                        : 'Discover nearby businesses.'}
+                  </p>
+
+                  <p className="mt-0.5 line-clamp-1 text-[9px] font-medium text-[color:var(--app-text-muted)] sm:text-[10px]">
+                    {viewerLocation
+                      ? isId
+                        ? 'Coba jelajahi area lain melalui peta.'
+                        : 'Explore another area on the map.'
+                      : isId
+                        ? 'Aktifkan lokasi agar hasil lebih relevan.'
+                        : 'Enable location for more relevant results.'}
+                  </p>
+                </div>
+
+                {viewerLocation ? (
+                  <Link
+                    href={UMKM_DISCOVERY_PATH}
+                    className="
+                      inline-flex h-7 shrink-0 items-center
+                      justify-center gap-0.5 rounded-full
+                      bg-emerald-600 px-2.5
+                      text-[9px] font-bold text-white
+                      transition-colors hover:bg-emerald-700
+                    "
+                  >
+                    {isId ? 'Peta' : 'Map'}
+
+                    <ChevronRight className="h-3 w-3" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setLocationPromptOpen(true)}
+                    className="
+                      inline-flex h-7 shrink-0 items-center
+                      justify-center gap-1 rounded-full
+                      bg-emerald-600 px-2.5
+                      text-[9px] font-bold text-white
+                      transition-colors hover:bg-emerald-700
+                    "
+                  >
+                    <Target className="h-3 w-3" />
+
+                    {isId ? 'Aktifkan' : 'Enable'}
+                  </button>
+                )}
               </div>
             </div>
           ) : null}
 
-          {/* LIST SLIDER */}
-          {stores.length > 0 && (
+          {/* ================= STORE CAROUSEL ================= */}
+
+          {stores.length > 0 ? (
             <div
-              className="cursor-grab overflow-hidden px-1 contain-paint active:cursor-grabbing sm:px-3 md:px-6"
               ref={emblaRef}
+              className="
+                contain-paint cursor-grab overflow-hidden
+                active:cursor-grabbing
+              "
             >
-              <div className="my-1 flex touch-pan-y gap-3 [backface-visibility:hidden] [will-change:transform]">
+              <div
+                className="
+                  flex touch-pan-y gap-2
+                  px-1 py-0.5
+                  sm:px-3
+                  md:px-6
+                  [backface-visibility:hidden]
+                  [will-change:transform]
+                "
+              >
                 {prepared.map(item => (
                   <div
                     key={item.store.id}
-                    className="shrink-0 select-none [backface-visibility:hidden]"
+                    className="
+                      shrink-0 select-none
+                      [backface-visibility:hidden]
+                    "
                   >
-                    <HomeUmkmCard item={item} isId={isId} />
+                    <HomeUmkmCard
+                      item={item}
+                      isId={isId}
+                    />
                   </div>
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </section>
+
+      {/* ================= LOCATION MODAL ================= */}
+
       <Modal
         open={locationPromptOpen}
-        title={isId ? 'Tampilkan usaha terdekat?' : 'Show nearby businesses?'}
+        title={
+          isId
+            ? 'Tampilkan usaha terdekat?'
+            : 'Show nearby businesses?'
+        }
         onClose={closeLocationPrompt}
-        className="max-w-none rounded-[24px] rounded-b-none p-4 sm:max-w-md sm:rounded-[28px] sm:p-5"
+        className="
+          max-w-none rounded-[20px] rounded-b-none p-3.5
+          sm:max-w-md sm:rounded-[24px] sm:p-4
+        "
         footer={
-          <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={closeLocationPrompt}
-              className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700"
+              disabled={locating}
+              className="
+                inline-flex min-h-10 items-center justify-center
+                rounded-full border border-slate-200
+                bg-white px-3 text-xs font-semibold text-slate-700
+                transition-colors hover:bg-slate-50
+                disabled:cursor-not-allowed disabled:opacity-60
+              "
             >
-              {isId ? 'Nanti saja' : 'Maybe later'}
+              {isId ? 'Nanti' : 'Later'}
             </button>
+
             <button
               type="button"
-              onClick={enableNearbyLocation}
+              onClick={() => void enableNearbyLocation()}
               disabled={locating}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-[13px] font-bold text-white shadow-[0_18px_34px_-22px_rgba(22,163,74,0.52)] disabled:opacity-70"
+              className="
+                inline-flex min-h-10 items-center justify-center gap-1.5
+                rounded-full bg-emerald-600 px-3
+                text-xs font-bold text-white
+                transition-colors hover:bg-emerald-700
+                disabled:cursor-not-allowed disabled:opacity-70
+              "
             >
-              <Target className="h-4 w-4" />
+              <Target className="h-3.5 w-3.5 shrink-0" />
+
               {locating
                 ? isId
-                  ? 'Mencari lokasi...'
-                  : 'Finding location...'
+                  ? 'Mencari...'
+                  : 'Finding...'
                 : isId
-                  ? 'Aktifkan lokasi'
-                  : 'Enable location'}
+                  ? 'Aktifkan'
+                  : 'Enable'}
             </button>
           </div>
         }
       >
-        <div className="space-y-3">
-          <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/70 p-4 text-emerald-900">
-            <p className="text-sm font-bold">
+        <div className="space-y-2">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 text-emerald-900">
+            <p className="text-xs font-bold">
               {isId
-                ? 'Kami urutkan usaha dari yang paling dekat dengan posisimu.'
-                : 'We will sort businesses from the closest to your position.'}
+                ? 'Tampilkan usaha berdasarkan lokasi terdekatmu.'
+                : 'Show businesses based on your nearby location.'}
             </p>
-            <p className="mt-1 text-[12px] leading-5 text-emerald-800/80">
+
+            <p className="mt-1 text-[11px] leading-4 text-emerald-800/80">
               {isId
-                ? 'Kalau tidak diaktifkan, Lajukan tetap menampilkan rekomendasi umum.'
-                : 'If not enabled, Lajukan will keep showing general recommendations.'}
+                ? 'Jika tidak diaktifkan, rekomendasi usaha umum tetap ditampilkan.'
+                : 'General business recommendations will still appear if location is disabled.'}
             </p>
           </div>
+
           {locationError ? (
-            <p className="rounded-[16px] border border-rose-100 bg-rose-50 px-3 py-2 text-[12px] font-semibold text-rose-700">
+            <p className="rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-2 text-[11px] font-semibold text-rose-700">
               {locationError}
             </p>
           ) : null}

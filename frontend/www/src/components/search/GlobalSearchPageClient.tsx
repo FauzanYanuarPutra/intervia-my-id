@@ -955,7 +955,7 @@ export function GlobalSearchPageClient({ locale }: { locale: LajukanLocale }) {
         <div className="h-[calc(52px+env(safe-area-inset-top))]" />
       </div>
 
-      <main className="mx-auto w-full max-w-[1700px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+      <main className="mx-auto w-full max-w-[2200px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <section
           className={cn(
             hasResultContext

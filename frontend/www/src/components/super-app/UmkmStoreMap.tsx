@@ -7,6 +7,7 @@ import type { LatLng } from '@/lib/super-app/maps';
 export type UmkmMapStore = {
   id: string;
   slug: string;
+  public_path?: string | null;
   name: string;
   city: string;
   address: string;
@@ -26,6 +27,13 @@ export type UmkmMapStore = {
 };
 
 export type UmkmMapTheme = 'default' | 'light' | 'dark';
+export type UmkmMapBounds = {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+};
+export type UmkmMapFocusOffset = { x: number; y: number };
 
 export type UmkmMapRouteSummary = {
   distance_m: number | null;
@@ -40,7 +48,10 @@ export function getNextUmkmMapTheme(theme: UmkmMapTheme): UmkmMapTheme {
   return 'default';
 }
 
-export function getUmkmMapThemeLabel(theme: UmkmMapTheme, isId: boolean): string {
+export function getUmkmMapThemeLabel(
+  theme: UmkmMapTheme,
+  isId: boolean,
+): string {
   if (theme === 'light') return isId ? 'Terang' : 'Light';
   if (theme === 'dark') return isId ? 'Gelap' : 'Dark';
   return isId ? 'Normal' : 'Standard';
@@ -52,6 +63,7 @@ type UmkmStoreMapProps = {
   onSelectStore?: (storeId: string) => void;
   isId?: boolean;
   viewerLocation?: LatLng | null;
+  viewerAccuracyMeters?: number | null;
   className?: string;
   interactive?: boolean;
   theme?: UmkmMapTheme;
@@ -60,10 +72,13 @@ type UmkmStoreMapProps = {
   onRouteResolved?: (route: UmkmMapRouteSummary) => void;
   focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
   focusNonce?: number;
+  focusOffset?: UmkmMapFocusOffset;
+  onBoundsChange?: (bounds: UmkmMapBounds) => void;
 };
 
 const UmkmStoreMapClient = dynamic(
-  () => import('./UmkmStoreMapClient').then((module) => module.UmkmStoreMapClient),
+  () =>
+    import('./UmkmStoreMapClient').then(module => module.UmkmStoreMapClient),
   {
     ssr: false,
     loading: () => (

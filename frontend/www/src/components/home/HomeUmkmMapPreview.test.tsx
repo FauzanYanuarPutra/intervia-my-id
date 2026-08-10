@@ -51,4 +51,40 @@ describe('HomeUmkmCard', () => {
     expect(html).not.toContain('Buka sekarang');
     expect(html).not.toContain('Aktif');
   });
+
+  it('renders a MinIO-hosted contextual reference image without claiming it is a shop photo', () => {
+    const store = {
+      id: 'reference-1',
+      slug: 'pasar-uji',
+      name: 'Pasar Uji',
+      description: 'Referensi lokasi publik.',
+      city: 'Bandung',
+      address: 'Bandung',
+      lat: -6.9,
+      lng: 107.6,
+      phone: null,
+      metadata: {
+        record_kind: 'real_open_data_reference',
+        market_side: 'reference',
+        media_storage: 'minio',
+        media_kind: 'licensed_reference_media',
+        image_url:
+          '/api/content/media/laju-chat/content/public-reference/ab/example.jpg',
+        image_credit: { provider: 'Wikimedia Commons' },
+      },
+      distance_km: null,
+      recommended_qr: null,
+    };
+    const item: ComponentProps<typeof HomeUmkmCard>['item'] = {
+      store,
+      ui: buildUmkmPlacePresentation(store, true, null),
+    };
+
+    const html = renderToStaticMarkup(<HomeUmkmCard item={item} isId={true} />);
+
+    expect(html).toContain('Foto kontekstual');
+    expect(html).toContain('Wikimedia Commons');
+    expect(html).toContain('Foto kontekstual untuk referensi Pasar Uji');
+    expect(html).not.toContain('Belum ada foto berizin');
+  });
 });

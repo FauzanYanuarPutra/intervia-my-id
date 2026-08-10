@@ -187,6 +187,16 @@ export type ListUmkmStoresOptions = {
   activeOnly?: boolean;
   backendOnly?: boolean;
   limit?: number;
+  bounds?: {
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+  };
+  viewer?: {
+    lat: number;
+    lng: number;
+  };
 };
 
 export type CreateUmkmStoreInput = {

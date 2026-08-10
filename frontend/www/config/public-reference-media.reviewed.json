@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "external_id": "node/7371191970",
+      "wikidata_id": "Q17100446",
+      "commons_file": "File:Pasar terapung.jpg",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/node/7371191970",
+      "note": "Commons explicitly identifies Pasar Terapung Lok Baintan; the OSM and Wikidata coordinates differ by about 8 metres."
+    },
+    {
+      "external_id": "way/286407307",
+      "wikidata_id": "Q12474416",
+      "commons_file": "File:Tampak Depan Duta Mall Banjarmasin 2025.jpg",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/way/286407307",
+      "note": "The facade, place name, and Banjarmasin location match Duta Mall; coordinates fall within the same mall site."
+    },
+    {
+      "external_id": "relation/19210245",
+      "wikidata_id": "Q12503410",
+      "commons_file": "File:Pasar Gede Harjonagoro.jpg",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/relation/19210245",
+      "note": "The Commons description explicitly identifies Pasar Gede Harjonagoro in Surakarta and the OSM relation uses the same Wikidata entity."
+    },
+    {
+      "external_id": "way/788961693",
+      "wikidata_id": "Q12504183",
+      "commons_file": "File:Pelabuhan Petikemas Trisakti di Sungai Barito, Banjarmasin - panoramio.jpg",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/way/788961693",
+      "note": "The file description names Trisakti container port in Banjarmasin and its camera coordinates are about 231 metres from the port geometry."
+    },
+    {
+      "external_id": "way/317545071",
+      "wikidata_id": "Q38251098",
+      "commons_file": "File:Soekarno—Hatta Port, Makassar.jpg",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/way/317545071",
+      "note": "The Commons file depicts Soekarno-Hatta Port in Makassar; camera and OSM coordinates differ by about 78 metres."
+    },
+    {
+      "external_id": "way/32388775",
+      "wikidata_id": "Q12486840",
+      "commons_file": "File:Istana Plaza Bandung 2024.png",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/way/32388775",
+      "note": "The file name, facade, and Bandung location match Istana Plaza; OSM, Wikidata, and camera coordinates differ by roughly 11-13 metres."
+    },
+    {
+      "external_id": "way/754594651",
+      "wikidata_id": "Q134888768",
+      "commons_file": "File:Main atrium of Living World Kota Wisata.jpg",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/way/754594651",
+      "note": "The Commons description names the Living World Kota Wisata atrium in Ciangsana and coordinates differ by about 52 metres."
+    },
+    {
+      "external_id": "way/97550317",
+      "wikidata_id": "Q12512232",
+      "commons_file": "File:Jakarta Sarinah.JPG",
+      "physical_poi_verified": true,
+      "approved_by": "Lajukan OSM-Wikidata-Commons data review 2026-07-30",
+      "approved_at": "2026-07-30T10:05:00.000Z",
+      "evidence_url": "https://www.openstreetmap.org/way/97550317",
+      "note": "The file depicts the same Sarinah landmark building in Jakarta and its coordinates are about 91 metres from the OSM geometry."
+    }
+  ]
+}

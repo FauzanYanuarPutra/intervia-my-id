@@ -2285,7 +2285,7 @@ export default function PaymentsPage() {
                       : 'Masukkan nominal'}
                   </p>
                   <div
-                    className={`${PAYMENT_AMOUNT_FIELD_CLASS} sm:min-h-[62px] sm:px-4`}
+                    className={`${PAYMENT_AMOUNT_FIELD_CLASS} sm:min-h-[62px] sm:px-2`}
                   >
                     <span className="text-lg font-bold text-[color:var(--app-accent)]">
                       Rp
