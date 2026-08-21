@@ -2,7 +2,8 @@ defmodule ChatService.Security do
   @forbidden_patterns [
     ~r/(?i)password/,
     ~r/(?i)transfer.*money/,
-    ~r/http:\/\/[^\s]+/ # Unsafe links
+    # Unsafe links
+    ~r/http:\/\/[^\s]+/
   ]
 
   def scan_content(body) do
