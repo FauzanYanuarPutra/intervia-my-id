@@ -28,7 +28,7 @@ dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 
-lapin = "3.7.1"
+lapin = "4.1.0"
 
 argon2 = "0.5"
 bcrypt = "0.15"
