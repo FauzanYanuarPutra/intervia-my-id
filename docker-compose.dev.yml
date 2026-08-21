@@ -133,7 +133,7 @@ services:
   # Local email/OTP flows expect SMTP_HOST=mailhog. Keep MailHog in the default
   # development stack; production/staging still inherit the base profile gate.
   mailhog:
-    profiles: []
+    profiles: !reset []
     ports:
       - "127.0.0.1:${PORT_MAILHOG_SMTP:-1025}:1025"
       - "127.0.0.1:${PORT_MAILHOG_UI:-8025}:8025"
