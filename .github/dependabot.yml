@@ -1,0 +1,85 @@
+version: 2
+
+updates:
+  # Frontend layout on the current repository. When Stage 03 converts frontend/
+  # into a root npm workspace, collapse these directories into /frontend.
+  - package-ecosystem: npm
+    directories:
+      - /frontend/apps/www
+      - /frontend/apps/usaha
+      - /frontend/apps/cms
+      - /frontend/apps/crm
+      - /frontend/packages
+    schedule:
+      interval: weekly
+      day: monday
+      time: "02:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 10
+    groups:
+      frontend-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - frontend
+
+  - package-ecosystem: cargo
+    directories:
+      - /services/identity_service
+      - /services/marketplace_service
+      - /services/community_service
+      - /services/ai_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 10
+    groups:
+      rust-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - rust
+
+  - package-ecosystem: mix
+    directory: /services/chat_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - elixir
+
+  - package-ecosystem: pip
+    directories:
+      - /services/ocr_service
+      - /services/liveness_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci

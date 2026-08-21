@@ -1,0 +1,128 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        type: choice
+        required: true
+        options:
+          - staging
+          - production
+      image_tag:
+        description: Immutable image tag, for example sha-<40-char-git-sha>
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate immutable tag
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
+            echo "image_tag must be sha- followed by the full 40-character commit SHA." >&2
+            exit 1
+          fi
+
+      - name: Prepare SSH
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Package deployment contract
+        shell: bash
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          overlay="docker-compose.${TARGET_ENV}.yml"
+          if [[ "$TARGET_ENV" == "production" ]]; then
+            overlay="docker-compose.prod.yml"
+          fi
+          tar -czf /tmp/lajukan-deploy.tgz \
+            docker-compose.yml \
+            "$overlay" \
+            infrastructure/caddy \
+            services/chat_service/priv/scylladb
+
+      - name: Upload deployment contract
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          scp -P "$port" /tmp/lajukan-deploy.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/lajukan-deploy.tgz"
+
+      - name: Apply deployment
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DOCKERHUB_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          TARGET_ENV: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' TARGET_ENV='$TARGET_ENV' IMAGE_TAG='$IMAGE_TAG' DOCKERHUB_NAMESPACE='$DOCKERHUB_NAMESPACE' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          mkdir -p "$DEPLOY_PATH"
+          tar -xzf /tmp/lajukan-deploy.tgz -C "$DEPLOY_PATH"
+          rm -f /tmp/lajukan-deploy.tgz
+          cd "$DEPLOY_PATH"
+
+          if [[ "$TARGET_ENV" == "production" ]]; then
+            overlay="docker-compose.prod.yml"
+            env_file=".env.production"
+          else
+            overlay="docker-compose.staging.yml"
+            env_file=".env.staging"
+          fi
+
+          [[ -f "$env_file" ]] || {
+            echo "Missing server-managed $DEPLOY_PATH/$env_file" >&2
+            exit 1
+          }
+
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_NAMESPACE" --password-stdin
+
+          export IMAGE_TAG DOCKERHUB_NAMESPACE
+          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" config --quiet
+          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" pull
+          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" up -d --remove-orphans
+          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" ps
+          REMOTE

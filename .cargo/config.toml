@@ -1,5 +1,6 @@
-[build]
-target-dir = "D:/lajukan/intervia-my-id/.cache/cargo-target"
-
 [registries.crates-io]
 protocol = "sparse"
+
+[net]
+retry = 3
+git-fetch-with-cli = true

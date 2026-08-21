@@ -1,75 +1,120 @@
 services:
   identity_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-identity:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-identity:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: staging
       APP_ENV: staging
       RUST_LOG: ${RUST_LOG:-info}
 
   marketplace_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-marketplace:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-marketplace:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: staging
       APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-info}
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
+      ORDER_ENGINE_API_ENABLED: ${ORDER_ENGINE_API_ENABLED:-false}
+      WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
+      WALLET_DEV_AUTO_SETTLE: "false"
+      WALLET_ALLOW_LIVE_IN_NON_PROD: "false"
+      WALLET_ALLOW_MOCK_IN_LIVE: "false"
+      WALLET_MIDTRANS_FALLBACK_TO_MOCK: "false"
 
   community_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-community:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-community:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: staging
       APP_ENV: staging
-      APP_PORT: "8082"
-      COMMUNITY_UPLOAD_DIR: /app/uploads/forum
-      COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
-
-  ai_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-ai:${IMAGE_TAG:-staging}
-    environment:
-      ENV: staging
-      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-info}
 
   chat_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-chat:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-chat:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      PHX_HOST: ${PHX_HOST:-staging.lajukan.com}
+
+  ai_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-ai:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: staging
       APP_ENV: staging
 
   ocr_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-ocr:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-ocr:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
 
   liveness_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-liveness:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-liveness:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
 
   www:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-www:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-www:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: staging
       APP_ENV: staging
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: staging
-      INTERNAL_COMMUNITY_URL: http://community_service:8082
-      COMMUNITY_SERVICE_URL: http://community_service:8082
-
-  usaha:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-usaha:${IMAGE_TAG:-staging}
-    environment:
-      ENV: staging
-      APP_ENV: staging
-      NODE_ENV: production
-      NEXT_PUBLIC_APP_ENV: staging
-      INTERNAL_COMMUNITY_URL: http://community_service:8082
-      COMMUNITY_SERVICE_URL: http://community_service:8082
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://staging.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://staging.lajukan.com}
 
   cms:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-cms:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-cms:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
+      ENV: staging
+      APP_ENV: staging
       NODE_ENV: production
+      NEXT_PUBLIC_APP_ENV: staging
 
   crm:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-crm:${IMAGE_TAG:-staging}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-crm:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
+      ENV: staging
+      APP_ENV: staging
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lajukan.com}
-      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
-      NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-https://crm.lajukan.com}
-      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-https://api.lajukan.com}
-      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://www.lajukan.com}
+      NEXT_PUBLIC_APP_ENV: staging
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.staging.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://staging.lajukan.com}
+      NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-https://crm.staging.lajukan.com}
+      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-https://api.staging.lajukan.com}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.staging.lajukan.com}
+
+  usaha:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-usaha:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_ENV: staging
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.staging.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://staging.lajukan.com}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.staging.lajukan.com}
+
+  caddy:
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-staging.lajukan.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-ops@lajukan.com}
+    volumes:
+      - ./infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config

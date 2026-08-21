@@ -1,7 +1,8 @@
 services:
   identity_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-identity:${IMAGE_TAG:-latest}
-    ports: !reset []
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-identity:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: production
       APP_ENV: production
@@ -10,25 +11,23 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
 
   marketplace_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-marketplace:${IMAGE_TAG:-latest}
-    ports: !reset []
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-marketplace:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: production
       APP_ENV: production
-      APP_PORT: "8081"
+      RUST_LOG: ${RUST_LOG:-warn}
       FRONTEND_URL: ${FRONTEND_URL:-https://www.lajukan.com}
-      # Financial and generic-order surfaces must be enabled deliberately only
-      # after provider credentials, webhook verification, and reconciliation
-      # alerts have passed the production runbook.
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
-      WALLET_DEFAULT_ENV: ${WALLET_DEFAULT_ENV:-development}
-      WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
       ORDER_ENGINE_API_ENABLED: ${ORDER_ENGINE_API_ENABLED:-false}
+      WALLET_DEFAULT_ENV: ${WALLET_DEFAULT_ENV:-production}
+      WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
       WALLET_DEFAULT_PROVIDER: ${WALLET_DEFAULT_PROVIDER:-midtrans}
-      WALLET_DEV_AUTO_SETTLE: ${WALLET_DEV_AUTO_SETTLE:-false}
-      WALLET_ALLOW_LIVE_IN_NON_PROD: ${WALLET_ALLOW_LIVE_IN_NON_PROD:-false}
-      WALLET_ALLOW_MOCK_IN_LIVE: ${WALLET_ALLOW_MOCK_IN_LIVE:-false}
-      WALLET_MIDTRANS_FALLBACK_TO_MOCK: ${WALLET_MIDTRANS_FALLBACK_TO_MOCK:-false}
+      WALLET_DEV_AUTO_SETTLE: "false"
+      WALLET_ALLOW_LIVE_IN_NON_PROD: "false"
+      WALLET_ALLOW_MOCK_IN_LIVE: "false"
+      WALLET_MIDTRANS_FALLBACK_TO_MOCK: "false"
       MIDTRANS_MERCHANT_ID: ${MIDTRANS_MERCHANT_ID:-}
       MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
       MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
@@ -44,64 +43,80 @@ services:
       WALLET_MIDTRANS_ERROR_REDIRECT_URL: ${WALLET_MIDTRANS_ERROR_REDIRECT_URL:-https://www.lajukan.com/id/payments}
 
   community_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-community:${IMAGE_TAG:-latest}
-    ports: !reset []
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-community:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: production
       APP_ENV: production
-      APP_PORT: "8082"
+      RUST_LOG: ${RUST_LOG:-warn}
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum
       COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
       INTERNAL_API_URL: http://identity_service:8080
 
   ai_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-ai:${IMAGE_TAG:-latest}
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-ai:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: production
       APP_ENV: production
 
+  ocr_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-ocr:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+
+  liveness_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-liveness:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+
   chat_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-chat:${IMAGE_TAG:-latest}
-    ports: !reset []
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-chat:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: production
       APP_ENV: production
-      SCYLLA_NODES: ${SCYLLA_NODES:?SCYLLA_NODES must point to a production Scylla cluster}
+      PHX_HOST: ${PHX_HOST:-lajukan.com}
+      SCYLLA_NODES: ${SCYLLA_NODES:?SCYLLA_NODES must point to the production Scylla cluster}
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:4000/api/ready" ]
+      test: ["CMD", "curl", "-fsS", "http://localhost:4000/api/ready"]
     depends_on: !override
       redis_cache: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
       scylla_migrate: { condition: service_completed_successfully }
 
+  scylla_db:
+    profiles: [development-database]
+
+  scylla_keyspace_setup:
+    profiles: [development-database]
+
   scylla_migrate:
-    image: scylladb/scylla:2025.2
+    image: ${SCYLLA_IMAGE:-scylladb/scylla:2025.2}
     restart: "no"
     environment:
-      SCYLLA_NODES: ${SCYLLA_NODES:?SCYLLA_NODES must point to a production Scylla cluster}
+      SCYLLA_NODES: ${SCYLLA_NODES:?SCYLLA_NODES must point to the production Scylla cluster}
       SCYLLA_PORT: ${SCYLLA_PORT:-9042}
       SCYLLA_USERNAME: ${SCYLLA_USERNAME:-}
       SCYLLA_PASSWORD: ${SCYLLA_PASSWORD:-}
       SCYLLA_SSL: ${SCYLLA_SSL:-0}
     volumes:
       - ./services/chat_service/priv/scylladb:/scylladb:ro
-    entrypoint: [ "/bin/sh", "-c" ]
+    entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        sed 's/\r$$//' /scylladb/run_migrations.sh > /tmp/run_chat_migrations.sh
+        set -e
+        sed 's/\r$//' /scylladb/run_migrations.sh > /tmp/run_chat_migrations.sh
         exec /bin/sh /tmp/run_chat_migrations.sh
-    networks:
-      - web
-
-  ocr_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-ocr:${IMAGE_TAG:-latest}
-
-  liveness_service:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-liveness:${IMAGE_TAG:-latest}
+    networks: [app, data]
 
   www:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-www:${IMAGE_TAG:-latest}
-    ports: !reset []
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-www:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: production
       APP_ENV: production
@@ -111,20 +126,41 @@ services:
       NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
-      KYC_AUTOMATED_APPROVAL_ENABLED: ${KYC_AUTOMATED_APPROVAL_ENABLED:-false}
       EMAIL_TRANSPORT: smtp
       SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required in production}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:?SMTP_USER is required in production}
       SMTP_PASS: ${SMTP_PASS:?SMTP_PASS is required in production}
-      INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
-      MARKETPLACE_URL: http://marketplace_service:8081
-      INTERNAL_COMMUNITY_URL: http://community_service:8082
-      COMMUNITY_SERVICE_URL: http://community_service:8082
+
+  cms:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-cms:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: production
+      APP_ENV: production
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_ENV: production
+
+  crm:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-crm:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: production
+      APP_ENV: production
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
+      NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-https://crm.lajukan.com}
+      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-https://api.lajukan.com}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.lajukan.com}
 
   usaha:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-usaha:${IMAGE_TAG:-latest}
-    ports: !reset []
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-usaha:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
     environment:
       ENV: production
       APP_ENV: production
@@ -138,66 +174,12 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:?SMTP_USER is required in production}
       SMTP_PASS: ${SMTP_PASS:?SMTP_PASS is required in production}
-      INTERNAL_COMMUNITY_URL: http://community_service:8082
-      COMMUNITY_SERVICE_URL: http://community_service:8082
-
-  cms:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-cms:${IMAGE_TAG:-latest}
-    ports: !reset []
-    environment:
-      NODE_ENV: production
-
-  crm:
-    image: ${DOCKERHUB_NAMESPACE}/lajukan-crm:${IMAGE_TAG:-latest}
-    ports: !reset []
-    environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lajukan.com}
-      NEXT_PUBLIC_IDENTITY_API_URL: /api/identity
-      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
-      NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-https://crm.lajukan.com}
-      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-https://api.lajukan.com}
-      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://www.lajukan.com}
-
-  identity_db:
-    ports: !reset []
-
-  # The single-node developer Scylla bundled in the base stack is intentionally
-  # excluded from production. Production chat must use SCYLLA_NODES and a
-  # separately operated, backed-up multi-node cluster.
-  scylla_db:
-    profiles: ["development-database"]
-
-  scylla_keyspace_setup:
-    profiles: ["development-database"]
-
-  community_db:
-    ports: !reset []
-
-  marketplace_db:
-    ports: !reset []
-
-  minio:
-    ports: !reset []
-
-  mailhog:
-    profiles: ["development-tools"]
-    ports: !reset []
-
-  pgadmin:
-    profiles: ["development-tools"]
-    ports: !reset []
-
-  db_ui:
-    profiles: ["development-tools"]
-    ports: !reset []
-
-  ollama:
-    ports: !reset []
-
-  cloudflare_tunnel:
-    ports: !reset []
 
   caddy:
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-lajukan.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-ops@lajukan.com}
     volumes:
       - ./infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config

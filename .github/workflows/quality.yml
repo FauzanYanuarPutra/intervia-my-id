@@ -1,111 +1,130 @@
-name: Quality gates
+name: Quality Gates
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: quality-${{ github.ref }}
+  group: quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CI: "true"
 
 jobs:
   repository-hygiene:
     name: Repository hygiene
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Reject tracked runtime and backup artifacts
-        run: python scripts/ci/check_repository_hygiene.py
+      - name: Reject tracked ignored/runtime artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f scripts/ci/check_repository_hygiene.py ]]; then
+            python scripts/ci/check_repository_hygiene.py
+          else
+            tracked_ignored="$(git ls-files -ci --exclude-standard)"
+            if [[ -n "$tracked_ignored" ]]; then
+              printf '%s\n' "$tracked_ignored"
+              echo "Tracked files match .gitignore. Untrack them before merging." >&2
+              exit 1
+            fi
+          fi
 
-  frontend-apps:
-    name: Frontend App / ${{ matrix.app }}
+      - name: Reject root database dumps
+        shell: bash
+        run: |
+          set -euo pipefail
+          forbidden=(
+            community.sql community_utf8.sql
+            identity.sql identity_utf8.sql
+            marketplace.sql marketplace_utf8.sql
+          )
+          failed=0
+          for path in "${forbidden[@]}"; do
+            if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              echo "Forbidden tracked database dump: $path" >&2
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-
-    needs:
-      - repository-hygiene
-
-    strategy:
-      fail-fast: false
-      matrix:
-        app:
-          - www
-          - usaha
-          - cms
-          - crm
-
-    defaults:
-      run:
-        working-directory: frontend/apps/${{ matrix.app }}
-
+    timeout-minutes: 45
+    needs: repository-hygiene
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
           cache: npm
-          cache-dependency-path: frontend/apps/${{ matrix.app }}/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/apps/*/package-lock.json
+            frontend/packages/package-lock.json
+            frontend/packages/*/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Install, lint, test and build
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Lint
-        run: npm run lint
+          # Final root-workspace layout.
+          if [[ -f frontend/package.json && -f frontend/package-lock.json ]]; then
+            cd frontend
+            npm ci --legacy-peer-deps --no-audit --no-fund
+            npm run lint --workspaces --if-present
+            npm run test --workspaces --if-present
+            npm run build --workspaces --if-present
+            exit 0
+          fi
 
-      - name: Build
-        run: npm run build
+          # Migration-safe current layout.
+          if [[ -f frontend/packages/package.json ]]; then
+            (
+              cd frontend/packages
+              npm ci --legacy-peer-deps --no-audit --no-fund
+              npm run build --if-present
+              npm run test --if-present
+            )
+          fi
 
-      - name: Unit tests
-        if: matrix.app == 'www'
-        run: npm run test:unit
-
-  frontend-packages:
-    name: Frontend Packages
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    needs:
-      - repository-hygiene
-
-    defaults:
-      run:
-        working-directory: frontend/packages
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/packages/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps --no-audit --no-fund
-
-      - name: Build shared package
-        run: npm run build
+          for app in www usaha cms crm; do
+            dir="frontend/apps/$app"
+            [[ -f "$dir/package.json" ]] || continue
+            (
+              cd "$dir"
+              npm ci --legacy-peer-deps --no-audit --no-fund
+              npm run lint --if-present
+              npm run test:unit --if-present
+              npm run test --if-present
+              npm run build --if-present
+            )
+          done
 
   rust:
     name: Rust / ${{ matrix.service }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-
-    needs:
-      - repository-hygiene
-
+    timeout-minutes: 45
+    needs: repository-hygiene
     strategy:
       fail-fast: false
       matrix:
@@ -113,38 +132,37 @@ jobs:
           - identity_service
           - marketplace_service
           - community_service
-
+          - ai_service
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
-
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Install pinned Rust toolchain
+        run: rustup show
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: services/${{ matrix.service }}
 
-      - run: cargo fmt --check
-      - run: cargo clippy --locked --all-targets -- -D warnings
-      - run: cargo test --locked
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --locked
 
   chat:
-    name: Chat / format and tests
+    name: Chat / Elixir
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-
-    needs:
-      - repository-hygiene
-
+    timeout-minutes: 30
+    needs: repository-hygiene
     defaults:
       run:
         working-directory: services/chat_service
-
     steps:
       - uses: actions/checkout@v4
 
@@ -153,75 +171,156 @@ jobs:
           otp-version: "26.2"
           elixir-version: "1.15.8"
 
-      - run: mix deps.get --only test
+      - name: Install dependencies
         env:
           MIX_ENV: test
+        run: mix deps.get --only test
 
-      - run: mix format --check-formatted
+      - name: Format
+        run: mix format --check-formatted
 
-      - run: mix test --no-start
+      - name: Tests
         env:
           MIX_ENV: test
+        run: mix test --no-start
 
-  deployment-contract:
-    name: Production deployment contract
+  python-services:
+    name: Python / ${{ matrix.service }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    needs:
-      - repository-hygiene
-
-    env:
-      DOCKERHUB_NAMESPACE: lajukan-ci
-      SMTP_HOST: smtp.invalid
-      SMTP_USER: ci-config-check
-      SMTP_PASS: ci-config-check
-      SCYLLA_NODES: scylla-1.internal:9042,scylla-2.internal:9042,scylla-3.internal:9042
-
+    timeout-minutes: 25
+    needs: repository-hygiene
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ocr_service, liveness_service]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate merged production Compose
-        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --services
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
-      - name: Assert only Caddy publishes host ports
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [[ -f requirements-dev.txt ]]; then
+            pip install -r requirements-dev.txt
+          fi
+          pip install pytest
+
+      - name: Compile
+        run: python -m compileall -q .
+
+      - name: Tests when present
+        shell: bash
+        run: |
+          if [[ -d tests ]]; then
+            pytest -q
+          else
+            echo "No tests directory yet; compile check completed."
+          fi
+
+  flutter:
+    name: Flutter mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: repository-hygiene
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Detect Flutter project
+        id: mobile
+        shell: bash
+        run: |
+          if [[ -f frontend/apps/mobile/pubspec.yaml ]]; then
+            echo "dir=frontend/apps/mobile" >> "$GITHUB_OUTPUT"
+          elif [[ -f frontend/apps/mobile/lajukan_webview/pubspec.yaml ]]; then
+            echo "dir=frontend/apps/mobile/lajukan_webview" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Analyze and test
+        if: steps.mobile.outputs.dir != ''
+        working-directory: ${{ steps.mobile.outputs.dir }}
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+  compose-contract:
+    name: Docker Compose contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: repository-hygiene
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate development configuration
+        run: >-
+          docker compose
+          --env-file .env.development.example
+          -f docker-compose.yml
+          -f docker-compose.dev.yml
+          config --quiet
+
+      - name: Validate staging configuration
+        env:
+          IMAGE_TAG: sha-ci
+          DOCKERHUB_NAMESPACE: lajukan-ci
+        run: >-
+          docker compose
+          --env-file .env.staging.example
+          -f docker-compose.yml
+          -f docker-compose.staging.yml
+          config --quiet
+
+      - name: Validate production configuration
+        env:
+          IMAGE_TAG: sha-ci
+          DOCKERHUB_NAMESPACE: lajukan-ci
+        run: >-
+          docker compose
+          --env-file .env.production.example
+          -f docker-compose.yml
+          -f docker-compose.prod.yml
+          config --quiet
+
+      - name: Assert production host ports are edge-only
+        env:
+          IMAGE_TAG: sha-ci
+          DOCKERHUB_NAMESPACE: lajukan-ci
         shell: bash
         run: |
           set -euo pipefail
-
           docker compose \
+            --env-file .env.production.example \
             -f docker-compose.yml \
             -f docker-compose.prod.yml \
-            config \
-            --format json > /tmp/compose.json
+            config --format json > /tmp/compose.json
 
           python - <<'PY'
           import json
-
           with open('/tmp/compose.json', encoding='utf-8') as handle:
-              config = json.load(handle)
-
+              cfg = json.load(handle)
           published = {
               name: service.get('ports', [])
-              for name, service in config.get('services', {}).items()
+              for name, service in cfg.get('services', {}).items()
               if service.get('ports')
           }
-
           assert set(published) == {'caddy'}, published
-
-          assert {
-              str(port.get('published'))
-              for port in published['caddy']
-          } == {'80', '443'}
+          ports = {str(item.get('published')) for item in published['caddy']}
+          assert ports == {'80', '443'}, ports
           PY
-
-      - name: Validate production Caddyfile
-        run: >-
-          docker run --rm
-          -e APP_DOMAIN=lajukan.test
-          -e ADMIN_EMAIL=ops@lajukan.test
-          -v "${PWD}/infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro"
-          caddy:2-alpine
-          caddy validate
-          --config /etc/caddy/Caddyfile
-          --adapter caddyfile

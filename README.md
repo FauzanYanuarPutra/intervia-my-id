@@ -1,98 +1,216 @@
 # Lajukan
 
-Lajukan is a compact marketplace and super-app for jobs, services, property, rentals (pinjam/meminjamkan), and UMKM. The UI is optimized for ultra-compact density and fast scanning, with Trust Center pages for policy and safety.
+Lajukan is a modular monorepo for an Indonesian UMKM super-app: marketplace, services, business discovery, community, chat, business operations, and AI-assisted workflows.
 
-## Repo layout
-- `frontend/www`: main web app
-- `frontend/cms`, `frontend/crm`: internal panels
-- `backend`: services and APIs
-- `docker-compose.yml`: local stack
+This repository intentionally uses a small number of deployable services with clear ownership instead of splitting every domain into a separate microservice.
 
-## Quick start (local)
-1. Copy env: duplicate `.env.example` to `.env` or `.env.development`.
-2. Docker on WSL/Linux: `bash ./up-super-fast.sh`
-3. Docker on Windows PowerShell: `.\up-super-fast.ps1`
-   Local AI/Ollama is included by default in dev mode.
-   Without local AI: `.\up-super-fast.ps1 -NoAi`
-   Lightweight text-only AI: `.\up-super-fast.ps1 -AiTextOnly`
-   Skip AI model check/download: `.\up-super-fast.ps1 -SkipAiModels`
-4. Untuk workflow dev yang lebih hemat storage di Windows:
-   `.\dev-stack.ps1 up` untuk jalan biasa,
-   `.\dev-stack.ps1 fresh` untuk hapus container project + build cache tak terpakai lalu jalan lagi,
-   `.\dev-stack.ps1 nuke` untuk full reset volume/data local lalu jalan lagi.
-5. One-command live frontend dev:
-   PowerShell: `.\dev-live.ps1`
-   WSL/Linux: `bash ./dev-live.sh`
-   Ini akan menyalakan container core yang dibutuhkan lalu menjalankan Next dev server lokal dengan auto-reload.
-   App lain:
-   PowerShell: `.\dev-live.ps1 -App usaha`
-   PowerShell: `.\dev-live.ps1 -App cms`
-   PowerShell: `.\dev-live.ps1 -App crm`
-   Bash: `bash ./dev-live.sh usaha`
-   Bash: `bash ./dev-live.sh cms`
-   Bash: `bash ./dev-live.sh crm`
-   Kalau butuh chat/scylla juga:
-   PowerShell: `.\dev-live.ps1 -FullStack`
-   Bash: `FULL_STACK=1 bash ./dev-live.sh`
-6. Direct compose fallback, only if Docker Compose v2 (`docker compose`) is available:
-   `docker compose --env-file .env.development build identity_service marketplace_service www usaha cms crm && docker compose --env-file .env.development up -d postgres_db redis_cache rabbitmq meilisearch identity_service marketplace_service www usaha cms crm mailhog`
-7. Open the web app based on the ports in `docker-compose.yml`.
+## Repository layout
 
-The `up-super-fast` scripts are the preferred local entrypoint because they serialize builds and warm missing base images first. That avoids common WSL/Docker Hub DNS timeouts during multi-service `docker compose build`.
-Untuk development di Windows, `dev-stack.ps1` adalah wrapper yang lebih aman dipakai dibanding `docker compose up -d --build` langsung karena build hanya dilakukan saat perlu dan ada mode cleanup yang eksplisit.
+```text
+frontend/
+  apps/          # www, usaha, cms, crm, mobile
+  packages/      # shared frontend code while workspace migration is in progress
+services/
+  identity_service/
+  marketplace_service/
+  community_service/
+  chat_service/
+  ai_service/
+  ocr_service/
+  liveness_service/
+infrastructure/
+  caddy/
+  observability/
+scripts/
+  ci/
+  maintenance/
+docs/
+  architecture/
+  engineering/
+  operations/
+  security/
+```
 
-Important for WSL/Linux:
-- Do not use legacy `docker-compose` v1 directly for this repo if you can avoid it. It can fail during recreate with `KeyError: 'ContainerConfig'`, especially on `www`, `usaha`, `cms`, and `crm`.
-- Prefer `bash ./up-super-fast.sh` or `docker compose ...`.
-- If you are stuck on `docker-compose` v1 and hit that error, remove the stale service containers first, then start again:
-  `bash ./legacy-compose-cleanup.sh www usaha cms crm`
-  `docker-compose up -d www usaha cms crm`
-- To clear every stale container in the project before retrying:
-  `bash ./legacy-compose-cleanup.sh --all`
-  `bash ./up-super-fast.sh`
+The target architecture and repository rules live in `docs/architecture/` and `AGENTS.md`.
 
-Important for Windows PowerShell:
-- Prefer `.\up-super-fast.ps1` or `.\dev-stack.ps1 up`.
-- If legacy `docker-compose` recreate gets stuck, remove the stale containers first:
-  `.\legacy-compose-cleanup.ps1 -Services cms,crm`
-  `docker-compose up -d cms crm`
+## Prerequisites
 
-Default local startup sekarang memakai stack inti yang lebih ringan:
-`postgres_db`, `redis_cache`, `rabbitmq`, `meilisearch`, `identity_service`, `marketplace_service`, `www`, `cms`, `crm`, `mailhog`.
+- Git
+- Docker Desktop / Docker Engine with Docker Compose v2
+- PowerShell 5.1+ on Windows or Bash on Linux/WSL
+- Rust is only required for running Rust services outside Docker
+- Node.js is only required for running Next.js apps outside Docker
+- Elixir/Erlang is only required for running Chat outside Docker
+- Python is only required for running OCR/Liveness outside Docker
 
-Service berat dinyalakan manual hanya saat perlu, misalnya:
-- Bash: `bash ./up-super-fast.sh scylla_db scylla_keyspace_setup chat_service ai_service ocr_service liveness_service minio qdrant`
-- PowerShell: `.\up-super-fast.ps1 -Services scylla_db,scylla_keyspace_setup,chat_service,ai_service,ocr_service,liveness_service,minio,qdrant`
+## First local start
 
-## Frontend (manual)
-- `cd frontend/www`
-- `npm install`
-- `npm run dev`
-- `npm run lint`
+Create the local environment file:
 
-## CRM role
-- `frontend/crm` is the operational command center, not just a sales list.
-- Use CRM to handle 4 lanes from `frontend/www`: lead intake from listings/chat/orders, support and dispute handling, trust policy approvals, and fraud/risk review.
-- Sensitive CRM actions should require 2-step verification, especially trust profile changes, manual holds, and risky order status updates.
-- CRM decisions should always read WWW identity signals such as KTP OCR, liveness, transaction eligibility, trust profile, chat context, and ticket history.
+### Windows PowerShell
 
-## Core flows
-- **Search**: grouped filters (jobs, freelancer, products/services, property, rentals, UMKM).
-- **Create**: compact form with optional fields in accordions.
-- **Trust**: `/[locale]/trust` and topic pages for policies and safety.
+```powershell
+Copy-Item .env.development.example .env.development
+.\up.ps1
+```
 
-## UMKM commerce
-- UMKM storefront supports online + offline orders.
-- Products can be configured as physical or digital.
-- Online checkout now supports fulfillment modes: courier/expedition, pickup, and digital delivery.
-- Shipping fee estimation is configurable with `UMKM_SHIPPING_*` environment variables.
+### Linux / WSL
 
-## UX rules
-- 1 title + 1 short paragraph + max 3 CTAs in hero.
-- Use global CSS tokens (`--app-*`, `ui-*` utilities) for colors.
-- Long details go behind expanders or subpages.
+```bash
+cp .env.development.example .env.development
+./up.sh
+```
 
-## Performance and security notes
-- Prefer debounced search and compact payloads.
-- Use server endpoints for sensitive actions (export data, delete account).
-- Keep color themes centralized via CSS variables.
+The default development stack starts the core data layer, backend services and frontends. Optional capabilities are enabled with profiles.
+
+Examples:
+
+```powershell
+.\up.ps1 -Profile ai
+.\up.ps1 -Profile kyc
+.\up.ps1 -Profile devtools
+.\up.ps1 -Profile edge
+.\up.ps1 -Profile ai,kyc,devtools
+```
+
+```bash
+./up.sh --profile ai
+./up.sh --profile kyc
+./up.sh --profile devtools
+./up.sh --profile edge
+./up.sh --profile ai --profile kyc --profile devtools
+```
+
+To rebuild images:
+
+```powershell
+.\up.ps1 -Build
+```
+
+```bash
+./up.sh --build
+```
+
+To stop the development stack without deleting volumes:
+
+```powershell
+.\up.ps1 -Down
+```
+
+```bash
+./up.sh --down
+```
+
+`-Fresh` / `--fresh` recreates containers but intentionally preserves volumes. Database deletion must always be a separate explicit operation.
+
+## Environments
+
+| Environment | Env file | Compose files |
+| --- | --- | --- |
+| development | `.env.development` | `docker-compose.yml` + `docker-compose.dev.yml` |
+| staging | `.env.staging` | `docker-compose.yml` + `docker-compose.staging.yml` |
+| production | `.env.production` | `docker-compose.yml` + `docker-compose.prod.yml` |
+
+Environment files containing real credentials are local/server-managed and must never be committed.
+
+Staging and production deploy immutable application image tags such as:
+
+```text
+sha-0123456789abcdef0123456789abcdef01234567
+```
+
+`latest` is deliberately not part of the deployment contract.
+
+## Development ports
+
+Development ports bind to `127.0.0.1` by default. Caddy is opt-in via the `edge` profile.
+
+Common defaults:
+
+| Component | Port |
+| --- | ---: |
+| WWW | 3000 |
+| CMS | 3001 |
+| CRM | 3002 |
+| Usaha | 3003 |
+| Chat | 4000 |
+| Identity | 8080 |
+| Marketplace | 8081 |
+| Community | 8082 |
+| AI gateway | 8084 |
+| OCR | 8001 |
+| Liveness | 8002 |
+| Meilisearch | 7700 |
+| RabbitMQ UI | 15672 |
+| MailHog UI | 8025 |
+
+## Core architecture rules
+
+1. Each service owns its own data.
+2. Services do not query another service's database directly.
+3. Postgres is the source of truth for transactional domains; Meilisearch is a rebuildable projection.
+4. Schema changes go through versioned migrations, not runtime `CREATE TABLE` business DDL.
+5. Already-applied migrations are immutable.
+6. Seed/reference data is not the same thing as a database dump.
+7. Request handlers stay thin; business logic belongs in service/domain modules.
+8. Object-level authorization must be enforced server-side.
+9. Financial writes require explicit invariants, transactions and idempotency.
+10. Runtime state, generated audits, caches, database dumps and user uploads do not belong in Git.
+
+## Quality checks
+
+Repository quality gates live in `.github/workflows/quality.yml`.
+
+Useful local checks:
+
+```bash
+python scripts/ci/check_repository_hygiene.py
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+```
+
+Compose validation:
+
+```bash
+docker compose --env-file .env.development -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+```
+
+Production contract validation can be run with a non-secret template:
+
+```bash
+IMAGE_TAG=sha-ci DOCKERHUB_NAMESPACE=lajukan-ci \
+  docker compose \
+  --env-file .env.production.example \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  config --quiet
+```
+
+## Security
+
+Never commit:
+
+- `.env*` files containing real secrets
+- database dumps
+- production/user uploads
+- private keys or tokens
+- `.runtime/`, `.cache/`, `.backups/`
+- generated screenshots or audit output
+
+Production wallet/payment surfaces remain disabled until provider credentials, webhook verification, reconciliation, alerting and rollback procedures have passed their runbook.
+
+## Documentation
+
+Start here:
+
+- `docs/README.md`
+- `docs/architecture/repository-map.md`
+- `docs/architecture/api-map.md`
+- `docs/architecture/event-map.md`
+- `docs/architecture/database-map.md`
+- `docs/architecture/deployment-architecture.md`
+
+## License / ownership
+
+This repository is project-specific. Add the final legal/license file only after ownership and distribution terms are explicitly decided.

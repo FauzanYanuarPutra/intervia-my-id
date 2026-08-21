@@ -1,39 +1,44 @@
-# ------------------------------------------------------------
-# OS / Editor
-# ------------------------------------------------------------
+# =============================================================================
+# Lajukan repository ignore rules
+# =============================================================================
+
+# OS / editors
 .DS_Store
 Thumbs.db
 Desktop.ini
-
 *.swp
 *.swo
 *.tmp
-*.bak
 *.orig
-
+*.iml
 .vscode/
 .idea/
-*.iml
 
-
-# ------------------------------------------------------------
-# Environment / Secrets
-# ------------------------------------------------------------
+# Environment / secrets
 .env
 .env.*
-
 !.env.example
+!.env.development.example
 !.env.staging.example
 !.env.production.example
-
 .npmrc
 
-
-# ------------------------------------------------------------
-# Local Backups / Database Dumps
-# ------------------------------------------------------------
+# Local runtime, cache, recovery and generated audit output
+/.runtime/
+/.cache/
 /.backups/
+/audit_output/
+**/.runtime/
+**/.cache/
+**/.npm-cache/
 
+# Historical root database dumps: migrations remain allowed elsewhere.
+/community.sql
+/community_utf8.sql
+/identity.sql
+/identity_utf8.sql
+/marketplace.sql
+/marketplace_utf8.sql
 *.dump
 *.dump.gz
 *.backup
@@ -41,133 +46,95 @@ Desktop.ini
 *.sql.gz
 *.sql.bak
 
-# IMPORTANT:
-# Jangan ignore semua *.sql.
-# Migration, schema, dan deterministic seed memang boleh berada di Git.
-
-
-# ------------------------------------------------------------
-# Runtime / Temporary State
-# ------------------------------------------------------------
-/.runtime/
-**/.runtime/
-
-**/tmp/
-**/temp/
-
-.tmp/
-.cache/
-
+# Logs / process state
 *.log
+*.pid
+*.pid.lock
+*.cache
+*.temp
+*.old
+*.bak
 
-
-# ------------------------------------------------------------
-# Generated Screenshots / Temporary Media
-# ------------------------------------------------------------
+# Generated screenshots / temporary media
 *.screenshot.png
 *.screenshot.jpg
 *.screenshot.jpeg
 *.screenshot.webp
-
 **/.codex-*.png
 **/.codex-*.jpg
 **/.codex-*.jpeg
 **/.codex-*.webp
-
 **/tmp-*.png
 **/tmp-*.jpg
 **/tmp-*.jpeg
 **/tmp-*.webp
 
-
-# ------------------------------------------------------------
-# Node / Frontend
-# ------------------------------------------------------------
+# Node / Next.js / frontend
 **/node_modules/
-
 **/.next/
 **/dist/
 **/build/
 **/out/
 **/.turbo/
-**/.cache/
 **/.parcel-cache/
 **/.vite/
-**/.npm-cache/
-
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-
 *.tsbuildinfo
 .eslintcache
 .stylelintcache
 
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/coverage/
+**/android/.gradle/
+**/android/local.properties
+**/ios/Pods/
+**/macos/Pods/
 
-# ------------------------------------------------------------
 # Python
-# ------------------------------------------------------------
 **/__pycache__/
-
 *.py[cod]
 *.pyo
-
 .venv/
 venv/
 env/
 ENV/
-
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tox/
+*.egg-info/
 
-
-# ------------------------------------------------------------
 # Rust
-# ------------------------------------------------------------
 **/target/
+*.profraw
+*.profdata
 
-
-# ------------------------------------------------------------
-# Elixir
-# ------------------------------------------------------------
+# Elixir / Erlang
 **/_build/
 **/deps/
-
 erl_crash.dump
 *.ez
 
-
-# ------------------------------------------------------------
-# Docker / Local Infrastructure Data
-# ------------------------------------------------------------
+# Docker / local infrastructure data
 .dockerbuildkit/
-
 docker-data/
-
-qdrant_storage/
 postgres_data/
 redis_data/
+rabbitmq_data/
 scylla_data/
 minio_data/
 meili_data/
+qdrant_storage/
 ollama_data/
 caddy_data/
 caddy_config/
-rabbitmq_data/
-
-data/generated/
-
-.docker-build-state
-.docker-build-state.*
-**/.docker-build-state
-**/.docker-build-state.*
-
-
-# ------------------------------------------------------------
-# Local Database / Infrastructure Volumes
-# ------------------------------------------------------------
 **/postgres_data/
 **/redis_data/
 **/rabbitmq_data/
@@ -178,42 +145,25 @@ data/generated/
 **/ollama_data/
 **/caddy_data/
 **/caddy_config/
+data/generated/
+.docker-build-state
+.docker-build-state.*
+**/.docker-build-state
+**/.docker-build-state.*
 
-
-# ------------------------------------------------------------
-# Large Local VM / Docker / WSL Files
-# ------------------------------------------------------------
+# VM / WSL / Docker Desktop images
 *.vhd
 *.vhdx
-
 AppDataLocalDockerwsldataext4.vhdx
-
 ubuntu.tar
 *.tar.tmp
 
-
-# ------------------------------------------------------------
-# Test / Coverage Generated Files
-# ------------------------------------------------------------
+# Coverage / test reports
 .coverage
 coverage/
 htmlcov/
-
 .nyc_output/
-
 playwright-report/
 test-results/
-
 **/playwright-report/
 **/test-results/
-
-
-# ------------------------------------------------------------
-# Misc Generated Files
-# ------------------------------------------------------------
-*.pid
-*.pid.lock
-
-*.cache
-*.temp
-*.old

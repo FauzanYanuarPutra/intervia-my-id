@@ -1,130 +1,279 @@
-# Lajukan Agent Guide
+# AGENTS.md — Lajukan engineering contract
 
-Status: repo audit 2026-07-11. This guide is binding for agents working in this repository.
+This file defines repository-wide rules for coding agents and contributors. It is intentionally stricter than style guidance because it protects data, API compatibility, deployment safety and maintainability.
 
-## Product Purpose
+## 1. Read before changing code
 
-Lajukan is a platform for Indonesian business needs: discovery, search, local business profiles, listings, maps, chat/WhatsApp contact, community, reels, support, CRM/CMS operations, and transactional primitives. Treat this as a verified implementation map, not a market-research thesis.
+Before editing a subsystem:
 
-## Repository Map
+1. Inspect the latest repository state.
+2. Read the relevant service/app entrypoint, configuration, migrations and tests.
+3. Search all references to files/functions/routes that will move or be deleted.
+4. Preserve externally observable contracts unless the task explicitly changes them.
+5. Prefer a small verified extraction over a large speculative rewrite.
 
-- `frontend/www`: main public Next.js app, API/BFF routes, home, search, create, profile, chat, community, reels, transactions, wallet, UMKM, support, AI surfaces.
-- `frontend/usaha`: owner/business workspace app.
-- `frontend/cms`: CMS app for managed content such as sectors/banners.
-- `frontend/crm`: CRM/ops command center.
-- `frontend/shared`: shared frontend package.
-- `services/identity_service`: Rust auth, sessions, roles, user profile, phone/Google login, public/discovery user APIs.
-- `services/marketplace_service`: Rust listing/content, events, learning/rewards, requests, UMKM stores/products/orders, transactions, wallet, notifications, support, CRM, CMS, trust profiles.
-- `services/community_service`: Rust forum, groups, reels, comments, actions, community search/feed.
-- `services/chat_service`: Elixir/Phoenix chat API backed by ScyllaDB rooms/messages/unread tables.
-- `services/ai_service`: Rust KYC/verification helper service; local Ollama AI for product features currently lives mainly in `frontend/www` API routes and Docker config.
-- `docker-compose*.yml`, `up-super-fast.ps1`: local/runtime orchestration.
+Do not infer current behavior only from folder names or documentation.
 
-## Required Docs
+## 2. Repository boundaries
 
-Read these before changing product direction: `docs/README.md`, `docs/product/product-principles.md`, `docs/product/current-capabilities.md`, `docs/product/decision-log.md`, `docs/research/evidence-register.md`, `docs/engineering/lessons-learned.md`.
+Primary code locations:
 
-## Verified Commands
+```text
+frontend/apps/              deployable user-facing/internal apps
+frontend/packages/          shared frontend code
+services/identity_service/  identity/authentication/authorization ownership
+services/marketplace_service/ marketplace/commerce/transaction ownership
+services/community_service/ community/social ownership
+services/chat_service/      realtime chat ownership
+services/ai_service/        AI orchestration ownership
+services/ocr_service/       OCR inference ownership
+services/liveness_service/  liveness inference ownership
+infrastructure/             deployment infrastructure, not business schema
+scripts/                    CI/dev/ops automation
+docs/                       durable human documentation
+```
 
-- `docker compose --env-file .env.development config --services`
-- `.\up-super-fast.ps1`
-- Frontend scripts by package file: `npm run dev`, `npm run build`, `npm run lint`, `npm run test` in `frontend/www`; `npm run dev`, `npm run build`, `npm run lint` in `frontend/cms`, `frontend/crm`, and `frontend/usaha`.
+Do not create another top-level source tree for the same responsibility.
 
-Do not paste secrets from `.env*` into docs, logs, issues, or chat.
+## 3. Service architecture
 
-## Audit Before Coding
+For Rust services:
 
-For every new request:
+- `main.rs` is bootstrap/composition only.
+- Route modules parse/authorize/map requests.
+- Service modules own business orchestration.
+- Repository modules own database access.
+- Domain state transitions and financial invariants must be explicit and testable.
+- Infrastructure adapters are kept at the edge of the domain.
 
-1. Identify the real product goal.
-2. Search existing routes, components, migrations, and docs.
-3. Read the nearest `AGENTS.md` if one is added later.
-4. Classify the request: valid, valid with adjustment, hypothesis, conflict, risky, or not verifiable.
-5. Prefer extending the canonical surface over adding a duplicate.
-6. Record durable decisions in `docs/product/decision-log.md` after approval.
+Do not move code into `utils`, `helpers`, `misc`, `common`, or `shared` merely to reduce file size. A module must have a clear owner and responsibility.
 
-## Anti-Duplication Rules
+For Phoenix/Elixir, preserve native Phoenix/OTP structure. Do not force Rust-style folders onto Chat.
 
-- Do not create a second search, listing detail, owner dashboard, chat, community, reels, or UMKM profile flow without proving the existing one cannot serve the need.
-- Canonical public routes are documented in `docs/lajukan-hidden-routes-audit.md`.
-- Communities and reels are engagement/distribution layers, not transaction categories equivalent to Mesin & Alat or Bahan Usaha.
+For Python inference services, keep modules small and direct: API/schema/service/model/security rather than enterprise layering.
 
-## Database And Migration Rules
+## 4. Data ownership
 
-- Never edit an applied migration. Add a new timestamped migration.
-- Keep service ownership clear: identity data in `identity_service`, marketplace/commerce data in `marketplace_service`, forum/reels/group data in `community_service`, chat history in `chat_service` ScyllaDB.
-- Add indexes for new query paths before shipping UI that depends on them.
-- Use event outbox/inbox patterns where cross-service synchronization is needed.
+- Identity owns identity data.
+- Marketplace owns marketplace, transaction, payment and wallet data.
+- Community owns community data.
+- Chat owns its Scylla data.
 
-## API Compatibility Rules
+A service MUST NOT query another service's database directly.
 
-- Next.js API routes in `frontend/www/src/app/api` are BFF/proxy surfaces. Preserve response shape unless a migration plan is documented.
-- Backend routes under `/v1/*` are service contracts. Version or adapt carefully.
-- Do not expose internal service URLs, tokens, model endpoints, or raw provider errors to users.
+Cross-service data flows through:
 
-## Search And Indexing Rules
+- documented APIs, or
+- events + local projections.
 
-- Search is multi-source: marketplace DB/Meilisearch, Postgres GIN/trigram indexes, community/forum search, and UI ranking.
-- Keep home, search, create taxonomy, DB metadata, and index fields aligned.
-- If using AI, AI may rank/summarize candidates but must not invent suppliers, prices, locations, or verification status.
+Postgres is the transactional source of truth. Search indexes are projections and must be rebuildable.
 
-## CRM And Lajukan Match Rules
+## 5. Database migrations
 
-- Current CRM priority is internal Lajukan operations: `Pencari -> Kebutuhan -> Penyedia sesuai -> Terhubung -> Berhasil/Gagal`.
-- Do not build a seller-owned sales CRM as the default next step. Owner/seller CRM is a later product mode after internal matching, verification, and connection tracking are stable.
-- Reuse existing request/listing data where possible. `content_items` with request pricing/mode can represent kebutuhan; supply listings and UMKM stores can be candidate penyedia.
-- Passive search, listing view, map view, or result click events belong to analytics by default. They must not create CRM leads/connections unless an explicit high-intent follow-up action exists.
-- `Lajukan Match` must be admin-reviewed first: AI can extract, score, explain, and rank candidates, but it must not auto-connect users or invent suppliers.
-- Store original user text/image context, structured extraction, model/prompt/scoring versions, confidence, admin corrections, candidate reasons, and final outcomes. Never overwrite the original input with AI output.
-- Matching should start with Postgres/Meilisearch retrieval and versioned scoring. Add Qdrant/vector infrastructure only when keyword/hybrid retrieval is proven insufficient.
-- Every matching/connection action needs audit metadata and idempotency when triggered by events.
+Never modify an already-applied migration only to make history look cleaner.
 
-## Chat And WhatsApp Rules
+Rules:
 
-- Treat internal chat and WhatsApp as separate communication channels.
-- Internal chat keeps platform history and privacy; WhatsApp supports fast local behavior.
-- Do not remove either channel without product decision evidence.
-- Do not display seller phone/WhatsApp unless consent/source field exists.
-- Track contact clicks where possible and avoid leaking private phone data in logs.
+- schema evolution -> versioned migration
+- stable reference data -> explicit deterministic seed/reference process
+- development/test fixture -> development/test seed
+- database backup/dump -> outside Git
 
-## Community And Reels Rules
+Business DDL must not be added to application startup.
 
-- Community/forum/reels support discovery, trust, education, and distribution.
-- Keep moderation/reporting requirements explicit; do not rely only on UI copy.
-- Reels should connect to stores/listings/profiles when metadata exists.
+Before destructive schema work:
 
-## Profile And Location Rules
+1. inventory live data,
+2. back up,
+3. use expand/backfill/switch/verify/contract where applicable,
+4. validate row counts and invariants,
+5. preserve rollback/recovery options.
 
-- Public profile, UMKM store profile, and owner workspace are different surfaces.
-- Location fields may be city/address/lat/lng; only show distance when both viewer and listing/store coordinates are available.
-- Do not imply exact location if only city or text address exists.
+SQL/CQL files use LF line endings to keep migration hashes stable across platforms.
 
-## Analytics Rules
+## 6. Authentication and authorization
 
-- Important user actions should emit events through `/api/events` or backend `/v1/events` where appropriate.
-- Record search, zero results, listing views, contact clicks, create funnel, chat start, transaction state, report, and profile/store interactions.
-- Analytics must not store secrets, raw tokens, or unnecessary personal data.
+Authentication success does not imply authorization.
 
-## Security Rules
+Every sensitive object operation must check the actor's right to the specific object. Never trust a user-supplied owner/user/store/order ID without server-side authorization.
 
-- Assume `.env.development` may contain real secrets. Do not quote them.
-- Bind local AI/Ollama to localhost only.
-- Validate uploads by size/type and store through controlled media APIs.
-- Keep auth checks server-side for protected data.
-- Mask phone numbers and tokens in logs.
-- Use least-privilege service boundaries; AI should not have direct uncontrolled production DB access.
+Do not weaken issuer/audience/expiry verification to fix authentication errors.
 
-## Conflicting Requests
+Do not log:
 
-When a user request conflicts with current architecture or docs, state the conflict, cite repo evidence, propose a safer path, and avoid changing product direction without approval.
+- authorization headers
+- cookies/session values
+- JWTs
+- passwords
+- OTPs
+- raw identity documents
+- NIK or other unnecessarily sensitive identity fields
 
-## Definition Of Done
+## 7. Payments and wallet
 
-- Existing implementation audited first.
-- Correct service boundary used.
-- New behavior has tests or a documented test gap.
-- Migrations are additive and indexed.
-- API contract impact considered.
-- Search/index/event impact considered.
-- Security/privacy impact considered.
-- Docs updated when product meaning changes.
+Financial code requires stronger guarantees than ordinary CRUD.
+
+Required properties include:
+
+- database transaction boundaries
+- idempotency for retries/webhooks
+- unique provider transaction identifiers
+- valid state transitions only
+- settle/refund/withdraw exactly according to invariants
+- no negative balances unless explicitly modelled
+- duplicate webhook processing must be harmless
+
+Production payment and wallet flags remain fail-closed until their operational runbook passes.
+
+## 8. RabbitMQ and eventing
+
+When a database write and event publication belong to one business operation, prefer transactional outbox semantics.
+
+Consumers must be idempotent. Inbox/event IDs should prevent duplicate side effects.
+
+Do not add Kafka or another broker without a demonstrated requirement that RabbitMQ cannot satisfy.
+
+## 9. Frontend
+
+The Next.js route tree owns routing/layout/composition. Reusable business UI belongs in feature modules.
+
+Shared frontend code becomes a package only when at least two apps need the same semantics, not merely similar-looking code.
+
+Preserve:
+
+- route URLs
+- response/request shapes
+- locale behavior
+- user-visible interaction semantics
+
+unless the task explicitly changes them.
+
+Do not expose private backend credentials through `NEXT_PUBLIC_*` variables.
+
+## 10. Environment and secrets
+
+Real secrets never belong in Git.
+
+Tracked files may contain only examples/placeholders such as `.env.production.example`.
+
+Application config should fail early when a production-required secret is absent. Development may use documented local-only defaults.
+
+Do not embed machine-specific paths such as `D:/...` in committed cross-platform configuration.
+
+## 11. Git hygiene
+
+Do not track:
+
+- `.runtime/`
+- `.cache/`
+- `.backups/`
+- database dumps
+- generated screenshots
+- generated audit output
+- build artifacts
+- dependency directories
+- user uploads
+- local infrastructure volumes
+
+`.gitignore` does not remove already-tracked files. Use an explicit index cleanup when required.
+
+Do not rewrite Git history without an explicit backup/classification plan.
+
+## 12. Docker and deployment
+
+Development ports bind to loopback by default.
+
+Production should publish host ports only through the edge proxy unless a documented operational requirement says otherwise.
+
+Deploy application images by immutable commit-derived tag/digest. Do not deploy `latest`.
+
+Do not introduce Kubernetes, service mesh, Kafka or another orchestration layer by default. Docker Compose remains the deployment model until scale/availability evidence requires a change.
+
+## 13. Observability
+
+Application logs go to stdout/stderr. Do not make each app manage its own production log files.
+
+Use structured logs where possible and propagate request/correlation IDs.
+
+New critical flows should expose useful metrics/traces without including secrets or sensitive payloads.
+
+## 14. Testing expectations
+
+Before considering a refactor complete, run the relevant subset of:
+
+### Rust
+
+```bash
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+```
+
+### Next.js / Node
+
+```bash
+npm run lint
+npm run test --if-present
+npm run build
+```
+
+### Elixir
+
+```bash
+mix format --check-formatted
+MIX_ENV=test mix test --no-start
+```
+
+### Python
+
+```bash
+python -m compileall -q .
+pytest -q
+```
+
+### Repository / deployment
+
+```bash
+python scripts/ci/check_repository_hygiene.py
+docker compose --env-file .env.development -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+```
+
+A file move is not complete while old path references still exist in tracked source/configuration.
+
+## 15. Safe refactor sequence
+
+For large modules such as Marketplace or Community:
+
+1. identify one coherent responsibility,
+2. add characterization/regression tests when needed,
+3. move code without changing behavior,
+4. compile/test,
+5. remove old definitions,
+6. search stale references,
+7. only then continue to the next module.
+
+Do not generate dozens of empty architecture folders in advance.
+
+## 16. Deletion rules
+
+A suspicious/legacy file is not automatically safe to delete.
+
+Before deletion:
+
+- search imports/references,
+- compare behavior when it is an alternate implementation,
+- prove required behavior exists elsewhere,
+- preserve recoverability through Git history or an explicit external backup.
+
+This rule especially applies to old service entrypoints, migrations, deployment scripts and recovery artifacts.
+
+## 17. Definition of Done
+
+A change is done when:
+
+- implementation is complete,
+- tests/checks for the affected scope pass,
+- stale tracked references are removed,
+- docs/config are updated when the contract changed,
+- no secrets/runtime artifacts were introduced,
+- rollback or recovery is understood for risky changes.
