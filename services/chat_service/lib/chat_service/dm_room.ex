@@ -7,7 +7,8 @@ defmodule ChatService.DmRoom do
   Builds a deterministic DM room id from two user (binary) UUIDs.
   Order-independent: same pair always yields same room_id.
   """
-  def build_room_id(user_id_bin_a, user_id_bin_b) when is_binary(user_id_bin_a) and is_binary(user_id_bin_b) do
+  def build_room_id(user_id_bin_a, user_id_bin_b)
+      when is_binary(user_id_bin_a) and is_binary(user_id_bin_b) do
     a_str = Ecto.UUID.cast!(user_id_bin_a)
     b_str = Ecto.UUID.cast!(user_id_bin_b)
     {min_id, max_id} = if a_str <= b_str, do: {a_str, b_str}, else: {b_str, a_str}
@@ -27,8 +28,10 @@ defmodule ChatService.DmRoom do
   """
   def peer_user_id_bin("dm:" <> rest, current_user_id_bin) when is_binary(current_user_id_bin) do
     parts = String.split(rest, ":", parts: 2)
+
     if length(parts) == 2 do
       [min_s, max_s] = parts
+
       with {:ok, min_b} <- Ecto.UUID.dump(min_s),
            {:ok, max_b} <- Ecto.UUID.dump(max_s) do
         cond do
@@ -43,5 +46,6 @@ defmodule ChatService.DmRoom do
       nil
     end
   end
+
   def peer_user_id_bin(_, _), do: nil
 end
