@@ -19,7 +19,7 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
-    "@types/node": "^20.19.25",
+    "@types/node": "^26.2.0",
     "@types/phoenix": "^1.6.7",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19",
