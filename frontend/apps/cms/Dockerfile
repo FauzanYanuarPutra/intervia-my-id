@@ -1,13 +1,10 @@
-# ==============================
-# CMS BUILD STAGE
-# ==============================
 ARG NPM_REGISTRY=https://registry.npmjs.org/
 
 FROM node:20-bullseye-slim AS cms_deps
 
 ARG NPM_REGISTRY
 
-WORKDIR /app/cms
+WORKDIR /app/apps/cms
 
 RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set fetch-retries 5 \
@@ -18,28 +15,18 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
 
-COPY shared /app/shared
-COPY cms/package*.json ./
+COPY packages /app/packages
 
 RUN set -eux; \
-    retry_npm() { \
-      attempt=1; \
-      while [ "$attempt" -le 5 ]; do \
-        "$@" && return 0; \
-        echo "npm command failed, retry ${attempt}/5"; \
-        npm cache verify || true; \
-        sleep $((attempt * 10)); \
-        attempt=$((attempt + 1)); \
-      done; \
-      return 1; \
-    }; \
-    cd /app/shared; \
+    cd /app/packages; \
     if [ -f package-lock.json ]; then \
-      retry_npm npm ci --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+      npm ci --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
     else \
-      retry_npm npm install --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
-    fi
-RUN cd /app/shared && ./node_modules/.bin/tsc -p tsconfig.build.json
+      npm install --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+    fi; \
+    ./node_modules/.bin/tsc -p tsconfig.build.json
+
+COPY apps/cms/package*.json ./
 
 RUN set -eux; \
     retry_npm() { \
@@ -60,11 +47,17 @@ RUN set -eux; \
     fi; \
     if ! node -e "require.resolve('@next/swc-linux-x64-gnu/package.json')"; then \
       NEXT_VERSION=$(node -p "require('./node_modules/next/package.json').version"); \
-      echo "Installing missing Linux SWC package for Next ${NEXT_VERSION}"; \
-      retry_npm npm install --no-save --legacy-peer-deps --prefer-offline --no-audit --no-fund "@next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
+      retry_npm npm install \
+        --no-save \
+        --legacy-peer-deps \
+        --prefer-offline \
+        --no-audit \
+        --no-fund \
+        "@next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
     fi
 
-COPY cms/ .
+COPY apps/cms/ ./
+
 RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -72,25 +65,26 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM cms_deps AS cms_builder
 
 RUN NODE_OPTIONS="--max-old-space-size=2048" npm run build
-RUN npm prune --omit=dev
+RUN npm prune --omit=dev --legacy-peer-deps
+RUN rm -rf .next/cache /root/.npm /tmp/*
 
 FROM cms_deps AS cms_dev
 
-# ==============================
-# CMS RUNTIME STAGE
-# ==============================
 FROM node:20-bullseye-slim AS cms
 
-WORKDIR /app/cms
+WORKDIR /app/apps/cms
 
-ENV NODE_ENV=${NODE_ENV}
+ENV NODE_ENV=production
 ENV PORT=3001
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=cms_builder /app/cms/.next ./.next
-COPY --from=cms_builder /app/cms/public ./public
-COPY --from=cms_builder /app/cms/package*.json ./
-COPY --from=cms_builder /app/cms/node_modules ./node_modules
+COPY --from=cms_builder /app/apps/cms/.next ./.next
+COPY --from=cms_builder /app/apps/cms/public ./public
+COPY --from=cms_builder /app/apps/cms/package*.json ./
+COPY --from=cms_builder /app/apps/cms/node_modules ./node_modules
+
+# Dibutuhkan apabila npm menyimpan local file dependency sebagai symlink.
+COPY --from=cms_builder /app/packages /app/packages
 
 EXPOSE 3001
 

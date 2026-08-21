@@ -41,8 +41,9 @@ Desktop.ini
 *.sql.gz
 *.sql.bak
 
-# Do NOT ignore *.sql globally.
-# SQL migrations, schemas, and deterministic seeds may belong in Git.
+# IMPORTANT:
+# Jangan ignore semua *.sql.
+# Migration, schema, dan deterministic seed memang boleh berada di Git.
 
 
 # ------------------------------------------------------------
@@ -68,13 +69,15 @@ Desktop.ini
 *.screenshot.jpeg
 *.screenshot.webp
 
-/tmp-*.png
-/tmp-*.jpg
-/tmp-*.jpeg
-/tmp-*.webp
+**/.codex-*.png
+**/.codex-*.jpg
+**/.codex-*.jpeg
+**/.codex-*.webp
 
-frontend/www/.codex-*.png
-frontend/www/tmp-storefront.png
+**/tmp-*.png
+**/tmp-*.jpg
+**/tmp-*.jpeg
+**/tmp-*.webp
 
 
 # ------------------------------------------------------------
@@ -90,6 +93,7 @@ frontend/www/tmp-storefront.png
 **/.cache/
 **/.parcel-cache/
 **/.vite/
+**/.npm-cache/
 
 npm-debug.log*
 yarn-debug.log*
@@ -189,7 +193,7 @@ ubuntu.tar
 
 
 # ------------------------------------------------------------
-# IDE / Tool Generated Files
+# Test / Coverage Generated Files
 # ------------------------------------------------------------
 .coverage
 coverage/

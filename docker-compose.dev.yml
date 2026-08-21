@@ -752,7 +752,7 @@ services:
   www:
     build:
       context: ./frontend
-      dockerfile: www/Dockerfile
+      dockerfile: apps/www/Dockerfile
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     restart: unless-stopped
@@ -900,7 +900,7 @@ services:
     profiles: [backoffice]
     build:
       context: ./frontend
-      dockerfile: usaha/Dockerfile
+      dockerfile: apps/usaha/Dockerfile
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     restart: unless-stopped
@@ -1002,7 +1002,7 @@ services:
     profiles: [backoffice]
     build:
       context: ./frontend
-      dockerfile: cms/Dockerfile
+      dockerfile: apps/cms/Dockerfile
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     restart: unless-stopped
@@ -1038,7 +1038,7 @@ services:
     profiles: [backoffice]
     build:
       context: ./frontend
-      dockerfile: crm/Dockerfile
+      dockerfile: apps/crm/Dockerfile
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     restart: unless-stopped

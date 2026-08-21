@@ -4,7 +4,7 @@ FROM node:20-bullseye-slim AS usaha_deps
 
 ARG NPM_REGISTRY
 
-WORKDIR /app/usaha
+WORKDIR /app/apps/usaha
 
 RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set fetch-retries 5 \
@@ -15,27 +15,7 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
 
-COPY shared /app/shared
-COPY usaha/package*.json ./
-
-RUN set -eux; \
-    retry_npm() { \
-      attempt=1; \
-      while [ "$attempt" -le 5 ]; do \
-        "$@" && return 0; \
-        echo "npm command failed, retry ${attempt}/5"; \
-        npm cache verify || true; \
-        sleep $((attempt * 10)); \
-        attempt=$((attempt + 1)); \
-      done; \
-      return 1; \
-    }; \
-    cd /app/shared; \
-    if [ -f package-lock.json ]; then \
-      retry_npm npm ci --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
-    else \
-      retry_npm npm install --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
-    fi
+COPY apps/usaha/package*.json ./
 
 RUN set -eux; \
     retry_npm() { \
@@ -50,21 +30,23 @@ RUN set -eux; \
       return 1; \
     }; \
     if [ -f package-lock.json ]; then \
-      echo "Using npm ci"; \
       retry_npm npm ci --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
     else \
-      echo "package-lock.json not found, running npm install"; \
       retry_npm npm install --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
     fi; \
     if ! node -e "require.resolve('@next/swc-linux-x64-gnu/package.json')"; then \
       NEXT_VERSION=$(node -p "require('./node_modules/next/package.json').version"); \
-      echo "Installing missing Linux SWC package for Next ${NEXT_VERSION}"; \
-      retry_npm npm install --no-save --legacy-peer-deps --prefer-offline --no-audit --no-fund "@next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
+      retry_npm npm install \
+        --no-save \
+        --legacy-peer-deps \
+        --prefer-offline \
+        --no-audit \
+        --no-fund \
+        "@next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
     fi
 
-RUN cd /app/shared && ./node_modules/.bin/tsc -p tsconfig.build.json
+COPY apps/usaha/ ./
 
-COPY usaha/ .
 RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -79,16 +61,16 @@ FROM usaha_deps AS usaha_dev
 
 FROM node:20-bullseye-slim AS usaha
 
-WORKDIR /app/usaha
+WORKDIR /app/apps/usaha
 
-ENV NODE_ENV=${NODE_ENV}
+ENV NODE_ENV=production
 ENV PORT=3003
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=usaha_builder /app/usaha/.next ./.next
-COPY --from=usaha_builder /app/usaha/public ./public
-COPY --from=usaha_builder /app/usaha/package*.json ./
-COPY --from=usaha_builder /app/usaha/node_modules ./node_modules
+COPY --from=usaha_builder /app/apps/usaha/.next ./.next
+COPY --from=usaha_builder /app/apps/usaha/public ./public
+COPY --from=usaha_builder /app/apps/usaha/package*.json ./
+COPY --from=usaha_builder /app/apps/usaha/node_modules ./node_modules
 
 EXPOSE 3003
 

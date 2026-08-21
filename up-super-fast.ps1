@@ -1740,10 +1740,10 @@ $serviceInputs = @{
     chat_service        = @("services/chat_service")
     ocr_service         = @("services/ocr_service")
     liveness_service    = @("services/liveness_service")
-    www                 = @("frontend/apps/www", "frontend/apps/shared", "frontend/apps/.dockerignore")
-    usaha               = @("frontend/apps/usaha", "frontend/apps/shared", "frontend/apps/.dockerignore")
-    cms                 = @("frontend/apps/cms", "frontend/apps/shared", "frontend/apps/.dockerignore")
-    crm                 = @("frontend/apps/crm", "frontend/apps/shared", "frontend/apps/.dockerignore")
+    www                 = @("frontend/apps/www", "frontend/packages", "frontend/.dockerignore")
+    usaha               = @("frontend/apps/usaha", "frontend/packages", "frontend/.dockerignore")
+    cms                 = @("frontend/apps/cms", "frontend/packages", "frontend/.dockerignore")
+    crm                 = @("frontend/apps/crm", "frontend/packages", "frontend/.dockerignore")
 }
 
 $composeProjectName = if ($env:COMPOSE_PROJECT_NAME) {

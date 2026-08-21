@@ -63,7 +63,7 @@
     "ioredis": "^5.8.2",
     "jose": "^6.1.3",
     "jsonwebtoken": "^9.0.2",
-    "lajukan-ui": "file:../shared",
+    "lajukan-ui": "file:../../packages",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.562.0",
     "next": "^16.0.7",
