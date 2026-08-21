@@ -9,6 +9,7 @@ defmodule ChatService.Repo do
       backoff_type: :exp,
       max_concurrent_requests_per_connection: 32
     ]
+
     Xandra.Cluster.child_spec(Keyword.merge(default_opts, opts))
   end
 
@@ -25,7 +26,10 @@ defmodule ChatService.Repo do
   end
 
   defp log_performance(query, start_time) do
-    latency = System.convert_time_unit(System.monotonic_time() - start_time, :native, :millisecond)
-    if latency > 100, do: Logger.warning("Slow Query (#{latency}ms): #{String.slice(query, 0, 50)}")
+    latency =
+      System.convert_time_unit(System.monotonic_time() - start_time, :native, :millisecond)
+
+    if latency > 100,
+      do: Logger.warning("Slow Query (#{latency}ms): #{String.slice(query, 0, 50)}")
   end
 end
