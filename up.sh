@@ -118,13 +118,19 @@ docker compose version >/dev/null 2>&1 || {
   exit 1
 }
 
+# Keep compatibility with existing local installations that still use `.env`.
+# Staging and production remain fail-closed and require their explicit files.
 if [[ ! -f "$ENV_FILE" ]]; then
-  if [[ -f "$ENV_FILE.example" ]]; then
+  if [[ "$ENVIRONMENT" == "development" && -f ".env" ]]; then
+    echo "warning: .env.development not found; using .env for legacy development compatibility." >&2
+    ENV_FILE=".env"
+  elif [[ -f "$ENV_FILE.example" ]]; then
     echo "Missing $ENV_FILE. Copy $ENV_FILE.example to $ENV_FILE and fill in its values." >&2
+    exit 1
   else
     echo "Missing environment file: $ENV_FILE" >&2
+    exit 1
   fi
-  exit 1
 fi
 
 COMPOSE=(
@@ -140,6 +146,9 @@ for profile in "${PROFILES[@]}"; do
     [[ -n "$item" ]] && COMPOSE+=(--profile "$item")
   done
 done
+
+# Fail before changing container state if the merged Compose model is invalid.
+"${COMPOSE[@]}" config --quiet
 
 if ((FRESH)); then
   echo "Recreating containers for $ENVIRONMENT (volumes are preserved)..."
