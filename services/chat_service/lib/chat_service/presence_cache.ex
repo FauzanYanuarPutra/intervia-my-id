@@ -5,8 +5,15 @@ defmodule ChatService.PresenceCache do
 
   def init do
     if :ets.whereis(@table) == :undefined do
-      :ets.new(@table, [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
+      :ets.new(@table, [
+        :set,
+        :public,
+        :named_table,
+        read_concurrency: true,
+        write_concurrency: true
+      ])
     end
+
     :ok
   end
 
@@ -24,4 +31,3 @@ defmodule ChatService.PresenceCache do
     :ets.lookup(@table, user_id_bin) != []
   end
 end
-
