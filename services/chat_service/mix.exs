@@ -46,7 +46,7 @@ defmodule ChatService.MixProject do
       {:phoenix, "~> 1.8.3"},
       {:phoenix_pubsub, "~> 2.2"},
       {:plug_cowboy, "~> 2.7"},
-      {:gettext, "~> 0.22"},
+      {:gettext, "~> 1.0"},
       {:plug, "~> 1.19.1"},
       {:cors_plug, "~> 3.0"},
       {:jason, "~> 1.4"},
