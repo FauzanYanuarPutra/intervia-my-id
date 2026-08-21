@@ -7,6 +7,7 @@ if config_env() == :prod do
   port = String.to_integer(System.get_env("APP_PORT") || "4000")
   scylla_host = System.get_env("SCYLLA_HOST") || "scylla_db"
   scylla_port = System.get_env("SCYLLA_PORT") || "9042"
+
   scylla_nodes =
     (System.get_env("SCYLLA_NODES") || "#{scylla_host}:#{scylla_port}")
     |> String.split(",")
@@ -18,10 +19,13 @@ if config_env() == :prod do
   end
 
   jwt_secret = System.fetch_env!("JWT_SECRET")
+
   if byte_size(String.trim(jwt_secret)) < 32 do
     raise "JWT_SECRET must be at least 32 characters"
   end
+
   jwt_issuer = System.get_env("JWT_ISSUER") || "laju"
+
   jwt_audiences =
     (System.get_env("CHAT_JWT_AUDIENCES") ||
        System.get_env("JWT_AUDIENCE") ||
@@ -36,12 +40,11 @@ if config_env() == :prod do
     http: [ip: {0, 0, 0, 0}, port: port],
     secret_key_base: secret_key_base
 
-  config :chat_service, ChatService.Repo, [
+  config :chat_service, ChatService.Repo,
     nodes: scylla_nodes,
     keyspace: System.get_env("SCYLLA_KEYSPACE") || "laju_chat",
     connect_timeout: 10_000,
     max_concurrent_requests_per_connection: 128
-  ]
 
   config :chat_service,
     jwt_issuer: jwt_issuer,
@@ -53,14 +56,17 @@ if config_env() == :prod do
 
   # 3. Redis Config (Rate Limiter)
   config :hammer,
-    backend: {Hammer.Backend.Redis, [
-      expiry_ms: String.to_integer(System.get_env("RATE_LIMIT_EXPIRY_MS") || "60000"), # TAMBAHKAN INI
-      redix_config: [
-        host: System.get_env("REDIS_HOST") || "redis_cache",
-        password: System.get_env("REDIS_PASSWORD"),
-        port: String.to_integer(System.get_env("REDIS_PORT") || "6379")
-      ]
-    ]}
+    backend:
+      {Hammer.Backend.Redis,
+       [
+         # TAMBAHKAN INI
+         expiry_ms: String.to_integer(System.get_env("RATE_LIMIT_EXPIRY_MS") || "60000"),
+         redix_config: [
+           host: System.get_env("REDIS_HOST") || "redis_cache",
+           password: System.get_env("REDIS_PASSWORD"),
+           port: String.to_integer(System.get_env("REDIS_PORT") || "6379")
+         ]
+       ]}
 
   # 4. RabbitMQ Config
   config :amqp,
@@ -71,6 +77,4 @@ if config_env() == :prod do
     issuer: nil,
     secret_key: jwt_secret,
     allowed_algos: ["HS256"]
-
-
 end
