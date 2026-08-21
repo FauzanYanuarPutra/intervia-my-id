@@ -156,13 +156,13 @@ test.describe('Lajukan stabilization regression smoke', () => {
     await page.goto('/id/explore', { waitUntil: 'domcontentloaded' });
 
     await expect(
-      page.getByRole('heading', { name: 'Cari kebutuhan usahamu' }),
+      page.getByRole('heading', { name: 'Mau cari apa untuk usahamu?' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Cari untuk usaha' }),
+      page.getByRole('link', { name: /Cari Bahan & stok/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Cari calon pembeli' }),
+      page.getByRole('link', { name: 'Lihat kebutuhan pembeli' }),
     ).toBeVisible();
 
     const input = page
@@ -176,7 +176,7 @@ test.describe('Lajukan stabilization regression smoke', () => {
 
     await expect(page).toHaveURL(/\/id\/explore\?q=supplier(\+|%20)kemasan/);
     await expect(
-      page.getByRole('heading', { name: 'Hasil pencarian' }),
+      page.getByRole('heading', { name: 'Cari barang & jasa' }),
     ).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Cari', exact: true }),
@@ -190,10 +190,10 @@ test.describe('Lajukan stabilization regression smoke', () => {
     await page.goto('/id/explore', { waitUntil: 'domcontentloaded' });
 
     await expect(
-      page.getByRole('button', { name: 'Cari untuk usaha' }),
+      page.getByRole('link', { name: /Cari Bahan & stok/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Cari calon pembeli' }),
+      page.getByRole('link', { name: 'Lihat kebutuhan pembeli' }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, 6);
   });

@@ -2,24 +2,42 @@
 defmodule ChatServiceWeb.RoomChannel do
   use ChatServiceWeb, :channel
 
-  alias ChatService.{AidaBot, IdentityClient, Repo, Security}
+  alias ChatService.{
+    AidaBot,
+    AttachmentPolicy,
+    CallSignaling,
+    IdentityClient,
+    MessagePersistence,
+    RateLimiter,
+    Repo,
+    Security,
+    TrustSafety,
+    UnreadState
+  }
+
   alias ChatServiceWeb.Presence
   require Logger
 
-  @history_limit 50
   @rate_max_msg 8
+  @rate_window_ms 10_000
+  @call_start_limit 3
+  @call_control_limit 30
+  @call_sdp_limit 12
+  @call_ice_limit 180
+  @call_rate_window_ms 60_000
+  @max_sdp_bytes 64 * 1_024
+  @max_ice_bytes 8 * 1_024
 
   # --- JOIN ROOM ---
   @impl true
-  def join("room:" <> room_id_raw, params, socket) do
+  def join("room:" <> room_id_raw, _params, socket) do
     room_id = URI.decode(room_id_raw)
 
     if can_join_room?(socket, room_id) do
-      last_seen = Map.get(params, "last_seen_id")
       Logger.info("[Channel] User #{socket.assigns.user_id} joined #{room_id}")
 
       # Kirim sinyal ke diri sendiri untuk proses background
-      send(self(), {:after_join, room_id, last_seen})
+      send(self(), :after_join)
 
       {:ok, assign(socket, :room_id, room_id)}
     else
@@ -30,18 +48,12 @@ defmodule ChatServiceWeb.RoomChannel do
 
   # --- AFTER JOIN ---
   @impl true
-  def handle_info({:after_join, room_id, last_seen_id}, socket) do
+  def handle_info(:after_join, socket) do
     # 1. Track Presence
     track_presence(socket)
 
     # 2. Push state awal (agar frontend berhenti "Checking presence")
     push(socket, "presence_state", Presence.list(socket))
-
-    # 3. Fetch History secara Async
-    Task.start(fn ->
-      history = fetch_history(room_id, last_seen_id)
-      push(socket, "history", %{messages: history})
-    end)
 
     {:noreply, socket}
   end
@@ -62,18 +74,19 @@ defmodule ChatServiceWeb.RoomChannel do
 
   @impl true
   def handle_in("read", _payload, socket) do
-    # Mark unread counter as cleared for current user in this room.
-    Repo.execute("DELETE FROM unread_counters WHERE user_id = ? AND room_id = ?", [
-      {"uuid", socket.assigns.user_id_bin},
-      {"text", socket.assigns.room_id}
-    ])
+    case UnreadState.clear(socket.assigns.user_id_bin, socket.assigns.room_id) do
+      :ok ->
+        broadcast_from!(socket, "read", %{
+          user_id: socket.assigns.user_id,
+          room_id: socket.assigns.room_id
+        })
 
-    broadcast_from!(socket, "read", %{
-      user_id: socket.assigns.user_id,
-      room_id: socket.assigns.room_id
-    })
+        {:reply, {:ok, %{status: "ok"}}, socket}
 
-    {:reply, {:ok, %{status: "ok"}}, socket}
+      {:error, reason} ->
+        Logger.error("[Scylla] Read receipt update failed: #{inspect(reason)}")
+        {:reply, {:error, %{reason: "message_storage_unavailable"}}, socket}
+    end
   end
 
   # --- TYPING ---
@@ -90,14 +103,15 @@ defmodule ChatServiceWeb.RoomChannel do
 
   # --- CALL SIGNALING ---
   @impl true
-  def handle_in("call_start", payload, socket) do
-    with :ok <- check_permission(socket, "call:start") do
-      call_id =
-        case Map.get(payload, "call_id") do
-          v when is_binary(v) and v != "" -> v
-          _ -> Ecto.UUID.generate()
-        end
-
+  def handle_in("call_start", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :start),
+         :ok <- ensure_direct_call_room(socket),
+         :ok <-
+           TrustSafety.ensure_room_send_allowed(
+             socket.assigns.room_id,
+             socket.assigns.user_id_bin
+           ),
+         {:ok, call_id} <- CallSignaling.start_call_id(Map.get(payload, "call_id")) do
       call_type = normalize_call_type(Map.get(payload, "call_type"))
       profile = current_user_profile(socket)
 
@@ -123,158 +137,296 @@ defmodule ChatServiceWeb.RoomChannel do
       {:reply, {:ok, %{call_id: call_id, call_type: call_type}}, socket}
     else
       {:error, reason} ->
-        {:reply, {:error, %{reason: inspect(reason)}}, socket}
+        call_error(socket, reason)
     end
   end
 
   @impl true
-  def handle_in("call_accept", %{"call_id" => call_id}, socket) do
-    broadcast_from!(socket, "call_accepted", %{
-      call_id: call_id,
-      user_id: socket.assigns.user_id
-    })
+  def handle_in("call_accept", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :control),
+         {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
+      broadcast_from!(socket, "call_accepted", %{
+        call_id: call_id,
+        user_id: socket.assigns.user_id
+      })
 
-    broadcast_call_event(socket, "call_accepted", %{
-      call_id: call_id,
-      room_id: socket.assigns.room_id,
-      user_id: socket.assigns.user_id
-    })
+      broadcast_call_event(socket, "call_accepted", %{
+        call_id: call_id,
+        room_id: socket.assigns.room_id,
+        user_id: socket.assigns.user_id
+      })
 
-    {:reply, {:ok, %{call_id: call_id}}, socket}
+      {:reply, {:ok, %{call_id: call_id}}, socket}
+    else
+      {:error, reason} -> call_error(socket, reason)
+    end
   end
 
   @impl true
-  def handle_in("call_reject", %{"call_id" => call_id}, socket) do
-    broadcast_from!(socket, "call_rejected", %{
-      call_id: call_id,
-      user_id: socket.assigns.user_id
-    })
+  def handle_in("call_reject", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :control),
+         {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
+      broadcast_from!(socket, "call_rejected", %{
+        call_id: call_id,
+        user_id: socket.assigns.user_id
+      })
 
-    broadcast_call_event(socket, "call_rejected", %{
-      call_id: call_id,
-      room_id: socket.assigns.room_id,
-      user_id: socket.assigns.user_id
-    })
+      broadcast_call_event(socket, "call_rejected", %{
+        call_id: call_id,
+        room_id: socket.assigns.room_id,
+        user_id: socket.assigns.user_id
+      })
 
-    {:reply, {:ok, %{call_id: call_id}}, socket}
+      {:reply, {:ok, %{call_id: call_id}}, socket}
+    else
+      {:error, reason} -> call_error(socket, reason)
+    end
   end
 
   @impl true
-  def handle_in("call_end", %{"call_id" => call_id}, socket) do
-    broadcast_from!(socket, "call_ended", %{
-      call_id: call_id,
-      user_id: socket.assigns.user_id
-    })
+  def handle_in("call_end", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :control),
+         {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")) do
+      broadcast_from!(socket, "call_ended", %{
+        call_id: call_id,
+        user_id: socket.assigns.user_id
+      })
 
-    broadcast_call_event(socket, "call_ended", %{
-      call_id: call_id,
-      room_id: socket.assigns.room_id,
-      user_id: socket.assigns.user_id
-    })
+      broadcast_call_event(socket, "call_ended", %{
+        call_id: call_id,
+        room_id: socket.assigns.room_id,
+        user_id: socket.assigns.user_id
+      })
 
-    {:reply, {:ok, %{call_id: call_id}}, socket}
+      {:reply, {:ok, %{call_id: call_id}}, socket}
+    else
+      {:error, reason} -> call_error(socket, reason)
+    end
   end
 
   @impl true
-  def handle_in("call_offer", %{"call_id" => call_id, "offer" => offer}, socket) do
-    broadcast_from!(socket, "call_offer_received", %{
-      call_id: call_id,
-      offer: offer,
-      from_user_id: socket.assigns.user_id
-    })
+  def handle_in("call_offer", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :sdp),
+         {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")),
+         {:ok, offer} <- CallSignaling.json_object(Map.get(payload, "offer"), @max_sdp_bytes) do
+      broadcast_from!(socket, "call_offer_received", %{
+        call_id: call_id,
+        offer: offer,
+        from_user_id: socket.assigns.user_id
+      })
 
-    {:reply, {:ok, %{call_id: call_id}}, socket}
+      {:reply, {:ok, %{call_id: call_id}}, socket}
+    else
+      {:error, reason} -> call_error(socket, reason)
+    end
   end
 
   @impl true
-  def handle_in("call_answer", %{"call_id" => call_id, "answer" => answer}, socket) do
-    broadcast_from!(socket, "call_answer_received", %{
-      call_id: call_id,
-      answer: answer,
-      from_user_id: socket.assigns.user_id
-    })
+  def handle_in("call_answer", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :sdp),
+         {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")),
+         {:ok, answer} <-
+           CallSignaling.json_object(Map.get(payload, "answer"), @max_sdp_bytes) do
+      broadcast_from!(socket, "call_answer_received", %{
+        call_id: call_id,
+        answer: answer,
+        from_user_id: socket.assigns.user_id
+      })
 
-    {:reply, {:ok, %{call_id: call_id}}, socket}
+      {:reply, {:ok, %{call_id: call_id}}, socket}
+    else
+      {:error, reason} -> call_error(socket, reason)
+    end
   end
 
   @impl true
-  def handle_in("call_ice_candidate", %{"call_id" => call_id, "candidate" => candidate}, socket) do
-    broadcast_from!(socket, "call_ice_candidate_received", %{
-      call_id: call_id,
-      candidate: candidate,
-      from_user_id: socket.assigns.user_id
-    })
+  def handle_in("call_ice_candidate", payload, socket) when is_map(payload) do
+    with :ok <- authorize_call_event(socket, :ice),
+         {:ok, call_id} <- CallSignaling.call_id(Map.get(payload, "call_id")),
+         {:ok, candidate} <-
+           CallSignaling.json_object(Map.get(payload, "candidate"), @max_ice_bytes) do
+      broadcast_from!(socket, "call_ice_candidate_received", %{
+        call_id: call_id,
+        candidate: candidate,
+        from_user_id: socket.assigns.user_id
+      })
 
-    {:reply, {:ok, %{call_id: call_id}}, socket}
+      {:reply, {:ok, %{call_id: call_id}}, socket}
+    else
+      {:error, reason} -> call_error(socket, reason)
+    end
   end
 
-  defp process_send_message(body, ref, message_type, attachments, socket) do
-    with :ok <- rate_limit(socket),
-         :ok <- check_permission(socket, "chat:send"),
-         {:ok, clean_body} <- sanitize(body, attachments),
-         {:ok, scan_result} <- scan_content(clean_body) do
-      profile = current_user_profile(socket)
-      message_id = Ecto.UUID.generate()
-      sent_at = DateTime.utc_now()
-      normalized_type = normalize_message_type(message_type)
-      normalized_attachments = normalize_attachments(attachments)
+  @impl true
+  def handle_in(event, _payload, socket)
+      when event in [
+             "call_start",
+             "call_accept",
+             "call_reject",
+             "call_end",
+             "call_offer",
+             "call_answer",
+             "call_ice_candidate"
+           ] do
+    case check_permission(socket, "call:signal") do
+      :ok -> call_error(socket, :invalid_call_payload)
+      {:error, reason} -> call_error(socket, reason)
+    end
+  end
 
-      display_body =
-        if clean_body == "" do
-          case normalized_type do
-            "image" -> "Image"
-            "video" -> "Video"
-            "audio" -> "Audio"
-            "file" -> "File"
-            "sticker" -> "Sticker"
-            "offer" -> "Offer"
-            "transaction" -> "Transaction update"
-            "application" -> "Application"
-            "listing" -> "Listing shared"
-            "order" -> "Order update"
-            "milestone" -> "Milestone update"
-            "ride_update" -> "Ride update"
-            "delivery_update" -> "Delivery update"
-            "job_update" -> "Job update"
-            _ -> "Attachment"
-          end
-        else
-          clean_body
+  defp authorize_call_event(socket, kind) do
+    with :ok <- check_permission(socket, "call:signal"),
+         :ok <- rate_limit_call(socket, kind) do
+      :ok
+    end
+  end
+
+  defp rate_limit_call(socket, kind) do
+    limit =
+      case kind do
+        :start -> @call_start_limit
+        :control -> @call_control_limit
+        :sdp -> @call_sdp_limit
+        :ice -> @call_ice_limit
+      end
+
+    RateLimiter.check(
+      {:call, kind, socket.assigns.user_id, socket.assigns.room_id},
+      limit,
+      @call_rate_window_ms
+    )
+  end
+
+  defp ensure_direct_call_room(socket) do
+    case Repo.execute(
+           "SELECT room_type FROM rooms WHERE room_id = ? LIMIT 1",
+           [{"text", socket.assigns.room_id}]
+         ) do
+      {:ok, rows} ->
+        case Enum.take(rows, 1) do
+          [%{"room_type" => "dm"}] -> :ok
+          [_room] -> {:error, :calls_direct_only}
+          [] -> {:error, :room_unavailable}
         end
 
-      payload = %{
-        message_id: message_id,
-        client_ref: ref,
-        room_id: socket.assigns.room_id,
-        sender_id: socket.assigns.user_id,
-        sender_username: profile.username,
-        sender_avatar: profile.avatar,
-        sender_avatar_style: profile.avatar_style,
-        body: display_body,
-        content: display_body,
-        message_type: normalized_type,
-        attachments: normalized_attachments,
-        sent_at: sent_at,
-        is_scam: scan_result == :warn
-      }
-
-      broadcast!(socket, "new_message", payload)
-
-      # Persist ke Scylla secara Async
-      Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
-        persist_message(payload, socket.assigns.user_id_bin)
-        update_last_active_projection(socket.assigns.user_id_bin, sent_at)
-        update_inbox_and_unread(payload, socket.assigns.user_id_bin)
-        broadcast_inbox_updated(payload.room_id)
-        maybe_reply_as_aida(payload)
-      end)
-
-      {:reply, {:ok, payload}, socket}
-    else
-      {:error, reason} ->
-        {:reply, {:error, %{reason: inspect(reason)}}, socket}
+      {:error, _reason} ->
+        {:error, :room_unavailable}
     end
   end
+
+  defp call_error(socket, reason) do
+    {:reply, {:error, %{reason: safe_call_error(reason)}}, socket}
+  end
+
+  defp safe_call_error(:forbidden), do: "unauthorized"
+  defp safe_call_error(:rate_limited), do: "rate_limited"
+  defp safe_call_error(:calls_direct_only), do: "calls_direct_only"
+  defp safe_call_error(:room_unavailable), do: "room_unavailable"
+  defp safe_call_error(:blocked), do: "contact_blocked"
+  defp safe_call_error(:storage_unavailable), do: "room_unavailable"
+  defp safe_call_error(:invalid_call_id), do: "invalid_call_id"
+  defp safe_call_error(:invalid_signal), do: "invalid_signal"
+  defp safe_call_error(:invalid_call_payload), do: "invalid_call_payload"
+  defp safe_call_error(_reason), do: "invalid_call_request"
+
+  defp process_send_message(body, ref, message_type, attachments, socket) do
+    normalized_type = normalize_message_type(message_type)
+
+    with {:ok, normalized_attachments} <-
+           AttachmentPolicy.normalize(normalized_type, attachments),
+         :ok <- check_permission(socket, "chat:send"),
+         {:ok, clean_body} <- sanitize(body, normalized_attachments),
+         {:ok, scan_result} <- scan_content(clean_body),
+         :ok <- rate_limit(socket),
+         :ok <-
+           TrustSafety.ensure_room_send_allowed(
+             socket.assigns.room_id,
+             socket.assigns.user_id_bin
+           ) do
+      profile = current_user_profile(socket)
+
+      persistence_attrs = %{
+        room_id: socket.assigns.room_id,
+        sender_id_bin: socket.assigns.user_id_bin,
+        client_ref: ref,
+        content: clean_body,
+        message_type: normalized_type,
+        attachments: normalized_attachments
+      }
+
+      case MessagePersistence.persist(persistence_attrs) do
+        {:ok, status, message} ->
+          display_body =
+            if message.content == "" do
+              media_fallback_text(message.message_type)
+            else
+              message.content
+            end
+
+          payload = %{
+            message_id: message.message_id,
+            client_ref: message.client_ref,
+            room_id: message.room_id,
+            sender_id: socket.assigns.user_id,
+            sender_username: profile.username,
+            sender_avatar: profile.avatar,
+            sender_avatar_style: profile.avatar_style,
+            body: display_body,
+            content: message.content,
+            message_type: message.message_type,
+            attachments: message.attachments,
+            sent_at: message.sent_at,
+            is_scam: scan_result == :warn,
+            deduplicated: status == :duplicate
+          }
+
+          if status == :inserted do
+            broadcast!(socket, "new_message", payload)
+
+            Task.Supervisor.start_child(ChatService.TaskSupervisor, fn ->
+              update_last_active_projection(socket.assigns.user_id_bin, message.sent_at)
+
+              case update_inbox_and_unread(payload, socket.assigns.user_id_bin) do
+                :ok ->
+                  broadcast_inbox_updated(payload.room_id)
+
+                {:error, reason} ->
+                  Logger.error("[Scylla] Inbox projection failed: #{inspect(reason)}")
+              end
+
+              maybe_reply_as_aida(payload)
+            end)
+          end
+
+          {:reply, {:ok, payload}, socket}
+
+        {:error, :invalid_client_ref} ->
+          {:reply, {:error, %{reason: "invalid_client_ref"}}, socket}
+
+        {:error, :invalid_attachments} ->
+          {:reply, {:error, %{reason: "invalid_attachments"}}, socket}
+
+        {:error, :client_ref_conflict} ->
+          {:reply, {:error, %{reason: "client_ref_conflict"}}, socket}
+
+        {:error, reason} ->
+          Logger.error("[Scylla] Message rejected because persistence failed: #{inspect(reason)}")
+          {:reply, {:error, %{reason: "message_storage_unavailable"}}, socket}
+      end
+    else
+      {:error, reason} ->
+        {:reply, {:error, %{reason: safe_send_error(reason)}}, socket}
+    end
+  end
+
+  defp safe_send_error(:blocked), do: "contact_blocked"
+  defp safe_send_error(:storage_unavailable), do: "message_storage_unavailable"
+  defp safe_send_error(:forbidden), do: "unauthorized"
+  defp safe_send_error(:rate_limited), do: "rate_limited"
+  defp safe_send_error(:invalid_attachments), do: "invalid_attachments"
+  defp safe_send_error("empty"), do: "empty_message"
+  defp safe_send_error("blocked"), do: "message_blocked"
+  defp safe_send_error(_reason), do: "message_rejected"
 
   # --- HELPERS ---
   defp can_join_room?(socket, room_id) do
@@ -288,7 +440,7 @@ defmodule ChatServiceWeb.RoomChannel do
              "SELECT user_id FROM room_members WHERE room_id = ? AND user_id = ? LIMIT 1",
              [{"text", current_room_id}, {"uuid", user_id_bin}]
            ) do
-        {:ok, rows} -> rows != []
+        {:ok, rows} -> Enum.any?(rows)
         _ -> false
       end
     end
@@ -347,69 +499,11 @@ defmodule ChatServiceWeb.RoomChannel do
 
   defp rate_limit(socket) do
     key = {:rate, socket.assigns.user_id}
-    # Update counter di ETS yang dibuat di application.ex
-    case :ets.update_counter(:rate_limiter, key, {2, 1}, {key, 0, 0}) do
-      count when count <= @rate_max_msg -> :ok
-      _ -> {:error, :rate_limited}
-    end
-  end
-
-  # --- SCYLLA DATA LAYER ---
-  defp fetch_history(room_id, last_id) do
-    bucket = Repo.get_bucket(DateTime.utc_now())
-
-    query =
-      "SELECT * FROM messages WHERE room_id = ? AND bucket = ? ORDER BY message_id DESC LIMIT ?"
-
-    case Repo.execute(query, [{"text", room_id}, {"int", bucket}, {"int", @history_limit}]) do
-      {:ok, rows} -> Enum.map(rows, &format_message/1)
-      _ -> []
-    end
-  end
-
-  defp format_message(row) do
-    %{
-      message_id: Ecto.UUID.cast!(row["message_id"]),
-      sender_id: Ecto.UUID.cast!(row["sender_id"]),
-      body: row["content"],
-      content: row["content"],
-      message_type: row["message_type"] || "text",
-      attachments: row["attachments"] || [],
-      sent_at: row["sent_at"]
-    }
-  end
-
-  defp persist_message(m, _sender_bin) do
-    # 1. Pastikan bucket adalah Integer (YYYYMM)
-    bucket = String.to_integer(Calendar.strftime(m.sent_at, "%Y%m"))
-
-    # 2. Dump UUID sender dengan benar
-    {:ok, sender_uuid_bin} = Ecto.UUID.dump(m.sender_id)
-
-    # 3. Gunakan 'now()' milik Scylla untuk message_id agar pasti valid timeuuid
-    query = """
-      INSERT INTO messages (room_id, bucket, message_id, sender_id, content, message_type, attachments, is_edited, is_deleted, sent_at)
-      VALUES (?, ?, now(), ?, ?, ?, ?, ?, ?, ?)
-    """
-
-    case Repo.execute(query, [
-           {"text", m.room_id},
-           {"int", bucket},
-           {"uuid", sender_uuid_bin},
-           {"text", m.body},
-           {"text", m.message_type || "text"},
-           {"list<text>", m.attachments || []},
-           {"boolean", false},
-           {"boolean", false},
-           {"timestamp", m.sent_at}
-         ]) do
-      {:ok, _} -> Logger.info("[Scylla] Message persisted successfully")
-      {:error, reason} -> Logger.error("[Scylla] Failed to persist message: #{inspect(reason)}")
-    end
+    RateLimiter.check(key, @rate_max_msg, @rate_window_ms)
   end
 
   defp update_last_active_projection(bin_id, ts) do
-    Repo.execute("UPDATE core.users SET last_active = ? WHERE user_id = ?", [
+    Repo.execute("UPDATE users SET last_active = ? WHERE user_id = ?", [
       {"timestamp", ts},
       {"uuid", bin_id}
     ])
@@ -445,6 +539,7 @@ defmodule ChatServiceWeb.RoomChannel do
          "transaction",
          "application",
          "listing",
+         "invite",
          "order",
          "milestone",
          "ride_update",
@@ -457,75 +552,123 @@ defmodule ChatServiceWeb.RoomChannel do
 
   defp normalize_message_type(_), do: "text"
 
-  defp normalize_attachments(nil), do: []
-
-  defp normalize_attachments(list) when is_list(list) do
-    list
-    |> Enum.filter(&is_binary/1)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.take(10)
-  end
-
-  defp normalize_attachments(one) when is_binary(one), do: normalize_attachments([one])
-  defp normalize_attachments(_), do: []
+  defp media_fallback_text("image"), do: "Image"
+  defp media_fallback_text("video"), do: "Video"
+  defp media_fallback_text("audio"), do: "Audio"
+  defp media_fallback_text("file"), do: "File"
+  defp media_fallback_text("sticker"), do: "Sticker"
+  defp media_fallback_text("offer"), do: "Offer"
+  defp media_fallback_text("transaction"), do: "Transaction update"
+  defp media_fallback_text("application"), do: "Application"
+  defp media_fallback_text("listing"), do: "Listing shared"
+  defp media_fallback_text("order"), do: "Order update"
+  defp media_fallback_text("milestone"), do: "Milestone update"
+  defp media_fallback_text("ride_update"), do: "Ride update"
+  defp media_fallback_text("delivery_update"), do: "Delivery update"
+  defp media_fallback_text("job_update"), do: "Job update"
+  defp media_fallback_text(_type), do: "Attachment"
 
   defp update_inbox_and_unread(m, sender_id_bin) do
-    members = fetch_room_members(m.room_id)
-    {room_type, room_name, room_avatar} = fetch_room_meta(m.room_id)
+    with {:ok, members} <- fetch_room_members_result(m.room_id),
+         {:ok, {room_type, room_name, room_avatar}} <- fetch_room_meta_result(m.room_id) do
+      Enum.reduce_while(members, :ok, fn member_id_bin, :ok ->
+        case update_member_inbox(
+               m,
+               sender_id_bin,
+               member_id_bin,
+               room_type,
+               room_name,
+               room_avatar
+             ) do
+          :ok -> {:cont, :ok}
+          {:error, _reason} = error -> {:halt, error}
+        end
+      end)
+    end
+  end
 
-    Enum.each(members, fn member_id_bin ->
-      is_sender = member_id_bin == sender_id_bin
+  defp update_member_inbox(m, sender_id_bin, member_id_bin, room_type, room_name, room_avatar) do
+    is_sender = member_id_bin == sender_id_bin
+    write_timestamp = DateTime.to_unix(m.sent_at, :microsecond)
 
+    inbox_result =
       Repo.execute(
         """
-        INSERT INTO user_rooms (user_id, last_message_at, room_id, room_type, room_name, room_avatar, last_message, last_sender, unread_count, is_pinned)
+        INSERT INTO user_room_state (user_id, room_id, last_message_at, room_type, room_name, room_avatar, last_message, last_sender, unread_count, is_pinned)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        USING TIMESTAMP ?
         """,
         [
           {"uuid", member_id_bin},
-          {"timestamp", m.sent_at},
           {"text", m.room_id},
+          {"timestamp", m.sent_at},
           {"text", room_type},
           {"text", room_name},
           {"text", room_avatar},
           {"text", m.body},
           {"uuid", sender_id_bin},
           {"int", if(is_sender, do: 0, else: 1)},
-          {"boolean", false}
+          {"boolean", false},
+          {"bigint", write_timestamp}
         ]
       )
 
-      if not is_sender do
+    unread_result =
+      if is_sender do
+        {:ok, :sender}
+      else
         Repo.execute(
           "UPDATE unread_counters SET unread = unread + 1 WHERE user_id = ? AND room_id = ?",
           [{"uuid", member_id_bin}, {"text", m.room_id}]
         )
       end
-    end)
-  end
 
-  defp fetch_room_members(room_id) do
-    case Repo.execute("SELECT user_id FROM room_members WHERE room_id = ?", [{"text", room_id}]) do
-      {:ok, rows} -> Enum.map(rows, & &1["user_id"])
-      _ -> []
+    case {inbox_result, unread_result} do
+      {{:ok, _}, {:ok, _}} -> :ok
+      {{:error, reason}, _} -> {:error, reason}
+      {_, {:error, reason}} -> {:error, reason}
     end
   end
 
-  defp fetch_room_meta(room_id) do
+  defp fetch_room_members_result(room_id) do
+    case Repo.execute("SELECT user_id FROM room_members WHERE room_id = ?", [{"text", room_id}]) do
+      {:ok, rows} ->
+        members = rows |> Enum.map(& &1["user_id"]) |> Enum.filter(&is_binary/1)
+        {:ok, members}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp fetch_room_members(room_id) do
+    case fetch_room_members_result(room_id) do
+      {:ok, members} -> members
+      {:error, _reason} -> []
+    end
+  end
+
+  defp fetch_room_meta_result(room_id) do
     case Repo.execute(
            "SELECT room_type, room_name, room_avatar FROM rooms WHERE room_id = ? LIMIT 1",
            [{"text", room_id}]
          ) do
-      {:ok, [row | _]} ->
-        {
-          row["room_type"] || "dm",
-          row["room_name"] || room_id,
-          row["room_avatar"] || ""
-        }
+      {:ok, rows} ->
+        case Enum.take(rows, 1) do
+          [row] ->
+            {:ok,
+             {
+               row["room_type"] || "dm",
+               row["room_name"] || room_id,
+               row["room_avatar"] || ""
+             }}
 
-      _ ->
-        {"dm", room_id, ""}
+          [] ->
+            {:error, :room_not_found}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -571,13 +714,14 @@ defmodule ChatServiceWeb.RoomChannel do
   defp to_binary_uuid(str),
     do:
       case(Ecto.UUID.dump(str),
-        do: (
-          {:ok, b} -> b
-          _ -> nil
-        )
+        do:
+          (
+            {:ok, b} -> b
+            _ -> nil
+          )
       )
 
-  defp normalize_call_type(v) when is_binary(v) do
+  defp normalize_call_type(v) when is_binary(v) and byte_size(v) <= 16 do
     t = String.downcase(String.trim(v))
     if t in ["video", "voice"], do: t, else: "voice"
   end
@@ -597,28 +741,44 @@ defmodule ChatServiceWeb.RoomChannel do
         Process.sleep(350)
 
         with {:ok, bot_id_bin} <- Ecto.UUID.dump(AidaBot.bot_id()) do
-          sent_at = DateTime.utc_now()
+          case MessagePersistence.persist(%{
+                 room_id: room_id,
+                 sender_id_bin: bot_id_bin,
+                 client_ref: "aida:" <> Ecto.UUID.generate(),
+                 content: reply_text,
+                 message_type: "text",
+                 attachments: []
+               }) do
+            {:ok, :inserted, message} ->
+              payload = %{
+                message_id: message.message_id,
+                client_ref: message.client_ref,
+                room_id: room_id,
+                sender_id: AidaBot.bot_id(),
+                sender_username: AidaBot.bot_name(),
+                sender_avatar: AidaBot.bot_avatar(),
+                body: message.content,
+                content: message.content,
+                message_type: message.message_type,
+                attachments: message.attachments,
+                sent_at: message.sent_at,
+                is_scam: false
+              }
 
-          payload = %{
-            message_id: Ecto.UUID.generate(),
-            room_id: room_id,
-            sender_id: AidaBot.bot_id(),
-            sender_username: AidaBot.bot_name(),
-            sender_avatar: AidaBot.bot_avatar(),
-            body: reply_text,
-            content: reply_text,
-            message_type: "text",
-            attachments: [],
-            sent_at: sent_at,
-            is_scam: false
-          }
+              ensure_bot_projection(bot_id_bin, message.sent_at)
+              ChatServiceWeb.Endpoint.broadcast!("room:" <> room_id, "new_message", payload)
+              update_last_active_projection(bot_id_bin, message.sent_at)
 
-          ensure_bot_projection(bot_id_bin, sent_at)
-          ChatServiceWeb.Endpoint.broadcast!("room:" <> room_id, "new_message", payload)
-          persist_message(payload, bot_id_bin)
-          update_last_active_projection(bot_id_bin, sent_at)
-          update_inbox_and_unread(payload, bot_id_bin)
-          broadcast_inbox_updated(room_id)
+              if update_inbox_and_unread(payload, bot_id_bin) == :ok do
+                broadcast_inbox_updated(room_id)
+              end
+
+            {:ok, :duplicate, _message} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.error("[Scylla] Aida reply persistence failed: #{inspect(reason)}")
+          end
         end
       end
     end
@@ -656,7 +816,7 @@ defmodule ChatServiceWeb.RoomChannel do
   defp ensure_bot_projection(bot_id_bin, now) do
     Repo.execute(
       """
-      INSERT INTO core.users (user_id, display_name, avatar_url, last_active, updated_at)
+      INSERT INTO users (user_id, display_name, avatar_url, last_active, updated_at)
       VALUES (?, ?, ?, ?, ?)
       """,
       [

@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
 
-const USE_OLLAMA = process.env.USE_OLLAMA === 'true';
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_MODEL =
-  process.env.OLLAMA_BUSINESS_MODEL || process.env.OLLAMA_MODEL || 'llama3.2:3b';
+const INTERNAL_AI_URL = (process.env.INTERNAL_AI_URL || '').trim().replace(/\/+$/, '');
+const AI_SERVICE_TOKEN = process.env.AI_SERVICE_TOKEN || '';
+const AI_REQUEST_TIMEOUT_MS = (() => {
+  const value = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '', 10);
+  if (!Number.isFinite(value)) return 90_000;
+  return Math.min(180_000, Math.max(3_000, value));
+})();
 
 type BusinessPlanItem = {
   label: string;
@@ -14,7 +17,7 @@ type BusinessPlanItem = {
 };
 
 type BusinessPlan = {
-  provider: 'local-rules' | 'ollama+rules';
+  provider: 'local-rules' | 'ai-service+rules';
   ideaTitle: string;
   summary: string;
   budget: Array<{ label: string; amount: number; note: string }>;
@@ -438,160 +441,146 @@ function cleanList(value: unknown, maxItems: number, maxLength = 180): string[] 
   return result;
 }
 
-function cleanPlanItem(value: unknown, fallback: BusinessPlanItem): BusinessPlanItem {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback;
-  const record = value as Record<string, unknown>;
+type BusinessAdvisorData = {
+  objective?: unknown;
+  summary?: unknown;
+  assumptions?: unknown;
+  recommendations?: unknown;
+  next_steps?: unknown;
+  risks?: unknown;
+  metrics_to_watch?: unknown;
+};
+
+type InternalAiBusinessResponse = {
+  status?: unknown;
+  request_id?: unknown;
+  response?: unknown;
+  message?: unknown;
+  data?: unknown;
+  error?: unknown;
+  warnings?: unknown;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function buildAiEnhancedPlan(
+  payload: InternalAiBusinessResponse,
+  fallback: BusinessPlan,
+): BusinessPlan | null {
+  const data = asRecord(payload.data) as BusinessAdvisorData;
+
+  const summary =
+    cleanText(data.summary, 320) ||
+    (typeof payload.response === 'string'
+      ? cleanText(payload.response, 320)
+      : '') ||
+    fallback.summary;
+
+  const recommendations = cleanList(data.recommendations, 5, 170);
+  const nextSteps = cleanList(data.next_steps, 5, 170);
+  const risks = cleanList(data.risks, 4, 170);
+
+  const combinedFirstSteps = Array.from(
+    new Set([...nextSteps, ...recommendations].map((item) => item.trim())),
+  )
+    .filter(Boolean)
+    .slice(0, 5);
+
+  if (
+    summary === fallback.summary &&
+    combinedFirstSteps.length === 0 &&
+    risks.length === 0
+  ) {
+    return null;
+  }
+
   return {
-    label: cleanText(record.label, 80) || fallback.label,
-    note: cleanText(record.note, 180) || fallback.note,
-    query: cleanText(record.query, 100) || fallback.query,
+    ...fallback,
+    provider: 'ai-service+rules',
+    summary,
+    risks: risks.length > 0 ? risks : fallback.risks,
+    firstSteps:
+      combinedFirstSteps.length > 0
+        ? combinedFirstSteps
+        : fallback.firstSteps,
   };
 }
 
-function cleanPlanItems(value: unknown, fallback: BusinessPlanItem[]): BusinessPlanItem[] {
-  if (!Array.isArray(value)) return fallback;
-  return fallback.map((fallbackItem, index) => cleanPlanItem(value[index], fallbackItem));
-}
-
-function extractJsonObject(value: string): Record<string, unknown> | null {
-  const direct = value.trim();
-  const fenced =
-    direct.match(/```json\s*([\s\S]+?)```/i)?.[1] ||
-    direct.match(/```([\s\S]+?)```/i)?.[1] ||
-    '';
-  const candidates = [direct, fenced].filter(Boolean);
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate) as unknown;
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-    } catch {
-      // Try brace slicing below.
-    }
+async function callInternalAiPlan(
+  input: BusinessPlanInput,
+  fallback: BusinessPlan,
+  requestId: string,
+): Promise<BusinessPlan> {
+  if (!INTERNAL_AI_URL) {
+    throw new Error('INTERNAL_AI_URL_NOT_CONFIGURED');
   }
-  const firstBrace = direct.indexOf('{');
-  const lastBrace = direct.lastIndexOf('}');
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    try {
-      const parsed = JSON.parse(direct.slice(firstBrace, lastBrace + 1)) as unknown;
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
 
-function sanitizeAiPlan(rawText: string, fallback: BusinessPlan): BusinessPlan | null {
-  const parsed = extractJsonObject(rawText);
-  if (!parsed) return null;
-  const needs = parsed.needs && typeof parsed.needs === 'object'
-    ? (parsed.needs as Record<string, unknown>)
-    : {};
-  const estimates = parsed.estimates && typeof parsed.estimates === 'object'
-    ? (parsed.estimates as Record<string, unknown>)
-    : {};
-
-  return {
-    provider: 'ollama+rules',
-    ideaTitle: cleanText(parsed.ideaTitle, 90) || fallback.ideaTitle,
-    summary: cleanText(parsed.summary, 320) || fallback.summary,
-    budget: fallback.budget,
-    needs: {
-      supplies: cleanPlanItems(needs.supplies, fallback.needs.supplies),
-      equipment: cleanPlanItems(needs.equipment, fallback.needs.equipment),
-      packaging: cleanPlanItems(needs.packaging, fallback.needs.packaging),
-      services: cleanPlanItems(needs.services, fallback.needs.services),
-    },
-    estimates: {
-      startingBudgetMin: fallback.estimates.startingBudgetMin,
-      startingBudgetMax: fallback.estimates.startingBudgetMax,
-      sellingPriceRange:
-        cleanText(estimates.sellingPriceRange, 90) || fallback.estimates.sellingPriceRange,
-      grossMarginRange:
-        cleanText(estimates.grossMarginRange, 90) || fallback.estimates.grossMarginRange,
-      breakEvenRange:
-        cleanText(estimates.breakEvenRange, 90) || fallback.estimates.breakEvenRange,
-      caveat: cleanText(estimates.caveat, 200) || fallback.estimates.caveat,
-    },
-    risks: cleanList(parsed.risks, 4, 170).length
-      ? cleanList(parsed.risks, 4, 170)
-      : fallback.risks,
-    firstSteps: cleanList(parsed.firstSteps, 5, 170).length
-      ? cleanList(parsed.firstSteps, 5, 170)
-      : fallback.firstSteps,
-    searchQueries: cleanList(parsed.searchQueries, 6, 100).length
-      ? cleanList(parsed.searchQueries, 6, 100)
-      : fallback.searchQueries,
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'x-request-id': requestId,
   };
-}
 
-async function callOllamaPlan(input: BusinessPlanInput, fallback: BusinessPlan) {
-  const response = await fetch(`${trimBaseUrl(OLLAMA_URL)}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      messages: [
-        {
-          role: 'system',
-          content: [
-            'Kamu adalah AI Perencana Usaha Lokal Lajukan untuk pelaku usaha Indonesia.',
-            'Berikan saran praktis, hemat modal, dan tidak menjanjikan pasti untung.',
-            'Jangan menyebut nama supplier palsu. Beri kebutuhan dan query pencarian saja.',
-            'Gunakan JSON valid saja. Jangan markdown.',
-          ].join('\n'),
+  if (AI_SERVICE_TOKEN) {
+    headers.Authorization = `Bearer ${AI_SERVICE_TOKEN}`;
+  }
+
+  const message =
+    input.locale === 'en'
+      ? [
+          'Review this small-business plan for an Indonesian operator.',
+          'Use the supplied input and baseline plan as facts.',
+          'Prioritize practical recommendations, risks, and next steps.',
+          'Do not invent suppliers, current prices, stock, permits, or guaranteed profit.',
+        ].join(' ')
+      : [
+          'Tinjau rencana usaha kecil ini untuk pelaku usaha Indonesia.',
+          'Gunakan input dan baseline plan pada context sebagai fakta.',
+          'Prioritaskan rekomendasi praktis, risiko, dan langkah berikutnya.',
+          'Jangan mengarang supplier, harga terkini, stok, izin, atau menjanjikan keuntungan.',
+        ].join(' ');
+
+  const response = await fetch(
+    `${INTERNAL_AI_URL}/v1/business/advice`,
+    {
+      method: 'POST',
+      headers,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
+      body: JSON.stringify({
+        message,
+        locale: input.locale,
+        response_mode: 'json',
+        temperature: 0.18,
+        max_tokens: 800,
+        context: {
+          business_plan_input: input,
+          baseline_plan: fallback,
         },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            request: 'Susun paket usaha ringan dari input user.',
-            input,
-            safeFallbackShape: fallback,
-            requiredSchema: {
-              ideaTitle: 'string',
-              summary: 'string',
-              needs: {
-                supplies: [{ label: 'string', note: 'string', query: 'string' }],
-                equipment: [{ label: 'string', note: 'string', query: 'string' }],
-                packaging: [{ label: 'string', note: 'string', query: 'string' }],
-                services: [{ label: 'string', note: 'string', query: 'string' }],
-              },
-              estimates: {
-                sellingPriceRange: 'string',
-                grossMarginRange: 'string',
-                breakEvenRange: 'string',
-                caveat: 'string',
-              },
-              risks: ['string'],
-              firstSteps: ['string'],
-              searchQueries: ['string'],
-            },
-          }),
-        },
-      ],
-      options: {
-        temperature: 0.25,
-        num_predict: 900,
-      },
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
+      }),
+    },
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as InternalAiBusinessResponse;
 
   if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`Ollama ${response.status}: ${text.slice(0, 300)}`);
+    const error =
+      typeof payload.error === 'string'
+        ? payload.error
+        : `Internal AI ${response.status}`;
+    throw new Error(error);
   }
-  const payload = (await response.json().catch(() => ({}))) as {
-    message?: { content?: string };
-  };
-  const plan = sanitizeAiPlan(payload.message?.content || '', fallback);
-  if (!plan) throw new Error('Ollama returned invalid business plan JSON.');
-  return plan;
+
+  const enhanced = buildAiEnhancedPlan(payload, fallback);
+  if (!enhanced) {
+    throw new Error('AI_SERVICE_RETURNED_NO_USABLE_BUSINESS_PLAN_DATA');
+  }
+
+  return enhanced;
 }
 
 export async function POST(req: NextRequest) {
@@ -606,9 +595,14 @@ export async function POST(req: NextRequest) {
       windowSeconds: 3600,
       message: 'Too many business plan requests. Please retry later.',
     });
+
     if (!rate.ok) return rate.response;
 
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const body = (await req.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+
     const input: BusinessPlanInput = {
       locale: body.locale === 'en' ? 'en' : 'id',
       capital: cleanAmount(body.capital),
@@ -626,21 +620,54 @@ export async function POST(req: NextRequest) {
     }
 
     const fallback = buildLocalPlan(input);
-    if (USE_OLLAMA) {
+
+    /*
+     * Business-plan must remain usable even if the local model is cold/down.
+     * AI enhancement is centralized in ai_service; deterministic local rules
+     * remain the safe availability fallback.
+     */
+    if (INTERNAL_AI_URL) {
+      const requestId =
+        req.headers.get('x-request-id')?.trim() || crypto.randomUUID();
+
       try {
-        const plan = await callOllamaPlan(input, fallback);
-        return NextResponse.json({ data: plan });
+        const plan = await callInternalAiPlan(
+          input,
+          fallback,
+          requestId,
+        );
+
+        const response = NextResponse.json({ data: plan });
+        response.headers.set('x-request-id', requestId);
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
       } catch (error) {
         console.warn(
-          '[AI_BUSINESS_PLAN_OLLAMA_FALLBACK]',
-          error instanceof Error ? error.message : error,
+          '[AI_BUSINESS_PLAN_GATEWAY_FALLBACK]',
+          {
+            requestId,
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
         );
       }
+    } else {
+      console.warn(
+        '[AI_BUSINESS_PLAN_GATEWAY_FALLBACK]',
+        'INTERNAL_AI_URL is not configured; using local rules.',
+      );
     }
 
-    return NextResponse.json({ data: fallback });
+    const response = NextResponse.json({ data: fallback });
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('X-AI-Fallback', 'local-rules');
+
+    return response;
   } catch (error) {
     console.error('[AI_BUSINESS_PLAN_ERROR]', error);
+
     return NextResponse.json(
       { error: 'Gagal membuat rencana usaha.' },
       { status: 500 },

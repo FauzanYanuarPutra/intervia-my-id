@@ -1,0 +1,17 @@
+target
+.git
+.gitignore
+
+.env
+.env.*
+!.env.example
+
+*.log
+*.tmp
+*.bak
+
+.DS_Store
+Thumbs.db
+
+.vscode
+.idea

@@ -87,6 +87,14 @@ const TAB_CONFIG: Record<
     descriptionId: 'Toko, UMKM, dan profil usaha yang relevan.',
     descriptionEn: 'Relevant stores, MSMEs, and business profiles.',
   },
+  references: {
+    labelId: 'Referensi data publik',
+    labelEn: 'Public data references',
+    descriptionId:
+      'Lokasi non-transaksi dengan sumber dan lisensi yang bisa diperiksa.',
+    descriptionEn:
+      'Non-transactional locations with a source and license you can inspect.',
+  },
   needs: {
     labelId: 'Kebutuhan',
     labelEn: 'Needs',

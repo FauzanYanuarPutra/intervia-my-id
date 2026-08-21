@@ -17,7 +17,7 @@ import {
   parseTransactionDelivery,
 } from '@/lib/transactionDelivery';
 import {
-  PHONE_VERIFICATION_SETTINGS_PATH,
+  // PHONE_VERIFICATION_SETTINGS_PATH,
   readTransactionVerification,
   type TransactionVerificationState,
 } from '@/lib/identityVerification';
@@ -3495,11 +3495,11 @@ export default function TransactionsPage() {
             verificationPrompt?.hasPhone && !verificationPrompt.phoneReady,
           );
           setVerificationPrompt(null);
-          router.push(
-            shouldOpenPhoneVerification
-              ? `/${locale}${PHONE_VERIFICATION_SETTINGS_PATH}`
-              : `/${locale}/profile/edit`,
-          );
+          // router.push(
+          //   shouldOpenPhoneVerification
+          //     ? `/${locale}${PHONE_VERIFICATION_SETTINGS_PATH}`
+          //     : `/${locale}/profile/edit`,
+          // );
         }}
         onOpenProfile={() => {
           setVerificationPrompt(null);

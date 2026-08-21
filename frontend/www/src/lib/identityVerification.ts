@@ -1,7 +1,7 @@
 export type UserKycStatus = 'none' | 'basic' | 'full' | 'enhanced';
 
-export const PHONE_VERIFICATION_SETTINGS_PATH =
-  '/profile/edit#profile-edit-identity';
+// export const PHONE_VERIFICATION_SETTINGS_PATH =
+//   '/profile/edit#profile-edit-identity';
 
 export type IdentityVerificationRecord = {
   status: string;

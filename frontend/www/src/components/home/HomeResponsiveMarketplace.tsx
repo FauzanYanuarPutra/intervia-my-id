@@ -25,6 +25,7 @@ import {
   BriefcaseBusiness,
   Award,
   ChevronRight,
+  CheckCircle2,
   CircleHelp,
   ClipboardList,
   Clapperboard,
@@ -39,6 +40,7 @@ import {
   MoreHorizontal,
   Package,
   PlayCircle,
+  Pin,
   Share2,
   ShieldCheck,
   ShoppingBag,
@@ -111,10 +113,8 @@ import {
 import { FeedColumnFooter } from '@/components/layout/FeedColumnFooter';
 import type {
   CommunityFeedItem,
-  CommunityFeedOverview,
   CommunityFeedResponse,
 } from '@/lib/community/types';
-import { CommunityComposer } from '@/components/community/CommunityFeedClient';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import {
@@ -254,7 +254,14 @@ type PublicReferenceApiResponse = {
   };
 };
 
-type CommunityTab = 'for-you' | 'following' | 'community';
+type CommunityTab = 'for-you' | 'community';
+
+type CommunityPostType =
+  | 'question'
+  | 'poll'
+  | 'update'
+  | 'media'
+  | 'discussion';
 
 type CommunityPost = {
   id: string;
@@ -275,6 +282,10 @@ type CommunityPost = {
   mediaItems: MediaPreviewItem[];
   avatar?: string;
   tags: string[];
+
+  isPinned: boolean;
+  isSolved: boolean;
+  postType: CommunityPostType;
 
   likes: number;
   comments: number;
@@ -1070,6 +1081,12 @@ function mapCommunityItemToPost(
   activeTab: CommunityTab,
 ): CommunityPost {
   const isReel = item.kind === 'reel';
+  const threadId = String(item.threadId || '').trim();
+
+  if (!threadId) {
+    throw new Error(`Community item ${item.id} is missing threadId`);
+  }
+
   const mediaItems = buildCommunityMediaItems(item);
   const firstMedia = mediaItems[0];
 
@@ -1083,9 +1100,39 @@ function mapCommunityItemToPost(
       ? item.media?.type
       : firstMedia?.type || item.media?.type;
 
+  const tags = (item.tags || [])
+    .map(tag => tag.name || tag.slug)
+    .filter(Boolean)
+    .slice(0, 4);
+
+  const normalizedTags = tags.map(tag => tag.trim().toLowerCase());
+  const isPoll =
+    normalizedTags.some(tag =>
+      /^(poll|polling|survey|jajak|voting)$/i.test(tag),
+    ) ||
+    /(?:^|\n)\s*(?:polling|poll|jajak pendapat)\s*:/i.test(item.body || '');
+  const isQuestion = normalizedTags.some(tag =>
+    /^(tanya|question|ask|help|support)$/i.test(tag),
+  );
+  const isMediaPost =
+    normalizedTags.some(tag => /^(media-usaha|photo|foto|video)$/i.test(tag)) ||
+    mediaItems.length > 0;
+  const isUpdate = normalizedTags.some(tag =>
+    /^(update-usaha|update|progress|cerita)$/i.test(tag),
+  );
+  const postType: CommunityPostType = isPoll
+    ? 'poll'
+    : isQuestion
+      ? 'question'
+      : isMediaPost
+        ? 'media'
+        : isUpdate
+          ? 'update'
+          : 'discussion';
+
   return {
     id: item.id,
-    threadId: item.threadId,
+    threadId,
     postId: item.postId || undefined,
 
     tab: activeTab,
@@ -1131,10 +1178,11 @@ function mapCommunityItemToPost(
       item.author?.name,
     ),
 
-    tags: (item.tags || [])
-      .map(tag => tag.name || tag.slug)
-      .filter(Boolean)
-      .slice(0, 4),
+    tags,
+
+    isPinned: Boolean(item.isPinned),
+    isSolved: Boolean(item.isSolved),
+    postType,
 
     likes: Math.max(0, item.stats?.reactions ?? 0),
     comments: Math.max(0, item.stats?.comments ?? 0),
@@ -1596,12 +1644,8 @@ function renderHomeAvatarProp(prop: HomeAvatarProp) {
 type CommunityTabItem = {
   id: CommunityTab;
   label: string;
-  caption: string;
-  actionLabel: string;
   emptyLabel: string;
-  loadingLabel: string;
   icon: LucideIcon;
-  tone: Tone;
 };
 
 function getCommunityTabs(isId: boolean): CommunityTabItem[] {
@@ -1609,42 +1653,18 @@ function getCommunityTabs(isId: boolean): CommunityTabItem[] {
     {
       id: 'for-you',
       label: isId ? 'Untukmu' : 'For you',
-      caption: isId ? 'Rekomendasi & tren' : 'Recommended trends',
-      actionLabel: isId ? 'Buka Untukmu' : 'Open For you',
       emptyLabel: isId
-        ? 'Belum ada rekomendasi komunitas.'
-        : 'No recommended community posts yet.',
-      loadingLabel: isId
-        ? 'Memuat rekomendasi...'
-        : 'Loading recommendations...',
-      icon: Sparkles,
-      tone: 'emerald',
-    },
-    {
-      id: 'following',
-      label: isId ? 'Diikuti' : 'Following',
-      caption: isId ? 'Dari akun/topik pilihan' : 'From followed signals',
-      actionLabel: isId ? 'Buka Diikuti' : 'Open Following',
-      emptyLabel: isId
-        ? 'Belum ada update dari yang diikuti.'
-        : 'No following updates yet.',
-      loadingLabel: isId ? 'Memuat update...' : 'Loading updates...',
-      icon: Heart,
-      tone: 'rose',
+        ? 'Belum ada diskusi yang direkomendasikan.'
+        : 'No recommended discussions yet.',
+      icon: MessageCircle,
     },
     {
       id: 'community',
       label: isId ? 'Grup' : 'Groups',
-      caption: isId ? 'Diskusi ruang UMKM' : 'Business group rooms',
-      actionLabel: isId ? 'Buka Grup' : 'Open Groups',
       emptyLabel: isId
-        ? 'Belum ada diskusi grup dari database.'
-        : 'No group discussions from the database yet.',
-      loadingLabel: isId
-        ? 'Memuat diskusi grup...'
-        : 'Loading group discussions...',
+        ? 'Belum ada diskusi grup untuk ditampilkan.'
+        : 'No group discussions to show yet.',
       icon: Users,
-      tone: 'teal',
     },
   ];
 }
@@ -1932,107 +1952,437 @@ function HeroVisualStage({
   const { user, isAuthenticated } = useAuth();
 
   const displayName =
-    user?.username || user?.fullName || user?.full_name || 'Sobat Bisnis';
+    user?.username ||
+    user?.fullName ||
+    user?.full_name ||
+    'Sobat Bisnis';
+
+  const quickSearches = isId
+    ? [
+        'Produk',
+        'Jasa',
+        'Bahan Usaha',
+        'Mesin & Alat',
+        'Tempat Usaha',
+        'Peluang Usaha',
+      ]
+    : [
+        'Products',
+        'Services',
+        'Business Supplies',
+        'Machines & Tools',
+        'Business Places',
+        'Business Opportunities',
+      ];
 
   return (
     <section
-      className={`mx-auto w-full max-w-7xl px-0 py-4 ${className || ''}`}
+      className={`mx-auto w-full max-w-7xl px-0 pt-3 pb-5 sm:pt-4 sm:pb-6 ${
+        className || ''
+      }`}
     >
+      {/* HERO */}
       <div
         className={`
-          relative overflow-hidden rounded-3xl bg-emerald-50/70
-          px-4 py-5 sm:px-6 sm:py-7
-          ${isAuthenticated ? 'min-h-[125px]' : 'min-h-[155px]'}
+          relative
+          isolate
+          overflow-hidden
+          rounded-3xl
+          px-4
+          py-5
+          sm:px-6
+          sm:py-7
+          md:px-8
+          md:py-8
+
+          !border
+          !border-emerald-100
+          !bg-emerald-50
+
+          dark:!border-emerald-900/60
+          dark:!bg-zinc-950
+
+          ${
+            isAuthenticated
+              ? 'min-h-[145px]'
+              : 'min-h-[175px]'
+          }
         `}
       >
-        <div className="relative z-10 grid grid-cols-3 items-center gap-3">
+        {/* Background decoration */}
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute
+            -right-16
+            -top-16
+            z-0
+            h-44
+            w-44
+            rounded-full
+            !bg-emerald-200/25
+            blur-3xl
+
+            dark:!bg-emerald-900/20
+          "
+        />
+
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute
+            -bottom-20
+            left-1/3
+            z-0
+            h-40
+            w-40
+            rounded-full
+            !bg-white/50
+            blur-3xl
+
+            dark:!bg-emerald-950/20
+          "
+        />
+
+        <div className="relative z-10 flex items-center">
           {/* LEFT */}
-          <div className="col-span-2 flex flex-col justify-center">
+          <div
+            className={`
+              min-w-0
+              ${
+                isAuthenticated
+                  ? 'max-w-3xl'
+                  : 'max-w-[calc(100%-105px)] sm:max-w-[calc(100%-160px)] md:max-w-[calc(100%-210px)]'
+              }
+            `}
+          >
             {isAuthenticated ? (
               <>
-                <h1 className="text-[clamp(1.25rem,3vw,2.25rem)] font-black leading-[0.95] tracking-[-0.05em] text-zinc-950">
-                  Halo,{' '}
-                  <span className="text-emerald-600">{displayName} 👋</span>
+                <p
+                  className="
+                    mb-1
+                    text-[10px]
+                    font-extrabold
+                    uppercase
+                    tracking-[0.12em]
+                    !text-emerald-700
+
+                    sm:text-xs
+
+                    dark:!text-emerald-400
+                  "
+                >
+                  {isId
+                    ? 'Selamat datang kembali'
+                    : 'Welcome back'}
+                </p>
+
+                <h1
+                  className="
+                    text-[clamp(1.35rem,3vw,2.35rem)]
+                    font-black
+                    leading-[0.98]
+                    tracking-[-0.055em]
+                    !text-zinc-950
+
+                    dark:!text-white
+                  "
+                >
+                  {isId ? 'Halo, ' : 'Hi, '}
+
+                  <span className="!text-emerald-700 dark:!text-emerald-400">
+                    {displayName}
+                  </span>
+
+                  <span aria-hidden="true"> 👋</span>
                 </h1>
 
-                <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-600 sm:text-sm sm:leading-6">
-                  Cari supplier, bahan usaha, jasa, tempat jualan, dan peluang
-                  baru untuk usahamu.
+                <p
+                  className="
+                    mt-2
+                    max-w-2xl
+                    text-xs
+                    font-semibold
+                    leading-5
+                    !text-zinc-700
+
+                    sm:text-sm
+                    sm:leading-6
+
+                    dark:!text-zinc-300
+                  "
+                >
+                  {isId
+                    ? 'Temukan produk, jasa, supplier, tempat usaha, dan peluang yang cocok untukmu.'
+                    : 'Find products, services, suppliers, business places, and opportunities that fit you.'}
                 </p>
               </>
             ) : (
               <>
-                <h1 className="text-[clamp(1.4rem,3.5vw,2.75rem)] font-black leading-[0.95] tracking-[-0.06em] text-zinc-950">
-                  Cari Kebutuhan
-                  <br />
-                  <span className="text-emerald-600">Usaha Lokal 🚀</span>
+                <p
+                  className="
+                    mb-1
+                    text-[10px]
+                    font-extrabold
+                    uppercase
+                    tracking-[0.12em]
+                    !text-emerald-700
+
+                    sm:text-xs
+
+                    dark:!text-emerald-400
+                  "
+                >
+                  {isId
+                    ? 'Platform usaha & peluang'
+                    : 'Business & opportunity platform'}
+                </p>
+
+                <h1
+                  className="
+                    text-[clamp(1.5rem,4vw,2.8rem)]
+                    font-black
+                    leading-[0.96]
+                    tracking-[-0.065em]
+                    !text-zinc-950
+
+                    dark:!text-white
+                  "
+                >
+                  {isId ? (
+                    <>
+                      Temukan yang kamu butuhkan
+                      <br className="hidden sm:block" />
+                      <span className="!text-emerald-700 dark:!text-emerald-400">
+                        untuk usahamu 🚀
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Find what you need
+                      <br className="hidden sm:block" />
+                      <span className="!text-emerald-700 dark:!text-emerald-400">
+                        for your business 🚀
+                      </span>
+                    </>
+                  )}
                 </h1>
 
-                <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-600 sm:text-sm sm:leading-6">
-                  Temukan supplier, bahan, mesin, jasa, tempat usaha, dan
-                  peluang bisnis untuk UMKM Indonesia.
+                <p
+                  className="
+                    mt-2
+                    max-w-2xl
+                    text-xs
+                    font-semibold
+                    leading-5
+                    !text-zinc-700
+
+                    sm:text-sm
+                    sm:leading-6
+
+                    dark:!text-zinc-300
+                  "
+                >
+                  {isId
+                    ? 'Produk, jasa, bahan usaha, mesin, tempat usaha, supplier, dan peluang bisnis dalam satu tempat.'
+                    : 'Products, services, supplies, machines, business places, suppliers, and opportunities in one place.'}
                 </p>
               </>
             )}
           </div>
 
           {/* RIGHT IMAGE */}
-          {!isAuthenticated && (
-            <div className="relative col-span-1 h-[110px] sm:h-[140px] md:h-[170px]">
+          {!isAuthenticated ? (
+            <div
+              className="
+                pointer-events-none
+                relative
+                ml-auto
+                h-[105px]
+                w-[100px]
+                shrink-0
+
+                sm:h-[135px]
+                sm:w-[145px]
+
+                md:h-[165px]
+                md:w-[190px]
+              "
+            >
               <Image
                 src={HOME_HERO_IMAGE}
-                alt="Lajukan Hero"
+                alt=""
                 width={500}
                 height={500}
                 priority
+                aria-hidden="true"
                 className="
-                  pointer-events-none absolute right-[-20px] top-1/2
-                  w-[150px] -translate-y-1/2 object-contain
-                  sm:w-[210px] md:w-[260px]
+                  absolute
+                  right-[-10px]
+                  top-1/2
+                  w-[145px]
+                  -translate-y-1/2
+                  object-contain
+
+                  sm:right-[-15px]
+                  sm:w-[200px]
+
+                  md:right-[-20px]
+                  md:w-[250px]
                 "
               />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
       {/* SEARCH */}
-      <div className="-mt-5 px-2">
+      <div className="relative z-20 -mt-5 px-2 sm:px-4">
         <form
           role="search"
-          aria-label={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
+          aria-label={
+            isId
+              ? 'Cari kebutuhan usaha'
+              : 'Search business needs'
+          }
           onSubmit={event => {
             event.preventDefault();
-            onSubmit(query);
+            onSubmit(query.trim());
           }}
-          className="ui-search-form ui-field-shell relative z-20 flex h-12 items-center gap-2 rounded-2xl border bg-white px-3 shadow-[0_14px_34px_-24px_rgba(15,23,42,0.28)]"
+          className="
+            ui-search-form
+            ui-field-shell
+            flex
+            h-13
+            w-full
+            items-center
+            gap-2
+            rounded-2xl
+            px-3
+
+            !border
+            !border-zinc-200
+            !bg-white
+            !shadow-[0_14px_34px_-22px_rgba(15,23,42,0.38)]
+
+            focus-within:!border-emerald-400
+
+            sm:h-14
+            sm:px-4
+
+            dark:!border-zinc-700
+            dark:!bg-zinc-900
+          "
         >
-          <Search className="h-4 w-4 shrink-0 text-emerald-600" />
+          <Search
+            className="
+              h-4
+              w-4
+              shrink-0
+              !text-emerald-600
+
+              sm:h-5
+              sm:w-5
+
+              dark:!text-emerald-400
+            "
+            aria-hidden="true"
+          />
 
           <input
             type="search"
             name="q"
             enterKeyHint="search"
+            autoComplete="off"
             value={query}
-            onChange={event => onQueryChange(event.target.value)}
+            onChange={event =>
+              onQueryChange(event.target.value)
+            }
             placeholder={
               isAuthenticated
-                ? 'Cari kebutuhan usaha hari ini...'
-                : 'Cari supplier, bahan usaha, jasa, atau peluang...'
+                ? isId
+                  ? 'Cari apa yang kamu butuhkan hari ini...'
+                  : 'What do you need today?'
+                : isId
+                  ? 'Cari produk, jasa, supplier, atau peluang...'
+                  : 'Search products, services, suppliers, or opportunities...'
             }
             className="
-              min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-700
-              placeholder:text-zinc-400 focus:outline-none
+              min-w-0
+              flex-1
+              bg-transparent
+              text-sm
+              font-semibold
+              !text-zinc-900
+              outline-none
+              !placeholder:text-zinc-400
+
+              sm:text-[15px]
+
+              dark:!text-white
+              dark:!placeholder:text-zinc-500
             "
           />
 
           <button
+            type="submit"
+            className="
+              hidden
+              h-9
+              shrink-0
+              items-center
+              justify-center
+              rounded-xl
+              px-4
+              text-xs
+              font-extrabold
+              !bg-emerald-600
+              !text-white
+              transition
+              hover:!bg-emerald-700
+
+              sm:inline-flex
+            "
+          >
+            {isId ? 'Cari' : 'Search'}
+          </button>
+
+          <button
             type="button"
             onClick={onOpenFilters}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-100"
-            aria-label="Filter pencarian"
+            className="
+              inline-flex
+              h-8
+              w-8
+              shrink-0
+              items-center
+              justify-center
+              rounded-xl
+              !text-zinc-500
+              transition
+
+              hover:!bg-zinc-100
+              hover:!text-zinc-900
+
+              sm:h-9
+              sm:w-9
+
+              dark:!text-zinc-400
+              dark:hover:!bg-zinc-800
+              dark:hover:!text-white
+            "
+            aria-label={
+              isId
+                ? 'Filter pencarian'
+                : 'Search filters'
+            }
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <SlidersHorizontal
+              className="h-4 w-4"
+              aria-hidden="true"
+            />
           </button>
         </form>
       </div>
@@ -2524,7 +2874,7 @@ export function RecommendationsSection({
 }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
-    containScroll: 'keepSnaps',
+    containScroll: 'trimSnaps',
     dragFree: true,
     skipSnaps: true,
   });
@@ -2533,7 +2883,7 @@ export function RecommendationsSection({
 
   return (
     <section
-      className="w-full py-1.5 sm:py-2"
+      className="w-full min-w-0 overflow-hidden py-1.5 sm:py-2"
       data-testid="home-recommendations-section"
       aria-label={
         isId
@@ -2542,64 +2892,72 @@ export function RecommendationsSection({
       }
     >
       {/* HEADER */}
-      <div className="flex h-6 items-center gap-1.5 px-1 sm:px-3 md:px-6">
+      <div className="flex min-w-0 items-center gap-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
 
-        <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
+        <h2 className="min-w-0 truncate text-[11px] font-bold leading-5 tracking-tight text-[color:var(--app-text)] sm:text-xs">
           {isId ? 'Rekomendasi untuk usahamu' : 'Recommended for you'}
         </h2>
 
-        <span className="hidden text-[9px] font-medium text-zinc-400 sm:inline">
+        <span className="hidden shrink-0 text-[9px] font-medium text-zinc-400 sm:inline">
           {isId ? 'Supplier, jasa & alat' : 'Suppliers, services & tools'}
         </span>
       </div>
 
       {/* EMPTY */}
       {items.length === 0 ? (
-        <div className="mt-1 px-1 sm:px-3 md:px-6">
-          <p className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-3 py-3 text-center text-[10px] font-medium text-zinc-500">
-            {isId
-              ? 'Belum ada rekomendasi saat ini.'
-              : 'No recommendations right now.'}
-          </p>
+        <div className="mt-1.5 px-2 sm:px-3 md:px-4 lg:px-6">
+          <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-3 py-4 text-center dark:border-zinc-800 dark:bg-zinc-900/40">
+            <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+              {isId
+                ? 'Belum ada rekomendasi saat ini.'
+                : 'No recommendations right now.'}
+            </p>
+          </div>
         </div>
       ) : (
-        /* CAROUSEL */
-        <div
-          ref={emblaRef}
-          className="mt-1 cursor-grab overflow-hidden contain-paint active:cursor-grabbing"
-        >
+        <div className="relative mt-1.5 min-w-0">
           <div
-            className="
-              flex touch-pan-y gap-2
-              px-1 py-0.5
-              sm:px-3
-              md:px-6
-              [backface-visibility:hidden]
-              [will-change:transform]
-            "
+            ref={emblaRef}
+            className="min-w-0 cursor-grab overflow-hidden active:cursor-grabbing"
           >
-            {items.map(item => (
-              <div
-                key={item.id}
-                className="
-                  w-[42vw]
-                  min-w-[150px]
-                  max-w-[190px]
-                  shrink-0 select-none
-                  sm:w-[190px]
-                  sm:max-w-[190px]
-                  md:w-[200px]
-                  md:max-w-[200px]
-                "
-                style={{ backfaceVisibility: 'hidden' }}
-              >
-                <RecommendationCard
-                  item={item}
-                  isId={isId}
-                />
-              </div>
-            ))}
+            <div
+              className="
+                flex min-w-0 touch-pan-y gap-2
+                px-2 py-0.5
+                sm:gap-2.5 sm:px-3
+                md:px-4
+                lg:gap-3 lg:px-6
+                [backface-visibility:hidden]
+              "
+            >
+              {items.map(item => (
+                <div
+                  key={item.id}
+                  className="
+                    min-w-0 shrink-0 grow-0 select-none
+
+                    basis-[calc((100vw-32px)/2.08)]
+
+                    min-[390px]:basis-[calc((100vw-36px)/2.15)]
+
+                    sm:basis-[180px]
+                    md:basis-[190px]
+                    lg:basis-[200px]
+                    xl:basis-[210px]
+                    2xl:basis-[220px]
+                  "
+                  style={{ backfaceVisibility: 'hidden' }}
+                >
+                  <RecommendationCard item={item} isId={isId} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop controls jika component ini sudah tersedia di Home */}
+          <div className="hidden md:block">
+            <EmblaDesktopControls api={emblaApi} compact />
           </div>
         </div>
       )}
@@ -2803,6 +3161,8 @@ export function PublicReferencesSection({
     </section>
   );
 }
+const PUBLIC_MEDIA_BASE =
+  'https://www.lajukan.com/api/content/media';
 
 function RecommendationCard({
   item,
@@ -2811,78 +3171,425 @@ function RecommendationCard({
   item: RecommendationItem;
   isId: boolean;
 }) {
-  const image = item.image || item.images?.[0];
+  const image = normalizeMediaUrl(
+    item.image || item.images?.[0],
+  );
+
   const price =
     item.unit && item.unit !== 'item'
       ? `${item.price} / ${item.unit}`
       : item.price;
+
+  const locationLabel =
+    item.distanceLabel || item.location;
+
+  const fallbackTitle = isId ? 'Gambar produk' : 'Product image';
 
   return (
     <a
       href={item.href}
       data-testid="home-recommendation-card"
       className="
-        group flex min-h-0 gap-3 rounded-2xl border border-zinc-200
-        bg-white p-2.5 transition hover:border-zinc-300 hover:shadow-sm
+        group
+        flex h-full min-w-0 w-full flex-col
+        overflow-hidden
+        rounded-2xl
+        border border-zinc-200/80
+        bg-white
+        text-left
+        shadow-[0_1px_2px_rgba(0,0,0,0.025)]
+        transition-all
+        duration-200
+        ease-out
+
+        hover:-translate-y-0.5
+        hover:border-zinc-300
+        hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.22)]
+
+        focus-visible:outline-none
+        focus-visible:ring-2
+        focus-visible:ring-emerald-500/70
+        focus-visible:ring-offset-2
+
+        dark:border-zinc-800
+        dark:bg-zinc-950
+        dark:hover:border-zinc-700
+        dark:hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.55)]
       "
     >
-      <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100">
+      {/* IMAGE */}
+      <div
+        className="
+          relative
+          aspect-square
+          w-full
+          shrink-0
+          overflow-hidden
+          bg-zinc-100
+          dark:bg-zinc-900
+        "
+      >
         {image ? (
           <img
             src={image}
-            alt={item.title}
-            className="size-full object-cover transition duration-300 group-hover:scale-105"
+            alt={item.title || fallbackTitle}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="
+              h-full
+              w-full
+              select-none
+              object-cover
+              transition-transform
+              duration-500
+              ease-out
+              group-hover:scale-[1.04]
+            "
+            onError={(event) => {
+              const target = event.currentTarget;
+
+              target.style.display = 'none';
+
+              const fallback =
+                target.parentElement?.querySelector(
+                  '[data-image-fallback]',
+                );
+
+              if (fallback instanceof HTMLElement) {
+                fallback.classList.remove('hidden');
+              }
+            }}
           />
-        ) : (
-          <div className="flex size-full items-center justify-center text-xs text-zinc-400">
-            {isId ? 'Tanpa foto' : 'No image'}
-          </div>
-        )}
-      </div>
+        ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <div className="mb-1 flex items-center gap-1.5">
-          <span className="truncate text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-            {item.typeLabel}
-          </span>
-
-          {item.verified && (
-            <span
-              className="size-1.5 shrink-0 rounded-full bg-emerald-500"
-              title={isId ? 'Terverifikasi' : 'Verified'}
-            />
+        {/* IMAGE FALLBACK */}
+        <div
+          data-image-fallback
+          className={cn(
+            image ? 'hidden' : 'flex',
+            'absolute inset-0 items-center justify-center bg-zinc-100 px-4 text-center dark:bg-zinc-900',
           )}
+        >
+          <span className="text-[10px] font-medium text-zinc-400 sm:text-xs">
+            {isId ? 'Belum ada foto' : 'No image'}
+          </span>
         </div>
 
-        <h3 className="line-clamp-2 text-sm font-extrabold leading-[1.25] text-zinc-900">
+        {/* TOP GRADIENT */}
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute inset-x-0 top-0
+            h-16
+            bg-gradient-to-b
+            from-black/20
+            via-black/5
+            to-transparent
+          "
+        />
+
+        {/* CATEGORY */}
+        {item.typeLabel ? (
+          <span
+            title={item.typeLabel}
+            className="
+              absolute
+              left-2
+              top-2
+              max-w-[72%]
+              truncate
+              rounded-full
+              border
+              border-white/20
+              bg-black/55
+              px-2.5
+              py-1.5
+              text-[8px]
+              font-bold
+              leading-none
+              text-white
+              shadow-sm
+              backdrop-blur-md
+
+              sm:text-[9px]
+            "
+          >
+            {item.typeLabel}
+          </span>
+        ) : null}
+
+        {/* VERIFIED */}
+        {item.verified ? (
+          <span
+            className="
+              absolute
+              bottom-2
+              left-2
+              inline-flex
+              items-center
+              gap-1.5
+              rounded-full
+              border
+              border-white/70
+              bg-white/92
+              px-2
+              py-1.5
+              text-[8px]
+              font-bold
+              leading-none
+              text-emerald-700
+              shadow-sm
+              backdrop-blur-md
+
+              sm:text-[9px]
+
+              dark:border-zinc-700/80
+              dark:bg-zinc-950/90
+              dark:text-emerald-400
+            "
+          >
+            <span
+              aria-hidden="true"
+              className="
+                h-1.5
+                w-1.5
+                shrink-0
+                rounded-full
+                bg-emerald-500
+              "
+            />
+
+            <span>
+              {isId ? 'Terverifikasi' : 'Verified'}
+            </span>
+          </span>
+        ) : null}
+      </div>
+
+      {/* CONTENT */}
+      <div
+        className="
+          flex
+          min-w-0
+          flex-1
+          flex-col
+          p-2.5
+          sm:p-3
+        "
+      >
+        {/* TITLE */}
+        <h3
+          className="
+            line-clamp-2
+            min-w-0
+            min-h-[32px]
+            text-[12px]
+            font-semibold
+            leading-[16px]
+            tracking-[-0.01em]
+            text-zinc-800
+
+            min-[360px]:text-[13px]
+            min-[360px]:leading-[17px]
+
+            sm:min-h-[36px]
+            sm:text-sm
+            sm:leading-[18px]
+
+            dark:text-zinc-100
+          "
+        >
           {item.title}
         </h3>
 
-        <div className="mt-1.5 flex items-end justify-between gap-2">
-          <div className="min-w-0">
-            {price && (
-              <p className="truncate text-sm font-black text-emerald-700">
-                {price}
-              </p>
-            )}
+        {/* PRICE */}
+        {price ? (
+          <p
+            title={price}
+            className="
+              mt-2
+              truncate
+              text-[14px]
+              font-black
+              leading-tight
+              tracking-[-0.025em]
+              text-emerald-700
 
-            {(item.distanceLabel || item.location) && (
-              <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                {item.distanceLabel || item.location}
-              </p>
-            )}
-          </div>
+              min-[360px]:text-[15px]
 
-          {item.side && (
-            <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-bold text-zinc-600">
+              sm:text-base
+
+              dark:text-emerald-400
+            "
+          >
+            {price}
+          </p>
+        ) : (
+          <div
+            aria-hidden="true"
+            className="mt-2 h-[17px] sm:h-[19px]"
+          />
+        )}
+
+        {/* META */}
+        <div
+          className="
+            mt-3
+            flex
+            min-w-0
+            items-center
+            gap-2
+            border-t
+            border-zinc-100
+            pt-2.5
+
+            dark:border-zinc-900
+          "
+        >
+          {/* LOCATION */}
+          {locationLabel ? (
+            <span
+              title={locationLabel}
+              className="
+                min-w-0
+                flex-1
+                truncate
+                text-[9px]
+                font-medium
+                leading-4
+                text-zinc-500
+
+                min-[360px]:text-[10px]
+                sm:text-[11px]
+
+                dark:text-zinc-400
+              "
+            >
+              {locationLabel}
+            </span>
+          ) : (
+            <span
+              aria-hidden="true"
+              className="min-w-0 flex-1"
+            />
+          )}
+
+          {/* SIDE */}
+          {item.side ? (
+            <span
+              title={item.side}
+              className="
+                max-w-[42%]
+                shrink-0
+                truncate
+                rounded-full
+                bg-zinc-100
+                px-2
+                py-1
+                text-[8px]
+                font-bold
+                leading-none
+                text-zinc-600
+
+                sm:max-w-[45%]
+                sm:text-[9px]
+
+                dark:bg-zinc-900
+                dark:text-zinc-300
+              "
+            >
               {item.side}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </a>
   );
 }
+
+function normalizeMediaUrl(value?: string | null): string | null {
+  if (!value) return null;
+
+  const raw = value.trim();
+
+  if (!raw) return null;
+
+  // Already a fully-qualified public Lajukan media URL.
+  if (raw.startsWith(`${PUBLIC_MEDIA_BASE}/`)) {
+    return raw;
+  }
+
+  // Already a relative public Lajukan media URL.
+  if (raw.startsWith('/api/content/media/')) {
+    return `https://www.lajukan.com${raw}`;
+  }
+
+  /**
+   * Direct object-storage path without a hostname.
+   *
+   * /laju-chat/content/foo.png
+   */
+  if (raw.startsWith('/laju-chat/')) {
+    return `${PUBLIC_MEDIA_BASE}${raw}`;
+  }
+
+  try {
+    const url = new URL(raw);
+
+    const pathname = url.pathname;
+
+    /**
+     * Any URL whose path points to the private object-storage
+     * bucket should go through the public Lajukan media proxy.
+     *
+     * Example:
+     *
+     * http://localhost:9002/laju-chat/content/foo.png
+     *
+     * becomes:
+     *
+     * https://www.lajukan.com/api/content/media/laju-chat/content/foo.png
+     */
+    if (pathname.startsWith('/laju-chat/')) {
+      return `${PUBLIC_MEDIA_BASE}${pathname}${url.search}${url.hash}`;
+    }
+
+    /**
+     * Local storage host fallback.
+     *
+     * This covers cases where the API may return a local storage URL
+     * with a different object path.
+     */
+    const isLocalHost =
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      url.hostname === '0.0.0.0';
+
+    if (isLocalHost) {
+      return `${PUBLIC_MEDIA_BASE}${pathname}${url.search}${url.hash}`;
+    }
+
+    /**
+     * Keep unrelated/external absolute URLs unchanged.
+     *
+     * This prevents external image/CDN URLs from being incorrectly
+     * rewritten through the Lajukan media proxy.
+     */
+    return url.toString();
+  } catch {
+    /**
+     * Last fallback for malformed-but-path-like media URLs.
+     */
+    if (raw.startsWith('laju-chat/')) {
+      return `${PUBLIC_MEDIA_BASE}/${raw}`;
+    }
+
+    return raw;
+  }
+}
+
 
 function CommunityPanel({
   isId,
@@ -2890,13 +3597,10 @@ function CommunityPanel({
   activeTab,
   onTabChange,
   avatarSrc,
-  overview,
   posts,
   loading = false,
-  hasMore = false,
   loadError = null,
-  onLoadMore,
-  onCreated,
+  onRetry,
   onToggleLike,
   onSubmitComment,
   onSharePost,
@@ -2907,13 +3611,10 @@ function CommunityPanel({
   activeTab: CommunityTab;
   onTabChange: (tab: CommunityTab) => void;
   avatarSrc: string;
-  overview: CommunityFeedOverview | null;
   posts: CommunityPost[];
   loading?: boolean;
-  hasMore?: boolean;
   loadError?: string | null;
-  onLoadMore?: () => void;
-  onCreated?: (item?: CommunityFeedItem) => void;
+  onRetry?: () => void;
   onToggleLike: (
     postId: string,
     liked: boolean,
@@ -2926,68 +3627,50 @@ function CommunityPanel({
   onRequireAuth?: () => void;
 }) {
   const router = useRouter();
-
   const postOptionsRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   const [postOptionsOpen, setPostOptionsOpen] = useState(false);
   const [postOptionsCopied, setPostOptionsCopied] = useState(false);
-
   const [shareFeedback, setShareFeedback] = useState<
     'shared' | 'copied' | null
   >(null);
-
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(
     () => new Set(),
   );
-
   const [likeOverrides, setLikeOverrides] = useState<
     Record<string, boolean>
   >({});
-
   const [likeCountOverrides, setLikeCountOverrides] = useState<
     Record<string, number>
   >({});
-
   const [commentCountDeltas, setCommentCountDeltas] = useState<
     Record<string, number>
   >({});
-
   const [pendingLikeIds, setPendingLikeIds] = useState<Set<string>>(
     () => new Set(),
   );
-
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
-
-  const [interactionError, setInteractionError] = useState<
-    string | null
-  >(null);
-
-  /* ================= DATA ================= */
+  const [interactionError, setInteractionError] = useState<string | null>(null);
 
   const tabs = getCommunityTabs(isId);
-
   const activeTabMeta =
     tabs.find(item => item.id === activeTab) || tabs[0]!;
-
-  const visiblePosts = posts.filter(
-    item => !hiddenPostIds.has(item.id),
-  );
-
+  const visiblePosts = posts.filter(item => !hiddenPostIds.has(item.id));
   const post =
     visiblePosts.find(item => item.tab === activeTab) ||
     visiblePosts[0] ||
     null;
-
   const communityPostHref = post
     ? buildCommunityPostHref(post)
     : buildCommunityTabHref(activeTab);
-
-  const morePosts = post
+  const morePosts = (post
     ? visiblePosts.filter(item => item.id !== post.id)
-    : visiblePosts.slice(1);
+    : visiblePosts
+  ).slice(0, 2);
+  const communityHref = buildCommunityTabHref(activeTab);
 
   const postMediaItems = post?.mediaItems?.length
     ? post.mediaItems
@@ -2995,55 +3678,108 @@ function CommunityPanel({
       ? [
           {
             src: post.mediaUrl,
-            type:
-              post.mediaType === 'video'
-                ? 'video'
-                : 'image',
+            type: post.mediaType === 'video' ? 'video' : 'image',
             alt: post.title,
           } satisfies MediaPreviewItem,
         ]
       : [];
-
   const postMediaUrl =
-    postMediaItems.length > 0
-      ? post?.mediaUrl || post?.image
-      : null;
-
+    postMediaItems.length > 0 ? post?.mediaUrl || post?.image : null;
   const postIsVideo = post?.mediaType === 'video';
-
   const postInitiallyLiked = post?.viewerVote === 1;
-
   const postLiked = post
     ? (likeOverrides[post.id] ?? postInitiallyLiked)
     : false;
-
   const postLikeCount = post
     ? (likeCountOverrides[post.id] ?? post.likes)
     : 0;
-
   const postCommentCount = post
-    ? post.comments +
-      (commentCountDeltas[post.id] ?? 0)
+    ? post.comments + (commentCountDeltas[post.id] ?? 0)
     : 0;
+  const postLikePending = post ? pendingLikeIds.has(post.id) : false;
 
-  const postLikePending = post
-    ? pendingLikeIds.has(post.id)
-    : false;
+  const cleanPreviewBody = (target: CommunityPost) => {
+    if (target.postType !== 'poll') return target.body;
+    return target.body
+      .replace(/\n+\s*(?:Polling|Poll|Jajak pendapat)\s*:\s*[\s\S]*$/i, '')
+      .trim();
+  };
 
-  /* ================= HELPERS ================= */
+  const renderContext = (target: CommunityPost, compact = false) => {
+    const contexts: Array<{
+      key: string;
+      label: string;
+      icon: LucideIcon;
+      className?: string;
+    }> = [];
 
-  const buildAbsolutePostUrl = (
-    targetPost: CommunityPost,
-  ) => {
-    const href = buildCommunityPostHref(targetPost);
-
-    if (typeof window === 'undefined') {
-      return href;
+    if (target.isPinned) {
+      contexts.push({
+        key: 'pinned',
+        label: isId ? 'Disematkan' : 'Pinned',
+        icon: Pin,
+      });
     }
 
-    return `${window.location.origin}${
-      href.startsWith('/') ? href : `/${href}`
-    }`;
+    if (target.isSolved) {
+      contexts.push({
+        key: 'solved',
+        label: isId ? 'Terjawab' : 'Answered',
+        icon: CheckCircle2,
+        className: 'text-emerald-700',
+      });
+    } else if (target.postType === 'poll') {
+      contexts.push({
+        key: 'poll',
+        label: isId ? 'Polling' : 'Poll',
+        icon: BarChart3,
+      });
+    } else if (target.postType === 'question') {
+      contexts.push({
+        key: 'question',
+        label: isId ? 'Pertanyaan' : 'Question',
+        icon: MessageCircle,
+      });
+    } else if (target.postType === 'update') {
+      contexts.push({
+        key: 'update',
+        label: isId ? 'Update usaha' : 'Business update',
+        icon: TrendingUp,
+      });
+    }
+
+    if (contexts.length === 0) return null;
+
+    return (
+      <span
+        className={cn(
+          'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-bold text-[color:var(--app-text-soft)]',
+          compact ? 'text-[9px]' : 'text-[10px]',
+        )}
+      >
+        {contexts.slice(0, compact ? 1 : 2).map(context => {
+          const Icon = context.icon;
+          return (
+            <span
+              key={context.key}
+              className={cn(
+                'inline-flex min-w-0 items-center gap-1',
+                context.className,
+              )}
+            >
+              <Icon className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
+              <span className="truncate">{context.label}</span>
+            </span>
+          );
+        })}
+      </span>
+    );
+  };
+
+  const buildAbsolutePostUrl = (targetPost: CommunityPost) => {
+    const href = buildCommunityPostHref(targetPost);
+    if (typeof window === 'undefined') return href;
+    return `${window.location.origin}${href.startsWith('/') ? href : `/${href}`}`;
   };
 
   const copyText = async (value: string) => {
@@ -3053,27 +3789,19 @@ function CommunityPanel({
     }
 
     const textarea = document.createElement('textarea');
-
     textarea.value = value;
     textarea.setAttribute('readonly', '');
     textarea.style.position = 'fixed';
     textarea.style.opacity = '0';
-
     document.body.appendChild(textarea);
     textarea.select();
-
     const copied = document.execCommand('copy');
-
     textarea.remove();
-
-    if (!copied) {
-      throw new Error('Unable to copy link');
-    }
+    if (!copied) throw new Error('Unable to copy link');
   };
 
   const openCommunityPost = () => {
     if (!post) return;
-
     router.push(communityPostHref);
   };
 
@@ -3083,13 +3811,10 @@ function CommunityPanel({
         ? 'Masuk terlebih dahulu untuk menggunakan fitur ini.'
         : 'Sign in first to use this feature.',
     );
-
     onRequireAuth?.();
   };
 
-  const isInteractiveTarget = (
-    target: EventTarget | null,
-  ) =>
+  const isInteractiveTarget = (target: EventTarget | null) =>
     target instanceof Element &&
     Boolean(
       target.closest(
@@ -3107,23 +3832,15 @@ function CommunityPanel({
       ),
     );
 
-  /* ================= OPTIONS ================= */
-
   const copyPostLink = async () => {
     if (!post) return;
 
     try {
       await copyText(buildAbsolutePostUrl(post));
-
       setPostOptionsCopied(true);
-
-      window.setTimeout(
-        () => setPostOptionsCopied(false),
-        1600,
-      );
+      window.setTimeout(() => setPostOptionsCopied(false), 1600);
     } catch {
       setPostOptionsCopied(false);
-
       setInteractionError(
         isId
           ? 'Link belum berhasil disalin.'
@@ -3134,19 +3851,13 @@ function CommunityPanel({
 
   const hidePostFromHome = () => {
     if (!post) return;
-
     setHiddenPostIds(current => {
       const next = new Set(current);
-
       next.add(post.id);
-
       return next;
     });
-
     setPostOptionsOpen(false);
   };
-
-  /* ================= LIKE ================= */
 
   const toggleLike = async () => {
     if (!post || postLikePending) return;
@@ -3157,51 +3868,23 @@ function CommunityPanel({
     }
 
     setInteractionError(null);
-
     const previousLiked = postLiked;
     const previousCount = postLikeCount;
-
     const nextLiked = !previousLiked;
+    const nextCount = Math.max(0, previousCount + (nextLiked ? 1 : -1));
 
-    const nextCount = Math.max(
-      0,
-      previousCount + (nextLiked ? 1 : -1),
-    );
-
-    setLikeOverrides(current => ({
-      ...current,
-      [post.id]: nextLiked,
-    }));
-
-    setLikeCountOverrides(current => ({
-      ...current,
-      [post.id]: nextCount,
-    }));
-
-    setPendingLikeIds(current => {
-      const next = new Set(current);
-
-      next.add(post.id);
-
-      return next;
-    });
+    setLikeOverrides(current => ({ ...current, [post.id]: nextLiked }));
+    setLikeCountOverrides(current => ({ ...current, [post.id]: nextCount }));
+    setPendingLikeIds(current => new Set(current).add(post.id));
 
     try {
-      await onToggleLike(
-        post.threadId,
-        nextLiked,
-      );
+      await onToggleLike(post.threadId, nextLiked);
     } catch {
-      setLikeOverrides(current => ({
-        ...current,
-        [post.id]: previousLiked,
-      }));
-
+      setLikeOverrides(current => ({ ...current, [post.id]: previousLiked }));
       setLikeCountOverrides(current => ({
         ...current,
         [post.id]: previousCount,
       }));
-
       setInteractionError(
         isId
           ? 'Suka belum berhasil diperbarui. Coba lagi.'
@@ -3210,15 +3893,11 @@ function CommunityPanel({
     } finally {
       setPendingLikeIds(current => {
         const next = new Set(current);
-
         next.delete(post.id);
-
         return next;
       });
     }
   };
-
-  /* ================= COMMENT ================= */
 
   const openInlineComment = () => {
     if (!post) return;
@@ -3229,13 +3908,10 @@ function CommunityPanel({
     }
 
     setInteractionError(null);
-
     setCommentOpen(current => !current);
 
     if (!commentOpen) {
-      window.requestAnimationFrame(() => {
-        commentInputRef.current?.focus();
-      });
+      window.requestAnimationFrame(() => commentInputRef.current?.focus());
     }
   };
 
@@ -3248,7 +3924,6 @@ function CommunityPanel({
     }
 
     const body = commentDraft.trim();
-
     if (!body) {
       commentInputRef.current?.focus();
       return;
@@ -3258,22 +3933,13 @@ function CommunityPanel({
     setInteractionError(null);
 
     try {
-      await onSubmitComment(
-        post.threadId,
-        body,
-      );
-
+      await onSubmitComment(post.threadId, body);
       setCommentDraft('');
-
       setCommentCountDeltas(current => ({
         ...current,
-        [post.id]:
-          (current[post.id] ?? 0) + 1,
+        [post.id]: (current[post.id] ?? 0) + 1,
       }));
-
-      window.requestAnimationFrame(() => {
-        commentInputRef.current?.focus();
-      });
+      window.requestAnimationFrame(() => commentInputRef.current?.focus());
     } catch {
       setInteractionError(
         isId
@@ -3285,13 +3951,10 @@ function CommunityPanel({
     }
   };
 
-  /* ================= SHARE ================= */
-
   const shareCurrentPost = async () => {
     if (!post) return;
 
     const url = buildAbsolutePostUrl(post);
-
     setInteractionError(null);
     setShareFeedback(null);
 
@@ -3302,39 +3965,22 @@ function CommunityPanel({
           text: post.body.slice(0, 140),
           url,
         });
-
         setShareFeedback('shared');
       } else {
         await copyText(url);
-
         setShareFeedback('copied');
       }
 
       await onSharePost?.(post.id);
-
-      window.setTimeout(
-        () => setShareFeedback(null),
-        1800,
-      );
+      window.setTimeout(() => setShareFeedback(null), 1800);
     } catch (error) {
-      if (
-        error instanceof DOMException &&
-        error.name === 'AbortError'
-      ) {
-        return;
-      }
+      if (error instanceof DOMException && error.name === 'AbortError') return;
 
       try {
         await copyText(url);
-
         setShareFeedback('copied');
-
         await onSharePost?.(post.id);
-
-        window.setTimeout(
-          () => setShareFeedback(null),
-          1800,
-        );
+        window.setTimeout(() => setShareFeedback(null), 1800);
       } catch {
         setInteractionError(
           isId
@@ -3345,8 +3991,6 @@ function CommunityPanel({
     }
   };
 
-  /* ================= RESET ================= */
-
   useEffect(() => {
     setPostOptionsOpen(false);
     setPostOptionsCopied(false);
@@ -3356,340 +4000,159 @@ function CommunityPanel({
     setInteractionError(null);
   }, [activeTab, post?.id]);
 
-  /* ================= OPTIONS OUTSIDE CLICK ================= */
-
   useEffect(() => {
     if (!postOptionsOpen) return;
 
-    const handlePointerDown = (
-      event: PointerEvent,
-    ) => {
+    const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
-
-      if (
-        !target ||
-        postOptionsRef.current?.contains(target)
-      ) {
-        return;
-      }
-
+      if (!target || postOptionsRef.current?.contains(target)) return;
       setPostOptionsOpen(false);
     };
-
-    const handleKeyDown = (
-      event: KeyboardEvent,
-    ) => {
-      if (event.key === 'Escape') {
-        setPostOptionsOpen(false);
-      }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPostOptionsOpen(false);
     };
 
-    document.addEventListener(
-      'pointerdown',
-      handlePointerDown,
-    );
-
-    document.addEventListener(
-      'keydown',
-      handleKeyDown,
-    );
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener(
-        'pointerdown',
-        handlePointerDown,
-      );
-
-      document.removeEventListener(
-        'keydown',
-        handleKeyDown,
-      );
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [postOptionsOpen]);
 
-  /* ================= TABS CAROUSEL ================= */
-
-  const [emblaTabsRef, emblaTabsApi] =
-    useEmblaCarousel({
-      align: 'start',
-      containScroll: 'keepSnaps',
-      dragFree: true,
-      skipSnaps: true,
-    });
-
-  useEmblaWheelGestures(emblaTabsApi);
-
   return (
     <section
-      className="
-        lajukan-home-community-panel
-        relative z-[1] w-full
-        py-1.5 sm:py-2
-      "
-      aria-label={
-        isId
-          ? 'Dari komunitas'
-          : 'From community'
-      }
+      className="lajukan-home-community-panel relative z-[1] w-full py-1.5 sm:py-2"
+      aria-label={isId ? 'Komunitas' : 'Community'}
     >
-      {/* ================= HEADER ================= */}
-
-      <div className="flex h-6 items-center gap-1.5 px-1 sm:px-3 md:px-6">
-        <Users className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-
-        <h2 className="truncate text-[11px] font-bold leading-none tracking-tight text-[color:var(--app-text)] sm:text-xs">
-          {isId
-            ? 'Dari Komunitas'
-            : 'From Community'}
-        </h2>
-
-        <span className="hidden truncate text-[9px] font-medium text-zinc-400 sm:inline">
-          {isId
-            ? 'Diskusi pelaku usaha'
-            : 'Business discussions'}
-        </span>
-      </div>
-
-      {/* ================= TABS ================= */}
-
-      <div
-        ref={emblaTabsRef}
-        className="
-          mt-1 cursor-grab
-          select-none overflow-hidden
-          contain-paint
-          active:cursor-grabbing
-        "
-      >
-        <div
-          role="tablist"
-          aria-label={
-            isId
-              ? 'Kategori komunitas'
-              : 'Community categories'
-          }
-          className="
-            flex touch-pan-y gap-1.5
-            px-1 py-0.5
-            sm:px-3
-            md:px-6
-            [backface-visibility:hidden]
-            [will-change:transform]
-          "
-        >
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-
-            const tone =
-              toneClassNames(tab.tone);
-
-            const active =
-              activeTab === tab.id;
-
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => {
-                  setPostOptionsOpen(false);
-                  setPostOptionsCopied(false);
-                  onTabChange(tab.id);
-                }}
-                className={cn(
-                  `
-                    inline-flex h-7 shrink-0
-                    items-center gap-1.5
-                    rounded-full border
-                    px-2.5
-                    text-[10px] font-semibold
-                    outline-none
-                    transition-colors
-
-                    focus-visible:ring-2
-                    focus-visible:ring-zinc-400/30
-                  `,
-                  active
-                    ? cn(
-                        tone.surface,
-                        tone.text,
-                        'border-transparent',
-                      )
-                    : `
-                        border-zinc-200/80
-                        bg-zinc-50/70
-                        text-zinc-600
-
-                        hover:border-zinc-300
-                        hover:bg-zinc-100
-                        hover:text-zinc-800
-                      `,
-                )}
-              >
-                <Icon
-                  className={cn(
-                    'h-3 w-3 shrink-0',
-                    !active &&
-                      'text-zinc-400',
-                  )}
-                />
-
-                <span className="whitespace-nowrap">
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
+      <div className="flex min-h-9 items-center justify-between gap-3 px-1 sm:px-3 md:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <Users className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+          <div className="min-w-0">
+            <h2 className="truncate text-[13px] font-bold tracking-[-0.025em] text-[color:var(--app-text)] sm:text-sm">
+              {isId ? 'Komunitas' : 'Community'}
+            </h2>
+            <p className="hidden truncate text-[10px] font-medium text-[color:var(--app-text-soft)] sm:block">
+              {isId ? 'Tanya, jawab, dan temukan koneksi usaha.' : 'Ask, answer, and find business connections.'}
+            </p>
+          </div>
         </div>
+
+        <Link
+          href={communityHref}
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-[10px] px-2 text-[10px] font-bold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)]"
+        >
+          {isId ? 'Lihat semua' : 'See all'}
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
-      {/* ================= COMPOSER ================= */}
-
-      <div className="mt-1.5">
-        <CommunityComposer
-          isId={isId}
-          userAvatar={avatarSrc}
-          isAuthenticated={isAuthenticated}
-          overview={overview}
-          onCreated={
-            onCreated ||
-            (() => undefined)
-          }
-        />
+      <div className="mt-1 flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)] px-1 sm:px-3 md:px-6">
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setPostOptionsOpen(false);
+                onTabChange(tab.id);
+              }}
+              className={cn(
+                'inline-flex min-h-9 shrink-0 items-center gap-1.5 border-b-2 px-0.5 text-[10px] font-bold transition',
+                active
+                  ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
+                  : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ================= PRIMARY POST ================= */}
+      <div className="px-1 sm:px-3 md:px-6">
+        <Link
+          href="/community?compose=question"
+          className="mt-2 flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]/30"
+        >
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <MessageCircle className="h-3.5 w-3.5" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+            {isId ? 'Punya pertanyaan usaha? Tanya komunitas.' : 'Have a business question? Ask the community.'}
+          </span>
+          <span className="shrink-0 text-[10px] font-bold text-[color:var(--app-accent)]">
+            {isId ? 'Tanya' : 'Ask'}
+          </span>
+        </Link>
+      </div>
 
-      {post ? (
+      {loading && !post ? (
+        <div className="mt-2 space-y-2 px-1 sm:px-3 md:px-6" aria-busy="true">
+          <div className="rounded-[16px] border border-[color:var(--app-border)] bg-white p-3">
+            <div className="flex items-center gap-2">
+              <SkeletonAvatar className="h-8 w-8" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <SkeletonStack lines={3} className="mt-3" />
+          </div>
+        </div>
+      ) : post ? (
         <article
           tabIndex={0}
           aria-label={
-            isId
-              ? `Buka posting ${post.title}`
-              : `Open post ${post.title}`
+            isId ? `Buka posting ${post.title}` : `Open post ${post.title}`
           }
           onClick={event => {
-            if (
-              isInteractiveTarget(
-                event.target,
-              )
-            ) {
-              return;
-            }
-
+            if (isInteractiveTarget(event.target)) return;
             openCommunityPost();
           }}
           onKeyDown={event => {
-            if (
-              event.target !==
-              event.currentTarget
-            ) {
-              return;
-            }
-
-            if (
-              event.key !== 'Enter' &&
-              event.key !== ' '
-            ) {
-              return;
-            }
-
+            if (event.target !== event.currentTarget) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
-
             openCommunityPost();
           }}
-          className="
-            mt-1.5 cursor-pointer
-            overflow-hidden
-            rounded-[18px]
-            border border-[color:var(--app-border)]
-            bg-white
-            transition-colors
-
-            hover:border-[color:var(--app-accent-border)]
-
-            focus-visible:outline-none
-            focus-visible:ring-2
-            focus-visible:ring-[color:var(--app-accent)]/30
-          "
+          className="mt-2 cursor-pointer overflow-hidden border-y border-[color:var(--app-border)] bg-white transition hover:border-[color:var(--app-accent-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]/30 sm:mx-3 sm:rounded-[18px] sm:border-x md:mx-6"
         >
-          {/* ================= POST HEADER ================= */}
-
           <div className="p-3">
             <div className="flex items-start justify-between gap-2.5">
               <div className="flex min-w-0 items-center gap-2.5">
                 <Image
-                  src={profileAvatarSrc(
-                    post.avatar,
-                  )}
+                  src={profileAvatarSrc(post.avatar)}
                   alt={post.author}
-                  width={36}
-                  height={36}
-                  className="h-9 w-9 shrink-0 rounded-full object-cover"
+                  width={34}
+                  height={34}
+                  className="h-[34px] w-[34px] shrink-0 rounded-full object-cover"
                 />
-
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-bold leading-4 tracking-[-0.02em] text-[color:var(--app-text)]">
+                  <p className="truncate text-xs font-bold text-[color:var(--app-text)]">
                     {post.author}
                   </p>
-
-                  <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] font-medium text-[color:var(--app-text-soft)]">
-                    <span className="truncate">
-                      {post.community}
-                    </span>
-
-                    <span
-                      className="shrink-0"
-                      aria-hidden="true"
-                    >
-                      ·
-                    </span>
-
-                    <span className="shrink-0">
-                      {post.time}
-                    </span>
-
-                    <Globe2 className="h-3 w-3 shrink-0" />
+                  <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-[color:var(--app-text-soft)]">
+                    <span className="truncate">{post.community}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="shrink-0">{post.time}</span>
                   </p>
                 </div>
               </div>
 
-              {/* OPTIONS */}
-
-              <div
-                ref={postOptionsRef}
-                className="relative shrink-0"
-              >
+              <div ref={postOptionsRef} className="relative shrink-0">
                 <button
                   type="button"
                   onClick={() => {
-                    setPostOptionsCopied(
-                      false,
-                    );
-
-                    setPostOptionsOpen(
-                      open => !open,
-                    );
+                    setPostOptionsCopied(false);
+                    setPostOptionsOpen(open => !open);
                   }}
-                  className="
-                    inline-flex h-8 w-8
-                    items-center justify-center
-                    rounded-full
-                    text-[color:var(--app-text-soft)]
-                    transition-colors
-
-                    hover:bg-slate-50
-                    hover:text-[color:var(--app-text)]
-                  "
-                  aria-label={
-                    isId
-                      ? 'Buka opsi posting'
-                      : 'Open post options'
-                  }
-                  aria-expanded={
-                    postOptionsOpen
-                  }
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--app-text-soft)] transition hover:bg-slate-50 hover:text-[color:var(--app-text)]"
+                  aria-label={isId ? 'Buka opsi posting' : 'Open post options'}
+                  aria-expanded={postOptionsOpen}
                   aria-haspopup="menu"
                 >
                   <MoreHorizontal className="h-4 w-4" />
@@ -3698,61 +4161,22 @@ function CommunityPanel({
                 {postOptionsOpen ? (
                   <div
                     role="menu"
-                    className="
-                      absolute right-0 top-9 z-20
-                      w-52 overflow-hidden
-                      rounded-[14px]
-                      border border-[color:var(--app-border)]
-                      bg-white p-1
-                      text-left
-                      shadow-[0_20px_44px_-26px_rgba(15,23,42,0.28)]
-                    "
-                    onClick={event =>
-                      event.stopPropagation()
-                    }
+                    className="absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-white p-1 text-left shadow-[0_20px_44px_-26px_rgba(15,23,42,0.28)]"
+                    onClick={event => event.stopPropagation()}
                   >
                     <Link
-                      href={
-                        communityPostHref
-                      }
+                      href={communityPostHref}
                       role="menuitem"
-                      className="
-                        flex min-h-9
-                        items-center
-                        justify-between
-                        gap-2 rounded-[10px]
-                        px-2.5
-                        text-[11px] font-bold
-                        text-[color:var(--app-text)]
-
-                        hover:bg-slate-50
-                      "
+                      className="flex min-h-9 items-center justify-between gap-2 rounded-[10px] px-2.5 text-[11px] font-bold text-[color:var(--app-text)] hover:bg-slate-50"
                     >
-                      {isId
-                        ? 'Buka detail'
-                        : 'Open detail'}
-
+                      {isId ? 'Buka detail' : 'Open detail'}
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Link>
-
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() =>
-                        void copyPostLink()
-                      }
-                      className="
-                        flex min-h-9 w-full
-                        items-center
-                        justify-between
-                        gap-2 rounded-[10px]
-                        px-2.5
-                        text-left
-                        text-[11px] font-bold
-                        text-[color:var(--app-text)]
-
-                        hover:bg-slate-50
-                      "
+                      onClick={() => void copyPostLink()}
+                      className="flex min-h-9 w-full items-center justify-between gap-2 rounded-[10px] px-2.5 text-left text-[11px] font-bold text-[color:var(--app-text)] hover:bg-slate-50"
                     >
                       {postOptionsCopied
                         ? isId
@@ -3761,33 +4185,15 @@ function CommunityPanel({
                         : isId
                           ? 'Salin link'
                           : 'Copy link'}
-
                       <Share2 className="h-3.5 w-3.5" />
                     </button>
-
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={
-                        hidePostFromHome
-                      }
-                      className="
-                        flex min-h-9 w-full
-                        items-center
-                        justify-between
-                        gap-2 rounded-[10px]
-                        px-2.5
-                        text-left
-                        text-[11px] font-bold
-                        text-[color:var(--app-text-soft)]
-
-                        hover:bg-slate-50
-                      "
+                      onClick={hidePostFromHome}
+                      className="flex min-h-9 w-full items-center justify-between gap-2 rounded-[10px] px-2.5 text-left text-[11px] font-bold text-[color:var(--app-text-soft)] hover:bg-slate-50"
                     >
-                      {isId
-                        ? 'Sembunyikan'
-                        : 'Hide'}
-
+                      {isId ? 'Sembunyikan dari Beranda' : 'Hide from Home'}
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -3795,79 +4201,45 @@ function CommunityPanel({
               </div>
             </div>
 
-            {/* ================= POST TEXT ================= */}
+            <div className="mt-2">{renderContext(post)}</div>
 
-            <h3 className="mt-2 line-clamp-2 text-[13px] font-bold leading-[18px] text-[color:var(--app-text)]">
+            <h3 className="mt-1.5 line-clamp-2 text-[13px] font-bold leading-[18px] text-[color:var(--app-text)]">
               {post.title}
             </h3>
 
-            {post.body ? (
+            {cleanPreviewBody(post) ? (
               <p className="mt-1 line-clamp-2 text-[11px] leading-[17px] text-[color:var(--app-text-soft)]">
-                {post.body}
+                {cleanPreviewBody(post)}
               </p>
             ) : null}
 
-            {/* TAGS */}
-
-            {post.tags.length > 0 ? (
-              <div className="mt-1.5 flex flex-wrap gap-1">
+            {post.tags.filter(tag => !/^(tanya|question|ask|help|support|poll|polling|survey|media-usaha|update-usaha)$/i.test(tag)).length > 0 ? (
+              <div className="mt-1.5 flex min-w-0 gap-1 overflow-hidden">
                 {post.tags
-                  .slice(0, 3)
+                  .filter(tag => !/^(tanya|question|ask|help|support|poll|polling|survey|media-usaha|update-usaha)$/i.test(tag))
+                  .slice(0, 2)
                   .map(tag => (
                     <Link
                       key={tag}
-                      href={`/community?tag=${encodeURIComponent(
-                        tag,
-                      )}`}
-                      className="
-                        rounded-full
-                        bg-slate-50
-                        px-2 py-0.5
-                        text-[9px] font-semibold
-                        text-[color:var(--app-text-soft)]
-                        transition-colors
-
-                        hover:bg-slate-100
-                        hover:text-[color:var(--app-text)]
-                      "
+                      href={`/community?tag=${encodeURIComponent(tag)}`}
+                      className="max-w-[140px] truncate rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
                     >
                       #{tag}
                     </Link>
                   ))}
-
-                {post.tags.length > 3 ? (
-                  <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-semibold text-zinc-400">
-                    +{post.tags.length - 3}
-                  </span>
-                ) : null}
               </div>
             ) : null}
           </div>
 
-          {/* ================= MEDIA ================= */}
-
           {postMediaItems.length > 0 ? (
             <Link
               href={communityPostHref}
-              className="
-                relative block
-                aspect-[4/3] w-full
-                overflow-hidden bg-slate-100
-                sm:aspect-[16/9]
-              "
-              aria-label={
-                isId
-                  ? 'Buka media posting'
-                  : 'Open post media'
-              }
+              className="relative block aspect-video w-full overflow-hidden bg-slate-100"
+              aria-label={isId ? 'Buka media posting' : 'Open post media'}
             >
-              {postIsVideo &&
-              postMediaItems.length ===
-                1 ? (
+              {postIsVideo && postMediaItems.length === 1 ? (
                 <video
-                  src={
-                    postMediaUrl || ''
-                  }
+                  src={postMediaUrl || ''}
                   muted
                   playsInline
                   preload="metadata"
@@ -3875,9 +4247,7 @@ function CommunityPanel({
                 />
               ) : (
                 <MediaPreviewCarousel
-                  items={
-                    postMediaItems
-                  }
+                  items={postMediaItems}
                   alt={post.community}
                   aspectClassName="h-full w-full"
                   className="h-full w-full bg-transparent"
@@ -3888,266 +4258,74 @@ function CommunityPanel({
                   showDots={false}
                 />
               )}
-
-              {post.kind === 'reel' ? (
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/16 text-white">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/45">
-                    <PlayCircle className="h-6 w-6" />
-                  </span>
-                </span>
-              ) : null}
             </Link>
           ) : null}
-
-          {/* ================= ERROR ================= */}
 
           {interactionError ? (
             <p
               role="alert"
-              className="
-                border-t border-rose-100
-                bg-rose-50
-                px-3 py-1.5
-                text-[10px] font-semibold
-                text-rose-700
-              "
+              className="border-t border-rose-100 bg-rose-50 px-3 py-1.5 text-[10px] font-semibold text-rose-700"
             >
               {interactionError}
             </p>
           ) : null}
 
-          {/* ================= ACTIONS ================= */}
-
           <div className="grid grid-cols-3 border-t border-[color:var(--app-border)] px-1.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-            {/* LIKE */}
-
             <button
               type="button"
-              onClick={() =>
-                void toggleLike()
-              }
+              onClick={() => void toggleLike()}
               disabled={postLikePending}
               aria-pressed={postLiked}
-              aria-label={
-                postLiked
-                  ? isId
-                    ? `Batalkan suka${
-                        postLikeCount > 0
-                          ? `, ${postLikeCount} suka`
-                          : ''
-                      }`
-                    : `Unlike${
-                        postLikeCount > 0
-                          ? `, ${postLikeCount} likes`
-                          : ''
-                      }`
-                  : isId
-                    ? `Suka${
-                        postLikeCount > 0
-                          ? `, ${postLikeCount} suka`
-                          : ''
-                      }`
-                    : `Like${
-                        postLikeCount > 0
-                          ? `, ${postLikeCount} likes`
-                          : ''
-                      }`
-              }
-              title={
-                postLiked
-                  ? isId
-                    ? 'Kamu menyukai posting ini'
-                    : 'You liked this post'
-                  : isId
-                    ? 'Suka'
-                    : 'Like'
-              }
               className={cn(
-                `
-                  inline-flex min-h-9
-                  items-center justify-center
-                  gap-1.5 rounded-[10px]
-                  px-2
-                  transition-colors
-
-                  disabled:cursor-not-allowed
-                  disabled:opacity-60
-                `,
+                'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] px-2 transition disabled:cursor-not-allowed disabled:opacity-60',
                 postLiked
-                  ? `
-                      bg-emerald-50
-                      text-emerald-700
-                    `
-                  : `
-                      hover:bg-slate-50
-                      hover:text-[color:var(--app-accent)]
-                    `,
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
               )}
             >
               <ThumbsUp
                 className={cn(
                   'h-3.5 w-3.5 shrink-0',
-                  postLiked &&
-                    'fill-current',
+                  postLiked && 'fill-current',
                 )}
               />
-
-              {postLikeCount > 0 ? (
-                <span className="tabular-nums">
-                  {formatCompactCount(
-                    postLikeCount,
-                    '0',
-                  )}
-                </span>
-              ) : null}
+              <span>{formatCompactCount(postLikeCount, '0')}</span>
             </button>
-
-            {/* COMMENT */}
 
             <button
               type="button"
-              onClick={
-                openInlineComment
-              }
+              onClick={openInlineComment}
               aria-expanded={commentOpen}
-              aria-label={
-                isId
-                  ? `Komentar${
-                      postCommentCount >
-                      0
-                        ? `, ${postCommentCount} komentar`
-                        : ''
-                    }`
-                  : `Comment${
-                      postCommentCount >
-                      0
-                        ? `, ${postCommentCount} comments`
-                        : ''
-                    }`
-              }
-              title={
-                isId
-                  ? 'Komentar'
-                  : 'Comment'
-              }
               className={cn(
-                `
-                  inline-flex min-h-9
-                  items-center justify-center
-                  gap-1.5 rounded-[10px]
-                  px-2
-                  transition-colors
-
-                  hover:bg-slate-50
-                  hover:text-[color:var(--app-accent)]
-                `,
+                'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
                 commentOpen &&
-                  `
-                    bg-[color:var(--app-accent-soft)]
-                    text-[color:var(--app-accent)]
-                  `,
+                  'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
               )}
             >
-              <MessageCircle
-                className={cn(
-                  'h-3.5 w-3.5 shrink-0',
-                  commentOpen &&
-                    'fill-current',
-                )}
-              />
-
-              {postCommentCount >
-              0 ? (
-                <span className="tabular-nums">
-                  {formatCompactCount(
-                    postCommentCount,
-                    '0',
-                  )}
-                </span>
-              ) : null}
+              <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+              <span>{formatCompactCount(postCommentCount, '0')}</span>
             </button>
-
-            {/* SHARE */}
 
             <button
               type="button"
-              onClick={() =>
-                void shareCurrentPost()
-              }
-              aria-label={
-                isId
-                  ? `Bagikan${
-                      post.shares > 0
-                        ? `, ${post.shares} kali dibagikan`
-                        : ''
-                    }`
-                  : `Share${
-                      post.shares > 0
-                        ? `, ${post.shares} shares`
-                        : ''
-                    }`
-              }
-              title={
-                shareFeedback ===
-                'copied'
-                  ? isId
-                    ? 'Link tersalin'
-                    : 'Link copied'
-                  : shareFeedback ===
-                      'shared'
-                    ? isId
-                      ? 'Berhasil dibagikan'
-                      : 'Shared successfully'
-                    : isId
-                      ? 'Bagikan'
-                      : 'Share'
-              }
+              onClick={() => void shareCurrentPost()}
               className={cn(
-                `
-                  inline-flex min-h-9
-                  items-center justify-center
-                  gap-1.5 rounded-[10px]
-                  px-2
-                  transition-colors
-
-                  hover:bg-slate-50
-                  hover:text-[color:var(--app-accent)]
-                `,
+                'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] px-2 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
                 shareFeedback &&
-                  `
-                    bg-[color:var(--app-accent-soft)]
-                    text-[color:var(--app-accent)]
-                  `,
+                  'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
               )}
             >
               <Share2 className="h-3.5 w-3.5 shrink-0" />
-
-              {post.shares > 0 ? (
-                <span className="tabular-nums">
-                  {formatCompactCount(
-                    post.shares,
-                    '0',
-                  )}
-                </span>
-              ) : null}
+              <span>{formatCompactCount(post.shares, '0')}</span>
             </button>
           </div>
-
-          {/* ================= INLINE COMMENT ================= */}
 
           {commentOpen ? (
             <form
               data-card-interactive="true"
-              className="
-                flex items-center gap-2
-                border-t border-[color:var(--app-border)]
-                bg-slate-50/60
-                px-2.5 py-2
-                sm:px-3
-              "
+              className="flex items-center gap-2 border-t border-[color:var(--app-border)] bg-slate-50/60 px-2.5 py-2 sm:px-3"
               onSubmit={event => {
                 event.preventDefault();
-
                 void submitInlineComment();
               }}
             >
@@ -4158,78 +4336,24 @@ function CommunityPanel({
                 height={28}
                 className="h-7 w-7 shrink-0 rounded-full object-cover"
               />
-
-              <label
-                className="sr-only"
-                htmlFor={`comment-${post.id}`}
-              >
-                {isId
-                  ? 'Tulis komentar'
-                  : 'Write a comment'}
+              <label className="sr-only" htmlFor={`comment-${post.id}`}>
+                {isId ? 'Tulis komentar' : 'Write a comment'}
               </label>
-
               <input
                 ref={commentInputRef}
                 id={`comment-${post.id}`}
                 value={commentDraft}
-                onChange={event =>
-                  setCommentDraft(
-                    event.target.value,
-                  )
-                }
-                disabled={
-                  commentSubmitting
-                }
+                onChange={event => setCommentDraft(event.target.value)}
+                disabled={commentSubmitting}
                 maxLength={1000}
                 autoComplete="off"
-                placeholder={
-                  isId
-                    ? 'Tulis komentar...'
-                    : 'Write a comment...'
-                }
-                className="
-                  min-h-9 min-w-0 flex-1
-                  rounded-full
-                  border border-[color:var(--app-border)]
-                  bg-white
-                  px-3
-                  text-[11px]
-                  text-[color:var(--app-text)]
-                  outline-none
-                  transition
-
-                  placeholder:text-[color:var(--app-text-soft)]
-
-                  focus:border-[color:var(--app-accent-border)]
-                  focus:ring-2
-                  focus:ring-[color:var(--app-accent)]/10
-
-                  disabled:opacity-60
-                "
+                placeholder={isId ? 'Tulis komentar...' : 'Write a comment...'}
+                className="min-h-9 min-w-0 flex-1 rounded-full border border-[color:var(--app-border)] bg-white px-3 text-[11px] text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)] focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent)]/10 disabled:opacity-60"
               />
-
               <button
                 type="submit"
-                disabled={
-                  commentSubmitting ||
-                  !commentDraft.trim()
-                }
-                className="
-                  inline-flex min-h-9
-                  shrink-0 items-center
-                  justify-center
-                  rounded-full
-                  bg-[color:var(--app-accent)]
-                  px-3
-                  text-[10px] font-bold
-                  text-white
-                  transition
-
-                  hover:brightness-95
-
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
-                "
+                disabled={commentSubmitting || !commentDraft.trim()}
+                className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {commentSubmitting
                   ? isId
@@ -4243,135 +4367,83 @@ function CommunityPanel({
           ) : null}
         </article>
       ) : (
-        /* ================= EMPTY ================= */
-
-        <div
-          className="
-            mt-1.5
-            rounded-xl
-            border border-dashed
-            border-[color:var(--app-border)]
-            bg-[color:var(--app-surface-muted)]
-            px-3 py-3
-            text-center
-            text-[10px] font-medium
-            text-[color:var(--app-text-soft)]
-          "
-        >
-          {activeTabMeta.emptyLabel}
+        <div className="mt-2 px-1 sm:px-3 md:px-6">
+          <div className="rounded-[16px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-center">
+            <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+              {activeTabMeta.emptyLabel}
+            </p>
+            <Link
+              href="/community?compose=question"
+              className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-[10px] bg-[color:var(--app-accent)] px-3 text-[10px] font-bold text-white"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              {isId ? 'Ajukan pertanyaan' : 'Ask a question'}
+            </Link>
+          </div>
         </div>
       )}
 
-      {/* ================= MORE POSTS ================= */}
-
-      {morePosts.length ? (
-        <div className="mt-1.5 space-y-1.5">
+      {morePosts.length > 0 ? (
+        <div className="mt-2 divide-y divide-[color:var(--app-border)] border-y border-[color:var(--app-border)] bg-white sm:mx-3 sm:overflow-hidden sm:rounded-[16px] sm:border-x md:mx-6">
           {morePosts.map(item => {
-            const href =
-              buildCommunityPostHref(item);
-
-            const itemMediaItems =
-              item.mediaItems?.length
-                ? item.mediaItems
-                : item.mediaUrl
-                  ? [
-                      {
-                        src: item.mediaUrl,
-                        type:
-                          item.mediaType ===
-                          'video'
-                            ? 'video'
-                            : 'image',
-                        alt: item.title,
-                      } satisfies MediaPreviewItem,
-                    ]
-                  : [];
-
+            const href = buildCommunityPostHref(item);
+            const itemMediaItems = item.mediaItems?.length
+              ? item.mediaItems
+              : item.mediaUrl
+                ? [
+                    {
+                      src: item.mediaUrl,
+                      type: item.mediaType === 'video' ? 'video' : 'image',
+                      alt: item.title,
+                    } satisfies MediaPreviewItem,
+                  ]
+                : [];
             return (
               <Link
                 key={item.id}
                 href={href}
-                className="
-                  group flex min-w-0
-                  items-start gap-2.5
-                  rounded-[14px]
-                  border border-[color:var(--app-border)]
-                  bg-white
-                  p-2.5
-                  transition-colors
-
-                  hover:border-[color:var(--app-accent-border)]
-                  hover:bg-[color:var(--app-accent-soft)]/30
-                "
+                className="group flex min-w-0 items-center gap-2.5 px-3 py-2.5 transition hover:bg-[color:var(--app-surface-muted)]"
               >
                 <Image
-                  src={profileAvatarSrc(
-                    item.avatar,
-                  )}
+                  src={profileAvatarSrc(item.avatar)}
                   alt={item.author}
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 shrink-0 rounded-full object-cover"
+                  width={30}
+                  height={30}
+                  className="h-[30px] w-[30px] shrink-0 rounded-full object-cover"
                 />
-
                 <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center gap-1 text-[9px] font-medium text-[color:var(--app-text-soft)]">
-                    <span className="truncate">
-                      {item.community}
-                    </span>
-
-                    <span className="shrink-0">
-                      ·
-                    </span>
-
-                    <span className="shrink-0">
-                      {item.time}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {renderContext(item, true)}
+                    <span className="truncate text-[9px] text-[color:var(--app-text-soft)]">
+                      {item.community} · {item.time}
                     </span>
                   </span>
-
-                  <span className="mt-0.5 line-clamp-1 block text-[11px] font-bold leading-4 text-[color:var(--app-text)]">
+                  <span className="mt-0.5 line-clamp-2 block text-[11px] font-bold leading-4 text-[color:var(--app-text)]">
                     {item.title}
                   </span>
-
-                  <span className="mt-0.5 line-clamp-1 block text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                    {item.body}
+                  <span className="mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+                    <MessageCircle className="h-3 w-3" />
+                    {formatCompactCount(item.comments, '0')}
                   </span>
                 </span>
 
-                {itemMediaItems.length >
-                0 ? (
-                  <span className="relative h-[54px] w-[72px] shrink-0 overflow-hidden rounded-[10px] bg-slate-100">
+                {itemMediaItems.length > 0 ? (
+                  <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-[9px] bg-slate-100">
                     <MediaPreviewCarousel
-                      items={
-                        itemMediaItems
-                      }
+                      items={itemMediaItems}
                       alt={item.title}
                       aspectClassName="h-full w-full"
                       className="h-full w-full bg-transparent"
-                      mediaClassName="transition duration-300 group-hover:scale-[1.025]"
-                      sizes="72px"
+                      mediaClassName="transition duration-300 group-hover:scale-[1.02]"
+                      sizes="64px"
                       controls={false}
                       lightbox={false}
                       showCounter={false}
                       showDots={false}
                     />
-
-                    {item.kind ===
-                    'reel' ? (
-                      <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/16 text-white">
-                        <PlayCircle className="h-5 w-5" />
-                      </span>
-                    ) : itemMediaItems.length >
-                      1 ? (
-                      <span className="pointer-events-none absolute right-1 top-1 rounded-full bg-black/60 px-1 py-0.5 text-[8px] font-bold text-white">
-                        +
-                        {itemMediaItems.length -
-                          1}
-                      </span>
-                    ) : null}
                   </span>
                 ) : (
-                  <ChevronRight className="mt-2 h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)]" />
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)]" />
                 )}
               </Link>
             );
@@ -4379,53 +4451,21 @@ function CommunityPanel({
         </div>
       ) : null}
 
-      {/* ================= LOAD ERROR ================= */}
-
       {loadError ? (
-        <p className="mt-1.5 rounded-xl bg-amber-50 px-2.5 py-1.5 text-center text-[10px] font-semibold text-amber-700 ring-1 ring-amber-100">
-          {loadError}
-        </p>
-      ) : null}
-
-      {/* ================= LOAD MORE ================= */}
-
-      {hasMore ||
-      loading ||
-      loadError ? (
-        <div className="mt-1.5 flex justify-center">
-          <button
-            type="button"
-            onClick={onLoadMore}
-            disabled={
-              loading || !onLoadMore
-            }
-            className="
-              inline-flex min-h-8
-              items-center justify-center
-              rounded-full
-              border border-[color:var(--app-border)]
-              bg-white
-              px-3
-              text-[10px] font-bold
-              text-[color:var(--app-text)]
-              transition-colors
-
-              hover:bg-slate-50
-
-              disabled:cursor-not-allowed
-              disabled:opacity-55
-            "
-          >
-            {loading
-              ? activeTabMeta.loadingLabel
-              : loadError
-                ? isId
-                  ? 'Coba lagi'
-                  : 'Try again'
-                : isId
-                  ? 'Muat lagi'
-                  : 'Load more'}
-          </button>
+        <div className="mt-2 flex items-center justify-between gap-2 px-1 sm:px-3 md:px-6">
+          <p className="min-w-0 flex-1 text-[10px] font-semibold text-amber-700">
+            {loadError}
+          </p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={loading}
+              className="min-h-8 shrink-0 rounded-[10px] border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-bold text-amber-800 disabled:opacity-50"
+            >
+              {isId ? 'Coba lagi' : 'Try again'}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -4853,12 +4893,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     PublicReferenceItem[]
   >([]);
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
-  const [communityOverview, setCommunityOverview] =
-    useState<CommunityFeedOverview | null>(null);
   const [communityLoading, setCommunityLoading] = useState(false);
   const [communityError, setCommunityError] = useState<string | null>(null);
-  const [communityHasMore, setCommunityHasMore] = useState(false);
-  const [communityOffset, setCommunityOffset] = useState(0);
   const communityRequestSeqRef = useRef(0);
   const [reels, setReels] = useState<ReelItem[]>([]);
   const [walletAmountLabel, setWalletAmountLabel] = useState(() =>
@@ -5157,158 +5193,81 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     };
   }, [isId, viewerLocationKey]);
 
-  const loadCommunityPostsPage = useCallback(
-    async (offset = 0) => {
-      const requestSeq = communityRequestSeqRef.current + 1;
-      communityRequestSeqRef.current = requestSeq;
-      setCommunityLoading(true);
-      setCommunityError(null);
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(
-        () => controller.abort(),
-        HOME_COMMUNITY_REQUEST_TIMEOUT_MS,
+  const loadCommunityPostsPage = useCallback(async () => {
+    const requestSeq = communityRequestSeqRef.current + 1;
+    communityRequestSeqRef.current = requestSeq;
+    setCommunityLoading(true);
+    setCommunityError(null);
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      HOME_COMMUNITY_REQUEST_TIMEOUT_MS,
+    );
+
+    try {
+      const params = new URLSearchParams({
+        tab: activeTab,
+        limit: String(HOME_COMMUNITY_PAGE_SIZE),
+        cursor: '0',
+      });
+      const response = await fetch(
+        `/api/community/feed?${params.toString()}`,
+        {
+          cache: 'no-store',
+          credentials: 'include',
+          signal: controller.signal,
+        },
       );
-      try {
-        const params = new URLSearchParams({
-          tab: activeTab,
-          limit: String(HOME_COMMUNITY_PAGE_SIZE),
-          cursor: String(offset),
-        });
-        const response = await fetch(
-          `/api/community/feed?${params.toString()}`,
-          {
-            cache: 'no-store',
-            credentials: 'include',
-            signal: controller.signal,
-          },
+      const payload = (await response
+        .json()
+        .catch(() => null)) as CommunityFeedResponse | null;
+
+      if (communityRequestSeqRef.current !== requestSeq) return;
+
+      if (!response.ok) {
+        throw new Error(
+          isId
+            ? 'Diskusi komunitas belum bisa dimuat. Coba lagi sebentar.'
+            : 'Community discussions could not be loaded. Please try again.',
         );
-        const payload = (await response
-          .json()
-          .catch(() => null)) as CommunityFeedResponse | null;
-        if (communityRequestSeqRef.current !== requestSeq) return;
-        if (!response.ok) {
-          throw new Error(
-            isId
-              ? 'Diskusi komunitas belum bisa dimuat. Coba lagi sebentar.'
-              : 'Community discussions could not be loaded. Please try again.',
-          );
-        }
-        const discussionItems = (payload?.items || []).filter(
-          item => item.kind !== 'reel',
-        );
-        const mapped = discussionItems.map(item =>
-          mapCommunityItemToPost(item, isId, activeTab),
-        );
-        const rawNextCursor =
-          typeof payload?.nextCursor === 'number' &&
-          Number.isFinite(payload.nextCursor)
-            ? payload.nextCursor
-            : null;
-        const responseItemCount = payload?.items?.length || 0;
-        const fallbackNextCursor =
-          offset + Math.max(responseItemCount, mapped.length);
-        const nextCursor =
-          rawNextCursor !== null && rawNextCursor > offset
-            ? rawNextCursor
-            : fallbackNextCursor;
-        const cursorAdvanced = nextCursor > offset;
-        setCommunityOverview(payload?.overview || null);
-        setCommunityPosts(prev => {
-          if (offset === 0) return mapped;
-          const seen = new Set(prev.map(item => item.id));
-          return [...prev, ...mapped.filter(item => !seen.has(item.id))];
-        });
-        setCommunityOffset(nextCursor);
-        setCommunityHasMore(
-          Boolean(payload?.hasMore) && cursorAdvanced && responseItemCount > 0,
-        );
-        setCommunityError(null);
-      } catch (error) {
-        if (communityRequestSeqRef.current !== requestSeq) return;
-        if (offset === 0) setCommunityPosts([]);
-        if (offset === 0) setCommunityOverview(null);
-        if (offset === 0) setCommunityHasMore(false);
-        const aborted =
-          error instanceof DOMException && error.name === 'AbortError';
-        setCommunityError(
-          aborted
-            ? isId
-              ? 'Koneksi komunitas terlalu lama. Coba muat lagi.'
-              : 'Community loading took too long. Try again.'
-            : isId
-              ? 'Diskusi komunitas gagal dimuat. Coba muat lagi.'
-              : 'Community discussions failed to load. Try again.',
-        );
-      } finally {
-        window.clearTimeout(timeoutId);
-        if (communityRequestSeqRef.current === requestSeq) {
-          setCommunityLoading(false);
-        }
       }
-    },
-    [activeTab, isId],
-  );
+
+      const mapped = (payload?.items || [])
+        .filter(item => item.kind !== 'reel')
+        .map(item => mapCommunityItemToPost(item, isId, activeTab))
+        .slice(0, 3);
+
+      setCommunityPosts(mapped);
+      setCommunityError(null);
+    } catch (error) {
+      if (communityRequestSeqRef.current !== requestSeq) return;
+
+      setCommunityPosts([]);
+      const aborted =
+        error instanceof DOMException && error.name === 'AbortError';
+      setCommunityError(
+        aborted
+          ? isId
+            ? 'Koneksi komunitas terlalu lama. Coba lagi.'
+            : 'Community loading took too long. Try again.'
+          : isId
+            ? 'Diskusi komunitas gagal dimuat. Coba lagi.'
+            : 'Community discussions failed to load. Try again.',
+      );
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (communityRequestSeqRef.current === requestSeq) {
+        setCommunityLoading(false);
+      }
+    }
+  }, [activeTab, isId]);
 
   useEffect(() => {
     setCommunityPosts([]);
-    setCommunityOverview(null);
     setCommunityError(null);
-    setCommunityOffset(0);
-    setCommunityHasMore(false);
-    void loadCommunityPostsPage(0);
+    void loadCommunityPostsPage();
   }, [loadCommunityPostsPage]);
-
-  const loadMoreCommunityPosts = useCallback(() => {
-    if (communityLoading) return;
-    if (communityError) {
-      void loadCommunityPostsPage(
-        communityPosts.length > 0 ? communityOffset : 0,
-      );
-      return;
-    }
-    if (!communityHasMore) return;
-    void loadCommunityPostsPage(communityOffset);
-  }, [
-    communityError,
-    communityHasMore,
-    communityLoading,
-    communityOffset,
-    communityPosts.length,
-    loadCommunityPostsPage,
-  ]);
-
-  const handleCommunityComposerCreated = useCallback(
-    (createdItem?: CommunityFeedItem) => {
-      if (!createdItem) {
-        void loadCommunityPostsPage(0);
-        return;
-      }
-
-      if (createdItem.kind === 'reel') {
-        void loadCommunityPostsPage(0);
-        return;
-      }
-
-      const nextPost = mapCommunityItemToPost(createdItem, isId, activeTab);
-      setCommunityPosts(current => [
-        nextPost,
-        ...current.filter(item => item.id !== nextPost.id),
-      ]);
-      setCommunityOverview(current =>
-        current
-          ? {
-              ...current,
-              stats: {
-                ...current.stats,
-                totalThreads: current.stats.totalThreads + 1,
-                totalPosts: current.stats.totalPosts + 1,
-              },
-            }
-          : current,
-      );
-    },
-    [activeTab, isId, loadCommunityPostsPage],
-  );
 
   useEffect(() => {
     let active = true;
@@ -5618,13 +5577,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           activeTab={activeTab}
           onTabChange={setActiveTab}
           avatarSrc={avatarSrc}
-          overview={communityOverview}
           posts={communityPosts}
           loading={communityLoading}
-          hasMore={communityHasMore}
           loadError={communityError}
-          onLoadMore={loadMoreCommunityPosts}
-          onCreated={handleCommunityComposerCreated}
+          onRetry={() => void loadCommunityPostsPage()}
           onToggleLike={toggleCommunityPostLike}
           onSubmitComment={createCommunityComment}
           onRequireAuth={() => {
@@ -5716,13 +5672,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
                   avatarSrc={avatarSrc}
-                  overview={communityOverview}
                   posts={communityPosts}
                   loading={communityLoading}
-                  hasMore={communityHasMore}
                   loadError={communityError}
-                  onLoadMore={loadMoreCommunityPosts}
-                  onCreated={handleCommunityComposerCreated}
+                  onRetry={() => void loadCommunityPostsPage()}
                   onToggleLike={toggleCommunityPostLike}
                   onSubmitComment={createCommunityComment}
                   onRequireAuth={() => {

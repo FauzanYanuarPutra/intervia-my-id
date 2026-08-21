@@ -31,7 +31,11 @@ defmodule ChatService.DmRoom do
       [min_s, max_s] = parts
       with {:ok, min_b} <- Ecto.UUID.dump(min_s),
            {:ok, max_b} <- Ecto.UUID.dump(max_s) do
-        if current_user_id_bin == min_b, do: max_b, else: min_b
+        cond do
+          current_user_id_bin == min_b -> max_b
+          current_user_id_bin == max_b -> min_b
+          true -> nil
+        end
       else
         _ -> nil
       end

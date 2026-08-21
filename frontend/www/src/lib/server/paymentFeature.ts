@@ -1,5 +1,3 @@
-import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
-
 function envFlag(key: string): boolean {
   return ['1', 'true', 'yes', 'on'].includes(
     String(process.env[key] || '').trim().toLowerCase(),
@@ -7,9 +5,7 @@ function envFlag(key: string): boolean {
 }
 
 export function paymentsEnabled(): boolean {
-  return (
-    !PROMO_ONLY_MODE ||
-    envFlag('PAYMENTS_ENABLED') ||
-    envFlag('WALLET_LIVE_ENABLED')
-  );
+  // Financial surfaces are fail-closed. Enabling a live wallet provider alone
+  // must never make payment UI/routes public without the explicit product flag.
+  return envFlag('PAYMENTS_ENABLED');
 }

@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const IDENTITY_API_URL =
+  process.env.NEXT_PUBLIC_IDENTITY_API_URL || '/api/identity';
 const CRM_AUTH_API_URL = process.env.NEXT_PUBLIC_CRM_AUTH_API_URL || '/api';
 const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8081';
@@ -659,7 +660,7 @@ export const superAppApi = {
 export const identityApi = {
   getPublicProfile: async (userId: string): Promise<IdentityPublicProfile> => {
     return fetchJson<IdentityPublicProfile>(
-      `${API_URL}/users/public/${encodeURIComponent(userId)}`,
+      `${IDENTITY_API_URL}/users/public/${encodeURIComponent(userId)}`,
       {
         method: 'GET',
       },
@@ -697,7 +698,7 @@ export const contentApi = {
 
 export const usersApi = {
   list: async (token: string) => {
-    return fetchJson(`${API_URL}/users`, {
+    return fetchJson(`${IDENTITY_API_URL}/users`, {
       method: 'GET',
       token,
     });

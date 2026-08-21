@@ -3,10 +3,12 @@ import {
   collectUploadFiles,
   storeValidatedUploads,
 } from '@/lib/server/uploadFiles';
-import { MEDIA_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
+import {
+  MEDIA_UPLOAD_RAW_MAX_BYTES,
+  VOICE_NOTE_UPLOAD_MAX_BYTES,
+} from '@/lib/media/uploadStandard';
 import { guardUploadRequest } from '@/lib/server/uploadGuard';
 
-const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
 const CHAT_FILE_KEYS = ['file', 'media', 'attachment'];
 
@@ -71,6 +73,7 @@ export async function POST(
       concurrency: 1,
       folder: `chat/${id}`,
       maxBytes: MEDIA_UPLOAD_RAW_MAX_BYTES,
+      maxBytesByType: { audio: VOICE_NOTE_UPLOAD_MAX_BYTES },
       minioTarget: id,
       requireMinio: true,
       minioTimeoutMs: 20000,
@@ -91,7 +94,6 @@ export async function POST(
           name: stored.name,
           size: stored.size,
           mime: stored.mime,
-          env: APP_ENV,
         },
       },
       { status: 201 },

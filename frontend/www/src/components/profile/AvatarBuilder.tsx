@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   BadgeCheck,
   Check,
+  CircleAlert,
   Crown,
   Dice5,
   Feather,
@@ -110,25 +111,25 @@ type AvatarTab = {
 };
 
 const AVATAR_TABS: ReadonlyArray<AvatarTab> = [
-  { key: 'preset', labelId: 'Saran', labelEn: 'Preset', icon: Crown },
-  { key: 'body', labelId: 'Body', labelEn: 'Body', icon: UserRound },
-  { key: 'skin', labelId: 'Skin', labelEn: 'Skin', icon: Palette },
-  { key: 'hair', labelId: 'Hair', labelEn: 'Hair', icon: Feather },
-  { key: 'headwear', labelId: 'Headwear', labelEn: 'Headwear', icon: Crown },
-  { key: 'face', labelId: 'Face', labelEn: 'Face', icon: Smile },
-  { key: 'outfit', labelId: 'Outfit', labelEn: 'Outfit', icon: Shirt },
-  { key: 'wing', labelId: 'Wings', labelEn: 'Wings', icon: Feather },
+  { key: 'preset', labelId: 'Template', labelEn: 'Presets', icon: Crown },
+  { key: 'body', labelId: 'Tubuh', labelEn: 'Body', icon: UserRound },
+  { key: 'skin', labelId: 'Kulit', labelEn: 'Skin', icon: Palette },
+  { key: 'hair', labelId: 'Rambut', labelEn: 'Hair', icon: Feather },
+  { key: 'headwear', labelId: 'Topi / Hijab', labelEn: 'Headwear', icon: Crown },
+  { key: 'face', labelId: 'Wajah', labelEn: 'Face', icon: Smile },
+  { key: 'outfit', labelId: 'Pakaian', labelEn: 'Outfit', icon: Shirt },
+  { key: 'wing', labelId: 'Sayap', labelEn: 'Wings', icon: Feather },
   { key: 'aura', labelId: 'Aura', labelEn: 'Aura', icon: Sparkles },
-  { key: 'backItem', labelId: 'Back Item', labelEn: 'Back Item', icon: Shield },
+  { key: 'backItem', labelId: 'Aksesori Belakang', labelEn: 'Back item', icon: Shield },
   {
     key: 'handItem',
-    labelId: 'Hand Item',
-    labelEn: 'Hand Item',
+    labelId: 'Aksesori Tangan',
+    labelEn: 'Hand item',
     icon: BadgeCheck,
   },
   {
     key: 'background',
-    labelId: 'Background',
+    labelId: 'Latar',
     labelEn: 'Background',
     icon: Palette,
   },
@@ -147,35 +148,83 @@ export function AvatarBuilder({
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<AvatarTabKey>('preset');
   const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
   const isId =
     typeof isIdProp === 'boolean'
       ? isIdProp
       : locale
         ? locale.toLowerCase().startsWith('id')
         : true;
-  const spec = useMemo(() => normalizeAvatarSpec(value), [value]);
-  const avatarLabel = title || 'Lajukan avatar';
-  const dataUrl = useMemo(
-    () => createLajukanAvatarDataUrl(spec, avatarLabel),
-    [avatarLabel, spec],
-  );
-  const rarity = getRarity(spec);
 
-  const update = (patch: Partial<LajukanAvatarStyle>) => {
-    const next = normalizeAvatarSpec({ ...spec, ...patch });
+  const normalizedValue = useMemo(() => normalizeAvatarSpec(value), [value]);
+  const [draftSpec, setDraftSpec] = useState<LajukanAvatarSpec>(() =>
+    normalizeAvatarSpec(value),
+  );
+  const avatarLabel = title || 'Lajukan avatar';
+
+  useEffect(() => {
+    if (customizerOpen) return;
+    setDraftSpec(current =>
+      sameAvatarSpec(current, normalizedValue) ? current : normalizedValue,
+    );
+  }, [customizerOpen, normalizedValue]);
+
+  const dataUrl = useMemo(
+    () => createLajukanAvatarDataUrl(draftSpec, avatarLabel),
+    [avatarLabel, draftSpec],
+  );
+  const rarity = useMemo(() => getRarity(draftSpec), [draftSpec]);
+
+  const commitSpec = (next: LajukanAvatarSpec) => {
+    setDraftSpec(next);
+    setConfirmError(null);
     onChange(next, createLajukanAvatarDataUrl(next, avatarLabel));
   };
 
-  const randomize = () => update(randomAvatarSpec(spec));
+  const update = (patch: Partial<LajukanAvatarStyle>) => {
+    const next = normalizeAvatarSpec({ ...draftSpec, ...patch });
+    commitSpec(next);
+  };
+
+  const randomize = () => {
+    const next = normalizeAvatarSpec({
+      ...draftSpec,
+      ...randomAvatarSpec(draftSpec),
+    });
+    commitSpec(next);
+  };
+
+  const openCustomizer = () => {
+    setDraftSpec(normalizedValue);
+    setConfirmError(null);
+    setActiveTab('preset');
+    setCustomizerOpen(true);
+  };
+
+  const closeCustomizer = () => {
+    if (confirming) return;
+    setConfirmError(null);
+    setCustomizerOpen(false);
+  };
+
   const confirmAvatar = async () => {
     if (!onConfirm) {
-      setCustomizerOpen(false);
+      closeCustomizer();
       return;
     }
+
     setConfirming(true);
+    setConfirmError(null);
     try {
-      await onConfirm(spec, dataUrl);
+      await onConfirm(draftSpec, dataUrl);
       setCustomizerOpen(false);
+    } catch {
+      setConfirmError(
+        isId
+          ? 'Avatar belum berhasil disimpan. Coba lagi.'
+          : 'The avatar could not be saved. Please try again.',
+      );
     } finally {
       setConfirming(false);
     }
@@ -185,12 +234,13 @@ export function AvatarBuilder({
     <>
       <section
         className={cn(
-          'overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_20%_0%,rgba(20,184,166,0.18),transparent_34%),linear-gradient(135deg,#ffffff,#f8fafc_45%,#ecfeff)] p-3 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.42)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_20%_0%,rgba(45,212,191,0.16),transparent_34%),linear-gradient(135deg,#020617,#0f172a_52%,#111827)]',
+          'relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-slate-950',
           compact ? 'sm:p-3' : 'sm:p-4',
           className,
         )}
       >
-        <div className="grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)] sm:items-center">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-emerald-50/90 to-transparent dark:from-emerald-500/10" />
+        <div className="relative grid grid-cols-[92px_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[132px_minmax(0,1fr)] sm:gap-4">
           <AvatarPreview
             alt={avatarLabel}
             dataUrl={dataUrl}
@@ -203,22 +253,22 @@ export function AvatarBuilder({
               <p className="min-w-0 truncate text-sm font-bold text-slate-950 dark:text-white">
                 {title || (isId ? 'Avatar Lajukan' : 'Lajukan Avatar')}
               </p>
-              <span className="flex justify-center items-center rounded-full !bg-slate-950 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] !text-white !dark:bg-white !dark:text-slate-950">
-                Chibi Game
+              <span className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                {isId ? 'Avatar 2D' : '2D Avatar'}
               </span>
             </div>
             <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
               {isId
-                ? 'Pilih karakter. Bisa ganti kulit, rambut, topi, pakaian, warna, sayap, aura, dan item.'
-                : 'Pick a character. Customize skin, hair, hats, outfit, colors, wings, aura, and items.'}
+                ? 'Pilih template atau atur detail wajah, rambut, pakaian, aksesori, dan latar.'
+                : 'Choose a preset or customize the face, hair, outfit, accessories, and background.'}
             </p>
-            <LoadoutSummary isId={isId} spec={spec} />
+            <LoadoutSummary isId={isId} spec={draftSpec} />
             <div className="mt-3 grid grid-cols-2 gap-2">
               <AvatarActionButton onClick={randomize} variant="secondary">
                 <Dice5 className="h-3.5 w-3.5" />
                 {isId ? 'Acak gaya' : 'Shuffle'}
               </AvatarActionButton>
-              <AvatarActionButton onClick={() => setCustomizerOpen(true)}>
+              <AvatarActionButton onClick={openCustomizer}>
                 <Sparkles className="h-3.5 w-3.5" />
                 {isId ? 'Atur avatar' : 'Customize'}
               </AvatarActionButton>
@@ -229,8 +279,8 @@ export function AvatarBuilder({
 
       <Modal
         open={customizerOpen}
-        title={isId ? 'Atur Avatar 2D' : 'Customize 2D Avatar'}
-        onClose={() => setCustomizerOpen(false)}
+        title={isId ? 'Buat Avatar Kamu' : 'Create Your Avatar'}
+        onClose={closeCustomizer}
         className="sm:max-w-5xl"
         footer={
           <>
@@ -259,7 +309,17 @@ export function AvatarBuilder({
           </>
         }
       >
-        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        {confirmError ? (
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200"
+          >
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{confirmError}</span>
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-0 lg:self-start">
             <AvatarPreview
               alt={avatarLabel}
@@ -268,10 +328,10 @@ export function AvatarBuilder({
               rarity={rarity}
               size="large"
             />
-            <LoadoutSummary isId={isId} spec={spec} variant="panel" />
+            <LoadoutSummary isId={isId} spec={draftSpec} variant="panel" />
           </aside>
 
-          <section className="min-w-0 rounded-[28px] border border-slate-200 bg-white/80 p-3 shadow-inner dark:border-white/10 dark:bg-white/8">
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/5 sm:p-4">
             <AvatarTabStrip
               activeTab={activeTab}
               isId={isId}
@@ -283,7 +343,7 @@ export function AvatarBuilder({
                 avatarLabel={avatarLabel}
                 isId={isId}
                 onChange={update}
-                spec={spec}
+                spec={draftSpec}
               />
             </div>
           </section>
@@ -310,28 +370,30 @@ function AvatarPreview({
   return (
     <div
       className={cn(
-        'relative mx-auto aspect-square overflow-hidden border border-emerald-200 bg-slate-100 shadow-inner ring-4 ring-amber-100/80 dark:border-emerald-400/20 dark:bg-slate-950 dark:ring-emerald-400/10',
+        'relative mx-auto aspect-square overflow-hidden border border-slate-200 bg-[linear-gradient(160deg,#ecfdf5_0%,#f8fafc_48%,#ffffff_100%)] shadow-[0_18px_38px_-30px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-[linear-gradient(160deg,#052e2b_0%,#0f172a_52%,#020617_100%)]',
         large
-          ? 'w-full max-w-[320px] rounded-[34px]'
-          : 'w-full max-w-[156px] rounded-[24px]',
+          ? 'w-full max-w-[220px] rounded-3xl sm:max-w-[260px] lg:max-w-[300px]'
+          : 'w-[92px] rounded-2xl sm:w-full sm:max-w-[132px]',
       )}
     >
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),transparent_35%,rgba(20,184,166,0.16))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.95),transparent_38%),linear-gradient(180deg,transparent_55%,rgba(15,23,42,0.08))] dark:bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.08),transparent_40%),linear-gradient(180deg,transparent_55%,rgba(0,0,0,0.18))]" />
       <Image
         src={dataUrl}
         alt={alt}
         width={large ? 320 : 156}
         height={large ? 320 : 156}
-        className="relative h-full w-full object-cover"
+        className="relative h-full w-full object-contain"
         unoptimized
       />
-      <span className="absolute left-2 top-2 inline-flex min-h-6 items-center gap-1 rounded-full bg-slate-950/82 px-2 text-[10px] font-bold text-white shadow-sm  dark:bg-white/85 dark:text-slate-950">
+      <span className="absolute left-2 top-2 inline-flex min-h-6 items-center gap-1 rounded-full bg-slate-950/80 px-2 text-[10px] font-bold text-white shadow-sm  dark:bg-white/90 dark:text-slate-950">
         <Crown className="h-3 w-3" />
-        {rarity}
+        {rarityLabel(rarity, isId)}
       </span>
-      <span className="absolute bottom-2 left-2 right-2 rounded-2xl bg-white/82 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700 shadow-sm  dark:bg-slate-950/72 dark:text-slate-100">
-        {isId ? 'Preview hidup' : 'Live preview'}
-      </span>
+      {large ? (
+        <span className="absolute bottom-2 left-2 right-2 rounded-xl bg-white/90 px-3 py-2 text-center text-[10px] font-bold text-slate-600 shadow-sm backdrop-blur dark:bg-slate-950/75 dark:text-slate-200">
+          {isId ? 'Pratinjau avatar' : 'Avatar preview'}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -346,7 +408,11 @@ function AvatarTabStrip({
   onSelect: (tab: AvatarTabKey) => void;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      role="tablist"
+      aria-label={isId ? 'Bagian avatar' : 'Avatar sections'}
+      className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {AVATAR_TABS.map(tab => {
         const Icon = tab.icon;
         const active = activeTab === tab.key;
@@ -354,12 +420,14 @@ function AvatarTabStrip({
           <button
             key={tab.key}
             type="button"
+            role="tab"
+            aria-selected={active}
             onClick={() => onSelect(tab.key)}
             className={cn(
-              'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-bold transition',
+              'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2',
               active
                 ? 'border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/15 dark:border-white dark:bg-white dark:text-slate-950'
-                : 'border-slate-200 bg-white/80 text-slate-700 hover:border-[color:var(--app-accent-border)] dark:border-white/10 dark:bg-white/8 dark:text-slate-200',
+                : 'border-slate-200 bg-white/80 text-slate-700 hover:border-[color:var(--app-accent-border)] dark:border-white/10 dark:bg-white/10 dark:text-slate-200',
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -395,16 +463,18 @@ function PartPanel({
           <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
             {activeTab === 'preset'
               ? isId
-                ? 'Pilih 1 dari 10 saran default, lalu custom setiap bagian.'
-                : 'Pick 1 of 10 defaults, then customize every part.'
+                ? `Pilih salah satu dari ${LAJUKAN_AVATAR_PRESETS.length} template, lalu ubah bagian yang kamu mau.`
+                : `Choose one of ${LAJUKAN_AVATAR_PRESETS.length} presets, then customize any part you want.`
               : isId
-                ? 'Klik kartu visual untuk mengganti bagian ini.'
-                : 'Click a visual card to swap this part.'}
+                ? 'Pilih salah satu opsi. Perubahan langsung terlihat di pratinjau.'
+                : 'Choose an option. Changes appear immediately in the preview.'}
           </p>
         </div>
-        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800 dark:bg-amber-300/15 dark:text-amber-200">
-          {LAJUKAN_AVATAR_PRESETS.length} {isId ? 'preset' : 'presets'}
-        </span>
+        {activeTab === 'preset' ? (
+          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+            {LAJUKAN_AVATAR_PRESETS.length} {isId ? 'template' : 'presets'}
+          </span>
+        ) : null}
       </div>
 
       {activeTab === 'preset' ? (
@@ -656,9 +726,10 @@ function AvatarOptionTile({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'group min-w-0 rounded-[18px] border bg-white p-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-lg dark:bg-white/8',
+        'group min-w-0 rounded-2xl border bg-white p-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 dark:bg-white/10',
         active
           ? 'border-[color:var(--app-accent)] ring-2 ring-[color:var(--app-accent)]/15'
           : 'border-slate-200 dark:border-white/10',
@@ -741,12 +812,13 @@ function PresetButton({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'group min-w-0 rounded-[20px] border bg-white p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-lg dark:bg-white/8',
+        'group min-w-0 rounded-2xl border bg-white p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 dark:bg-white/10',
         active
-          ? '!border-slate-950 !ring-2 !ring-slate-950/10 !dark:border-white !dark:ring-white/20'
-          : '!border-slate-200 !dark:border-white/10',
+          ? 'border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/20'
+          : 'border-slate-200 dark:border-white/10',
       )}
     >
       <div className="relative overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-950">
@@ -759,7 +831,7 @@ function PresetButton({
           unoptimized
         />
         <span className="absolute left-1.5 top-1.5 rounded-full bg-slate-950/80 px-1.5 py-0.5 text-[9px] font-bold text-white ">
-          {preset.rarity}
+          {rarityLabel(preset.rarity, isId)}
         </span>
         {active ? (
           <span className="absolute right-1.5 top-1.5 rounded-full bg-slate-950 p-1 text-white dark:bg-white dark:text-slate-950">
@@ -787,18 +859,19 @@ function LoadoutSummary({
   variant?: 'compact' | 'panel';
 }) {
   const chips = buildChips(spec, isId);
+  const visibleChips = variant === 'compact' ? chips.slice(0, 4) : chips;
   return (
     <div
       className={cn(
-        'rounded-[20px] border border-slate-200 bg-white/82 p-3 shadow-sm dark:border-white/10 dark:bg-white/8',
+        'rounded-[20px] border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/10',
         variant === 'panel' ? 'mt-3' : 'mt-2',
       )}
     >
       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-        {isId ? 'Build sekarang' : 'Current build'}
+        {isId ? 'Pilihan saat ini' : 'Current choices'}
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {chips.map(chip => (
+        {visibleChips.map(chip => (
           <span
             key={chip}
             className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200"
@@ -828,10 +901,10 @@ function AvatarActionButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60',
         variant === 'primary'
-          ? '!bg-slate-950 !text-white !hover:bg-slate-800 !dark:bg-white !containerdark:text-slate-950'
-          : 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white',
+          ? 'bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100'
+          : 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15',
       )}
     >
       {children}
@@ -879,11 +952,11 @@ function focusForTab(tab: AvatarTabKey): OptionFocus {
 }
 
 function focusClass(focus: OptionFocus): string {
-  if (focus === 'head') return 'scale-[1.62] translate-y-8';
-  if (focus === 'body') return 'scale-[1.28] -translate-y-2';
-  if (focus === 'wide') return 'scale-110';
-  if (focus === 'effect') return 'scale-105';
-  if (focus === 'background') return 'scale-90';
+  if (focus === 'head') return 'scale-[1.45] translate-y-5';
+  if (focus === 'body') return 'scale-[1.18] -translate-y-1';
+  if (focus === 'wide') return 'scale-105';
+  if (focus === 'effect') return 'scale-100';
+  if (focus === 'background') return 'scale-95';
   return '';
 }
 
@@ -943,25 +1016,27 @@ function getRarity(spec: LajukanAvatarSpec): string {
 function randomAvatarSpec(
   base: LajukanAvatarSpec,
 ): Partial<LajukanAvatarStyle> {
+  const fantasyMode = Math.random() < 0.32;
+
   return {
     ...base,
     body: pickRandom(BODY_TYPES),
     skin: pickRandom(SKINS),
     hair: pickRandom(HAIRS),
     hairColor: pickRandom(HAIR_COLORS),
-    headwear: maybeNone(HEADWEAR, 0.28),
-    eyewear: maybeNone(EYEWEAR, 0.48),
-    faceAccessory: maybeNone(FACE_ACCESSORIES, 0.42),
+    headwear: maybeNone(HEADWEAR, 0.48),
+    eyewear: maybeNone(EYEWEAR, 0.68),
+    faceAccessory: maybeNone(FACE_ACCESSORIES, 0.76),
     outfit: pickRandom(OUTFITS),
     outfitColor: pickRandom(OUTFIT_COLORS),
-    wing: maybeNone(WINGS, 0.24),
-    aura: maybeNone(AURAS, 0.24),
-    backItem: maybeNone(BACK_ITEMS, 0.38),
-    handItem: maybeNone(HAND_ITEMS, 0.24),
+    wing: fantasyMode ? maybeNone(WINGS, 0.5) : noneOrFirst(WINGS),
+    aura: fantasyMode ? maybeNone(AURAS, 0.42) : noneOrFirst(AURAS),
+    backItem: maybeNone(BACK_ITEMS, 0.7),
+    handItem: maybeNone(HAND_ITEMS, 0.48),
     mood: pickRandom(MOODS),
     background: pickRandom(BACKGROUNDS),
     pose: pickRandom(POSES),
-    motion: Math.random() > 0.18 ? 'full' : pickRandom(MOTIONS),
+    motion: pickRandom(MOTIONS),
   };
 }
 
@@ -969,11 +1044,34 @@ function pickRandom<T extends string>(
   options: ReadonlyArray<AvatarOption<T>>,
   skipNone = false,
 ): T {
+  const fallback = options[0];
+  if (!fallback) {
+    throw new Error('Avatar option list cannot be empty');
+  }
   const candidates = skipNone
     ? options.filter(option => option.id !== 'none')
     : options;
-  const index = Math.floor(Math.random() * candidates.length);
-  return (candidates[index] || options[0]).id;
+  const source = candidates.length > 0 ? candidates : options;
+  const index = Math.floor(Math.random() * source.length);
+  return (source[index] || fallback).id;
+}
+
+function noneOrFirst<T extends string>(
+  options: ReadonlyArray<AvatarOption<T>>,
+): T {
+  const none = options.find(option => option.id === 'none');
+  return none?.id ?? pickRandom(options);
+}
+
+function rarityLabel(value: string, isId: boolean): string {
+  if (!isId) return value;
+  const labels: Record<string, string> = {
+    Basic: 'Dasar',
+    Rare: 'Langka',
+    Epic: 'Epik',
+    Legend: 'Legenda',
+  };
+  return labels[value] || value;
 }
 
 function maybeNone<T extends string>(

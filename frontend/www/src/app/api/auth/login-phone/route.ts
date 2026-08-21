@@ -5,16 +5,12 @@ import {
   shouldUseSecureCookies,
 } from '@/lib/server/forwardCookies';
 import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
-import {
-  consumeOTPVerificationTokenForPurposes,
-  hasOTPVerificationTokenForPurposes,
-} from '@/lib/redis';
+import { hasOTPVerificationTokenForPurposes } from '@/lib/redis';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { z } from 'zod';
 
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
-const LOGIN_PHONE_OTP_REQUIRED = process.env.LOGIN_PHONE_OTP_REQUIRED !== 'false';
 const LOGIN_RATE_LIMIT_PER_15_MIN = Number.parseInt(
   process.env.LOGIN_RATE_LIMIT_PER_15_MIN || '20',
   10,
@@ -93,28 +89,26 @@ export async function POST(req: NextRequest) {
     });
     if (!loginRateByPhone.ok) return loginRateByPhone.response;
 
-    if (LOGIN_PHONE_OTP_REQUIRED) {
-      if (!phoneOtpToken) {
-        return NextResponse.json(
-          { error: 'Phone OTP verification is required for login' },
-          { status: 401 },
-        );
-      }
-
-      const validOtpToken = await hasOTPVerificationTokenForPurposes(
-        phoneOtpToken,
-        {
-          type: 'phone',
-          target: phone,
-        },
-        ['login', 'register'],
+    if (!phoneOtpToken) {
+      return NextResponse.json(
+        { error: 'Phone OTP verification is required for login' },
+        { status: 401 },
       );
-      if (!validOtpToken) {
-        return NextResponse.json(
-          { error: 'Invalid or expired phone login OTP verification token' },
-          { status: 401 },
-        );
-      }
+    }
+
+    const validOtpToken = await hasOTPVerificationTokenForPurposes(
+      phoneOtpToken,
+      {
+        type: 'phone',
+        target: phone,
+      },
+      ['login', 'register'],
+    );
+    if (!validOtpToken) {
+      return NextResponse.json(
+        { error: 'Invalid or expired phone login OTP verification token' },
+        { status: 401 },
+      );
     }
 
     const backendRes = await fetch(`${API_URL}/auth/login-phone`, {
@@ -123,7 +117,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         ...authSecurityHeaders(security),
       },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, phone_otp_token: phoneOtpToken }),
     });
 
     const text = await backendRes.text();
@@ -152,20 +146,6 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json(data, { status: backendRes.status });
-    }
-
-    if (LOGIN_PHONE_OTP_REQUIRED && phoneOtpToken) {
-      const consumed = await consumeOTPVerificationTokenForPurposes(
-        phoneOtpToken,
-        {
-          type: 'phone',
-          target: phone,
-        },
-        ['login', 'register'],
-      );
-      if (!consumed) {
-        console.warn('[AUTH_LOGIN_PHONE_OTP_ALREADY_CONSUMED]', { phone });
-      }
     }
 
     const response = NextResponse.json(data);

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 
 import {
   MAX_REELS_PAGE_LIMIT,
@@ -14,6 +15,7 @@ type PageProps = {
   params: Promise<{ locale: string }>;
   searchParams: Promise<{
     video?: string;
+    reel?: string;
     q?: string;
     upload?: string;
     create?: string;
@@ -67,7 +69,6 @@ function getCommunityBackendBases(): string[] {
   return [
     process.env.COMMUNITY_SERVICE_URL,
     process.env.INTERNAL_COMMUNITY_URL,
-    process.env.NEXT_PUBLIC_COMMUNITY_URL,
   ]
     .map(value => value?.trim() || '')
     .filter((value, index, source) => value && source.indexOf(value) === index);
@@ -77,6 +78,7 @@ async function getInitialReelsPage(
   cursor: number,
   limit: number,
   q?: string,
+  accessToken?: string,
 ): Promise<ReelsPageResult> {
   const candidates = await Promise.all(
     getCommunityBackendBases().map(async base => {
@@ -86,8 +88,10 @@ async function getInitialReelsPage(
       if (q?.trim()) url.searchParams.set('q', q.trim());
 
       try {
+        const headers: Record<string, string> = { Accept: 'application/json' };
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
         const response = await fetch(url, {
-          headers: { Accept: 'application/json' },
+          headers,
           cache: 'no-store',
           signal: AbortSignal.timeout(REELS_INITIAL_REQUEST_TIMEOUT_MS),
         });
@@ -176,7 +180,9 @@ function getRequestedReelIndex(
 
 export default async function ReelsPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
-  const { video, q, upload, create } = await searchParams;
+  const { video, reel, q, upload, create } = await searchParams;
+  const requestedVideo = video?.trim() || reel?.trim();
+  const accessToken = (await cookies()).get('access_token')?.value;
   const uploadRequest = String(upload || create || '').toLowerCase();
   const initialUploadOpen = [
     '1',
@@ -187,7 +193,7 @@ export default async function ReelsPage({ params, searchParams }: PageProps) {
     'studio',
   ].includes(uploadRequest);
 
-  const requestedIndex = getRequestedNumericIndex(video);
+  const requestedIndex = getRequestedNumericIndex(requestedVideo);
   const needsIdLookup = requestedIndex === null;
 
   const initialLimit = Math.min(
@@ -196,8 +202,15 @@ export default async function ReelsPage({ params, searchParams }: PageProps) {
       ? MAX_REELS_PAGE_LIMIT
       : Math.max(REELS_PAGE_SIZE, requestedIndex + REELS_PAGE_SIZE),
   );
-  const initialPage = await getInitialReelsPage(0, initialLimit, q);
-  const requestedReel = needsIdLookup ? await getInitialReel(video) : null;
+  const initialPage = await getInitialReelsPage(
+    0,
+    initialLimit,
+    q,
+    accessToken,
+  );
+  const requestedReel = needsIdLookup
+    ? await getInitialReel(requestedVideo)
+    : null;
   const initialItems = requestedReel
     ? [
         requestedReel,
@@ -206,7 +219,7 @@ export default async function ReelsPage({ params, searchParams }: PageProps) {
     : initialPage.items;
   const initialIndex = requestedReel
     ? 0
-    : getRequestedReelIndex(initialItems, video);
+    : getRequestedReelIndex(initialItems, requestedVideo);
 
   return (
     <ReelsClient

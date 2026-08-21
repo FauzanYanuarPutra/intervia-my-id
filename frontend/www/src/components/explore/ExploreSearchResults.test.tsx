@@ -137,6 +137,33 @@ describe('ExploreSearchResults public references', () => {
     expect(html).not.toContain('tulis kebutuhan agar penyedia');
   });
 
+  it('turns a marketplace zero result into the matching create action', () => {
+    const payload = emptyGlobalSearchResponse('kemasan custom');
+    const needHtml = renderToStaticMarkup(
+      <ExploreSearchResults
+        payload={payload}
+        loading={false}
+        error={false}
+        locale="id"
+        searchSide="supply"
+      />,
+    );
+    const offerHtml = renderToStaticMarkup(
+      <ExploreSearchResults
+        payload={payload}
+        loading={false}
+        error={false}
+        locale="id"
+        searchSide="demand"
+      />,
+    );
+
+    expect(needHtml).toContain('Pasang kebutuhan');
+    expect(needHtml).toContain('/create?side=demand');
+    expect(offerHtml).toContain('Tawarkan yang kamu punya');
+    expect(offerHtml).toContain('/create?side=supply');
+  });
+
   it('uses the selected-tab empty state even when another tab has results', () => {
     const payload = emptyGlobalSearchResponse('kopi');
     payload.groups.references = {

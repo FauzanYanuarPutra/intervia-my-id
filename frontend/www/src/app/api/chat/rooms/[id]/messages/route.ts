@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { requireAuth } from '@/lib/serverAuth';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { evaluateTrustSafety } from '@/lib/trustSafety';
+import {
+  normalizeChatAttachments,
+  safeStoredChatAttachments,
+  type ChatAttachmentPolicyOptions,
+} from '@/lib/chatAttachments';
 
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
 const MAX_MESSAGE_LENGTH = 4000;
-const MAX_ATTACHMENTS = 10;
-const MAX_ATTACHMENT_URL_LENGTH = 2048;
-const MAX_STRUCTURED_ATTACHMENT_LENGTH = 32 * 1024;
+const MAX_CLIENT_REF_LENGTH = 128;
+const CLIENT_REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 
 function safeDecodeRoomId(id: string): string {
   try {
@@ -17,25 +22,20 @@ function safeDecodeRoomId(id: string): string {
   }
 }
 
-function normalizeAttachment(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const value = raw.trim();
-  if (!value) return null;
+function attachmentPolicyOptions(req: NextRequest): ChatAttachmentPolicyOptions {
+  const configuredOrigins = [
+    req.nextUrl.origin,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_WWW_URL,
+    ...(process.env.CHAT_MEDIA_ALLOWED_ORIGINS || '').split(','),
+  ]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
 
-  const isStructuredPayload = value.startsWith('{') || value.startsWith('[');
-  if (isStructuredPayload) {
-    if (value.length > MAX_STRUCTURED_ATTACHMENT_LENGTH) return null;
-    try {
-      const parsed = JSON.parse(value) as unknown;
-      if (!parsed || typeof parsed !== 'object') return null;
-      return JSON.stringify(parsed);
-    } catch {
-      return null;
-    }
-  }
-
-  if (value.length > MAX_ATTACHMENT_URL_LENGTH) return null;
-  return value;
+  return {
+    appOrigins: configuredOrigins,
+    minioPublicUrl: process.env.MINIO_PUBLIC_URL || null,
+  };
 }
 
 export async function GET(
@@ -69,16 +69,24 @@ export async function GET(
       room_name?: string;
     };
     if (res.ok && Array.isArray(data.data)) {
+      const attachmentOptions = attachmentPolicyOptions(req);
       // Backend returns newest-first; urutkan oldest-first (terbaru di bawah)
       const ordered = [...data.data].reverse();
-      const messages = ordered.map((m) => ({
-        id: m.message_id ?? m.sent_at ?? '',
-        content: m.content ?? '',
-        sender_id: m.sender_id ?? '',
-        message_type: m.message_type ?? 'text',
-        attachments: Array.isArray(m.attachments) ? m.attachments : [],
-        created_at: m.sent_at ?? '',
-      }));
+      const messages = ordered.map((m) => {
+        const messageType = m.message_type ?? 'text';
+        return {
+          id: m.message_id ?? m.sent_at ?? '',
+          content: m.content ?? '',
+          sender_id: m.sender_id ?? '',
+          message_type: messageType,
+          attachments: safeStoredChatAttachments(
+            messageType,
+            m.attachments,
+            attachmentOptions,
+          ),
+          created_at: m.sent_at ?? '',
+        };
+      });
       const roomName = (data as { room_name?: string }).room_name ?? roomId;
       return NextResponse.json({ messages, room_name: roomName }, { status: res.status });
     }
@@ -124,16 +132,52 @@ export async function POST(
     }
     clientPayload = body as Record<string, unknown>;
 
+    const rawClientRef = clientPayload.client_ref;
+    let clientRef: string;
+    if (rawClientRef === undefined || rawClientRef === null) {
+      // Compatibility for callers deployed before idempotent message sends.
+      clientRef = randomUUID();
+    } else if (typeof rawClientRef === 'string') {
+      clientRef = rawClientRef.trim();
+      if (
+        !clientRef ||
+        clientRef.length > MAX_CLIENT_REF_LENGTH ||
+        !CLIENT_REF_PATTERN.test(clientRef)
+      ) {
+        return NextResponse.json(
+          { error: 'client_ref must be 1-128 safe ASCII characters' },
+          { status: 400 },
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: 'client_ref must be a string' },
+        { status: 400 },
+      );
+    }
+
     const contentRaw =
       typeof clientPayload.content === 'string' ? clientPayload.content : '';
     const hasContent = contentRaw.trim().length > 0;
 
-    const attachments = Array.isArray(clientPayload.attachments)
-      ? clientPayload.attachments
-          .map((item) => normalizeAttachment(item))
-          .filter((item): item is string => Boolean(item))
-          .slice(0, MAX_ATTACHMENTS)
-      : [];
+    const rawType =
+      typeof clientPayload.type === 'string'
+        ? clientPayload.type.trim().toLowerCase()
+        : 'text';
+    const messageType = /^[a-z0-9_-]{2,24}$/.test(rawType) ? rawType : 'text';
+
+    const attachmentResult = normalizeChatAttachments(
+      messageType,
+      clientPayload.attachments,
+      attachmentPolicyOptions(req),
+    );
+    if (!attachmentResult.ok) {
+      return NextResponse.json(
+        { error: 'Attachments are invalid or are not hosted by Lajukan' },
+        { status: 400 },
+      );
+    }
+    const attachments = attachmentResult.attachments;
 
     const hasAttachments = attachments.length > 0;
 
@@ -165,12 +209,6 @@ export async function POST(
       );
     }
 
-    const rawType =
-      typeof clientPayload.type === 'string'
-        ? clientPayload.type.trim().toLowerCase()
-        : 'text';
-    const messageType = /^[a-z0-9_-]{2,24}$/.test(rawType) ? rawType : 'text';
-
     const pathSegment = encodeURIComponent(roomId);
     const res = await fetch(`${CHAT_URL}/api/v1/rooms/${pathSegment}/messages`, {
       method: 'POST',
@@ -182,34 +220,46 @@ export async function POST(
         content: safety.sanitizedText,
         type: messageType,
         attachments,
+        client_ref: clientRef,
       }),
     });
 
     const data = (await res.json().catch(() => ({}))) as {
       data?: {
         room_id?: string;
+        message_id?: string;
+        client_ref?: string;
         sender_id?: string;
         content?: string;
         message_type?: string;
         attachments?: string[];
         sent_at?: string;
+        deduplicated?: boolean;
       };
     };
     if (res.ok && data.data) {
-      const serverType = data.data.message_type ?? 'text';
-      const clientType = messageType;
-      const message_type = clientType !== 'text' ? clientType : serverType;
+      const message_type = data.data.message_type ?? 'text';
+      const responseAttachments = safeStoredChatAttachments(
+        message_type,
+        data.data.attachments ?? attachments,
+        attachmentPolicyOptions(req),
+      );
       const msg = {
-        id: (data.data as { message_id?: string }).message_id ?? data.data.sent_at ?? `msg-${Date.now()}`,
+        id: data.data.message_id ?? data.data.sent_at ?? `msg-${Date.now()}`,
+        client_ref: data.data.client_ref ?? clientRef,
         content: data.data.content ?? '',
         sender_id: data.data.sender_id ?? '',
         message_type,
-        attachments: Array.isArray(data.data.attachments)
-          ? data.data.attachments
-          : attachments,
+        attachments: responseAttachments,
         created_at: data.data.sent_at ?? new Date().toISOString(),
+        deduplicated: data.data.deduplicated === true,
       };
-      const dataPayload = { ...data.data, message_type };
+      const dataPayload = {
+        ...data.data,
+        client_ref: data.data.client_ref ?? clientRef,
+        message_type,
+        attachments: responseAttachments,
+      };
       return NextResponse.json({ message: msg, data: dataPayload }, { status: res.status });
     }
     return NextResponse.json(data, { status: res.status });

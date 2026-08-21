@@ -16,6 +16,7 @@ const PRIVATE_ROUTE_PATHS = [
   'my-listings',
   'onboarding',
 ];
+
 const DISALLOW_ROUTES = [
   '/api/',
   '/private/',
@@ -23,8 +24,12 @@ const DISALLOW_ROUTES = [
   '/tmp/',
   ...['id', 'en'].flatMap(locale => [
     ...PRIVATE_ROUTE_PATHS.map(path => `/${locale}/${path}`),
+
+    // Owner profile only.
+    // Jangan gunakan `/${locale}/profile` karena public profile
+    // berada di bawah /profile/[slug].
     `/${locale}/profile$`,
-    `/${locale}/profile/edit`,
+
     `/${locale}/content/*/edit`,
   ]),
 ];

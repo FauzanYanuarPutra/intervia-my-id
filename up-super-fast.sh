@@ -1,692 +1,907 @@
-#!/usr/bin/env bash
+param(
+    [ValidateSet("dev", "prod")]
+    [string]$Mode = "dev",
+    [string]$EnvFile = ".env.development",
+    [switch]$BuildAll,
+    [switch]$NoBuild,
+    [switch]$PullLatest,
+    [switch]$SkipCleanup,
+    [string[]]$Services
+)
 
-set -euo pipefail
+$ErrorActionPreference = "Stop"
+Set-Location $PSScriptRoot
 
-MODE="dev"
-ENV_FILE=""
-NO_BUILD=0
-PULL_LATEST=0
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_FILE="$SCRIPT_DIR/.docker-build-state.sh.tsv"
-RUNTIME_DIR="$SCRIPT_DIR/.runtime"
-STARTUP_STATE_FILE="$RUNTIME_DIR/stack-startup.json"
-COMPOSE_IS_LEGACY_V1=0
-COMPOSE_BIN=()
+$RuntimeDir = Join-Path $PSScriptRoot ".runtime"
+$StartupStateFile = Join-Path $RuntimeDir "stack-startup.json"
 
-usage() {
-  cat <<'EOF'
-Usage: ./up-super-fast.sh [options] [service ...]
-
-Options:
-  -m, --mode <dev|prod>   Run in dev or prod mode. Default: dev
-  -e, --env-file <path>   Env file for compose. Default: .env.development in dev, .env.production in prod
-      --no-build          Skip compose build
-      --pull-latest       In prod mode, pull images before starting
-  -h, --help              Show this help
-
-Examples:
-  ./up-super-fast.sh
-  ./up-super-fast.sh www crm
-  ./up-super-fast.sh --no-build
-  ./up-super-fast.sh --mode prod --pull-latest
-
-In dev mode the script only rebuilds services whose inputs changed and
-reuses existing local images for everything else.
-EOF
-}
-
-die() {
-  printf '%s\n' "$*" >&2
-  exit 1
-}
-
-json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
-}
-
-write_startup_state() {
-  local active="$1"
-  local status="$2"
-  local phase="$3"
-  local message="$4"
-  shift 4 || true
-
-  mkdir -p "$RUNTIME_DIR"
-
-  local now started_at service services_json separator
-  now="$(date -Iseconds)"
-  started_at="$now"
-  if [[ -f "$STARTUP_STATE_FILE" ]]; then
-    started_at="$(sed -n 's/.*"startedAt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$STARTUP_STATE_FILE" | head -n 1)"
-    started_at="${started_at:-$now}"
-  fi
-
-  services_json="["
-  separator=""
-  for service in "$@"; do
-    [[ -n "$service" ]] || continue
-    services_json+="${separator}\"$(json_escape "$service")\""
-    separator=","
-  done
-  services_json+="]"
-
-  cat > "$STARTUP_STATE_FILE" <<EOF
-{
-  "active": $active,
-  "status": "$(json_escape "$status")",
-  "phase": "$(json_escape "$phase")",
-  "message": "$(json_escape "$message")",
-  "script": "up-super-fast.sh",
-  "mode": "$(json_escape "$MODE")",
-  "services": $services_json,
-  "startedAt": "$(json_escape "$started_at")",
-  "updatedAt": "$(json_escape "$now")"
-}
-EOF
-}
-
-on_startup_error() {
-  local exit_code=$?
-  write_startup_state false failed failed "Startup failed." "${SELECTED_SERVICES[@]}"
-  exit "$exit_code"
-}
-
-init_compose() {
-  local version_output=""
-
-  if docker compose version >/dev/null 2>&1; then
-    COMPOSE_BIN=(docker compose)
-    COMPOSE_IS_LEGACY_V1=0
-    return 0
-  fi
-
-  if ! docker-compose version >/dev/null 2>&1; then
-    die "Docker Compose not found. Install Docker Compose v2 or docker-compose."
-  fi
-
-  COMPOSE_BIN=(docker-compose)
-  version_output="$(docker-compose version 2>/dev/null || true)"
-  if grep -Eqi '(^|[[:space:]])(docker-compose[[:space:]]+)?version[[:space:]]+1\.' <<<"$version_output"; then
-    COMPOSE_IS_LEGACY_V1=1
-  else
-    COMPOSE_IS_LEGACY_V1=0
-  fi
-}
-
-compose_cmd() {
-  "${COMPOSE_BIN[@]}" "$@"
-}
-
-compose_up_with_legacy_retry() {
-  local project_name="$1"
-  shift
-
-  local output_file exit_code=0
-  output_file="$(mktemp)"
-
-  set +e
-  compose_cmd "$@" > >(tee "$output_file") 2> >(tee -a "$output_file" >&2)
-  exit_code=$?
-  set -e
-
-  if (( exit_code == 0 )); then
-    rm -f "$output_file"
-    return 0
-  fi
-
-  if (( COMPOSE_IS_LEGACY_V1 == 1 )) && grep -Eq "ContainerConfig|KeyError: 'ContainerConfig'" "$output_file"; then
-    local service skip_next=0
-    local -a services_to_cleanup=()
-
-    for service in "$@"; do
-      if (( skip_next == 1 )); then
-        skip_next=0
-        continue
-      fi
-
-      case "$service" in
-        --env-file|-f|--project-name|-p)
-          skip_next=1
-          ;;
-        up|-d|--no-build|--no-recreate|--remove-orphans|--force-recreate|--build|start|stop|restart|ps)
-          ;;
-        --*)
-          ;;
-        *)
-          services_to_cleanup+=("$service")
-          ;;
-      esac
-    done
-
-    if [[ "${#services_to_cleanup[@]}" -gt 0 ]]; then
-      echo "Legacy docker-compose v1 hit ContainerConfig. Removing stale containers and retrying once: ${services_to_cleanup[*]}"
-      remove_legacy_compose_service_containers "$project_name" "${services_to_cleanup[@]}"
-      rm -f "$output_file"
-      compose_cmd "$@"
-      return $?
-    fi
-  fi
-
-  rm -f "$output_file"
-  return "$exit_code"
-}
-
-configure_build_backend() {
-  local buildkit_requested compose_cli_requested
-
-  buildkit_requested="${DOCKER_BUILDKIT:-1}"
-  compose_cli_requested="${COMPOSE_DOCKER_CLI_BUILD:-1}"
-
-  if [[ "$buildkit_requested" != "1" || "$compose_cli_requested" != "1" ]]; then
-    export DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-0}"
-    export COMPOSE_DOCKER_CLI_BUILD="${COMPOSE_DOCKER_CLI_BUILD:-0}"
-    return 0
-  fi
-
-  if docker buildx version >/dev/null 2>&1; then
-    export DOCKER_BUILDKIT=1
-    export COMPOSE_DOCKER_CLI_BUILD=1
-    return 0
-  fi
-
-  export DOCKER_BUILDKIT=0
-  export COMPOSE_DOCKER_CLI_BUILD=0
-  echo "Docker BuildKit requested but docker buildx is unavailable. Falling back to the legacy builder."
-}
-
-remove_legacy_compose_service_containers() {
-  local project_name="$1"
-  shift
-
-  (( COMPOSE_IS_LEGACY_V1 == 1 )) || return 0
-  [[ "$#" -gt 0 ]] || return 0
-
-  local service container_id
-  local -a container_ids=()
-
-  for service in "$@"; do
-    while IFS= read -r container_id; do
-      [[ -n "$container_id" ]] || continue
-      container_ids+=("$container_id")
-    done < <(
-      docker ps -aq \
-        --filter "label=com.docker.compose.project=$project_name" \
-        --filter "label=com.docker.compose.service=$service"
+function Write-StartupState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [bool]$Active,
+        [Parameter(Mandatory = $true)]
+        [string]$Status,
+        [Parameter(Mandatory = $true)]
+        [string]$Phase,
+        [string]$Message = "",
+        [string[]]$ServiceNames = @()
     )
-  done
 
-  [[ "${#container_ids[@]}" -gt 0 ]] || return 0
+    if (-not (Test-Path $RuntimeDir)) {
+        New-Item -ItemType Directory -Path $RuntimeDir -Force *> $null
+    }
 
-  echo "Legacy docker-compose v1 detected. Removing stale containers before recreate: $*"
-  docker rm -f "${container_ids[@]}" >/dev/null
+    $now = (Get-Date).ToString("o")
+    $startedAt = $now
+    if (Test-Path $StartupStateFile) {
+        try {
+            $existing = Get-Content $StartupStateFile -Raw | ConvertFrom-Json
+            if ($existing.startedAt) {
+                $startedAt = [string]$existing.startedAt
+            }
+        }
+        catch {
+            $startedAt = $now
+        }
+    }
+
+    $state = @{
+        active    = $Active
+        status    = $Status
+        phase     = $Phase
+        message   = $Message
+        script    = "up-super-fast.ps1"
+        mode      = $Mode
+        services  = @($ServiceNames)
+        startedAt = $startedAt
+        updatedAt = $now
+    }
+
+    $state | ConvertTo-Json -Depth 5 | Set-Content -Path $StartupStateFile -Encoding UTF8
 }
 
-test_local_image() {
-  local image_name="$1"
-  docker image inspect "$image_name" >/dev/null 2>&1
+trap {
+    Write-StartupState -Active $false -Status "failed" -Phase "failed" -Message "$($_.Exception.Message)" -ServiceNames $selectedServices
+    break
 }
 
-pull_image_with_retry() {
-  local image_name="$1"
-  local attempt
+Write-StartupState -Active $true -Status "starting" -Phase "initializing" -Message "Preparing Docker startup." -ServiceNames $Services
 
-  for attempt in 1 2 3; do
-    echo "Pulling base image: $image_name (attempt $attempt/3)"
-    if docker pull "$image_name"; then
-      return 0
-    fi
+$env:DOCKER_BUILDKIT = "1"
+$env:COMPOSE_DOCKER_CLI_BUILD = "1"
+$env:COMPOSE_PARALLEL_LIMIT = "3"
+$env:BUILDKIT_PROGRESS = "plain"
 
-    if (( attempt < 3 )); then
-      sleep $(( attempt * 3 ))
-    fi
-  done
-
-  return 1
+$composeV2Available = $false
+$composeLegacyV1 = $false
+try {
+    & docker compose version *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $composeV2Available = $true
+    }
+}
+catch {
+    $composeV2Available = $false
 }
 
-warm_base_images_for_services() {
-  local service image_name
-  local -A seen_images=()
-  local images_to_pull=()
-
-  for service in "$@"; do
-    read -r -a service_images <<<"${SERVICE_BASE_IMAGES[$service]:-}"
-    for image_name in "${service_images[@]}"; do
-      [[ -n "$image_name" ]] || continue
-      [[ -n "${seen_images[$image_name]:-}" ]] && continue
-      seen_images["$image_name"]=1
-
-      if test_local_image "$image_name"; then
-        continue
-      fi
-
-      images_to_pull+=("$image_name")
-    done
-  done
-
-  if [[ "${#images_to_pull[@]}" -eq 0 ]]; then
-    return 0
-  fi
-
-  echo "Warming missing base images before build..."
-  for image_name in "${images_to_pull[@]}"; do
-    pull_image_with_retry "$image_name"
-  done
+if (-not $composeV2Available) {
+    try {
+        $dockerComposeVersion = (& docker-compose version 2>$null | Out-String)
+        if ($LASTEXITCODE -eq 0 -and $dockerComposeVersion -match '(^|\s)(docker-compose\s+)?version\s+1\.') {
+            $composeLegacyV1 = $true
+        }
+    }
+    catch {
+        $composeLegacyV1 = $false
+    }
 }
 
-get_latest_write_epoch() {
-  local latest=0
-  local relative_path full_path file_epoch
+if ($composeLegacyV1) {
+    Write-Host "Legacy docker-compose v1 detected. Wrapper mode will avoid known recreate bugs where possible." -ForegroundColor Yellow
+}
 
-  for relative_path in "$@"; do
-    full_path="$SCRIPT_DIR/$relative_path"
-    [[ -e "$full_path" ]] || continue
-
-    if [[ -f "$full_path" ]]; then
-      file_epoch="$(stat -c %Y "$full_path" 2>/dev/null || stat -f %m "$full_path")"
-      if [[ "$file_epoch" =~ ^[0-9]+$ ]] && (( file_epoch > latest )); then
-        latest="$file_epoch"
-      fi
-      continue
-    fi
-
-    while IFS= read -r file_epoch; do
-      file_epoch="${file_epoch%%.*}"
-      if [[ "$file_epoch" =~ ^[0-9]+$ ]] && (( file_epoch > latest )); then
-        latest="$file_epoch"
-      fi
-    done < <(
-      find "$full_path" \
-        \( -type d \( \
-          -name .git -o \
-          -name node_modules -o \
-          -name .next -o \
-          -name .turbo -o \
-          -name dist -o \
-          -name target -o \
-          -name .cache -o \
-          -name .gradle -o \
-          -name playwright-report -o \
-          -name coverage -o \
-          -name test-results \
-        \) -prune \) \
-        -o -type f -printf '%T@\n' 2>/dev/null
+function Invoke-Compose {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Args
     )
-  done
 
-  printf '%s\n' "$latest"
+    $effectiveArgs = @()
+    if ($Mode -eq "dev") {
+        $effectiveArgs += @("-f", "docker-compose.dev.yml", "--profile", "ai")
+    }
+    $effectiveArgs += $Args
+
+    if ($composeV2Available) {
+        & docker compose @effectiveArgs
+    }
+    else {
+        & docker-compose @effectiveArgs
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Compose command failed: $($effectiveArgs -join ' ')"
+    }
 }
 
-declare -A STATE_TICKS=()
-declare -A STATE_BUILT_AT=()
+function Configure-BuildBackend {
+    $buildkitRequested = if ([string]::IsNullOrWhiteSpace($env:DOCKER_BUILDKIT)) { "1" } else { $env:DOCKER_BUILDKIT }
+    $composeCliRequested = if ([string]::IsNullOrWhiteSpace($env:COMPOSE_DOCKER_CLI_BUILD)) { "1" } else { $env:COMPOSE_DOCKER_CLI_BUILD }
 
-load_state_file() {
-  local path="$1"
-  [[ -f "$path" ]] || return 0
+    if ($buildkitRequested -ne "1" -or $composeCliRequested -ne "1") {
+        if ([string]::IsNullOrWhiteSpace($env:DOCKER_BUILDKIT)) { $env:DOCKER_BUILDKIT = "0" }
+        if ([string]::IsNullOrWhiteSpace($env:COMPOSE_DOCKER_CLI_BUILD)) { $env:COMPOSE_DOCKER_CLI_BUILD = "0" }
+        return
+    }
 
-  while IFS=$'\t' read -r service tick built_at; do
-    [[ -n "$service" ]] || continue
-    [[ "$tick" =~ ^[0-9]+$ ]] || continue
-    STATE_TICKS["$service"]="$tick"
-    STATE_BUILT_AT["$service"]="$built_at"
-  done < "$path"
+    & docker buildx version *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $env:DOCKER_BUILDKIT = "1"
+        $env:COMPOSE_DOCKER_CLI_BUILD = "1"
+        return
+    }
+
+    $env:DOCKER_BUILDKIT = "0"
+    $env:COMPOSE_DOCKER_CLI_BUILD = "0"
+    Write-Host "Docker BuildKit requested but docker buildx is unavailable. Falling back to the legacy builder." -ForegroundColor Yellow
 }
 
-save_state_file() {
-  local path="$1"
-  local tmp_path
+Configure-BuildBackend
 
-  tmp_path="$(mktemp "${path}.XXXXXX")"
-  while IFS= read -r service; do
-    printf '%s\t%s\t%s\n' \
-      "$service" \
-      "${STATE_TICKS[$service]}" \
-      "${STATE_BUILT_AT[$service]:-}" >> "$tmp_path"
-  done < <(printf '%s\n' "${!STATE_TICKS[@]}" | sort)
+function Resolve-WorkspacePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
 
-  mv "$tmp_path" "$path"
+    $candidate = if ([System.IO.Path]::IsPathRooted($Path)) {
+        $Path
+    }
+    else {
+        Join-Path $PSScriptRoot $Path
+    }
+
+    return [System.IO.Path]::GetFullPath($candidate)
 }
 
-get_project_container_ids() {
-  local project_name="$1"
-  local running_only="${2:-0}"
+function Test-IsWorkspaceChildPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
 
-  if [[ "$running_only" -eq 1 ]]; then
-    docker ps -q --filter "label=com.docker.compose.project=$project_name"
-  else
-    docker ps -a -q --filter "label=com.docker.compose.project=$project_name"
-  fi
+    $root = ([System.IO.Path]::GetFullPath($PSScriptRoot)).TrimEnd('\', '/')
+    $fullPath = ([System.IO.Path]::GetFullPath($Path)).TrimEnd('\', '/')
+    $comparison = [System.StringComparison]::OrdinalIgnoreCase
+
+    return $fullPath.StartsWith($root + [System.IO.Path]::DirectorySeparatorChar, $comparison)
 }
 
-contains_service() {
-  local needle="$1"
-  shift || true
-  local item
-  for item in "$@"; do
-    if [[ "$item" == "$needle" ]]; then
-      return 0
-    fi
-  done
-  return 1
+function Remove-WorkspaceJunkItem {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $fullPath = Resolve-WorkspacePath -Path $Path
+    if (-not (Test-IsWorkspaceChildPath -Path $fullPath)) {
+        throw "Refusing to clean path outside workspace: $fullPath"
+    }
+
+    if (-not (Test-Path -LiteralPath $fullPath)) {
+        return $false
+    }
+
+    Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
+    return $true
 }
 
-filter_group() {
-  local -n out_ref="$1"
-  shift
-  out_ref=()
+function Invoke-FastWorkspaceCleanup {
+    $removedCount = 0
 
-  local svc
-  for svc in "$@"; do
-    if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]] || contains_service "$svc" "${SELECTED_SERVICES[@]}"; then
-      out_ref+=("$svc")
-    fi
-  done
+    $directoryTargets = @(
+        ".codex-chrome-home-scroll",
+        ".codex-chrome-home-scroll-2",
+        ".codex-tmp",
+        "frontend/www/.next",
+        "frontend/www/.turbo",
+        "frontend/www/out",
+        "frontend/www/coverage",
+        "frontend/www/playwright-report",
+        "frontend/www/test-results",
+        "frontend/www/.parcel-cache",
+        "frontend/www/.vite",
+        "frontend/cms/.next",
+        "frontend/cms/.turbo",
+        "frontend/cms/out",
+        "frontend/cms/coverage",
+        "frontend/cms/playwright-report",
+        "frontend/cms/test-results",
+        "frontend/crm/.next",
+        "frontend/crm/.turbo",
+        "frontend/crm/out",
+        "frontend/crm/coverage",
+        "frontend/crm/playwright-report",
+        "frontend/crm/test-results",
+        "frontend/usaha/.next",
+        "frontend/usaha/.turbo",
+        "frontend/usaha/out",
+        "frontend/usaha/coverage",
+        "frontend/usaha/playwright-report",
+        "frontend/usaha/test-results"
+    )
+
+    foreach ($target in $directoryTargets) {
+        try {
+            if (Remove-WorkspaceJunkItem -Path $target) {
+                $removedCount++
+            }
+        }
+        catch {
+            Write-Host "Skip cleanup target '$target': $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+
+    $patternTargets = @(
+        @{ Base = "."; Patterns = @(".codex-*.log", "tmp-*.png", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/www"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/cms"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/crm"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/usaha"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") }
+    )
+
+    foreach ($target in $patternTargets) {
+        $basePath = Resolve-WorkspacePath -Path $target.Base
+        if (-not (Test-IsWorkspaceChildPath -Path $basePath) -and (([System.IO.Path]::GetFullPath($basePath)).TrimEnd('\', '/') -ne ([System.IO.Path]::GetFullPath($PSScriptRoot)).TrimEnd('\', '/'))) {
+            throw "Refusing to scan cleanup path outside workspace: $basePath"
+        }
+        if (-not (Test-Path -LiteralPath $basePath)) {
+            continue
+        }
+
+        foreach ($pattern in $target.Patterns) {
+            $items = @(Get-ChildItem -LiteralPath $basePath -Force -File -Filter $pattern -ErrorAction SilentlyContinue)
+            foreach ($item in $items) {
+                try {
+                    if (Remove-WorkspaceJunkItem -Path $item.FullName) {
+                        $removedCount++
+                    }
+                }
+                catch {
+                    Write-Host "Skip cleanup file '$($item.FullName)': $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
+        }
+    }
+
+    if ($removedCount -gt 0) {
+        Write-Host "Fast workspace cleanup removed $removedCount junk item(s)."
+    }
+    else {
+        Write-Host "Fast workspace cleanup: nothing to remove."
+    }
 }
 
-SELECTED_SERVICES=()
+if (-not $SkipCleanup) {
+    Write-StartupState -Active $true -Status "starting" -Phase "cleaning_workspace" -Message "Removing local temporary build artifacts." -ServiceNames $Services
+    Invoke-FastWorkspaceCleanup
+}
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -m|--mode)
-      [[ $# -ge 2 ]] || die "Missing value for $1"
-      MODE="$2"
-      shift 2
-      ;;
-    -e|--env-file)
-      [[ $# -ge 2 ]] || die "Missing value for $1"
-      ENV_FILE="$2"
-      shift 2
-      ;;
-    --no-build)
-      NO_BUILD=1
-      shift
-      ;;
-    --pull-latest)
-      PULL_LATEST=1
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --)
-      shift
-      while [[ $# -gt 0 ]]; do
-        SELECTED_SERVICES+=("$1")
-        shift
-      done
-      ;;
-    -*)
-      die "Unknown option: $1"
-      ;;
-    *)
-      SELECTED_SERVICES+=("$1")
-      shift
-      ;;
-  esac
-done
+function Get-LatestWriteTicks {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Paths
+    )
 
-case "$MODE" in
-  dev|prod) ;;
-  *)
-    die "Invalid mode: $MODE"
-    ;;
-esac
+    $ignoreDirNames = @(
+        ".git", "node_modules", ".next", ".turbo", "dist", "target",
+        ".cache", ".gradle", "playwright-report", "coverage", "test-results"
+    )
 
-if [[ -z "$ENV_FILE" ]]; then
-  if [[ "$MODE" == "prod" ]]; then
-    ENV_FILE=".env.production"
-  else
-    ENV_FILE=".env.development"
-  fi
-fi
+    $latest = [int64]0
 
-cd "$SCRIPT_DIR"
-trap on_startup_error ERR
-write_startup_state true starting initializing "Preparing Docker startup." "${SELECTED_SERVICES[@]}"
+    foreach ($relativePath in $Paths) {
+        $fullPath = Join-Path $PSScriptRoot $relativePath
+        if (-not (Test-Path $fullPath)) {
+            continue
+        }
 
-export DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-1}"
-export COMPOSE_DOCKER_CLI_BUILD="${COMPOSE_DOCKER_CLI_BUILD:-1}"
-export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
-export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
+        $item = Get-Item $fullPath
+        if (-not $item.PSIsContainer) {
+            if ($item.LastWriteTimeUtc.Ticks -gt $latest) {
+                $latest = $item.LastWriteTimeUtc.Ticks
+            }
+            continue
+        }
 
-init_compose
-configure_build_backend
+        $stack = New-Object 'System.Collections.Generic.Stack[System.IO.DirectoryInfo]'
+        $stack.Push([System.IO.DirectoryInfo]$item.FullName)
 
-if (( COMPOSE_IS_LEGACY_V1 == 1 )); then
-  echo "Legacy docker-compose v1 detected. Wrapper mode will avoid known recreate bugs where possible."
-  if [[ ! "${COMPOSE_PARALLEL_LIMIT:-}" =~ ^[0-9]+$ ]] || (( COMPOSE_PARALLEL_LIMIT < 2 )); then
-    export COMPOSE_PARALLEL_LIMIT=2
-  fi
-fi
+        while ($stack.Count -gt 0) {
+            $dir = $stack.Pop()
 
-if [[ "$MODE" == "prod" ]]; then
-  if [[ ! -f "$ENV_FILE" ]]; then
-    if [[ "$ENV_FILE" == ".env.development" && -f .env ]]; then
-      ENV_FILE=".env"
-    else
-      die "Env file not found: $ENV_FILE"
-    fi
-  fi
-  compose_files=(-f docker-compose.yml -f docker-compose.prod.yml)
+            foreach ($file in $dir.GetFiles()) {
+                if ($file.LastWriteTimeUtc.Ticks -gt $latest) {
+                    $latest = $file.LastWriteTimeUtc.Ticks
+                }
+            }
 
-  if [[ "$PULL_LATEST" -eq 1 ]]; then
-    echo "Pulling latest production images..."
-    if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]]; then
-      compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" pull
-    else
-      compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" pull "${SELECTED_SERVICES[@]}"
-    fi
-  fi
+            foreach ($subDir in $dir.GetDirectories()) {
+                if ($ignoreDirNames -contains $subDir.Name) {
+                    continue
+                }
+                $stack.Push($subDir)
+            }
+        }
+    }
 
-  echo "Starting production services without build..."
-  if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]]; then
-    compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" up -d --no-build --no-recreate --remove-orphans
-    compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" ps
-  else
-    compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" up -d --no-build --no-recreate --remove-orphans "${SELECTED_SERVICES[@]}"
-    compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" ps "${SELECTED_SERVICES[@]}"
-  fi
-  write_startup_state false ready ready "Production services are ready." "${SELECTED_SERVICES[@]}"
-  exit 0
-fi
+    return $latest
+}
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  if [[ "$ENV_FILE" == ".env.development" && -f .env ]]; then
-    ENV_FILE=".env"
-  else
-    die "Env file not found: $ENV_FILE"
-  fi
-fi
+function Test-LocalImage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ImageName
+    )
+    try {
+        $output = & docker image inspect $ImageName 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
 
-mapfile -t AVAILABLE_SERVICES < <(compose_cmd --env-file "$ENV_FILE" config --services)
-declare -A AVAILABLE_SERVICE_LOOKUP=()
-for svc in "${AVAILABLE_SERVICES[@]}"; do
-  AVAILABLE_SERVICE_LOOKUP["$svc"]=1
-done
+        Write-Host "Local image check failed for ${ImageName}; treating it as missing so it can be rebuilt." -ForegroundColor Yellow
+        return $false
+    }
+    catch {
+        Write-Host "Local image check threw for ${ImageName}; treating it as missing so it can be rebuilt." -ForegroundColor Yellow
+        return $false
+    }
+}
 
-compose_project_name="${COMPOSE_PROJECT_NAME:-$(basename "$SCRIPT_DIR")}"
+function Get-ComposeServiceContainerIds {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Services
+    )
 
-declare -A SERVICE_INPUTS=(
-  [identity_service]="backend/rust_apps docker-compose.yml"
-  [marketplace_service]="backend/rust_apps docker-compose.yml"
-  [community_service]="backend/rust_apps docker-compose.yml"
-  [ai_service]="backend/rust_apps docker-compose.yml"
-  [chat_service]="backend/chat_service docker-compose.yml"
-  [ocr_service]="ai/ocr_paddle docker-compose.yml"
-  [liveness_service]="ai/liveness docker-compose.yml"
-  [www]="frontend/www frontend/shared frontend/.dockerignore docker-compose.yml"
-  [usaha]="frontend/usaha frontend/shared frontend/.dockerignore docker-compose.yml"
-  [cms]="frontend/cms frontend/shared frontend/.dockerignore docker-compose.yml"
-  [crm]="frontend/crm frontend/shared frontend/.dockerignore docker-compose.yml"
+    $ids = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($service in $Services) {
+        if ([string]::IsNullOrWhiteSpace($service)) {
+            continue
+        }
+
+        $serviceIds = & docker ps -aq --filter "label=com.docker.compose.project=$ProjectName" --filter "label=com.docker.compose.service=$service"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to inspect Docker containers for service '$service'."
+        }
+
+        foreach ($id in $serviceIds) {
+            $trimmed = "$id".Trim()
+            if ($trimmed -ne "") {
+                $ids.Add($trimmed)
+            }
+        }
+    }
+
+    return @($ids | Select-Object -Unique)
+}
+
+function Remove-LegacyComposeContainers {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Services
+    )
+
+    if (-not $composeLegacyV1) {
+        return
+    }
+
+    $containerIds = Get-ComposeServiceContainerIds -ProjectName $ProjectName -Services $Services
+    if ($containerIds.Count -eq 0) {
+        return
+    }
+
+    Write-Host "Legacy docker-compose v1 detected. Removing stale containers before recreate: $($Services -join ', ')" -ForegroundColor Yellow
+    & docker rm -f @containerIds *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to remove stale service containers before recreate."
+    }
+}
+
+function Invoke-DockerPullWithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ImageName
+    )
+
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Write-Host "Pulling base image: $ImageName (attempt $attempt/3)"
+        & docker pull $ImageName
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+
+        if ($attempt -lt 3) {
+            Start-Sleep -Seconds (3 * $attempt)
+        }
+    }
+
+    throw "Failed to pull base image: $ImageName"
+}
+
+function Warm-BaseImagesForServices {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$ServiceNames
+    )
+
+    $seenImages = @{}
+    $imagesToPull = New-Object 'System.Collections.Generic.List[string]'
+
+    foreach ($serviceName in $ServiceNames) {
+        if (-not $serviceBaseImages.ContainsKey($serviceName)) {
+            continue
+        }
+
+        foreach ($imageName in $serviceBaseImages[$serviceName]) {
+            if ([string]::IsNullOrWhiteSpace($imageName)) {
+                continue
+            }
+            if ($seenImages.ContainsKey($imageName)) {
+                continue
+            }
+
+            $seenImages[$imageName] = $true
+            if (-not (Test-LocalImage -ImageName $imageName)) {
+                $imagesToPull.Add($imageName)
+            }
+        }
+    }
+
+    if ($imagesToPull.Count -eq 0) {
+        return
+    }
+
+    Write-Host "Warming missing base images before build..."
+    foreach ($imageName in $imagesToPull) {
+        Invoke-DockerPullWithRetry -ImageName $imageName
+    }
+}
+
+function Get-ProjectContainerIds {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [switch]$RunningOnly
+    )
+
+    $args = @("ps")
+    if (-not $RunningOnly) {
+        $args += "-a"
+    }
+    $args += @("-q", "--filter", "label=com.docker.compose.project=$ProjectName")
+
+    $ids = & docker @args
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to query docker containers for project '$ProjectName'"
+    }
+
+    return @($ids | ForEach-Object { "$_".Trim() } | Where-Object { $_ -ne "" })
+}
+
+function Start-ContainerIdsFast {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$ContainerIds
+    )
+
+    $uniqueIds = @($ContainerIds | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    if ($uniqueIds.Count -eq 0) {
+        return $false
+    }
+
+    $runningProjectContainerIds = Get-ProjectContainerIds -ProjectName $ProjectName -RunningOnly
+    $runningLookup = @{}
+    foreach ($runningId in $runningProjectContainerIds) {
+        $runningLookup[$runningId] = $true
+    }
+
+    $toStartIds = @($uniqueIds | Where-Object { -not $runningLookup.ContainsKey($_) })
+    if ($toStartIds.Count -gt 0) {
+        & docker start @toStartIds *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to start one or more stopped containers."
+        }
+        Write-Host "Started $($toStartIds.Count) existing container(s) without Compose recreate."
+    }
+    else {
+        Write-Host "Requested containers already running. Skip start/recreate."
+    }
+
+    return $true
+}
+
+function Start-ComposeServicesFast {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Services
+    )
+
+    $containerIds = New-Object 'System.Collections.Generic.List[string]'
+    $missingServices = New-Object 'System.Collections.Generic.List[string]'
+
+    foreach ($serviceName in $Services) {
+        if ([string]::IsNullOrWhiteSpace($serviceName)) {
+            continue
+        }
+
+        $serviceContainerIds = Get-ComposeServiceContainerIds -ProjectName $ProjectName -Services @($serviceName)
+        if ($serviceContainerIds.Count -eq 0) {
+            $missingServices.Add($serviceName)
+            continue
+        }
+
+        foreach ($id in $serviceContainerIds) {
+            $containerIds.Add($id)
+        }
+    }
+
+    if ($missingServices.Count -gt 0) {
+        Write-Host "Missing containers for service(s): $($missingServices -join ', '). Falling back to Compose up."
+        return $false
+    }
+
+    return Start-ContainerIdsFast -ProjectName $ProjectName -ContainerIds @($containerIds)
+}
+
+function Save-StateFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$State,
+        [Parameter(Mandatory = $true)]
+        [string]$StateFilePath
+    )
+
+    $stateOut = @{
+        updated_at = (Get-Date).ToString("o")
+        services   = @{}
+    }
+
+    foreach ($serviceName in $State.services.Keys) {
+        $stateOut.services[$serviceName] = @{
+            input_ticks = [int64]$State.services[$serviceName].input_ticks
+            built_at    = [string]$State.services[$serviceName].built_at
+        }
+    }
+
+    $stateOut | ConvertTo-Json -Depth 6 | Set-Content $StateFilePath
+}
+
+# Fail fast when the development AI service has not been installed completely.
+if ($Mode -eq "dev") {
+    $requiredDevFiles = @(
+        "docker-compose.dev.yml",
+        "services/ai_service/Cargo.toml",
+        "services/ai_service/Dockerfile",
+        "services/ai_service/docker-entrypoint.sh",
+        "services/ai_service/src/main.rs"
+    )
+
+    $missingDevFiles = @(
+        $requiredDevFiles | Where-Object {
+            -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $_))
+        }
+    )
+
+    if ($missingDevFiles.Count -gt 0) {
+        throw "Development stack is incomplete. Missing: $($missingDevFiles -join ', ')"
+    }
+}
+
+$stateFile = Join-Path $PSScriptRoot ".docker-build-state.json"
+$state = @{
+    services = @{}
+}
+
+if (Test-Path $stateFile) {
+    try {
+        $raw = Get-Content $stateFile -Raw | ConvertFrom-Json
+        if ($raw.services) {
+            foreach ($prop in $raw.services.PSObject.Properties) {
+                $state.services[$prop.Name] = @{
+                    input_ticks = [int64]$prop.Value.input_ticks
+                    built_at    = [string]$prop.Value.built_at
+                }
+            }
+        }
+    }
+    catch {
+        $state = @{
+            services = @{}
+        }
+    }
+}
+
+$serviceInputs = @{
+    identity_service    = @("services/identity_service", "docker-compose.dev.yml")
+    marketplace_service = @("services/marketplace_service", "docker-compose.dev.yml")
+    community_service   = @("services/community_service", "docker-compose.dev.yml")
+    ai_service          = @("services/ai_service", "docker-compose.dev.yml")
+    chat_service        = @("services/chat_service", "docker-compose.dev.yml")
+    ocr_service         = @("ai/ocr_paddle", "docker-compose.dev.yml")
+    liveness_service    = @("ai/liveness", "docker-compose.dev.yml")
+    www                 = @("frontend/www", "frontend/shared", "frontend/.dockerignore", "docker-compose.dev.yml")
+    usaha               = @("frontend/usaha", "frontend/shared", "frontend/.dockerignore", "docker-compose.dev.yml")
+    cms                 = @("frontend/cms", "frontend/shared", "frontend/.dockerignore", "docker-compose.dev.yml")
+    crm                 = @("frontend/crm", "frontend/shared", "frontend/.dockerignore", "docker-compose.dev.yml")
+}
+
+$composeProjectName = if ($env:COMPOSE_PROJECT_NAME) {
+    $env:COMPOSE_PROJECT_NAME
+}
+else {
+    Split-Path -Leaf $PSScriptRoot
+}
+
+$serviceImages = @{
+    identity_service    = "$composeProjectName-identity_service"
+    marketplace_service = "$composeProjectName-marketplace_service"
+    community_service   = "$composeProjectName-community_service"
+    ai_service          = "$composeProjectName-ai_service"
+    chat_service        = "$composeProjectName-chat_service"
+    ocr_service         = "$composeProjectName-ocr_service"
+    liveness_service    = "$composeProjectName-liveness_service"
+    www                 = "$composeProjectName-www"
+    usaha               = "$composeProjectName-usaha"
+    cms                 = "$composeProjectName-cms"
+    crm                 = "$composeProjectName-crm"
+}
+
+$serviceBaseImages = @{
+    identity_service    = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
+    marketplace_service = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
+    community_service   = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
+    ai_service          = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
+    chat_service        = @("docker/dockerfile:1.7", "elixir:1.15-slim", "erlang:26-slim")
+    ocr_service         = @("python:3.9-slim")
+    liveness_service    = @("python:3.11-slim")
+    www                 = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
+    usaha               = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
+    cms                 = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
+    crm                 = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
+}
+
+$defaultDevServices = @(
+    "identity_db",
+    "community_db",
+    "marketplace_db",
+    "redis_cache",
+    "rabbitmq",
+    "meilisearch",
+    "scylla_db",
+    "scylla_keyspace_setup",
+    "minio",
+    "identity_service",
+    "marketplace_service",
+    "community_service",
+    "chat_service",
+    "ai_service",
+    "ollama",
+    "www",
+    "mailhog"
 )
 
-declare -A SERVICE_IMAGES=(
-  [identity_service]="${compose_project_name}-identity_service"
-  [marketplace_service]="${compose_project_name}-marketplace_service"
-  [community_service]="${compose_project_name}-community_service"
-  [ai_service]="${compose_project_name}-ai_service"
-  [chat_service]="${compose_project_name}-chat_service"
-  [ocr_service]="${compose_project_name}-ocr_service"
-  [liveness_service]="${compose_project_name}-liveness_service"
-  [www]="${compose_project_name}-www"
-  [usaha]="${compose_project_name}-usaha"
-  [cms]="${compose_project_name}-cms"
-  [crm]="${compose_project_name}-crm"
-)
+if ($Mode -eq "prod") {
+    $prodArgs = @("-f", "docker-compose.yml", "-f", "docker-compose.prod.yml")
 
-declare -A SERVICE_BASE_IMAGES=(
-  [identity_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
-  [marketplace_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
-  [community_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
-  [ai_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
-  [chat_service]="docker/dockerfile:1.7 elixir:1.15-slim erlang:26-slim"
-  [ocr_service]="python:3.9-slim"
-  [liveness_service]="python:3.11-slim"
-  [www]="docker/dockerfile:1.7 node:20-bullseye-slim"
-  [usaha]="docker/dockerfile:1.7 node:20-bullseye-slim"
-  [cms]="docker/dockerfile:1.7 node:20-bullseye-slim"
-  [crm]="docker/dockerfile:1.7 node:20-bullseye-slim"
-)
+    if ($PullLatest) {
+        Write-Host "Pulling latest production images..."
+        Invoke-Compose ($prodArgs + @("pull"))
+    }
 
-build_groups=(
-  "identity_service marketplace_service community_service ai_service"
-  "chat_service"
-  "ocr_service liveness_service"
-  "www usaha cms crm"
-)
+    Write-Host "Starting production services without build..."
+    Invoke-Compose ($prodArgs + @("up", "-d", "--no-build", "--no-recreate", "--remove-orphans"))
+    Invoke-Compose ($prodArgs + @("ps"))
+    Write-StartupState -Active $false -Status "ready" -Phase "ready" -Message "Production services are ready." -ServiceNames $Services
+    exit 0
+}
 
-load_state_file "$STATE_FILE"
+if (-not (Test-Path $EnvFile)) {
+    if ($EnvFile -eq ".env.development" -and (Test-Path ".env")) {
+        $EnvFile = ".env"
+    }
+    else {
+        throw "Env file not found: $EnvFile"
+    }
+}
 
-declare -A CURRENT_TICKS_BY_SERVICE=()
-declare -A IMAGE_EXISTS_BY_SERVICE=()
-services_to_build=()
+$availableServices = @{}
+try {
+    if ($composeV2Available) {
+        $configuredServices = & docker compose -f docker-compose.dev.yml --profile ai --env-file $EnvFile config --services
+    }
+    else {
+        $configuredServices = & docker-compose -f docker-compose.dev.yml --profile ai --env-file $EnvFile config --services
+    }
+    if ($LASTEXITCODE -eq 0) {
+        foreach ($service in $configuredServices) {
+            $serviceName = "$service".Trim()
+            if ($serviceName -ne "") {
+                $availableServices[$serviceName] = $true
+            }
+        }
+    }
+}
+catch {
+    $availableServices = @{}
+}
 
-for service in "${!SERVICE_INPUTS[@]}"; do
-  if [[ -z "${AVAILABLE_SERVICE_LOOKUP[$service]:-}" ]]; then
-    continue
-  fi
+$requestedServices = @()
+if ($Services) {
+    $requestedServices = @(
+        $Services |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { "$_" -split "," } |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -ne "" } |
+        Select-Object -Unique
+    )
+}
 
-  if [[ "${#SELECTED_SERVICES[@]}" -gt 0 ]] && ! contains_service "$service" "${SELECTED_SERVICES[@]}"; then
-    continue
-  fi
+if ($requestedServices.Count -gt 0 -and $availableServices.Count -gt 0) {
+    $invalidServices = @($requestedServices | Where-Object { -not $availableServices.ContainsKey($_) })
+    if ($invalidServices.Count -gt 0) {
+        throw "Unknown or unsupported services requested: $($invalidServices -join ', ')"
+    }
+}
 
-  read -r -a input_paths <<<"${SERVICE_INPUTS[$service]}"
-  CURRENT_TICKS_BY_SERVICE["$service"]="$(get_latest_write_epoch "${input_paths[@]}")"
+$selectedServices = if ($requestedServices.Count -gt 0) {
+    $requestedServices
+}
+else {
+    $defaultDevServices
+}
 
-  if test_local_image "${SERVICE_IMAGES[$service]}"; then
-    IMAGE_EXISTS_BY_SERVICE["$service"]=1
-  else
-    IMAGE_EXISTS_BY_SERVICE["$service"]=0
-  fi
+Write-StartupState -Active $true -Status "starting" -Phase "checking_images" -Message "Checking images and service inputs." -ServiceNames $selectedServices
 
-  previous_tick=0
-  if [[ -n "${STATE_TICKS[$service]:-}" ]]; then
-    previous_tick="${STATE_TICKS[$service]}"
-  elif [[ "${IMAGE_EXISTS_BY_SERVICE[$service]}" -eq 1 ]]; then
-    previous_tick="${CURRENT_TICKS_BY_SERVICE[$service]}"
-    STATE_TICKS["$service"]="$previous_tick"
-    STATE_BUILT_AT["$service"]="bootstrap-existing-image"
-  fi
+$startupServices = @($selectedServices | Where-Object {
+        $availableServices.Count -eq 0 -or $availableServices.ContainsKey($_)
+    })
 
-  if [[ "$NO_BUILD" -eq 0 ]]; then
-    if [[ "${IMAGE_EXISTS_BY_SERVICE[$service]}" -eq 0 ]] || (( CURRENT_TICKS_BY_SERVICE[$service] > previous_tick )); then
-      services_to_build+=("$service")
-    fi
-  fi
-done
+$startupServiceLookup = @{}
+foreach ($serviceName in $startupServices) {
+    $startupServiceLookup[$serviceName] = $true
+}
 
-if [[ "$NO_BUILD" -eq 0 ]]; then
-  if [[ "${#services_to_build[@]}" -gt 0 ]]; then
-    write_startup_state true building building "Building changed services." "${services_to_build[@]}"
-    warm_base_images_for_services "${services_to_build[@]}"
-
-    local_group=()
-    for group in "${build_groups[@]}"; do
-      read -r -a group_services <<<"$group"
-      local_group=()
-      for svc in "${group_services[@]}"; do
-        [[ -n "${AVAILABLE_SERVICE_LOOKUP[$svc]:-}" ]] || continue
-        contains_service "$svc" "${services_to_build[@]}" || continue
-        local_group+=("$svc")
-      done
-
-      if [[ "${#local_group[@]}" -eq 0 ]]; then
+$currentTicksByService = @{}
+$imageExistsByService = @{}
+foreach ($serviceName in $serviceInputs.Keys) {
+    if ($availableServices.Count -gt 0 -and -not $availableServices.ContainsKey($serviceName)) {
         continue
-      fi
+    }
+    if ($requestedServices.Count -gt 0 -and -not $startupServiceLookup.ContainsKey($serviceName)) {
+        continue
+    }
+    $currentTicksByService[$serviceName] = Get-LatestWriteTicks -Paths $serviceInputs[$serviceName]
+    $imageExistsByService[$serviceName] = Test-LocalImage -ImageName $serviceImages[$serviceName]
+}
 
-      echo "Building services: ${local_group[*]}"
-      compose_cmd --env-file "$ENV_FILE" build "${local_group[@]}"
-    done
+$servicesToBuild = @()
 
-    build_timestamp="$(date -Iseconds)"
-    for service in "${services_to_build[@]}"; do
-      STATE_TICKS["$service"]="${CURRENT_TICKS_BY_SERVICE[$service]}"
-      STATE_BUILT_AT["$service"]="$build_timestamp"
-    done
-    save_state_file "$STATE_FILE"
-  else
-    echo "No image rebuild needed. Reusing existing local images."
-    for service in "${!CURRENT_TICKS_BY_SERVICE[@]}"; do
-      if [[ -z "${STATE_TICKS[$service]:-}" ]] && [[ "${IMAGE_EXISTS_BY_SERVICE[$service]}" -eq 1 ]]; then
-        STATE_TICKS["$service"]="${CURRENT_TICKS_BY_SERVICE[$service]}"
-        STATE_BUILT_AT["$service"]="bootstrap-no-build"
-      fi
-    done
-    save_state_file "$STATE_FILE"
-  fi
-else
-  echo "Skipping image rebuild because --no-build was requested."
-  for service in "${!CURRENT_TICKS_BY_SERVICE[@]}"; do
-    if [[ -z "${STATE_TICKS[$service]:-}" ]] && [[ "${IMAGE_EXISTS_BY_SERVICE[$service]}" -eq 1 ]]; then
-      STATE_TICKS["$service"]="${CURRENT_TICKS_BY_SERVICE[$service]}"
-      STATE_BUILT_AT["$service"]="bootstrap-no-build"
-    fi
-  done
-  save_state_file "$STATE_FILE"
-fi
+if (-not $NoBuild) {
+    foreach ($serviceName in $serviceInputs.Keys) {
+        if ($availableServices.Count -gt 0 -and -not $availableServices.ContainsKey($serviceName)) {
+            continue
+        }
+        if ($requestedServices.Count -gt 0 -and -not $startupServiceLookup.ContainsKey($serviceName)) {
+            continue
+        }
+        $imageExists = [bool]$imageExistsByService[$serviceName]
+        $previousTicks = [int64]0
 
-echo "Starting services..."
-write_startup_state true starting_services starting_services "Starting Docker services." "${SELECTED_SERVICES[@]}"
-if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]]; then
-  if [[ "${#services_to_build[@]}" -gt 0 ]]; then
-    remove_legacy_compose_service_containers "$compose_project_name" "${services_to_build[@]}"
-    compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build "${services_to_build[@]}"
-    if ! compose_cmd --env-file "$ENV_FILE" start; then
-      compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build --no-recreate
-    fi
-  else
-    mapfile -t all_project_container_ids < <(get_project_container_ids "$compose_project_name" 0)
-    if [[ "${#all_project_container_ids[@]}" -gt 0 ]]; then
-      mapfile -t running_project_container_ids < <(get_project_container_ids "$compose_project_name" 1)
-      declare -A RUNNING_LOOKUP=()
-      for running_id in "${running_project_container_ids[@]}"; do
-        RUNNING_LOOKUP["$running_id"]=1
-      done
+        if ($state.services.ContainsKey($serviceName)) {
+            $previousTicks = [int64]$state.services[$serviceName].input_ticks
+        }
+        elseif ($imageExists -and -not $BuildAll) {
+            # Bootstrap state dari image lokal yang sudah ada agar run pertama
+            # tidak memaksa rebuild semua service.
+            $previousTicks = [int64]$currentTicksByService[$serviceName]
+            $state.services[$serviceName] = @{
+                input_ticks = [int64]$previousTicks
+                built_at    = "bootstrap-existing-image"
+            }
+        }
 
-      to_start_ids=()
-      for container_id in "${all_project_container_ids[@]}"; do
-        [[ -n "${RUNNING_LOOKUP[$container_id]:-}" ]] && continue
-        to_start_ids+=("$container_id")
-      done
+        $needsBuild = $BuildAll -or (-not $imageExists) -or ($currentTicksByService[$serviceName] -gt $previousTicks)
+        if ($needsBuild) {
+            $servicesToBuild += $serviceName
+        }
+    }
+}
 
-      if [[ "${#to_start_ids[@]}" -gt 0 ]]; then
-        docker start "${to_start_ids[@]}" >/dev/null
-      else
-        echo "All containers already running. Skip start/recreate."
-      fi
-    else
-      compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build --no-recreate
-    fi
-  fi
-  compose_cmd --env-file "$ENV_FILE" ps
-else
-  if (( COMPOSE_IS_LEGACY_V1 == 1 )); then
-    remove_legacy_compose_service_containers "$compose_project_name" "${SELECTED_SERVICES[@]}"
-  elif [[ "${#services_to_build[@]}" -gt 0 ]]; then
-    remove_legacy_compose_service_containers "$compose_project_name" "${services_to_build[@]}"
-  fi
-  compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build "${SELECTED_SERVICES[@]}"
-  compose_cmd --env-file "$ENV_FILE" ps "${SELECTED_SERVICES[@]}"
-fi
-write_startup_state false ready ready "All requested services are ready." "${SELECTED_SERVICES[@]}"
+if ($servicesToBuild.Count -gt 0) {
+    Write-StartupState -Active $true -Status "building" -Phase "building" -Message "Building changed services." -ServiceNames $servicesToBuild
+    Warm-BaseImagesForServices -ServiceNames $servicesToBuild
+
+    $buildOrder = @(
+        @("identity_service", "marketplace_service", "community_service", "ai_service"),
+        @("chat_service"),
+        @("ocr_service", "liveness_service"),
+        @("www", "usaha", "cms", "crm")
+    )
+
+    foreach ($group in $buildOrder) {
+        $groupToBuild = @($group | Where-Object { $servicesToBuild -contains $_ })
+        if ($groupToBuild.Count -eq 0) {
+            continue
+        }
+        Write-Host "Building services: $($groupToBuild -join ', ')"
+        Invoke-Compose (@("--env-file", $EnvFile, "build") + $groupToBuild)
+    }
+
+    foreach ($serviceName in $servicesToBuild) {
+        $state.services[$serviceName] = @{
+            input_ticks = [int64]$currentTicksByService[$serviceName]
+            built_at    = (Get-Date).ToString("o")
+        }
+    }
+
+    Save-StateFile -State $state -StateFilePath $stateFile
+}
+else {
+    Write-Host "No image rebuild needed. Reusing existing local images."
+
+    foreach ($serviceName in $serviceInputs.Keys) {
+        if (-not $state.services.ContainsKey($serviceName) -and [bool]$imageExistsByService[$serviceName]) {
+            $state.services[$serviceName] = @{
+                input_ticks = [int64]$currentTicksByService[$serviceName]
+                built_at    = "bootstrap-no-build"
+            }
+        }
+    }
+    Save-StateFile -State $state -StateFilePath $stateFile
+}
+
+Write-Host "Starting services..."
+Write-StartupState -Active $true -Status "starting_services" -Phase "starting_services" -Message "Starting Docker services." -ServiceNames $startupServices
+if ($servicesToBuild.Count -gt 0) {
+    Remove-LegacyComposeContainers -ProjectName $composeProjectName -Services $servicesToBuild
+    Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build") + $servicesToBuild)
+
+    # Ensure profile services such as Ollama are created on the first run too.
+    if ($startupServices.Count -gt 0) {
+        Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate") + $startupServices)
+    }
+    else {
+        Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate")
+    }
+}
+else {
+    if ($startupServices.Count -gt 0) {
+        if (-not (Start-ComposeServicesFast -ProjectName $composeProjectName -Services $startupServices)) {
+            Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate") + $startupServices)
+        }
+    }
+    else {
+        # Fastest path: gunakan docker native start agar tidak menunggu dependency
+        # health checks dari compose setiap kali.
+        $allProjectContainerIds = Get-ProjectContainerIds -ProjectName $composeProjectName
+        if ($allProjectContainerIds.Count -gt 0) {
+            Start-ContainerIdsFast -ProjectName $composeProjectName -ContainerIds $allProjectContainerIds *> $null
+        }
+        else {
+            # Jika belum pernah ada container untuk project ini, baru lakukan up.
+            Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate")
+        }
+    }
+}
+Invoke-Compose @("--env-file", $EnvFile, "ps")
+Write-StartupState -Active $false -Status "ready" -Phase "ready" -Message "All requested services are ready." -ServiceNames $startupServices
+

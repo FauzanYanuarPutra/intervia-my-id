@@ -32,4 +32,17 @@ defmodule ChatService.DmRoomTest do
       assert ChatService.DmRoom.validate_not_self(a, a) == {:error, :self_chat}
     end
   end
+
+  describe "peer_user_id_bin/2" do
+    test "returns the other participant and rejects an outsider" do
+      first = "00000000-0000-0000-0000-000000000001" |> Ecto.UUID.dump!()
+      second = "00000000-0000-0000-0000-000000000002" |> Ecto.UUID.dump!()
+      outsider = "00000000-0000-0000-0000-000000000003" |> Ecto.UUID.dump!()
+      room_id = ChatService.DmRoom.build_room_id(first, second)
+
+      assert ChatService.DmRoom.peer_user_id_bin(room_id, first) == second
+      assert ChatService.DmRoom.peer_user_id_bin(room_id, second) == first
+      assert ChatService.DmRoom.peer_user_id_bin(room_id, outsider) == nil
+    end
+  end
 end

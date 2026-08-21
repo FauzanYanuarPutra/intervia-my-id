@@ -68,7 +68,6 @@ COPY crm/ .
 RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV FAST_DOCKER_BUILD=true
 
 FROM crm_deps AS crm_builder
 

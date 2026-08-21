@@ -5,7 +5,7 @@ Status: repo audit 2026-07-11. Status means source surfaces exist; it does not g
 | Domain | Sudah Ada | Sebagian | Belum | Service | API | Database | Frontend | Risiko | Rekomendasi |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Home | Yes |  |  | www/marketplace | `/api/home/trending-searches`, `/api/content` | event/search tables | `/home` | Trending may use fallback if event data thin | Keep event-driven home modules |
-| Search | Yes |  |  | www/marketplace/community/Meili | `/api/search`, `/api/content`, `/v1/content`, forum/community search | `content_items`, GIN/trigram, Meili | `/explore` results mode | Taxonomy/index drift | Keep one public Explore entry and one canonical search intent schema |
+| Search & public people discovery | Yes |  |  | www/identity/marketplace/community/Meili | `/api/search`, `/api/users/discover`, identity `/users/discover`, content and community search | identity public-profile projection, `content_items`, GIN/trigram, Meili | `/explore` hub, results, and `tab=users` | Taxonomy drift and accidental private-profile exposure | Keep one public Explore entry, allowlisted public user DTOs, and explicit discoverability consent |
 | Listing | Yes |  |  | marketplace/www | `/api/content`, `/v1/content` | `content_items`, `listings` | `/content/[id]` | Legacy route/canonical mismatch | Keep `/content/[id]` canonical |
 | Mencari/Menawarkan |  | Yes |  | www/marketplace | create/content/offers/requests APIs | content metadata, offers/request-related migrations | `/create/[flow]`, `/my-projects` | Flow taxonomy can drift; detailed view/chat analytics are not yet available per owned request | Keep owner-scoped request workspace and show only measured counts |
 | Kategori |  | Yes |  | www/marketplace | content/search/create APIs | metadata indexes | home/explore/create | Mixed labels/promotional badges risk | Maintain taxonomy doc |
@@ -16,7 +16,8 @@ Status: repo audit 2026-07-11. Status means source surfaces exist; it does not g
 | Blog |  | Yes |  | www/marketplace | `/api/blog`, `/api/blog/[slug]`, `/v1/content?type=article/news` | `content_items` with blog metadata indexes | `/blog`, `/blog/[slug]` | CMS authoring workflow not fully exposed; static fallback still exists | Treat blog as content pipeline, not a separate table |
 | Komunitas | Yes |  |  | community/www | `/api/community`, `/api/forum`, `/v1/community`, `/v1/forum` | forum/groups tables | `/community` | Moderation scope must be explicit | Add moderation checklist |
 | Reels | Yes |  |  | community/www | `/api/reels`, `/v1/reels` | reels/comments/actions/events | `/reels` | Listing/profile linkage may be partial; external video URLs must stay browser-playable and rights-safe | Require explicit metadata links and media provenance |
-| Chat | Yes |  |  | chat/www | `/api/chat`, `/api/v1/*` | Scylla rooms/messages/unread | `/chat` | WebSocket/presence needs verification | Test E2E chat flows |
+| Chat | Yes |  |  | chat/www | `/api/chat`, `/api/v1/*` | Scylla rooms/messages/unread/block/report/idempotency | `/chat` | Production migration, moderation ownership, TURN capacity, cross-month pagination, and durable projection replay still need operational verification | Keep WebSocket-first bounded cache/revalidation, run migrations before all replicas, test two-client reconnect/read/block/report/call flows, and add a bucket manifest plus projection outbox |
+| Profile AI |  | Yes |  | www/marketplace/AI providers | `/api/ai/personal/*` | Postgres personal agents/threads/messages/memory/preferences/request claims | `/profile/ai` | Provider availability, transcription handling, migration rollout, cache privacy, and human review remain operational dependencies | Keep bounded allowlisted browser snapshots, recipient memory opt-in, idempotent retries, disclosed voice transcription, and consequential actions draft-first |
 | WhatsApp seller |  | Yes |  | www/identity/provider | webhooks, WhatsApp helper | phone/metadata fields | CTAs in UMKM/profile surfaces | Consent/click tracking uncertain | Track CTA and honor consent |
 | Notifikasi | Yes |  |  | marketplace/www | notifications APIs, stream | `user_notifications` | `/notifications` | Stream reliability needs runtime test | Add notification E2E checks |
 | Autentikasi | Yes |  |  | identity/www | auth APIs | users/sessions/roles | login/register/onboarding | Public copy may conflict Google/password/OTP | Keep auth docs current |
@@ -35,7 +36,7 @@ Status: repo audit 2026-07-11. Status means source surfaces exist; it does not g
 ## UI Or Documentation Only / Not Fully Verified
 
 - Full production payment/refund/escrow readiness.
-- Chat block/report/rate-limit behavior.
+- Production rollout and end-to-end verification of chat block/report/rate-limit behavior.
 - Exact Meilisearch synchronization guarantees.
 - Public SEO rendering quality for all profile/listing pages.
 - Consent and analytics coverage for WhatsApp seller clicks.

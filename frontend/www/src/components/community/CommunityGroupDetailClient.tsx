@@ -1188,7 +1188,6 @@ export default function CommunityGroupDetailClient({
               <div className="space-y-3">
                 {items.map(item => (
                   <CommunityPostCard
-                    variant="home" // atau "feed"
                     key={item.id}
                     item={item}
                     isId={isId}

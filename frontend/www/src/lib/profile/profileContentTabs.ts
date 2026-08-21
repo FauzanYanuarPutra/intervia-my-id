@@ -27,21 +27,6 @@ export type ProfileContentTabDefinition = {
 
 export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
   {
-    key: 'all',
-    labelId: 'Semua',
-    labelEn: 'All',
-    emptyTitleId: 'Belum ada yang ditampilkan',
-    emptyTitleEn: 'Nothing to show yet',
-    emptyDescriptionId:
-      'Mulai isi profil dan pasang listing supaya halaman ini terasa hidup.',
-    emptyDescriptionEn:
-      'Start filling this profile and publish listings so this page feels alive.',
-    addLabelId: 'Mulai isi',
-    addLabelEn: 'Start building',
-    createHref: '/profile/edit?focus=identity',
-    browseHref: '/explore',
-  },
-  {
     key: 'job',
     labelId: 'Jobs',
     labelEn: 'Jobs',
@@ -55,21 +40,6 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     addLabelEn: 'Add job',
     createHref: '/create/jual/lowongan',
     browseHref: '/explore?type=job',
-  },
-  {
-    key: 'freelancer',
-    labelId: 'Freelancer',
-    labelEn: 'Freelancer',
-    emptyTitleId: 'Belum ada mode freelancer',
-    emptyTitleEn: 'No freelancer setup yet',
-    emptyDescriptionId:
-      'Lengkapi headline, skill, pengalaman, dan portofolio agar buyer bisa langsung menilai Anda.',
-    emptyDescriptionEn:
-      'Complete your headline, skills, experience, and portfolio so buyers can assess you quickly.',
-    addLabelId: 'Lengkapi freelancer',
-    addLabelEn: 'Setup freelancer',
-    createHref: '/profile/edit?focus=talent',
-    browseHref: '/explore?type=freelancer',
   },
   {
     key: 'product',

@@ -53,6 +53,8 @@ const OTP_PREFIX = 'otp:';
 const OTP_EXPIRY = 300; // 5 minutes
 const OTP_VERIFY_PREFIX = 'otp:verify:';
 const OTP_VERIFY_EXPIRY = 900; // 15 minutes
+const IDENTITY_VERIFICATION_PROOF_PREFIX = 'identity:verification:proof:';
+const IDENTITY_VERIFICATION_PROOF_EXPIRY = 300; // 5 minutes
 const REFRESH_REVOKED_PREFIX = 'auth:refresh:revoked:';
 const REFRESH_SESSION_REVOKED_PREFIX = 'auth:refresh:session:revoked:';
 const DEFAULT_REFRESH_REVOKE_TTL = 30 * 24 * 60 * 60;
@@ -63,6 +65,11 @@ type OTPVerifyPayload = {
   type: 'email' | 'phone';
   target: string;
   purpose: OTPPurpose;
+};
+
+type IdentityVerificationProofPayload = {
+  user_id: string;
+  verification: Record<string, unknown>;
 };
 
 function normalizeTarget(type: 'email' | 'phone', target: string): string {
@@ -221,6 +228,29 @@ export async function consumeOTPVerificationToken(
     },
     [expected.purpose],
   );
+}
+
+export async function issueIdentityVerificationProof(
+  userId: string,
+  verification: Record<string, unknown>,
+): Promise<string> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) {
+    throw new Error('Identity verification proof requires a user id');
+  }
+
+  const redis = getRedis();
+  const token = crypto.randomBytes(32).toString('hex');
+  const payload: IdentityVerificationProofPayload = {
+    user_id: normalizedUserId,
+    verification,
+  };
+  await redis.setex(
+    `${IDENTITY_VERIFICATION_PROOF_PREFIX}${token}`,
+    IDENTITY_VERIFICATION_PROOF_EXPIRY,
+    JSON.stringify(payload),
+  );
+  return token;
 }
 
 // Session/Token storage

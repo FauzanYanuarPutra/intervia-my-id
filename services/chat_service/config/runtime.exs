@@ -7,6 +7,16 @@ if config_env() == :prod do
   port = String.to_integer(System.get_env("APP_PORT") || "4000")
   scylla_host = System.get_env("SCYLLA_HOST") || "scylla_db"
   scylla_port = System.get_env("SCYLLA_PORT") || "9042"
+  scylla_nodes =
+    (System.get_env("SCYLLA_NODES") || "#{scylla_host}:#{scylla_port}")
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  if scylla_nodes == [] do
+    raise "SCYLLA_NODES must contain at least one host:port"
+  end
+
   jwt_secret = System.fetch_env!("JWT_SECRET")
   if byte_size(String.trim(jwt_secret)) < 32 do
     raise "JWT_SECRET must be at least 32 characters"
@@ -27,7 +37,7 @@ if config_env() == :prod do
     secret_key_base: secret_key_base
 
   config :chat_service, ChatService.Repo, [
-    nodes: ["#{scylla_host}:#{scylla_port}"],
+    nodes: scylla_nodes,
     keyspace: System.get_env("SCYLLA_KEYSPACE") || "laju_chat",
     connect_timeout: 10_000,
     max_concurrent_requests_per_connection: 128

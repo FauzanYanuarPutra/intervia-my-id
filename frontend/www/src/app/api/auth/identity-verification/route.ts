@@ -18,9 +18,12 @@ import {
 import { fetchWithTimeout } from '@/lib/server/fetchWithTimeout';
 import { validateUploadCandidate } from '@/lib/server/uploadFiles';
 import { IMAGE_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
+import { issueIdentityVerificationProof } from '@/lib/redis';
 
 const AI_URL = process.env.INTERNAL_AI_URL || 'http://ai_service:8080';
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
+const AUTOMATED_KYC_APPROVAL_ENABLED =
+  process.env.KYC_AUTOMATED_APPROVAL_ENABLED === 'true';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -81,8 +84,26 @@ function buildStoredVerificationRecord(
   ]);
 
   const verifiedAt = new Date().toISOString();
-  const status = readString(verification.status) || 'manual_review';
-  const kycStatus = normalizeKycStatus(verification.kyc_status);
+  const providerStatus = readString(verification.status) || 'manual_review';
+  const providerKycStatus = normalizeKycStatus(verification.kyc_status);
+  // OCR/liveness output is evidence for review, not an authorization boundary.
+  // Automated approval stays fail-closed until a reviewed provider and release
+  // gate explicitly enable it.
+  const documentVerified =
+    AUTOMATED_KYC_APPROVAL_ENABLED &&
+    readBoolean(verification.document_verified);
+  const livenessVerified =
+    AUTOMATED_KYC_APPROVAL_ENABLED &&
+    readBoolean(verification.liveness_verified);
+  const identityVerified =
+    AUTOMATED_KYC_APPROVAL_ENABLED &&
+    readBoolean(verification.identity_verified);
+  const status = AUTOMATED_KYC_APPROVAL_ENABLED
+    ? providerStatus
+    : 'manual_review';
+  const kycStatus = AUTOMATED_KYC_APPROVAL_ENABLED
+    ? providerKycStatus
+    : 'none';
 
   return {
     status,
@@ -90,12 +111,12 @@ function buildStoredVerificationRecord(
     phone_verified: false,
     document_type: readString(verification.document_type) || 'ktp',
     document_country: readString(verification.document_country) || 'ID',
-    document_verified: readBoolean(verification.document_verified),
-    liveness_verified: readBoolean(verification.liveness_verified),
-    identity_verified: readBoolean(verification.identity_verified),
+    document_verified: documentVerified,
+    liveness_verified: livenessVerified,
+    identity_verified: identityVerified,
     transaction_eligible:
-      readBoolean(verification.transaction_eligible) ||
-      readBoolean(verification.identity_verified),
+      AUTOMATED_KYC_APPROVAL_ENABLED &&
+      (readBoolean(verification.transaction_eligible) || identityVerified),
     kyc_status: kycStatus,
     capture_quality: readString(verification.capture_quality),
     trust_score: readNumber(verification.trust_score),
@@ -103,7 +124,7 @@ function buildStoredVerificationRecord(
       readString(verification.review_recommendation) || 'manual_review',
     verified_at: verifiedAt,
     last_attempt_at: verifiedAt,
-    last_attempt_status: status,
+    last_attempt_status: providerStatus,
     document_name: documentName,
     nik_masked: maskNik(nik),
     nik_last4: nik ? nik.replace(/\D/g, '').slice(-4) : undefined,
@@ -320,6 +341,10 @@ export async function POST(req: NextRequest) {
       currentVerification,
       nextVerification,
     );
+    const verificationProofToken = await issueIdentityVerificationProof(
+      auth.ctx.userId,
+      mergedVerification as unknown as Record<string, unknown>,
+    );
 
     const persistRes = await fetchWithTimeout(
       `${API_URL}/users/me`,
@@ -331,7 +356,7 @@ export async function POST(req: NextRequest) {
           ...authSecurityHeaders(security),
         },
         body: JSON.stringify({
-          verification: mergedVerification,
+          identity_verification_proof_token: verificationProofToken,
         }),
         cache: 'no-store',
       },

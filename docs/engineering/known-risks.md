@@ -1,6 +1,6 @@
 # Known Risks
 
-Status: repo audit 2026-07-11.
+Status: repo audit updated 2026-08-13.
 
 ## Product/Architecture Risks
 
@@ -18,7 +18,22 @@ Status: repo audit 2026-07-11.
 
 ## Technical Risks Needing Follow-Up
 
-- Chat block/report/rate limit not verified.
+- Chat block/report/rate-limit contracts now exist in source, but migration
+  rollout, moderation ownership, and end-to-end production behavior remain
+  unverified.
+- Chat message rows are idempotent across WebSocket/HTTP retries, but inbox,
+  unread, and realtime projection repair is not yet backed by a durable outbox.
+- Chat history is partitioned by monthly `(room_id, bucket)` without a canonical
+  per-room bucket manifest. The latest bucket resolves correctly, but safe
+  cross-month cursor pagination needs an additive projection/backfill and BFF/UI
+  cursor propagation; scanning arbitrary prior months is prohibited.
+- Browser caches for Chat and Profile AI improve first paint but retain bounded
+  plaintext conversation data on the device. Logout/account-switch purge,
+  TTL/pruning, quota failure, and future edit/delete tombstone invalidation need
+  recurring privacy regression tests.
+- Voice-note uploads enforce type/signature/size and a five-minute client
+  limit; hard server-side duration enforcement still needs a trusted audio
+  metadata parser or provider-duration quota.
 - Notification stream reliability not tested.
 - Wallet ledger invariants not audited.
 - Media upload size/type/security policy may vary by route.

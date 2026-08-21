@@ -843,10 +843,29 @@ function DiscoveryScopeControl({
   compact?: boolean;
   onChange: (scope: DiscoveryScope) => void;
 }) {
-  const options: Array<{ value: DiscoveryScope; label: string }> = [
-    { value: 'all', label: isId ? 'Semua' : 'All' },
-    { value: 'registered', label: isId ? 'Usaha terdaftar' : 'Registered' },
-    { value: 'references', label: isId ? 'Referensi publik' : 'Public data' },
+  const options: Array<{
+    value: DiscoveryScope;
+    label: string;
+    activeClass: string;
+  }> = [
+    {
+      value: 'all',
+      label: isId ? 'Semua' : 'All',
+      activeClass:
+        'bg-[color:var(--app-accent)] text-white shadow-sm shadow-black/10',
+    },
+    {
+      value: 'registered',
+      label: isId ? 'Usaha terdaftar' : 'Registered',
+      activeClass:
+        'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
+    },
+    {
+      value: 'references',
+      label: isId ? 'Referensi publik' : 'Public data',
+      activeClass:
+        'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
+    },
   ];
 
   return (
@@ -854,29 +873,61 @@ function DiscoveryScopeControl({
       role="group"
       aria-label={isId ? 'Filter jenis lokasi' : 'Filter location type'}
       data-testid="umkm-scope-filter"
-      className="flex min-w-0 gap-1 overflow-x-auto rounded-full border border-slate-200 bg-white/92 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800 dark:bg-slate-950/82"
+      className={cn(
+        'flex min-w-0 items-center gap-1 overflow-x-auto',
+        'rounded-full border border-slate-200/80',
+        'bg-slate-100/80 p-1',
+        'shadow-sm shadow-slate-950/[0.04]',
+        'backdrop-blur-md',
+        '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'dark:border-white/10',
+        'dark:bg-slate-900/75',
+        'dark:shadow-black/20',
+      )}
     >
-      {options.map(option => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          aria-pressed={scope === option.value}
-          className={cn(
-            'shrink-0 rounded-full font-bold transition',
-            compact
-              ? 'min-h-[28px] px-2.5 text-[9.5px]'
-              : 'min-h-8 px-3 text-[10.5px]',
-            scope === option.value
-              ? option.value === 'references'
-                ? 'bg-sky-600 text-white'
-                : 'bg-[color:var(--app-accent)] text-white'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800',
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
+      {options.map(option => {
+        const active = scope === option.value;
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            aria-pressed={active}
+            className={cn(
+              'relative shrink-0 rounded-full',
+              'font-semibold leading-none',
+              'transition-all duration-200 ease-out',
+              'outline-none',
+
+              compact
+                ? 'min-h-7 px-2.5 text-[9.5px]'
+                : 'min-h-8 px-3 text-[10.5px]',
+
+              active
+                ? option.activeClass
+                : [
+                    'bg-transparent text-slate-600',
+                    'hover:bg-white hover:text-slate-900',
+                    'hover:shadow-sm',
+                    'dark:text-slate-400',
+                    'dark:hover:bg-white/[0.07]',
+                    'dark:hover:text-slate-100',
+                  ],
+
+              'focus-visible:ring-2',
+              'focus-visible:ring-[color:var(--app-accent)]/40',
+              'focus-visible:ring-offset-1',
+              'focus-visible:ring-offset-white',
+              'dark:focus-visible:ring-offset-slate-950',
+
+              'active:scale-[0.97]',
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

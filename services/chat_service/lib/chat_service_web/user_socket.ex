@@ -181,7 +181,7 @@ defmodule ChatServiceWeb.UserSocket do
     now = DateTime.utc_now()
     Repo.execute(
       """
-      INSERT INTO core.users (user_id, display_name, avatar_url, last_active, updated_at)
+      INSERT INTO users (user_id, display_name, avatar_url, last_active, updated_at)
       VALUES (?, ?, ?, ?, ?)
       """,
       [{"uuid", user_id}, {"text", name}, {"text", img}, {"timestamp", now}, {"timestamp", now}]

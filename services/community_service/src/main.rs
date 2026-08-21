@@ -117,8 +117,6 @@ struct AccessClaims {
     #[allow(dead_code)]
     perms: Vec<String>,
     #[serde(default)]
-    email: Option<String>,
-    #[serde(default)]
     username: Option<String>,
     #[serde(default)]
     name: Option<String>,
@@ -132,7 +130,6 @@ struct AccessClaims {
 struct AuthActor {
     user_id: String,
     roles: Vec<String>,
-    email: Option<String>,
     username: Option<String>,
     name: Option<String>,
 }
@@ -142,6 +139,35 @@ struct IdentityPublicProfile {
     username: Option<String>,
     full_name: Option<String>,
     avatar_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MarketplaceStoreEnvelope {
+    data: MarketplaceStoreData,
+}
+
+#[derive(Debug, Deserialize)]
+struct MarketplaceStoreData {
+    store: MarketplaceStoreProfile,
+}
+
+#[derive(Debug, Deserialize)]
+struct MarketplaceStoreProfile {
+    id: Uuid,
+    owner_user_id: Uuid,
+    name: String,
+    slug: String,
+    city: String,
+    is_active: bool,
+}
+
+#[derive(Debug, Clone)]
+struct CanonicalStoreLink {
+    id: String,
+    slug: String,
+    name: String,
+    city: String,
+    storefront_path: String,
 }
 
 #[derive(Debug, Default)]
@@ -472,7 +498,8 @@ struct SolutionRequest {
 #[serde(rename_all = "camelCase")]
 struct CreateReelRequest {
     title: Option<String>,
-    creator: Option<String>,
+    #[serde(rename = "creator")]
+    _creator: Option<String>,
     caption: Option<String>,
     tag: Option<String>,
     product_name: Option<String>,
@@ -491,11 +518,14 @@ struct CreateReelRequest {
     live_title: Option<String>,
     live_scheduled_at: Option<String>,
     metadata: Option<Value>,
+    visibility: Option<String>,
+    allow_comments: Option<bool>,
     store_id: Option<String>,
     store_slug: Option<String>,
     store_name: Option<String>,
     store_city: Option<String>,
-    store_phone: Option<String>,
+    #[serde(rename = "storePhone")]
+    _store_phone: Option<String>,
     storefront_path: Option<String>,
 }
 
@@ -510,6 +540,19 @@ struct ReelEventRequest {
 #[serde(rename_all = "camelCase")]
 struct ReelActionRequest {
     action: Option<String>,
+    active: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct TrustReportRequest {
+    reason: Option<String>,
+    details: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct UserBlockRequest {
     active: Option<bool>,
 }
 
@@ -831,11 +874,12 @@ struct ReelRow {
     live_title: Option<String>,
     live_scheduled_at: Option<DateTime<Utc>>,
     metadata: Value,
+    visibility: String,
+    allow_comments: bool,
     store_id: String,
     store_slug: String,
     store_name: String,
     store_city: String,
-    store_phone: Option<String>,
     storefront_path: String,
     creator_avatar_url: Option<String>,
     followers_count: i64,
@@ -886,6 +930,13 @@ struct LajukanReel {
     live_title: Option<String>,
     live_scheduled_at: Option<DateTime<Utc>>,
     metadata: Value,
+    visibility: String,
+    allow_comments: bool,
+    store_id: String,
+    store_slug: String,
+    store_name: String,
+    store_city: String,
+    storefront_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -924,6 +975,7 @@ struct ReelCommentsResponse {
     items: Vec<ReelComment>,
     next_cursor: Option<i64>,
     has_more: bool,
+    allow_comments: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -933,7 +985,6 @@ struct ReelFeedStore {
     slug: String,
     name: String,
     city: String,
-    phone: Option<String>,
     storefront_path: String,
 }
 
@@ -951,6 +1002,8 @@ struct ReelFeedItem {
     live_status: String,
     live_title: Option<String>,
     live_scheduled_at: Option<DateTime<Utc>>,
+    visibility: String,
+    allow_comments: bool,
     store: ReelFeedStore,
 }
 
@@ -1103,6 +1156,10 @@ async fn main() -> anyhow::Result<()> {
             "/v1/community/users/{user_id}/follow",
             post(set_profile_follow),
         )
+        .route(
+            "/v1/community/users/{user_id}/block",
+            post(set_community_user_block),
+        )
         .route("/v1/community/feed", get(get_community_feed))
         .route("/v1/community/search", get(search_community))
         .route("/v1/community/groups", get(list_groups).post(create_group))
@@ -1129,6 +1186,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/v1/reels/{reel_id}/me", get(get_reel_viewer_state))
         .route("/v1/reels/{reel_id}/actions", post(set_reel_action))
+        .route("/v1/reels/{reel_id}/report", post(report_reel))
         .route("/v1/reels/{reel_id}/events", post(record_reel_event))
         .route(
             "/v1/reels/{reel_id}/comments",
@@ -1162,6 +1220,7 @@ async fn main() -> anyhow::Result<()> {
             get(list_posts).post(create_post),
         )
         .route("/v1/forum/threads/{thread_id}/vote", post(vote_thread))
+        .route("/v1/forum/threads/{thread_id}/report", post(report_thread))
         .route(
             "/v1/forum/threads/{thread_id}/poll-vote",
             get(get_poll_votes).post(vote_poll_option),
@@ -1407,6 +1466,10 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
           live_title text NULL,
           live_scheduled_at timestamptz NULL,
           metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+          visibility text NOT NULL DEFAULT 'public' CHECK (
+            visibility IN ('public', 'followers', 'private')
+          ),
+          allow_comments boolean NOT NULL DEFAULT true,
           store_id text NOT NULL DEFAULT '',
           store_slug text NOT NULL DEFAULT '',
           store_name text NOT NULL DEFAULT '',
@@ -1463,12 +1526,24 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS live_title text NULL",
         "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS live_scheduled_at timestamptz NULL",
         "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb",
+        "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'public' CHECK (visibility IN ('public', 'followers', 'private'))",
+        "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS allow_comments boolean NOT NULL DEFAULT true",
         "ALTER TABLE reel.lajukan_reel_comments ADD COLUMN IF NOT EXISTS author_avatar text NULL",
     ];
 
     for statement in alter_statements {
         sqlx::query(statement).execute(db).await?;
     }
+
+    sqlx::query(
+        r#"
+        CREATE INDEX IF NOT EXISTS lajukan_reels_visibility_feed_idx
+          ON reel.lajukan_reels (visibility, published_at DESC, id)
+          WHERE status = 'published'
+        "#,
+    )
+    .execute(db)
+    .await?;
 
     sqlx::query(
         r#"
@@ -1643,7 +1718,6 @@ fn optional_actor(headers: &HeaderMap, state: &AppState) -> Option<AuthActor> {
     Some(AuthActor {
         user_id: claims.sub,
         roles: claims.roles,
-        email: claims.email,
         username: claims.username,
         name: claims.name.or(claims.full_name).or(claims.display_name),
     })
@@ -1815,7 +1889,7 @@ fn forum_username(actor: &AuthActor, display_name: &str) -> String {
         actor
             .username
             .as_deref()
-            .or(actor.email.as_deref())
+            .filter(|value| !looks_like_email(value))
             .unwrap_or(display_name),
         &actor.user_id,
     );
@@ -2088,7 +2162,8 @@ fn parse_reel_live_scheduled_at(value: Option<String>) -> Option<DateTime<Utc>> 
 fn sanitize_reel_metadata(value: Option<Value>) -> Value {
     match value {
         Some(Value::Object(map)) => {
-            let metadata = Value::Object(map);
+            let mut metadata = Value::Object(map);
+            strip_private_reel_metadata(&mut metadata, true);
             if metadata.to_string().len() <= 4096 {
                 metadata
             } else {
@@ -2341,6 +2416,27 @@ fn clean_profile_text(value: Option<String>) -> Option<String> {
         .filter(|item| !item.is_empty())
 }
 
+fn looks_like_email(value: &str) -> bool {
+    let Some((local, domain)) = value.trim().split_once('@') else {
+        return false;
+    };
+    !local.is_empty()
+        && !domain.is_empty()
+        && !local.chars().any(char::is_whitespace)
+        && !domain.chars().any(char::is_whitespace)
+}
+
+fn clean_public_display_name(value: Option<String>) -> Option<String> {
+    clean_profile_text(value)
+        .filter(|item| !looks_like_email(item))
+        .map(|item| item.chars().take(80).collect())
+}
+
+fn safe_public_display_name(value: &str) -> String {
+    clean_public_display_name(Some(value.to_string()))
+        .unwrap_or_else(|| "Pengguna Lajukan".to_string())
+}
+
 fn clean_profile_avatar(value: Option<String>) -> Option<String> {
     value.map(|item| item.trim().to_string()).filter(|item| {
         !item.is_empty()
@@ -2475,21 +2571,44 @@ async fn sync_forum_users_from_identity(db: &PgPool) {
 async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUser> {
     let id = forum_user_id(actor);
     let identity_profile = fetch_identity_forum_profile(actor).await;
-    let name = identity_profile
-        .name
+    let existing = sqlx::query_as::<_, ForumUser>(
+        r#"
+        SELECT id, username, name, avatar_url, title, reputation, base_reputation,
+               badges, created_at, updated_at
+        FROM forum.lajukan_forum_users
+        WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(&id)
+    .fetch_optional(db)
+    .await
+    .map_err(internal_error)?;
+
+    let name = clean_public_display_name(identity_profile.name)
         .or_else(|| {
-            actor
-                .name
-                .clone()
-                .or_else(|| actor.username.clone())
-                .or_else(|| actor.email.clone())
+            existing
+                .as_ref()
+                .and_then(|user| clean_public_display_name(Some(user.name.clone())))
         })
-        .unwrap_or_else(|| format!("User {}", actor.user_id));
-    let username = identity_profile
-        .username
+        .or_else(|| clean_public_display_name(actor.name.clone()))
+        .or_else(|| clean_public_display_name(actor.username.clone()))
+        .unwrap_or_else(|| "Pengguna Lajukan".to_string());
+    let username = clean_profile_text(identity_profile.username)
+        .filter(|value| !looks_like_email(value))
+        .or_else(|| {
+            existing
+                .as_ref()
+                .map(|user| user.username.clone())
+                .filter(|value| !looks_like_email(value))
+        })
         .unwrap_or_else(|| forum_username(actor, &name));
     let avatar_url = identity_profile
         .avatar_url
+        .or_else(|| {
+            existing
+                .as_ref()
+                .and_then(|user| clean_profile_avatar(user.avatar_url.clone()))
+        })
         .unwrap_or_else(|| "/default-avatar.svg".to_string());
 
     sqlx::query_as::<_, ForumUser>(
@@ -3595,6 +3714,610 @@ async fn set_profile_follow(
         Query(ProfileSocialQuery { limit: Some(48) }),
     )
     .await
+}
+
+fn normalize_trust_report_reason(value: Option<String>) -> ApiResult<String> {
+    let reason = value.unwrap_or_default().trim().to_ascii_lowercase();
+    if matches!(
+        reason.as_str(),
+        "spam"
+            | "scam"
+            | "harassment"
+            | "hate"
+            | "sexual"
+            | "violence"
+            | "illegal"
+            | "privacy"
+            | "other"
+    ) {
+        Ok(reason)
+    } else {
+        Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Select a valid report reason",
+        ))
+    }
+}
+
+fn is_private_contact_metadata_key(key: &str) -> bool {
+    let normalized = key
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect::<String>();
+    matches!(
+        normalized.as_str(),
+        "phone"
+            | "phonenumber"
+            | "storephone"
+            | "storephonenumber"
+            | "creatorphone"
+            | "ownerphone"
+            | "sellerphone"
+            | "businessphone"
+            | "contactphone"
+            | "contactnumber"
+            | "whatsapp"
+            | "whatsappnumber"
+            | "wa"
+            | "email"
+            | "emailaddress"
+            | "storeemail"
+            | "creatoremail"
+            | "owneremail"
+            | "selleremail"
+            | "businessemail"
+            | "contactemail"
+    )
+}
+
+fn is_untrusted_reel_identity_key(key: &str) -> bool {
+    let normalized = key
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect::<String>();
+    matches!(
+        normalized.as_str(),
+        "creator"
+            | "creatorname"
+            | "creatoruserid"
+            | "creatoravatar"
+            | "creatoravatarurl"
+            | "author"
+            | "authorname"
+            | "authoruserid"
+            | "authoravatar"
+            | "authoravatarurl"
+            | "linkedstoreid"
+            | "linkedstorename"
+            | "storeid"
+            | "storeslug"
+            | "storename"
+            | "storecity"
+            | "storefrontpath"
+    )
+}
+
+fn strip_private_reel_metadata(value: &mut Value, root: bool) {
+    match value {
+        Value::Object(object) => {
+            object.retain(|key, _| {
+                !is_private_contact_metadata_key(key)
+                    && (!root || !is_untrusted_reel_identity_key(key))
+            });
+            for nested in object.values_mut() {
+                strip_private_reel_metadata(nested, false);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                strip_private_reel_metadata(item, false);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn metadata_text(value: &Value, pointers: &[&str]) -> Option<String> {
+    pointers.iter().find_map(|pointer| {
+        value
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|item| !item.is_empty())
+            .map(ToOwned::to_owned)
+    })
+}
+
+fn metadata_bool(value: &Value, pointers: &[&str]) -> Option<bool> {
+    pointers.iter().find_map(|pointer| {
+        let candidate = value.pointer(pointer)?;
+        candidate.as_bool().or_else(|| {
+            candidate
+                .as_str()
+                .and_then(|item| match item.trim().to_ascii_lowercase().as_str() {
+                    "true" | "1" => Some(true),
+                    "false" | "0" => Some(false),
+                    _ => None,
+                })
+        })
+    })
+}
+
+fn normalize_reel_visibility(value: Option<String>) -> ApiResult<String> {
+    let visibility = value
+        .unwrap_or_else(|| "public".to_string())
+        .trim()
+        .to_ascii_lowercase();
+    if matches!(visibility.as_str(), "public" | "followers" | "private") {
+        Ok(visibility)
+    } else {
+        Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid reel visibility",
+        ))
+    }
+}
+
+fn resolve_reel_privacy(
+    explicit_visibility: Option<String>,
+    explicit_allow_comments: Option<bool>,
+    metadata: &Value,
+    current: Option<(&str, bool)>,
+) -> ApiResult<(String, bool)> {
+    let visibility = explicit_visibility
+        .or_else(|| {
+            metadata_text(
+                metadata,
+                &[
+                    "/visibility",
+                    "/publishingPreferences/visibility",
+                    "/publishing_preferences/visibility",
+                ],
+            )
+        })
+        .or_else(|| current.map(|value| value.0.to_string()));
+    let allow_comments = explicit_allow_comments
+        .or_else(|| {
+            metadata_bool(
+                metadata,
+                &[
+                    "/allowComments",
+                    "/allow_comments",
+                    "/publishingPreferences/allowComments",
+                    "/publishingPreferences/allow_comments",
+                    "/publishing_preferences/allowComments",
+                    "/publishing_preferences/allow_comments",
+                ],
+            )
+        })
+        .or_else(|| current.map(|value| value.1))
+        .unwrap_or(true);
+
+    Ok((normalize_reel_visibility(visibility)?, allow_comments))
+}
+
+fn apply_reel_privacy_metadata(metadata: &mut Value, visibility: &str, allow_comments: bool) {
+    if !metadata.is_object() {
+        *metadata = json!({});
+    }
+    let Some(object) = metadata.as_object_mut() else {
+        return;
+    };
+    object.insert(
+        "visibility".to_string(),
+        Value::String(visibility.to_string()),
+    );
+    object.insert("allowComments".to_string(), Value::Bool(allow_comments));
+    object.insert("allow_comments".to_string(), Value::Bool(allow_comments));
+
+    let preferences = object
+        .entry("publishingPreferences".to_string())
+        .or_insert_with(|| json!({}));
+    if !preferences.is_object() {
+        *preferences = json!({});
+    }
+    if let Some(preferences) = preferences.as_object_mut() {
+        preferences.insert(
+            "visibility".to_string(),
+            Value::String(visibility.to_string()),
+        );
+        preferences.insert("allowComments".to_string(), Value::Bool(allow_comments));
+    }
+}
+
+fn apply_reel_store_metadata(
+    metadata: &mut Value,
+    store_id: &str,
+    store_slug: &str,
+    store_name: &str,
+    store_city: &str,
+    storefront_path: &str,
+) {
+    if !metadata.is_object() {
+        *metadata = json!({});
+    }
+    let Some(object) = metadata.as_object_mut() else {
+        return;
+    };
+    for key in [
+        "linkedStoreId",
+        "linked_store_id",
+        "linkedStoreName",
+        "linked_store_name",
+        "storeId",
+        "store_id",
+        "storeSlug",
+        "store_slug",
+        "storeName",
+        "store_name",
+        "storeCity",
+        "store_city",
+        "storefrontPath",
+        "storefront_path",
+        "storePhone",
+        "store_phone",
+    ] {
+        object.remove(key);
+    }
+    if store_id.is_empty() {
+        return;
+    }
+    object.insert(
+        "linkedStoreId".to_string(),
+        Value::String(store_id.to_string()),
+    );
+    object.insert(
+        "linkedStoreName".to_string(),
+        Value::String(store_name.to_string()),
+    );
+    object.insert("storeId".to_string(), Value::String(store_id.to_string()));
+    object.insert(
+        "storeSlug".to_string(),
+        Value::String(store_slug.to_string()),
+    );
+    object.insert(
+        "storeName".to_string(),
+        Value::String(store_name.to_string()),
+    );
+    object.insert(
+        "storeCity".to_string(),
+        Value::String(store_city.to_string()),
+    );
+    object.insert(
+        "storefrontPath".to_string(),
+        Value::String(storefront_path.to_string()),
+    );
+}
+
+fn clean_store_reference(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|item| !item.is_empty() && item.len() <= 120)
+        .filter(|item| {
+            item.chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+        })
+        .map(ToOwned::to_owned)
+}
+
+async fn resolve_owned_store_link(
+    actor: &AuthActor,
+    store_id: Option<&str>,
+    store_slug: Option<&str>,
+) -> ApiResult<Option<CanonicalStoreLink>> {
+    let raw_store_ref = store_id
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .or_else(|| store_slug.map(str::trim).filter(|item| !item.is_empty()));
+    let Some(raw_store_ref) = raw_store_ref else {
+        return Ok(None);
+    };
+    let store_ref = clean_store_reference(Some(raw_store_ref))
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid linked store reference"))?;
+    let owner_user_id = public_identity_user_id(Some(actor.user_id.clone()))
+        .and_then(|value| Uuid::parse_str(&value).ok())
+        .ok_or_else(|| {
+            ApiError::new(
+                StatusCode::FORBIDDEN,
+                "Store linkage requires a canonical account",
+            )
+        })?;
+    let base_url = env::var("INTERNAL_MARKETPLACE_URL")
+        .ok()
+        .or_else(|| env::var("MARKETPLACE_URL").ok())
+        .unwrap_or_else(|| "http://marketplace_service:8081".to_string())
+        .trim_end_matches('/')
+        .to_string();
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_millis(700))
+        .timeout(std::time::Duration::from_millis(2_000))
+        .build()
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Store verification is temporarily unavailable",
+            )
+        })?;
+    let response = client
+        .get(format!("{base_url}/v1/umkm/stores/{store_ref}"))
+        .send()
+        .await
+        .map_err(|error| {
+            tracing::warn!("reel store verification failed: {:?}", error);
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Store verification is temporarily unavailable",
+            )
+        })?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Linked store was not found",
+        ));
+    }
+    if !response.status().is_success() {
+        tracing::warn!(
+            "reel store verification returned status {}",
+            response.status()
+        );
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Store verification is temporarily unavailable",
+        ));
+    }
+    let envelope = response
+        .json::<MarketplaceStoreEnvelope>()
+        .await
+        .map_err(|error| {
+            tracing::warn!("reel store verification decode failed: {:?}", error);
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Store verification is temporarily unavailable",
+            )
+        })?;
+    let store = envelope.data.store;
+    if store.owner_user_id != owner_user_id {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "You can only link a store you own",
+        ));
+    }
+    if !store.is_active {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Only an active store can be linked",
+        ));
+    }
+    let slug = build_slug(&store.slug);
+    if slug.is_empty() {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Linked store has an invalid slug",
+        ));
+    }
+    Ok(Some(CanonicalStoreLink {
+        id: store.id.to_string(),
+        slug: slug.clone(),
+        name: sanitize_title(Some(store.name), 90),
+        city: sanitize_title(Some(store.city), 64),
+        storefront_path: format!("/toko/{slug}"),
+    }))
+}
+
+fn sanitize_report_details(value: Option<String>) -> Option<String> {
+    clean_optional(value).map(|details| details.chars().take(1000).collect())
+}
+
+async fn save_trust_report(
+    state: &Arc<AppState>,
+    reporter: &ForumUser,
+    target_type: &str,
+    target_id: &str,
+    target_user_id: Option<&str>,
+    payload: TrustReportRequest,
+) -> ApiResult<Json<Value>> {
+    let reason = normalize_trust_report_reason(payload.reason)?;
+    let details = sanitize_report_details(payload.details);
+    let mut tx = state.db.begin().await.map_err(internal_error)?;
+    let receipt = sqlx::query(
+        r#"
+        INSERT INTO forum.lajukan_trust_reports
+          (id, reporter_user_id, target_type, target_id, target_user_id, reason, details, status, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', now(), now())
+        ON CONFLICT (reporter_user_id, target_type, target_id) DO UPDATE
+        SET reason = EXCLUDED.reason,
+            details = EXCLUDED.details,
+            target_user_id = EXCLUDED.target_user_id,
+            status = 'open',
+            updated_at = now()
+        RETURNING id, status, created_at, updated_at
+        "#,
+    )
+    .bind(create_id("report"))
+    .bind(&reporter.id)
+    .bind(target_type)
+    .bind(target_id)
+    .bind(target_user_id)
+    .bind(&reason)
+    .bind(details.as_deref())
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(internal_error)?;
+
+    let report_id = receipt.get::<String, _>("id");
+    let status = receipt.get::<String, _>("status");
+    let created_at = receipt.get::<DateTime<Utc>, _>("created_at");
+    let updated_at = receipt.get::<DateTime<Utc>, _>("updated_at");
+
+    record_audit(
+        &mut tx,
+        &reporter.id,
+        "trust.report.submit",
+        target_type,
+        target_id,
+        json!({
+            "reportId": report_id,
+            "reason": reason,
+            "hasDetails": details.is_some(),
+            "status": status,
+        }),
+    )
+    .await?;
+    tx.commit().await.map_err(internal_error)?;
+
+    Ok(Json(json!({
+        "ok": true,
+        "reportId": report_id,
+        "status": status,
+        "createdAt": created_at,
+        "updatedAt": updated_at,
+        "message": "Report received for moderation review",
+    })))
+}
+
+async fn report_reel(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(reel_id): Path<String>,
+    Json(payload): Json<TrustReportRequest>,
+) -> ApiResult<Json<Value>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "trust:report:reel", 60, 20).await?;
+    let reporter = ensure_forum_user(&state.db, &actor).await?;
+    let reel = get_reel_row_for_viewer(&state.db, &reel_id, Some(&actor)).await?;
+    let target_user_id = reel.creator_user_id.as_deref();
+    if target_user_id.is_some_and(|target| {
+        target == actor.user_id.as_str()
+            || target == reporter.id.as_str()
+            || profile_forum_user_id(target) == reporter.id
+    }) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "You cannot report your own reel",
+        ));
+    }
+
+    save_trust_report(&state, &reporter, "reel", &reel_id, target_user_id, payload).await
+}
+
+async fn report_thread(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(thread_id): Path<String>,
+    Json(payload): Json<TrustReportRequest>,
+) -> ApiResult<Json<Value>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "trust:report:thread", 60, 20).await?;
+    let reporter = ensure_forum_user(&state.db, &actor).await?;
+    let thread = get_thread_row(&state.db, &thread_id).await?;
+    if thread.author_id == reporter.id {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "You cannot report your own post",
+        ));
+    }
+
+    save_trust_report(
+        &state,
+        &reporter,
+        "thread",
+        &thread_id,
+        Some(&thread.author_id),
+        payload,
+    )
+    .await
+}
+
+async fn resolve_forum_user_id(db: &PgPool, user_id: &str) -> ApiResult<String> {
+    let raw = user_id.trim();
+    if raw.is_empty() {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid user id"));
+    }
+    let canonical = profile_forum_user_id(raw);
+    sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT id
+        FROM forum.lajukan_forum_users
+        WHERE id = $1 OR id = $2
+        ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END
+        LIMIT 1
+        "#,
+    )
+    .bind(raw)
+    .bind(canonical)
+    .fetch_optional(db)
+    .await
+    .map_err(internal_error)?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "User not found"))
+}
+
+async fn set_community_user_block(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Json(payload): Json<UserBlockRequest>,
+) -> ApiResult<Json<Value>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "trust:user:block", 90, 30).await?;
+    let blocker = ensure_forum_user(&state.db, &actor).await?;
+    let blocked_user_id = resolve_forum_user_id(&state.db, &user_id).await?;
+    if blocker.id == blocked_user_id {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "You cannot block yourself",
+        ));
+    }
+    let active = payload.active.unwrap_or(true);
+    let mut tx = state.db.begin().await.map_err(internal_error)?;
+    let changed = if active {
+        sqlx::query(
+            r#"
+            INSERT INTO forum.lajukan_user_blocks
+              (blocker_user_id, blocked_user_id, created_at, updated_at)
+            VALUES ($1, $2, now(), now())
+            ON CONFLICT (blocker_user_id, blocked_user_id) DO NOTHING
+            "#,
+        )
+        .bind(&blocker.id)
+        .bind(&blocked_user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(internal_error)?
+        .rows_affected()
+            > 0
+    } else {
+        sqlx::query(
+            "DELETE FROM forum.lajukan_user_blocks WHERE blocker_user_id = $1 AND blocked_user_id = $2",
+        )
+        .bind(&blocker.id)
+        .bind(&blocked_user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(internal_error)?
+        .rows_affected()
+            > 0
+    };
+
+    record_audit(
+        &mut tx,
+        &blocker.id,
+        if active { "user.block" } else { "user.unblock" },
+        "user",
+        &blocked_user_id,
+        json!({ "active": active, "changed": changed }),
+    )
+    .await?;
+    tx.commit().await.map_err(internal_error)?;
+
+    Ok(Json(json!({
+        "ok": true,
+        "active": active,
+        "changed": changed,
+        "blockedUserId": public_identity_user_id(Some(blocked_user_id.clone()))
+            .unwrap_or(blocked_user_id),
+    })))
 }
 
 async fn fetch_group_member(
@@ -5997,12 +6720,18 @@ async fn list_reels(
     let mut rows = sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.id, r.creator_user_id,
+          COALESCE(
+            NULLIF(p.name, ''),
+            CASE WHEN r.creator_user_id IS NULL THEN r.creator ELSE 'Pengguna Lajukan' END
+          ) AS creator,
+          r.title, r.caption, r.tag,
           r.product_name, r.product_price, r.product_href,
           r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
           r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
           r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
-          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          r.visibility, r.allow_comments,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.storefront_path,
           p.avatar_url AS creator_avatar_url,
           COALESCE(followers.followers_count, 0)::bigint AS followers_count,
           COALESCE(following.following_count, 0)::bigint AS following_count,
@@ -6014,7 +6743,8 @@ async fn list_reels(
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
           FROM lajukan_reel_user_actions a
-          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+          WHERE a.action = 'follow'
+            AND a.target_user_id IN (r.creator_user_id, p.id)
         ) followers ON true
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
@@ -6025,14 +6755,15 @@ async fn list_reels(
           SELECT COUNT(*)::bigint AS creator_reels_count
           FROM reel.lajukan_reels cr
           WHERE cr.status = 'published'
-            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+            AND cr.visibility = 'public'
+            AND cr.creator_user_id IN (r.creator_user_id, p.id)
         ) creator_reels ON true
         WHERE r.status = 'published'
           AND (
             $1::text IS NULL OR
             lower(r.title) LIKE '%' || lower($1) || '%' OR
             lower(r.caption) LIKE '%' || lower($1) || '%' OR
-            lower(r.creator) LIKE '%' || lower($1) || '%' OR
+            lower(COALESCE(NULLIF(p.name, ''), CASE WHEN r.creator_user_id IS NULL THEN r.creator ELSE '' END)) LIKE '%' || lower($1) || '%' OR
             lower(r.tag) LIKE '%' || lower($1) || '%' OR
             lower(coalesce(r.product_name, '')) LIKE '%' || lower($1) || '%' OR
             lower(r.store_name) LIKE '%' || lower($1) || '%' OR
@@ -6043,7 +6774,7 @@ async fn list_reels(
             lower(r.tag) = lower($2) OR
             lower(r.icon_key) = lower($2)
           )
-          AND ($3::text IS NULL OR lower(r.creator) LIKE '%' || lower($3) || '%')
+          AND ($3::text IS NULL OR lower(COALESCE(NULLIF(p.name, ''), CASE WHEN r.creator_user_id IS NULL THEN r.creator ELSE '' END)) LIKE '%' || lower($3) || '%')
           AND (
             $4::boolean = false OR (
               r.creator_user_id IS NOT NULL AND (
@@ -6052,8 +6783,48 @@ async fn list_reels(
               )
             )
           )
+          AND (
+            $6::text IS NULL OR (
+              NOT EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions hidden
+                WHERE hidden.reel_id = r.id
+                  AND hidden.actor_user_id = $6
+                  AND hidden.action = 'not_interested'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM forum.lajukan_user_blocks blocked
+                WHERE blocked.blocker_user_id = $6
+                  AND blocked.blocked_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
+          AND (
+            r.visibility = 'public'
+            OR $7::boolean
+            OR (
+              r.creator_user_id IS NOT NULL
+              AND (
+                ($5::text IS NOT NULL AND r.creator_user_id = $5)
+                OR ($6::text IS NOT NULL AND r.creator_user_id = $6)
+                OR ($6::text IS NOT NULL AND p.id = $6)
+              )
+            )
+            OR (
+              r.visibility = 'followers'
+              AND $6::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions follower
+                WHERE follower.actor_user_id = $6
+                  AND follower.action = 'follow'
+                  AND follower.target_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
         ORDER BY r.published_at DESC, r.id ASC
-        LIMIT $7 OFFSET $8
+        LIMIT $8 OFFSET $9
         "#,
     )
     .bind(q.as_deref())
@@ -6062,6 +6833,7 @@ async fn list_reels(
     .bind(mine)
     .bind(actor_user_id)
     .bind(actor_forum_user_id.as_deref())
+    .bind(actor.as_ref().is_some_and(is_moderator))
     .bind(limit + 1)
     .bind(cursor)
     .fetch_all(&state.db)
@@ -6088,8 +6860,13 @@ async fn list_reels(
 
 async fn list_reels_feed(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<ReelsFeedQuery>,
 ) -> ApiResult<Json<ReelsFeedResponse>> {
+    let actor = optional_actor(&headers, &state);
+    let viewer_identity_id = actor.as_ref().map(|item| item.user_id.as_str());
+    let viewer_forum_id = actor.as_ref().map(forum_user_id);
+    let viewer_is_moderator = actor.as_ref().is_some_and(is_moderator);
     let limit = query.limit.unwrap_or(18).clamp(1, MAX_REEL_LIMIT);
     let q = clean_optional(query.q);
     let store = clean_optional(query.store);
@@ -6098,12 +6875,18 @@ async fn list_reels_feed(
     let rows = sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.id, r.creator_user_id,
+          COALESCE(
+            NULLIF(p.name, ''),
+            CASE WHEN r.creator_user_id IS NULL THEN r.creator ELSE 'Pengguna Lajukan' END
+          ) AS creator,
+          r.title, r.caption, r.tag,
           r.product_name, r.product_price, r.product_href,
           r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
           r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
           r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
-          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          r.visibility, r.allow_comments,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.storefront_path,
           p.avatar_url AS creator_avatar_url,
           COALESCE(followers.followers_count, 0)::bigint AS followers_count,
           COALESCE(following.following_count, 0)::bigint AS following_count,
@@ -6115,7 +6898,8 @@ async fn list_reels_feed(
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
           FROM lajukan_reel_user_actions a
-          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+          WHERE a.action = 'follow'
+            AND a.target_user_id IN (r.creator_user_id, p.id)
         ) followers ON true
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
@@ -6126,7 +6910,8 @@ async fn list_reels_feed(
           SELECT COUNT(*)::bigint AS creator_reels_count
           FROM reel.lajukan_reels cr
           WHERE cr.status = 'published'
-            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+            AND cr.visibility = 'public'
+            AND cr.creator_user_id IN (r.creator_user_id, p.id)
         ) creator_reels ON true
         WHERE r.status = 'published'
           AND (
@@ -6145,13 +6930,50 @@ async fn list_reels_feed(
             lower(r.store_name) LIKE '%' || lower($2) || '%'
           )
           AND ($3::text IS NULL OR lower(r.store_city) LIKE '%' || lower($3) || '%')
+          AND (
+            $5::text IS NULL OR (
+              NOT EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions hidden
+                WHERE hidden.reel_id = r.id
+                  AND hidden.actor_user_id = $5
+                  AND hidden.action = 'not_interested'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM forum.lajukan_user_blocks blocked
+                WHERE blocked.blocker_user_id = $5
+                  AND blocked.blocked_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
+          AND (
+            r.visibility = 'public'
+            OR $6::boolean
+            OR ($4::text IS NOT NULL AND r.creator_user_id = $4)
+            OR ($5::text IS NOT NULL AND (r.creator_user_id = $5 OR p.id = $5))
+            OR (
+              r.visibility = 'followers'
+              AND $5::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions follower
+                WHERE follower.actor_user_id = $5
+                  AND follower.action = 'follow'
+                  AND follower.target_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
         ORDER BY r.published_at DESC, r.id ASC
-        LIMIT $4
+        LIMIT $7
         "#,
     )
     .bind(q.as_deref())
     .bind(store.as_deref())
     .bind(city.as_deref())
+    .bind(viewer_identity_id)
+    .bind(viewer_forum_id.as_deref())
+    .bind(viewer_is_moderator)
     .bind(limit)
     .fetch_all(&state.db)
     .await
@@ -6159,30 +6981,69 @@ async fn list_reels_feed(
 
     let stores: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(DISTINCT store_id)::bigint
-        FROM reel.lajukan_reels
-        WHERE status = 'published'
+        SELECT COUNT(DISTINCT NULLIF(r.store_id, ''))::bigint
+        FROM reel.lajukan_reels r
+        LEFT JOIN forum.lajukan_forum_users p
+          ON p.id = r.creator_user_id OR p.id = 'auth-' || r.creator_user_id
+        WHERE r.status = 'published'
           AND (
             $1::text IS NULL OR
-            lower(title) LIKE '%' || lower($1) || '%' OR
-            lower(caption) LIKE '%' || lower($1) || '%' OR
-            lower(tag) LIKE '%' || lower($1) || '%' OR
-            lower(coalesce(product_name, '')) LIKE '%' || lower($1) || '%' OR
-            lower(store_name) LIKE '%' || lower($1) || '%' OR
-            lower(store_city) LIKE '%' || lower($1) || '%'
+            lower(r.title) LIKE '%' || lower($1) || '%' OR
+            lower(r.caption) LIKE '%' || lower($1) || '%' OR
+            lower(r.tag) LIKE '%' || lower($1) || '%' OR
+            lower(coalesce(r.product_name, '')) LIKE '%' || lower($1) || '%' OR
+            lower(r.store_name) LIKE '%' || lower($1) || '%' OR
+            lower(r.store_city) LIKE '%' || lower($1) || '%'
           )
           AND (
             $2::text IS NULL OR
-            lower(store_id) = lower($2) OR
-            lower(store_slug) = lower($2) OR
-            lower(store_name) LIKE '%' || lower($2) || '%'
+            lower(r.store_id) = lower($2) OR
+            lower(r.store_slug) = lower($2) OR
+            lower(r.store_name) LIKE '%' || lower($2) || '%'
           )
-          AND ($3::text IS NULL OR lower(store_city) LIKE '%' || lower($3) || '%')
+          AND ($3::text IS NULL OR lower(r.store_city) LIKE '%' || lower($3) || '%')
+          AND (
+            $5::text IS NULL OR (
+              NOT EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions hidden
+                WHERE hidden.reel_id = r.id
+                  AND hidden.actor_user_id = $5
+                  AND hidden.action = 'not_interested'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM forum.lajukan_user_blocks blocked
+                WHERE blocked.blocker_user_id = $5
+                  AND blocked.blocked_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
+          AND (
+            r.visibility = 'public'
+            OR $6::boolean
+            OR ($4::text IS NOT NULL AND r.creator_user_id = $4)
+            OR ($5::text IS NOT NULL AND (r.creator_user_id = $5 OR p.id = $5))
+            OR (
+              r.visibility = 'followers'
+              AND $5::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions follower
+                WHERE follower.actor_user_id = $5
+                  AND follower.action = 'follow'
+                  AND follower.target_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
         "#,
     )
     .bind(q.as_deref())
     .bind(store.as_deref())
     .bind(city.as_deref())
+    .bind(viewer_identity_id)
+    .bind(viewer_forum_id.as_deref())
+    .bind(viewer_is_moderator)
     .fetch_one(&state.db)
     .await
     .map_err(internal_error)?;
@@ -6197,9 +7058,11 @@ async fn list_reels_feed(
 
 async fn get_reel(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(reel_id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    let reel = get_reel_row(&state.db, &reel_id).await?;
+    let actor = optional_actor(&headers, &state);
+    let reel = get_reel_row_for_viewer(&state.db, &reel_id, actor.as_ref()).await?;
     Ok(Json(json!({ "reel": map_reel(reel) })))
 }
 
@@ -6211,6 +7074,12 @@ async fn create_reel(
     let actor = require_actor(&headers, &state)?;
     mutation_rate_limit(&state, &headers, &actor, "reel:create", 60, 20).await?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    let linked_store = resolve_owned_store_link(
+        &actor,
+        payload.store_id.as_deref(),
+        payload.store_slug.as_deref(),
+    )
+    .await?;
 
     let title = sanitize_title(payload.title, MAX_REEL_TITLE_LEN);
     let caption = sanitize_body(payload.caption, MAX_REEL_CAPTION_LEN);
@@ -6241,8 +7110,11 @@ async fn create_reel(
     let live_status = normalize_reel_live_status(payload.live_status, &capture_mode);
     let live_title = sanitize_reel_live_title(payload.live_title);
     let live_scheduled_at = parse_reel_live_scheduled_at(payload.live_scheduled_at);
-    let metadata = sanitize_reel_metadata(payload.metadata);
-    let creator = sanitize_title(payload.creator.or(Some(forum_user.name.clone())), 80);
+    let mut metadata = sanitize_reel_metadata(payload.metadata);
+    let (visibility, allow_comments) =
+        resolve_reel_privacy(payload.visibility, payload.allow_comments, &metadata, None)?;
+    apply_reel_privacy_metadata(&mut metadata, &visibility, allow_comments);
+    let creator = safe_public_display_name(&forum_user.name);
     let product_name = clean_optional(payload.product_name).map(|value| {
         value
             .chars()
@@ -6257,30 +7129,25 @@ async fn create_reel(
             .take(60)
             .collect::<String>()
     });
-    let store_name = sanitize_title(
-        payload
-            .store_name
-            .or_else(|| product_name.clone())
-            .or(Some(creator.clone())),
-        90,
+    let (store_id, store_slug, store_name, store_city, storefront_path) = linked_store
+        .map(|store| {
+            (
+                store.id,
+                store.slug,
+                store.name,
+                store.city,
+                store.storefront_path,
+            )
+        })
+        .unwrap_or_default();
+    apply_reel_store_metadata(
+        &mut metadata,
+        &store_id,
+        &store_slug,
+        &store_name,
+        &store_city,
+        &storefront_path,
     );
-    let store_slug = clean_optional(payload.store_slug)
-        .map(|value| build_slug(&value))
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| build_slug(&store_name));
-    let store_id = clean_optional(payload.store_id)
-        .map(|value| clean_auth_id(&value))
-        .unwrap_or_else(|| format!("store-{store_slug}"));
-    let store_city = sanitize_title(payload.store_city, 64);
-    let store_phone = clean_optional(payload.store_phone).map(|value| {
-        value
-            .chars()
-            .filter(|ch| ch.is_ascii_digit() || matches!(ch, '+' | '-' | ' ' | '(' | ')'))
-            .take(32)
-            .collect::<String>()
-    });
-    let storefront_path = sanitize_public_url(payload.storefront_path, true)
-        .unwrap_or_else(|| format!("/toko/{store_slug}"));
     let hook = sanitize_body(payload.hook, 160);
 
     let reel_id = create_id("reel");
@@ -6294,7 +7161,8 @@ async fn create_reel(
             video_src, source_url, likes_count, comments_count, shares_count,
             tone, icon_key, media_url, media_type, hook,
             filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-            store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+            visibility, allow_comments,
+            store_id, store_slug, store_name, store_city, storefront_path,
             status, published_at, created_at, updated_at
           )
         VALUES
@@ -6304,7 +7172,8 @@ async fn create_reel(
             $10, $11, 0, 0, 0,
             $12, $13, $14, $15, $16,
             $17, $18, $19, $20, $21, $22,
-            $23, $24, $25, $26, $27, $28,
+            $23, $24,
+            $25, $26, $27, $28, $29,
             'published', now(), now(), now()
           )
         RETURNING
@@ -6313,8 +7182,9 @@ async fn create_reel(
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
           filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-          store_id, store_slug, store_name, store_city, store_phone, storefront_path,
-          $29::text AS creator_avatar_url,
+          visibility, allow_comments,
+          store_id, store_slug, store_name, store_city, storefront_path,
+          $30::text AS creator_avatar_url,
           0::bigint AS followers_count,
           0::bigint AS following_count,
           1::bigint AS creator_reels_count,
@@ -6343,11 +7213,12 @@ async fn create_reel(
     .bind(&live_title)
     .bind(&live_scheduled_at)
     .bind(&metadata)
+    .bind(&visibility)
+    .bind(allow_comments)
     .bind(&store_id)
     .bind(&store_slug)
     .bind(&store_name)
     .bind(&store_city)
-    .bind(&store_phone)
     .bind(&storefront_path)
     .bind(&forum_user.avatar_url)
     .fetch_one(&mut *tx)
@@ -6365,7 +7236,10 @@ async fn create_reel(
             "mediaType": media_type,
             "captureMode": capture_mode,
             "filterPreset": filter_preset,
-            "liveStatus": live_status
+            "liveStatus": live_status,
+            "visibility": visibility,
+            "allowComments": allow_comments,
+            "storeId": if store_id.is_empty() { None } else { Some(store_id.as_str()) }
         }),
     )
     .await?;
@@ -6392,6 +7266,33 @@ async fn update_reel(
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
     }
 
+    let store_reference_supplied = payload.store_id.is_some() || payload.store_slug.is_some();
+    let linked_store_update = if store_reference_supplied {
+        let has_store_reference = payload
+            .store_id
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+            || payload
+                .store_slug
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty());
+        if has_store_reference {
+            Some(
+                resolve_owned_store_link(
+                    &actor,
+                    payload.store_id.as_deref(),
+                    payload.store_slug.as_deref(),
+                )
+                .await?,
+            )
+        } else {
+            Some(None)
+        }
+    } else {
+        None
+    };
+
+    let canonical_creator = existing.creator.clone();
     let mut title = existing.title;
     let mut caption = existing.caption;
     let mut tag = existing.tag;
@@ -6411,11 +7312,12 @@ async fn update_reel(
     let mut live_title = existing.live_title;
     let mut live_scheduled_at = existing.live_scheduled_at;
     let mut metadata = existing.metadata;
+    let mut visibility = existing.visibility;
+    let mut allow_comments = existing.allow_comments;
     let mut store_id = existing.store_id;
     let mut store_slug = existing.store_slug;
     let mut store_name = existing.store_name;
     let mut store_city = existing.store_city;
-    let mut store_phone = existing.store_phone;
     let mut storefront_path = existing.storefront_path;
 
     if payload.title.is_some() {
@@ -6501,39 +7403,48 @@ async fn update_reel(
     if payload.live_scheduled_at.is_some() {
         live_scheduled_at = parse_reel_live_scheduled_at(payload.live_scheduled_at);
     }
-    if payload.metadata.is_some() {
-        metadata = sanitize_reel_metadata(payload.metadata);
+    let metadata_was_supplied = payload.metadata.is_some();
+    if let Some(value) = payload.metadata {
+        metadata = sanitize_reel_metadata(Some(value));
     }
-    if let Some(value) = payload.store_name {
-        store_name = sanitize_title(Some(value), 90);
-        if store_name.is_empty() {
-            store_name = title.clone();
+    let empty_metadata = Value::Null;
+    let privacy_metadata = if metadata_was_supplied {
+        &metadata
+    } else {
+        &empty_metadata
+    };
+    (visibility, allow_comments) = resolve_reel_privacy(
+        payload.visibility,
+        payload.allow_comments,
+        privacy_metadata,
+        Some((&visibility, allow_comments)),
+    )?;
+    strip_private_reel_metadata(&mut metadata, true);
+    apply_reel_privacy_metadata(&mut metadata, &visibility, allow_comments);
+
+    if let Some(linked_store) = linked_store_update {
+        if let Some(linked_store) = linked_store {
+            store_id = linked_store.id;
+            store_slug = linked_store.slug;
+            store_name = linked_store.name;
+            store_city = linked_store.city;
+            storefront_path = linked_store.storefront_path;
+        } else {
+            store_id.clear();
+            store_slug.clear();
+            store_name.clear();
+            store_city.clear();
+            storefront_path.clear();
         }
     }
-    if let Some(value) = payload.store_slug {
-        let next_slug = build_slug(&value);
-        if !next_slug.is_empty() {
-            store_slug = next_slug;
-        }
-    }
-    if let Some(value) = payload.store_id {
-        store_id = clean_auth_id(&value);
-    }
-    if payload.store_city.is_some() {
-        store_city = sanitize_title(payload.store_city, 64);
-    }
-    if let Some(value) = payload.store_phone {
-        store_phone = clean_optional(Some(value)).map(|item| {
-            item.chars()
-                .filter(|ch| ch.is_ascii_digit() || matches!(ch, '+' | '-' | ' ' | '(' | ')'))
-                .take(32)
-                .collect::<String>()
-        });
-    }
-    if payload.storefront_path.is_some() {
-        storefront_path = sanitize_public_url(payload.storefront_path, true)
-            .unwrap_or_else(|| format!("/toko/{store_slug}"));
-    }
+    apply_reel_store_metadata(
+        &mut metadata,
+        &store_id,
+        &store_slug,
+        &store_name,
+        &store_city,
+        &storefront_path,
+    );
 
     let mut tx = state.db.begin().await.map_err(internal_error)?;
     let row = sqlx::query_as::<_, ReelRow>(
@@ -6546,8 +7457,9 @@ async fn update_reel(
           tone = $10, icon_key = $11, media_url = $12, media_type = $13, hook = $14,
           filter_preset = $15, capture_mode = $16, live_status = $17,
           live_title = $18, live_scheduled_at = $19, metadata = $20,
-          store_id = $21, store_slug = $22, store_name = $23, store_city = $24,
-          store_phone = $25, storefront_path = $26, updated_at = now()
+          visibility = $21, allow_comments = $22,
+          store_id = $23, store_slug = $24, store_name = $25, store_city = $26,
+          storefront_path = $27, updated_at = now()
         WHERE id = $1 AND status = 'published'
         RETURNING
           id, creator_user_id, creator, title, caption, tag,
@@ -6555,7 +7467,8 @@ async fn update_reel(
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
           filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-          store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+          visibility, allow_comments,
+          store_id, store_slug, store_name, store_city, storefront_path,
           NULL::text AS creator_avatar_url,
           0::bigint AS followers_count,
           0::bigint AS following_count,
@@ -6583,16 +7496,19 @@ async fn update_reel(
     .bind(&live_title)
     .bind(&live_scheduled_at)
     .bind(&metadata)
+    .bind(&visibility)
+    .bind(allow_comments)
     .bind(&store_id)
     .bind(&store_slug)
     .bind(&store_name)
     .bind(&store_city)
-    .bind(&store_phone)
     .bind(&storefront_path)
     .fetch_optional(&mut *tx)
     .await
     .map_err(internal_error)?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Reel not found"))?;
+    let mut row = row;
+    row.creator = canonical_creator;
 
     record_audit(
         &mut tx,
@@ -6600,7 +7516,11 @@ async fn update_reel(
         "reel.update",
         "reel",
         &reel_id,
-        json!({}),
+        json!({
+            "visibility": visibility,
+            "allowComments": allow_comments,
+            "storeId": if store_id.is_empty() { None } else { Some(store_id.as_str()) }
+        }),
     )
     .await?;
     tx.commit().await.map_err(internal_error)?;
@@ -6656,8 +7576,9 @@ async fn get_reel_viewer_state(
     headers: HeaderMap,
     Path(reel_id): Path<String>,
 ) -> ApiResult<Json<ReelViewerState>> {
-    let reel = get_reel_row(&state.db, &reel_id).await?;
-    let Some(actor) = optional_actor(&headers, &state) else {
+    let actor = optional_actor(&headers, &state);
+    let reel = get_reel_row_for_viewer(&state.db, &reel_id, actor.as_ref()).await?;
+    let Some(actor) = actor else {
         return Ok(Json(ReelViewerState::default()));
     };
     let actor_user_id = forum_user_id(&actor);
@@ -6681,9 +7602,22 @@ async fn set_reel_action(
     let actor = require_actor(&headers, &state)?;
     mutation_rate_limit(&state, &headers, &actor, "reel:action", 300, 120).await?;
     let forum_user = ensure_forum_user(&state.db, &actor).await?;
-    let reel = get_reel_row(&state.db, &reel_id).await?;
+    let reel = get_reel_row_for_viewer(&state.db, &reel_id, Some(&actor)).await?;
     let action = normalize_reel_action(payload.action)?;
     let active = payload.active.unwrap_or(true);
+
+    if action == "not_interested"
+        && reel.creator_user_id.as_deref().is_some_and(|target| {
+            target == actor.user_id.as_str()
+                || target == forum_user.id.as_str()
+                || profile_forum_user_id(target) == forum_user.id
+        })
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "You cannot hide your own reel as not interested",
+        ));
+    }
 
     let target_user_id = if action == "follow" {
         let target = reel
@@ -6803,7 +7737,7 @@ async fn set_reel_action(
     .await?;
     tx.commit().await.map_err(internal_error)?;
 
-    let reel = get_reel_row(&state.db, &reel_id).await?;
+    let reel = get_reel_row_for_viewer(&state.db, &reel_id, Some(&actor)).await?;
     let viewer_state = fetch_reel_viewer_state(
         &state.db,
         &reel_id,
@@ -6859,7 +7793,7 @@ async fn record_reel_event(
         ));
     }
 
-    get_reel_row(&state.db, &reel_id).await?;
+    get_reel_row_for_viewer(&state.db, &reel_id, actor.as_ref()).await?;
 
     let actor_user_id = actor.as_ref().map(forum_user_id);
     let mut tx = state.db.begin().await.map_err(internal_error)?;
@@ -6891,19 +7825,21 @@ async fn record_reel_event(
     }
     tx.commit().await.map_err(internal_error)?;
 
-    let reel = get_reel_row(&state.db, &reel_id).await?;
+    let reel = get_reel_row_for_viewer(&state.db, &reel_id, actor.as_ref()).await?;
     Ok(Json(json!({ "ok": true, "reel": map_reel(reel) })))
 }
 
 async fn list_reel_comments(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(reel_id): Path<String>,
     Query(query): Query<ReelCommentsQuery>,
 ) -> ApiResult<Json<ReelCommentsResponse>> {
     let cursor = query.cursor.unwrap_or(0).max(0);
     let limit = query.limit.unwrap_or(20).clamp(1, MAX_REEL_COMMENT_LIMIT);
 
-    get_reel_row(&state.db, &reel_id).await?;
+    let actor = optional_actor(&headers, &state);
+    let reel = get_reel_row_for_viewer(&state.db, &reel_id, actor.as_ref()).await?;
 
     let mut rows = sqlx::query_as::<_, ReelCommentRow>(
         r#"
@@ -6950,6 +7886,7 @@ async fn list_reel_comments(
             None
         },
         has_more,
+        allow_comments: reel.allow_comments,
     }))
 }
 
@@ -6972,7 +7909,13 @@ async fn create_reel_comment(
     }
     safety_check(&body, false)?;
 
-    get_reel_row(&state.db, &reel_id).await?;
+    let visible_reel = get_reel_row_for_viewer(&state.db, &reel_id, Some(&actor)).await?;
+    if !visible_reel.allow_comments {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Comments are disabled for this reel",
+        ));
+    }
     let parent_comment_id = clean_optional(payload.parent_comment_id);
     if let Some(parent_id) = parent_comment_id.as_deref() {
         validate_reel_comment_parent(&state.db, &reel_id, parent_id).await?;
@@ -7032,7 +7975,8 @@ async fn create_reel_comment(
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
           filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
-          store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+          visibility, allow_comments,
+          store_id, store_slug, store_name, store_city, storefront_path,
           NULL::text AS creator_avatar_url,
           0::bigint AS followers_count,
           0::bigint AS following_count,
@@ -7045,6 +7989,8 @@ async fn create_reel_comment(
     .await
     .map_err(internal_error)?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Reel not found"))?;
+    let mut reel = reel;
+    reel.creator = visible_reel.creator;
 
     record_audit(
         &mut tx,
@@ -7106,12 +8052,18 @@ async fn get_reel_row(db: &PgPool, reel_id: &str) -> ApiResult<ReelRow> {
     sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.id, r.creator_user_id,
+          COALESCE(
+            NULLIF(p.name, ''),
+            CASE WHEN r.creator_user_id IS NULL THEN r.creator ELSE 'Pengguna Lajukan' END
+          ) AS creator,
+          r.title, r.caption, r.tag,
           r.product_name, r.product_price, r.product_href,
           r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
           r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
           r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
-          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          r.visibility, r.allow_comments,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.storefront_path,
           p.avatar_url AS creator_avatar_url,
           COALESCE(followers.followers_count, 0)::bigint AS followers_count,
           COALESCE(following.following_count, 0)::bigint AS following_count,
@@ -7123,7 +8075,8 @@ async fn get_reel_row(db: &PgPool, reel_id: &str) -> ApiResult<ReelRow> {
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
           FROM lajukan_reel_user_actions a
-          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+          WHERE a.action = 'follow'
+            AND a.target_user_id IN (r.creator_user_id, p.id)
         ) followers ON true
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
@@ -7134,7 +8087,8 @@ async fn get_reel_row(db: &PgPool, reel_id: &str) -> ApiResult<ReelRow> {
           SELECT COUNT(*)::bigint AS creator_reels_count
           FROM reel.lajukan_reels cr
           WHERE cr.status = 'published'
-            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+            AND cr.visibility = 'public'
+            AND cr.creator_user_id IN (r.creator_user_id, p.id)
         ) creator_reels ON true
         WHERE r.id = $1 AND r.status = 'published'
         "#,
@@ -7146,9 +8100,64 @@ async fn get_reel_row(db: &PgPool, reel_id: &str) -> ApiResult<ReelRow> {
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Reel not found"))
 }
 
+fn actor_owns_reel(actor: &AuthActor, reel: &ReelRow) -> bool {
+    let actor_forum_user_id = forum_user_id(actor);
+    reel.creator_user_id.as_deref().is_some_and(|creator_id| {
+        creator_id == actor.user_id
+            || creator_id == actor_forum_user_id
+            || profile_forum_user_id(creator_id) == actor_forum_user_id
+    })
+}
+
+async fn get_reel_row_for_viewer(
+    db: &PgPool,
+    reel_id: &str,
+    actor: Option<&AuthActor>,
+) -> ApiResult<ReelRow> {
+    let reel = get_reel_row(db, reel_id).await?;
+    if reel.visibility == "public"
+        || actor.is_some_and(is_moderator)
+        || actor.is_some_and(|viewer| actor_owns_reel(viewer, &reel))
+    {
+        return Ok(reel);
+    }
+
+    if reel.visibility == "followers" {
+        if let (Some(viewer), Some(creator_user_id)) = (actor, reel.creator_user_id.as_deref()) {
+            let viewer_forum_user_id = forum_user_id(viewer);
+            let creator_forum_user_id = profile_forum_user_id(creator_user_id);
+            let follows = sqlx::query_scalar::<_, bool>(
+                r#"
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM lajukan_reel_user_actions
+                  WHERE actor_user_id = $1
+                    AND action = 'follow'
+                    AND target_user_id IN ($2, $3)
+                )
+                "#,
+            )
+            .bind(viewer_forum_user_id)
+            .bind(creator_user_id)
+            .bind(creator_forum_user_id)
+            .fetch_one(db)
+            .await
+            .map_err(internal_error)?;
+            if follows {
+                return Ok(reel);
+            }
+        }
+    }
+
+    Err(ApiError::new(StatusCode::NOT_FOUND, "Reel not found"))
+}
+
 fn normalize_reel_action(value: Option<String>) -> ApiResult<String> {
     let action = value.unwrap_or_default().trim().to_ascii_lowercase();
-    if matches!(action.as_str(), "like" | "save" | "follow") {
+    if matches!(
+        action.as_str(),
+        "like" | "save" | "follow" | "not_interested"
+    ) {
         Ok(action)
     } else {
         Err(ApiError::new(
@@ -7194,6 +8203,16 @@ async fn fetch_reel_viewer_state(
 }
 
 fn enrich_reel_metadata(mut metadata: Value, row: &ReelRow) -> Value {
+    strip_private_reel_metadata(&mut metadata, true);
+    apply_reel_privacy_metadata(&mut metadata, &row.visibility, row.allow_comments);
+    apply_reel_store_metadata(
+        &mut metadata,
+        &row.store_id,
+        &row.store_slug,
+        &row.store_name,
+        &row.store_city,
+        &row.storefront_path,
+    );
     let object = if let Value::Object(object) = &mut metadata {
         object
     } else {
@@ -7245,7 +8264,7 @@ fn map_reel(row: ReelRow) -> LajukanReel {
         id: row.id,
         base_id: None,
         title: row.title,
-        creator: row.creator,
+        creator: safe_public_display_name(&row.creator),
         creator_user_id,
         caption: row.caption,
         tag: row.tag,
@@ -7269,6 +8288,13 @@ fn map_reel(row: ReelRow) -> LajukanReel {
         live_title: row.live_title,
         live_scheduled_at: row.live_scheduled_at,
         metadata,
+        visibility: row.visibility,
+        allow_comments: row.allow_comments,
+        store_id: row.store_id,
+        store_slug: row.store_slug,
+        store_name: row.store_name,
+        store_city: row.store_city,
+        storefront_path: row.storefront_path,
     }
 }
 
@@ -7277,8 +8303,9 @@ fn map_reel_comment(row: ReelCommentRow) -> ReelComment {
         id: row.id,
         reel_id: row.reel_id,
         parent_comment_id: row.parent_comment_id,
-        author_user_id: row.author_user_id,
-        author_name: row.author_name,
+        author_user_id: public_identity_user_id(Some(row.author_user_id.clone()))
+            .unwrap_or(row.author_user_id),
+        author_name: safe_public_display_name(&row.author_name),
         author_avatar_url: row.author_avatar_url,
         body: row.body,
         reply_count: row.reply_count,
@@ -7303,12 +8330,13 @@ fn map_reel_feed_item(row: ReelRow) -> ReelFeedItem {
         live_status: row.live_status,
         live_title: row.live_title,
         live_scheduled_at: row.live_scheduled_at,
+        visibility: row.visibility,
+        allow_comments: row.allow_comments,
         store: ReelFeedStore {
             id: row.store_id,
             slug: row.store_slug,
             name: row.store_name,
             city: row.store_city,
-            phone: row.store_phone,
             storefront_path: row.storefront_path,
         },
     }
@@ -7330,8 +8358,16 @@ async fn get_community_feed(
     let requested_thread = clean_optional(query.thread);
 
     if tab == "reels" {
-        let mut items =
-            build_reel_community_items(&state.db, q.as_deref(), cursor, limit + 1).await?;
+        let mut items = build_reel_community_items(
+            &state.db,
+            q.as_deref(),
+            actor.as_ref().map(|viewer| viewer.user_id.as_str()),
+            viewer_id.as_deref(),
+            actor.as_ref().is_some_and(is_moderator),
+            cursor,
+            limit + 1,
+        )
+        .await?;
         let has_more = items.len() as i64 > limit;
         if has_more {
             items.truncate(limit as usize);
@@ -7405,6 +8441,7 @@ async fn get_community_feed(
 
             WHERE
             ($1::text IS NULL OR c.id = $1 OR c.slug = $1 OR lower(c.name) = lower($1))
+            AND t.status <> 'deleted'
             AND ($2::text IS NULL OR EXISTS (
                 SELECT 1 FROM forum.lajukan_forum_thread_tags ft
                 WHERE ft.thread_id = t.id AND ft.tag_slug = $2
@@ -7421,9 +8458,33 @@ async fn get_community_feed(
                 (
                 g.status = 'active' AND (
                     g.privacy = 'public'
+                    OR EXISTS (
+                      SELECT 1
+                      FROM lajukan_group_members viewer_member
+                      WHERE viewer_member.group_id = g.id
+                        AND viewer_member.user_id = $5
+                        AND viewer_member.status = 'active'
+                    )
                     OR $6::boolean
                 )
                 )
+            )
+
+            AND (
+              $5::text IS NULL OR (
+                NOT EXISTS (
+                  SELECT 1
+                  FROM forum.lajukan_user_blocks blocked
+                  WHERE blocked.blocker_user_id = $5
+                    AND blocked.blocked_user_id = t.author_id
+                )
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM forum.lajukan_user_blocks blocked_by
+                  WHERE blocked_by.blocker_user_id = t.author_id
+                    AND blocked_by.blocked_user_id = $5
+                )
+              )
             )
 
             GROUP BY
@@ -7431,6 +8492,12 @@ async fn get_community_feed(
             p.id,
             p.avatar_url,
             p.metadata
+            ORDER BY
+              CASE WHEN $7::text IS NOT NULL AND t.id = $7 THEN 0 ELSE 1 END,
+              t.is_pinned DESC,
+              t.last_activity_at DESC,
+              t.id ASC
+            LIMIT $8 OFFSET $9
         "#,
     )
     .bind(category.as_deref())
@@ -7554,6 +8621,22 @@ async fn search_community(
                   )
                 )
               )
+              AND (
+                $2::text IS NULL OR (
+                  NOT EXISTS (
+                    SELECT 1
+                    FROM forum.lajukan_user_blocks blocked
+                    WHERE blocked.blocker_user_id = $2
+                      AND blocked.blocked_user_id = t.author_id
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM forum.lajukan_user_blocks blocked_by
+                    WHERE blocked_by.blocker_user_id = t.author_id
+                      AND blocked_by.blocked_user_id = $2
+                  )
+                )
+              )
             GROUP BY t.id
             ORDER BY t.created_at DESC, t.last_activity_at DESC
             LIMIT $4
@@ -7602,7 +8685,16 @@ async fn search_community(
     };
 
     let reels = if include_reels {
-        build_reel_community_items(&state.db, Some(&q), 0, limit).await?
+        build_reel_community_items(
+            &state.db,
+            Some(&q),
+            actor.as_ref().map(|viewer| viewer.user_id.as_str()),
+            viewer_id.as_deref(),
+            actor.as_ref().is_some_and(is_moderator),
+            0,
+            limit,
+        )
+        .await?
     } else {
         vec![]
     };
@@ -7630,18 +8722,27 @@ async fn search_community(
 async fn build_reel_community_items(
     db: &PgPool,
     q: Option<&str>,
+    viewer_identity_id: Option<&str>,
+    viewer_forum_id: Option<&str>,
+    viewer_is_moderator: bool,
     cursor: i64,
     limit: i64,
 ) -> ApiResult<Vec<CommunityFeedItem>> {
     let rows = sqlx::query_as::<_, ReelRow>(
         r#"
         SELECT
-          r.id, r.creator_user_id, r.creator, r.title, r.caption, r.tag,
+          r.id, r.creator_user_id,
+          COALESCE(
+            NULLIF(p.name, ''),
+            CASE WHEN r.creator_user_id IS NULL THEN r.creator ELSE 'Pengguna Lajukan' END
+          ) AS creator,
+          r.title, r.caption, r.tag,
           r.product_name, r.product_price, r.product_href,
           r.video_src, r.source_url, r.likes_count, r.comments_count, r.shares_count,
           r.tone, r.icon_key, r.media_url, r.media_type, r.hook,
           r.filter_preset, r.capture_mode, r.live_status, r.live_title, r.live_scheduled_at, r.metadata,
-          r.store_id, r.store_slug, r.store_name, r.store_city, r.store_phone, r.storefront_path,
+          r.visibility, r.allow_comments,
+          r.store_id, r.store_slug, r.store_name, r.store_city, r.storefront_path,
           p.avatar_url AS creator_avatar_url,
           COALESCE(followers.followers_count, 0)::bigint AS followers_count,
           COALESCE(following.following_count, 0)::bigint AS following_count,
@@ -7652,7 +8753,8 @@ async fn build_reel_community_items(
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.actor_user_id)::bigint AS followers_count
           FROM lajukan_reel_user_actions a
-          WHERE a.action = 'follow' AND a.target_user_id = COALESCE(p.id, r.creator_user_id)
+          WHERE a.action = 'follow'
+            AND a.target_user_id IN (r.creator_user_id, p.id)
         ) followers ON true
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT a.target_user_id)::bigint AS following_count
@@ -7663,23 +8765,61 @@ async fn build_reel_community_items(
           SELECT COUNT(*)::bigint AS creator_reels_count
           FROM reel.lajukan_reels cr
           WHERE cr.status = 'published'
-            AND cr.creator_user_id = COALESCE(p.id, r.creator_user_id)
+            AND cr.visibility = 'public'
+            AND cr.creator_user_id IN (r.creator_user_id, p.id)
         ) creator_reels ON true
         WHERE r.status = 'published'
           AND (
             $1::text IS NULL OR
             lower(r.title) LIKE '%' || lower($1) || '%' OR
             lower(r.caption) LIKE '%' || lower($1) || '%' OR
-            lower(r.creator) LIKE '%' || lower($1) || '%' OR
+            lower(COALESCE(NULLIF(p.name, ''), CASE WHEN r.creator_user_id IS NULL THEN r.creator ELSE '' END)) LIKE '%' || lower($1) || '%' OR
             lower(r.tag) LIKE '%' || lower($1) || '%' OR
             lower(coalesce(r.product_name, '')) LIKE '%' || lower($1) || '%' OR
             lower(r.store_name) LIKE '%' || lower($1) || '%'
           )
+          AND (
+            $3::text IS NULL OR (
+              NOT EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions hidden
+                WHERE hidden.reel_id = r.id
+                  AND hidden.actor_user_id = $3
+                  AND hidden.action = 'not_interested'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM forum.lajukan_user_blocks blocked
+                WHERE blocked.blocker_user_id = $3
+                  AND blocked.blocked_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
+          AND (
+            r.visibility = 'public'
+            OR $4::boolean
+            OR ($2::text IS NOT NULL AND r.creator_user_id = $2)
+            OR ($3::text IS NOT NULL AND (r.creator_user_id = $3 OR p.id = $3))
+            OR (
+              r.visibility = 'followers'
+              AND $3::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM lajukan_reel_user_actions follower
+                WHERE follower.actor_user_id = $3
+                  AND follower.action = 'follow'
+                  AND follower.target_user_id IN (r.creator_user_id, p.id)
+              )
+            )
+          )
         ORDER BY r.published_at DESC, r.id ASC
-        LIMIT $2 OFFSET $3
+        LIMIT $5 OFFSET $6
         "#,
     )
     .bind(q)
+    .bind(viewer_identity_id)
+    .bind(viewer_forum_id)
+    .bind(viewer_is_moderator)
     .bind(limit.clamp(1, MAX_REEL_LIMIT + 1))
     .bind(cursor.max(0))
     .fetch_all(db)
@@ -7701,7 +8841,7 @@ async fn build_reel_community_items(
             author: CommunityFeedAuthor {
                 id: public_identity_user_id(row.creator_user_id.clone())
                     .unwrap_or_else(|| row.creator_user_id.clone().unwrap_or(row.store_id.clone())),
-                name: row.creator.clone(),
+                name: safe_public_display_name(&row.creator),
                 title: row.tag.clone(),
                 avatar_url: row
                     .creator_avatar_url
@@ -8338,7 +9478,13 @@ fn internal_error(error: sqlx::Error) -> ApiError {
 
 #[cfg(test)]
 mod security_tests {
-    use super::{has_valid_media_signature, parse_media_range, MAX_MEDIA_RANGE_BYTES};
+    use super::{
+        apply_reel_privacy_metadata, clean_store_reference, has_valid_media_signature,
+        normalize_reel_action, normalize_trust_report_reason, parse_media_range,
+        resolve_reel_privacy, safe_public_display_name, sanitize_reel_metadata,
+        sanitize_report_details, MAX_MEDIA_RANGE_BYTES,
+    };
+    use serde_json::json;
 
     #[test]
     fn media_signatures_reject_active_content_disguised_as_an_image() {
@@ -8361,5 +9507,107 @@ mod security_tests {
         );
         assert_eq!(parse_media_range("bytes=99-100", 20), None);
         assert_eq!(parse_media_range("bytes=0-1,4-5", total), None);
+    }
+
+    #[test]
+    fn trust_safety_actions_and_reasons_are_allowlisted() {
+        assert_eq!(
+            normalize_reel_action(Some(" Not_Interested ".to_string())).unwrap(),
+            "not_interested"
+        );
+        assert!(normalize_reel_action(Some("report".to_string())).is_err());
+        assert_eq!(
+            normalize_trust_report_reason(Some(" Scam ".to_string())).unwrap(),
+            "scam"
+        );
+        assert!(normalize_trust_report_reason(Some("because".to_string())).is_err());
+    }
+
+    #[test]
+    fn trust_report_details_are_trimmed_and_bounded() {
+        assert_eq!(
+            sanitize_report_details(Some("  bukti ringkas  ".to_string())).as_deref(),
+            Some("bukti ringkas")
+        );
+        assert_eq!(
+            sanitize_report_details(Some("x".repeat(1200)))
+                .unwrap()
+                .chars()
+                .count(),
+            1000
+        );
+    }
+
+    #[test]
+    fn reel_privacy_accepts_legacy_metadata_shapes_and_rejects_unknown_visibility() {
+        let camel_case = json!({
+            "publishingPreferences": {
+                "visibility": "followers",
+                "allowComments": false
+            }
+        });
+        assert_eq!(
+            resolve_reel_privacy(None, None, &camel_case, None).unwrap(),
+            ("followers".to_string(), false)
+        );
+
+        let snake_case = json!({
+            "visibility": "private",
+            "allow_comments": "0"
+        });
+        assert_eq!(
+            resolve_reel_privacy(None, None, &snake_case, None).unwrap(),
+            ("private".to_string(), false)
+        );
+        assert!(resolve_reel_privacy(Some("friends".to_string()), None, &json!({}), None).is_err());
+    }
+
+    #[test]
+    fn reel_privacy_metadata_is_canonicalized_for_compatible_clients() {
+        let mut metadata = json!({"publishingPreferences": {"shareToMainFeed": true}});
+        apply_reel_privacy_metadata(&mut metadata, "private", false);
+        assert_eq!(metadata["visibility"], json!("private"));
+        assert_eq!(metadata["allowComments"], json!(false));
+        assert_eq!(metadata["allow_comments"], json!(false));
+        assert_eq!(
+            metadata["publishingPreferences"]["visibility"],
+            json!("private")
+        );
+        assert_eq!(
+            metadata["publishingPreferences"]["allowComments"],
+            json!(false)
+        );
+    }
+
+    #[test]
+    fn reel_metadata_and_creator_identity_do_not_leak_contact_fields() {
+        let metadata = sanitize_reel_metadata(Some(json!({
+            "storePhone": "+62 812 0000 0000",
+            "creatorEmail": "owner@example.test",
+            "creator": "Spoofed Creator",
+            "linkedStoreId": "spoofed-store",
+            "studio": {"phone": "+62 811 0000 0000", "filter": "warm"}
+        })));
+        assert!(metadata.get("storePhone").is_none());
+        assert!(metadata.get("creatorEmail").is_none());
+        assert!(metadata.get("creator").is_none());
+        assert!(metadata.get("linkedStoreId").is_none());
+        assert!(metadata["studio"].get("phone").is_none());
+        assert_eq!(metadata["studio"]["filter"], json!("warm"));
+        assert_eq!(
+            safe_public_display_name("owner@example.test"),
+            "Pengguna Lajukan"
+        );
+        assert_eq!(safe_public_display_name("  Toko Aman  "), "Toko Aman");
+    }
+
+    #[test]
+    fn store_references_are_tightly_allowlisted() {
+        assert_eq!(
+            clean_store_reference(Some(" toko-kopi_01 ")).as_deref(),
+            Some("toko-kopi_01")
+        );
+        assert!(clean_store_reference(Some("../../internal")).is_none());
+        assert!(clean_store_reference(Some("toko?owner=lain")).is_none());
     }
 }

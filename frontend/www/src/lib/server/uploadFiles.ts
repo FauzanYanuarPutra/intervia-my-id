@@ -22,6 +22,7 @@ type StoreUploadOptions = {
   accept: UploadAccept;
   folder: string;
   maxBytes: number;
+  maxBytesByType?: Partial<Record<StoredUploadFile['type'], number>>;
   minioTarget: string;
   requireMinio?: boolean;
   minioTimeoutMs?: number;
@@ -31,6 +32,7 @@ type StoreUploadOptions = {
 type ValidateUploadOptions = {
   accept: UploadAccept;
   maxBytes: number;
+  maxBytesByType?: Partial<Record<StoredUploadFile['type'], number>>;
 };
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -112,13 +114,12 @@ const MIME_ALIASES_BY_EXT: Record<string, Set<string>> = {
   '.heif': new Set(['image/heif', 'image/heic']),
   '.jpg': new Set(['image/jpeg', 'image/pjpeg']),
   '.jpeg': new Set(['image/jpeg', 'image/pjpeg']),
-  '.m4a': new Set(['audio/mp4', 'audio/x-m4a']),
-  '.rar': new Set([
-    'application/x-rar-compressed',
-    'application/vnd.rar',
-  ]),
+  '.m4a': new Set(['audio/m4a', 'audio/mp4', 'audio/x-m4a']),
+  '.ogg': new Set(['application/ogg', 'audio/ogg']),
+  '.rar': new Set(['application/x-rar-compressed', 'application/vnd.rar']),
   '.rtf': new Set(['application/rtf', 'text/rtf']),
   '.wav': new Set(['audio/wav', 'audio/x-wav']),
+  '.webm': new Set(['audio/webm', 'video/webm']),
   '.zip': new Set(['application/zip', 'application/x-zip-compressed']),
 };
 
@@ -195,8 +196,15 @@ export function validateUploadCandidate(
 
 function validateUploadFile(file: File, options: ValidateUploadOptions) {
   if (file.size <= 0) return 'file is empty';
-  if (file.size > options.maxBytes) {
-    return `file too large (max ${formatBytes(options.maxBytes)})`;
+  const mime = inferUploadMime(file);
+  const storedType = inferStoredFileType(mime, file.name);
+  const typeLimit = options.maxBytesByType?.[storedType];
+  const maxBytes =
+    typeof typeLimit === 'number' && Number.isFinite(typeLimit) && typeLimit > 0
+      ? Math.min(options.maxBytes, typeLimit)
+      : options.maxBytes;
+  if (file.size > maxBytes) {
+    return `file too large (max ${formatBytes(maxBytes)})`;
   }
   if (!isAllowedUpload(file, options.accept)) {
     return 'file type is not allowed';
@@ -224,10 +232,12 @@ function isAllowedUpload(file: File, accept: UploadAccept): boolean {
 }
 
 function mimeMatchesExtension(mime: string, ext: string): boolean {
-  if (mime === 'application/octet-stream') return true;
+  const normalizedMime =
+    mime.split(';', 1)[0]?.trim().toLowerCase() || mime.toLowerCase();
+  if (normalizedMime === 'application/octet-stream') return true;
   const aliases = MIME_ALIASES_BY_EXT[ext];
-  if (aliases) return aliases.has(mime);
-  return MIME_BY_EXT[ext] === mime;
+  if (aliases) return aliases.has(normalizedMime);
+  return MIME_BY_EXT[ext] === normalizedMime;
 }
 
 async function storeUploadFile(file: File, options: StoreUploadOptions) {
@@ -245,18 +255,23 @@ async function storeUploadFile(file: File, options: StoreUploadOptions) {
     url,
     size: file.size,
     mime,
-    type: inferStoredFileType(mime),
+    type: inferStoredFileType(mime, file.name),
   } satisfies StoredUploadFile;
 }
 
 export function hasExpectedFileSignature(buffer: Buffer, ext: string): boolean {
   if (ext === '.jpg' || ext === '.jpeg') {
-    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    return (
+      buffer.length >= 3 &&
+      buffer[0] === 0xff &&
+      buffer[1] === 0xd8 &&
+      buffer[2] === 0xff
+    );
   }
   if (ext === '.png') {
-    return buffer.subarray(0, 8).equals(
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    );
+    return buffer
+      .subarray(0, 8)
+      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   }
   if (ext === '.gif') {
     const header = buffer.subarray(0, 6).toString('ascii');
@@ -269,9 +284,19 @@ export function hasExpectedFileSignature(buffer: Buffer, ext: string): boolean {
     );
   }
   if (ext === '.bmp') return buffer.subarray(0, 2).toString('ascii') === 'BM';
-  if (ext === '.pdf') return buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+  if (ext === '.pdf')
+    return buffer.subarray(0, 5).toString('ascii') === '%PDF-';
   if (ext === '.avif' || ext === '.heic' || ext === '.heif') {
     return buffer.subarray(4, 12).toString('ascii').includes('ftyp');
+  }
+  if (ext === '.webm') {
+    return buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+  }
+  if (ext === '.ogg') {
+    return buffer.subarray(0, 4).toString('ascii') === 'OggS';
+  }
+  if (ext === '.m4a') {
+    return buffer.subarray(4, 8).toString('ascii') === 'ftyp';
   }
   return true;
 }
@@ -326,10 +351,26 @@ function safeSegment(value: string): string {
   return (value || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 96);
 }
 
-function inferStoredFileType(mime: string): StoredUploadFile['type'] {
-  if (mime.startsWith('image/')) return 'image';
-  if (mime.startsWith('video/')) return 'video';
-  if (mime.startsWith('audio/')) return 'audio';
+function inferStoredFileType(
+  mime: string,
+  filename = '',
+): StoredUploadFile['type'] {
+  const normalizedMime =
+    mime.split(';', 1)[0]?.trim().toLowerCase() || mime.toLowerCase();
+  if (normalizedMime.startsWith('image/')) return 'image';
+  if (normalizedMime.startsWith('video/')) return 'video';
+  if (
+    normalizedMime.startsWith('audio/') ||
+    normalizedMime === 'application/ogg'
+  ) {
+    return 'audio';
+  }
+  if (normalizedMime === 'application/octet-stream') {
+    const ext = path.extname(filename).toLowerCase();
+    if (IMAGE_EXT.has(ext)) return 'image';
+    if (VIDEO_EXT.has(ext)) return 'video';
+    if (AUDIO_EXT.has(ext)) return 'audio';
+  }
   return 'file';
 }
 

@@ -55,6 +55,8 @@ defmodule ChatServiceWeb.Endpoint do
     ]
 
   plug ChatServiceWeb.Plugs.SecurityHeaders
+  # Liveness intentionally avoids dependencies. Readiness is routed separately
+  # and verifies that Scylla can serve queries before traffic is admitted.
   plug :health_check
 
   defp health_check(%{path_info: ["api", "health"]} = conn, _opts) do

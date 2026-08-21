@@ -81,6 +81,25 @@ CREATE TABLE IF NOT EXISTS user_rooms (
 WITH CLUSTERING ORDER BY (last_message_at DESC)
 AND compression = {'sstable_compression': 'LZ4Compressor'};
 
+-- Canonical inbox projection. The legacy user_rooms table above is retained
+-- temporarily so rolling deployments can merge old rows while this table is
+-- backfilled. One partition row per room prevents unbounded duplicate inbox
+-- entries for every message.
+CREATE TABLE IF NOT EXISTS user_room_state (
+    user_id uuid,
+    room_id text,
+    last_message_at timestamp,
+    room_type text,
+    room_name text,
+    room_avatar text,
+    last_message text,
+    last_sender uuid,
+    unread_count int,
+    is_pinned boolean,
+    PRIMARY KEY ((user_id), room_id)
+)
+WITH compression = {'sstable_compression': 'LZ4Compressor'};
+
 -- ============================================================
 -- 6. MESSAGES (BUCKETED)
 -- ============================================================
@@ -105,6 +124,22 @@ AND compaction = {
 }
 AND compression = {'sstable_compression': 'LZ4Compressor'};
 
+-- Stable idempotency reservation used by both websocket and HTTP sends.
+-- Every client ref is its own partition so high-volume rooms do not create an
+-- unbounded deduplication partition or serialize unrelated LWT operations.
+CREATE TABLE IF NOT EXISTS message_client_refs (
+    room_id text,
+    sender_id uuid,
+    client_ref text,
+    message_id timeuuid,
+    bucket int,
+    sent_at timestamp,
+    payload_hash text,
+    created_at timestamp,
+    PRIMARY KEY ((room_id, sender_id, client_ref))
+)
+WITH compression = {'sstable_compression': 'LZ4Compressor'};
+
 -- ============================================================
 -- 7. READ RECEIPTS
 -- ============================================================
@@ -126,6 +161,36 @@ CREATE TABLE IF NOT EXISTS unread_counters (
     unread counter,
     PRIMARY KEY (user_id, room_id)
 );
+
+-- ============================================================
+-- 9. CHAT TRUST AND SAFETY
+-- ============================================================
+-- Directional block rows keep the user's own block list queryable. Message
+-- send checks both directions for deterministic DM rooms.
+CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker_id uuid,
+    blocked_id uuid,
+    created_at timestamp,
+    PRIMARY KEY ((blocker_id), blocked_id)
+)
+WITH compression = {'sstable_compression': 'LZ4Compressor'};
+
+-- Append-only report intake. Each report has its own bounded partition and a
+-- stable timeuuid; moderation projections can be added separately when an ops
+-- query contract is approved instead of relying on ALLOW FILTERING.
+CREATE TABLE IF NOT EXISTS chat_reports (
+    report_id timeuuid,
+    reporter_id uuid,
+    room_id text,
+    message_id timeuuid,
+    reported_user_id uuid,
+    reason text,
+    details text,
+    created_at timestamp,
+    status text,
+    PRIMARY KEY ((report_id))
+)
+WITH compression = {'sstable_compression': 'LZ4Compressor'};
 
 -- ============================================================
 -- END — THIS IS ENOUGH FOR 10M+ USERS

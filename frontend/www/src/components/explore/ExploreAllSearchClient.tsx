@@ -3,22 +3,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  ChevronRight,
-  ClipboardList,
   ExternalLink,
-  MapPinned,
   Search,
-  Store,
 } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 
 import { ExploreSearchResults } from '@/components/explore/ExploreSearchResults';
+import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { Header } from '@/components/layout/Header';
+import {
+  ExploreArtwork,
+  ExploreModeTabs,
+  ExploreSurface,
+  useExploreEmblaRail,
+} from '@/components/explore/ExploreVisualSystem';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import {
   MARKETPLACE_EXPLORE_CATEGORIES,
-  buildCategorySearchHref,
+  buildExploreCategoryHref,
+  getExploreCategoryBySlug,
   type LajukanLocale,
 } from '@/lib/discovery/lajukanCategories';
 import {
@@ -30,15 +37,28 @@ import {
 } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
 
-function appendSearchParams(path: string, params: URLSearchParams) {
+function appendSearchParams(
+  path: string,
+  params: URLSearchParams,
+) {
   const search = params.toString();
-  return search ? `${path}?${search}` : path;
+
+  return search
+    ? `${path}?${search}`
+    : path;
 }
 
-type ExploreSearchMode = 'supply' | 'demand' | 'references';
+type ExploreSearchMode =
+  | 'supply'
+  | 'demand'
+  | 'people'
+  | 'references';
 
-const SEARCH_RESPONSE_CACHE = new Map<string, GlobalSearchResponse>();
+const SEARCH_RESPONSE_CACHE =
+  new Map<string, GlobalSearchResponse>();
+
 const MAX_SEARCH_CACHE_ENTRIES = 12;
+
 const EXPLORE_ADVANCED_FILTER_KEYS = [
   'location',
   'lat',
@@ -54,212 +74,1087 @@ const EXPLORE_ADVANCED_FILTER_KEYS = [
   'privacy',
 ] as const;
 
-function rememberSearchResponse(key: string, payload: GlobalSearchResponse) {
+const SUPPLY_TABS = new Set([
+  'all',
+  'products',
+  'services',
+  'businesses',
+]);
+
+const ALL_CATEGORY_IMAGE =
+  '/images/hero/menu/semua-01.png';
+
+function rememberSearchResponse(
+  key: string,
+  payload: GlobalSearchResponse,
+) {
   SEARCH_RESPONSE_CACHE.delete(key);
-  SEARCH_RESPONSE_CACHE.set(key, payload);
-  while (SEARCH_RESPONSE_CACHE.size > MAX_SEARCH_CACHE_ENTRIES) {
-    const oldestKey = SEARCH_RESPONSE_CACHE.keys().next().value;
+  SEARCH_RESPONSE_CACHE.set(
+    key,
+    payload,
+  );
+
+  while (
+    SEARCH_RESPONSE_CACHE.size >
+    MAX_SEARCH_CACHE_ENTRIES
+  ) {
+    const oldestKey =
+      SEARCH_RESPONSE_CACHE
+        .keys()
+        .next()
+        .value;
+
     if (!oldestKey) break;
-    SEARCH_RESPONSE_CACHE.delete(oldestKey);
+
+    SEARCH_RESPONSE_CACHE.delete(
+      oldestKey,
+    );
   }
 }
 
-function normalizeQuery(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
+function normalizeQuery(
+  value: string,
+): string {
+  return value
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
+/**
+ * Marketplace canonicalization:
+ *
+ * supply:
+ *   side=supply
+ *   tab=all|products|services|businesses
+ *
+ * demand:
+ *   side=demand
+ *   tab=needs
+ */
+function canonicalizeMarketplaceParams(
+  params: URLSearchParams,
+  side: 'supply' | 'demand',
+) {
+  params.set('side', side);
+
+  if (side === 'demand') {
+    params.set('tab', 'needs');
+    return;
+  }
+
+  const requestedTab =
+    params.get('tab');
+
+  params.set(
+    'tab',
+    requestedTab &&
+      SUPPLY_TABS.has(requestedTab)
+      ? requestedTab
+      : 'all',
+  );
+}
+
+export function ExploreAllSearchClient({
+  locale,
+}: {
+  locale: LajukanLocale;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchKey = searchParams.toString();
+
+  const searchKey =
+    searchParams.toString();
+
   const state = useMemo(
-    () => parseGlobalSearchState(new URLSearchParams(searchKey)),
+    () =>
+      parseGlobalSearchState(
+        new URLSearchParams(
+          searchKey,
+        ),
+      ),
     [searchKey],
   );
-  const isId = locale === 'id';
-  const referenceMode = state.tab === 'references';
-  const searchSide: Exclude<GlobalSearchSide, 'all'> =
-    state.side === 'demand' ? 'demand' : 'supply';
-  const searchMode: ExploreSearchMode = referenceMode
-    ? 'references'
-    : searchSide;
-  const [queryDraft, setQueryDraft] = useState({
-    source: state.query,
-    value: state.query,
-  });
-  const queryInput =
-    queryDraft.source === state.query ? queryDraft.value : state.query;
-  const setQueryInput = (value: string) => {
-    setQueryDraft({ source: state.query, value });
-  };
-  const [payload, setPayload] = useState<GlobalSearchResponse>(() =>
-    emptyGlobalSearchResponse(state.query),
+
+  const activeCategory = useMemo(
+    () =>
+      getExploreCategoryBySlug(
+        state.category,
+      ),
+    [state.category],
   );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
 
+  const activeSubcategory =
+    useMemo(
+      () =>
+        activeCategory?.subcategories.find(
+          subcategory =>
+            subcategory.slug ===
+            state.subcategory,
+        ),
+      [
+        activeCategory,
+        state.subcategory,
+      ],
+    );
+
+  const isId = locale === 'id';
+
+  const referenceMode =
+    state.tab === 'references';
+
+  const peopleMode =
+    state.tab === 'users';
+
+  /**
+   * Marketplace default is explicitly supply.
+   */
+  const searchSide: Exclude<
+    GlobalSearchSide,
+    'all'
+  > =
+    state.side === 'demand'
+      ? 'demand'
+      : 'supply';
+
+  const [queryDraft, setQueryDraft] =
+    useState({
+      source: state.query,
+      value: state.query,
+    });
+
+  const queryInput =
+    queryDraft.source ===
+    state.query
+      ? queryDraft.value
+      : state.query;
+
+  const setQueryInput = (
+    value: string,
+  ) => {
+    setQueryDraft({
+      source: state.query,
+      value,
+    });
+  };
+
+  const [payload, setPayload] =
+    useState<GlobalSearchResponse>(
+      () =>
+        emptyGlobalSearchResponse(
+          state.query,
+        ),
+    );
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState(false);
+
+  const [retryKey, setRetryKey] =
+    useState(0);
+
+  const {
+    emblaRef: categoryRailRef,
+    emblaApi: categoryRailApi,
+  } =
+    useExploreEmblaRail();
+
+  const {
+    emblaRef: subcategoryRailRef,
+    emblaApi: subcategoryRailApi,
+  } =
+    useExploreEmblaRail();
+
+  /**
+   * Keep category carousel synchronized.
+   */
   useEffect(() => {
-    const params = new URLSearchParams(searchKey);
+    if (!categoryRailApi) {
+      return;
+    }
+
+    const index = activeCategory
+      ? MARKETPLACE_EXPLORE_CATEGORIES.findIndex(
+          item =>
+            item.id ===
+            activeCategory.id,
+        ) + 1
+      : 0;
+
+    categoryRailApi.scrollTo(
+      Math.max(0, index),
+      true,
+    );
+  }, [
+    activeCategory,
+    categoryRailApi,
+  ]);
+
+  /**
+   * Keep subcategory carousel synchronized.
+   */
+  useEffect(() => {
+    if (
+      !subcategoryRailApi ||
+      !activeSubcategory ||
+      !activeCategory
+    ) {
+      return;
+    }
+
+    const index =
+      activeCategory.subcategories.findIndex(
+        item =>
+          item.slug ===
+          activeSubcategory.slug,
+      );
+
+    if (index >= 0) {
+      subcategoryRailApi.scrollTo(
+        index + 1,
+        true,
+      );
+    }
+  }, [
+    activeCategory,
+    activeSubcategory,
+    subcategoryRailApi,
+  ]);
+
+  /**
+   * Canonicalize URL state.
+   *
+   * This prevents cases such as:
+   *
+   * /explore
+   * /explore?tab=all
+   * /explore?side=
+   * /explore?side=supply
+   *
+   * from representing different states accidentally.
+   */
+  useEffect(() => {
+    const params =
+      new URLSearchParams(
+        searchKey,
+      );
+
     let changed = false;
-    const rawQuery = params.get('q') || '';
-    const cleanQuery = normalizeQuery(rawQuery);
 
-    if (rawQuery !== cleanQuery || cleanQuery.length === 1) {
-      if (cleanQuery.length >= 2) params.set('q', cleanQuery);
-      else params.delete('q');
-      changed = true;
-    }
-    if (referenceMode && params.has('side')) {
-      params.delete('side');
-      changed = true;
-    } else if (!referenceMode && state.side === 'all') {
-      params.set('side', 'supply');
-      changed = true;
-    }
-    if (!referenceMode && params.get('tab') === 'references') {
-      params.delete('tab');
-      changed = true;
-    }
-    for (const key of ['type', 'category', 'subcategory']) {
-      if (!params.has(key)) continue;
-      params.delete(key);
-      changed = true;
-    }
-    if (!referenceMode && params.has('cursor')) {
-      params.delete('cursor');
-      changed = true;
-    }
-    if (changed) {
-      router.replace(appendSearchParams(`/${locale}/explore`, params), {
-        scroll: false,
-      });
-    }
-  }, [locale, referenceMode, router, searchKey, state.side]);
+    const rawQuery =
+      params.get('q') || '';
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const params = new URLSearchParams(searchKey);
-    params.delete('category');
-    params.delete('subcategory');
-    params.delete('type');
-    if (referenceMode) {
-      params.delete('side');
-      params.set('tab', 'references');
+    const cleanQuery =
+      normalizeQuery(rawQuery);
+
+    if (
+      rawQuery !== cleanQuery ||
+      cleanQuery.length === 1
+    ) {
+      if (
+        cleanQuery.length >= 2
+      ) {
+        params.set(
+          'q',
+          cleanQuery,
+        );
+      } else {
+        params.delete('q');
+      }
+
+      changed = true;
+    }
+
+    /**
+     * References and people are not marketplace modes.
+     * Remove marketplace-only parameters.
+     */
+    if (
+      referenceMode ||
+      peopleMode
+    ) {
+      if (params.has('side')) {
+        params.delete('side');
+        changed = true;
+      }
+
+      if (
+        params.has('category')
+      ) {
+        params.delete('category');
+        changed = true;
+      }
+
+      if (
+        params.has(
+          'subcategory',
+        )
+      ) {
+        params.delete(
+          'subcategory',
+        );
+        changed = true;
+      }
+
+      if (
+        params.has('cursor') &&
+        !referenceMode
+      ) {
+        params.delete('cursor');
+        changed = true;
+      }
+
+      if (
+        peopleMode &&
+        params.get('tab') !==
+          'users'
+      ) {
+        params.set(
+          'tab',
+          'users',
+        );
+        changed = true;
+      }
+
+      if (
+        referenceMode &&
+        params.get('tab') !==
+          'references'
+      ) {
+        params.set(
+          'tab',
+          'references',
+        );
+        changed = true;
+      }
     } else {
-      params.set('side', searchSide);
-      if (searchSide === 'demand') params.set('tab', 'needs');
-      else if (params.get('tab') === 'needs') params.delete('tab');
-      params.delete('cursor');
+      /**
+       * Marketplace always has explicit side.
+       */
+      const canonicalSide =
+        state.side === 'demand'
+          ? 'demand'
+          : 'supply';
+
+      const previousSide =
+        params.get('side');
+
+      if (
+        previousSide !==
+        canonicalSide
+      ) {
+        params.set(
+          'side',
+          canonicalSide,
+        );
+        changed = true;
+      }
+
+      const previousTab =
+        params.get('tab');
+
+      if (
+        canonicalSide ===
+        'demand'
+      ) {
+        if (
+          previousTab !==
+          'needs'
+        ) {
+          params.set(
+            'tab',
+            'needs',
+          );
+
+          changed = true;
+        }
+      } else {
+        const canonicalTab: string =
+          previousTab &&
+          SUPPLY_TABS.has(
+            previousTab,
+          )
+            ? previousTab
+            : 'all';
+
+        if (
+          previousTab !==
+          canonicalTab
+        ) {
+          params.set(
+            'tab',
+            canonicalTab,
+          );
+
+          changed = true;
+        }
+      }
+
+      if (
+        params.has('cursor')
+      ) {
+        params.delete(
+          'cursor',
+        );
+        changed = true;
+      }
+
+      /**
+       * Validate category.
+       */
+      const rawCategory =
+        params.get(
+          'category',
+        ) || '';
+
+      const validCategory =
+        rawCategory
+          ? getExploreCategoryBySlug(
+              rawCategory,
+            )
+          : undefined;
+
+      if (
+        rawCategory &&
+        !validCategory
+      ) {
+        params.delete(
+          'category',
+        );
+        params.delete(
+          'subcategory',
+        );
+        changed = true;
+      } else if (
+        validCategory &&
+        params.has(
+          'subcategory',
+        )
+      ) {
+        const subcategory =
+          params.get(
+            'subcategory',
+          ) || '';
+
+        const validSubcategory =
+          validCategory.subcategories.some(
+            item =>
+              item.slug ===
+              subcategory,
+          );
+
+        if (!validSubcategory) {
+          params.delete(
+            'subcategory',
+          );
+          changed = true;
+        }
+      }
     }
 
-    const requestKey = params.toString();
-    const cachedPayload = SEARCH_RESPONSE_CACHE.get(requestKey);
+    if (
+      params.has('type')
+    ) {
+      params.delete('type');
+      changed = true;
+    }
+
+    if (changed) {
+      router.replace(
+        appendSearchParams(
+          `/${locale}/explore`,
+          params,
+        ),
+        {
+          scroll: false,
+        },
+      );
+    }
+  }, [
+    locale,
+    peopleMode,
+    referenceMode,
+    router,
+    searchKey,
+    state.side,
+    state.tab,
+  ]);
+
+  /**
+   * Fetch search results.
+   */
+  useEffect(() => {
+    const controller =
+      new AbortController();
+
+    const params =
+      new URLSearchParams(
+        searchKey,
+      );
+
+    params.delete('type');
+
+    if (referenceMode) {
+      params.delete(
+        'category',
+      );
+      params.delete(
+        'subcategory',
+      );
+      params.delete('side');
+
+      params.set(
+        'tab',
+        'references',
+      );
+    } else if (peopleMode) {
+      params.delete('side');
+      params.delete(
+        'category',
+      );
+      params.delete(
+        'subcategory',
+      );
+      params.delete(
+        'cursor',
+      );
+
+      params.set(
+        'tab',
+        'users',
+      );
+    } else {
+      /**
+       * Marketplace:
+       * ALWAYS explicitly specify side.
+       */
+      canonicalizeMarketplaceParams(
+        params,
+        searchSide,
+      );
+
+      params.delete(
+        'cursor',
+      );
+    }
+
+    const requestKey =
+      params.toString();
+
+    const cachedPayload =
+      SEARCH_RESPONSE_CACHE.get(
+        requestKey,
+      );
 
     queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      if (cachedPayload) setPayload(cachedPayload);
-      else setPayload(emptyGlobalSearchResponse(state.query));
+      if (
+        controller.signal.aborted
+      ) {
+        return;
+      }
+
+      if (cachedPayload) {
+        setPayload(
+          cachedPayload,
+        );
+      } else {
+        setPayload(
+          emptyGlobalSearchResponse(
+            state.query,
+          ),
+        );
+      }
+
       setLoading(true);
       setError(false);
     });
-    void fetch(`/api/search?${requestKey}`, {
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-      .then(async response => {
-        if (!response.ok) throw new Error('search_failed');
-        return (await response.json()) as GlobalSearchResponse;
-      })
-      .then(nextPayload => {
-        if (controller.signal.aborted) return;
-        rememberSearchResponse(requestKey, nextPayload);
-        setPayload(nextPayload);
-      })
+
+    void fetch(
+      `/api/search?${requestKey}`,
+      {
+        cache: 'no-store',
+        signal:
+          controller.signal,
+      },
+    )
+      .then(
+        async response => {
+          if (!response.ok) {
+            throw new Error(
+              'search_failed',
+            );
+          }
+
+          return (await response.json()) as GlobalSearchResponse;
+        },
+      )
+      .then(
+        nextPayload => {
+          if (
+            controller.signal
+              .aborted
+          ) {
+            return;
+          }
+
+          rememberSearchResponse(
+            requestKey,
+            nextPayload,
+          );
+
+          setPayload(
+            nextPayload,
+          );
+        },
+      )
       .catch(() => {
-        if (!controller.signal.aborted) setError(true);
+        if (
+          !controller.signal
+            .aborted
+        ) {
+          setError(true);
+        }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (
+          !controller.signal
+            .aborted
+        ) {
+          setLoading(false);
+        }
       });
-    return () => controller.abort();
-  }, [referenceMode, retryKey, searchKey, searchSide, state.query]);
 
+    return () =>
+      controller.abort();
+  }, [
+    peopleMode,
+    referenceMode,
+    retryKey,
+    searchKey,
+    searchSide,
+    state.query,
+  ]);
+
+  /**
+   * Update URL parameters.
+   *
+   * Marketplace side is preserved unless the caller
+   * explicitly enters people/reference mode.
+   */
   const updateParams = (
-    changes: Record<string, string | null>,
-    mode: 'push' | 'replace' = 'push',
+    changes: Record<
+      string,
+      string | null
+    >,
+    mode:
+      | 'push'
+      | 'replace' = 'push',
   ) => {
-    const params = new URLSearchParams(searchKey);
-    Object.entries(changes).forEach(([key, value]) => {
-      if (!value || value === 'all' || value === 'relevance') {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
-    params.delete('category');
+    const params =
+      new URLSearchParams(
+        searchKey,
+      );
+
+    Object.entries(changes).forEach(
+      ([key, value]) => {
+        const isDefaultFilterValue =
+          (key === 'sort' &&
+            value ===
+              'relevance') ||
+          ([
+            'condition',
+            'service_mode',
+            'status',
+            'privacy',
+          ].includes(key) &&
+            value === 'all');
+
+        if (
+          value === null ||
+          value === '' ||
+          isDefaultFilterValue
+        ) {
+          params.delete(key);
+        } else {
+          params.set(
+            key,
+            value,
+          );
+        }
+      },
+    );
+
+    /**
+     * Canonicalize marketplace state after changes.
+     */
+    const targetTab =
+      params.get('tab');
+
+    const targetIsSpecialMode =
+      targetTab ===
+        'references' ||
+      targetTab === 'users';
+
+    if (!targetIsSpecialMode) {
+      const targetSide =
+        params.get('side') ===
+        'demand'
+          ? 'demand'
+          : 'supply';
+
+      canonicalizeMarketplaceParams(
+        params,
+        targetSide,
+      );
+    }
+
     params.delete('cursor');
     params.delete('type');
-    router[mode](appendSearchParams(`/${locale}/explore`, params), {
-      scroll: false,
-    });
+
+    router[mode](
+      appendSearchParams(
+        `/${locale}/explore`,
+        params,
+      ),
+      {
+        scroll: false,
+      },
+    );
   };
 
-  const submitSearch = (nextQuery = queryInput) => {
-    const clean = normalizeQuery(nextQuery);
-    if (clean.length === 1 || (clean.length < 2 && !referenceMode)) return;
-    if (clean.length >= 2) {
-      void trackLajukanEvent('navbar_search_submit', {
-        properties: {
-          locale,
-          source: 'explore_all',
-          route: '/explore',
-          query: clean,
-          side: referenceMode ? 'reference' : searchSide,
-        },
-      });
+  /**
+   * Submit search.
+   */
+  const submitSearch = (
+    nextQuery = queryInput,
+  ) => {
+    const clean =
+      normalizeQuery(nextQuery);
+
+    if (
+      clean.length === 1
+    ) {
+      return;
     }
+
+    if (
+      clean.length < 2 &&
+      !referenceMode &&
+      !peopleMode
+    ) {
+      return;
+    }
+
+    if (
+      clean.length >= 2
+    ) {
+      void trackLajukanEvent(
+        'navbar_search_submit',
+        {
+          properties: {
+            locale,
+            source:
+              'explore_all',
+            route: '/explore',
+            query: clean,
+            side:
+              referenceMode
+                ? 'reference'
+                : peopleMode
+                  ? 'people'
+                  : searchSide,
+          },
+        },
+      );
+    }
+
+    if (referenceMode) {
+      updateParams({
+        q: clean || null,
+        side: null,
+        tab: 'references',
+      });
+
+      return;
+    }
+
+    if (peopleMode) {
+      updateParams({
+        q: clean || null,
+        side: null,
+        tab: 'users',
+      });
+
+      return;
+    }
+
     updateParams({
       q: clean || null,
-      side: referenceMode ? null : searchSide,
-      tab: referenceMode
-        ? 'references'
-        : searchSide === 'demand'
+      side: searchSide,
+      tab:
+        searchSide ===
+        'demand'
           ? 'needs'
-          : null,
+          : 'all',
     });
   };
 
-  const selectMode = (mode: ExploreSearchMode) => {
+  /**
+   * Switch main discovery mode.
+   */
+  const selectMode = (
+    mode: ExploreSearchMode,
+  ) => {
+    void trackLajukanEvent(
+      'filter_applied',
+      {
+        properties: {
+          locale,
+          source:
+            'explore_results_mode',
+          route: '/explore',
+          filter:
+            'discovery_mode',
+          value: mode,
+        },
+      },
+    );
+
+    if (
+      mode ===
+      'references'
+    ) {
+      updateParams(
+        {
+          side: null,
+          tab: 'references',
+          category: null,
+          subcategory: null,
+        },
+        'replace',
+      );
+
+      return;
+    }
+
+    if (
+      mode === 'people'
+    ) {
+      updateParams(
+        {
+          side: null,
+          tab: 'users',
+          category: null,
+          subcategory: null,
+        },
+        'replace',
+      );
+
+      return;
+    }
+
+    /**
+     * Marketplace mode.
+     *
+     * Supply and demand remain explicit.
+     */
     updateParams(
       {
-        side: mode === 'references' ? null : mode,
+        side: mode,
         tab:
-          mode === 'references'
-            ? 'references'
-            : mode === 'demand'
-              ? 'needs'
-              : null,
-        subcategory: null,
+          mode ===
+          'demand'
+            ? 'needs'
+            : 'all',
+        category:
+          activeCategory?.slug ||
+          null,
+        subcategory:
+          activeSubcategory?.slug ||
+          null,
       },
       'replace',
     );
   };
 
-  const selectTab = (tab: GlobalSearchTab) => {
-    if (tab === 'references') {
-      selectMode('references');
+  /**
+   * Change result tab.
+   */
+  const selectTab = (
+    tab: GlobalSearchTab,
+  ) => {
+    if (
+      tab === 'references'
+    ) {
+      selectMode(
+        'references',
+      );
       return;
     }
-    updateParams({ tab: tab === 'all' ? null : tab });
+
+    if (
+      peopleMode
+    ) {
+      return;
+    }
+
+    if (
+      searchSide ===
+      'demand'
+    ) {
+      /**
+       * Demand has exactly one marketplace tab.
+       */
+      updateParams({
+        side: 'demand',
+        tab: 'needs',
+      });
+
+      void trackLajukanEvent(
+        'search_tab_change',
+        {
+          properties: {
+            locale,
+            source:
+              'explore_results',
+            route: '/explore',
+            contentType:
+              'needs',
+            query:
+              state.query,
+            side: 'demand',
+          },
+        },
+      );
+
+      return;
+    }
+
+    const safeTab =
+      SUPPLY_TABS.has(
+        tab,
+      )
+        ? tab
+        : 'all';
+
+    updateParams({
+      side: 'supply',
+      tab: safeTab,
+    });
+
+    void trackLajukanEvent(
+      'search_tab_change',
+      {
+        properties: {
+          locale,
+          source:
+            'explore_results',
+          route: '/explore',
+          contentType:
+            safeTab,
+          query:
+            state.query,
+          side: 'supply',
+        },
+      },
+    );
   };
 
-  const loadNextReferenceBatch = (cursor: string) => {
-    const cleanCursor = cursor.trim();
+  /**
+   * Select category while preserving current marketplace side.
+   */
+  const selectCategory = (
+    category: ReturnType<
+      typeof getExploreCategoryBySlug
+    >,
+  ) => {
+    if (
+      referenceMode ||
+      peopleMode
+    ) {
+      return;
+    }
+
+    updateParams({
+      category:
+        category?.slug ||
+        null,
+      subcategory: null,
+      side: searchSide,
+    });
+
+    void trackLajukanEvent(
+      'search_category_change',
+      {
+        properties: {
+          locale,
+          source:
+            'explore_results',
+          route: '/explore',
+          category:
+            category?.slug ||
+            'all',
+          query: state.query,
+          side: searchSide,
+        },
+      },
+    );
+  };
+
+  /**
+   * Select subcategory while preserving current side.
+   */
+  const selectSubcategory = (
+    subcategory: string | null,
+  ) => {
+    if (
+      referenceMode ||
+      peopleMode
+    ) {
+      return;
+    }
+
+    updateParams({
+      subcategory,
+      side: searchSide,
+    });
+
+    void trackLajukanEvent(
+      'search_subcategory_change',
+      {
+        properties: {
+          locale,
+          source:
+            'explore_results',
+          route: '/explore',
+          category:
+            activeCategory?.slug ||
+            'all',
+          subcategory:
+            subcategory ||
+            'all',
+          query: state.query,
+          side: searchSide,
+        },
+      },
+    );
+  };
+
+  /**
+   * Reference pagination.
+   */
+  const loadNextReferenceBatch = (
+    cursor: string,
+  ) => {
+    const cleanCursor =
+      cursor.trim();
+
     if (
       !referenceMode ||
       !cleanCursor ||
-      cleanCursor.length > 96 ||
+      cleanCursor.length >
+        96 ||
       !/^\d{1,19}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
         cleanCursor,
       )
@@ -267,34 +1162,186 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
       return;
     }
 
-    const params = new URLSearchParams(searchKey);
-    params.set('tab', 'references');
-    params.set('cursor', cleanCursor);
-    params.delete('side');
-    params.delete('category');
-    params.delete('subcategory');
-    params.delete('type');
-    router.push(appendSearchParams(`/${locale}/explore`, params), {
-      scroll: false,
-    });
-  };
+    const params =
+      new URLSearchParams(
+        searchKey,
+      );
 
-  const normalizedQueryLength = queryInput.trim().length;
-  const canSubmit = referenceMode
-    ? normalizedQueryLength === 0 || normalizedQueryLength >= 2
-    : normalizedQueryLength >= 2;
-  const advancedFilterCount = EXPLORE_ADVANCED_FILTER_KEYS.filter(key => {
-    const value = new URLSearchParams(searchKey).get(key);
-    return Boolean(value && value.trim());
-  }).length;
-  const clearAdvancedFilters = () => {
-    updateParams(
-      Object.fromEntries(
-        EXPLORE_ADVANCED_FILTER_KEYS.map(key => [key, null]),
+    params.set(
+      'tab',
+      'references',
+    );
+
+    params.set(
+      'cursor',
+      cleanCursor,
+    );
+
+    params.delete('side');
+    params.delete(
+      'category',
+    );
+    params.delete(
+      'subcategory',
+    );
+    params.delete('type');
+
+    router.push(
+      appendSearchParams(
+        `/${locale}/explore`,
+        params,
       ),
-      'replace',
+      {
+        scroll: false,
+      },
     );
   };
+
+  const normalizedQueryLength =
+    queryInput.trim().length;
+
+  const canSubmit =
+    referenceMode ||
+    peopleMode
+      ? normalizedQueryLength ===
+          0 ||
+        normalizedQueryLength >=
+          2
+      : normalizedQueryLength >= 2;
+
+  const advancedFilterCount =
+    EXPLORE_ADVANCED_FILTER_KEYS.filter(
+      key => {
+        const value =
+          new URLSearchParams(
+            searchKey,
+          ).get(key);
+
+        return Boolean(
+          value &&
+            value.trim(),
+        );
+      },
+    ).length;
+
+  const clearAdvancedFilters =
+    () => {
+      updateParams(
+        Object.fromEntries(
+          EXPLORE_ADVANCED_FILTER_KEYS.map(
+            key => [
+              key,
+              null,
+            ],
+          ),
+        ),
+        'replace',
+      );
+    };
+
+  /**
+   * Effective result tab.
+   */
+  const effectiveResultTab:
+    GlobalSearchTab =
+    referenceMode
+      ? 'references'
+      : peopleMode
+        ? 'users'
+        : searchSide ===
+            'demand'
+          ? 'needs'
+          : SUPPLY_TABS.has(
+                state.tab,
+              )
+            ? state.tab
+            : 'all';
+
+  /**
+   * Active top-level mode.
+   */
+  const activeMode:
+    ExploreSearchMode =
+    referenceMode
+      ? 'references'
+      : peopleMode
+        ? 'people'
+        : searchSide;
+
+  /**
+   * Main discovery modes.
+   */
+  const modeOptions: Array<{
+    value: ExploreSearchMode;
+    label: string;
+  }> = [
+    {
+      value: 'supply',
+      label: isId
+        ? 'Menawarkan'
+        : 'Offering',
+    },
+    {
+      value: 'demand',
+      label: isId
+        ? 'Membutuhkan'
+        : 'Looking for',
+    },
+    {
+      value: 'people',
+      label: isId
+        ? 'Orang'
+        : 'People',
+    },
+    {
+      value: 'references',
+      label: isId
+        ? 'Peta usaha'
+        : 'Business map',
+    },
+  ];
+
+  /**
+   * Hero title follows actual mode.
+   */
+  const heroTitle =
+    referenceMode
+      ? isId
+        ? 'Cari usaha di sekitar'
+        : 'Find nearby businesses'
+      : peopleMode
+        ? isId
+          ? 'Cari orang & keahlian'
+          : 'Find people & skills'
+        : searchSide ===
+            'demand'
+          ? isId
+            ? 'Cari yang kamu butuhkan'
+            : 'Find what you need'
+          : isId
+            ? 'Lihat penawaran usaha'
+            : 'Explore business offers';
+
+  /**
+   * Search placeholder follows actual mode.
+   */
+  const searchPlaceholder =
+    referenceMode
+      ? isId
+        ? 'Nama usaha atau lokasi...'
+        : 'Business name or location...'
+      : peopleMode
+        ? isId
+          ? 'Nama, keahlian, atau kota...'
+          : 'Name, skill, or city...'
+        : searchSide ===
+            'demand'
+          ? isId
+            ? 'Cari produk, jasa, supplier, atau kebutuhan...'
+            : 'Search products, services, suppliers, or needs...'
+          : isId
+            ? 'Cari produk, jasa, supplier, atau mesin...'
+            : 'Search products, services, suppliers, or equipment...';
 
   return (
     <div className="min-h-[100svh] overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
@@ -303,301 +1350,588 @@ export function ExploreAllSearchClient({ locale }: { locale: LajukanLocale }) {
         <div className="h-[calc(52px+env(safe-area-inset-top))]" />
       </div>
 
-      <main className="mx-auto w-full min-w-0 max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-        <nav
-          aria-label={isId ? 'Breadcrumb' : 'Breadcrumb'}
-          className="flex items-center gap-1.5 text-xs text-[color:var(--app-text-soft)]"
+      <main className="mx-auto w-full min-w-0 max-w-[1080px] px-3 py-3 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+        <ExploreSurface
+          elevated
+          className="p-3 sm:p-4"
         >
-          <Link
-            href="/explore"
-            className="cursor-pointer hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
-          >
-            {isId ? 'Jelajahi' : 'Explore'}
-          </Link>
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span
-            aria-current="page"
-            className="truncate font-semibold text-[color:var(--app-text)]"
-          >
-            {referenceMode
-              ? isId
-                ? 'Referensi tempat'
-                : 'Place references'
-              : searchSide === 'demand'
-                ? isId
-                  ? 'Permintaan pembeli'
-                  : 'Buyer requests'
-                : isId
-                  ? 'Hasil pencarian'
-                  : 'Search results'}
-          </span>
-        </nav>
+          <h1 className="text-[clamp(1.25rem,4vw,1.8rem)] font-black leading-[1.05] tracking-[-0.035em] text-zinc-950 dark:text-white">
+            {heroTitle}
+          </h1>
 
-        <section className="mt-4 grid min-w-0 gap-5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.5)] sm:p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:gap-10">
-          <div className="min-w-0">
-              <h1 className="text-2xl font-bold leading-tight text-[color:var(--app-text)] sm:text-3xl">
-                {referenceMode
-                  ? isId
-                    ? 'Referensi tempat usaha'
-                    : 'Business place references'
-                  : searchSide === 'demand'
-                    ? isId
-                      ? 'Permintaan dari calon pembeli'
-                      : 'Requests from potential buyers'
-                    : isId
-                      ? 'Hasil pencarian'
-                      : 'Search results'}
-              </h1>
-              <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-                {referenceMode
-                  ? isId
-                    ? 'Data lokasi untuk acuan. Ini bukan daftar toko atau penawaran aktif.'
-                    : 'Location data for reference. These are not active stores or offers.'
-                  : searchSide === 'demand'
-                  ? isId
-                    ? 'Cari orang yang sedang membutuhkan produk atau jasa seperti milikmu.'
-                    : 'Find people looking for products or services like yours.'
-                  : isId
-                    ? 'Cari produk, jasa, supplier, dan usaha dari semua kategori.'
-                    : 'Find products, services, suppliers, and businesses across all categories.'}
-              </p>
-          </div>
+          <form
+            action={`/${locale}/explore`}
+            method="get"
+            role="search"
+            aria-label={
+              isId
+                ? 'Cari di Lajukan'
+                : 'Search Lajukan'
+            }
+            onSubmit={event => {
+              event.preventDefault();
 
-          <div className="min-w-0">
+              const submitted =
+                new FormData(
+                  event.currentTarget,
+                ).get('q');
+
+              submitSearch(
+                typeof submitted ===
+                  'string'
+                  ? submitted
+                  : queryInput,
+              );
+            }}
+            className="mt-2.5 flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-[13px] border border-zinc-200 bg-white p-1 pl-2.5 transition focus-within:border-emerald-300 focus-within:ring-3 focus-within:ring-emerald-500/5 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-within:border-emerald-800"
+          >
+            <Search
+              className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+              aria-hidden="true"
+            />
+
+            <label
+              htmlFor="explore-results-search"
+              className="sr-only"
+            >
+              {isId
+                ? 'Cari di Lajukan'
+                : 'Search Lajukan'}
+            </label>
+
+            <input
+              type="search"
+              id="explore-results-search"
+              name="q"
+              value={queryInput}
+              onChange={event =>
+                setQueryInput(
+                  event.target.value,
+                )
+              }
+              placeholder={
+                searchPlaceholder
+              }
+              className="min-w-0 flex-1 bg-transparent text-[12px] font-semibold text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-600 sm:text-sm"
+              aria-describedby={
+                normalizedQueryLength ===
+                1
+                  ? 'explore-results-search-help'
+                  : undefined
+              }
+              aria-invalid={
+                normalizedQueryLength ===
+                1
+                  ? true
+                  : undefined
+              }
+              autoComplete="off"
+              enterKeyHint="search"
+            />
+
             {referenceMode ? (
-              <button
-                type="button"
-                onClick={() => selectMode('supply')}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
-              >
-                <Store className="h-4 w-4" />
-                {isId ? 'Kembali ke produk & jasa' : 'Back to products & services'}
-              </button>
+              <input
+                type="hidden"
+                name="tab"
+                value="references"
+              />
+            ) : peopleMode ? (
+              <input
+                type="hidden"
+                name="tab"
+                value="users"
+              />
             ) : (
               <>
-                <div
-                  className="grid grid-cols-[repeat(2,minmax(0,1fr))] rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1"
-                  aria-label={isId ? 'Pilih tujuan pencarian' : 'Choose a search goal'}
-                  role="group"
-                >
-                  {[
-                    {
-                      value: 'supply' as const,
-                      label: isId ? 'Produk & jasa' : 'Products & services',
-                      icon: Store,
-                    },
-                    {
-                      value: 'demand' as const,
-                      label: isId ? 'Permintaan pembeli' : 'Buyer requests',
-                      icon: ClipboardList,
-                    },
-                  ].map(option => {
-                    const Icon = option.icon;
-                    const active = searchMode === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => selectMode(option.value)}
-                        aria-pressed={active}
-                        className={cn(
-                          'inline-flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-center text-xs font-bold leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:text-sm',
-                          active
-                            ? 'cursor-default bg-[color:var(--app-accent)] text-white shadow-sm'
-                            : 'cursor-pointer text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-strong)] hover:text-[color:var(--app-text)]',
-                        )}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="min-w-0">{option.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => selectMode('references')}
-                  className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[color:var(--app-text-soft)] transition hover:bg-amber-50 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
-                >
-                  <MapPinned className="h-4 w-4" />
-                  {isId ? 'Cari referensi tempat usaha' : 'Find business place references'}
-                </button>
+                <input
+                  type="hidden"
+                  name="side"
+                  value={searchSide}
+                />
+
+                {searchSide ===
+                'demand' ? (
+                  <input
+                    type="hidden"
+                    name="tab"
+                    value="needs"
+                  />
+                ) : (
+                  <input
+                    type="hidden"
+                    name="tab"
+                    value="all"
+                  />
+                )}
               </>
             )}
 
-            <form
-              action={`/${locale}/explore`}
-              method="get"
-              onSubmit={event => {
-                event.preventDefault();
-                const submitted = new FormData(event.currentTarget).get('q');
-                submitSearch(typeof submitted === 'string' ? submitted : queryInput);
-              }}
-              className="mt-2.5"
-              role="search"
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className={cn(
+                'inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-[10px] bg-zinc-950 px-3 text-[10px] font-black text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 disabled:pointer-events-none dark:bg-white dark:text-zinc-950 dark:hover:bg-emerald-300 sm:px-3.5 sm:text-[11px]',
+                !canSubmit &&
+                  'opacity-40',
+              )}
             >
-              <label htmlFor="explore-results-search" className="sr-only">
-                {isId ? 'Cari di Lajukan' : 'Search Lajukan'}
-              </label>
-              <div className="flex min-h-[52px] min-w-0 items-center gap-2 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.45)] focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)]">
-                <Search className="h-5 w-5 shrink-0 text-[color:var(--app-text-soft)]" />
-                <input
-                  type="search"
-                  id="explore-results-search"
-                  name="q"
-                  value={queryInput}
-                  onChange={event => setQueryInput(event.target.value)}
-                  placeholder={
-                    referenceMode
-                      ? isId
-                        ? 'Contoh: warung makan Bandung'
-                        : 'Example: restaurants in Bandung'
-                      : searchSide === 'demand'
-                      ? isId
-                        ? 'Contoh: pembeli butuh kemasan'
-                        : 'Example: buyers need packaging'
-                      : isId
-                        ? 'Contoh: kemasan standing pouch'
-                        : 'Example: standing pouch packaging'
-                  }
-                  className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)]"
-                  aria-label={isId ? 'Cari di seluruh Lajukan' : 'Search all of Lajukan'}
-                />
-                {referenceMode ? (
-                  <input type="hidden" name="tab" value="references" />
-                ) : (
-                  <input type="hidden" name="side" value={searchSide} />
-                )}
-                {!referenceMode && searchSide === 'demand' ? (
-                  <input type="hidden" name="tab" value="needs" />
-                ) : null}
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className={cn(
-                    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white transition hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none',
-                    !canSubmit && 'cursor-not-allowed opacity-40',
-                  )}
-                >
-                  <span>
-                    {referenceMode && !queryInput.trim()
-                      ? isId
-                        ? 'Muat'
-                        : 'Load'
-                      : isId
-                        ? 'Cari'
-                        : 'Search'}
-                  </span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
+              {(referenceMode ||
+                peopleMode) &&
+              !queryInput.trim()
+                ? isId
+                  ? 'Lihat'
+                  : 'Browse'
+                : isId
+                  ? 'Cari'
+                  : 'Search'}
+
+              <ArrowRight
+                className="h-3.5 w-3.5"
+                aria-hidden="true"
+              />
+            </button>
+          </form>
+
+          {normalizedQueryLength ===
+          1 ? (
+            <p
+              id="explore-results-search-help"
+              role="status"
+              className="mt-1.5 px-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400"
+            >
+              {isId
+                ? 'Minimal 2 karakter.'
+                : 'Enter at least 2 characters.'}
+            </p>
+          ) : null}
+
+          <ExploreModeTabs
+            value={activeMode}
+            options={modeOptions}
+            onChange={selectMode}
+            ariaLabel={
+              isId
+                ? 'Jenis pencarian'
+                : 'Search type'
+            }
+            className="mt-2"
+          />
+        </ExploreSurface>
 
         {referenceMode ? (
-          <section className="my-5 rounded-lg border border-amber-200 bg-amber-50/70 p-4 sm:p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-white text-amber-800">
-                  <MapPinned className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="text-sm font-black text-amber-950">
-                    {isId
-                      ? 'Data lokasi untuk acuan, bukan toko aktif'
-                      : 'Location data for reference, not active stores'}
-                  </h2>
-                  <p className="mt-1 max-w-3xl text-xs leading-5 text-amber-950/80">
-                    {isId
-                      ? 'Gunakan untuk menemukan nama dan lokasi tempat usaha. Data ini tidak menunjukkan stok, harga, kontak, atau status verifikasi.'
-                      : 'Use this to find business names and locations. It does not show stock, prices, contact details, or verification status.'}
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/umkm?scope=references"
-                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 text-xs font-black text-amber-950 transition hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
-              >
-                <MapPinned className="h-4 w-4" aria-hidden="true" />
-                {isId ? 'Lihat di peta UMKM' : 'View on the MSME map'}
-              </Link>
+          <div className="mt-2 rounded-[14px] border border-amber-200/80 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/20 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black text-amber-950 dark:text-amber-100 sm:text-xs">
+                {isId
+                  ? 'Data lokasi publik'
+                  : 'Public location data'}
+              </p>
+
+              <p className="mt-0.5 text-[10px] font-medium leading-4 text-amber-900/70 dark:text-amber-200/70 sm:text-[11px]">
+                {isId
+                  ? 'Untuk mencari nama dan lokasi usaha. Stok dan harga belum tentu tersedia.'
+                  : 'For business names and locations. Stock and pricing may not be available.'}
+              </p>
+
+              <p className="mt-1 text-[9px] font-medium text-amber-800/65 dark:text-amber-300/60">
+                {isId
+                  ? 'Sumber:'
+                  : 'Source:'}{' '}
+                <a
+                  href="https://www.openstreetmap.org/copyright"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 font-bold hover:underline"
+                >
+                  OpenStreetMap
+                  <ExternalLink
+                    className="h-2.5 w-2.5"
+                    aria-hidden="true"
+                  />
+                </a>
+                {' · '}
+                <a
+                  href="https://opendatacommons.org/licenses/odbl/1-0/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 font-bold hover:underline"
+                >
+                  ODbL
+                  <ExternalLink
+                    className="h-2.5 w-2.5"
+                    aria-hidden="true"
+                  />
+                </a>
+              </p>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-amber-200 pt-4 text-[11px] font-bold">
-              <a
-                href="https://www.openstreetmap.org/copyright"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 text-amber-950 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
-              >
-                {isId ? 'Sumber: OpenStreetMap' : 'Source: OpenStreetMap'}
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
-              <a
-                href="https://opendatacommons.org/licenses/odbl/1-0/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 text-amber-950 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
-              >
-                {isId ? 'Lisensi data: ODbL 1.0' : 'Data license: ODbL 1.0'}
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
-            </div>
-          </section>
+
+            <Link
+              href="/umkm?scope=references"
+              className="mt-2 inline-flex min-h-8 shrink-0 items-center rounded-[9px] bg-zinc-950 px-3 text-[10px] font-black text-white transition hover:bg-amber-800 dark:bg-white dark:text-zinc-950 sm:mt-0 sm:text-[11px]"
+            >
+              {isId
+                ? 'Buka peta'
+                : 'Open map'}
+            </Link>
+          </div>
+        ) : peopleMode ? (
+          <div className="mt-2 rounded-[14px] border border-teal-200/70 bg-teal-50/60 px-3 py-2 text-[10px] font-medium leading-4 text-teal-950 dark:border-teal-900/60 dark:bg-teal-950/25 dark:text-teal-100/80 sm:text-[11px]">
+            <span className="font-black">
+              {isId
+                ? 'Profil publik · '
+                : 'Public profiles · '}
+            </span>
+
+            {isId
+              ? 'Kontak pribadi tetap disembunyikan.'
+              : 'Private contact details stay hidden.'}
+          </div>
         ) : (
-          <section className="my-4 min-w-0" aria-labelledby="explore-result-category-title">
-            <div className="flex min-h-9 items-center justify-between gap-3">
+          <ExploreSurface
+            className="mt-2 p-2.5 sm:p-3"
+            aria-labelledby="explore-result-category-title"
+          >
+            <div className="flex min-w-0 items-center justify-between gap-2">
               <h2
                 id="explore-result-category-title"
-                className="text-sm font-bold text-[color:var(--app-text)]"
+                className="min-w-0 text-[12px] font-black text-zinc-900 dark:text-zinc-100 sm:text-sm"
               >
-                {isId ? 'Pilih kategori' : 'Choose a category'}
+                {isId
+                  ? 'Kategori'
+                  : 'Category'}
+
+                {activeCategory ? (
+                  <span className="ml-1.5 font-semibold text-zinc-400 dark:text-zinc-500">
+                    ·{' '}
+                    {isId
+                      ? activeCategory.shortLabelId
+                      : activeCategory.shortLabelEn}
+                  </span>
+                ) : null}
               </h2>
-              {advancedFilterCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={clearAdvancedFilters}
-                  className="min-h-11 rounded-lg px-2 text-xs font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
-                >
-                  {isId
-                    ? `Hapus ${advancedFilterCount} filter tambahan`
-                    : `Clear ${advancedFilterCount} extra filters`}
-                </button>
-              ) : null}
+
+              <div className="flex shrink-0 items-center gap-1">
+                <EmblaDesktopControls
+                  api={
+                    categoryRailApi
+                  }
+                  isId={isId}
+                  compact
+                />
+
+                {activeCategory ? (
+                  <Link
+                    href={buildExploreCategoryHref(
+                      activeCategory,
+                    )}
+                    className="hidden min-h-7 items-center rounded-[8px] px-2 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40 sm:inline-flex"
+                  >
+                    {isId
+                      ? 'Buka'
+                      : 'Open'}
+                  </Link>
+                ) : null}
+
+                {advancedFilterCount >
+                0 ? (
+                  <button
+                    type="button"
+                    onClick={
+                      clearAdvancedFilters
+                    }
+                    className="inline-flex min-h-7 items-center rounded-[8px] px-2 text-[9px] font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40 sm:text-[10px]"
+                  >
+                    {isId
+                      ? `Hapus filter (${advancedFilterCount})`
+                      : `Clear (${advancedFilterCount})`}
+                  </button>
+                ) : null}
+              </div>
             </div>
-            <div className="mt-2 flex min-w-0 gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span
-              aria-current="page"
-              className="inline-flex min-h-11 shrink-0 cursor-default items-center rounded-full border border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] px-4 text-xs font-bold text-[color:var(--app-accent)]"
+
+            <div
+              ref={
+                categoryRailRef
+              }
+              className="mt-2 w-full min-w-0 cursor-grab overflow-hidden pb-1 active:cursor-grabbing"
+              aria-label={
+                isId
+                  ? 'Kategori pencarian'
+                  : 'Search categories'
+              }
             >
-              {isId ? 'Semua' : 'All'}
-            </span>
-            {MARKETPLACE_EXPLORE_CATEGORIES.map(category => (
-              <Link
-                key={category.id}
-                href={buildCategorySearchHref({
-                  category,
-                  query: state.query,
-                  side: searchSide,
-                })}
-                className="inline-flex min-h-11 shrink-0 cursor-pointer items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
-              >
-                {isId ? category.shortLabelId : category.shortLabelEn}
-              </Link>
-            ))}
+              <div className="flex touch-pan-y gap-1.5 [backface-visibility:hidden] [will-change:transform]">
+                <div className="min-w-0 shrink-0 flex-[0_0_68px] min-[420px]:flex-[0_0_72px] sm:flex-[0_0_78px]">
+                  <button
+                    type="button"
+                    aria-label={
+                      isId
+                        ? 'Semua kategori'
+                        : 'All categories'
+                    }
+                    aria-current={
+                      !activeCategory
+                        ? 'page'
+                        : undefined
+                    }
+                    aria-pressed={
+                      !activeCategory
+                        ? true
+                        : undefined
+                    }
+                    onClick={() =>
+                      selectCategory(
+                        null,
+                      )
+                    }
+                    className={cn(
+                      'flex h-full min-h-[74px] w-full flex-col items-center justify-center rounded-[13px] border p-1.5 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 sm:min-h-[78px]',
+                      !activeCategory
+                        ? 'border-zinc-950 bg-zinc-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950'
+                        : 'border-zinc-200/70 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700',
+                    )}
+                  >
+                    <ExploreArtwork
+                      src={
+                        ALL_CATEGORY_IMAGE
+                      }
+                      alt=""
+                      visualId="all"
+                      size="xs"
+                      active={
+                        !activeCategory
+                      }
+                      muted={Boolean(
+                        activeCategory,
+                      )}
+                    />
+
+                    <span
+                      className={cn(
+                        'mt-1 line-clamp-2 text-[9px] font-black leading-[11px] sm:text-[10px] sm:leading-3',
+                        !activeCategory
+                          ? 'text-white dark:text-zinc-950'
+                          : 'text-zinc-700 dark:text-zinc-200',
+                      )}
+                    >
+                      {isId
+                        ? 'Semua'
+                        : 'All'}
+                    </span>
+                  </button>
+                </div>
+
+                {MARKETPLACE_EXPLORE_CATEGORIES.map(
+                  category => {
+                    const selected =
+                      activeCategory?.id ===
+                      category.id;
+
+                    const label =
+                      isId
+                        ? category.shortLabelId
+                        : category.shortLabelEn;
+
+                    return (
+                      <div
+                        key={
+                          category.id
+                        }
+                        className="min-w-0 shrink-0 flex-[0_0_68px] min-[420px]:flex-[0_0_72px] sm:flex-[0_0_78px]"
+                      >
+                        <button
+                          type="button"
+                          aria-label={label}
+                          aria-current={
+                            selected
+                              ? 'page'
+                              : undefined
+                          }
+                          aria-pressed={
+                            selected
+                              ? true
+                              : undefined
+                          }
+                          onClick={() =>
+                            selectCategory(
+                              category,
+                            )
+                          }
+                          className={cn(
+                            'group flex h-full min-h-[74px] w-full flex-col items-center justify-center rounded-[13px] border p-1.5 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/20 sm:min-h-[78px]',
+                            selected
+                              ? 'border-zinc-950 bg-zinc-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950'
+                              : 'border-zinc-200/70 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700',
+                          )}
+                        >
+                          <ExploreArtwork
+                            src={
+                              category.image
+                            }
+                            alt=""
+                            visualId={
+                              category.id
+                            }
+                            size="xs"
+                            active={
+                              selected
+                            }
+                            muted={
+                              !selected
+                            }
+                          />
+
+                          <span
+                            className={cn(
+                              'mt-1 line-clamp-2 text-[9px] font-black leading-[11px] sm:text-[10px] sm:leading-3',
+                              selected
+                                ? 'text-white dark:text-zinc-950'
+                                : 'text-zinc-700 dark:text-zinc-200',
+                            )}
+                          >
+                            {label}
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  },
+                )}
+              </div>
             </div>
-          </section>
+
+            {activeCategory?.subcategories
+              .length ? (
+              <div className="mt-2 flex min-w-0 items-center gap-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+                <span className="shrink-0 text-[10px] font-black text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+                  {isId
+                    ? 'Jenis'
+                    : 'Type'}
+                </span>
+
+                <div
+                  ref={
+                    subcategoryRailRef
+                  }
+                  className="min-w-0 flex-1 cursor-grab overflow-hidden active:cursor-grabbing"
+                  aria-label={
+                    isId
+                      ? 'Subkategori pencarian'
+                      : 'Search subcategories'
+                  }
+                >
+                  <div className="flex touch-pan-y gap-1.5">
+                    <div className="shrink-0">
+                      <button
+                        type="button"
+                        aria-pressed={
+                          !activeSubcategory
+                            ? true
+                            : undefined
+                        }
+                        onClick={() =>
+                          selectSubcategory(
+                            null,
+                          )
+                        }
+                        className={cn(
+                          'inline-flex h-8 items-center rounded-full border px-3 text-[9px] font-semibold transition sm:text-[10px]',
+                          !activeSubcategory
+                            ? 'border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950'
+                            : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-white',
+                        )}
+                      >
+                        {isId
+                          ? 'Semua'
+                          : 'All'}
+                      </button>
+                    </div>
+
+                    {activeCategory.subcategories.map(
+                      subcategory => {
+                        const selected =
+                          activeSubcategory?.slug ===
+                          subcategory.slug;
+
+                        return (
+                          <div
+                            key={
+                              subcategory.slug
+                            }
+                            className="shrink-0"
+                          >
+                            <button
+                              type="button"
+                              aria-pressed={
+                                selected
+                                  ? true
+                                  : undefined
+                              }
+                              onClick={() =>
+                                selectSubcategory(
+                                  subcategory.slug,
+                                )
+                              }
+                              className={cn(
+                                'inline-flex h-8 max-w-[190px] items-center rounded-full border px-3 text-[9px] font-semibold transition sm:text-[10px]',
+                                selected
+                                  ? 'border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950'
+                                  : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-white',
+                              )}
+                            >
+                              <span className="truncate">
+                                {isId
+                                  ? subcategory.labelId
+                                  : subcategory.labelEn}
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                </div>
+
+                {activeCategory
+                  .subcategories
+                  .length > 4 ? (
+                  <div className="hidden shrink-0 sm:block">
+                    <EmblaDesktopControls
+                      api={
+                        subcategoryRailApi
+                      }
+                      isId={isId}
+                      compact
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </ExploreSurface>
         )}
 
-        <ExploreSearchResults
-          payload={payload}
-          loading={loading}
-          error={error}
-          locale={locale}
-          activeTab={state.tab}
-          onSelectTab={selectTab}
-          onNextCursor={loadNextReferenceBatch}
-          onRetry={() => setRetryKey(value => value + 1)}
-        />
+        <section className="mt-2 min-w-0 sm:mt-3">
+          <ExploreSearchResults
+            payload={payload}
+            loading={loading}
+            error={error}
+            locale={locale}
+            searchSide={searchSide}
+            activeTab={
+              effectiveResultTab
+            }
+            onSelectTab={
+              selectTab
+            }
+            onNextCursor={
+              loadNextReferenceBatch
+            }
+            onRetry={() =>
+              setRetryKey(
+                value => value + 1,
+              )
+            }
+          />
+        </section>
       </main>
     </div>
   );

@@ -1,8 +1,42 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeListingNeedsPrimaryImage,
   toUpsertListingPayload,
   validateListingPayload,
 } from './listingFlowRules';
+
+describe('activeListingNeedsPrimaryImage', () => {
+  it.each([
+    ['product', 'supply', true],
+    ['property', 'supply', true],
+    ['service', 'supply', false],
+    ['product', 'demand', false],
+    ['property', 'demand', false],
+    ['service', 'demand', false],
+  ])('%s / %s => %s', (listingType, listingSide, expected) => {
+    expect(activeListingNeedsPrimaryImage(listingType, listingSide)).toBe(
+      expected,
+    );
+  });
+
+  it.each([
+    ['materials-suppliers', 'product', true],
+    ['machines-tools', 'product', true],
+    ['business-places', 'property', true],
+    ['services', 'service', false],
+    ['business-opportunities', 'service', false],
+  ])(
+    'keeps the %s offer image contract aligned with its %s content type',
+    (_categorySlug, listingType, expected) => {
+      expect(activeListingNeedsPrimaryImage(listingType, 'supply')).toBe(
+        expected,
+      );
+      expect(activeListingNeedsPrimaryImage(listingType, 'demand')).toBe(
+        false,
+      );
+    },
+  );
+});
 
 describe('validateListingPayload', () => {
   it('canonicalizes matching listing type aliases without forwarding the legacy type key', () => {

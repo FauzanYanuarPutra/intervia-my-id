@@ -72,8 +72,17 @@ ENV FAST_DOCKER_BUILD=true
 
 FROM www_deps AS www_builder
 
+# next-env.d.ts wajib berupa file, bukan directory.
+# Hapus directory rusak jika pernah ikut tercopy dari host.
+RUN if [ -d "/app/www/next-env.d.ts" ]; then \
+      echo "WARNING: next-env.d.ts was a directory; removing it"; \
+      rm -rf "/app/www/next-env.d.ts"; \
+    fi
+
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
 RUN npm prune --omit=dev --legacy-peer-deps
+
 RUN rm -rf .next/cache /root/.npm /tmp/*
 
 FROM www_deps AS www_dev

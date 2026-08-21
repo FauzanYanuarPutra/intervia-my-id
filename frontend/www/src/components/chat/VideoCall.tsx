@@ -3,7 +3,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
-import { getIceServers } from '@/lib/webrtc';
+import { getIceConfiguration } from '@/lib/webrtc';
+import {
+  createCallLifecycle,
+  type CallLifecycle,
+} from '@/lib/webrtcCallLifecycle';
+import { useAuth } from '@/context/AuthContext';
 import { soundManager } from '@/lib/soundManager';
 import {
   describeGetUserMediaError,
@@ -97,11 +102,20 @@ export function VideoCall({
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const remotePlayAttemptRef = useRef(0);
-  const iceServers = useMemo(() => getIceServers(), []);
+  const lifecycleRef = useRef<CallLifecycle | null>(null);
+  const { authFetch } = useAuth();
+  const [iceConfiguration, setIceConfiguration] =
+    useState<RTCConfiguration | null>(null);
   const pathname = usePathname();
   const isId = pathname.startsWith('/id');
   const { notify } = useToast();
   const lastConnectionSoundRef = useRef(connectionStatus);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const requestClose = useCallback(() => {
+    onCloseRef.current();
+  }, []);
 
   useEffect(() => {
     soundManager.play('callStart');
@@ -262,6 +276,18 @@ export function VideoCall({
     });
   };
 
+  const releaseCallResources = useCallback(
+    (resetVideoState = true) => {
+      lifecycleRef.current?.dispose();
+      lifecycleRef.current = null;
+      localStreamRef.current = null;
+      peerConnectionRef.current = null;
+      pendingCandidatesRef.current = [];
+      clearVideoElements(resetVideoState);
+    },
+    [clearVideoElements],
+  );
+
   const closeCallWithError = useCallback(
     (message: string) => {
       try {
@@ -269,15 +295,23 @@ export function VideoCall({
       } catch {
         // Ignore signaling failures.
       }
+      releaseCallResources();
       notify({
         title: isId ? 'Panggilan gagal' : 'Call failed',
         description: message,
         variant: 'error',
         durationMs: 5000,
       });
-      onClose();
+      requestClose();
     },
-    [callId, channel, isId, notify, onClose],
+    [
+      callId,
+      channel,
+      isId,
+      notify,
+      releaseCallResources,
+      requestClose,
+    ],
   );
 
   const handlePermissionDenied = useCallback(() => {
@@ -286,8 +320,9 @@ export function VideoCall({
     } catch {
       // ignore
     }
-    onClose();
-  }, [callId, channel, onClose]);
+    releaseCallResources();
+    requestClose();
+  }, [callId, channel, releaseCallResources, requestClose]);
 
   const endCall = useCallback(() => {
     if (channel) {
@@ -300,18 +335,36 @@ export function VideoCall({
     soundManager.play('callEnd');
     soundManager.stopLoop('outgoingRing');
     soundManager.stopLoop('incomingRing');
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-    }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-    }
-    clearVideoElements();
-    onClose();
-  }, [callId, channel, clearVideoElements, onClose]);
+    releaseCallResources();
+    requestClose();
+  }, [callId, channel, releaseCallResources, requestClose]);
 
   useEffect(() => {
-    if (!channel || !permissionGranted) return;
+    let cancelled = false;
+    void getIceConfiguration(authFetch)
+      .then(configuration => {
+        if (!cancelled) setIceConfiguration(configuration);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        closeCallWithError(
+          isId
+            ? 'Panggilan aman sedang tidak tersedia. Coba lagi nanti.'
+            : 'Secure calling is temporarily unavailable. Please try again later.',
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch, closeCallWithError, isId]);
+
+  useEffect(() => {
+    if (!channel || !permissionGranted || !iceConfiguration) return;
+
+    const lifecycle = createCallLifecycle();
+    lifecycleRef.current = lifecycle;
+    let ownedStream: MediaStream | null = null;
+    let ownedPeer: RTCPeerConnection | null = null;
 
     // Initialize WebRTC dengan signaling via Phoenix Channel
     const initCall = async () => {
@@ -340,9 +393,14 @@ export function VideoCall({
 
         for (const constraints of attempts) {
           try {
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const acquiredStream =
+              await navigator.mediaDevices.getUserMedia(constraints);
+            if (!lifecycle.registerStream(acquiredStream)) return;
+            stream = acquiredStream;
+            ownedStream = acquiredStream;
             break;
           } catch (mediaError) {
+            if (!lifecycle.isActive()) return;
             lastMediaError = mediaError;
             const errName = getUserMediaErrorName(mediaError);
             if (
@@ -355,6 +413,7 @@ export function VideoCall({
           }
         }
 
+        if (!lifecycle.isActive()) return;
         if (!stream) {
           throw (
             lastMediaError ?? new Error('Unable to access camera/microphone.')
@@ -378,9 +437,9 @@ export function VideoCall({
         syncLocalVideoMeta();
 
         // Create peer connection
-        const pc = new RTCPeerConnection({
-          iceServers,
-        });
+        const pc = new RTCPeerConnection(iceConfiguration);
+        if (!lifecycle.registerPeer(pc)) return;
+        ownedPeer = pc;
 
         // Add local stream tracks
         stream.getTracks().forEach(track => {
@@ -389,6 +448,7 @@ export function VideoCall({
 
         // Handle remote stream
         pc.ontrack = event => {
+          if (!lifecycle.isActive()) return;
           const [stream] = event.streams;
           if (!stream) return;
 
@@ -411,6 +471,7 @@ export function VideoCall({
         };
 
         pc.oniceconnectionstatechange = () => {
+          if (!lifecycle.isActive()) return;
           const state = pc.iceConnectionState;
           console.log('[VideoCall] ICE state:', state);
           if (state === 'connected' || state === 'completed') {
@@ -425,6 +486,7 @@ export function VideoCall({
         };
 
         pc.onconnectionstatechange = () => {
+          if (!lifecycle.isActive()) return;
           const state = pc.connectionState;
           console.log('[VideoCall] Peer state:', state);
           if (state === 'failed') {
@@ -434,7 +496,7 @@ export function VideoCall({
 
         // Handle ICE candidates
         pc.onicecandidate = event => {
-          if (event.candidate && channel) {
+          if (lifecycle.isActive() && event.candidate) {
             channel.push('call_ice_candidate', {
               call_id: callId,
               candidate: JSON.stringify(event.candidate),
@@ -452,33 +514,37 @@ export function VideoCall({
             from_user_id: string;
             call_id?: string;
           }) => {
+            if (!lifecycle.isActive()) return;
             if (payload.call_id && payload.call_id !== callId) return;
-            if (
-              payload.from_user_id !== userId &&
-              peerConnectionRef.current &&
-              !isCaller
-            ) {
-              const offer = JSON.parse(payload.offer);
-              peerConnectionRef.current
-                .setRemoteDescription(new RTCSessionDescription(offer))
-                .then(() => {
-                  flushPendingCandidates();
-                  return peerConnectionRef.current!.createAnswer();
-                })
-                .then(answer => {
-                  return peerConnectionRef.current!.setLocalDescription(answer);
-                })
-                .then(() => {
-                  if (channel && peerConnectionRef.current?.localDescription) {
-                    channel.push('call_answer', {
-                      call_id: callId,
-                      answer: JSON.stringify(
-                        peerConnectionRef.current.localDescription,
-                      ),
-                    });
-                  }
-                })
-                .catch(console.error);
+            if (payload.from_user_id !== userId && !isCaller) {
+              try {
+                const offer = JSON.parse(payload.offer);
+                pc.setRemoteDescription(new RTCSessionDescription(offer))
+                  .then(() => {
+                    if (!lifecycle.isActive()) return undefined;
+                    flushPendingCandidates();
+                    return pc.createAnswer();
+                  })
+                  .then(answer => {
+                    if (!answer || !lifecycle.isActive()) return undefined;
+                    return pc.setLocalDescription(answer);
+                  })
+                  .then(() => {
+                    if (lifecycle.isActive() && pc.localDescription) {
+                      channel.push('call_answer', {
+                        call_id: callId,
+                        answer: JSON.stringify(pc.localDescription),
+                      });
+                    }
+                  })
+                  .catch(error => {
+                    if (lifecycle.isActive()) {
+                      console.error('[VideoCall] Error handling offer:', error);
+                    }
+                  });
+              } catch (error) {
+                console.error('[VideoCall] Error parsing offer:', error);
+              }
             }
           },
         );
@@ -490,18 +556,15 @@ export function VideoCall({
             from_user_id: string;
             call_id?: string;
           }) => {
+            if (!lifecycle.isActive()) return;
             if (payload.call_id && payload.call_id !== callId) return; // Ignore answers for other calls
-            if (
-              payload.from_user_id !== userId &&
-              peerConnectionRef.current &&
-              isCaller
-            ) {
+            if (payload.from_user_id !== userId && isCaller) {
               try {
                 const answer = JSON.parse(payload.answer);
-                peerConnectionRef.current
+                pc
                   .setRemoteDescription(new RTCSessionDescription(answer))
                   .then(() => {
-                    flushPendingCandidates();
+                    if (lifecycle.isActive()) flushPendingCandidates();
                   })
                   .catch(err => {
                     console.error(
@@ -523,15 +586,16 @@ export function VideoCall({
             from_user_id: string;
             call_id?: string;
           }) => {
+            if (!lifecycle.isActive()) return;
             if (payload.call_id && payload.call_id !== callId) return; // Ignore ICE candidates for other calls
-            if (payload.from_user_id !== userId && peerConnectionRef.current) {
+            if (payload.from_user_id !== userId) {
               try {
                 const candidate = JSON.parse(payload.candidate);
-                if (!peerConnectionRef.current.remoteDescription) {
+                if (!pc.remoteDescription) {
                   pendingCandidatesRef.current.push(candidate);
                   return;
                 }
-                peerConnectionRef.current
+                pc
                   .addIceCandidate(new RTCIceCandidate(candidate))
                   .catch(err => {
                     console.error(
@@ -549,40 +613,53 @@ export function VideoCall({
         const endedRef = channel.on(
           'call_ended',
           (payload: { call_id: string }) => {
-            if (payload.call_id === callId) {
+            if (lifecycle.isActive() && payload.call_id === callId) {
               endCall();
             }
           },
         );
 
+        lifecycle.addCleanup(() => {
+          pc.ontrack = null;
+          pc.oniceconnectionstatechange = null;
+          pc.onconnectionstatechange = null;
+          pc.onicecandidate = null;
+          channel.off('call_offer_received', offerRef);
+          channel.off('call_answer_received', answerRef);
+          channel.off('call_ice_candidate_received', iceRef);
+          channel.off('call_ended', endedRef);
+        });
+
         // Jika caller, create offer setelah delay
         if (isCaller) {
-          setTimeout(async () => {
+          const offerTimer = window.setTimeout(async () => {
             try {
-              if (!peerConnectionRef.current || !channel) return;
-              const offer = await peerConnectionRef.current.createOffer({
+              if (!lifecycle.isActive()) return;
+              const offer = await pc.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true,
               });
-              await peerConnectionRef.current.setLocalDescription(offer);
+              if (!lifecycle.isActive()) return;
+              await pc.setLocalDescription(offer);
+              if (!lifecycle.isActive()) return;
               channel.push('call_offer', {
                 call_id: callId,
                 offer: JSON.stringify(offer),
               });
             } catch (error) {
+              if (!lifecycle.isActive()) return;
               console.error('[VideoCall] Failed to create offer:', error);
-              onClose(); // Close call UI on error
+              closeCallWithError(
+                isId
+                  ? 'Gagal memulai panggilan. Coba lagi.'
+                  : 'Could not start the call. Please try again.',
+              );
             }
           }, 1500); // Increased delay for better reliability
+          lifecycle.setOfferTimer(offerTimer);
         }
-
-        return () => {
-          channel.off('call_offer_received', offerRef);
-          channel.off('call_answer_received', answerRef);
-          channel.off('call_ice_candidate_received', iceRef);
-          channel.off('call_ended', endedRef);
-        };
       } catch (error) {
+        if (!lifecycle.isActive()) return;
         console.error('Failed to initialize call:', error);
         closeCallWithError(
           describeGetUserMediaError(error, { audio: true, video: true }),
@@ -590,18 +667,21 @@ export function VideoCall({
       }
     };
 
-    const cleanupPromise = initCall();
+    void initCall();
 
     return () => {
-      cleanupPromise.then(cleanupFn => cleanupFn?.()).catch(() => {});
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
+      lifecycle.dispose();
+      if (localStreamRef.current === ownedStream) {
+        localStreamRef.current = null;
       }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
+      if (peerConnectionRef.current === ownedPeer) {
+        peerConnectionRef.current = null;
+      }
+      if (lifecycleRef.current === lifecycle) {
+        lifecycleRef.current = null;
       }
       pendingCandidatesRef.current = [];
-      clearVideoElements(false);
+      if (lifecycleRef.current === null) clearVideoElements(false);
     };
   }, [
     roomId,
@@ -609,12 +689,12 @@ export function VideoCall({
     callId,
     channel,
     isCaller,
-    onClose,
     closeCallWithError,
     permissionGranted,
     clearVideoElements,
     endCall,
-    iceServers,
+    iceConfiguration,
+    isId,
     syncLocalVideoMeta,
     syncRemoteVideoMeta,
     tryPlayRemoteVideo,
@@ -703,7 +783,16 @@ export function VideoCall({
   } ${isRemoteVideoEnabled ? 'opacity-100' : 'opacity-0'}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#020617] text-[color:var(--app-text-inverse)]">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="video-call-title"
+      aria-describedby="video-call-status"
+      className="fixed inset-0 z-50 flex flex-col bg-[#020617] text-[color:var(--app-text-inverse)]"
+    >
+      <h2 id="video-call-title" className="sr-only">
+        {isId ? 'Panggilan video' : 'Video call'}
+      </h2>
       <MediaPermissionGate
         enabled={!permissionGranted}
         isId={isId}
@@ -737,7 +826,12 @@ export function VideoCall({
           )}
 
           <div className="absolute left-3 top-3 z-10 sm:left-5 sm:top-5">
-            <div className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-white/88  sm:text-sm">
+            <div
+              id="video-call-status"
+              role="status"
+              aria-live="polite"
+              className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-white/88  sm:text-sm"
+            >
               {connectionLabel}
             </div>
           </div>

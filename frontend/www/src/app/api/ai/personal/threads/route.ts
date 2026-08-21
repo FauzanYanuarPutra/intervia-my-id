@@ -4,6 +4,7 @@ import {
   createPersonalAiThread,
   getPersonalAiAgentForUse,
   listPersonalAiThreads,
+  PersonalAiQuotaExceededError,
 } from '@/lib/personal-ai/store';
 
 export const runtime = 'nodejs';
@@ -32,7 +33,26 @@ export async function POST(req: NextRequest) {
   if (!agent) {
     return NextResponse.json({ error: 'AI not found.' }, { status: 404 });
   }
-  const title = typeof body.title === 'string' ? body.title.trim() : 'Chat baru';
-  const thread = await createPersonalAiThread(auth.ctx.userId, agent.id, title);
-  return NextResponse.json({ data: { thread } }, { status: 201 });
+  const title =
+    typeof body.title === 'string' ? body.title.trim() : 'Chat baru';
+  try {
+    const thread = await createPersonalAiThread(
+      auth.ctx.userId,
+      agent.id,
+      title,
+    );
+    return NextResponse.json({ data: { thread } }, { status: 201 });
+  } catch (error) {
+    if (error instanceof PersonalAiQuotaExceededError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          quota: { resource: error.resource, limit: error.limit },
+        },
+        { status: 409 },
+      );
+    }
+    throw error;
+  }
 }

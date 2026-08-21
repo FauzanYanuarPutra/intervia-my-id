@@ -37,7 +37,11 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod identity_projection;
 mod order_engine;
+use identity_projection::{
+    run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
+};
 use order_engine::{create_order, get_order, list_orders, transition_order};
 
 #[derive(Clone)]
@@ -245,8 +249,37 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
           identity_version bigint NOT NULL DEFAULT 0,
           identity_updated_at timestamptz NULL,
           identity_deleted_at timestamptz NULL,
+          identity_has_email boolean NOT NULL DEFAULT false,
+          identity_has_phone boolean NOT NULL DEFAULT false,
+          identity_user_email_verified boolean NOT NULL DEFAULT false,
+          identity_user_phone_verified boolean NOT NULL DEFAULT false,
+          identity_user_active boolean NOT NULL DEFAULT false,
+          identity_user_updated_at timestamptz NULL,
+          identity_user_event_id uuid NULL,
+          identity_user_operation text NULL,
+          identity_profile_updated_at timestamptz NULL,
+          identity_profile_event_id uuid NULL,
+          identity_profile_operation text NULL,
           synced_at timestamptz NOT NULL DEFAULT now()
         )
+        "#,
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        r#"
+        ALTER TABLE users_read_model
+          ADD COLUMN IF NOT EXISTS identity_has_email boolean NOT NULL DEFAULT false,
+          ADD COLUMN IF NOT EXISTS identity_has_phone boolean NOT NULL DEFAULT false,
+          ADD COLUMN IF NOT EXISTS identity_user_email_verified boolean NOT NULL DEFAULT false,
+          ADD COLUMN IF NOT EXISTS identity_user_phone_verified boolean NOT NULL DEFAULT false,
+          ADD COLUMN IF NOT EXISTS identity_user_active boolean NOT NULL DEFAULT false,
+          ADD COLUMN IF NOT EXISTS identity_user_updated_at timestamptz NULL,
+          ADD COLUMN IF NOT EXISTS identity_user_event_id uuid NULL,
+          ADD COLUMN IF NOT EXISTS identity_user_operation text NULL,
+          ADD COLUMN IF NOT EXISTS identity_profile_updated_at timestamptz NULL,
+          ADD COLUMN IF NOT EXISTS identity_profile_event_id uuid NULL,
+          ADD COLUMN IF NOT EXISTS identity_profile_operation text NULL
         "#,
     )
     .execute(db)
@@ -560,13 +593,31 @@ struct PatchListingDraftRequest {
     contact_snapshot: Option<Value>,
     completion_percentage: Option<i32>,
     title: Option<String>,
-    summary: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nullable_patch_field")]
+    summary: Option<Option<String>>,
     body: Option<String>,
-    price_cents: Option<i64>,
+    #[serde(default, deserialize_with = "deserialize_nullable_patch_field")]
+    price_cents: Option<Option<i64>>,
     pricing_mode: Option<String>,
-    price_unit: Option<String>,
-    cover_image: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nullable_patch_field")]
+    price_unit: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_nullable_patch_field")]
+    cover_image: Option<Option<String>>,
     industry_ids: Option<Vec<String>>,
+}
+
+fn deserialize_nullable_patch_field<'de, D, T>(
+    deserializer: D,
+) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+fn resolve_nullable_patch<T>(patch: Option<Option<T>>, current: Option<T>) -> Option<T> {
+    patch.unwrap_or(current)
 }
 
 #[derive(Debug, Serialize, FromRow, Clone)]
@@ -2245,7 +2296,27 @@ async fn main() -> anyhow::Result<()> {
         notification_tx,
     });
 
+    let identity_projection_config = IdentityProjectionConfig::from_env();
+    if identity_projection_config.enabled {
+        let processor_db = state.db.clone();
+        let processor_config = identity_projection_config.clone();
+        tokio::spawn(async move {
+            run_identity_inbox_processor(processor_db, processor_config).await;
+        });
+    } else {
+        tracing::warn!("Identity read-model projection is disabled by configuration.");
+    }
+
     if let Ok(rabbitmq_url) = env::var("RABBITMQ_URL") {
+        if identity_projection_config.enabled {
+            let consumer_db = state.db.clone();
+            let consumer_url = rabbitmq_url.clone();
+            let consumer_config = identity_projection_config.clone();
+            tokio::spawn(async move {
+                run_identity_event_consumer(consumer_db, consumer_url, consumer_config).await;
+            });
+        }
+
         let outbox_db = state.db.clone();
         let exchange =
             env::var("OUTBOX_EXCHANGE").unwrap_or_else(|_| "marketplace.outbox".to_string());
@@ -2265,6 +2336,9 @@ async fn main() -> anyhow::Result<()> {
         });
     } else {
         tracing::warn!("RABBITMQ_URL not set. Transactional outbox publisher is disabled.");
+        if identity_projection_config.enabled {
+            tracing::warn!("RABBITMQ_URL not set. Identity event consumer is disabled.");
+        }
     }
 
     let configured_origins = parse_cors_origins();
@@ -4627,6 +4701,10 @@ fn wallet_default_environment() -> String {
         .unwrap_or_else(|| "development".to_string())
 }
 
+fn payments_enabled() -> bool {
+    parse_env_bool("PAYMENTS_ENABLED", false)
+}
+
 fn wallet_live_enabled() -> bool {
     parse_env_bool("WALLET_LIVE_ENABLED", false)
 }
@@ -5255,6 +5333,31 @@ fn midtrans_signature(
     hasher.update(raw.as_bytes());
     let digest = hasher.finalize();
     format!("{digest:x}")
+}
+
+fn parse_major_amount_cents(value: &str) -> Option<i64> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    let mut parts = value.split('.');
+    let whole = parts.next()?;
+    let fraction = parts.next().unwrap_or("");
+    if parts.next().is_some()
+        || whole.is_empty()
+        || !whole.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+        || fraction.bytes().skip(2).any(|byte| byte != b'0')
+    {
+        return None;
+    }
+
+    let whole_cents = whole.parse::<i64>().ok()?.checked_mul(100)?;
+    let mut fraction_digits = fraction.bytes();
+    let tenths = fraction_digits.next().map(|byte| byte - b'0').unwrap_or(0);
+    let hundredths = fraction_digits.next().map(|byte| byte - b'0').unwrap_or(0);
+    whole_cents.checked_add(i64::from(tenths) * 10 + i64::from(hundredths))
 }
 
 fn normalize_deal_kind(value: Option<String>) -> Option<String> {
@@ -10723,18 +10826,21 @@ async fn patch_listing_draft(
     }
 
     let title = clean_text(payload.title).unwrap_or(current.title);
-    let summary = match payload.summary {
-        Some(value) => clean_text(Some(value)),
-        None => current.summary,
-    };
+    let summary = resolve_nullable_patch(payload.summary.map(clean_text), current.summary);
     let body = clean_text(payload.body).unwrap_or(current.body);
     let pricing_mode = normalize_pricing_mode(payload.pricing_mode).unwrap_or(current.pricing_mode);
-    let price_cents = payload
-        .price_cents
-        .or(current.price_cents)
-        .filter(|value| *value >= 0);
-    let price_unit = normalize_price_unit(payload.price_unit).or(current.price_unit);
-    let cover_image = clean_text(payload.cover_image).or(current.cover_image);
+    let price_cents = resolve_nullable_patch(
+        payload
+            .price_cents
+            .map(|value| value.filter(|price| *price >= 0)),
+        current.price_cents,
+    );
+    let price_unit = resolve_nullable_patch(
+        payload.price_unit.map(normalize_price_unit),
+        current.price_unit,
+    );
+    let cover_image =
+        resolve_nullable_patch(payload.cover_image.map(clean_text), current.cover_image);
     let values = payload.values.unwrap_or(current.values);
     let media = payload.media.unwrap_or(current.media);
     let attributes = json_object_or_default(payload.attributes.or(Some(current.attributes)));
@@ -14115,6 +14221,9 @@ async fn fund_transaction(
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
+    if !payments_enabled() {
+        return err(StatusCode::SERVICE_UNAVAILABLE, "payments are disabled").into_response();
+    }
 
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
@@ -15641,6 +15750,9 @@ async fn create_wallet_withdrawal(
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
+    if !payments_enabled() {
+        return err(StatusCode::SERVICE_UNAVAILABLE, "payments are disabled").into_response();
+    }
 
     let environment = normalize_wallet_environment(payload.environment)
         .unwrap_or_else(wallet_default_environment);
@@ -16354,6 +16466,9 @@ async fn create_wallet_topup(
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
+    if !payments_enabled() {
+        return err(StatusCode::SERVICE_UNAVAILABLE, "payments are disabled").into_response();
+    }
 
     let environment = normalize_wallet_environment(payload.environment)
         .unwrap_or_else(wallet_default_environment);
@@ -16402,6 +16517,13 @@ async fn create_wallet_topup(
         .unwrap_or_else(wallet_default_provider);
     if !is_valid_payment_provider(&payment_provider) {
         return err(StatusCode::BAD_REQUEST, "invalid payment_provider").into_response();
+    }
+    if payment_provider == "midtrans" && currency != "IDR" {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "midtrans top-up currently supports IDR only",
+        )
+        .into_response();
     }
     if environment == "live"
         && payment_provider == "mock"
@@ -16918,6 +17040,9 @@ async fn sync_wallet_topup_status(
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
+    if !payments_enabled() {
+        return err(StatusCode::SERVICE_UNAVAILABLE, "payments are disabled").into_response();
+    }
 
     let current = sqlx::query_as::<_, WalletTopupRow>(
         r#"
@@ -17094,6 +17219,7 @@ async fn sync_wallet_topup_status(
                     "order_id": order_id,
                     "status_code": provider_code,
                     "gross_amount": gross_amount,
+                    "currency": current.currency,
                     "signature_key": signature_key,
                     "transaction_status": "failure",
                     "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
@@ -17225,6 +17351,7 @@ async fn sync_wallet_topup_status(
             "order_id": order_id,
             "status_code": status_code,
             "gross_amount": gross_amount,
+            "currency": current.currency,
             "signature_key": signature_key,
             "transaction_status": transaction_status,
             "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
@@ -17655,6 +17782,7 @@ async fn reconcile_pending_midtrans_topups_for_user(
                         "order_id": order_id,
                         "status_code": provider_code,
                         "gross_amount": gross_amount,
+                        "currency": topup.currency,
                         "signature_key": signature_key,
                         "transaction_status": "failure",
                         "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
@@ -17706,6 +17834,7 @@ async fn reconcile_pending_midtrans_topups_for_user(
                 "order_id": order_id,
                 "status_code": status_code,
                 "gross_amount": gross_amount,
+                "currency": topup.currency,
                 "signature_key": signature_key,
                 "transaction_status": transaction_status,
                 "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
@@ -17844,6 +17973,31 @@ async fn handle_midtrans_wallet_notify(
         midtrans_signature(&order_id, &status_code, &gross_amount, &server_key);
     if expected_signature != signature_key {
         return err(StatusCode::UNAUTHORIZED, "invalid callback signature").into_response();
+    }
+
+    let callback_amount_cents = match parse_major_amount_cents(&gross_amount) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "invalid gross_amount").into_response(),
+    };
+    let callback_currency = midtrans_text_field(&payload, "currency")
+        .unwrap_or_else(|| "IDR".to_string())
+        .to_uppercase();
+    if callback_amount_cents != current.amount_cents
+        || callback_currency != current.currency.to_uppercase()
+    {
+        tracing::warn!(
+            "midtrans callback amount/currency mismatch topup_id={} expected_amount_cents={} received_amount_cents={} expected_currency={} received_currency={}",
+            current.id,
+            current.amount_cents,
+            callback_amount_cents,
+            current.currency,
+            callback_currency
+        );
+        return err(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "callback amount or currency does not match top-up",
+        )
+        .into_response();
     }
 
     let transaction_status = midtrans_text_field(&payload, "transaction_status")
@@ -23508,6 +23662,53 @@ mod tests {
     use super::*;
 
     #[test]
+    fn listing_draft_patch_distinguishes_omitted_null_and_present_nullable_fields() {
+        let omitted: PatchListingDraftRequest =
+            serde_json::from_value(json!({})).expect("empty patch should deserialize");
+        assert_eq!(omitted.summary, None);
+        assert_eq!(omitted.price_cents, None);
+        assert_eq!(omitted.price_unit, None);
+        assert_eq!(omitted.cover_image, None);
+
+        let cleared: PatchListingDraftRequest = serde_json::from_value(json!({
+            "summary": null,
+            "price_cents": null,
+            "price_unit": null,
+            "cover_image": null
+        }))
+        .expect("explicit null patch should deserialize");
+        assert_eq!(cleared.summary, Some(None));
+        assert_eq!(cleared.price_cents, Some(None));
+        assert_eq!(cleared.price_unit, Some(None));
+        assert_eq!(cleared.cover_image, Some(None));
+
+        let present: PatchListingDraftRequest = serde_json::from_value(json!({
+            "summary": "Ringkasan baru",
+            "price_cents": 125000,
+            "price_unit": "paket",
+            "cover_image": "https://cdn.example.com/cover.webp"
+        }))
+        .expect("present patch values should deserialize");
+        assert_eq!(present.summary, Some(Some("Ringkasan baru".to_string())));
+        assert_eq!(present.price_cents, Some(Some(125000)));
+        assert_eq!(present.price_unit, Some(Some("paket".to_string())));
+        assert_eq!(
+            present.cover_image,
+            Some(Some("https://cdn.example.com/cover.webp".to_string()))
+        );
+    }
+
+    #[test]
+    fn nullable_listing_draft_patch_preserves_clears_or_replaces_current_value() {
+        assert_eq!(resolve_nullable_patch::<i64>(None, Some(100)), Some(100));
+        assert_eq!(resolve_nullable_patch(Some(None), Some(100)), None);
+        assert_eq!(
+            resolve_nullable_patch(Some(Some(250)), Some(100)),
+            Some(250)
+        );
+    }
+
+    #[test]
     fn canonical_content_type_normalizes_aliases() {
         assert_eq!(canonical_content_type("jobs"), "job");
         assert_eq!(canonical_content_type("properties"), "property");
@@ -23766,6 +23967,16 @@ mod tests {
             midtrans_rejection_summary(401, &payload),
             "status 401 message=Operation is not allowed due to unauthorized payload."
         );
+    }
+
+    #[test]
+    fn parses_provider_amount_without_floating_point_rounding() {
+        assert_eq!(parse_major_amount_cents("10000.00"), Some(1_000_000));
+        assert_eq!(parse_major_amount_cents("10.5"), Some(1_050));
+        assert_eq!(parse_major_amount_cents("10.000"), Some(1_000));
+        assert_eq!(parse_major_amount_cents("10.001"), None);
+        assert_eq!(parse_major_amount_cents("-10.00"), None);
+        assert_eq!(parse_major_amount_cents("NaN"), None);
     }
 
     #[test]

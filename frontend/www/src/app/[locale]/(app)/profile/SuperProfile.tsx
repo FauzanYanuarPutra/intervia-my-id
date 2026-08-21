@@ -6,18 +6,20 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import NextImage from 'next/image';
-import { usePathname } from 'next/navigation';
-import useEmblaCarousel from 'embla-carousel-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
+  BriefcaseBusiness,
   BadgeCheck,
   BarChart3,
   CalendarDays,
   Camera,
   Check,
+  ChevronRight,
   Circle,
   ClipboardList,
   Eye,
@@ -32,16 +34,19 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   Settings2,
   ShoppingBag,
+  Star,
+  Store,
   Users,
   X,
 } from 'lucide-react';
 
 import { ImageCropModal } from '@/components/common/ImageCropModal';
-import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
-import { useEmblaWheelGestures } from '@/components/common/useEmblaWheelGestures';
-import { ProfileViewSkeleton } from '@/components/system/feedback/RouteSkeletons';
+
+import { ProfileRail, ProfileRailItem } from '@/components/profile/ProfileRail';
+import { OwnerProfileSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { LocalizedLink } from '@/components/ui-kit';
 import { useAuth } from '@/context/AuthContext';
 import { useChatInbox } from '@/context/ChatInboxContext';
@@ -62,6 +67,7 @@ import {
   normalizePublicProfileHandleInput,
 } from '@/lib/profile/publicProfileLink';
 import { cn } from '@/lib/utils';
+import { OwnerProfileEditModal, OwnerProfileEditSection } from './OwnerProfileEditModal';
 
 type MetaRecord = Record<string, unknown>;
 
@@ -151,15 +157,6 @@ type DashboardStats = {
   total_favorites: number;
 };
 
-type StatItem = {
-  key: string;
-  label: string;
-  value: string;
-  hint: string;
-  icon: ComponentType<{ className?: string }>;
-  iconClassName: string;
-};
-
 type QuickAction = {
   key: string;
   label: string;
@@ -188,6 +185,68 @@ type ProfileSocialSummary = {
 };
 
 type ProfileSocialTab = 'followers' | 'following';
+type ProfileModalKind = 'edit' | 'social' | 'crop';
+type CropTarget = 'avatar' | 'cover';
+type ModalNavigationMode = 'push' | 'replace';
+
+function normalizeProfileModalKind(value: string | null): ProfileModalKind | null {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'edit' || normalized === 'social' || normalized === 'crop') {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeProfileSocialTab(value: string | null): ProfileSocialTab | null {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'followers' || normalized === 'following') return normalized;
+  return null;
+}
+
+function normalizeCropTarget(value: string | null): CropTarget | null {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'avatar' || normalized === 'cover') return normalized;
+  return null;
+}
+
+function normalizeOwnerProfileEditSection(
+  value: string | null,
+): OwnerProfileEditSection | null {
+  switch ((value || '').trim().toLowerCase()) {
+    case 'menu':
+      return 'menu';
+    case 'identity':
+    case 'profile':
+    case 'main':
+      return 'identity';
+    case 'contact':
+      return 'contact';
+    case 'business':
+    case 'seller':
+    case 'provider':
+      return 'business';
+    case 'professional':
+    case 'talent':
+    case 'freelancer':
+      return 'professional';
+    case 'buyer':
+    case 'need':
+      return 'buyer';
+    case 'history':
+    case 'experience':
+    case 'education':
+      return 'history';
+    case 'media':
+    case 'gallery':
+    case 'document':
+      return 'media';
+    case 'trust':
+    case 'verification':
+      return 'trust';
+    default:
+      return null;
+  }
+}
 
 type Copy = ReturnType<typeof buildCopy>;
 
@@ -200,7 +259,6 @@ const ROUTES = {
   drafts: '/my-listings?status=draft',
   promotion: '/create?mode=promotion',
   insights: '/dashboard',
-  editProfile: '/profile/edit',
   chat: '/chat',
 } as const;
 
@@ -826,60 +884,45 @@ function ProfileTabRail({
   items: Array<{ key: OwnerTab; label: string; count: number }>;
   onChange: (tab: OwnerTab) => void;
 }) {
-  const [viewportRef, api] = useEmblaCarousel({
-    align: 'start',
-    containScroll: 'trimSnaps',
-    dragFree: true,
-  });
-  useEmblaWheelGestures(api);
-
-  useEffect(() => {
-    const index = items.findIndex(item => item.key === activeTab);
-    if (index >= 0) api?.scrollTo(index);
-  }, [activeTab, api, items]);
-
   return (
     <div className="px-2.5 pt-2.5 sm:px-2 sm:pt-4">
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0 flex-1 rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]">
-          <div
-            ref={viewportRef}
-            className="cursor-grab overflow-hidden active:cursor-grabbing"
-          >
-            <div className="flex touch-pan-y gap-1">
-              {items.map(item => {
-                const active = item.key === activeTab;
-
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => onChange(item.key)}
+      <div className="rounded-xl bg-[color:var(--app-surface-muted)] p-1 dark:bg-[color:var(--app-surface)]">
+        <ProfileRail
+          activeIndex={items.findIndex(item => item.key === activeTab)}
+          ariaLabel="Profile content status"
+          trackClassName="gap-1"
+        >
+          {items.map(item => {
+            const active = item.key === activeTab;
+            return (
+              <ProfileRailItem key={item.key}>
+                <button
+                  type="button"
+                  onClick={() => onChange(item.key)}
+                  aria-pressed={active}
+                  className={cn(
+                    'flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-black transition',
+                    active
+                      ? 'bg-[color:var(--app-surface-strong)] text-emerald-700 shadow-sm dark:text-emerald-300'
+                      : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+                  )}
+                >
+                  <span>{item.label}</span>
+                  <span
                     className={cn(
-                      'flex min-h-9 flex-[0_0_auto] items-center gap-1.5 rounded-lg px-3 text-xs font-black transition',
+                      'rounded-full px-2 py-0.5 text-[10px]',
                       active
-                        ? 'bg-[color:var(--app-surface-strong)] text-emerald-700 shadow-sm dark:text-emerald-300'
-                        : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                        : 'bg-black/5 text-[color:var(--app-text-soft)] dark:bg-white/10',
                     )}
                   >
-                    <span>{item.label}</span>
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px]',
-                        active
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-                          : 'bg-black/5 text-[color:var(--app-text-soft)] dark:bg-white/10',
-                      )}
-                    >
-                      {item.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <EmblaDesktopControls api={api} compact />
+                    {item.count}
+                  </span>
+                </button>
+              </ProfileRailItem>
+            );
+          })}
+        </ProfileRail>
       </div>
     </div>
   );
@@ -894,78 +937,33 @@ function FilterRail({
   items: Array<{ key: ListingFilter; label: string }>;
   onChange: (filter: ListingFilter) => void;
 }) {
-  const [viewportRef, api] = useEmblaCarousel({
-    align: 'start',
-    containScroll: 'trimSnaps',
-    dragFree: true,
-  });
-  useEmblaWheelGestures(api);
-
-  useEffect(() => {
-    const index = items.findIndex(item => item.key === activeFilter);
-    if (index >= 0) api?.scrollTo(index);
-  }, [activeFilter, api, items]);
-
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
-      <div
-        ref={viewportRef}
-        className="min-w-0 flex-1 cursor-grab overflow-hidden active:cursor-grabbing"
-      >
-        <div className="flex touch-pan-y gap-2">
-          {items.map(item => {
-            const active = item.key === activeFilter;
-
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => onChange(item.key)}
-                className={cn(
-                  'min-h-9 flex-[0_0_auto] rounded-full border px-4 text-xs font-bold transition',
-                  active
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                    : 'border-[color:var(--app-border)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]',
-                )}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <EmblaDesktopControls api={api} compact />
-    </div>
-  );
-}
-
-function StatCard({ item }: { item: StatItem }) {
-  const Icon = item.icon;
-
-  return (
-    <div className="h-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 sm:p-3">
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-            item.iconClassName,
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
-            {item.label}
-          </p>
-          <p className="mt-0.5 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            {item.value}
-          </p>
-          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-            {item.hint}
-          </p>
-        </div>
-      </div>
-    </div>
+    <ProfileRail
+      activeIndex={items.findIndex(item => item.key === activeFilter)}
+      ariaLabel="Listing filters"
+      className="min-w-0 flex-1"
+    >
+      {items.map(item => {
+        const active = item.key === activeFilter;
+        return (
+          <ProfileRailItem key={item.key}>
+            <button
+              type="button"
+              onClick={() => onChange(item.key)}
+              aria-pressed={active}
+              className={cn(
+                'min-h-9 whitespace-nowrap rounded-full border px-4 text-xs font-bold transition',
+                active
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]',
+              )}
+            >
+              {item.label}
+            </button>
+          </ProfileRailItem>
+        );
+      })}
+    </ProfileRail>
   );
 }
 
@@ -1240,104 +1238,75 @@ function ListingCard({
     'favorites',
     'likes',
   ]);
-  const chats = readListingMetric(item, [
-    'chat_count',
-    'chats_count',
-    'comment_count',
-    'comments_count',
-    'chats',
-    'comments',
-  ]);
 
   return (
-    <article className="relative grid min-w-0 grid-cols-[78px_minmax(0,1fr)] gap-2.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 transition hover:border-emerald-200 sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:gap-3 sm:p-3">
-      <LocalizedLink
-        href={getListingHref(item)}
-        className="relative h-20 overflow-hidden rounded-lg bg-[color:var(--app-surface-muted)] sm:h-24"
-      >
-        {imageUrl ? (
-          <NextImage
-            src={imageUrl}
-            alt={item.title || ''}
-            fill
-            unoptimized
-            sizes="112px"
-            className="object-cover transition duration-300 hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
-            <Package className="h-8 w-8" />
-          </div>
-        )}
-      </LocalizedLink>
-
-      <div className="min-w-0 self-center pr-8 sm:pr-0">
-        <div className="flex min-w-0 flex-wrap items-start gap-2">
-          <LocalizedLink href={getListingHref(item)} className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
-              {item.title || 'Untitled'}
-            </h3>
-          </LocalizedLink>
+    <article className="group relative min-w-0 overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_16px_36px_-28px_rgba(15,23,42,0.45)]">
+      <LocalizedLink href={getListingHref(item)} className="block min-w-0">
+        <div className="relative aspect-square w-full overflow-hidden bg-[color:var(--app-surface-muted)]">
+          {imageUrl ? (
+            <NextImage
+              src={imageUrl}
+              alt={item.title || ''}
+              fill
+              unoptimized
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
+              className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
+              <Package className="h-9 w-9" />
+            </div>
+          )}
 
           <span
             className={cn(
-              'hidden shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold sm:inline-flex',
+              'absolute left-2 top-2 inline-flex rounded-lg px-2 py-1 text-[8px] font-black tracking-[0.04em] shadow-sm backdrop-blur-sm sm:text-[9px]',
+              presentation.className,
+            )}
+          >
+            {presentation.label}
+          </span>
+
+          <span
+            className={cn(
+              'absolute bottom-2 left-2 inline-flex rounded-full px-2 py-1 text-[8px] font-black shadow-sm backdrop-blur-sm',
               status === 'draft'
-                ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
-                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+                ? 'bg-amber-50/95 text-amber-700'
+                : 'bg-emerald-50/95 text-emerald-700',
             )}
           >
             {status === 'draft' ? copy.drafts : copy.active}
           </span>
         </div>
 
-        <span
-          className={cn(
-            'mt-1.5 inline-flex rounded-md px-2 py-0.5 text-[9px] font-black tracking-wide',
-            presentation.className,
-          )}
-        >
-          {presentation.label}
-        </span>
+        <div className="min-w-0 p-3">
+          <h3 className="line-clamp-2 min-h-10 text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
+            {item.title || (isId ? 'Tanpa judul' : 'Untitled')}
+          </h3>
+          <p className="mt-1 truncate text-[13px] font-black text-emerald-700 dark:text-emerald-300 sm:text-sm">
+            {formatPrice(item, locale, copy.emptyPrice)}
+          </p>
 
-        <p className="mt-1 truncate text-xs font-black text-emerald-700 dark:text-emerald-300">
-          {formatPrice(item, locale, copy.emptyPrice)}
-        </p>
-
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
-          <span className="inline-flex items-center gap-1">
-            <Eye className="h-3.5 w-3.5" />
-            {formatCompactNumber(views, locale)}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Heart className="h-3.5 w-3.5" />
-            {formatCompactNumber(favorites, locale)}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <MessageCircle className="h-3.5 w-3.5" />
-            {formatCompactNumber(chats, locale)}
-          </span>
+          <div className="mt-2 flex items-center gap-3 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+            <span className="inline-flex items-center gap-1">
+              <Eye className="h-3.5 w-3.5" />
+              {formatCompactNumber(views, locale)}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Heart className="h-3.5 w-3.5" />
+              {formatCompactNumber(favorites, locale)}
+            </span>
+          </div>
         </div>
-
-        <span
-          className={cn(
-            'mt-2 inline-flex rounded-lg px-2.5 py-1 text-[9px] font-bold sm:hidden',
-            status === 'draft'
-              ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
-              : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-          )}
-        >
-          {status === 'draft' ? copy.drafts : copy.active}
-        </span>
-      </div>
+      </LocalizedLink>
 
       <LocalizedLink
         href={`${ROUTES.manageListings}?listing=${encodeURIComponent(item.id)}`}
         aria-label={copy.manage}
         title={copy.manage}
-        className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] sm:static sm:self-center"
+        className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-black/48 text-white shadow-sm backdrop-blur-md transition hover:bg-black/68"
       >
-        <MoreVertical className="h-5 w-5" />
+        <MoreVertical className="h-[18px] w-[18px]" />
       </LocalizedLink>
     </article>
   );
@@ -1347,6 +1316,8 @@ export default function SuperProfile() {
   const { user, authFetch, refreshUser, loading: authLoading } = useAuth();
   const { totalUnread } = useChatInbox();
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const isId = resolveLocaleFromPathname(pathname) === 'id';
   const numberLocale = isId ? 'id-ID' : 'en-US';
   const copy = useMemo(() => buildCopy(isId), [isId]);
@@ -1367,18 +1338,129 @@ export default function SuperProfile() {
   const [activeTab, setActiveTab] = useState<OwnerTab>('posts');
   const [activeFilter, setActiveFilter] = useState<ListingFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
-  const [socialModalTab, setSocialModalTab] = useState<ProfileSocialTab | null>(
-    null,
-  );
 
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
   const [coverUrlInput, setCoverUrlInput] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
-
   const [cropSource, setCropSource] = useState('');
-  const [cropTarget, setCropTarget] = useState<'avatar' | 'cover' | null>(null);
+  const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
+  const modalOpenedByUiRef = useRef(false);
+  const cropModalSessionRef = useRef(false);
+
+  const modalKind = normalizeProfileModalKind(searchParams.get('modal'));
+  const legacyEditSection = normalizeOwnerProfileEditSection(
+    searchParams.get('edit'),
+  );
+  const editSection =
+    modalKind === 'edit'
+      ? normalizeOwnerProfileEditSection(searchParams.get('section')) || 'menu'
+      : modalKind === null
+        ? legacyEditSection
+        : null;
+  const socialModalTab =
+    modalKind === 'social'
+      ? normalizeProfileSocialTab(searchParams.get('tab')) || 'followers'
+      : null;
+  const urlCropTarget =
+    modalKind === 'crop' ? normalizeCropTarget(searchParams.get('target')) : null;
+
+  const navigateModal = useCallback(
+    (
+      next:
+        | { kind: 'edit'; section: OwnerProfileEditSection }
+        | { kind: 'social'; tab: ProfileSocialTab }
+        | { kind: 'crop'; target: CropTarget }
+        | null,
+      mode: ModalNavigationMode = 'push',
+    ) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const key of ['modal', 'section', 'tab', 'target', 'edit']) {
+        params.delete(key);
+      }
+
+      if (next) {
+        params.set('modal', next.kind);
+        if (next.kind === 'edit') params.set('section', next.section);
+        if (next.kind === 'social') params.set('tab', next.tab);
+        if (next.kind === 'crop') params.set('target', next.target);
+      }
+
+      const query = params.toString();
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      const href = `${pathname}${query ? `?${query}` : ''}${hash}`;
+      const options = { scroll: false } as const;
+
+      if (mode === 'replace') router.replace(href, options);
+      else router.push(href, options);
+    },
+    [pathname, router, searchParams],
+  );
+
+  const openEditModal = useCallback(
+    (section: OwnerProfileEditSection = 'menu') => {
+      modalOpenedByUiRef.current = true;
+      navigateModal({ kind: 'edit', section }, 'push');
+    },
+    [navigateModal],
+  );
+
+  const changeEditSection = useCallback(
+    (section: OwnerProfileEditSection) => {
+      navigateModal({ kind: 'edit', section }, 'replace');
+    },
+    [navigateModal],
+  );
+
+  const openSocialModal = useCallback(
+    (tab: ProfileSocialTab = 'followers') => {
+      modalOpenedByUiRef.current = true;
+      navigateModal({ kind: 'social', tab }, 'push');
+    },
+    [navigateModal],
+  );
+
+  const changeSocialTab = useCallback(
+    (tab: ProfileSocialTab) => {
+      navigateModal({ kind: 'social', tab }, 'replace');
+    },
+    [navigateModal],
+  );
+
+  const closeProfileModal = useCallback(() => {
+    if (
+      modalOpenedByUiRef.current &&
+      typeof window !== 'undefined' &&
+      window.history.length > 1
+    ) {
+      modalOpenedByUiRef.current = false;
+      router.back();
+      return;
+    }
+    navigateModal(null, 'replace');
+  }, [navigateModal, router]);
+
+  useEffect(() => {
+    if (!modalKind && !legacyEditSection) modalOpenedByUiRef.current = false;
+  }, [legacyEditSection, modalKind]);
+
+  useEffect(() => {
+    if (!legacyEditSection || modalKind) return;
+    navigateModal({ kind: 'edit', section: legacyEditSection }, 'replace');
+  }, [legacyEditSection, modalKind, navigateModal]);
+
+  useEffect(() => {
+    if (modalKind !== 'crop') {
+      cropModalSessionRef.current = false;
+      return;
+    }
+    if (!urlCropTarget || (!cropSource && !cropModalSessionRef.current)) {
+      navigateModal(null, 'replace');
+      return;
+    }
+    if (cropSource && cropTarget !== urlCropTarget) setCropTarget(urlCropTarget);
+  }, [cropSource, cropTarget, modalKind, navigateModal, urlCropTarget]);
 
   const mergedMetadata = useMemo(
     () => ({
@@ -1646,49 +1728,11 @@ export default function SuperProfile() {
     );
   }, [coverUrlInput, detail, user?.metadata]);
 
-  const allListings = useMemo(
-    () => [...activeListings, ...draftListings],
-    [activeListings, draftListings],
-  );
-
-  const aggregateMetrics = useMemo(
-    () =>
-      allListings.reduce(
-        (totals, item) => ({
-          views:
-            totals.views +
-            readListingMetric(item, ['view_count', 'views_count', 'views']),
-          favorites:
-            totals.favorites +
-            readListingMetric(item, [
-              'favorite_count',
-              'favorites_count',
-              'like_count',
-              'likes_count',
-              'favorites',
-              'likes',
-            ]),
-        }),
-        { views: 0, favorites: 0 },
-      ),
-    [allListings],
-  );
-
   const unreadChats = Math.max(
     0,
     Number.isFinite(totalUnread) ? totalUnread : 0,
     dashboardStats.unread_messages,
   );
-
-  const totalViews =
-    dashboardStats.profile_views > 0
-      ? dashboardStats.profile_views
-      : aggregateMetrics.views;
-
-  const totalFavorites =
-    dashboardStats.total_favorites > 0
-      ? dashboardStats.total_favorites
-      : aggregateMetrics.favorites;
 
   const activePostCount = Math.max(
     dashboardStats.total_content,
@@ -1726,61 +1770,11 @@ export default function SuperProfile() {
     ),
   );
 
-  const stats = useMemo<StatItem[]>(
-    () => [
-      {
-        key: 'views',
-        label: copy.viewed,
-        value: formatCompactNumber(totalViews, numberLocale),
-        hint: copy.totalViews,
-        icon: Eye,
-        iconClassName:
-          'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-      },
-      {
-        key: 'favorites',
-        label: copy.favorites,
-        value: formatCompactNumber(totalFavorites, numberLocale),
-        hint: copy.savedByUsers,
-        icon: Heart,
-        iconClassName:
-          'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300',
-      },
-      {
-        key: 'chats',
-        label: copy.unreadChats,
-        value: formatCompactNumber(unreadChats, numberLocale),
-        hint: unreadChats > 0 ? copy.unreadHint : copy.inboxClean,
-        icon: MessageCircle,
-        iconClassName:
-          'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
-      },
-      {
-        key: 'active',
-        label: copy.activePosts,
-        value: formatCompactNumber(activePostCount, numberLocale),
-        hint: copy.currentlyActive,
-        icon: ShoppingBag,
-        iconClassName:
-          'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
-      },
-    ],
-    [
-      activePostCount,
-      copy,
-      numberLocale,
-      totalFavorites,
-      totalViews,
-      unreadChats,
-    ],
-  );
-
   const completionItems = useMemo(
     () => [
       {
         key: 'avatar',
         label: copy.photoProfile,
-        href: `${ROUTES.editProfile}?focus=media`,
         complete: Boolean(
           normalizeProfileMediaUrl(avatarUrlInput) ||
           detail?.avatar_url ||
@@ -1791,32 +1785,22 @@ export default function SuperProfile() {
       {
         key: 'bio',
         label: copy.bioBusiness,
-        href: `${ROUTES.editProfile}?focus=identity`,
         complete: Boolean(firstString(detail?.bio, user?.bio)),
       },
       {
         key: 'location',
         label: copy.businessLocation,
-        href: `${ROUTES.editProfile}?focus=identity`,
         complete: Boolean(location),
       },
       {
         key: 'contact',
         label: copy.contact,
-        href: `${ROUTES.editProfile}?focus=identity`,
         complete: Boolean(phone || detail?.email || user?.email),
       },
       {
         key: 'cover',
         label: copy.businessPhoto,
-        href: `${ROUTES.editProfile}?focus=media`,
         complete: Boolean(effectiveCoverUrl),
-      },
-      {
-        key: 'verification',
-        label: copy.identityVerification,
-        href: `${ROUTES.editProfile}?focus=identity`,
-        complete: verified,
       },
     ],
     [
@@ -1827,7 +1811,6 @@ export default function SuperProfile() {
       location,
       phone,
       user,
-      verified,
     ],
   );
 
@@ -1961,7 +1944,7 @@ export default function SuperProfile() {
 
   const openCropper = (
     event: ChangeEvent<HTMLInputElement>,
-    target: 'avatar' | 'cover',
+    target: CropTarget,
   ) => {
     const file = event.target.files?.[0] || null;
     event.target.value = '';
@@ -1971,12 +1954,16 @@ export default function SuperProfile() {
     setSaveMessage('');
     setCropSource(URL.createObjectURL(file));
     setCropTarget(target);
+    modalOpenedByUiRef.current = true;
+    cropModalSessionRef.current = true;
+    navigateModal({ kind: 'crop', target }, 'push');
   };
 
   const closeCropper = () => {
     if (cropSource) URL.revokeObjectURL(cropSource);
     setCropSource('');
     setCropTarget(null);
+    if (modalKind === 'crop') closeProfileModal();
   };
 
   const confirmCrop = async (file: File) => {
@@ -2018,7 +2005,7 @@ export default function SuperProfile() {
     }
   };
 
-  if (authLoading || loading) return <ProfileViewSkeleton />;
+  if (authLoading || loading) return <OwnerProfileSkeleton />;
 
   if (!user) {
     return (
@@ -2038,82 +2025,183 @@ export default function SuperProfile() {
         username: handle || undefined,
         full_name: displayName || 'member',
       })}`
-    : ROUTES.editProfile;
+    : '/profile';
+
+  const contactVerified = Boolean(
+    detail?.phone_verified ||
+      detail?.email_verified ||
+      mergedMetadata.phone_verified === true ||
+      mergedMetadata.email_verified === true,
+  );
+  const coreProfileReady = completionItems.every(item => item.complete);
+  const catalogTarget = 5;
+  const catalogComplete = activeListings.length >= catalogTarget;
+  const catalogRemaining = Math.max(0, catalogTarget - activeListings.length);
+
+  const trustSignals = [
+    {
+      key: 'identity',
+      label: isId ? 'Identitas' : 'Identity',
+      active: verified,
+      icon: BadgeCheck,
+    },
+    {
+      key: 'contact',
+      label: isId ? 'Kontak' : 'Contact',
+      active: contactVerified,
+      icon: MessageCircle,
+    },
+    {
+      key: 'profile',
+      label: isId ? 'Profil' : 'Profile',
+      active: coreProfileReady,
+      icon: Check,
+    },
+    {
+      key: 'catalog',
+      label: isId ? 'Katalog 5+' : 'Catalog 5+',
+      active: catalogComplete,
+      icon: ShoppingBag,
+    },
+  ];
+  const trustSignalCount = trustSignals.filter(item => item.active).length;
+  const trustPercent = Math.round((trustSignalCount / trustSignals.length) * 100);
+
+  const nextTrustMission = !contactVerified
+    ? {
+        label: isId ? 'Verifikasi kontak' : 'Verify contact',
+        helper: isId
+          ? 'Nomor atau email terverifikasi menambah kepercayaan.'
+          : 'A verified phone or email builds trust.',
+        section: 'contact' as OwnerProfileEditSection,
+      }
+    : !coreProfileReady && nextCompletionItem
+      ? {
+          label: nextCompletionItem.label,
+          helper: isId
+            ? `Profil ${profilePercent}% lengkap`
+            : `Profile ${profilePercent}% complete`,
+          section:
+            nextCompletionItem.key === 'bio' || nextCompletionItem.key === 'location'
+              ? ('identity' as OwnerProfileEditSection)
+              : nextCompletionItem.key === 'contact'
+                ? ('contact' as OwnerProfileEditSection)
+                : ('menu' as OwnerProfileEditSection),
+          target:
+            nextCompletionItem.key === 'avatar' || nextCompletionItem.key === 'cover'
+              ? nextCompletionItem.key
+              : undefined,
+        }
+      : !catalogComplete
+        ? {
+            label: isId
+              ? `Tambah ${catalogRemaining} penawaran lagi`
+              : `Add ${catalogRemaining} more offer${catalogRemaining === 1 ? '' : 's'}`,
+            helper: isId
+              ? 'Buka lencana Katalog 5+.'
+              : 'Unlock the Catalog 5+ badge.',
+            href: ROUTES.create,
+          }
+        : !verified
+          ? {
+              label: isId ? 'Pelajari verifikasi identitas' : 'Review identity verification',
+              helper: isId
+                ? 'Lihat status verifikasi yang benar-benar aktif.'
+                : 'Review the verification signals that are actually active.',
+              section: 'trust' as OwnerProfileEditSection,
+            }
+          : null;
+
+  const attentionAction = unreadChats > 0
+    ? {
+        label: isId
+          ? `${unreadChats > 99 ? '99+' : unreadChats} pesan perlu dibalas`
+          : `${unreadChats > 99 ? '99+' : unreadChats} messages need replies`,
+        href: ROUTES.chat,
+        icon: MessageCircle,
+        tone: 'bg-blue-600 text-white',
+      }
+    : draftListings.length > 0
+      ? {
+          label: isId
+            ? `${draftListings.length} draft belum diterbitkan`
+            : `${draftListings.length} drafts are unpublished`,
+          href: ROUTES.drafts,
+          icon: FileText,
+          tone: 'bg-amber-500 text-white',
+        }
+      : null;
+
+  const AttentionIcon = attentionAction?.icon ?? ArrowRight;
+
+  const providerProfile = asRecord(mergedMetadata.provider_profile) ?? {};
+  const freelancerProfile = asRecord(mergedMetadata.freelancer_profile) ?? {};
+  const buyerProfile = asRecord(mergedMetadata.buyer_profile) ?? {};
+  const profileDetailRows = [
+    {
+      key: 'business',
+      label: isId ? 'Usaha / layanan' : 'Business / services',
+      value: firstString(providerProfile.headline),
+      section: 'business' as OwnerProfileEditSection,
+      icon: Store,
+    },
+    {
+      key: 'professional',
+      label: isId ? 'Keahlian' : 'Expertise',
+      value: firstString(
+        freelancerProfile.professional_title,
+        freelancerProfile.tagline,
+      ),
+      section: 'professional' as OwnerProfileEditSection,
+      icon: BriefcaseBusiness,
+    },
+    {
+      key: 'buyer',
+      label: isId ? 'Sedang mencari' : 'Looking for',
+      value: firstString(buyerProfile.intent),
+      section: 'buyer' as OwnerProfileEditSection,
+      icon: Search,
+    },
+  ].filter(item => item.value);
 
   const quickActions: QuickAction[] = [
     {
       key: 'create',
-      label: copy.createPost,
+      label: isId ? 'Buat' : 'Create',
       href: ROUTES.create,
       icon: Plus,
     },
     {
       key: 'manage-listings',
-      label: copy.manageListings,
+      label: isId ? 'Etalase' : 'Storefront',
       href: ROUTES.manageListings,
       icon: ClipboardList,
       badge: draftListings.length,
     },
     {
       key: 'chat',
-      label: isId ? 'Pesan masuk' : 'Inbox',
+      label: isId ? 'Pesan' : 'Messages',
       href: ROUTES.chat,
       icon: MessageCircle,
       badge: unreadChats,
     },
     {
-      key: 'community',
-      label: copy.communityChannel,
-      href: ROUTES.manageCommunity,
-      icon: Users,
-    },
-    {
-      key: 'reels',
-      label: copy.reelsChannel,
-      href: ROUTES.manageReels,
-      icon: Play,
-    },
-    {
       key: 'insights',
-      label: copy.insights,
+      label: isId ? 'Statistik' : 'Insights',
       href: ROUTES.insights,
       icon: BarChart3,
     },
   ];
 
-  const quickActionDescriptions: Record<string, string> = isId
-    ? {
-        create: 'Tawarkan produk, jasa, bahan, atau tempat usaha.',
-        'manage-listings': 'Lihat yang sudah tayang dan belum diterbitkan.',
-        chat: 'Balas calon pembeli dan calon mitra usaha.',
-        community: 'Kelola grup dan diskusi yang kamu ikuti.',
-        reels: 'Kelola video pendek untuk menarik perhatian.',
-        insights: 'Lihat kunjungan, simpan, dan respons pengguna.',
-      }
-    : {
-        create: 'Offer a product, service, supply, or business place.',
-        'manage-listings': 'Review published and unpublished offers.',
-        chat: 'Reply to potential buyers and business partners.',
-        community: 'Manage your groups and discussions.',
-        reels: 'Manage short videos that attract attention.',
-        insights: 'Review visits, saves, and user responses.',
-      };
-
   const quickActionTone: Record<string, string> = {
-    create:
-      'bg-emerald-600 text-white shadow-emerald-900/15 group-hover:bg-emerald-700',
-    'manage-listings':
-      'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+    create: 'bg-emerald-600 text-white',
+    'manage-listings': 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
     chat: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-    community:
-      'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
-    reels: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
-    insights:
-      'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+    insights: 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
   };
 
   const tabItems: Array<{ key: OwnerTab; label: string; count: number }> = [
-    { key: 'posts', label: copy.myPosts, count: activeListings.length },
+    { key: 'posts', label: isId ? 'Tayang' : 'Published', count: activeListings.length },
     { key: 'drafts', label: copy.drafts, count: draftListings.length },
   ];
 
@@ -2133,36 +2221,11 @@ export default function SuperProfile() {
 
   return (
     <>
-      <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-2 sm:pb-10 sm:pt-5">
-        <div className="page-shell min-w-0 space-y-4 overflow-x-clip sm:space-y-5">
-          {/* <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                {isId ? 'Profil Saya' : 'My Profile'}
-              </p>
-              <h1 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
-                {isId
-                  ? 'Kelola identitas dan aktivitas usahamu'
-                  : 'Manage your identity and business activity'}
-              </h1>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? 'Pastikan informasi usahamu jelas, balas calon pembeli, lalu pantau penawaran yang sudah tayang.'
-                  : 'Keep your business information clear, reply to prospects, and monitor published offers.'}
-              </p>
-            </div>
-
-            <LocalizedLink
-              href={ROUTES.create}
-              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-lg shadow-emerald-900/10 transition hover:-translate-y-0.5 hover:bg-emerald-700"
-            >
-              <Plus className="h-5 w-5" />
-              {copy.createPost}
-            </LocalizedLink>
-          </header> */}
-
-          <section className="min-w-0 overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
-            <div className="relative h-36 overflow-hidden sm:h-44 lg:h-52">
+      <main className="min-h-screen max-w-full overflow-x-clip bg-[color:var(--app-surface-muted)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-8">
+        <div className="mx-auto w-full max-w-[1120px] space-y-3 px-0 py-0 sm:space-y-4 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+          {/* PROFILE — identity first, like familiar social/business profiles. */}
+          <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border sm:shadow-[0_18px_48px_-40px_rgba(15,23,42,0.35)]">
+            <div className="relative h-28 overflow-hidden sm:h-36 lg:h-40">
               {effectiveCoverUrl ? (
                 <NextImage
                   src={effectiveCoverUrl}
@@ -2170,46 +2233,52 @@ export default function SuperProfile() {
                   fill
                   priority
                   unoptimized
-                  sizes="100vw"
+                  sizes="(max-width: 640px) 100vw, 1120px"
                   className="object-cover"
                 />
               ) : (
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.34),transparent_30%),radial-gradient(circle_at_76%_24%,rgba(14,165,233,0.2),transparent_28%),linear-gradient(135deg,#d1fae5_0%,#f8fafc_48%,#dcfce7_100%)] dark:bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.2),transparent_30%),radial-gradient(circle_at_76%_24%,rgba(14,165,233,0.14),transparent_28%),linear-gradient(135deg,#052e25_0%,#0f172a_52%,#022c22_100%)]">
-                  <div className="absolute -bottom-12 left-[8%] h-28 w-28 rounded-full bg-white/70 blur-sm dark:bg-white/5" />
-                  <div className="absolute bottom-0 right-[12%] h-20 w-44 rounded-t-[36px] border-x border-t border-emerald-200/80 bg-white/75 dark:border-white/10 dark:bg-white/5" />
-                  <div className="absolute bottom-8 right-[18%] rounded-xl bg-emerald-700 px-5 py-2 text-xs font-black tracking-[0.16em] text-white shadow-lg">
-                    LAJUKAN
-                  </div>
-                </div>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.28),transparent_34%),radial-gradient(circle_at_78%_18%,rgba(14,165,233,0.14),transparent_28%),linear-gradient(135deg,#d1fae5_0%,#f8fafc_52%,#ecfdf5_100%)] dark:bg-[radial-gradient(circle_at_16%_24%,rgba(16,185,129,0.16),transparent_34%),radial-gradient(circle_at_78%_18%,rgba(14,165,233,0.1),transparent_28%),linear-gradient(135deg,#052e25_0%,#0f172a_52%,#022c22_100%)]" />
               )}
-
               <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/30" />
 
-              <label
-                htmlFor="owner-cover-upload"
-                className="absolute right-3 top-3 inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-white/50 bg-slate-950/55 px-3 text-xs font-bold text-white shadow-sm backdrop-blur-md transition hover:bg-slate-950/70"
-              >
-                {coverUploading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Camera className="h-4 w-4" />
-                )}
-                <span>{copy.coverLabel}</span>
-              </label>
+              <div className="absolute right-2.5 top-2.5 flex items-center gap-2 sm:right-4 sm:top-4">
+                <button
+                  type="button"
+                  onClick={() => void loadProfile('refresh')}
+                  disabled={refreshing}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white shadow-sm backdrop-blur-md transition hover:bg-black/60 disabled:opacity-60"
+                  aria-label={refreshing ? copy.refreshing : copy.refresh}
+                  title={refreshing ? copy.refreshing : copy.refresh}
+                >
+                  <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+                </button>
 
-              <input
-                id="owner-cover-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={coverUploading || avatarUploading}
-                onChange={event => openCropper(event, 'cover')}
-              />
+                <label
+                  htmlFor="owner-cover-upload"
+                  className="grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-black/45 text-white shadow-sm backdrop-blur-md transition hover:bg-black/60"
+                  aria-label={copy.coverLabel}
+                  title={copy.coverLabel}
+                >
+                  {coverUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                </label>
+                <input
+                  id="owner-cover-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={coverUploading || avatarUploading}
+                  onChange={event => openCropper(event, 'cover')}
+                />
+              </div>
             </div>
 
-            <div className="relative min-w-0 px-4 pb-5 sm:px-6 sm:pb-6">
-              <div className="-mt-12 flex min-w-0 items-end justify-between gap-3 sm:-mt-14">
-                <div className="relative h-24 w-24 shrink-0 rounded-full border-4 border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:h-28 sm:w-28">
+            <div className="relative px-3 pb-4 sm:px-5 sm:pb-5">
+              <div className="-mt-10 flex min-w-0 items-start gap-3 sm:-mt-12 sm:gap-4">
+                <div className="relative h-20 w-20 shrink-0 rounded-full bg-[color:var(--app-surface-muted)] shadow-lg ring-[4px] ring-[color:var(--app-surface-strong)] sm:h-24 sm:w-24">
                   <div className="absolute inset-0 overflow-hidden rounded-full">
                     <NextImage
                       src={effectiveAvatarUrl}
@@ -2217,15 +2286,14 @@ export default function SuperProfile() {
                       fill
                       priority
                       unoptimized
-                      sizes="128px"
+                      sizes="96px"
                       className="object-cover"
                     />
                   </div>
-
                   <label
                     htmlFor="owner-avatar-upload"
                     aria-label={copy.avatarLabel}
-                    className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-[3px] border-[color:var(--app-surface-strong)] bg-emerald-600 text-white shadow-md transition hover:scale-105 hover:bg-emerald-700"
+                    className="absolute bottom-0 right-0 grid h-8 w-8 cursor-pointer place-items-center rounded-full border-[3px] border-[color:var(--app-surface-strong)] bg-emerald-600 text-white shadow-md transition hover:bg-emerald-700"
                   >
                     {avatarUploading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -2233,7 +2301,6 @@ export default function SuperProfile() {
                       <Camera className="h-4 w-4" />
                     )}
                   </label>
-
                   <input
                     id="owner-avatar-upload"
                     type="file"
@@ -2244,149 +2311,142 @@ export default function SuperProfile() {
                   />
                 </div>
 
-                <div className="hidden items-center gap-2 pb-2 md:flex">
-                  <button
-                    type="button"
-                    onClick={() => void loadProfile('refresh')}
-                    disabled={refreshing}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60"
-                    aria-label={refreshing ? copy.refreshing : copy.refresh}
-                    title={refreshing ? copy.refreshing : copy.refresh}
-                  >
-                    <RefreshCw
-                      className={cn('h-4 w-4', refreshing && 'animate-spin')}
-                    />
-                  </button>
-
-                  <LocalizedLink
-                    href={publicProfileHref}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
-                  >
-                    <Eye className="h-4 w-4" />
-                    {copy.publicProfile}
-                  </LocalizedLink>
-
-                  <LocalizedLink
-                    href={ROUTES.editProfile}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700"
-                  >
-                    <PencilLine className="h-4 w-4" />
-                    {copy.editProfile}
-                  </LocalizedLink>
-                </div>
-              </div>
-
-              <div className="mt-4 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <h2 className="min-w-0 max-w-full break-words text-2xl font-black leading-tight tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                <div className="min-w-0 flex-1 pb-0.5 sm:pb-1.5 pt-10">
+                  <div className="flex min-w-0 items-center gap-1.5 -mb-[10px]">
+                    <h1 className="min-w-0 truncate text-xl font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
                       {displayName}
-                    </h2>
+                    </h1>
                     {verified ? (
                       <BadgeCheck
-                        className="h-6 w-6 shrink-0 fill-emerald-600 text-white"
-                        aria-label={copy.verified}
+                        className="h-5 w-5 shrink-0 fill-emerald-600 text-white"
+                        aria-label={isId ? 'Identitas terverifikasi' : 'Identity verified'}
                       />
                     ) : null}
+                    <button
+                      type="button"
+                      onClick={() => openEditModal('identity')}
+                      className="ml-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]"
+                      aria-label={isId ? 'Edit profil utama' : 'Edit main profile'}
+                    >
+                      <PencilLine className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-
-                  <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="max-w-full break-all text-sm font-semibold text-[color:var(--app-text-soft)]">
-                      @{handle || 'user'}
-                    </span>
-                    {verified ? (
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                        {copy.verified}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <p className="mt-3 max-w-3xl break-words text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {bio}
+                  <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                    @{handle || 'user'}
                   </p>
-
-                  <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-[color:var(--app-text-soft)]">
-                    <span className="inline-flex min-w-0 items-center gap-1.5">
-                      <MapPin className="h-4 w-4 shrink-0" />
-                      <span className="truncate">
-                        {location || copy.locationFallback}
-                      </span>
-                    </span>
-                    {joinedDate ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <CalendarDays className="h-4 w-4 shrink-0" />
-                        {copy.joined} {joinedDate}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[color:var(--app-surface-muted)] p-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setSocialModalTab('followers')}
-                    className="rounded-xl px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-strong)]"
-                  >
-                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {formatCompactNumber(followersCount, numberLocale)}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                      {copy.followers}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSocialModalTab('following')}
-                    className="rounded-xl px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-strong)]"
-                  >
-                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {formatCompactNumber(followingCount, numberLocale)}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                      {copy.following}
-                    </span>
-                  </button>
-                  <LocalizedLink
-                    href={`/reels?creator=${encodeURIComponent(user.id)}`}
-                    className="rounded-xl px-2 py-2.5 text-center transition hover:bg-[color:var(--app-surface-strong)]"
-                  >
-                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {formatCompactNumber(reelsCount, numberLocale)}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
-                      {copy.reelsChannel}
-                    </span>
-                  </LocalizedLink>
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 md:hidden">
-                <LocalizedLink
-                  href={publicProfileHref}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] px-3 text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
-                >
-                  <Eye className="h-4 w-4" />
-                  <span className="truncate">{copy.publicProfile}</span>
+              <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="max-w-[62vw] truncate sm:max-w-sm">
+                    {location || copy.locationFallback}
+                  </span>
+                </span>
+                {joinedDate ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {copy.joined} {joinedDate}
+                  </span>
+                ) : null}
+              </div>
+
+              <p className="mt-2.5 line-clamp-2 max-w-2xl text-[12px] font-medium leading-5 text-[color:var(--app-text-soft)] sm:text-sm sm:leading-6">
+                {bio}
+              </p>
+
+              <div className="mt-3 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {trustSignals
+                  .filter(item => item.active)
+                  .map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <span
+                        key={item.key}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {item.label}
+                      </span>
+                    );
+                  })}
+                {trustSignalCount === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => openEditModal('trust')}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                  >
+                    <BadgeCheck className="h-3.5 w-3.5" />
+                    {isId ? 'Bangun kepercayaan' : 'Build trust'}
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid grid-cols-4 divide-x divide-[color:var(--app-border)] border-y border-[color:var(--app-border)] py-2.5 sm:max-w-2xl sm:rounded-xl sm:border sm:py-0">
+                <LocalizedLink href={ROUTES.manageListings} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
+                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                    {formatCompactNumber(activePostCount, numberLocale)}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
+                    {isId ? 'Penawaran' : 'Offers'}
+                  </span>
                 </LocalizedLink>
-                <LocalizedLink
-                  href={ROUTES.editProfile}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-black text-white"
+                <button type="button" onClick={() => openSocialModal('followers')} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
+                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                    {formatCompactNumber(followersCount, numberLocale)}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
+                    {copy.followers}
+                  </span>
+                </button>
+                <LocalizedLink href={`/reels?creator=${encodeURIComponent(user.id)}`} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
+                  <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                    {formatCompactNumber(reelsCount, numberLocale)}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
+                    {copy.reels}
+                  </span>
+                </LocalizedLink>
+                <LocalizedLink href={ROUTES.insights} className="min-w-0 px-1 py-1 text-center transition hover:bg-[color:var(--app-surface-muted)] sm:px-3 sm:py-3">
+                  <span className="flex items-center justify-center gap-1 truncate text-sm font-black text-amber-600 dark:text-amber-300 sm:text-base">
+                    <Star className="h-3.5 w-3.5 fill-current" />
+                    {dashboardStats.user_rating > 0 ? dashboardStats.user_rating.toFixed(1) : '—'}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
+                    Rating
+                  </span>
+                </LocalizedLink>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => openEditModal('menu')}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
                 >
                   <PencilLine className="h-4 w-4" />
                   {copy.editProfile}
+                </button>
+                <LocalizedLink
+                  href={publicProfileHref}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                >
+                  <Eye className="h-4 w-4" />
+                  {copy.publicProfile}
                 </LocalizedLink>
               </div>
             </div>
           </section>
 
           {saveMessage ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <div className="mx-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200 sm:mx-0">
               {saveMessage}
             </div>
           ) : null}
 
           {profileError ? (
-            <div className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mx-3 flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200 sm:mx-0 sm:flex-row sm:items-center sm:justify-between">
               <span>{profileError}</span>
               <button
                 type="button"
@@ -2398,170 +2458,171 @@ export default function SuperProfile() {
             </div>
           ) : null}
 
-          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-            <section className="min-w-0 rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:p-5">
-              <div className="flex min-w-0 items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {copy.profileReady}
-                    </h2>
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                      {profilePercent}%
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                    {copy.profileHint}
-                  </p>
-                </div>
+          {/* ONE NEXT ACTION — no dashboard wall. */}
+          {attentionAction ? (
+            <LocalizedLink
+              href={attentionAction.href}
+              className="mx-3 flex min-h-14 items-center gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 transition hover:border-emerald-200 hover:bg-[color:var(--app-surface-muted)] sm:mx-0 sm:px-4"
+            >
+              <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', attentionAction.tone)}>
+                <AttentionIcon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {attentionAction.label}
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+            </LocalizedLink>
+          ) : null}
 
-                <LocalizedLink
-                  href={nextCompletionItem?.href || ROUTES.editProfile}
-                  className="hidden min-h-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-black text-white transition hover:bg-emerald-700 sm:inline-flex"
-                >
-                  {nextCompletionItem ? copy.improveNow : copy.editProfile}
-                </LocalizedLink>
-              </div>
-
-              <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-                <div
-                  className="h-full rounded-full bg-emerald-600 transition-[width] duration-500"
-                  style={{ width: `${profilePercent}%` }}
-                />
-              </div>
-
-              {incompleteCompletionItems.length > 0 ? (
-                <div className="mt-4">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300">
-                    {isId ? 'Yang masih perlu dilengkapi' : 'Still needs attention'}
-                  </p>
-                  <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
-                    {incompleteCompletionItems.map(item => (
-                      <CompletionItem
-                        key={item.key}
-                        label={item.label}
-                        href={item.href}
-                        complete={false}
-                        completeLabel={copy.completeLabel}
-                        missingLabel={copy.missingLabel}
-                        actionLabel={copy.openTask}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-                    <Check className="h-4 w-4" strokeWidth={3} />
-                  </span>
-                  {isId
-                    ? 'Profilmu sudah siap dilihat calon pembeli.'
-                    : 'Your profile is ready for potential buyers.'}
-                </div>
-              )}
-
-              <LocalizedLink
-                href={nextCompletionItem?.href || ROUTES.editProfile}
-                className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-black text-white sm:hidden"
-              >
-                {nextCompletionItem ? copy.improveNow : copy.editProfile}
-              </LocalizedLink>
-            </section>
-
-            <section className="min-w-0 rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:p-5">
-              <div>
+          {/* TRUST — proof, not decorative badges. */}
+          <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-4 sm:rounded-[24px] sm:border sm:px-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {isId ? 'Ringkasan perkembangan' : 'Performance summary'}
+                  {isId ? 'Kepercayaan' : 'Trust'}
                 </h2>
-                <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                  {isId
-                    ? 'Lihat respons orang terhadap profil dan penawaranmu.'
-                    : 'See how people respond to your profile and offers.'}
+                <p className="mt-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                  {trustSignalCount}/{trustSignals.length} {isId ? 'tanda aktif' : 'signals active'}
                 </p>
               </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2.5">
-                {stats.map(item => (
-                  <StatCard key={item.key} item={item} />
-                ))}
-              </div>
-
-              {statsPartial ? (
-                <p className="mt-3 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                  {copy.profileApiPartial}
-                </p>
-              ) : null}
-            </section>
-          </div>
-
-          <section className="min-w-0 rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:p-5">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {copy.quickActions}
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                  {isId
-                    ? 'Pilih satu langkah. Setiap menu menjelaskan hasil yang akan kamu dapatkan.'
-                    : 'Choose one next step. Each menu explains what it helps you do.'}
-                </p>
-              </div>
-              <LocalizedLink
-                href={ROUTES.manage}
-                className="inline-flex min-h-9 items-center gap-1.5 text-xs font-black text-emerald-700 hover:underline dark:text-emerald-300"
-              >
-                {copy.managePosts}
-                <ArrowRight className="h-4 w-4" />
-              </LocalizedLink>
+              <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+                {trustPercent}%
+              </span>
             </div>
 
-            <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+              <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${trustPercent}%` }} />
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {trustSignals.map(item => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.key}
+                    className={cn(
+                      'flex min-w-0 items-center gap-2 rounded-xl px-2.5 py-2 text-[10px] font-black sm:text-[11px]',
+                      item.active
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+                    )}
+                  >
+                    <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-full', item.active ? 'bg-emerald-600 text-white' : 'bg-black/5 dark:bg-white/10')}>
+                      {item.active ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : <Icon className="h-3.5 w-3.5" />}
+                    </span>
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {nextTrustMission ? (
+              nextTrustMission.href ? (
+                <LocalizedLink
+                  href={nextTrustMission.href}
+                  className="mt-3 flex min-h-12 items-center gap-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/55 px-3 transition hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10"
+                >
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><ArrowRight className="h-4 w-4" /></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-xs font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{nextTrustMission.label}</span><span className="mt-0.5 block truncate text-[10px] text-[color:var(--app-text-soft)]">{nextTrustMission.helper}</span></span>
+                </LocalizedLink>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (nextTrustMission.target === 'avatar') {
+                      document.getElementById('owner-avatar-upload')?.click();
+                      return;
+                    }
+                    if (nextTrustMission.target === 'cover') {
+                      document.getElementById('owner-cover-upload')?.click();
+                      return;
+                    }
+                    openEditModal(nextTrustMission.section || 'menu');
+                  }}
+                  className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/55 px-3 text-left transition hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10"
+                >
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><ArrowRight className="h-4 w-4" /></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-xs font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{nextTrustMission.label}</span><span className="mt-0.5 block truncate text-[10px] text-[color:var(--app-text-soft)]">{nextTrustMission.helper}</span></span>
+                </button>
+              )
+            ) : (
+              <div className="mt-3 flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                <BadgeCheck className="h-4 w-4" />
+                {isId ? 'Profil siap dipercaya dan ditemukan.' : 'Your profile is ready to be discovered.'}
+              </div>
+            )}
+          </section>
+
+          {profileDetailRows.length > 0 ? (
+            <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
+              <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3 sm:px-5">
+                <div>
+                  <h2 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">{isId ? 'Tentang' : 'About'}</h2>
+                  <p className="mt-0.5 text-[10px] text-[color:var(--app-text-soft)]">{isId ? 'Ringkasan yang membantu orang memahami profilmu.' : 'A quick summary that helps people understand your profile.'}</p>
+                </div>
+                <button type="button" onClick={() => openEditModal('menu')} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"><PencilLine className="h-3.5 w-3.5" />{isId ? 'Edit' : 'Edit'}</button>
+              </div>
+              <div className="divide-y divide-[color:var(--app-border)]">
+                {profileDetailRows.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <button key={item.key} type="button" onClick={() => openEditModal(item.section)} className="flex min-h-14 w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[color:var(--app-surface-muted)] sm:px-5">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]"><Icon className="h-4 w-4" /></span>
+                      <span className="min-w-0 flex-1"><span className="block text-[10px] font-bold text-[color:var(--app-text-soft)]">{item.label}</span><span className="mt-0.5 block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{item.value}</span></span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {/* OWNER TOOLS — four actions only. */}
+          <section className="border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 sm:rounded-[24px] sm:border sm:px-5 sm:py-4">
+            <div className="grid grid-cols-4 gap-2">
               {quickActions.map(action => {
                 const Icon = action.icon;
                 return (
                   <LocalizedLink
                     key={action.key}
                     href={action.href}
-                    className="group flex min-w-0 items-center gap-3 rounded-2xl border border-[color:var(--app-border)] p-3.5 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm"
+                    className="group relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-2.5 text-center transition hover:bg-[color:var(--app-surface-muted)]"
                   >
-                    <span
-                      className={cn(
-                        'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm transition',
-                        quickActionTone[action.key],
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
+                    <span className={cn('relative grid h-10 w-10 place-items-center rounded-xl', quickActionTone[action.key])}>
+                      <Icon className="h-[18px] w-[18px]" />
                       {typeof action.badge === 'number' && action.badge > 0 ? (
                         <span className="absolute -right-2 -top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white ring-2 ring-[color:var(--app-surface-strong)]">
                           {action.badge > 99 ? '99+' : action.badge}
                         </span>
                       ) : null}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {action.label}
-                      </span>
-                      <span className="mt-1 block text-xs leading-5 text-[color:var(--app-text-soft)]">
-                        {quickActionDescriptions[action.key]}
-                      </span>
+                    <span className="max-w-full truncate text-[10px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xs">
+                      {action.label}
                     </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5 group-hover:text-emerald-600" />
                   </LocalizedLink>
                 );
               })}
             </div>
           </section>
 
-          <section className="min-w-0 overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
-            <div className="border-b border-[color:var(--app-border)] px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
-              <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {isId ? 'Penawaran yang kamu kelola' : 'Offers you manage'}
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? 'Periksa produk, jasa, supplier, atau tempat usaha yang sudah tayang maupun belum diterbitkan.'
-                  : 'Review published and unpublished products, services, suppliers, or business places.'}
-              </p>
+          {/* STOREFRONT — visual first, like familiar profile/shop grids. */}
+          <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:border">
+            <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3.5 sm:px-5">
+              <div className="min-w-0">
+                <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-lg">
+                  {isId ? 'Etalase' : 'Storefront'}
+                </h2>
+                <p className="mt-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                  {activeListings.length} {isId ? 'penawaran tayang' : 'published offers'}
+                </p>
+              </div>
+              <LocalizedLink
+                href={ROUTES.create}
+                className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-[11px] font-black text-white transition hover:bg-emerald-700 sm:text-xs"
+              >
+                <Plus className="h-4 w-4" />
+                {isId ? 'Tambah' : 'Add'}
+              </LocalizedLink>
             </div>
 
             <ProfileTabRail
@@ -2573,24 +2634,15 @@ export default function SuperProfile() {
               }}
             />
 
-            <div className="flex min-w-0 flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:px-5">
-              <FilterRail
-                activeFilter={activeFilter}
-                items={filterItems}
-                onChange={setActiveFilter}
-              />
-
-              <label className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[color:var(--app-border)] px-3 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                <Settings2 className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
-                <span className="sr-only">
-                  {isId ? 'Urutkan berdasarkan' : 'Sort by'}
-                </span>
+            <div className="flex min-w-0 items-center gap-2 border-b border-[color:var(--app-border)]/70 px-3 py-2.5 sm:px-5">
+              <FilterRail activeFilter={activeFilter} items={filterItems} onChange={setActiveFilter} />
+              <label className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <Settings2 className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-text-soft)]" />
+                <span className="sr-only">{isId ? 'Urutkan berdasarkan' : 'Sort by'}</span>
                 <select
                   value={sortMode}
-                  onChange={event =>
-                    setSortMode(event.target.value as SortMode)
-                  }
-                  className="min-w-0 bg-transparent text-xs font-bold outline-none"
+                  onChange={event => setSortMode(event.target.value as SortMode)}
+                  className="max-w-28 bg-transparent text-[10px] font-bold outline-none sm:max-w-none sm:text-xs"
                 >
                   {sortOptions.map(option => (
                     <option key={option.value} value={option.value}>
@@ -2602,7 +2654,7 @@ export default function SuperProfile() {
             </div>
 
             {visibleListings.length > 0 ? (
-              <div className="space-y-2.5 px-3 pb-3 sm:px-5 sm:pb-5">
+              <div className="grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-4 lg:grid-cols-4">
                 {visibleListings.map(item => (
                   <ListingCard
                     key={item.id}
@@ -2615,29 +2667,17 @@ export default function SuperProfile() {
               </div>
             ) : (
               <EmptyState
-                title={
-                  activeTab === 'drafts' ? copy.noDraftTitle : copy.noPostsTitle
-                }
-                description={
-                  activeTab === 'drafts'
-                    ? copy.noDraftDescription
-                    : copy.noPostsDescription
-                }
+                title={activeTab === 'drafts' ? copy.noDraftTitle : copy.noPostsTitle}
+                description={activeTab === 'drafts' ? copy.noDraftDescription : copy.noPostsDescription}
                 href={activeTab === 'drafts' ? ROUTES.drafts : ROUTES.create}
-                actionLabel={
-                  activeTab === 'drafts' ? copy.manageDrafts : copy.makePost
-                }
+                actionLabel={activeTab === 'drafts' ? copy.manageDrafts : copy.makePost}
               />
             )}
 
             {visibleListings.length > 0 ? (
               <div className="border-t border-[color:var(--app-border)] px-3 py-3 sm:px-5">
                 <LocalizedLink
-                  href={
-                    activeTab === 'drafts'
-                      ? ROUTES.drafts
-                      : ROUTES.manageListings
-                  }
+                  href={activeTab === 'drafts' ? ROUTES.drafts : ROUTES.manageListings}
                   className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
                 >
                   {copy.viewAll}
@@ -2646,6 +2686,18 @@ export default function SuperProfile() {
               </div>
             ) : null}
           </section>
+
+          <div className="flex items-center justify-center gap-4 px-3 pb-1 text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-xs">
+            <LocalizedLink href={ROUTES.manageReels} className="inline-flex items-center gap-1.5 hover:text-emerald-700 dark:hover:text-emerald-300">
+              <Play className="h-3.5 w-3.5" />
+              {isId ? 'Kelola Reels' : 'Manage Reels'}
+            </LocalizedLink>
+            <span aria-hidden="true">·</span>
+            <LocalizedLink href={ROUTES.manageCommunity} className="inline-flex items-center gap-1.5 hover:text-emerald-700 dark:hover:text-emerald-300">
+              <Users className="h-3.5 w-3.5" />
+              {isId ? 'Komunitas' : 'Community'}
+            </LocalizedLink>
+          </div>
         </div>
       </main>
 
@@ -2658,12 +2710,25 @@ export default function SuperProfile() {
         following={profileSocial?.following || []}
         followersCount={followersCount}
         followingCount={followingCount}
-        onTabChange={setSocialModalTab}
-        onClose={() => setSocialModalTab(null)}
+        onTabChange={changeSocialTab}
+        onClose={closeProfileModal}
+      />
+
+      <OwnerProfileEditModal
+        open={Boolean(editSection)}
+        detail={detail}
+        metadata={mergedMetadata}
+        isId={isId}
+        initialSection={editSection || 'menu'}
+        onSectionChange={changeEditSection}
+        onClose={closeProfileModal}
+        onSaved={async () => {
+          await loadProfile('refresh');
+        }}
       />
 
       <ImageCropModal
-        open={Boolean(cropTarget && cropSource)}
+        open={Boolean(modalKind === 'crop' && cropTarget && cropSource)}
         imageSrc={cropSource}
         aspect={cropTarget === 'cover' ? 16 / 9 : 1}
         maxOutputSize={cropTarget === 'cover' ? 1600 : 512}
@@ -2674,4 +2739,5 @@ export default function SuperProfile() {
       />
     </>
   );
+
 }

@@ -7,7 +7,6 @@ import {
 } from '../shared/config/nextSecurityHeaders.mjs';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
-const FAST_DOCKER_BUILD = process.env.FAST_DOCKER_BUILD === 'true';
 const WWW_ORIGIN =
   (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
   'https://www.lajukan.com';
@@ -30,7 +29,7 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   typescript: {
-    ignoreBuildErrors: FAST_DOCKER_BUILD,
+    ignoreBuildErrors: false,
   },
   experimental: {
     optimizeCss: false,

@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+set -eu
+
+PORT="${PORT:-8080}"
+RUST_LOG="${RUST_LOG:-info}"
+
+case "$PORT" in
+  ''|*[!0-9]*)
+    echo "[ai_service] invalid PORT: $PORT" >&2
+    exit 64
+    ;;
+esac
+
+if [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+  echo "[ai_service] PORT must be between 1 and 65535" >&2
+  exit 64
+fi
+
+export PORT
+export RUST_LOG
+
+echo "=========================================="
+echo " Lajukan AI Service"
+echo "=========================================="
+echo "Port     : $PORT"
+echo "Log level: $RUST_LOG"
+echo "=========================================="
+
+exec "$@"

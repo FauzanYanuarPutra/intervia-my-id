@@ -79,7 +79,7 @@ export function notificationTargetHref(notification: NotificationLike): string {
     return `/profile/${encodeURIComponent(entityId)}`;
   }
   if ((entityType === 'reel' || entityType === 'reels') && entityId) {
-    return `/reels?reel=${encodeURIComponent(entityId)}`;
+    return `/reels?video=${encodeURIComponent(entityId)}`;
   }
   if (entityType === 'content' && entityId) {
     return buildContentHref(

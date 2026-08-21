@@ -42,10 +42,13 @@ function normalizeSocketUrl(raw: string, forceLongPoll: boolean): string {
   return value;
 }
 
-function shouldForceLongPoll(host: string): boolean {
-  if (process.env.NEXT_PUBLIC_CHAT_FORCE_LONGPOLL === 'true') return true;
-  const normalizedHost = String(host || '').trim().toLowerCase();
-  return normalizedHost === 'www.lajukan.com' || normalizedHost === 'lajukan.com';
+function shouldForceLongPoll(): boolean {
+  // Long-poll is intentionally opt-in. Phoenix keeps one HTTP poll open and
+  // immediately starts the next, which looks like an endless request stream
+  // and is substantially more expensive than the same-origin WebSocket that
+  // Caddy already proxies in production. Phoenix can still use its bounded
+  // transport fallback when a particular network blocks WebSockets.
+  return process.env.NEXT_PUBLIC_CHAT_FORCE_LONGPOLL === 'true';
 }
 
 function resolveSocketUrls(): string[] {
@@ -56,7 +59,7 @@ function resolveSocketUrls(): string[] {
   if (typeof window !== 'undefined') {
     const isHttps = window.location.protocol === 'https:';
     const host = window.location.hostname;
-    const forceLongPoll = shouldForceLongPoll(host);
+    const forceLongPoll = shouldForceLongPoll();
     const socketProto = forceLongPoll
       ? isHttps
         ? 'https'
@@ -70,7 +73,7 @@ function resolveSocketUrls(): string[] {
       host,
       'localhost',
       '127.0.0.1',
-    ]).map((candidate) => `${socketProto}://${candidate}:4000/socket`);
+    ]).map(candidate => `${socketProto}://${candidate}:4000/socket`);
     const hostParts = host.split('.');
     const baseDomain =
       hostParts.length >= 3 && hostParts[0] === 'www'
@@ -149,7 +152,9 @@ function connectSocketWithUrl(token?: string, preferredUrl?: string): Socket {
   const tokenChanged = token !== undefined && token !== socketToken;
   const candidates = resolveSocketUrls();
   const nextUrl =
-    preferredUrl && candidates.includes(preferredUrl) ? preferredUrl : candidates[0];
+    preferredUrl && candidates.includes(preferredUrl)
+      ? preferredUrl
+      : candidates[0];
   const urlChanged = socketUrl !== null && socketUrl !== nextUrl;
 
   if (!socket || tokenChanged || urlChanged) {
@@ -192,9 +197,22 @@ export function ensureSocketConnected(token?: string): Socket {
   return connectSocket(token);
 }
 
+export function disconnectChatSocket(): void {
+  if (socket) {
+    try {
+      socket.disconnect();
+    } catch {
+      // Logout and account changes must continue even if transport cleanup fails.
+    }
+  }
+  socket = null;
+  socketToken = undefined;
+  socketUrl = null;
+}
+
 export async function getSocketWhenOpen(
   token?: string,
-  timeoutMs = 10000
+  timeoutMs = 10000,
 ): Promise<Socket> {
   const candidates = resolveSocketUrls();
   if (candidates.length === 0) {
@@ -203,7 +221,7 @@ export async function getSocketWhenOpen(
 
   const perCandidateTimeout = Math.max(
     1500,
-    Math.floor(timeoutMs / Math.max(1, candidates.length))
+    Math.floor(timeoutMs / Math.max(1, candidates.length)),
   );
 
   let lastError: Error | null = null;
@@ -237,7 +255,7 @@ export async function getSocketWhenOpen(
   throw new Error(
     `[chat] socket open timeout (${candidates.join(' -> ')})${
       lastError ? `: ${lastError.message}` : ''
-    }`
+    }`,
   );
 }
 

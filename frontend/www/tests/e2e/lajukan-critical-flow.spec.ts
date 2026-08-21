@@ -102,8 +102,20 @@ test.describe('Lajukan Indonesian critical journey', () => {
     });
 
     const dialog = page.getByTestId('community-compose-modal');
+    const surface = page.getByTestId('community-compose-surface');
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(/buat posting/i);
+    await expect(
+      page.getByRole('dialog', { name: /buat posting/i }),
+    ).toBeVisible();
+    await expect(page.getByTestId('community-compose-title-input')).toBeFocused();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.dataset.bodyScrollLocked,
+        ),
+      )
+      .toBe('true');
     expect(
       await dialog.evaluate(element => element.parentElement === document.body),
     ).toBe(true);
@@ -125,10 +137,94 @@ test.describe('Lajukan Indonesian critical journey', () => {
 
     expect(modalZ).toBeGreaterThanOrEqual(200);
     expect(modalZ).toBeGreaterThan(chromeMaxZ);
-    await expectCenteredInViewport(
-      page,
-      page.getByTestId('community-compose-surface'),
-    );
+    await expectCenteredInViewport(page, surface);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.dataset.bodyScrollLocked,
+        ),
+      )
+      .toBeUndefined();
+  });
+
+  test('Explore exposes a responsive task grid and public people directory', async ({
+    page,
+  }) => {
+    await installFixturesWhenRequested(page);
+
+    for (const viewport of [MOBILE_VIEWPORT, DESKTOP_VIEWPORT]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/id/explore', { waitUntil: 'domcontentloaded' });
+
+      await expect(
+        page.getByRole('heading', { name: /mau cari apa untuk usahamu/i }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: /cari bahan & stok/i }),
+      ).toBeVisible();
+      const peopleLink = page.getByRole('link', {
+        name: /temukan orang & pelaku usaha/i,
+      });
+      await expect(peopleLink).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: /lihat kebutuhan pembeli/i }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, 6);
+    }
+
+    await page
+      .getByRole('link', { name: /temukan orang & pelaku usaha/i })
+      .click();
+    await expect(page).toHaveURL(/\/id\/explore\?tab=users/);
+    await expect(
+      page.getByRole('heading', { name: /cari orang & pelaku usaha/i }),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page, 6);
+  });
+
+  test('community compose fills mobile viewport and restores trigger focus', async ({
+    page,
+  }) => {
+    await installFixturesWhenRequested(page);
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await page.goto('/id/community', { waitUntil: 'domcontentloaded' });
+
+    const trigger = page
+      .getByRole('button', { name: /tanya atau bagikan update usaha/i })
+      .first();
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+
+    const surface = page.getByTestId('community-compose-surface');
+    await expect(surface).toBeVisible();
+    await expect(page.getByTestId('community-compose-title-input')).toBeFocused();
+
+    const surfaceBox = await surface.boundingBox();
+    expect(surfaceBox).not.toBeNull();
+    if (surfaceBox) {
+      expect(surfaceBox.x).toBeLessThanOrEqual(1);
+      expect(surfaceBox.y).toBeLessThanOrEqual(1);
+      expect(surfaceBox.width).toBeGreaterThanOrEqual(MOBILE_VIEWPORT.width - 2);
+      expect(surfaceBox.height).toBeGreaterThanOrEqual(MOBILE_VIEWPORT.height - 2);
+    }
+
+    await page.evaluate(() => {
+      const outsideControl = document.querySelector<HTMLElement>('header button');
+      outsideControl?.focus();
+    });
+    await page.keyboard.press('Tab');
+    expect(
+      await surface.evaluate(element =>
+        element.contains(document.activeElement),
+      ),
+    ).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(surface).toBeHidden();
+    await expect(trigger).toBeFocused();
   });
 
   test('top-level flow pages render on mobile without document overflow', async ({

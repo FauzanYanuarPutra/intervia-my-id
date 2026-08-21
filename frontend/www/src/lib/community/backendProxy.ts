@@ -6,7 +6,6 @@ function getCommunityBackendBase(): string | null {
   const base =
     process.env.COMMUNITY_SERVICE_URL ||
     process.env.INTERNAL_COMMUNITY_URL ||
-    process.env.NEXT_PUBLIC_COMMUNITY_URL ||
     '';
   const configured = base.trim();
   if (configured) return configured;

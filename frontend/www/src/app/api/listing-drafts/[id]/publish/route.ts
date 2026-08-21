@@ -1,44 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-const MARKETPLACE_URL =
-  process.env.INTERNAL_MARKETPLACE_URL ||
-  process.env.MARKETPLACE_URL ||
-  'http://localhost:8081';
+import { NextRequest } from 'next/server';
+import { proxyListingDraftRequest } from '../../_proxy';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-function authHeaders(req: NextRequest) {
-  const headers = new Headers({ 'Content-Type': 'application/json' });
-  const bearer = req.headers.get('authorization');
-  const cookieToken = req.cookies.get('access_token')?.value?.trim();
-  if (bearer) headers.set('Authorization', bearer);
-  else if (cookieToken) headers.set('Authorization', `Bearer ${cookieToken}`);
-  return headers;
-}
-
-async function readJson(res: Response) {
-  const text = await res.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return { error: text };
-  }
-}
-
 export async function POST(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
-  const res = await fetch(
-    new URL(
-      `/v1/listing-drafts/${encodeURIComponent(id)}/publish`,
-      MARKETPLACE_URL,
-    ),
-    {
-      method: 'POST',
-      headers: authHeaders(req),
-      body: await req.text().catch(() => ''),
-      cache: 'no-store',
-    },
+  return proxyListingDraftRequest(
+    req,
+    `/v1/listing-drafts/${encodeURIComponent(id)}/publish`,
+    { method: 'POST' },
   );
-  return NextResponse.json(await readJson(res), { status: res.status });
 }

@@ -27,6 +27,9 @@ use uuid::Uuid;
 use sqlx::Row;
 
 use crate::config::AppState;
+use crate::routes::proofs::{
+    consume_identity_verification_proof, consume_phone_otp_proof,
+};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
 const MAX_METADATA_BYTES: usize = 48 * 1024;
@@ -100,6 +103,8 @@ pub struct UpdateMeRequest {
     pub buyer_profile: Option<Value>,
     pub media: Option<Value>,
     pub verification: Option<Value>,
+    pub phone_otp_token: Option<String>,
+    pub identity_verification_proof_token: Option<String>,
     pub roles: Option<Vec<String>>,
     pub image_urls: Option<Vec<String>>,
     pub document_urls: Option<Vec<String>>,
@@ -172,19 +177,6 @@ fn normalize_phone_digits(raw: &str) -> String {
     raw.chars().filter(|ch| ch.is_ascii_digit()).collect()
 }
 
-fn read_json_bool(value: &Value) -> Option<bool> {
-    match value {
-        Value::Bool(flag) => Some(*flag),
-        Value::String(text) => match text.trim().to_ascii_lowercase().as_str() {
-            "true" | "1" | "yes" => Some(true),
-            "false" | "0" | "no" => Some(false),
-            _ => None,
-        },
-        Value::Number(number) => Some(number.as_i64().unwrap_or(0) == 1),
-        _ => None,
-    }
-}
-
 fn sanitize_key(raw: &str) -> Option<String> {
     let value = raw.trim();
     if value.is_empty() || value.len() > 64 {
@@ -209,7 +201,62 @@ fn sanitize_string(raw: &str) -> Option<String> {
     Some(value)
 }
 
-fn sanitize_json_value(value: Value, depth: usize) -> Option<Value> {
+fn normalize_metadata_key(raw: &str) -> String {
+    let mut normalized = String::new();
+    for (index, ch) in raw.trim().chars().enumerate() {
+        if ch.is_ascii_uppercase() {
+            if index > 0 && !normalized.ends_with('_') {
+                normalized.push('_');
+            }
+            normalized.push(ch.to_ascii_lowercase());
+        } else if ch == '-' || ch.is_ascii_whitespace() {
+            if !normalized.ends_with('_') {
+                normalized.push('_');
+            }
+        } else {
+            normalized.push(ch.to_ascii_lowercase());
+        }
+    }
+    normalized
+}
+
+fn is_server_owned_metadata_key(raw: &str) -> bool {
+    let key = normalize_metadata_key(raw);
+    matches!(
+        key.as_str(),
+        "verification"
+            | "verified"
+            | "is_verified"
+            | "email_verified"
+            | "phone_verified"
+            | "document_verified"
+            | "liveness_verified"
+            | "identity_verified"
+            | "transaction_eligible"
+            | "kyc_status"
+            | "trust_status"
+            | "trust_score"
+            | "trust_tier"
+            | "trust_badge"
+            | "manual_verified"
+            | "verified_by_lajukan"
+            | "lajukan_verified"
+            | "reviewed_by"
+            | "reviewed_at"
+    ) || key.contains("verification")
+        || key.ends_with("_verified")
+        || key.starts_with("verification_")
+        || key.starts_with("kyc_")
+        || key.starts_with("trust_")
+        || key.starts_with("admin_review_")
+        || key.starts_with("manual_review_")
+}
+
+fn sanitize_json_value_with_policy(
+    value: Value,
+    depth: usize,
+    allow_server_owned: bool,
+) -> Option<Value> {
     if depth > MAX_METADATA_DEPTH {
         return None;
     }
@@ -221,7 +268,9 @@ fn sanitize_json_value(value: Value, depth: usize) -> Option<Value> {
         Value::Array(values) => {
             let mut next = Vec::new();
             for item in values.into_iter().take(MAX_METADATA_ARRAY_ITEMS) {
-                if let Some(cleaned) = sanitize_json_value(item, depth + 1) {
+                if let Some(cleaned) =
+                    sanitize_json_value_with_policy(item, depth + 1, allow_server_owned)
+                {
                     next.push(cleaned);
                 }
             }
@@ -233,13 +282,26 @@ fn sanitize_json_value(value: Value, depth: usize) -> Option<Value> {
                 let Some(clean_key) = sanitize_key(&key) else {
                     continue;
                 };
-                if let Some(clean_value) = sanitize_json_value(value, depth + 1) {
+                if !allow_server_owned && is_server_owned_metadata_key(&clean_key) {
+                    continue;
+                }
+                if let Some(clean_value) =
+                    sanitize_json_value_with_policy(value, depth + 1, allow_server_owned)
+                {
                     next.insert(clean_key, clean_value);
                 }
             }
             Some(Value::Object(next))
         }
     }
+}
+
+fn sanitize_json_value(value: Value, depth: usize) -> Option<Value> {
+    sanitize_json_value_with_policy(value, depth, false)
+}
+
+fn sanitize_trusted_json_value(value: Value, depth: usize) -> Option<Value> {
+    sanitize_json_value_with_policy(value, depth, true)
 }
 
 fn normalize_http_url(raw: &str) -> Option<String> {
@@ -578,6 +640,18 @@ pub async fn update_me_profile(
         }
     };
 
+    if payload.verification.is_some() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"verification is server-managed"})),
+        )
+            .into_response();
+    }
+
+    let phone_otp_token = normalize_optional_text(payload.phone_otp_token);
+    let identity_verification_proof_token =
+        normalize_optional_text(payload.identity_verification_proof_token);
+
     let full_name = normalize_optional_text(payload.full_name.or(payload.name));
     let username = normalize_optional_text(payload.username);
     let phone = normalize_optional_text(payload.phone);
@@ -610,14 +684,68 @@ pub async fn update_me_profile(
     let media_raw = payload
         .media
         .and_then(|value| sanitize_json_value(value, 0));
-    let verification_raw = payload
-        .verification
-        .and_then(|value| sanitize_json_value(value, 0));
-    let verification_phone_verified = verification_raw
-        .as_ref()
-        .and_then(|value| value.get("phone_verified"))
-        .and_then(read_json_bool)
-        .unwrap_or(false);
+
+    let phone_verified_by_proof = match phone_otp_token.as_deref() {
+        Some(token) => {
+            let Some(phone_value) = phone.as_deref() else {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error":"phone is required for phone verification"})),
+                )
+                    .into_response();
+            };
+            match consume_phone_otp_proof(&state, token, phone_value, &["profile"]).await {
+                Ok(true) => true,
+                Ok(false) => {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(json!({"error":"invalid or expired phone verification"})),
+                    )
+                        .into_response();
+                }
+                Err(error) => {
+                    tracing::error!("phone profile proof verification unavailable: {:?}", error);
+                    return (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        Json(json!({"error":"phone verification is temporarily unavailable"})),
+                    )
+                        .into_response();
+                }
+            }
+        }
+        None => false,
+    };
+
+    let trusted_verification = match identity_verification_proof_token.as_deref() {
+        Some(token) => match consume_identity_verification_proof(&state, token, user_id).await {
+            Ok(Some(value)) => match sanitize_trusted_json_value(value, 0) {
+                Some(Value::Object(value)) if !value.is_empty() => Some(Value::Object(value)),
+                _ => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({"error":"invalid identity verification payload"})),
+                    )
+                        .into_response();
+                }
+            },
+            Ok(None) => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({"error":"invalid or expired identity verification proof"})),
+                )
+                    .into_response();
+            }
+            Err(error) => {
+                tracing::error!("identity verification proof unavailable: {:?}", error);
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(json!({"error":"identity verification is temporarily unavailable"})),
+                )
+                    .into_response();
+            }
+        },
+        None => None,
+    };
 
     if let Some(ref username_value) = username {
         if username_value.len() < 3 {
@@ -688,7 +816,7 @@ pub async fn update_me_profile(
         .unwrap_or(false);
 
     if phone.is_some() {
-        let next_phone_verified = if verification_phone_verified {
+        let next_phone_verified = if phone_verified_by_proof {
             true
         } else if phone_changed {
             false
@@ -768,12 +896,21 @@ pub async fn update_me_profile(
     if let Some(media) = media_raw {
         metadata_patch.insert("media".to_string(), media);
     }
-    let mut verification_patch = match verification_raw {
+    let mut verification_patch = match trusted_verification {
         Some(Value::Object(map)) => map,
         Some(_) | None => serde_json::Map::new(),
     };
-    if phone_changed && !verification_phone_verified {
-        verification_patch.insert("phone_verified".to_string(), Value::Bool(false));
+    if phone.is_some() {
+        verification_patch.insert(
+            "phone_verified".to_string(),
+            Value::Bool(if phone_verified_by_proof {
+                true
+            } else if phone_changed {
+                false
+            } else {
+                current_phone_verified
+            }),
+        );
     }
     if !verification_patch.is_empty() {
         metadata_patch.insert(
@@ -845,16 +982,16 @@ pub async fn update_me_profile(
             _ => serde_json::Map::new(),
         };
         for (key, value) in metadata_patch {
-            if key == "extended" {
-                if let Value::Object(next_extended) = value {
-                    let mut existing_extended = match merged.remove("extended") {
+            if key == "extended" || key == "verification" {
+                if let Value::Object(next_object) = value {
+                    let mut existing_object = match merged.remove(&key) {
                         Some(Value::Object(map)) => map,
                         _ => serde_json::Map::new(),
                     };
-                    for (extended_key, extended_value) in next_extended {
-                        existing_extended.insert(extended_key, extended_value);
+                    for (nested_key, nested_value) in next_object {
+                        existing_object.insert(nested_key, nested_value);
                     }
-                    merged.insert(key, Value::Object(existing_extended));
+                    merged.insert(key, Value::Object(existing_object));
                     continue;
                 }
             }
@@ -1047,6 +1184,22 @@ pub async fn delete_me_account(
             )
                 .into_response();
         }
+    }
+
+    if sqlx::query(
+        "UPDATE core.sessions SET revoked = TRUE WHERE user_id = $1 AND revoked = FALSE",
+    )
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        let _ = tx.rollback().await;
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"failed to revoke account sessions"})),
+        )
+            .into_response();
     }
 
     if tx.commit().await.is_err() {
@@ -1311,4 +1464,63 @@ pub async fn get_user_detail(
         }),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{sanitize_json_value, sanitize_trusted_json_value};
+
+    #[test]
+    fn owner_metadata_drops_server_managed_trust_fields_recursively() {
+        let sanitized = sanitize_json_value(
+            json!({
+                "headline": "Pengrajin",
+                "verification": { "identity_verified": true },
+                "profile": {
+                    "bio": "Profil publik",
+                    "phone_verified": true,
+                    "trust_score": 100
+                },
+                "extended": {
+                    "kyc_status": "enhanced",
+                    "skills": ["Anyaman"]
+                }
+            }),
+            0,
+        )
+        .expect("sanitized metadata");
+
+        assert_eq!(sanitized["headline"].as_str(), Some("Pengrajin"));
+        assert_eq!(
+            sanitized["profile"]["bio"].as_str(),
+            Some("Profil publik")
+        );
+        assert_eq!(
+            sanitized["extended"]["skills"][0].as_str(),
+            Some("Anyaman")
+        );
+        assert!(sanitized.get("verification").is_none());
+        assert!(sanitized["profile"].get("phone_verified").is_none());
+        assert!(sanitized["profile"].get("trust_score").is_none());
+        assert!(sanitized["extended"].get("kyc_status").is_none());
+    }
+
+    #[test]
+    fn trusted_verification_payload_retains_server_managed_fields() {
+        let sanitized = sanitize_trusted_json_value(
+            json!({
+                "identity_verified": true,
+                "document_verified": true,
+                "kyc_status": "full"
+            }),
+            0,
+        )
+        .expect("trusted verification");
+
+        assert_eq!(sanitized["identity_verified"].as_bool(), Some(true));
+        assert_eq!(sanitized["document_verified"].as_bool(), Some(true));
+        assert_eq!(sanitized["kyc_status"].as_str(), Some("full"));
+    }
 }

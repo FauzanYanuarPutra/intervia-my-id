@@ -138,7 +138,7 @@ export function mapVideo(item: JsonRecord): GlobalSearchItem | null {
     kind: 'videos',
     title: firstString(item.title, item.caption, item.body, 'Video Lajukan'),
     summary: firstString(item.caption, item.body),
-    href: firstString(item.href, `/reels?reel=${encodeURIComponent(id)}`),
+    href: firstString(item.href, `/reels?video=${encodeURIComponent(id)}`),
     image:
       firstString(
         item.thumbnail_url,

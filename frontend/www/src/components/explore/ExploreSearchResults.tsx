@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 
 import { CompactSeeAllButton } from '@/components/common/CompactSectionAction';
+import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
+import { useExploreEmblaRail } from '@/components/explore/ExploreVisualSystem';
 import { ExploreCardMedia } from '@/components/explore/cards/ExploreCardMedia';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { BusinessSearchCard } from '@/components/search/result-cards/BusinessSearchCard';
@@ -28,6 +30,7 @@ import type {
   GlobalSearchTab,
 } from '@/lib/search/globalSearch';
 import type { LajukanLocale } from '@/lib/discovery/lajukanCategories';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { cn } from '@/lib/utils';
 
 const SEARCH_GROUPS: GlobalSearchGroupKey[] = [
@@ -41,6 +44,25 @@ const SEARCH_GROUPS: GlobalSearchGroupKey[] = [
   'users',
 ];
 
+const DEFAULT_SEARCH_GROUPS: GlobalSearchGroupKey[] = [
+  'products',
+  'services',
+  'businesses',
+];
+
+const SUPPLY_RESULT_TABS: GlobalSearchTab[] = [
+  'all',
+  'products',
+  'services',
+  'businesses',
+];
+
+const DEDICATED_TABS = new Set<GlobalSearchTab>([
+  'needs',
+  'users',
+  'references',
+]);
+
 const SEARCH_GROUP_COPY: Record<
   GlobalSearchGroupKey,
   {
@@ -53,31 +75,33 @@ const SEARCH_GROUP_COPY: Record<
   products: {
     labelId: 'Produk',
     labelEn: 'Products',
-    descriptionId: 'Bahan, stok, alat, dan barang yang bisa dibandingkan.',
+    descriptionId: 'Produk, bahan, stok, dan alat yang bisa kamu bandingkan.',
     descriptionEn: 'Materials, stock, tools, and goods you can compare.',
   },
   services: {
     labelId: 'Jasa',
     labelEn: 'Services',
-    descriptionId: 'Penyedia jasa operasional, kreatif, teknis, dan usaha.',
+    descriptionId: 'Jasa untuk kebutuhan operasional, kreatif, teknis, dan usaha.',
     descriptionEn: 'Operational, creative, technical, and business services.',
   },
   businesses: {
     labelId: 'Usaha',
     labelEn: 'Businesses',
-    descriptionId: 'Toko, UMKM, dan profil penyedia yang relevan.',
+    descriptionId: 'Toko, UMKM, dan usaha yang sesuai dengan pencarianmu.',
     descriptionEn: 'Relevant stores, MSMEs, and provider profiles.',
   },
   references: {
-    labelId: 'Referensi tempat usaha',
-    labelEn: 'Business place references',
-    descriptionId: 'Data lokasi untuk acuan, bukan daftar toko aktif.',
-    descriptionEn: 'Location data for reference, not a list of active stores.',
+    labelId: 'Lokasi Usaha',
+    labelEn: 'Public data references',
+    descriptionId:
+      'Referensi lokasi usaha dari data publik yang sumbernya bisa diperiksa.',
+    descriptionEn:
+      'Non-transactional locations with a source and license you can inspect.',
   },
   needs: {
-    labelId: 'Kebutuhan',
+    labelId: 'Kebutuhan Pembeli',
     labelEn: 'Needs',
-    descriptionId: 'Permintaan aktif dari pembeli atau pencari penyedia.',
+    descriptionId: 'Orang atau usaha yang sedang mencari produk, jasa, atau penyedia.',
     descriptionEn: 'Active requests from buyers or seekers.',
   },
   communities: {
@@ -93,12 +117,107 @@ const SEARCH_GROUP_COPY: Record<
     descriptionEn: 'Short content for business inspiration and education.',
   },
   users: {
-    labelId: 'Orang',
+    labelId: 'Orang & Keahlian',
     labelEn: 'Users',
-    descriptionId: 'Profil orang dan pelaku usaha yang bisa dicek.',
+    descriptionId: 'Profil pelaku usaha, penjual, freelancer, dan keahlian yang bisa kamu lihat.',
     descriptionEn: 'People and business owner profiles you can inspect.',
   },
 };
+
+
+function ResultTypeTabs({
+  payload,
+  activeTab,
+  locale,
+  onSelectTab,
+}: {
+  payload: GlobalSearchResponse;
+  activeTab: GlobalSearchTab;
+  locale: LajukanLocale;
+  onSelectTab?: (tab: GlobalSearchTab) => void;
+}) {
+  if (!onSelectTab || DEDICATED_TABS.has(activeTab)) return null;
+
+  const isId = locale === 'id';
+  const tabs = SUPPLY_RESULT_TABS.filter(tab => {
+    if (tab === 'all') return true;
+    const group = payload.groups[tab as GlobalSearchGroupKey];
+    return Boolean(group?.available && (group.total > 0 || tab === activeTab));
+  });
+
+  if (tabs.length <= 1) return null;
+
+  return (
+    <div className="mt-3 rounded-[16px] border border-zinc-200/80 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-950 sm:p-2.5">
+      <div className="flex items-center justify-between gap-3 px-1 pb-2">
+        <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+          {isId ? 'Jenis hasil' : 'Result type'}
+        </p>
+        {activeTab !== 'all' ? (
+          <button
+            type="button"
+            onClick={() => onSelectTab('all')}
+            className="text-[10px] font-bold text-emerald-700 hover:underline dark:text-emerald-400 sm:text-[11px]"
+          >
+            {isId ? 'Semua hasil' : 'All results'}
+          </button>
+        ) : null}
+      </div>
+      <div
+        role="tablist"
+        aria-label={isId ? 'Jenis hasil pencarian' : 'Search result type'}
+        className="flex min-w-0 flex-wrap gap-1.5"
+      >
+        {tabs.map(tab => {
+          const active = activeTab === tab;
+          const count =
+            tab === 'all'
+              ? DEFAULT_SEARCH_GROUPS.reduce(
+                  (total, key) => total + (payload.groups[key]?.total || 0),
+                  0,
+                )
+              : payload.groups[tab as GlobalSearchGroupKey]?.total || 0;
+          const label =
+            tab === 'all'
+              ? isId
+                ? 'Semua hasil'
+                : 'All results'
+              : isId
+                ? SEARCH_GROUP_COPY[tab as GlobalSearchGroupKey].labelId
+                : SEARCH_GROUP_COPY[tab as GlobalSearchGroupKey].labelEn;
+
+          return (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={active ? true : undefined}
+              onClick={() => onSelectTab(tab)}
+              className={cn(
+                'inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-[10px] border px-2.5 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25',
+                active
+                  ? 'border-zinc-950 bg-zinc-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950'
+                  : 'border-zinc-200 bg-white text-zinc-500 shadow-none hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-white',
+              )}
+            >
+              <span className="truncate">{label}</span>
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[9px] tabular-nums',
+                  active
+                    ? 'bg-emerald-400 text-zinc-950 dark:bg-emerald-500 dark:text-zinc-950'
+                    : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-500',
+                )}
+              >
+                {count.toLocaleString(isId ? 'id-ID' : 'en-US')}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function ReferenceNextBatchAction({
   cursor,
@@ -114,7 +233,7 @@ function ReferenceNextBatchAction({
       <p className="text-[11px] leading-5 text-[color:var(--app-text-soft)]">
         {isId
           ? 'Daftar berikutnya akan mengganti hasil saat ini agar halaman tetap ringan.'
-          : 'The next list replaces the current results to keep this page lightweight.'}
+          : 'The next batch replaces the current results to keep this page lightweight.'}
       </p>
       <button
         type="button"
@@ -129,27 +248,8 @@ function ReferenceNextBatchAction({
 }
 
 function metadataText(item: GlobalSearchItem, key: string): string {
-  const metadata = item.metadata || {};
-  const value = metadata[key];
+  const value = item.metadata[key];
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function isValidPublicReference(item: GlobalSearchItem): boolean {
-  if (item.kind !== 'references') return false;
-  if (item.metadata?.isTransactional === true) return false;
-
-  return Boolean(
-    metadataText(item, 'sourceTitle') &&
-      safeExternalHref(metadataText(item, 'sourceUrl')) &&
-      metadataText(item, 'sourceLicense') &&
-      safeExternalHref(metadataText(item, 'sourceLicenseUrl')),
-  );
-}
-
-function formatResultCount(value: number, locale: LajukanLocale): string {
-  return Math.max(Number(value || 0), 0).toLocaleString(
-    locale === 'id' ? 'id-ID' : 'en-US',
-  );
 }
 
 function safeExternalHref(value: string): string {
@@ -161,6 +261,17 @@ function safeExternalHref(value: string): string {
   } catch {
     return '';
   }
+}
+
+function hasCompleteReferenceProvenance(item: GlobalSearchItem): boolean {
+  if (item.kind !== 'references') return true;
+  return Boolean(
+    item.metadata.isTransactional === false &&
+      metadataText(item, 'sourceTitle') &&
+      safeExternalHref(metadataText(item, 'sourceUrl')) &&
+      metadataText(item, 'sourceLicense') &&
+      safeExternalHref(metadataText(item, 'sourceLicenseUrl')),
+  );
 }
 
 function PublicReferenceCard({
@@ -181,7 +292,7 @@ function PublicReferenceCard({
   const imageSourceUrl = safeExternalHref(
     metadataText(item, 'imageSourceUrl'),
   );
-  const distanceKm = item.metadata?.distanceKm;
+  const distanceKm = item.metadata.distanceKm;
   const distanceLabel =
     typeof distanceKm === 'number' && Number.isFinite(distanceKm)
       ? `${distanceKm.toLocaleString(isId ? 'id-ID' : 'en-US', {
@@ -192,14 +303,14 @@ function PublicReferenceCard({
   return (
     <article
       data-testid="public-reference-card"
-      className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-amber-200/80 bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]"
+      className="flex h-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-amber-200/80 bg-[color:var(--app-surface-strong)] shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)] dark:border-amber-900/60"
     >
       <div className="relative">
         <Link
           href={item.href}
           aria-label={
             isId
-              ? `Buka catatan referensi ${item.title}`
+              ? `Buka informasi lokasi ${item.title}`
               : `Open reference record ${item.title}`
           }
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--app-accent)]"
@@ -209,13 +320,11 @@ function PublicReferenceCard({
             alt={item.title}
             attribution={imageAttribution}
             sourceHref={imageSourceUrl || undefined}
-            fallbackLabel={
-              isId ? 'Referensi lokasi publik' : 'Public location reference'
-            }
+            fallbackLabel={isId ? 'Lokasi usaha dari data publik' : 'Business location from public data'}
             className="aspect-[16/9] w-full"
           />
         </Link>
-        <span className="absolute left-2 top-2 inline-flex min-h-7 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 text-[10px] font-black text-amber-900 shadow-sm backdrop-blur">
+        <span className="absolute left-2 top-2 inline-flex min-h-7 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 text-[10px] font-black text-amber-900 shadow-sm backdrop-blur dark:border-amber-800 dark:bg-amber-950/90 dark:text-amber-100">
           <Database className="h-3.5 w-3.5" aria-hidden="true" />
           {isId ? 'Data lokasi publik' : 'Public location data'}
         </span>
@@ -254,10 +363,10 @@ function PublicReferenceCard({
           </p>
         ) : null}
 
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold leading-4 text-amber-950">
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold leading-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-100">
           {isId
-            ? 'Bukan toko atau penawaran aktif. Stok, harga, kontak, dan status verifikasi tidak tersedia.'
-            : 'Not an active store or offer. Stock, prices, contact details, and verification status are unavailable.'}
+            ? 'Bukan toko atau penawaran aktif di Lajukan. Gunakan untuk melihat lokasi; stok, harga, kontak, dan status usaha perlu dicek lagi.'
+            : 'Not a Lajukan store or offer. Activity, ownership, stock, price, contact details, and verification are not implied.'}
         </p>
 
         <div className="mt-auto grid gap-1.5 pt-3 text-[10px] font-bold">
@@ -266,7 +375,7 @@ function PublicReferenceCard({
               href={sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2 text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+              className="inline-flex min-h-8 min-w-0 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2 text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
             >
               <Database className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">
@@ -281,7 +390,7 @@ function PublicReferenceCard({
               href={sourceLicenseUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2 text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+              className="inline-flex min-h-8 min-w-0 items-center gap-1.5 rounded-md border border-[color:var(--app-border)] px-2 text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
             >
               <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">
@@ -297,16 +406,12 @@ function PublicReferenceCard({
   );
 }
 
-function SearchSkeleton({ locale }: { locale: LajukanLocale }) {
+function SearchSkeleton() {
   return (
     <section
-      className="border-t border-[color:var(--app-border)] py-6"
-      aria-busy="true"
-      aria-live="polite"
+      className="py-3"
+      aria-hidden="true"
     >
-      <span className="sr-only">
-        {locale === 'id' ? 'Memuat hasil pencarian.' : 'Loading search results.'}
-      </span>
       <div className="h-5 w-40 animate-pulse rounded bg-[color:var(--app-border)]" />
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, index) => (
@@ -353,83 +458,106 @@ function SearchGroupSection({
   onNextCursor?: (cursor: string) => void;
 }) {
   const isId = locale === 'id';
-  const safeItems =
-    groupKey === 'references'
-      ? group.items.filter(isValidPublicReference)
-      : group.items;
-  if (!group.available || (safeItems.length === 0 && !group.error)) return null;
+  const { emblaRef, emblaApi } = useExploreEmblaRail();
+
+  if (!group.available || (group.items.length === 0 && !group.error)) {
+    return null;
+  }
+
   const copy = SEARCH_GROUP_COPY[groupKey];
   const items = compact
-    ? safeItems.slice(0, groupKey === 'videos' ? 4 : 3)
-    : safeItems;
-  const displayedTotal =
-    groupKey === 'references'
-      ? safeItems.length
-      : Math.max(group.total, safeItems.length);
+    ? group.items.slice(0, groupKey === 'videos' ? 6 : 5)
+    : group.items;
+
+  const compactSlideClass =
+    groupKey === 'videos'
+      ? 'flex-[0_0_47%] sm:flex-[0_0_31%] lg:flex-[0_0_24%]'
+      : groupKey === 'products' || groupKey === 'services'
+        ? 'flex-[0_0_47%] sm:flex-[0_0_31%] lg:flex-[0_0_24%]'
+        : 'flex-[0_0_88%] sm:flex-[0_0_48%] lg:flex-[0_0_32%]';
+
+  const fullGridClass =
+    groupKey === 'videos'
+      ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+      : groupKey === 'products' || groupKey === 'services'
+        ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
+        : groupKey === 'needs'
+          ? 'sm:grid-cols-2 xl:grid-cols-3'
+          : groupKey === 'businesses' ||
+              groupKey === 'references' ||
+              groupKey === 'communities'
+            ? 'sm:grid-cols-2 lg:grid-cols-3'
+            : 'sm:grid-cols-2 xl:grid-cols-3';
 
   return (
-    <section className="border-t border-[color:var(--app-border)] py-6">
-      <div className="flex items-end justify-between gap-4">
+    <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 shadow-[0_10px_26px_-26px_rgba(15,23,42,0.24)] sm:p-4">
+      <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-bold text-[color:var(--app-text)]">
+          <h2 className="text-base font-bold tracking-[-0.02em] text-[color:var(--app-text)] sm:text-lg">
             {isId ? copy.labelId : copy.labelEn}
           </h2>
-          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-[color:var(--app-text-soft)]">
-            {isId ? copy.descriptionId : copy.descriptionEn}{' '}
-            {isId ? 'Menampilkan' : 'Showing'}{' '}
-            {formatResultCount(displayedTotal, locale)}.
+          <p className="mt-0.5 text-[11px] font-medium text-[color:var(--app-text-soft)]">
+            {group.total.toLocaleString(isId ? 'id-ID' : 'en-US')} {isId ? 'hasil' : 'results'}
           </p>
         </div>
-        {compact && safeItems.length > 0 && onSelectTab ? (
-          <CompactSeeAllButton
-            isId={isId}
-            label={isId ? 'Lihat semua' : 'View all'}
-            className="h-11 min-h-11"
-            onClick={() => onSelectTab(groupKey)}
-            aria-label={
-              isId ? `Lihat semua ${copy.labelId}` : `View all ${copy.labelEn}`
-            }
-          />
+
+        {compact && group.items.length > 0 ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <EmblaDesktopControls api={emblaApi} isId={isId} compact />
+            {onSelectTab ? (
+              <CompactSeeAllButton
+                isId={isId}
+                onClick={() => onSelectTab(groupKey)}
+                aria-label={
+                  isId
+                    ? `Lihat semua ${copy.labelId}`
+                    : `View all ${copy.labelEn}`
+                }
+              />
+            ) : null}
+          </div>
         ) : null}
       </div>
 
       {group.error ? (
-        <div
-          role="status"
-          className="mt-3 rounded-[8px] border border-dashed border-[color:var(--app-border-strong)] p-4 text-xs text-[color:var(--app-text-soft)]"
-        >
+        <div className="mt-3 rounded-[16px] border border-dashed border-[color:var(--app-border-strong)] p-4 text-xs text-[color:var(--app-text-soft)]">
           {isId
-            ? `Sebagian hasil ${copy.labelId.toLowerCase()} belum dapat dimuat. Hasil yang sudah tersedia tetap ditampilkan.`
-            : `Some ${copy.labelEn.toLowerCase()} results could not be loaded. Available results remain visible.`}
+            ? `Hasil ${copy.labelId.toLowerCase()} belum dapat dimuat. Bagian lain tetap tersedia.`
+            : `${copy.labelEn} results are temporarily unavailable. Other sections remain available.`}
         </div>
-      ) : null}
-
-      {items.length > 0 ? (
+      ) : compact ? (
         <>
           <div
-            className={cn(
-              'mt-4 grid gap-3',
-              groupKey === 'videos'
-                ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
-                : groupKey === 'products' || groupKey === 'services'
-                  ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
-                  : groupKey === 'needs'
-                    ? 'sm:grid-cols-2 xl:grid-cols-3'
-                    : groupKey === 'businesses' ||
-                        groupKey === 'references' ||
-                        groupKey === 'communities'
-                      ? 'sm:grid-cols-2 lg:grid-cols-3'
-                      : 'sm:grid-cols-2 xl:grid-cols-3',
-            )}
+            ref={emblaRef}
+            className="mt-3 w-full min-w-0 cursor-grab overflow-hidden pb-1 active:cursor-grabbing"
+            aria-label={isId ? copy.labelId : copy.labelEn}
           >
+            <div className="flex touch-pan-y gap-3 [backface-visibility:hidden] [will-change:transform]">
+              {items.map(item => (
+                <div
+                  key={`${item.kind}-${item.id}`}
+                  className={`min-w-0 shrink-0 select-none [backface-visibility:hidden] ${compactSlideClass}`}
+                >
+                  <div className="h-full w-full">
+                    {renderSearchCard(item, locale)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </>
+      ) : (
+        <>
+          <div className={`mt-4 grid gap-3 ${fullGridClass}`}>
             {items.map(item => (
               <div key={`${item.kind}-${item.id}`}>
                 {renderSearchCard(item, locale)}
               </div>
             ))}
           </div>
-          {!compact &&
-          groupKey === 'references' &&
+
+          {groupKey === 'references' &&
           group.nextCursor &&
           onNextCursor ? (
             <ReferenceNextBatchAction
@@ -439,7 +567,7 @@ function SearchGroupSection({
             />
           ) : null}
         </>
-      ) : null}
+      )}
     </section>
   );
 }
@@ -451,6 +579,7 @@ export function ExploreSearchResults({
   locale,
   compact = true,
   activeTab = 'all',
+  searchSide = 'supply',
   onSelectTab,
   onNextCursor,
   onRetry,
@@ -461,59 +590,55 @@ export function ExploreSearchResults({
   locale: LajukanLocale;
   compact?: boolean;
   activeTab?: GlobalSearchTab;
+  searchSide?: 'supply' | 'demand';
   onSelectTab?: (tab: GlobalSearchTab) => void;
   onNextCursor?: (cursor: string) => void;
   onRetry?: () => void;
 }) {
   const isId = locale === 'id';
-  const groups =
-    activeTab === 'all'
-      ? SEARCH_GROUPS
-      : SEARCH_GROUPS.filter(groupKey => groupKey === activeTab);
-  const visibleGroups = groups.filter(groupKey => {
-    const group = payload.groups[groupKey];
-    if (!group.available) return false;
-    if (groupKey === 'references') {
-      return group.items.some(isValidPublicReference) || Boolean(group.error);
-    }
-    return group.items.length > 0 || Boolean(group.error);
-  });
-  const availableFilterGroups = SEARCH_GROUPS.filter(groupKey => {
-    if (groupKey === 'references') return false;
-    const group = payload.groups[groupKey];
-    return (
-      group.available && (group.items.length > 0 || Boolean(group.error))
-    );
-  });
-  const selectedGroup =
-    activeTab === 'all' ? null : payload.groups[activeTab as GlobalSearchGroupKey];
-  const visibleTotal =
-    activeTab === 'all'
-      ? visibleGroups.reduce((total, groupKey) => {
-          const group = payload.groups[groupKey];
-          if (groupKey === 'references') {
-            return total + group.items.filter(isValidPublicReference).length;
-          }
-          return total + Math.max(group.total, group.items.length);
-        }, 0)
-      : activeTab === 'references'
-        ? payload.groups.references.items.filter(isValidPublicReference).length
-        : Math.max(selectedGroup?.total || 0, selectedGroup?.items.length || 0);
+  const safeReferenceItems = payload.groups.references.items.filter(
+    hasCompleteReferenceProvenance,
+  );
+  const visiblePayload: GlobalSearchResponse =
+    safeReferenceItems.length === payload.groups.references.items.length
+      ? payload
+      : {
+          ...payload,
+          groups: {
+            ...payload.groups,
+            references: {
+              ...payload.groups.references,
+              items: safeReferenceItems,
+              total:
+                safeReferenceItems.length === 0
+                  ? 0
+                  : Math.max(
+                      safeReferenceItems.length,
+                      payload.groups.references.total,
+                    ),
+            },
+          },
+        };
   const referenceNextCursor =
     activeTab === 'references'
-      ? payload.groups.references.nextCursor
+      ? visiblePayload.groups.references.nextCursor
       : null;
-  const hasRenderableResults = visibleTotal > 0 || visibleGroups.length > 0;
+  const createHref =
+    searchSide === 'demand' ? '/create?side=supply' : '/create?side=demand';
+  const hasVisibleItems =
+    activeTab === 'all'
+      ? DEFAULT_SEARCH_GROUPS.some(
+          key => visiblePayload.groups[key].items.length > 0,
+        )
+      : visiblePayload.groups[activeTab as GlobalSearchGroupKey]?.items
+          .length > 0;
 
-  if (loading && !hasRenderableResults) return <SearchSkeleton locale={locale} />;
+  if (loading && !hasVisibleItems) return <SearchSkeleton />;
 
-  if (error && !hasRenderableResults) {
+  if (error && !hasVisibleItems) {
     return (
-      <section className="border-t border-[color:var(--app-border)] py-8">
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-4 rounded-[8px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 sm:flex-row sm:items-center sm:justify-between"
-        >
+      <section className="py-3">
+        <div className="flex flex-col items-start gap-4 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
               <CircleAlert className="h-4 w-4 text-amber-600" />
@@ -522,7 +647,7 @@ export function ExploreSearchResults({
                 : 'Results could not be loaded.'}
             </p>
             <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-              {isId ? 'Periksa koneksi lalu coba lagi.' : 'Check your connection and retry.'}
+              {isId ? 'Coba lagi sebentar.' : 'Please retry in a moment.'}
             </p>
           </div>
           {onRetry ? (
@@ -539,54 +664,45 @@ export function ExploreSearchResults({
     );
   }
 
-  if (!hasRenderableResults) {
+  const activeGroupKey =
+    activeTab === 'all' ? null : (activeTab as GlobalSearchGroupKey);
+  const displayedTotal = activeGroupKey
+    ? visiblePayload.groups[activeGroupKey]?.total || 0
+    : DEFAULT_SEARCH_GROUPS.reduce(
+        (total, key) => total + (visiblePayload.groups[key]?.total || 0),
+        0,
+      );
+
+  if (displayedTotal === 0) {
     return (
-      <section className="border-t border-[color:var(--app-border)] py-8">
-        <div
-          role="status"
-          className="rounded-[8px] border border-dashed border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-5"
-        >
+      <>
+        <ResultTypeTabs
+          payload={visiblePayload}
+          activeTab={activeTab}
+          locale={locale}
+          onSelectTab={onSelectTab}
+        />
+        <section className="py-3">
+        <div className="rounded-[18px] border border-dashed border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-4 sm:p-5">
           <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
             <PackageSearch className="h-4 w-4 text-[color:var(--app-accent)]" />
-            {isId ? 'Belum ada hasil yang cocok.' : 'No matching results yet.'}
+            {activeTab !== 'all' && activeTab !== 'references'
+              ? isId
+                ? `Belum ada hasil ${SEARCH_GROUP_COPY[activeTab as GlobalSearchGroupKey].labelId.toLowerCase()}`
+                : `No ${SEARCH_GROUP_COPY[activeTab as GlobalSearchGroupKey].labelEn.toLowerCase()} results yet`
+              : isId
+                ? 'Belum ada hasil yang cocok.'
+                : 'No matching results yet.'}
           </p>
           <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
             {activeTab === 'references'
               ? isId
                 ? 'Coba nama usaha, jenis tempat, atau kota lain. Hanya data dengan sumber dan lisensi yang jelas yang ditampilkan.'
                 : 'Try another business name, place type, or city. Only data with a clear source and license is shown.'
-              : activeTab !== 'all'
-                ? isId
-                  ? `Belum ada hasil ${SEARCH_GROUP_COPY[activeTab as GlobalSearchGroupKey]?.labelId.toLowerCase() || 'jenis ini'}. Coba lihat semua hasil.`
-                  : 'There are no results of this type yet. Try viewing all results.'
-                : isId
-                  ? 'Coba kata yang lebih singkat, pilih kategori lain, atau tulis kebutuhanmu.'
-                  : 'Try another keyword, choose a category, or post a need so providers can respond.'}
+              : isId
+                ? 'Coba kata yang lebih umum, pilih kategori lain, atau pasang kebutuhan agar orang yang cocok bisa menghubungimu.'
+                : 'Try another keyword, choose a category, or post a need so providers can respond.'}
           </p>
-          {activeTab !== 'all' && activeTab !== 'references' && onSelectTab ? (
-            <button
-              type="button"
-              onClick={() => onSelectTab('all')}
-              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2"
-            >
-              {isId ? 'Lihat semua hasil' : 'View all results'}
-            </button>
-          ) : activeTab === 'all' ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                href="/explore"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-bold text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
-              >
-                {isId ? 'Pilih kategori' : 'Choose a category'}
-              </Link>
-              <Link
-                href="/create?side=demand"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white hover:bg-[color:var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2"
-              >
-                {isId ? 'Tulis kebutuhan' : 'Post a need'}
-              </Link>
-            </div>
-          ) : null}
           {referenceNextCursor && onNextCursor ? (
             <ReferenceNextBatchAction
               cursor={referenceNextCursor}
@@ -594,96 +710,85 @@ export function ExploreSearchResults({
               onNextCursor={onNextCursor}
             />
           ) : null}
+          {activeTab !== 'references' ? (
+            <Link
+              href={createHref}
+              onClick={() => {
+                void trackLajukanEvent('search.zero_result_action_clicked', {
+                  properties: {
+                    active_tab: activeTab,
+                    search_side: searchSide,
+                    action: searchSide === 'demand' ? 'post_offer' : 'post_need',
+                  },
+                });
+              }}
+              className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+            >
+              {searchSide === 'demand'
+                ? isId
+                  ? 'Tawarkan yang kamu punya'
+                  : 'Post what you offer'
+                : isId
+                  ? 'Pasang kebutuhan'
+                  : 'Post a need'}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          ) : null}
         </div>
       </section>
+      </>
     );
   }
 
-  return (
-    <div aria-busy={loading} aria-live="polite">
-      {onSelectTab && activeTab !== 'references' ? (
-        <nav
-          aria-label={isId ? 'Jenis hasil pencarian' : 'Search result type'}
-          className="mt-4 flex min-w-0 gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <button
-            type="button"
-            onClick={() => onSelectTab('all')}
-            aria-pressed={activeTab === 'all'}
-            className={cn(
-              'inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
-              activeTab === 'all'
-                ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)]',
-            )}
-          >
-            {isId ? 'Semua hasil' : 'All results'}
-          </button>
-          {availableFilterGroups.map(groupKey => {
-            const copy = SEARCH_GROUP_COPY[groupKey];
-            const active = activeTab === groupKey;
-            return (
-              <button
-                key={groupKey}
-                type="button"
-                onClick={() => onSelectTab(groupKey)}
-                aria-pressed={active}
-                className={cn(
-                  'inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
-                  active
-                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)]',
-                )}
-              >
-                {isId ? copy.labelId : copy.labelEn}
-              </button>
-            );
-          })}
-        </nav>
-      ) : null}
+  const groups =
+    activeTab === 'all'
+      ? DEFAULT_SEARCH_GROUPS
+      : SEARCH_GROUPS.filter(groupKey => groupKey === activeTab);
 
+  return (
+    <>
       {loading || error ? (
         <div
           role="status"
-          className={cn(
-            'mt-5 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-xs font-semibold',
-            error
-              ? 'border-amber-200 bg-amber-50 text-amber-950'
-              : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]',
-          )}
+          className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"
         >
           <span>
-            {error
+            {loading
               ? isId
-                ? 'Pembaruan gagal. Hasil terakhir yang tersedia tetap ditampilkan.'
-                : 'Refresh failed. The latest available results remain visible.'
+                ? 'Memperbarui hasil. Hasil terakhir tetap ditampilkan.'
+                : 'Refreshing results. The latest available results remain visible.'
               : isId
-                ? 'Memperbarui hasil…'
-                : 'Refreshing results…'}
+                ? 'Pembaruan gagal. Hasil terakhir yang tersedia tetap ditampilkan.'
+                : 'Refresh failed. The latest available results remain visible.'}
           </span>
           {error && onRetry ? (
             <button
               type="button"
               onClick={onRetry}
-              className="shrink-0 rounded-md px-2 py-1 font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700"
+              className="shrink-0 font-bold text-[color:var(--app-accent)]"
             >
               {isId ? 'Coba lagi' : 'Retry'}
             </button>
           ) : null}
         </div>
       ) : null}
-
+      <ResultTypeTabs
+        payload={visiblePayload}
+        activeTab={activeTab}
+        locale={locale}
+        onSelectTab={onSelectTab}
+      />
       {groups.map(groupKey => (
         <SearchGroupSection
           key={groupKey}
           groupKey={groupKey}
-          group={payload.groups[groupKey]}
+          group={visiblePayload.groups[groupKey]}
           locale={locale}
           compact={compact && activeTab === 'all'}
           onSelectTab={onSelectTab}
           onNextCursor={onNextCursor}
         />
       ))}
-    </div>
+    </>
   );
 }

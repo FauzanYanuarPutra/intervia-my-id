@@ -68,31 +68,16 @@ pub fn derive_verification_state(
         .unwrap_or(false);
 
     let effective_email_verified = has_email
-        && (email_verified
-            || read_nested_bool(metadata, &["verification", "email_verified"])
-            || read_nested_bool(metadata, &["profile", "verification", "email_verified"])
-            || read_nested_bool(metadata, &["extended", "verification", "email_verified"]));
+        && (email_verified || read_nested_bool(metadata, &["verification", "email_verified"]));
     let effective_phone_verified = has_phone
-        && (phone_verified
-            || read_nested_bool(metadata, &["verification", "phone_verified"])
-            || read_nested_bool(metadata, &["profile", "verification", "phone_verified"])
-            || read_nested_bool(metadata, &["extended", "verification", "phone_verified"]));
+        && (phone_verified || read_nested_bool(metadata, &["verification", "phone_verified"]));
 
-    let document_verified = read_nested_bool(metadata, &["verification", "document_verified"])
-        || read_nested_bool(metadata, &["profile", "verification", "document_verified"])
-        || read_nested_bool(metadata, &["extended", "verification", "document_verified"]);
-    let liveness_verified = read_nested_bool(metadata, &["verification", "liveness_verified"])
-        || read_nested_bool(metadata, &["profile", "verification", "liveness_verified"])
-        || read_nested_bool(metadata, &["extended", "verification", "liveness_verified"]);
-    let stored_identity_verified =
-        read_nested_bool(metadata, &["verification", "identity_verified"])
-            || read_nested_bool(metadata, &["profile", "verification", "identity_verified"])
-            || read_nested_bool(metadata, &["extended", "verification", "identity_verified"]);
+    let document_verified = read_nested_bool(metadata, &["verification", "document_verified"]);
+    let liveness_verified = read_nested_bool(metadata, &["verification", "liveness_verified"]);
+    let stored_identity_verified = read_nested_bool(metadata, &["verification", "identity_verified"]);
 
     let kyc_status = normalize_kyc_status(
-        read_nested_string(metadata, &["verification", "kyc_status"])
-            .or_else(|| read_nested_string(metadata, &["profile", "verification", "kyc_status"]))
-            .or_else(|| read_nested_string(metadata, &["extended", "verification", "kyc_status"])),
+        read_nested_string(metadata, &["verification", "kyc_status"]),
     )
     .unwrap_or_else(|| {
         if document_verified && liveness_verified && effective_phone_verified {
@@ -179,18 +164,8 @@ pub fn public_verification_payload(metadata: Option<&Value>, state: &Verificatio
             "not_started".to_string()
         }
     });
-    let document_type = read_nested_string(metadata, &["verification", "document_type"])
-        .unwrap_or_else(|| "ktp".to_string());
-    let document_country = read_nested_string(metadata, &["verification", "document_country"])
-        .unwrap_or_else(|| "ID".to_string());
-
     Value::Object(Map::from_iter([
         ("status".to_string(), Value::String(status)),
-        ("document_type".to_string(), Value::String(document_type)),
-        (
-            "document_country".to_string(),
-            Value::String(document_country),
-        ),
         (
             "email_verified".to_string(),
             Value::Bool(state.email_verified),
@@ -220,4 +195,45 @@ pub fn public_verification_payload(metadata: Option<&Value>, state: &Verificatio
             Value::String(state.kyc_status.clone()),
         ),
     ]))
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::derive_verification_state;
+
+    #[test]
+    fn nested_owner_metadata_cannot_assert_verification() {
+        let metadata = json!({
+            "profile": {
+                "verification": {
+                    "identity_verified": true,
+                    "phone_verified": true
+                }
+            },
+            "extended": {
+                "verification": {
+                    "document_verified": true,
+                    "liveness_verified": true,
+                    "kyc_status": "enhanced"
+                }
+            }
+        });
+
+        let state = derive_verification_state(
+            Some(&metadata),
+            true,
+            Some("member@example.com"),
+            Some("6281234567890"),
+            false,
+            false,
+        );
+
+        assert!(!state.phone_verified);
+        assert!(!state.document_verified);
+        assert!(!state.liveness_verified);
+        assert!(!state.identity_verified);
+        assert_eq!(state.kyc_status, "none");
+    }
 }

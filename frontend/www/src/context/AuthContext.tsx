@@ -11,9 +11,43 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { buildLoginPath, isProtectedRoutePath } from '@/lib/authRoutes';
 import { saveAccountSnapshot } from '@/lib/accountVault';
+import { clearChatMessageCache } from '@/lib/chatMessageCache';
 import { getLocaleFromPathname, isSupportedLocale } from '@/lib/locale';
+import { clearPersonalAiCache } from '@/lib/personal-ai/browserCache';
 const IS_DEV = process.env.NODE_ENV === 'development';
 const LOCALE_COOKIE = 'NEXT_LOCALE';
+const CHAT_INBOX_CACHE_PREFIX = 'lajukan:chat-inbox:v1:';
+const CHAT_AI_SETTINGS_PREFIX = 'chat_ai_settings:';
+
+async function clearLocalMessagingData(userId: string): Promise<void> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) return;
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage.removeItem(
+        `${CHAT_INBOX_CACHE_PREFIX}${encodeURIComponent(normalizedUserId)}`,
+      );
+      window.localStorage.removeItem(
+        `${CHAT_AI_SETTINGS_PREFIX}${normalizedUserId}`,
+      );
+    } catch {
+      // Storage can be unavailable in private modes; IndexedDB cleanup continues.
+    }
+  }
+  await Promise.allSettled([
+    clearChatMessageCache(normalizedUserId),
+    clearPersonalAiCache(normalizedUserId),
+  ]);
+}
+
+async function disconnectLocalChatTransport(): Promise<void> {
+  try {
+    const { disconnectChatSocket } = await import('@/lib/socket');
+    disconnectChatSocket();
+  } catch {
+    // Authentication cleanup must not depend on the optional chat bundle.
+  }
+}
 
 function readCookieValue(name: string): string | undefined {
   if (typeof document === 'undefined') return undefined;
@@ -157,6 +191,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const refreshPromise = useRef<Promise<string | null> | null>(null);
+  const currentUserIdRef = useRef('');
+  const previousLocalDataOwnerRef = useRef('');
 
   const pathname = usePathname();
   const router = useRouter();
@@ -171,6 +207,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fungsi pembersihan total
   const hardResetAuth = useCallback(() => {
+    const cacheOwner = currentUserIdRef.current;
+    void disconnectLocalChatTransport();
+    if (cacheOwner) void clearLocalMessagingData(cacheOwner);
     setUser(null);
     setAccessToken(null);
     refreshPromise.current = null;
@@ -180,6 +219,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('session_id');
     }
   }, []);
+
+  useEffect(() => {
+    const nextUserId = user?.id?.trim() || '';
+    const previousUserId = previousLocalDataOwnerRef.current;
+    currentUserIdRef.current = nextUserId;
+    if (previousUserId && previousUserId !== nextUserId) {
+      void clearLocalMessagingData(previousUserId);
+    }
+    previousLocalDataOwnerRef.current = nextUserId;
+  }, [user?.id]);
 
   const redirectToLogin = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -422,10 +471,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : {}),
         ...(options?.otpToken
           ? {
-            otp_token: options.otpToken,
-            otp_type: options.otpType || 'email',
-            otp_target: options.otpTarget,
-          }
+              otp_token: options.otpToken,
+              otp_type: options.otpType || 'email',
+              otp_target: options.otpTarget,
+            }
           : {}),
       }),
       credentials: 'include',
@@ -552,6 +601,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async (options?: { redirectTo?: string }) => {
+    const cacheOwner = user?.id?.trim() || currentUserIdRef.current;
     setLoading(true);
     try {
       const res = await fetch('/api/auth/logout', { method: 'POST' });
@@ -566,6 +616,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       hardResetAuth();
     } finally {
+      await disconnectLocalChatTransport();
+      if (cacheOwner) {
+        await Promise.race([
+          clearLocalMessagingData(cacheOwner),
+          new Promise<void>(resolve => window.setTimeout(resolve, 1_000)),
+        ]);
+      }
       hardResetAuth();
       if (typeof window !== 'undefined') {
         window.location.replace(options?.redirectTo || `/${getLocale()}/login`);

@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   Bell,
@@ -21,25 +20,34 @@ import {
   MessageCircle,
   Package,
   Plus,
-  Search as SearchIcon,
   Settings,
   ShoppingBag,
   Store,
   UserRound,
   Users,
   Wallet,
-  Wrench,
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
+import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
+
 import {
   LocalizedAnchor as Link,
   localizeHref,
 } from '@/components/navigation/LocalizedAnchor';
 import { useAuth } from '@/context/AuthContext';
-// import { useTheme } from '@/context/ThemeContext';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { LanguageSwitcherButton } from '@/components/modal/LanguageModal/LanguageSwitcherButton';
 import { useLanguageModal } from '@/components/modal/LanguageModal/LanguageModalContext';
@@ -47,990 +55,1593 @@ import LajuloLogo from '@/components/logo/LajuloLogo';
 import { HeaderInboxDropdown } from '@/components/layout/HeaderInboxDropdown';
 import { ExploreMegaMenu } from '@/components/navigation/ExploreMegaMenu';
 import { NavbarGlobalSearch } from '@/components/navigation/NavbarGlobalSearch';
-import { getCategoryIcon } from '@/components/navigation/CategoryIcon';
 import {
   buildPrimaryNavItems,
   resolveActivePrimaryNavKey,
 } from '@/components/system/navigation/PrimaryNav';
+
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
+import {
+  profileAvatarSrc,
+  readProfileAvatarStyle,
+} from '@/lib/profile/avatar';
+
 import {
   UMKM_DISCOVERY_PATH,
   LEGACY_UMKM_OWNER_PATH,
   buildUsahaPath,
   getUmkmSurfaceCopy,
 } from '@/lib/umkmSurface';
+
 import { cn } from '@/lib/utils';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
+
 import {
   LAJUKAN_EXPLORE_CATEGORIES,
   buildExploreCategoryHref,
   categoryLabel,
+  type LajukanLocale,
 } from '@/lib/discovery/lajukanCategories';
 
-function normalizePathname(pathname: string): string {
-  const clean = pathname.replace(/^\/(id|en)(?=\/|$)/, '');
-  return clean === '' ? '/' : clean;
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
+
+type MenuArtworkKey =
+  | 'all'
+  | 'materials'
+  | 'services'
+  | 'machines'
+  | 'places'
+  | 'opportunities';
+
+type DrawerVisual =
+  | {
+      kind: 'icon';
+      icon: LucideIcon;
+    }
+  | {
+      kind: 'artwork';
+      src: string;
+      circle?: boolean;
+    };
+
+type DrawerItem = {
+  href: string;
+  label: string;
+  caption?: string;
+  visual: DrawerVisual;
+  matchers?: string[];
+};
+
+type ImageTileSize =
+  | 'small'
+  | 'medium'
+  | 'large';
+
+/* -------------------------------------------------------------------------- */
+/* Assets                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const MENU_ARTWORKS: Record<
+  MenuArtworkKey,
+  string
+> = {
+  all: '/images/hero/menu/semua-01.png',
+  materials: '/images/hero/menu/bahan-01.png',
+  services: '/images/hero/menu/jasa-01.png',
+  machines: '/images/hero/menu/mesin-01.png',
+  places: '/images/hero/menu/lok-01.png',
+  opportunities: '/images/hero/menu/peluang-01.png',
+};
+
+const CREATE_ARTWORKS = {
+  need: '/images/create/kategori/cari.png',
+  offer: '/images/create/kategori/tawar.png',
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function normalizePathname(
+  pathname: string,
+): string {
+  const clean = pathname.replace(
+    /^\/(id|en)(?=\/|$)/,
+    '',
+  );
+
+  return clean || '/';
 }
 
-function matchesRoute(pathname: string, matcher: string) {
+function matchesRoute(
+  pathname: string,
+  matcher: string,
+): boolean {
   const exact = matcher.endsWith('$');
-  const route = exact ? matcher.slice(0, -1) || '/' : matcher;
-  if (route === '/') return pathname === '/';
-  if (exact) return pathname === route;
-  return pathname === route || pathname.startsWith(`${route}/`);
+
+  const route = exact
+    ? matcher.slice(0, -1) || '/'
+    : matcher;
+
+  if (route === '/') {
+    return pathname === '/';
+  }
+
+  if (exact) {
+    return pathname === route;
+  }
+
+  return (
+    pathname === route ||
+    pathname.startsWith(`${route}/`)
+  );
 }
 
 function hrefPath(href: string): string {
   return href.split(/[?#]/)[0] || '/';
 }
 
-type DrawerItem = {
-  href: string;
-  label: string;
-  caption?: string;
+function getCategoryArtwork(
+  id: string,
+  slug: string,
+  fallback?: string,
+): string {
+  const source =
+    `${id} ${slug}`.toLowerCase();
+
+  if (
+    source.includes('material') ||
+    source.includes('supply') ||
+    source.includes('bahan')
+  ) {
+    return MENU_ARTWORKS.materials;
+  }
+
+  if (
+    source.includes('service') ||
+    source.includes('jasa')
+  ) {
+    return MENU_ARTWORKS.services;
+  }
+
+  if (
+    source.includes('machine') ||
+    source.includes('equipment') ||
+    source.includes('alat') ||
+    source.includes('mesin')
+  ) {
+    return MENU_ARTWORKS.machines;
+  }
+
+  if (
+    source.includes('property') ||
+    source.includes('place') ||
+    source.includes('location') ||
+    source.includes('tempat') ||
+    source.includes('lokasi')
+  ) {
+    return MENU_ARTWORKS.places;
+  }
+
+  if (
+    source.includes('opportun') ||
+    source.includes('peluang')
+  ) {
+    return MENU_ARTWORKS.opportunities;
+  }
+
+
+  return fallback || MENU_ARTWORKS.all;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Artwork                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function MenuArtwork({
+  src,
+  size = 'medium',
+  priority = false,
+  circle = false,
+}: {
+  src: string;
+  size?: ImageTileSize;
+  priority?: boolean;
+  circle?: boolean;
+}) {
+  const sizeClass =
+    size === 'small'
+      ? 'h-[42px] w-[42px]'
+      : size === 'large'
+        ? 'h-[82px] w-[82px]'
+        : 'h-[64px] w-[64px]';
+
+  /*
+   * Semua artwork dari CREATE_ARTWORKS otomatis dibuat bulat.
+   *
+   * Ini membuat:
+   * - /images/create/kategori/cari.png
+   * - /images/create/kategori/tawar.png
+   *
+   * selalu:
+   * - rounded-full
+   * - center
+   * - object-cover
+   *
+   * Jadi pemanggil MenuArtwork tidak perlu lagi menambahkan
+   * circle secara manual.
+   */
+  const isCreateArtwork =
+    src.startsWith('/images/create/');
+
+  const shouldBeCircle =
+    circle || isCreateArtwork;
+
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        'flex shrink-0 items-center justify-center overflow-hidden',
+        sizeClass,
+        shouldBeCircle &&
+          'rounded-full',
+      )}
+    >
+      <Image
+        src={src}
+        alt=""
+        width={
+          size === 'small'
+            ? 48
+            : size === 'large'
+              ? 96
+              : 76
+        }
+        height={
+          size === 'small'
+            ? 48
+            : size === 'large'
+              ? 96
+              : 76
+        }
+        priority={priority}
+        loading={
+          priority
+            ? undefined
+            : 'lazy'
+        }
+        draggable={false}
+        className={cn(
+          'block h-full w-full select-none',
+          shouldBeCircle
+            ? 'object-cover'
+            : 'object-contain',
+        )}
+        sizes={
+          size === 'small'
+            ? '48px'
+            : size === 'large'
+              ? '96px'
+              : '76px'
+        }
+      />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Simple icon                                                                */
+/* -------------------------------------------------------------------------- */
+
+function MenuIcon({
+  icon: Icon,
+  active = false,
+}: {
   icon: LucideIcon;
-  matchers?: string[];
-};
+  active?: boolean;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition',
+        active
+          ? 'bg-white text-[color:var(--app-accent)] shadow-sm dark:bg-[color:var(--app-surface-strong)]'
+          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+      )}
+    >
+      <Icon className="h-[18px] w-[18px]" />
+    </span>
+  );
+}
+
+function DrawerVisual({
+  visual,
+  artworkSize = 'small',
+  active = false,
+}: {
+  visual: DrawerVisual;
+  artworkSize?: ImageTileSize;
+  active?: boolean;
+}) {
+  if (visual.kind === 'artwork') {
+    return (
+      <MenuArtwork
+        src={visual.src}
+        size={artworkSize}
+        circle={visual.circle}
+      />
+    );
+  }
+
+  return (
+    <MenuIcon
+      icon={visual.icon}
+      active={active}
+    />
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Header                                                                     */
+/* -------------------------------------------------------------------------- */
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, logout, isAuthenticated } = useAuth();
-  const userAvatarStyle = readProfileAvatarStyle(user);
-  const userAvatarSrc = profileAvatarSrc(
-    user?.avatarUrl || user?.avatar_url,
-    userAvatarStyle,
-    user?.fullName || user?.full_name || user?.email,
-  );
-  const userAvatarIsRemote = userAvatarSrc.startsWith('https://');
-  // Dark/light switching is paused while Lajukan focuses on light mode.
-  // const { isDark, isReady, setColorScheme } = useTheme();
-  const { open: openLanguageModal, currentLocale } = useLanguageModal();
-  const activeSearchQuery = searchParams.get('q') || '';
 
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [globalSearchDraft, setGlobalSearchDraft] = useState({
-    source: activeSearchQuery,
-    value: activeSearchQuery,
-  });
-  const [menuSearch, setMenuSearch] = useState('');
+  const {
+    user,
+    logout,
+    isAuthenticated,
+  } = useAuth();
 
-  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const {
+    open: openLanguageModal,
+    currentLocale,
+  } = useLanguageModal();
 
-  const locale = resolveLocaleFromPathname(pathname);
-  const localeKey = locale === 'id' ? 'id' : 'en';
+  const locale =
+    resolveLocaleFromPathname(
+      pathname,
+    );
+
+  const localeKey: LajukanLocale =
+    locale === 'id'
+      ? 'id'
+      : 'en';
+
+  const isId = localeKey === 'id';
+
+  const cleanPath =
+    normalizePathname(pathname);
+
+  const activeSearchQuery =
+    searchParams.get('q') || '';
+
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
+  const [profileOpen, setProfileOpen] =
+    useState(false);
+
+  const [globalSearchDraft, setGlobalSearchDraft] =
+    useState({
+      source: activeSearchQuery,
+      value: activeSearchQuery,
+    });
+
+  const profileMenuRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const avatarStyle =
+    readProfileAvatarStyle(user);
+
+  const avatarSrc =
+    profileAvatarSrc(
+      user?.avatarUrl ||
+        user?.avatar_url,
+      avatarStyle,
+      user?.fullName ||
+        user?.full_name ||
+        user?.email ||
+        'User',
+    );
+
+  const avatarRemote =
+    avatarSrc.startsWith(
+      'https://',
+    );
+
   const globalSearch =
-    globalSearchDraft.source === activeSearchQuery
+    globalSearchDraft.source ===
+    activeSearchQuery
       ? globalSearchDraft.value
       : activeSearchQuery;
-  const cleanPath = normalizePathname(pathname);
-  const createHref = isAuthenticated ? '/create' : '/register';
-  const manageHref = buildUsahaPath('home');
-  const accountHref = isAuthenticated ? '/profile' : '/login';
-  const chatHref = isAuthenticated ? '/chat' : '/login';
-  const surfaceCopy = getUmkmSurfaceCopy(locale);
 
-  const text = {
-    brand: locale === 'id' ? 'Lajukan UMKM' : 'Lajukan',
-    brandHint:
-      locale === 'id'
-        ? 'Supplier, jasa, peluang'
-        : 'Suppliers, services, deals',
-    search: locale === 'id' ? 'Cari' : 'Search',
-    searchPlaceholder:
-      locale === 'id'
-        ? 'Cari supplier, jasa, lokasi...'
-        : 'Search suppliers, services, places...',
-    menu: locale === 'id' ? 'Menu' : 'Menu',
-    manage: surfaceCopy.owner,
-    create: locale === 'id' ? 'Posting' : 'Post',
-    createLong:
-      locale === 'id'
-        ? 'Posting kebutuhan/tawaran'
-        : 'Post a new need or offer',
-    chat: locale === 'id' ? 'Chat' : 'Chat',
-    account: locale === 'id' ? 'Akun' : 'Account',
-    login: locale === 'id' ? 'Masuk' : 'Login',
-    register: locale === 'id' ? 'Daftar' : 'Register',
-    logout: locale === 'id' ? 'Keluar' : 'Logout',
-    support: locale === 'id' ? 'Bantuan' : 'Get help',
-    searchMenu: locale === 'id' ? 'Cari Menu' : 'Search Menu',
-    social: locale === 'id' ? 'Sosial' : 'Social',
-    business: locale === 'id' ? 'Cari Kebutuhan' : 'Business Search',
-    professional: locale === 'id' ? 'Profesional' : 'Professional',
-    createSection: locale === 'id' ? 'Buat' : 'Create',
-    preferences: locale === 'id' ? 'Tampilan' : 'Display',
-    language: locale === 'id' ? 'Bahasa' : 'Language',
-    dark: locale === 'id' ? 'Gelap' : 'Dark',
-    light: locale === 'id' ? 'Terang' : 'Light',
-  } as const;
+  const createHref =
+    isAuthenticated
+      ? '/create'
+      : '/register';
 
-  const coreDrawerItems = useMemo(
-    () => buildPrimaryNavItems(isAuthenticated, localeKey),
-    [isAuthenticated, localeKey],
-  );
-  const coreDrawerLinks = useMemo(
-    () => coreDrawerItems.filter(item => item.key !== 'account'),
-    [coreDrawerItems],
-  );
-  const desktopPrimaryLinks = useMemo(
-    () => coreDrawerLinks.filter(item => item.key !== 'create'),
-    [coreDrawerLinks],
-  );
-  const coreDrawerActiveKey = resolveActivePrimaryNavKey(
-    coreDrawerItems,
-    pathname,
+  const chatHref =
+    isAuthenticated
+      ? '/chat'
+      : '/login';
+
+  const manageHref =
+    buildUsahaPath('home');
+
+  const accountHref =
+    isAuthenticated
+      ? '/profile'
+      : '/login';
+
+  const text = useMemo(
+    () => ({
+      menu: 'Menu',
+
+      create: isId
+        ? 'Posting'
+        : 'Post',
+
+      login: isId
+        ? 'Masuk'
+        : 'Login',
+
+      register: isId
+        ? 'Daftar'
+        : 'Register',
+
+      logout: isId
+        ? 'Keluar'
+        : 'Logout',
+
+      support: isId
+        ? 'Bantuan'
+        : 'Help',
+
+      categoryTitle: isId
+        ? 'Jelajahi kategori'
+        : 'Explore categories',
+
+      categoryHint: isId
+        ? 'Pilih yang paling dekat dengan kebutuhanmu.'
+        : 'Choose the category closest to what you need.',
+
+      createTitle: isId
+        ? 'Mau buat apa?'
+        : 'What do you want to do?',
+
+      createHint: isId
+        ? 'Pilih salah satu. Kamu bisa lanjut mengisi detail setelahnya.'
+        : 'Choose one. You can add the details next.',
+
+      aroundTitle: isId
+        ? 'Di sekitar kamu'
+        : 'Around you',
+
+      activityTitle: isId
+        ? 'Aktivitas'
+        : 'Activity',
+
+      all: isId
+        ? 'Semua'
+        : 'All',
+
+      allHint: isId
+        ? 'Lihat semuanya'
+        : 'Browse everything',
+
+      seeAll: isId
+        ? 'Lihat semua'
+        : 'See all',
+    }),
+    [isId],
   );
 
-  const accountDrawerItems = useMemo<DrawerItem[]>(() => {
-    const drawerSurfaceCopy = getUmkmSurfaceCopy(localeKey);
+  /* ---------------------------------------------------------------------- */
+  /* Primary navigation                                                      */
+  /* ---------------------------------------------------------------------- */
 
-    return isAuthenticated
-      ? [
-          {
-            href: accountHref,
-            label: localeKey === 'id' ? 'Akun' : 'Account',
-            caption:
-              localeKey === 'id'
-                ? 'Identitas, rating, aktivitas'
-                : 'Identity, rating, activity',
-            icon: UserRound,
-            matchers: ['/profile$', '/profile/edit'],
+  const primaryItems =
+    useMemo(
+      () =>
+        buildPrimaryNavItems(
+          isAuthenticated,
+          localeKey,
+        ),
+      [
+        isAuthenticated,
+        localeKey,
+      ],
+    );
+
+  const desktopPrimaryItems =
+    useMemo(
+      () =>
+        primaryItems.filter(
+          item =>
+            item.key !==
+              'account' &&
+            item.key !==
+              'create',
+        ),
+      [primaryItems],
+    );
+
+  const activePrimaryKey =
+    resolveActivePrimaryNavKey(
+      primaryItems,
+      pathname,
+    );
+
+  /* ---------------------------------------------------------------------- */
+  /* Categories                                                              */
+  /* ---------------------------------------------------------------------- */
+
+  const categories =
+    useMemo(
+      () =>
+        LAJUKAN_EXPLORE_CATEGORIES.filter(
+          category => {
+            if (!category.navigation.showInMobileDrawer) {
+              return false;
+            }
+
+            const source =
+              `${category.id} ${category.slug}`.toLowerCase();
+
+            return !(
+              source.includes('community') ||
+              source.includes('komunit') ||
+              source.includes('video') ||
+              source.includes('reel')
+            );
           },
-          {
-            href: '/manage',
-            label: localeKey === 'id' ? 'Pusat Kelola' : 'Manage content',
-            caption:
-              localeKey === 'id'
-                ? 'Listing, komunitas, dan reels'
-                : 'Listings, community, and reels',
-            icon: LayoutDashboard,
-            matchers: ['/manage'],
-          },
-          {
-            href: '/my-listings',
-            label: localeKey === 'id' ? 'Postingan' : 'Posts',
-            caption:
-              localeKey === 'id'
-                ? 'Listing aktif dan draft'
-                : 'Active listings and drafts',
-            icon: ShoppingBag,
-            matchers: ['/my-listings'],
-          },
-          {
-            href: '/my-listings?filter=favorites',
-            label: localeKey === 'id' ? 'Favorit' : 'Favorites',
-            caption:
-              localeKey === 'id' ? 'Simpan referensi' : 'Saved references',
-            icon: Heart,
-            matchers: ['/my-listings'],
-          },
-          ...(!PROMO_ONLY_MODE
-            ? [
-                {
-                  href: '/payments',
-                  label: localeKey === 'id' ? 'Saldo' : 'Balance',
-                  caption:
-                    localeKey === 'id'
-                      ? 'Top up dan pembayaran'
-                      : 'Top up and payments',
-                  icon: Wallet,
-                  matchers: ['/payments'],
-                },
-              ]
-            : []),
-          {
-            href: manageHref,
-            label: drawerSurfaceCopy.owner,
-            caption:
-              localeKey === 'id'
-                ? 'Toko, katalog, order'
-                : 'Store, catalog, orders',
-            icon: MapPinned,
-            matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
-          },
-          ...(!PROMO_ONLY_MODE
-            ? [
-                {
-                  href: '/transactions',
-                  label: localeKey === 'id' ? 'Transaksi' : 'Transactions',
-                  caption:
-                    localeKey === 'id'
-                      ? 'Deal, riwayat, status'
-                      : 'Deals, history, status',
-                  icon: Store,
-                  matchers: ['/transactions'],
-                },
-              ]
-            : []),
-          {
-            href: '/settings',
-            label: localeKey === 'id' ? 'Pengaturan' : 'Settings',
-            caption:
-              localeKey === 'id'
-                ? 'Bahasa, keamanan, akun'
-                : 'Language, security, account',
-            icon: Settings,
-            matchers: ['/settings'],
-          },
-        ]
-      : [
+        ),
+      [],
+    );
+
+  /* ---------------------------------------------------------------------- */
+  /* Account                                                                */
+  /* ---------------------------------------------------------------------- */
+
+  const accountItems =
+    useMemo<DrawerItem[]>(() => {
+      const surface =
+        getUmkmSurfaceCopy(
+          localeKey,
+        );
+
+      if (!isAuthenticated) {
+        return [
           {
             href: '/login',
-            label: localeKey === 'id' ? 'Masuk' : 'Login',
-            caption:
-              localeKey === 'id'
-                ? 'Akses chat dan profil'
-                : 'Access chats and profile',
-            icon: UserRound,
+            label: isId ? 'Masuk' : 'Login',
+            caption: isId
+              ? 'Akses akun dan chat'
+              : 'Access account and chat',
+            visual: { kind: 'icon', icon: LogIn },
             matchers: ['/login'],
           },
           {
             href: '/register',
-            label: localeKey === 'id' ? 'Daftar' : 'Register',
-            caption:
-              localeKey === 'id'
-                ? 'Buat akun Lajukan'
-                : 'Create a Lajukan account',
-            icon: Plus,
+            label: isId ? 'Daftar' : 'Register',
+            caption: isId
+              ? 'Buat akun Lajukan'
+              : 'Create your account',
+            visual: { kind: 'icon', icon: Plus },
             matchers: ['/register'],
           },
           {
             href: '/support',
-            label: localeKey === 'id' ? 'Bantuan' : 'Get help',
-            caption: localeKey === 'id' ? 'Pusat bantuan' : 'Help center',
-            icon: CircleHelp,
+            label: isId ? 'Bantuan' : 'Help',
+            caption: isId
+              ? 'Pusat bantuan'
+              : 'Help center',
+            visual: { kind: 'icon', icon: CircleHelp },
             matchers: ['/support'],
           },
         ];
-  }, [accountHref, isAuthenticated, localeKey, manageHref]);
+      }
 
-  const menuGroups = useMemo(() => {
-    const isId = localeKey === 'id';
-    const guarded = (href: string) => (isAuthenticated ? href : '/login');
+      return [
+        {
+          href: accountHref,
+          label: isId ? 'Akun' : 'Account',
+          caption: isId
+            ? 'Profil dan aktivitas'
+            : 'Profile and activity',
+          visual: { kind: 'icon', icon: UserRound },
+          matchers: ['/profile$', '/profile/edit'],
+        },
+        {
+          href: '/manage',
+          label: isId ? 'Pusat Kelola' : 'Manage',
+          caption: isId
+            ? 'Kelola postingan dan konten'
+            : 'Manage posts and content',
+          visual: { kind: 'icon', icon: LayoutDashboard },
+          matchers: ['/manage'],
+        },
+        {
+          href: '/my-listings',
+          label: isId ? 'Postingan' : 'Posts',
+          caption: isId
+            ? 'Postingan aktif dan draft'
+            : 'Live posts and drafts',
+          visual: { kind: 'icon', icon: Package },
+          matchers: ['/my-listings'],
+        },
+        {
+          href: '/my-listings?filter=favorites',
+          label: isId ? 'Tersimpan' : 'Saved',
+          caption: isId
+            ? 'Postingan yang disimpan'
+            : 'Saved posts',
+          visual: { kind: 'icon', icon: Heart },
+          matchers: ['/my-listings'],
+        },
+        ...(!PROMO_ONLY_MODE
+          ? [
+              {
+                href: '/payments',
+                label: isId ? 'Saldo' : 'Balance',
+                caption: isId
+                  ? 'Pembayaran dan saldo'
+                  : 'Payments and balance',
+                visual: { kind: 'icon' as const, icon: Wallet },
+                matchers: ['/payments'],
+              },
+            ]
+          : []),
+        {
+          href: manageHref,
+          label:
+            surface.owner ||
+            (isId ? 'Usaha Saya' : 'My Business'),
+          caption: isId
+            ? 'Toko, katalog, dan order'
+            : 'Store, catalog, and orders',
+          visual: { kind: 'icon', icon: BriefcaseBusiness },
+          matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
+        },
+        ...(!PROMO_ONLY_MODE
+          ? [
+              {
+                href: '/transactions',
+                label: isId ? 'Transaksi' : 'Transactions',
+                caption: isId
+                  ? 'Deal dan proses berjalan'
+                  : 'Deals and active processes',
+                visual: { kind: 'icon' as const, icon: ShoppingBag },
+                matchers: ['/transactions'],
+              },
+            ]
+          : []),
+        {
+          href: '/settings',
+          label: isId ? 'Pengaturan' : 'Settings',
+          caption: isId
+            ? 'Bahasa, keamanan, akun'
+            : 'Language, security, account',
+          visual: { kind: 'icon', icon: Settings },
+          matchers: ['/settings'],
+        },
+      ];
+    }, [
+      accountHref,
+      isAuthenticated,
+      isId,
+      localeKey,
+      manageHref,
+    ]);
 
-    return [
-      {
-        id: 'main',
-        title: isId ? 'Utama' : 'Main',
-        items: [
+  /* ---------------------------------------------------------------------- */
+  /* Create items                                                           */
+  /* ---------------------------------------------------------------------- */
+
+  const createItems =
+    useMemo<DrawerItem[]>(
+      () => {
+        const needHref =
+          isAuthenticated
+            ? isId
+              ? '/create/butuh'
+              : '/create/need'
+            : '/register';
+
+        const offerHref =
+          isAuthenticated
+            ? isId
+              ? '/create/jual'
+              : '/create/sell'
+            : '/register';
+
+        return [
           {
-            href: '/home',
-            label: isId ? 'Beranda' : 'Home',
-            caption: isId ? 'Update terbaru' : 'Latest updates',
-            icon: Home,
-            matchers: ['/home', '/'],
-          },
-          {
-            href: '/explore',
-            label: isId ? 'Jelajahi' : 'Explore',
-            caption: isId ? 'Kategori usaha' : 'Business categories',
-            icon: LayoutGrid,
-            matchers: ['/explore'],
-          },
-          {
-            href: '/community',
-            label: isId ? 'Komunitas' : 'Community',
-            caption: isId ? 'Diskusi & grup usaha' : 'Business groups',
-            icon: Users,
-            matchers: ['/community'],
-          },
-          {
-            href: '/reels',
-            label: isId ? 'Video' : 'Video',
-            caption: isId ? 'Video pendek usaha' : 'Short business videos',
-            icon: Clapperboard,
-            matchers: ['/reels'],
-          },
-        ],
-      },
-      {
-        id: 'explore-categories',
-        title: isId ? 'Kategori' : 'Categories',
-        items: LAJUKAN_EXPLORE_CATEGORIES.filter(
-          category => category.navigation.showInMobileDrawer,
-        ).map(category => ({
-          href: buildExploreCategoryHref(category),
-          label: categoryLabel(category, localeKey),
-          caption: isId ? category.descriptionId : category.descriptionEn,
-          icon: getCategoryIcon(category.icon),
-          matchers: [buildExploreCategoryHref(category)],
-        })),
-      },
-      {
-        id: 'activity',
-        title: isId ? 'Aktivitas' : 'Activity',
-        items: [
-          {
-            href: chatHref,
-            label: 'Chat',
+            href: needHref,
+            label: isId
+              ? 'Saya sedang mencari'
+              : 'I am looking for',
             caption: isId
-              ? 'Pesan dan tindak lanjut'
-              : 'Messages and follow-up',
-            icon: MessageCircle,
-            matchers: ['/chat'],
+              ? 'Cari produk, jasa, alat, tempat, atau peluang.'
+              : 'Find products, services, tools, places, or opportunities.',
+            visual: {
+              kind: 'artwork',
+              src: CREATE_ARTWORKS.need,
+              circle: true,
+            },
+            matchers: ['/create/butuh', '/create/need'],
           },
           {
-            href: guarded('/notifications'),
-            label: isId ? 'Notifikasi' : 'Notifications',
-            caption: isId ? 'Kabar penting' : 'Updates',
-            icon: Bell,
-            matchers: ['/notifications'],
-          },
-          {
-            href: guarded('/manage'),
-            label: isId ? 'Pusat Kelola' : 'Manage content',
+            href: offerHref,
+            label: isId
+              ? 'Saya punya sesuatu'
+              : 'I have something',
             caption: isId
-              ? 'Listing, komunitas, dan reels'
-              : 'Listings, community, and reels',
-            icon: LayoutDashboard,
-            matchers: ['/manage'],
+              ? 'Tawarkan produk, jasa, alat, tempat, atau peluang.'
+              : 'Offer products, services, tools, places, or opportunities.',
+            visual: {
+              kind: 'artwork',
+              src: CREATE_ARTWORKS.offer,
+              circle: true,
+            },
+            matchers: ['/create/jual', '/create/sell'],
           },
-          {
-            href: guarded('/my-listings?filter=favorites'),
-            label: isId ? 'Tersimpan' : 'Saved',
-            caption: isId ? 'Postingan yang disimpan' : 'Saved posts',
-            icon: Heart,
-            matchers: ['/my-listings'],
-          },
-          {
-            href: guarded('/my-listings?filter=draft'),
-            label: isId ? 'Draft' : 'Drafts',
-            caption: isId ? 'Lanjutkan postingan' : 'Continue your posts',
-            icon: ClipboardList,
-            matchers: ['/my-listings'],
-          },
-        ],
+        ];
       },
-      {
-        id: 'nearby',
-        title: isId ? 'Sekitar' : 'Nearby',
-        items: [
-          {
-            href: UMKM_DISCOVERY_PATH,
-            label: isId ? 'Usaha Sekitar' : 'Nearby Businesses',
-            caption: isId ? 'Bisnis lokal' : 'Local businesses',
-            icon: MapPinned,
-            matchers: [UMKM_DISCOVERY_PATH],
-          },
-          {
-            href: '/umkm?view=map',
-            label: isId ? 'Peta Usaha' : 'Business Map',
-            caption: isId ? 'Jelajahi lewat peta' : 'Browse on the map',
-            icon: MapPinned,
-            matchers: ['/umkm'],
-          },
-          {
-            href: '/learn',
-            label: isId ? 'Panduan' : 'Guides',
-            caption: isId
-              ? 'Belajar menjalankan usaha'
-              : 'Learn to run a business',
-            icon: BriefcaseBusiness,
-            matchers: ['/learn'],
-          },
-          {
-            href: '/support',
-            label: isId ? 'Pusat Bantuan' : 'Help Center',
-            caption: isId ? 'Dapatkan bantuan' : 'Get help',
-            icon: CircleHelp,
-            matchers: ['/support'],
-          },
-        ],
-      },
-    ];
-  }, [chatHref, isAuthenticated, localeKey]);
-
-  const createDrawerItems = useMemo<DrawerItem[]>(() => {
-    const createNeedHref = isAuthenticated
-      ? localeKey === 'id'
-        ? '/create/butuh'
-        : '/create/need'
-      : '/register';
-    const createSellHref = isAuthenticated
-      ? localeKey === 'id'
-        ? '/create/jual'
-        : '/create/sell'
-      : '/register';
-    const createProductHref = isAuthenticated
-      ? localeKey === 'id'
-        ? '/create/jual/produk'
-        : '/create/sell/products'
-      : '/register';
-    const createServiceHref = isAuthenticated
-      ? localeKey === 'id'
-        ? '/create/jual/jasa'
-        : '/create/sell/services'
-      : '/register';
-
-    return [
-      {
-        href: createHref,
-        label: localeKey === 'id' ? 'Buat Baru' : 'Create',
-        caption: localeKey === 'id' ? 'Jual atau cari' : 'Offer or find',
-        icon: Plus,
-        matchers: ['/create'],
-      },
-      {
-        href: createNeedHref,
-        label: localeKey === 'id' ? 'Saya Mencari' : 'I need',
-        caption:
-          localeKey === 'id'
-            ? 'Supplier, jasa, mentor'
-            : 'Suppliers, services, mentors',
-        icon: ClipboardList,
-        matchers: ['/create/butuh', '/create/need'],
-      },
-      {
-        href: createSellHref,
-        label: localeKey === 'id' ? 'Saya Menawarkan' : 'I offer',
-        caption:
-          localeKey === 'id'
-            ? 'Produk, jasa, tempat'
-            : 'Products, services, places',
-        icon: ShoppingBag,
-        matchers: ['/create/jual', '/create/sell'],
-      },
-      {
-        href: createProductHref,
-        label: localeKey === 'id' ? 'Produk' : 'Product',
-        caption: localeKey === 'id' ? 'Stok & harga' : 'Stock & price',
-        icon: Package,
-        matchers: ['/create/jual/produk', '/create/sell/products'],
-      },
-      {
-        href: createServiceHref,
-        label: localeKey === 'id' ? 'Jasa' : 'Service',
-        caption: localeKey === 'id' ? 'Paket & harga' : 'Packages & price',
-        icon: Wrench,
-        matchers: ['/create/jual/jasa', '/create/sell/services'],
-      },
-      {
-        href: '/community?compose=reel',
-        label: localeKey === 'id' ? 'Video' : 'Video',
-        caption: localeKey === 'id' ? 'Reels usaha' : 'Business reels',
-        icon: Clapperboard,
-        matchers: ['/community'],
-      },
-    ];
-  }, [createHref, isAuthenticated, localeKey]);
-
-  const menuSearchNeedle = menuSearch.trim().toLowerCase();
-  const visibleMenuGroups = useMemo(() => {
-    if (!menuSearchNeedle) {
-      return menuGroups.filter(group => group.items.length > 0);
-    }
-
-    return menuGroups
-      .map(group => ({
-        ...group,
-        items: group.items.filter(item =>
-          `${item.label} ${item.caption || ''}`
-            .toLowerCase()
-            .includes(menuSearchNeedle),
-        ),
-      }))
-      .filter(group => group.items.length > 0);
-  }, [menuGroups, menuSearchNeedle]);
-
-  const visibleCreateDrawerItems = useMemo(() => {
-    if (!menuSearchNeedle) return createDrawerItems.slice(0, 3);
-    return createDrawerItems.filter(item =>
-      `${item.label} ${item.caption || ''}`
-        .toLowerCase()
-        .includes(menuSearchNeedle),
+      [isAuthenticated, isId],
     );
-  }, [createDrawerItems, menuSearchNeedle]);
 
-  const drawerQuickLinks = useMemo<DrawerItem[]>(
-    () => [
-      {
-        href: '/explore',
-        label: localeKey === 'id' ? 'Jelajahi' : 'Explore',
-        caption:
-          localeKey === 'id' ? 'Cari kebutuhan usaha' : 'Find business needs',
-        icon: SearchIcon,
-        matchers: ['/explore'],
+  /* ---------------------------------------------------------------------- */
+  /* Quick navigation                                                        */
+  /* ---------------------------------------------------------------------- */
+
+  const quickItems =
+    useMemo<DrawerItem[]>(
+      () => [
+        {
+          href: '/home',
+          label: isId ? 'Beranda' : 'Home',
+          visual: { kind: 'icon', icon: Home },
+          matchers: ['/home', '/'],
+        },
+        {
+          href: '/explore',
+          label: isId ? 'Jelajahi' : 'Explore',
+          visual: { kind: 'icon', icon: LayoutGrid },
+          matchers: ['/explore'],
+        },
+        {
+          href: '/community',
+          label: isId ? 'Komunitas' : 'Community',
+          visual: { kind: 'icon', icon: Users },
+          matchers: ['/community'],
+        },
+        {
+          href: '/reels',
+          label: 'Video',
+          visual: { kind: 'icon', icon: Clapperboard },
+          matchers: ['/reels'],
+        },
+        {
+          href: chatHref,
+          label: 'Chat',
+          visual: { kind: 'icon', icon: MessageCircle },
+          matchers: ['/chat'],
+        },
+        {
+          href: createHref,
+          label: isId ? 'Posting' : 'Post',
+          visual: { kind: 'icon', icon: Plus },
+          matchers: ['/create'],
+        },
+      ],
+      [chatHref, createHref, isId],
+    );
+
+  /* ---------------------------------------------------------------------- */
+  /* Around                                                                  */
+  /* ---------------------------------------------------------------------- */
+
+  const aroundItems =
+    useMemo<DrawerItem[]>(
+      () => [
+        {
+          href: UMKM_DISCOVERY_PATH,
+          label: isId
+            ? 'Usaha Sekitar'
+            : 'Nearby Businesses',
+          caption: isId
+            ? 'Cari usaha di dekatmu'
+            : 'Find businesses near you',
+          visual: { kind: 'icon', icon: Store },
+          matchers: [UMKM_DISCOVERY_PATH],
+        },
+        {
+          href: '/umkm?view=map',
+          label: isId ? 'Peta Usaha' : 'Business Map',
+          caption: isId
+            ? 'Lihat usaha lewat peta'
+            : 'Browse businesses on the map',
+          visual: { kind: 'icon', icon: MapPinned },
+          matchers: ['/umkm'],
+        },
+      ],
+      [isId],
+    );
+
+  /* ---------------------------------------------------------------------- */
+  /* Activity                                                                */
+  /* ---------------------------------------------------------------------- */
+
+  const activityItems =
+    useMemo<DrawerItem[]>(
+      () => [
+        {
+          href: isAuthenticated ? '/notifications' : '/login',
+          label: isId ? 'Notifikasi' : 'Notifications',
+          caption: isId ? 'Kabar penting' : 'Important updates',
+          visual: { kind: 'icon', icon: Bell },
+          matchers: ['/notifications'],
+        },
+        {
+          href: isAuthenticated ? '/manage' : '/login',
+          label: isId ? 'Pusat Kelola' : 'Manage',
+          caption: isId
+            ? 'Kelola postingan dan konten'
+            : 'Manage posts and content',
+          visual: { kind: 'icon', icon: LayoutDashboard },
+          matchers: ['/manage'],
+        },
+        {
+          href: isAuthenticated
+            ? '/my-listings?filter=favorites'
+            : '/login',
+          label: isId ? 'Tersimpan' : 'Saved',
+          caption: isId
+            ? 'Postingan yang disimpan'
+            : 'Saved posts',
+          visual: { kind: 'icon', icon: Heart },
+          matchers: ['/my-listings'],
+        },
+        {
+          href: isAuthenticated
+            ? '/my-listings?filter=draft'
+            : '/login',
+          label: isId ? 'Draft' : 'Drafts',
+          caption: isId
+            ? 'Lanjutkan postingan'
+            : 'Continue posts',
+          visual: { kind: 'icon', icon: ClipboardList },
+          matchers: ['/my-listings'],
+        },
+      ],
+      [isAuthenticated, isId],
+    );
+
+  /* ---------------------------------------------------------------------- */
+  /* Global handlers                                                         */
+  /* ---------------------------------------------------------------------- */
+
+  const closeAll =
+    useCallback(() => {
+      setProfileOpen(false);
+      setMobileOpen(false);
+    }, []);
+
+  const setGlobalSearch =
+    useCallback(
+      (value: string) => {
+        setGlobalSearchDraft({
+          source:
+            activeSearchQuery,
+          value,
+        });
       },
-      {
-        href: chatHref,
-        label: localeKey === 'id' ? 'Chat' : 'Chat',
-        caption:
-          localeKey === 'id' ? 'Tanya user atau admin' : 'Ask users or admin',
-        icon: MessageCircle,
-        matchers: ['/chat'],
+      [activeSearchQuery],
+    );
+
+  const handleGlobalSearchSubmit =
+    useCallback(
+      (submittedQuery: string) => {
+        const query =
+          submittedQuery.trim();
+
+        const nextHref =
+          query
+            ? `/explore?q=${encodeURIComponent(query)}`
+            : '/explore';
+
+        closeAll();
+
+        router.push(
+          localizeHref(
+            nextHref,
+            locale,
+          ),
+        );
       },
-      {
-        href: isAuthenticated ? '/manage' : '/login',
-        label: localeKey === 'id' ? 'Pusat Kelola' : 'Manage content',
-        caption:
-          localeKey === 'id'
-            ? 'Semua konten dalam satu tempat'
-            : 'All content in one place',
-        icon: LayoutDashboard,
-        matchers: ['/manage'],
-      },
-      {
-        href: manageHref,
-        label: localeKey === 'id' ? 'Kelola Usaha' : 'Manage business',
-        caption:
-          localeKey === 'id'
-            ? 'Profil, katalog, order'
-            : 'Profile, catalog, orders',
-        icon: Store,
-        matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
-      },
-    ],
-    [chatHref, isAuthenticated, localeKey, manageHref],
-  );
+      [
+        closeAll,
+        locale,
+        router,
+      ],
+    );
 
-  const closeAll = useCallback(() => {
-    setProfileOpen(false);
-    setMobileOpen(false);
-    setMenuSearch('');
-  }, []);
+  const toggleMobileMenu =
+    useCallback(() => {
+      setMobileOpen(
+        previous => !previous,
+      );
+    }, []);
 
-  const openLanguageFromDrawer = useCallback(() => {
-    setMobileOpen(false);
-    setMenuSearch('');
-    openLanguageModal();
-  }, [openLanguageModal]);
-
-  // const toggleDrawerTheme = useCallback(() => {
-  //   setColorScheme(isDark ? 'light' : 'dark');
-  // }, [isDark, setColorScheme]);
-
-  const setGlobalSearch = (value: string) => {
-    setGlobalSearchDraft({
-      source: activeSearchQuery,
-      value,
-    });
-  };
-
-  const handleGlobalSearchSubmit = (submittedQuery: string) => {
-    const query = submittedQuery.trim();
-    const nextHref = query
-      ? `/explore?q=${encodeURIComponent(query)}`
-      : '/explore';
-
-    closeAll();
-    router.push(localizeHref(nextHref, locale));
-  };
+  /* ---------------------------------------------------------------------- */
+  /* Effects                                                                 */
+  /* ---------------------------------------------------------------------- */
 
   useEffect(() => {
-    if (!profileOpen) return;
+    if (!profileOpen) {
+      return;
+    }
 
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
+    const handlePointerDown =
+      (event: MouseEvent) => {
+        const target =
+          event.target;
 
-      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
-        setProfileOpen(false);
-      }
-    };
+        if (!(target instanceof Node)) {
+          return;
+        }
 
-    document.addEventListener('mousedown', onPointerDown);
+        if (
+          !profileMenuRef.current?.contains(
+            target,
+          )
+        ) {
+          setProfileOpen(false);
+        }
+      };
+
+    document.addEventListener(
+      'mousedown',
+      handlePointerDown,
+    );
+
     return () => {
-      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener(
+        'mousedown',
+        handlePointerDown,
+      );
     };
   }, [profileOpen]);
 
   useEffect(() => {
-    if (!profileOpen && !mobileOpen) return;
+    if (
+      !profileOpen &&
+      !mobileOpen
+    ) {
+      return;
+    }
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setProfileOpen(false);
-      setMobileOpen(false);
-    };
+    const handleKeyDown =
+      (event: KeyboardEvent) => {
+        if (
+          event.key !== 'Escape'
+        ) {
+          return;
+        }
 
-    document.addEventListener('keydown', onKeyDown);
+        setProfileOpen(false);
+        setMobileOpen(false);
+      };
+
+    document.addEventListener(
+      'keydown',
+      handleKeyDown,
+    );
+
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener(
+        'keydown',
+        handleKeyDown,
+      );
     };
-  }, [mobileOpen, profileOpen]);
+  }, [
+    mobileOpen,
+    profileOpen,
+  ]);
 
-  useBodyScrollLock(mobileOpen);
-
-  const toggleMobileMenu = useCallback(() => {
-    setMobileOpen(prev => !prev);
-  }, []);
-
-  const renderDrawerGroup = (
-    title: string,
-    items: DrawerItem[],
-    options?: { compact?: boolean },
-  ) => (
-    <section
-      className={cn(
-        'overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.32)] dark:border-[color:var(--app-border-strong)]',
-        options?.compact &&
-          'border-[color:color-mix(in_srgb,var(--app-accent-border)_54%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_28%,var(--app-surface-strong))]',
-      )}
-    >
-      <div className="flex items-center justify-between gap-3 px-2 py-1.5">
-        <p className="min-w-0 truncate text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
-          {title}
-        </p>
-        <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-bold text-[color:var(--app-text-soft)]">
-          {items.length}
-        </span>
-      </div>
-      <div className="space-y-1">
-        {items.map(item => {
-          const Icon = item.icon;
-          const active = (
-            item.matchers?.length ? item.matchers : [hrefPath(item.href)]
-          ).some(matcher => matchesRoute(cleanPath, matcher));
-
-          return (
-            <Link
-              key={`${title}-${item.href}-${item.label}`}
-              href={item.href}
-              onClick={closeAll}
-              title={item.caption}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'ui-pressable group flex min-h-[46px] min-w-0 items-center gap-2.5 rounded-[15px] px-2.5 py-2 text-left transition',
-                active
-                  ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                  : 'text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
-              )}
-            >
-              <span
-                className={cn(
-                  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] border transition',
-                  active
-                    ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] dark:bg-white/10'
-                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] group-hover:text-[color:var(--app-accent)]',
-                )}
-              >
-                <Icon className="h-4.5 w-4.5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="line-clamp-1 block text-[13px] font-bold leading-tight">
-                  {item.label}
-                </span>
-              </span>
-              <ChevronRight
-                className={cn(
-                  'h-4 w-4 shrink-0 transition group-hover:translate-x-0.5',
-                  active
-                    ? 'text-[color:var(--app-accent)]'
-                    : 'text-[color:var(--app-text-soft)]',
-                )}
-              />
-            </Link>
-          );
-        })}
-      </div>
-    </section>
+  useBodyScrollLock(
+    mobileOpen,
   );
 
-  const mobileDrawerLayer =
-    typeof document !== 'undefined' && mobileOpen
+  /* ---------------------------------------------------------------------- */
+  /* Menu item renderer                                                      */
+  /* ---------------------------------------------------------------------- */
+
+  const renderMenuRow = (
+    item: DrawerItem,
+    options?: {
+      compact?: boolean;
+    },
+  ) => {
+    const active = (
+      item.matchers &&
+      item.matchers.length > 0
+        ? item.matchers
+        : [hrefPath(item.href)]
+    ).some(
+      matcher =>
+        matchesRoute(
+          cleanPath,
+          matcher,
+        ),
+    );
+
+    return (
+      <Link
+        key={`${item.href}-${item.label}`}
+        href={item.href}
+        onClick={closeAll}
+        aria-current={
+          active
+            ? 'page'
+            : undefined
+        }
+        className={cn(
+          'group flex min-w-0 items-center gap-2.5 rounded-[14px] p-2 transition',
+          active
+            ? 'bg-[color:var(--app-accent-soft)]'
+            : 'hover:bg-[color:var(--app-surface-muted)]',
+          options?.compact &&
+            'min-h-[54px]',
+        )}
+      >
+        <DrawerVisual visual={item.visual} active={active} />
+
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              'block truncate text-[12px] font-black',
+              active
+                ? 'text-[color:var(--app-accent)]'
+                : 'text-[color:var(--app-text)]',
+            )}
+          >
+            {item.label}
+          </span>
+
+          {item.caption ? (
+            <span className="mt-0.5 block line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+              {item.caption}
+            </span>
+          ) : null}
+        </span>
+      </Link>
+    );
+  };
+
+  /* ---------------------------------------------------------------------- */
+  /* Mobile create card                                                      */
+  /* ---------------------------------------------------------------------- */
+
+  const renderCreateCard = (
+    item: DrawerItem,
+  ) => (
+    <Link
+      key={item.href}
+      href={item.href}
+      onClick={closeAll}
+      className="group min-w-0 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 text-center transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_16px_32px_-24px_rgba(15,23,42,0.35)]"
+    >
+      <div className="flex h-[86px] items-center justify-center">
+        <DrawerVisual visual={item.visual} artworkSize="large" />
+      </div>
+
+      <h3 className="mt-2.5 line-clamp-2 min-h-[34px] text-[13px] font-black leading-4 text-[color:var(--app-text)]">
+        {item.label}
+      </h3>
+
+      {item.caption ? (
+        <p className="mt-1.5 line-clamp-3 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+          {item.caption}
+        </p>
+      ) : null}
+    </Link>
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* Mobile quick card                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  const renderQuickCard = (
+    item: DrawerItem,
+  ) => {
+    const active = (
+      item.matchers &&
+      item.matchers.length > 0
+        ? item.matchers
+        : [hrefPath(item.href)]
+    ).some(
+      matcher =>
+        matchesRoute(
+          cleanPath,
+          matcher,
+        ),
+    );
+
+    return (
+      <Link
+        key={`${item.href}-${item.label}`}
+        href={item.href}
+        onClick={closeAll}
+        aria-current={
+          active
+            ? 'page'
+            : undefined
+        }
+        className={cn(
+          'flex min-h-[74px] min-w-0 flex-col items-center justify-center rounded-[15px] border px-1 py-2 text-center transition',
+          active
+            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
+            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]',
+        )}
+      >
+        <div className="flex h-10 items-center justify-center">
+          <DrawerVisual visual={item.visual} active={active} />
+        </div>
+
+        <span
+          className={cn(
+            'mt-1.5 line-clamp-1 text-[10.5px] font-black',
+            active
+              ? 'text-[color:var(--app-accent)]'
+              : 'text-[color:var(--app-text)]',
+          )}
+        >
+          {item.label}
+        </span>
+      </Link>
+    );
+  };
+
+  /* ---------------------------------------------------------------------- */
+  /* Mobile drawer                                                           */
+  /* ---------------------------------------------------------------------- */
+
+  const mobileDrawer =
+    typeof document !==
+      'undefined' &&
+    mobileOpen
       ? createPortal(
           <>
             <button
               type="button"
-              aria-label="Close mobile menu overlay"
-              onClick={() => setMobileOpen(false)}
-              className="ui-layer-popover fixed inset-0 bg-slate-950/32 "
+              aria-label={
+                isId
+                  ? 'Tutup menu'
+                  : 'Close menu'
+              }
+              onClick={() =>
+                setMobileOpen(false)
+              }
+              className="ui-layer-popover fixed inset-0 bg-slate-950/35"
             />
-            <aside className="ui-layer-drawer fixed inset-y-0 right-0 flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-[min(92vw,390px)] flex-col overflow-hidden border-l border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_86px_-34px_rgba(15,23,42,0.56)] ring-1 ring-black/[0.04] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-white/10 lg:inset-y-4 lg:right-4 lg:h-[calc(var(--app-viewport-height)-2rem)] lg:w-[min(400px,calc(100vw-2rem))] lg:rounded-[28px] lg:border">
-              <div className="shrink-0 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.85rem)] dark:border-[color:var(--app-border-strong)]">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]">
+
+            <aside
+              className="ui-layer-drawer fixed inset-y-0 right-0 flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-[min(94vw,410px)] flex-col overflow-hidden border-l border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_86px_-34px_rgba(15,23,42,0.56)] dark:border-[color:var(--app-border-strong)] lg:inset-y-4 lg:right-4 lg:h-[calc(var(--app-viewport-height)-2rem)] lg:w-[410px] lg:rounded-[26px] lg:border"
+            >
+              <div className="shrink-0 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)]">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-[color:var(--app-surface-muted)]">
                       <LajuloLogo
                         markOnly
                         className="h-7 w-7"
                         markClassName="h-7 w-7"
                       />
                     </span>
-                    <div className="min-w-0">
-                      <h2 className="truncate text-[18px] font-bold leading-tight tracking-[-0.03em] text-[color:var(--app-text)]">
-                        {locale === 'id' ? 'Menu Lajukan' : 'Lajukan menu'}
-                      </h2>
-                      <p className="truncate text-[12px] font-semibold text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? 'Akses cepat fitur utama.'
-                          : 'Quick access to main features.'}
-                      </p>
-                    </div>
+
+                    <h2 className="text-[17px] font-black text-[color:var(--app-text)]">
+                      Menu
+                    </h2>
                   </div>
+
                   <button
                     type="button"
-                    onClick={() => setMobileOpen(false)}
-                    aria-label="Close menu"
-                    className="ui-pressable inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-strong)]"
+                    onClick={() =>
+                      setMobileOpen(false)
+                    }
+                    aria-label={
+                      isId
+                        ? 'Tutup'
+                        : 'Close'
+                    }
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
                   >
-                    <X className="h-4.5 w-4.5" />
+                    <X className="h-5 w-5" />
                   </button>
                 </div>
 
-                <div className="relative mt-4">
+                <div className="mt-3">
                   <NavbarGlobalSearch
                     locale={localeKey}
                     pathname={cleanPath}
                     value={globalSearch}
                     onValueChange={setGlobalSearch}
-                    onSubmit={nextQuery => {
-                      handleGlobalSearchSubmit(nextQuery);
-                      setMobileOpen(false);
-                    }}
+                    onSubmit={handleGlobalSearchSubmit}
                   />
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain bg-[color:var(--app-surface-muted)] p-3 pb-4">
-                <section className="grid grid-cols-2 gap-1.5">
-                  {drawerQuickLinks.map(item => {
-                    const Icon = item.icon;
-                    const active = (
-                      item.matchers?.length
-                        ? item.matchers
-                        : [hrefPath(item.href)]
-                    ).some(matcher => matchesRoute(cleanPath, matcher));
-
-                    return (
-                      <Link
-                        key={`quick-${item.href}-${item.label}`}
-                        href={item.href}
-                        onClick={closeAll}
-                        className={cn(
-                          'ui-pressable group flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[17px] border px-2 py-2 text-center transition',
-                          active
-                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]',
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            'inline-flex h-8 w-8 items-center justify-center rounded-[12px] border transition',
-                            active
-                              ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)]'
-                              : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] group-hover:text-[color:var(--app-accent)]',
-                          )}
-                        >
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <span className="block max-w-full truncate text-[11px] font-bold leading-tight">
-                          {item.label}
-                        </span>
-                      </Link>
-                    );
-                  })}
+              <div className="min-h-0 flex-1 overflow-y-auto bg-[color:var(--app-surface-muted)] px-2.5 py-2.5 pb-4">
+                <section className="grid grid-cols-3 gap-1.5">
+                  {quickItems.map(
+                    renderQuickCard,
+                  )}
                 </section>
 
-                <div className="relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.32)] dark:border-[color:var(--app-border-strong)]">
-                  <div aria-hidden="true" className="hidden" />
+                <section className="mt-2.5 rounded-[17px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5">
                   {isAuthenticated ? (
-                    <div className="relative">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <Image
-                          src={userAvatarSrc}
-                          alt="Profile avatar"
-                          width={44}
-                          height={44}
-                          className="h-11 w-11 shrink-0 rounded-full border border-[color:var(--app-border)] object-contain"
-                          unoptimized={userAvatarIsRemote}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
-                            {user?.username || user?.fullName || 'User'}
-                          </p>
-                          <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
-                            {user?.email ||
-                              (locale === 'id'
-                                ? 'Akun aktif'
-                                : 'Active account')}
-                          </p>
-                        </div>
-                        <Link
-                          href="/profile"
-                          onClick={closeAll}
-                          className="ui-pressable inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
-                          aria-label={
-                            locale === 'id' ? 'Buka profil' : 'Open profile'
-                          }
-                        >
-                          <UserRound className="h-4 w-4" />
-                        </Link>
+                    <div className="flex items-center gap-2.5">
+                      <Image
+                        src={avatarSrc}
+                        alt={
+                          isId
+                            ? 'Foto profil'
+                            : 'Profile photo'
+                        }
+                        width={40}
+                        height={40}
+                        unoptimized={
+                          avatarRemote
+                        }
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-black text-[color:var(--app-text)]">
+                          {user?.username ||
+                            user?.fullName ||
+                            user?.full_name ||
+                            'User'}
+                        </p>
+
+                        <p className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                          {user?.email ||
+                            (isId
+                              ? 'Akun aktif'
+                              : 'Active account')}
+                        </p>
                       </div>
-                      <div
-                        className={cn(
-                          'mt-3 grid gap-1.5',
-                          PROMO_ONLY_MODE ? 'grid-cols-1' : 'grid-cols-3',
-                        )}
+
+                      <Link
+                        href="/profile"
+                        onClick={closeAll}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)]"
+                        aria-label={
+                          isId
+                            ? 'Buka profil'
+                            : 'Open profile'
+                        }
                       >
-                        {!PROMO_ONLY_MODE ? (
-                          <>
-                            <Link
-                              href="/payments"
-                              onClick={closeAll}
-                              className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-bold text-[color:var(--app-text)]"
-                            >
-                              <Wallet className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-                              {locale === 'id' ? 'Saldo' : 'Balance'}
-                            </Link>
-                            <Link
-                              href="/transactions"
-                              onClick={closeAll}
-                              className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-bold text-[color:var(--app-text)]"
-                            >
-                              <Store className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-                              {locale === 'id' ? 'Transaksi' : 'Deals'}
-                            </Link>
-                          </>
-                        ) : null}
-                        <Link
-                          href={manageHref}
-                          onClick={closeAll}
-                          className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-bold text-[color:var(--app-text)]"
-                        >
-                          <MapPinned className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-                          {locale === 'id' ? 'Usaha' : 'Business'}
-                        </Link>
-                      </div>
+                        <UserRound className="h-4 w-4" />
+                      </Link>
                     </div>
                   ) : (
-                    <div className="relative">
-                      <p className="text-sm font-bold text-[color:var(--app-text)]">
-                        {locale === 'id' ? 'Masuk ke akun' : 'Sign in'}
+                    <div className="flex items-center gap-2">
+                      <p className="min-w-0 flex-1 text-[13px] font-black text-[color:var(--app-text)]">
+                        {isId
+                          ? 'Simpan chat dan draft'
+                          : 'Save chats and drafts'}
                       </p>
-                      <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? PROMO_ONLY_MODE
-                            ? 'Chat, profil, dan draft promosi jadi tersimpan.'
-                            : 'Chat, transaksi, dan draft jadi tersimpan.'
-                          : PROMO_ONLY_MODE
-                            ? 'Keep chats, profiles, and promotion drafts saved.'
-                            : 'Keep chats, transactions, and drafts saved.'}
-                      </p>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <Link
-                          href="/login"
-                          onClick={closeAll}
-                          className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)]"
-                        >
-                          {text.login}
-                        </Link>
-                        <Link
-                          href="/register"
-                          onClick={closeAll}
-                          className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)]"
-                        >
-                          {text.register}
-                        </Link>
-                      </div>
+
+                      <Link
+                        href="/login"
+                        onClick={closeAll}
+                        className="flex min-h-9 items-center rounded-[11px] bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-black"
+                      >
+                        {text.login}
+                      </Link>
+
+                      <Link
+                        href="/register"
+                        onClick={closeAll}
+                        className="flex min-h-9 items-center rounded-[11px] bg-[color:var(--app-accent-strong)] px-3 text-[11px] font-black text-white"
+                      >
+                        {text.register}
+                      </Link>
                     </div>
                   )}
-                </div>
+                </section>
 
-                <section className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)]">
-                  <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                    {text.preferences}
-                  </p>
-                  <div className="grid grid-cols-1 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={openLanguageFromDrawer}
-                      className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-bold text-[color:var(--app-text)]"
-                    >
-                      <Languages className="h-4 w-4 text-[color:var(--app-accent)]" />
-                      <span className="min-w-0">
-                        <span className="block truncate">{text.language}</span>
-                        <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
-                          {currentLocale?.toUpperCase() ||
-                            localeKey.toUpperCase()}
-                        </span>
-                      </span>
-                    </button>
-                    {/* Dark/light switching is paused while Lajukan focuses on light mode.
-                    <button
-                      type="button"
-                      onClick={toggleDrawerTheme}
-                      disabled={!isReady}
-                      className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-bold text-[color:var(--app-text)] disabled:opacity-50"
-                    >
-                      {isDark ? (
-                        <Sun className="h-4 w-4 text-[color:var(--app-accent)]" />
-                      ) : (
-                        <Moon className="h-4 w-4 text-[color:var(--app-accent)]" />
-                      )}
-                      <span className="min-w-0">
-                        <span className="block truncate">
-                          {isDark ? text.light : text.dark}
-                        </span>
-                        <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                          {locale === 'id' ? 'Mode' : 'Mode'}
-                        </span>
-                      </span>
-                    </button>
-                    */}
+                <section className="mt-3">
+                  <div className="px-1">
+                    <h3 className="text-[14px] font-black text-[color:var(--app-text)]">
+                      {text.createTitle}
+                    </h3>
+
+                    <p className="mt-0.5 text-[10px] text-[color:var(--app-text-soft)]">
+                      {text.createHint}
+                    </p>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {createItems.map(
+                      renderCreateCard,
+                    )}
                   </div>
                 </section>
 
-                <div className="space-y-2.5">
-                  {visibleCreateDrawerItems.length > 0
-                    ? renderDrawerGroup(
-                        text.createSection,
-                        visibleCreateDrawerItems,
-                        { compact: true },
-                      )
-                    : null}
-                  {visibleMenuGroups.map(group => (
-                    <div key={group.id}>
-                      {renderDrawerGroup(group.title, group.items)}
-                    </div>
-                  ))}
-                  {visibleMenuGroups.length === 0 &&
-                  visibleCreateDrawerItems.length === 0 ? (
-                    <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-center text-sm font-semibold text-[color:var(--app-text-soft)]">
-                      {locale === 'id'
-                        ? 'Menu tidak ditemukan.'
-                        : 'No menu found.'}
-                    </div>
-                  ) : null}
-                </div>
+                <section className="mt-3">
+                  <div className="px-1">
+                    <h3 className="text-[13px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                      {text.categoryTitle}
+                    </h3>
+
+                    <p className="mt-0.5 text-[10px] text-[color:var(--app-text-soft)]">
+                      {text.categoryHint}
+                    </p>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Link
+                      href="/explore?tab=all&side=supply"
+                      onClick={closeAll}
+                      className="group rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)]"
+                    >
+                      <div className="flex h-[82px] items-center justify-center">
+                        <MenuArtwork
+                          src={MENU_ARTWORKS.all}
+                          size="large"
+                        />
+                      </div>
+
+                      <h3 className="mt-2.5 text-[13px] font-black text-[color:var(--app-text)]">
+                        {text.all}
+                      </h3>
+
+                      <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                        {text.allHint}
+                      </p>
+                    </Link>
+
+                    {categories.map(
+                      category => {
+                        const href =
+                          buildExploreCategoryHref(
+                            category,
+                          );
+
+                        const active =
+                          cleanPath ===
+                            href ||
+                          cleanPath.startsWith(
+                            `${href}/`,
+                          );
+
+                        const image =
+                          category.image ||
+                          getCategoryArtwork(
+                            category.id,
+                            category.slug,
+                          );
+
+                        const label =
+                          categoryLabel(
+                            category,
+                            localeKey,
+                          );
+
+                        const description =
+                          isId
+                            ? category.descriptionId
+                            : category.descriptionEn;
+
+                        return (
+                          <Link
+                            key={category.id}
+                            href={href}
+                            onClick={closeAll}
+                            aria-current={
+                              active
+                                ? 'page'
+                                : undefined
+                            }
+                            className={cn(
+                              'group rounded-[18px] border p-3.5 transition hover:-translate-y-0.5',
+                              active
+                                ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
+                                : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)]',
+                            )}
+                          >
+                            <div className="flex h-[82px] items-center justify-center">
+                              <MenuArtwork
+                                src={image}
+                                size="large"
+                              />
+                            </div>
+
+                            <h3
+                              className={cn(
+                                'mt-2.5 line-clamp-2 text-[13px] font-black leading-4',
+                                active
+                                  ? 'text-[color:var(--app-accent)]'
+                                  : 'text-[color:var(--app-text)]',
+                              )}
+                            >
+                              {label}
+                            </h3>
+
+                            <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                              {description}
+                            </p>
+                          </Link>
+                        );
+                      },
+                    )}
+                  </div>
+
+                  <Link
+                    href="/explore"
+                    onClick={closeAll}
+                    className="mt-2 flex min-h-10 items-center justify-center rounded-[14px] bg-[color:var(--app-surface-strong)] text-[11px] font-black text-[color:var(--app-accent)]"
+                  >
+                    {text.seeAll}
+                  </Link>
+                </section>
+
+                <section className="mt-3">
+                  <div className="px-1">
+                    <h3 className="text-[14px] font-black text-[color:var(--app-text)]">
+                      {text.aroundTitle}
+                    </h3>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {aroundItems.map(
+                      renderCreateCard,
+                    )}
+                  </div>
+                </section>
+
+                <section className="mt-3">
+                  <div className="px-1">
+                    <h3 className="text-[14px] font-black text-[color:var(--app-text)]">
+                      {text.activityTitle}
+                    </h3>
+                  </div>
+
+                  <div className="mt-2 overflow-hidden rounded-[17px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+                    {activityItems.map(
+                      (
+                        item,
+                        index,
+                      ) => {
+                        const active =
+                          (
+                            item.matchers ||
+                            []
+                          ).some(
+                            matcher =>
+                              matchesRoute(
+                                cleanPath,
+                                matcher,
+                              ),
+                          );
+
+                        return (
+                          <Link
+                            key={`${item.href}-${item.label}`}
+                            href={item.href}
+                            onClick={closeAll}
+                            className={cn(
+                              'flex min-h-[58px] items-center gap-2.5 px-3',
+                              index <
+                                activityItems.length -
+                                  1 &&
+                                'border-b border-[color:var(--app-border)]',
+                              active
+                                ? 'bg-[color:var(--app-accent-soft)]'
+                                : 'hover:bg-[color:var(--app-surface-muted)]',
+                            )}
+                          >
+                            <DrawerVisual visual={item.visual} active={active} />
+
+                            <span className="min-w-0 flex-1">
+                              <span
+                                className={cn(
+                                  'block truncate text-[12px] font-black',
+                                  active
+                                    ? 'text-[color:var(--app-accent)]'
+                                    : 'text-[color:var(--app-text)]',
+                                )}
+                              >
+                                {item.label}
+                              </span>
+
+                              {item.caption ? (
+                                <span className="mt-0.5 block truncate text-[10px] text-[color:var(--app-text-soft)]">
+                                  {item.caption}
+                                </span>
+                              ) : null}
+                            </span>
+
+                            <ChevronRight
+                              aria-hidden="true"
+                              className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]"
+                            />
+                          </Link>
+                        );
+                      },
+                    )}
+                  </div>
+                </section>
               </div>
 
-              <div className="shrink-0 border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-[color:var(--app-border-strong)]">
-                <div className="grid grid-cols-2 gap-1.5">
+              <div className="shrink-0 border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)]">
+                <div
+                  className={cn(
+                    'grid gap-1',
+                    isAuthenticated
+                      ? 'grid-cols-4'
+                      : 'grid-cols-3',
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      openLanguageModal();
+                    }}
+                    className="flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-[11px] bg-[color:var(--app-surface-muted)] text-[10px] font-black"
+                  >
+                    <Languages className="h-4 w-4" />
+                    {currentLocale?.toUpperCase() ||
+                      localeKey.toUpperCase()}
+                  </button>
+
                   <Link
                     href="/support"
                     onClick={closeAll}
-                    className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)]"
+                    className="flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-[11px] bg-[color:var(--app-surface-muted)] text-[10px] font-black"
                   >
                     <CircleHelp className="h-4 w-4" />
                     {text.support}
                   </Link>
+
                   <Link
                     href="/settings"
                     onClick={closeAll}
-                    className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)]"
+                    className="flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-[11px] bg-[color:var(--app-surface-muted)] text-[10px] font-black"
                   >
                     <Settings className="h-4 w-4" />
-                    {locale === 'id' ? 'Setelan' : 'Settings'}
+                    {isId
+                      ? 'Setelan'
+                      : 'Settings'}
                   </Link>
+
+                  {isAuthenticated ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeAll();
+                        void logout();
+                      }}
+                      className="flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-[11px] bg-[color:var(--app-surface-muted)] text-[10px] font-black text-[color:var(--app-danger)]"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {text.logout}
+                    </button>
+                  ) : null}
                 </div>
-                {isAuthenticated ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeAll();
-                      void logout();
-                    }}
-                    className="ui-pressable mt-1.5 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[13px] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_58%,_transparent)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    {text.logout}
-                  </button>
-                ) : null}
               </div>
             </aside>
           </>,
@@ -1038,86 +1649,117 @@ export function Header() {
         )
       : null;
 
+  /* ---------------------------------------------------------------------- */
+  /* Render                                                                  */
+  /* ---------------------------------------------------------------------- */
+
   return (
     <>
       <header
-        className="ui-layer-header fixed inset-x-0 top-0 border-x-0 border-b border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)]  dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)]"
+        className="ui-layer-header fixed inset-x-0 top-0 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/95 backdrop-blur-xl"
         data-tour="www-header"
       >
-        <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+        <div
+          style={{
+            height:
+              'env(safe-area-inset-top,0px)',
+          }}
+        />
+
         <div className="lajukan-header-shell page-shell flex h-12 items-center gap-2 sm:h-14">
-          <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href="/home"
-              className="ui-pressable inline-flex shrink-0 items-center"
-              onClick={closeAll}
-              aria-label={text.brand}
-            >
-              <span className="inline-flex max-w-[40px] select-none 2xl:max-w-[128px]">
-                <LajuloLogo textClassName="hidden 2xl:inline" />
-              </span>
-            </Link>
-          </div>
+          <Link
+            href="/home"
+            onClick={closeAll}
+            aria-label="Lajukan"
+            className="shrink-0"
+          >
+            <span className="inline-flex max-w-[40px] 2xl:max-w-[128px]">
+              <LajuloLogo
+                textClassName="hidden 2xl:inline"
+              />
+            </span>
+          </Link>
 
           <nav
-            className="hidden shrink-0 items-center justify-start gap-0.5 lg:flex"
-            aria-label={locale === 'id' ? 'Navigasi utama' : 'Main navigation'}
+            className="hidden shrink-0 items-center gap-0.5 lg:flex"
+            aria-label={
+              isId
+                ? 'Navigasi utama'
+                : 'Main navigation'
+            }
           >
-            {desktopPrimaryLinks.map(item => {
-              if (item.key === 'explore') {
-                return (
-                  <ExploreMegaMenu
-                    key={item.key}
-                    locale={localeKey}
-                    pathname={cleanPath}
-                    onNavigate={closeAll}
-                  />
-                );
-              }
-              const Icon = item.icon;
-              const active = coreDrawerActiveKey === item.key;
+            {desktopPrimaryItems.map(
+              item => {
+                if (
+                  item.key ===
+                  'explore'
+                ) {
+                  return (
+                    <ExploreMegaMenu
+                      key={item.key}
+                      locale={localeKey}
+                      pathname={cleanPath}
+                      onNavigate={closeAll}
+                    />
+                  );
+                }
 
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  onClick={closeAll}
-                  className={cn(
-                    'ui-pressable inline-flex !min-h-[42px] items-center justify-center gap-1.5 rounded-[14px] px-2 text-sm font-semibold transition xl:px-2.5',
-                    active
-                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
-                  )}
-                  aria-current={active ? 'page' : undefined}
-                  aria-label={item.label}
-                  title={item.label}
-                >
-                  <span
-                    className={cn(
-                      'inline-flex h-8 w-8 items-center justify-center rounded-full transition',
+                const Icon =
+                  item.icon;
+
+                const active =
+                  activePrimaryKey ===
+                  item.key;
+
+                return (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    onClick={closeAll}
+                    aria-current={
                       active
-                        ? 'bg-white text-[color:var(--app-accent)]'
-                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span
+                        ? 'page'
+                        : undefined
+                    }
                     className={cn(
-                      item.key === 'home'
-                        ? 'hidden xl:inline'
-                        : 'hidden 2xl:inline',
+                      'inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-[14px] px-2 text-sm font-semibold transition xl:px-2.5',
+                      active
+                        ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                        : 'text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
                     )}
                   >
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
+                    <span
+                      className={cn(
+                        'flex h-8 w-8 items-center justify-center rounded-full',
+                        active
+                          ? 'bg-white text-[color:var(--app-accent)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+
+                    <span
+                      className={
+                        item.key ===
+                        'home'
+                          ? 'hidden xl:inline'
+                          : 'hidden 2xl:inline'
+                      }
+                    >
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              },
+            )}
           </nav>
 
-          {matchesRoute(cleanPath, '/explore') ? (
-            <div className="hidden flex-1 lg:block" aria-hidden="true" />
+          {matchesRoute(
+            cleanPath,
+            '/explore',
+          ) ? (
+            <div className="hidden flex-1 lg:block" />
           ) : (
             <div className="hidden min-w-[220px] flex-1 lg:block 2xl:min-w-[360px]">
               <NavbarGlobalSearch
@@ -1130,275 +1772,240 @@ export function Header() {
             </div>
           )}
 
-          <div className="hidden shrink-0 items-center justify-end gap-1.5 lg:flex xl:gap-2">
+          <div className="ml-auto hidden shrink-0 items-center gap-1.5 lg:flex xl:gap-2">
             <button
               type="button"
               onClick={toggleMobileMenu}
               aria-expanded={mobileOpen}
               aria-label={text.menu}
               className={cn(
-                'ui-pressable inline-flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full border shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition',
+                'flex h-11 w-11 items-center justify-center rounded-full border transition',
                 mobileOpen
                   ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-strong)]',
+                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]',
               )}
-              title={text.menu}
             >
-              <LayoutGrid className="h-4.5 w-4.5" />
+              <LayoutGrid className="h-5 w-5" />
             </button>
 
             {isAuthenticated ? (
               <>
                 <HeaderInboxDropdown
                   kind="chat"
-                  isId={locale === 'id'}
-                  active={matchesRoute(cleanPath, '/chat')}
+                  isId={isId}
+                  active={matchesRoute(
+                    cleanPath,
+                    '/chat',
+                  )}
                 />
 
                 <HeaderInboxDropdown
                   kind="notifications"
-                  isId={locale === 'id'}
-                  active={matchesRoute(cleanPath, '/notifications')}
+                  isId={isId}
+                  active={matchesRoute(
+                    cleanPath,
+                    '/notifications',
+                  )}
                 />
               </>
             ) : null}
 
             <Link
               href={createHref}
-              className="ui-pressable inline-flex h-11 min-h-11 items-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-2.5 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_14px_28px_-18px_color-mix(in_srgb,var(--app-accent)_72%,transparent)] transition hover:brightness-105 xl:px-4"
               onClick={closeAll}
-              aria-label={text.createLong}
-              title={text.createLong}
-              data-tour="www-create"
-              data-testid="app-header-create-link"
+              className="flex h-11 items-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-3 text-sm font-black text-white transition hover:brightness-105"
             >
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,_var(--app-text-inverse)_14%,_transparent)]">
-                <Plus className="h-4 w-4" />
+              <Plus
+                aria-hidden="true"
+                className="h-4 w-4"
+              />
+
+              <span className="hidden xl:inline">
+                {text.create}
               </span>
-              <span className="hidden xl:inline">{text.create}</span>
             </Link>
 
             {isAuthenticated ? (
               <div
-                className="ui-layer-local-topbar relative"
                 ref={profileMenuRef}
+                className="relative"
               >
                 <button
                   type="button"
-                  onClick={() => setProfileOpen(prev => !prev)}
+                  onClick={() =>
+                    setProfileOpen(
+                      previous =>
+                        !previous,
+                    )
+                  }
                   aria-haspopup="menu"
                   aria-expanded={profileOpen}
-                  className={cn(
-                    'ui-pressable inline-flex h-11 min-h-11 items-center gap-0 rounded-full border px-2 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition xl:gap-2 xl:px-2 xl:pr-3',
-                    matchesRoute(cleanPath, '/profile$') ||
-                      matchesRoute(cleanPath, '/profile/edit') ||
-                      matchesRoute(cleanPath, '/manage') ||
-                      matchesRoute(cleanPath, '/usaha') ||
-                      matchesRoute(cleanPath, LEGACY_UMKM_OWNER_PATH) ||
-                      matchesRoute(cleanPath, '/settings') ||
-                      (!PROMO_ONLY_MODE &&
-                        (matchesRoute(cleanPath, '/transactions') ||
-                          matchesRoute(cleanPath, '/payments')))
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
-                  )}
-                  data-tour="www-profile"
+                  className="flex h-11 items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2"
                 >
                   <Image
-                    src={userAvatarSrc}
-                    alt="Profile avatar"
-                    width={28}
-                    height={28}
-                    className="h-8 w-8 rounded-full object-contain"
-                    unoptimized={userAvatarIsRemote}
+                    src={avatarSrc}
+                    alt={
+                      isId
+                        ? 'Foto profil'
+                        : 'Profile photo'
+                    }
+                    width={32}
+                    height={32}
+                    unoptimized={
+                      avatarRemote
+                    }
+                    className="h-8 w-8 rounded-full object-cover"
                   />
-                  <span className="hidden max-w-[84px] truncate text-sm font-semibold 2xl:inline">
-                    {user?.username || user?.fullName || 'User'}
+
+                  <span className="hidden max-w-[90px] truncate text-sm font-semibold 2xl:inline">
+                    {user?.username ||
+                      user?.fullName ||
+                      user?.full_name ||
+                      'User'}
                   </span>
                 </button>
 
                 {profileOpen ? (
                   <div
                     role="menu"
-                    className="ui-layer-popover absolute right-0 mt-2 w-[min(21rem,calc(100vw-1.5rem))] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_24px_70px_-38px_rgba(15,23,42,0.45)]"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[320px] rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-2xl"
                   >
-                    <div className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-muted))] p-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <Image
-                          src={userAvatarSrc}
-                          alt="Profile avatar"
-                          width={44}
-                          height={44}
-                          className="h-11 w-11 shrink-0 rounded-full border-2 border-[color:var(--app-surface-strong)] object-contain shadow-[0_14px_28px_-24px_rgba(15,23,42,0.55)]"
-                          unoptimized={userAvatarIsRemote}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
-                            {user?.username || user?.fullName || 'User'}
-                          </p>
-                          <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
-                            {user?.email ||
-                              (locale === 'id'
-                                ? 'Akun aktif'
-                                : 'Active account')}
-                          </p>
-                        </div>
+                    <div className="flex items-center gap-2 rounded-[14px] bg-[color:var(--app-surface-muted)] p-2">
+                      <Image
+                        src={avatarSrc}
+                        alt=""
+                        width={40}
+                        height={40}
+                        unoptimized={
+                          avatarRemote
+                        }
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black">
+                          {user?.username ||
+                            user?.fullName ||
+                            user?.full_name ||
+                            'User'}
+                        </p>
+
+                        <p className="truncate text-[11px] text-[color:var(--app-text-soft)]">
+                          {user?.email ||
+                            (isId
+                              ? 'Akun aktif'
+                              : 'Active account')}
+                        </p>
                       </div>
                     </div>
-                    <div className="mt-2 grid gap-1">
-                      {accountDrawerItems.map(item => {
-                        const itemPath = hrefPath(item.href);
-                        const itemFilter = new URLSearchParams(
-                          item.href.split('?')[1] || '',
-                        ).get('filter');
-                        const currentFilter = searchParams.get('filter');
-                        const active =
-                          itemPath === '/my-listings'
-                            ? cleanPath === '/my-listings' &&
-                              (itemFilter
-                                ? currentFilter === itemFilter
-                                : !currentFilter)
-                            : (item.matchers?.some(matcher =>
-                                matchesRoute(cleanPath, matcher),
-                              ) ?? false);
-                        const ItemIcon = item.icon;
 
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                              'ui-pressable group flex min-h-[46px] items-center gap-2.5 rounded-[15px] px-2.5 text-sm font-semibold transition',
-                              active
-                                ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                                : 'text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
-                            )}
-                            onClick={() => setProfileOpen(false)}
-                            role="menuitem"
-                            aria-current={active ? 'page' : undefined}
-                          >
-                            <span
-                              className={cn(
-                                'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ring-1 transition',
+                    <div className="mt-2 grid grid-cols-2 gap-1">
+                      {accountItems.map(
+                        item => {
+                          const active =
+                            (
+                              item.matchers ||
+                              []
+                            ).some(
+                              matcher =>
+                                matchesRoute(
+                                  cleanPath,
+                                  matcher,
+                                ),
+                            );
+
+                          return (
+                            <Link
+                              key={`${item.href}-${item.label}`}
+                              href={item.href}
+                              role="menuitem"
+                              aria-current={
                                 active
-                                  ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] ring-[color:var(--app-accent-border)]'
-                                  : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] ring-[color:var(--app-border)] group-hover:text-[color:var(--app-accent)]',
+                                  ? 'page'
+                                  : undefined
+                              }
+                              onClick={() =>
+                                setProfileOpen(
+                                  false,
+                                )
+                              }
+                              className={cn(
+                                'flex min-h-[46px] items-center gap-2 rounded-[12px] px-2',
+                                active
+                                  ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                                  : 'hover:bg-[color:var(--app-surface-muted)]',
                               )}
                             >
-                              <ItemIcon className="h-4 w-4" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate">
+                              <DrawerVisual visual={item.visual} active={active} />
+
+                              <span className="min-w-0 truncate text-[11px] font-black">
                                 {item.label}
                               </span>
-                              {item.caption ? (
-                                <span className="block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                                  {item.caption}
-                                </span>
-                              ) : null}
-                            </span>
-                            {active ? (
-                              <span className="h-2 w-2 min-w-2 min-h-3 max-w-2 max-h-2 shrink-0 rounded-full bg-[color:var(--app-accent)]" />
-                            ) : null}
-                          </Link>
-                        );
-                      })}
+                            </Link>
+                          );
+                        },
+                      )}
                     </div>
+
                     <div className="my-2 border-t border-[color:var(--app-border)]" />
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-1 py-1">
+
+                    <div className="grid grid-cols-[1fr_auto] gap-1">
                       <LanguageSwitcherButton />
                       <ThemeToggle />
                     </div>
-                    <div className="my-1 border-t border-[color:var(--app-border)]" />
+
                     <button
                       type="button"
-                      className="ui-pressable flex min-h-[44px] w-full items-center gap-2.5 rounded-[15px] px-3 text-left text-sm font-semibold text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
                       onClick={async () => {
                         await logout();
-                        setProfileOpen(false);
+                        setProfileOpen(
+                          false,
+                        );
                       }}
+                      className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-[12px] text-xs font-black text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
                     >
-                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]">
-                        <LogOut className="h-4 w-4" />
-                      </span>
+                      <LogOut className="h-4 w-4" />
                       {text.logout}
                     </button>
                   </div>
                 ) : null}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <>
                 <LanguageSwitcherButton />
                 <ThemeToggle />
+
                 <Link
                   href="/login"
-                  className="ui-pressable inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-sm font-bold text-[color:var(--app-text)] shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
                   onClick={closeAll}
-                  data-tour="www-login"
+                  className="flex h-11 items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black"
                 >
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]">
-                    <LogIn className="h-3.5 w-3.5" />
-                  </span>
+                  <LogIn
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                  />
+
                   {text.login}
                 </Link>
-              </div>
+              </>
             )}
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 lg:hidden">
-            {/* <Link
-              href="/explore"
-              className={cn(
-                'ui-pressable inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border transition',
-                matchesRoute(cleanPath, '/explore')
-                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]',
-              )}
-              onClick={closeAll}
-              data-tour="www-search-mobile"
-              data-testid="app-header-mobile-search-link"
-              aria-label={text.search}
-            >
-              <SearchIcon className="h-4 w-4" />
-            </Link>
-
-            <Link
-              href={chatHref}
-              onClick={closeAll}
-              className={cn(
-                'ui-pressable relative inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border transition',
-                matchesRoute(cleanPath, '/chat')
-                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]',
-              )}
-              aria-label={text.chat}
-            >
-              <MessageCircle className="h-4 w-4" />
-              {totalUnread > 0 ? (
-                <span className="absolute right-0 top-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-danger)] px-1 text-[9px] font-bold text-[color:var(--app-text-inverse)]">
-                  {totalUnread > 99 ? '99+' : totalUnread}
-                </span>
-              ) : null}
-            </Link>
-
-            <Link
-              href={createHref}
-              onClick={closeAll}
-              className="ui-pressable inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] shadow-[var(--app-shadow)]"
-              aria-label={text.createLong}
-              data-tour="www-create-mobile"
-              data-testid="app-header-mobile-create-link"
-            >
-              <Plus className="h-4.5 w-4.5" />
-            </Link> */}
-
+          <div className="ml-auto flex lg:hidden">
             <button
               type="button"
               onClick={toggleMobileMenu}
               aria-expanded={mobileOpen}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-              className="ui-pressable inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]"
-              data-testid="app-header-mobile-menu-button"
+              aria-label={
+                mobileOpen
+                  ? isId
+                    ? 'Tutup menu'
+                    : 'Close menu'
+                  : isId
+                    ? 'Buka menu'
+                    : 'Open menu'
+              }
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
             >
               {mobileOpen ? (
                 <X className="h-5 w-5" />
@@ -1409,7 +2016,8 @@ export function Header() {
           </div>
         </div>
       </header>
-      {mobileDrawerLayer}
+
+      {mobileDrawer}
     </>
   );
 }

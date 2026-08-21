@@ -68,7 +68,6 @@ COPY cms/ .
 RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV FAST_DOCKER_BUILD=true
 
 FROM cms_deps AS cms_builder
 

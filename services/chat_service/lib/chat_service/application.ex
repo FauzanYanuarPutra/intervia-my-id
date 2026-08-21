@@ -6,10 +6,8 @@ defmodule ChatService.Application do
 
   @impl true
   def start(_type, _args) do
-    # 1. INISIALISASI ETS (PENTING)
-    # Membuat tabel :rate_limiter agar bisa diakses oleh semua proses Channel.
-    # :public memungkinkan proses channel mengupdate counter.
-    # :named_table memungkinkan kita memanggilnya dengan atom :rate_limiter.
+    # Own the fallback fixed-window limiter table for the full application
+    # lifetime. Production enforcement is shared through Redis/Hammer.
     if :ets.whereis(:rate_limiter) == :undefined do
       :ets.new(:rate_limiter, [
         :set,

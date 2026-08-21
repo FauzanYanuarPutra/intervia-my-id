@@ -37,6 +37,7 @@ use chrono::{DateTime, Duration, Utc}; // ✅ Serde enabled via Cargo.toml
 use uuid::Uuid;
 
 use crate::config::AppState;
+use crate::routes::proofs::{consume_phone_otp_proof, validate_phone_otp_proof};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
 // Optional: cookie::time::Duration for cookie expiry
@@ -80,6 +81,8 @@ pub struct LoginRequest {
 #[derive(Debug, Deserialize)]
 pub struct PhoneLoginRequest {
     pub phone: String,
+    #[serde(default, alias = "phoneOtpToken")]
+    pub phone_otp_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -799,10 +802,31 @@ async fn rotate_refresh_token(
     let new_expires = now + chrono::Duration::days(state.config.refresh_token_exp_days);
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("UPDATE core.sessions SET revoked = true WHERE id = $1")
+    let active_user = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT is_active
+        FROM core.users
+        WHERE id = $1 AND deleted_at IS NULL
+        FOR UPDATE
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if active_user != Some(true) {
+        anyhow::bail!("refresh rejected for inactive account");
+    }
+
+    let revoked = sqlx::query(
+        "UPDATE core.sessions SET revoked = true WHERE id = $1 AND user_id = $2 AND revoked = false",
+    )
         .bind(old_session_id)
+        .bind(user_id)
         .execute(&mut *tx)
         .await?;
+    if revoked.rows_affected() != 1 {
+        anyhow::bail!("refresh session was already rotated or revoked");
+    }
 
     let new_id = Uuid::new_v4();
     sqlx::query(
@@ -839,9 +863,12 @@ async fn find_and_verify_session(
 ) -> Result<Option<(Uuid, DateTime<Utc>)>, sqlx::Error> {
     let row_opt = sqlx::query(
         r#"
-        SELECT user_id, refresh_token_hash, expires_at, revoked
-        FROM sessions
-        WHERE id = $1
+        SELECT s.user_id, s.refresh_token_hash, s.expires_at, s.revoked
+        FROM core.sessions s
+        INNER JOIN core.users u ON u.id = s.user_id
+        WHERE s.id = $1
+          AND u.is_active = TRUE
+          AND u.deleted_at IS NULL
         LIMIT 1
         "#,
     )
@@ -1630,6 +1657,47 @@ pub async fn login_phone(
             .into_response();
     }
 
+    let phone_otp_token = payload
+        .phone_otp_token
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let otp_verified = match phone_otp_token {
+        Some(token) => {
+            match validate_phone_otp_proof(&state, token, &phone, &["login", "register"]).await {
+                Ok(verified) => verified,
+                Err(error) => {
+                    tracing::error!("phone login proof verification unavailable: {:?}", error);
+                    return (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        Json(json!({"error":"phone verification is temporarily unavailable"})),
+                    )
+                        .into_response();
+                }
+            }
+        }
+        None => false,
+    };
+
+    if !otp_verified {
+        record_audit_log(
+            state.clone(),
+            "user".to_string(),
+            "login.failed",
+            None,
+            None,
+            Some(json!({"phone_attempt": masked_phone, "reason": "invalid phone proof"})),
+            ip_address,
+            user_agent,
+        )
+        .await;
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"invalid or expired phone login verification"})),
+        )
+            .into_response();
+    }
+
     let rows = match sqlx::query(
         r#"
         SELECT
@@ -1725,6 +1793,30 @@ pub async fn login_phone(
             )
                 .into_response();
         }
+    }
+
+    let proof_consumed = match phone_otp_token {
+        Some(token) => {
+            match consume_phone_otp_proof(&state, token, &phone, &["login", "register"]).await {
+                Ok(consumed) => consumed,
+                Err(error) => {
+                    tracing::error!("phone login proof consumption unavailable: {:?}", error);
+                    return (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        Json(json!({"error":"phone verification is temporarily unavailable"})),
+                    )
+                        .into_response();
+                }
+            }
+        }
+        None => false,
+    };
+    if !proof_consumed {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"invalid or expired phone login verification"})),
+        )
+            .into_response();
     }
 
     let user_data = UserData {

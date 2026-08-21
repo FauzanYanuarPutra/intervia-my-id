@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod health;
 pub mod info;
+mod proofs;
 pub mod user_lookup;
 pub mod users;
 pub mod verification;

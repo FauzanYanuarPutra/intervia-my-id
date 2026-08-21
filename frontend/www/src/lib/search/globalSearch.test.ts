@@ -37,6 +37,17 @@ describe('global search URL state', () => {
     expect(serializeGlobalSearchState(state)).toBe('q=desain&tab=services');
   });
 
+  it('keeps existing people links compatible with the public user directory', () => {
+    for (const legacyType of ['people', 'orang', 'user', 'freelancer']) {
+      const state = parseGlobalSearchState(
+        new URLSearchParams(`type=${legacyType}`),
+      );
+
+      expect(state.tab).toBe('users');
+      expect(serializeGlobalSearchState(state)).toBe('tab=users');
+    }
+  });
+
   it('parses marketplace side aliases for need and offer pages', () => {
     const demand = parseGlobalSearchState(
       new URLSearchParams('q=kaos&side=seeker'),

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { forwardPersonalAiMessage } from '@/lib/personal-ai/store';
+import {
+  forwardPersonalAiMessage,
+  PersonalAiQuotaExceededError,
+} from '@/lib/personal-ai/store';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
 
@@ -40,11 +43,26 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     );
   }
   const { messageId } = await ctx.params;
-  const result = await forwardPersonalAiMessage({
-    userId: auth.ctx.userId,
-    messageId,
-    targetThreadId,
-  });
+  let result: Awaited<ReturnType<typeof forwardPersonalAiMessage>>;
+  try {
+    result = await forwardPersonalAiMessage({
+      userId: auth.ctx.userId,
+      messageId,
+      targetThreadId,
+    });
+  } catch (error) {
+    if (error instanceof PersonalAiQuotaExceededError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          quota: { resource: error.resource, limit: error.limit },
+        },
+        { status: 409 },
+      );
+    }
+    throw error;
+  }
   if (!result) {
     return NextResponse.json(
       { error: 'Message or target chat was not found.' },

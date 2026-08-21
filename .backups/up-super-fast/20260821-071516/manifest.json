@@ -1,0 +1,55 @@
+﻿{
+    "created_at":  "2026-08-21T07:16:23.0258607+07:00",
+    "project":  "intervia-my-id",
+    "script_version":  "2026.08.21-one-command-safe-3.0.1",
+    "powershell_version":  "5.1.26100.9168",
+    "compose_files":  [
+                          "-f",
+                          "docker-compose.dev.yml"
+                      ],
+    "backup_path":  "D:\\intervia-my-id\\.backups\\up-super-fast\\20260821-071516",
+    "result":  "partial",
+    "failures":  [
+                     "scylla_db",
+                     "minio"
+                 ],
+    "items":  [
+                  {
+                      "name":  "identity_db",
+                      "status":  "ok",
+                      "file":  "identity_db.dump",
+                      "note":  ""
+                  },
+                  {
+                      "name":  "community_db",
+                      "status":  "ok",
+                      "file":  "community_db.dump",
+                      "note":  ""
+                  },
+                  {
+                      "name":  "marketplace_db",
+                      "status":  "ok",
+                      "file":  "marketplace_db.dump",
+                      "note":  ""
+                  },
+                  {
+                      "name":  "scylla_db",
+                      "status":  "failed",
+                      "file":  "",
+                      "note":  "snapshot_backup_failed"
+                  },
+                  {
+                      "name":  "community_uploads",
+                      "status":  "ok",
+                      "file":  "community-uploads.tar.gz",
+                      "note":  ""
+                  },
+                  {
+                      "name":  "minio",
+                      "status":  "failed",
+                      "file":  "",
+                      "note":  "bucket_backup_failed"
+                  }
+              ],
+    "restore_note":  "Automatic local recovery checkpoint. This script never deletes Docker named volumes."
+}

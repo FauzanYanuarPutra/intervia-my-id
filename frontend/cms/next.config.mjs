@@ -4,7 +4,6 @@ import {
   buildSecurityHeaders,
 } from '../shared/config/nextSecurityHeaders.mjs';
 
-const FAST_DOCKER_BUILD = process.env.FAST_DOCKER_BUILD === 'true';
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SECURITY_HEADERS = buildSecurityHeaders({
   csp: buildInternalWebCsp({ production: IS_PROD }),
@@ -18,7 +17,7 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   typescript: {
-    ignoreBuildErrors: FAST_DOCKER_BUILD,
+    ignoreBuildErrors: false,
   },
   transpilePackages: ['lajukan-ui'],
   experimental: {

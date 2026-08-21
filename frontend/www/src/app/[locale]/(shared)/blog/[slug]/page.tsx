@@ -13,6 +13,7 @@ import {
   BLOG_ARTICLES,
   buildBlogArticleJsonLd,
   buildBlogPath,
+  buildBlogRobots,
   buildBlogUrl,
 } from '@/lib/seo/blog';
 import {
@@ -43,6 +44,7 @@ export async function generateMetadata({
     title: article.localized.title,
     description: article.localized.description,
     keywords: article.keywords,
+    robots: buildBlogRobots(article),
     alternates: {
       canonical: buildBlogUrl(locale, article.slug),
       languages: {

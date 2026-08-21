@@ -220,15 +220,7 @@ export const CORE_LAJUKAN_FLOWS: LajukanFlow[] = [
         primaryActionId: 'edit-or-verify',
         expectedSignals: ['identity', 'trusted', 'skill-arena', 'listings', 'reels'],
         mobilePriority: 'critical',
-      },
-      {
-        id: 'profile-edit',
-        route: '/profile/edit',
-        labelId: 'Lengkapi profil',
-        primaryActionId: 'save-profile',
-        expectedSignals: ['avatar', 'bio', 'skills', 'phone'],
-        mobilePriority: 'high',
-      },
+      }
     ],
   },
 ];

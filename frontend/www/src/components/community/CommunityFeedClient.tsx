@@ -25,6 +25,7 @@ import {
   Crown,
   Earth,
   Expand,
+  Flag,
   ImageIcon,
   Loader2,
   Lock,
@@ -32,11 +33,13 @@ import {
   MoreHorizontal,
   Plus,
   PlayCircle,
+  Pin,
   Search,
   Send,
   Share2,
   ShieldCheck,
   Sparkles,
+  Store,
   ThumbsUp,
   UserCog,
   UserMinus,
@@ -50,6 +53,13 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
+import {
+  TRUST_REPORT_REASONS,
+  isSameCommunityUser,
+  setCommunityUserBlocked,
+  submitTrustReport,
+  type TrustReportReason,
+} from '@/lib/community/trustSafety';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import {
@@ -82,7 +92,7 @@ type CommunityFeedClientProps = {
   isId: boolean;
 };
 
-type ComposeMode = 'post' | 'photo' | 'poll' | 'feeling';
+type ComposeMode = 'question' | 'post' | 'photo' | 'poll' | 'feeling';
 
 type ForumThreadDetail = {
   id: string;
@@ -91,12 +101,16 @@ type ForumThreadDetail = {
   views: number;
   replyCount: number;
   likeCount?: number;
+  bookmarkCount?: number;
   voteScore?: number;
   viewerVote?: -1 | 0 | 1;
   author: CommunityFeedItem['author'] | null;
   category: CommunityFeedCategory | null;
   tags: CommunityFeedTag[];
   imageUrls?: string[];
+  isPinned?: boolean;
+  isSolved?: boolean;
+  solutionPostId?: string | null;
 };
 
 type ForumPostDetail = {
@@ -111,6 +125,7 @@ type ForumPostDetail = {
   likeCount: number;
   voteScore?: number;
   viewerVote?: -1 | 0 | 1;
+  isAnswer?: boolean;
 };
 
 type ForumPostsResponse = {
@@ -175,6 +190,33 @@ const COMMUNITY_MODAL_SHELL_CLASS =
 const COMMUNITY_MODAL_SURFACE_CLASS =
   'flex h-full w-full flex-col overflow-hidden shadow-[0_30px_80px_-40px_rgba(15,23,42,0.42)] sm:h-auto sm:max-h-[calc(var(--app-viewport-height)-2rem)] sm:rounded-[24px]';
 
+const COMMUNITY_COMPOSER_FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function communityComposerFocusableElements(
+  container: HTMLElement,
+): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      COMMUNITY_COMPOSER_FOCUSABLE_SELECTOR,
+    ),
+  ).filter(element => {
+    const style = window.getComputedStyle(element);
+    return (
+      element.getAttribute('aria-hidden') !== 'true' &&
+      style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      element.getClientRects().length > 0
+    );
+  });
+}
+
 const TABS: Array<{
   id: CommunityFeedTab;
   labelId: string;
@@ -185,18 +227,18 @@ const TABS: Array<{
 }> = [
   {
     id: 'for-you',
-    labelId: 'Diskusi',
-    labelEn: 'Discussions',
-    captionId: 'Pertanyaan, jawaban, dan update usaha',
-    captionEn: 'Business questions, answers, and updates',
+    labelId: 'Untukmu',
+    labelEn: 'For you',
+    captionId: 'Diskusi bisnis yang paling relevan untukmu',
+    captionEn: 'Business discussions most relevant to you',
     icon: MessageCircle,
   },
   {
     id: 'community',
     labelId: 'Grup',
     labelEn: 'Groups',
-    captionId: 'Ruang diskusi per topik',
-    captionEn: 'Topic-based discussion rooms',
+    captionId: 'Diskusi dari grup usaha yang kamu ikuti dan temukan',
+    captionEn: 'Discussions from business groups you follow and discover',
     icon: Users,
   },
 ];
@@ -211,6 +253,7 @@ const SEARCH_TABS: Array<{
   { id: 'posts', labelId: 'Postingan', labelEn: 'Posts', icon: MessageCircle },
   { id: 'people', labelId: 'Orang', labelEn: 'People', icon: UserCog },
   { id: 'groups', labelId: 'Grup', labelEn: 'Groups', icon: Users },
+  { id: 'marketplace', labelId: 'Marketplace', labelEn: 'Marketplace', icon: Store },
 ];
 
 function resolveCommunityMediaSrc(value?: string | null): string {
@@ -392,7 +435,7 @@ function parseCommunityPoll(
     .map(line =>
       line
         .trim()
-        .replace(/^[-*â€¢]\s*/, '')
+        .replace(/^[-*•]\s*/, '')
         .replace(/^\d+[\).]\s*/, '')
         .trim(),
     )
@@ -1281,10 +1324,15 @@ export function CommunityComposer({
   );
 
   const [pollOptions, setPollOptions] = useState(['', '']);
+  const [topicTag, setTopicTag] = useState('');
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draggingMedia, setDraggingMedia] = useState(false);
+  const composerSurfaceRef = useRef<HTMLFormElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const closeComposerRef = useRef<() => void>(() => undefined);
 
   const loginHref = buildLoginHref(
     pathname,
@@ -1306,6 +1354,23 @@ export function CommunityComposer({
     reputation: 0,
   };
 
+  const rememberReturnFocus = useCallback(() => {
+    if (
+      typeof document === 'undefined' ||
+      returnFocusRef.current
+    ) {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLElement &&
+      activeElement !== document.body
+    ) {
+      returnFocusRef.current = activeElement;
+    }
+  }, []);
+
   /* ================= QUERY COMPOSER ================= */
 
   useEffect(() => {
@@ -1323,6 +1388,7 @@ export function CommunityComposer({
 
     if (
       ![
+        'question',
         'post',
         'photo',
         'poll',
@@ -1337,6 +1403,7 @@ export function CommunityComposer({
     queueMicrotask(() => {
       if (!alive) return;
 
+      rememberReturnFocus();
       setMode(requestedMode as ComposeMode);
       setOpen(true);
     });
@@ -1344,11 +1411,12 @@ export function CommunityComposer({
     return () => {
       alive = false;
     };
-  }, [router, searchParams]);
+  }, [rememberReturnFocus, router, searchParams]);
 
   /* ================= OPEN / CLOSE ================= */
 
   const openComposer = (nextMode: ComposeMode) => {
+    rememberReturnFocus();
     setMode(nextMode);
     setOpen(true);
   };
@@ -1379,6 +1447,10 @@ export function CommunityComposer({
     );
   }, [pathname, router, searchParams]);
 
+  useEffect(() => {
+    closeComposerRef.current = closeComposer;
+  }, [closeComposer]);
+
   /* ================= MODAL UX ================= */
 
   useBodyScrollLock(open);
@@ -1386,11 +1458,56 @@ export function CommunityComposer({
   useEffect(() => {
     if (!open) return;
 
+    rememberReturnFocus();
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const initialTarget =
+        titleInputRef.current || composerSurfaceRef.current;
+      initialTarget?.focus({ preventScroll: true });
+    });
+
     const handleKeyDown = (
       event: KeyboardEvent,
     ) => {
       if (event.key === 'Escape') {
-        closeComposer();
+        event.preventDefault();
+        closeComposerRef.current();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const surface = composerSurfaceRef.current;
+      if (!surface) return;
+
+      const focusableElements =
+        communityComposerFocusableElements(surface);
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        surface.focus({ preventScroll: true });
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement =
+        focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (
+        event.shiftKey &&
+        (activeElement === firstElement ||
+          !surface.contains(activeElement))
+      ) {
+        event.preventDefault();
+        lastElement.focus({ preventScroll: true });
+      } else if (
+        !event.shiftKey &&
+        (activeElement === lastElement ||
+          !surface.contains(activeElement))
+      ) {
+        event.preventDefault();
+        firstElement.focus({ preventScroll: true });
       }
     };
 
@@ -1400,12 +1517,19 @@ export function CommunityComposer({
     );
 
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       document.removeEventListener(
         'keydown',
         handleKeyDown,
       );
+
+      const returnTarget = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (returnTarget?.isConnected) {
+        returnTarget.focus({ preventScroll: true });
+      }
     };
-  }, [closeComposer, open]);
+  }, [open, rememberReturnFocus]);
 
   /* ================= FEED TARGET ================= */
 
@@ -1502,30 +1626,17 @@ export function CommunityComposer({
 
     setSaving(true);
 
-    const selectedTags = [
-      mode === 'poll'
-        ? overview?.trendingTags?.find(tag =>
-            /poll|survey|event|support/i.test(
-              `${tag.slug} ${tag.name}`,
-            ),
-          )?.slug || 'polling'
-        : mode === 'feeling'
-          ? overview?.trendingTags?.find(tag =>
-              /growth|support|community/i.test(
-                `${tag.slug} ${tag.name}`,
-              ),
-            )?.slug || 'perasaan'
+    const modeTag =
+      mode === 'question'
+        ? 'tanya'
+        : mode === 'poll'
+          ? 'polling'
           : mode === 'photo'
-            ? overview?.trendingTags?.find(tag =>
-                /market|produk|supply/i.test(
-                  `${tag.slug} ${tag.name}`,
-                ),
-              )?.slug
-            : overview?.trendingTags?.[0]?.slug,
-    ].filter(
-      (item): item is string =>
-        Boolean(item),
-    );
+            ? 'media-usaha'
+            : 'update-usaha';
+    const selectedTags = Array.from(
+      new Set([modeTag, topicTag.trim()].filter(Boolean)),
+    ).slice(0, 2);
 
     try {
       const response = await authFetch(
@@ -1583,6 +1694,7 @@ export function CommunityComposer({
       setBody('');
       setMediaUrls([]);
       setPollOptions(['', '']);
+      setTopicTag('');
 
       closeComposer();
 
@@ -1696,59 +1808,51 @@ export function CommunityComposer({
 
   const actions = [
     {
-      id: 'post' as const,
-      label: isId
-        ? 'Posting'
-        : 'Post',
+      id: 'question' as const,
+      label: isId ? 'Tanya' : 'Ask',
       icon: MessageCircle,
-      tone:
-        'text-sky-700 bg-sky-50',
+      tone: 'text-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)]',
+    },
+    {
+      id: 'post' as const,
+      label: isId ? 'Update' : 'Update',
+      icon: Sparkles,
+      tone: 'text-slate-600 bg-slate-100',
     },
     {
       id: 'photo' as const,
-      label: isId
-        ? 'Foto'
-        : 'Photo',
+      label: isId ? 'Foto/Video' : 'Photo/Video',
       icon: ImageIcon,
-      tone:
-        'text-emerald-700 bg-emerald-50',
+      tone: 'text-slate-600 bg-slate-100',
     },
     {
       id: 'poll' as const,
-      label: isId
-        ? 'Polling'
-        : 'Poll',
+      label: isId ? 'Polling' : 'Poll',
       icon: BarChart3,
-      tone:
-        'text-amber-700 bg-amber-50',
-    },
-    {
-      id: 'feeling' as const,
-      label: isId
-        ? 'Perasaan'
-        : 'Feeling',
-      icon: Sparkles,
-      tone:
-        'text-teal-700 bg-teal-50',
+      tone: 'text-slate-600 bg-slate-100',
     },
   ];
 
   const modeLabel =
-    mode === 'photo'
+    mode === 'question'
       ? isId
-        ? 'Bagikan foto'
-        : 'Share photo'
-      : mode === 'poll'
+        ? 'Ajukan pertanyaan'
+        : 'Ask a question'
+      : mode === 'photo'
         ? isId
-          ? 'Buat polling'
-          : 'Create poll'
-        : mode === 'feeling'
+          ? 'Bagikan foto atau video'
+          : 'Share photo or video'
+        : mode === 'poll'
           ? isId
-            ? 'Bagikan perasaan'
-            : 'Share feeling'
-          : isId
-            ? 'Buat posting'
-            : 'Create post';
+            ? 'Buat polling'
+            : 'Create poll'
+          : mode === 'feeling'
+            ? isId
+              ? 'Bagikan update'
+              : 'Share update'
+            : isId
+              ? 'Bagikan update usaha'
+              : 'Share a business update';
 
   return (
     <section
@@ -1775,10 +1879,10 @@ export function CommunityComposer({
         <button
           type="button"
           onClick={() =>
-            openComposer('post')
+            openComposer('question')
           }
           className="
-            flex min-h-9 min-w-0 flex-1
+            flex min-h-11 min-w-0 flex-1
             items-center
             rounded-full
             border border-[color:var(--app-border)]
@@ -1797,8 +1901,12 @@ export function CommunityComposer({
         >
           <span className="truncate">
             {isId
-              ? 'Tanya atau bagikan update usaha...'
-              : 'Ask or share a business update...'}
+              ? lockedGroup
+                ? `Tanya atau bagikan sesuatu di ${lockedGroup.name}...`
+                : 'Tanya, bagikan pengalaman, atau temukan peluang...'
+              : lockedGroup
+                ? `Ask or share something in ${lockedGroup.name}...`
+                : 'Ask, share experience, or discover opportunities...'}
           </span>
         </button>
       </div>
@@ -1825,7 +1933,7 @@ export function CommunityComposer({
                 openComposer(action.id)
               }
               className="
-                inline-flex h-8
+                inline-flex min-h-10
                 shrink-0 items-center
                 justify-center
                 gap-1.5
@@ -1867,15 +1975,12 @@ export function CommunityComposer({
             flex h-[var(--app-visual-viewport-height)] w-screen
             items-stretch justify-center
             overflow-hidden
-            bg-black/45
+            bg-[color:color-mix(in_srgb,_var(--app-overlay)_40%,_transparent)]
             p-0
             backdrop-blur-[2px]
 
-            sm:items-center sm:p-5
+            sm:items-center sm:p-4
           "
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="community-compose-title"
           data-testid="community-compose-modal"
           onMouseDown={event => {
             if (
@@ -1887,7 +1992,12 @@ export function CommunityComposer({
           }}
         >
           <form
+            ref={composerSurfaceRef}
             onSubmit={handleSubmit}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="community-compose-title"
+            tabIndex={-1}
             data-testid="community-compose-surface"
             className="
               flex
@@ -1898,11 +2008,11 @@ export function CommunityComposer({
               overflow-hidden
               border border-[color:var(--app-border)]
               bg-[color:var(--app-surface-strong)]
-              shadow-[0_24px_70px_-18px_rgba(15,23,42,0.38)]
+              shadow-2xl
 
               sm:h-auto
-              sm:max-h-[calc(var(--app-visual-viewport-height)-40px)]
-              sm:rounded-[22px]
+              sm:max-h-[calc(var(--app-visual-viewport-height)-2rem)]
+              sm:rounded-[2rem]
             "
           >
             {/* ================= MODAL HEADER ================= */}
@@ -1916,6 +2026,9 @@ export function CommunityComposer({
                 border-b
                 border-[color:var(--app-border)]
                 px-3.5
+                pt-[env(safe-area-inset-top)]
+
+                sm:pt-0
               "
             >
               <div className="min-w-0">
@@ -2178,6 +2291,8 @@ export function CommunityComposer({
                 )}
               >
                 <input
+                  ref={titleInputRef}
+                  data-testid="community-compose-title-input"
                   value={title}
                   onChange={event =>
                     setTitle(
@@ -2186,9 +2301,13 @@ export function CommunityComposer({
                   }
                   maxLength={110}
                   placeholder={
-                    isId
-                      ? 'Judul singkat diskusi'
-                      : 'Short discussion title'
+                    mode === 'question'
+                      ? isId
+                        ? 'Apa yang ingin kamu tanyakan?'
+                        : 'What do you want to ask?'
+                      : isId
+                        ? 'Judul singkat dan jelas'
+                        : 'Short, clear title'
                   }
                   className="
                     min-h-10
@@ -2227,6 +2346,29 @@ export function CommunityComposer({
                     </span>
                   </div>
                 ) : null}
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <label className="min-w-0">
+                  <span className="sr-only">{isId ? 'Topik posting' : 'Post topic'}</span>
+                  <select
+                    value={topicTag}
+                    onChange={event => setTopicTag(event.target.value)}
+                    className="min-h-10 w-full rounded-[11px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent-border)] focus:bg-white"
+                  >
+                    <option value="">{isId ? 'Topik tambahan (opsional)' : 'Additional topic (optional)'}</option>
+                    {(overview?.trendingTags || []).slice(0, 8).map(tag => (
+                      <option key={tag.id} value={tag.slug}>
+                        #{tag.slug || tag.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span className="text-[9px] font-medium leading-4 text-[color:var(--app-text-soft)] sm:max-w-[190px]">
+                  {isId
+                    ? 'Topik membantu orang menemukan diskusi yang relevan.'
+                    : 'Topics help people discover relevant discussions.'}
+                </span>
               </div>
 
               {/* ================= FEELING ================= */}
@@ -2283,8 +2425,12 @@ export function CommunityComposer({
                 rows={4}
                 maxLength={10000}
                 placeholder={
-                  mode === 'poll'
+                  mode === 'question'
                     ? isId
+                      ? 'Jelaskan konteks, kendala, lokasi, budget, atau hal penting agar orang lain bisa membantu dengan tepat...'
+                      : 'Explain the context, constraints, location, budget, or important details so others can help accurately...'
+                    : mode === 'poll'
+                      ? isId
                       ? 'Tulis pertanyaan polling...'
                       : 'Write your poll question...'
                     : mode === 'photo'
@@ -2493,9 +2639,9 @@ export function CommunityComposer({
                 border-t
                 border-[color:var(--app-border)]
                 bg-white/95
-                px-3 py-2.5
+                px-3 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2.5
                 backdrop-blur
-                sm:px-3.5
+                sm:px-3.5 sm:py-2.5
               "
             >
               <div className="min-w-0">
@@ -2602,6 +2748,217 @@ const communityCardCommentCache = new Map<
   CommunityCardCommentCacheEntry
 >();
 
+function communityReportReasonLabel(
+  reason: TrustReportReason,
+  isId: boolean,
+): string {
+  const labels: Record<TrustReportReason, [string, string]> = {
+    spam: ['Spam', 'Spam'],
+    scam: ['Penipuan', 'Scam or fraud'],
+    harassment: ['Perundungan', 'Harassment'],
+    hate: ['Ujaran kebencian', 'Hate speech'],
+    sexual: ['Konten seksual', 'Sexual content'],
+    violence: ['Kekerasan', 'Violence'],
+    illegal: ['Barang/aktivitas ilegal', 'Illegal activity'],
+    privacy: ['Pelanggaran privasi', 'Privacy violation'],
+    other: ['Lainnya', 'Other'],
+  };
+  return labels[reason][isId ? 0 : 1];
+}
+
+function CommunityReportDialog({
+  item,
+  isId,
+  onClose,
+}: {
+  item: CommunityFeedItem;
+  isId: boolean;
+  onClose: () => void;
+}) {
+  const { authFetch } = useAuth();
+  const { notify } = useToast();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [reason, setReason] = useState<TrustReportReason>('spam');
+  const [details, setDetails] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [receiptId, setReceiptId] = useState('');
+  useBodyScrollLock(true);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onClose, saving]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!item.threadId || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      const receipt = await submitTrustReport(
+        authFetch,
+        'thread',
+        item.threadId,
+        { reason, details },
+      );
+      setReceiptId(receipt.reportId);
+      void trackLajukanEvent('report.submitted', {
+        entityType: 'community_thread',
+        entityId: item.threadId,
+        page: item.href,
+        properties: {
+          reason,
+          source: 'community_post_menu',
+          receipt_id: receipt.reportId,
+        },
+      });
+      notify({
+        title: isId ? 'Laporan diterima' : 'Report received',
+        description: `${isId ? 'Nomor laporan' : 'Report ID'}: ${receipt.reportId}`,
+        variant: 'success',
+      });
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : isId
+            ? 'Laporan belum terkirim. Coba lagi.'
+            : 'The report was not sent. Try again.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`community-report-title-${item.id}`}
+    >
+      <button
+        type="button"
+        className="absolute inset-0"
+        aria-label={isId ? 'Tutup laporan' : 'Close report'}
+        onClick={() => !saving && onClose()}
+      />
+      <section className="relative max-h-[calc(100svh-1rem)] w-full overflow-y-auto rounded-t-[26px] bg-white p-4 shadow-2xl sm:max-w-lg sm:rounded-[26px] sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-rose-600">
+              {isId ? 'Keamanan komunitas' : 'Community safety'}
+            </p>
+            <h2
+              id={`community-report-title-${item.id}`}
+              className="mt-1 text-lg font-bold text-[color:var(--app-text)]"
+            >
+              {isId ? 'Laporkan posting' : 'Report post'}
+            </h2>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 text-slate-700 disabled:opacity-50"
+            aria-label={isId ? 'Tutup' : 'Close'}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {receiptId ? (
+          <div role="status" className="mt-4 rounded-2xl bg-emerald-50 p-4 text-center">
+            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
+            <p className="mt-2 text-sm font-bold text-emerald-900">
+              {isId ? 'Laporan masuk ke antrean moderasi.' : 'Report added to the moderation queue.'}
+            </p>
+            <p className="mt-1 break-all text-xs font-semibold text-emerald-700">
+              {isId ? 'Nomor laporan' : 'Report ID'}: {receiptId}
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-4 min-h-11 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white"
+            >
+              {isId ? 'Selesai' : 'Done'}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="mt-4 space-y-4">
+            <fieldset>
+              <legend className="text-sm font-bold text-[color:var(--app-text)]">
+                {isId ? 'Alasan laporan' : 'Report reason'}
+              </legend>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {TRUST_REPORT_REASONS.map(value => (
+                  <label
+                    key={value}
+                    className={cn(
+                      'flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 text-xs font-semibold',
+                      reason === value
+                        ? 'border-rose-400 bg-rose-50 text-rose-900'
+                        : 'border-slate-200 text-slate-700',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={`community-report-reason-${item.id}`}
+                      value={value}
+                      checked={reason === value}
+                      onChange={() => setReason(value)}
+                      className="accent-rose-600"
+                    />
+                    {communityReportReasonLabel(value, isId)}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="block text-sm font-bold text-[color:var(--app-text)]">
+              {isId ? 'Keterangan (opsional)' : 'Details (optional)'}
+              <textarea
+                value={details}
+                onChange={event => setDetails(event.target.value)}
+                maxLength={1000}
+                rows={3}
+                className="mt-2 w-full resize-none rounded-2xl border border-slate-200 px-3 py-3 text-sm font-medium outline-none focus:border-rose-400"
+              />
+            </label>
+
+            {error ? (
+              <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                {error}
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-rose-600 px-4 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+              {isId ? 'Kirim laporan' : 'Submit report'}
+            </button>
+          </form>
+        )}
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
 export function CommunityPostCard({
   item,
   isId,
@@ -2627,6 +2984,8 @@ export function CommunityPostCard({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockSaving, setBlockSaving] = useState(false);
 
   const [rootPostId, setRootPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<ForumPostDetail[]>([]);
@@ -2645,6 +3004,9 @@ export function CommunityPostCard({
   );
 
   const displayBody = poll ? poll.body : item.body;
+  const isQuestionPost = item.tags.some(tag =>
+    /^(tanya|question|ask|help|support)$/i.test(tag.slug || tag.name),
+  );
   const feedMediaItems = getFeedMediaItems(item);
   const safeMedia = feedMediaItems[0] || null;
 
@@ -2652,6 +3014,7 @@ export function CommunityPostCard({
   const actorName =
     user?.fullName || user?.full_name || user?.username || user?.email || '';
   const actorUsername = String(user?.username || '').trim();
+  const isOwnPost = isSameCommunityUser(actorId, item.author?.id);
 
   const viewerAvatar = profileAvatarSrc(
     user?.avatarUrl || user?.avatar_url,
@@ -3099,13 +3462,58 @@ export function CommunityPostCard({
     }
   };
 
+  const blockAuthor = async () => {
+    const targetUserId = String(item.author?.id || '').trim();
+    if (!targetUserId || blockSaving || isOwnPost) return;
+    setOptionsOpen(false);
+    if (!isAuthenticated) {
+      router.push(loginHref);
+      return;
+    }
+    const confirmed = window.confirm(
+      isId
+        ? `Blokir ${item.author.name}? Posting mereka tidak akan muncul lagi di komunitas Anda.`
+        : `Block ${item.author.name}? Their posts will no longer appear in your community feed.`,
+    );
+    if (!confirmed) return;
+
+    setBlockSaving(true);
+    try {
+      await setCommunityUserBlocked(authFetch, targetUserId, true);
+      void trackLajukanEvent('community.user_blocked', {
+        entityType: 'community_user',
+        entityId: targetUserId,
+        page: item.href,
+        properties: { source: 'community_post_menu' },
+      });
+      notify({
+        title: isId ? 'Pengguna diblokir' : 'User blocked',
+        description: isId
+          ? 'Posting pengguna ini disembunyikan dari komunitas Anda.'
+          : "This user's posts are hidden from your community feed.",
+        variant: 'success',
+      });
+      setHidden(true);
+    } catch (blockError) {
+      notify({
+        title: isId ? 'Gagal memblokir pengguna' : 'Failed to block user',
+        description:
+          blockError instanceof Error ? blockError.message : undefined,
+        variant: 'error',
+      });
+    } finally {
+      setBlockSaving(false);
+    }
+  };
+
   if (hidden) return null;
 
   return (
-    <article
-      ref={cardRef}
-      className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_30px_-28px_rgba(15,23,42,0.16)] transition hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.2)]"
-    >
+    <>
+      <article
+        ref={cardRef}
+        className="overflow-hidden border-y border-[color:var(--app-border)] bg-white sm:rounded-[18px] sm:border-x sm:shadow-[0_14px_28px_-28px_rgba(15,23,42,0.16)]"
+      >
       {/* ================= POST HEADER ================= */}
 
       <div className="p-3.5 sm:p-4">
@@ -3198,10 +3606,75 @@ export function CommunityPostCard({
                   {isId ? 'Sembunyikan posting' : 'Hide post'}
                   <X className="h-3.5 w-3.5" />
                 </button>
+
+                {!isOwnPost && item.threadId ? (
+                  <>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOptionsOpen(false);
+                        if (!isAuthenticated) {
+                          router.push(loginHref);
+                          return;
+                        }
+                        setReportOpen(true);
+                      }}
+                      className="flex min-h-[40px] w-full items-center justify-between gap-2 rounded-[12px] px-3 text-left text-xs font-bold text-rose-700 hover:bg-rose-50"
+                    >
+                      {isId ? 'Laporkan posting' : 'Report post'}
+                      <Flag className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void blockAuthor()}
+                      disabled={blockSaving}
+                      className="flex min-h-[40px] w-full items-center justify-between gap-2 rounded-[12px] px-3 text-left text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {isId ? 'Blokir pengguna' : 'Block user'}
+                      {blockSaving ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <UserMinus className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </>
+                ) : null}
               </div>
             ) : null}
           </div>
         </div>
+
+        {/* ================= POST CONTEXT ================= */}
+
+        {(item.isPinned || item.isSolved || poll || isQuestionPost) ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
+            {item.isPinned ? (
+              <span className="inline-flex items-center gap-1">
+                <Pin className="h-3.5 w-3.5" />
+                {isId ? 'Disematkan' : 'Pinned'}
+              </span>
+            ) : null}
+            {item.isSolved ? (
+              <span className="inline-flex items-center gap-1 text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {isId ? 'Terjawab' : 'Answered'}
+              </span>
+            ) : null}
+            {poll ? (
+              <span className="inline-flex items-center gap-1">
+                <BarChart3 className="h-3.5 w-3.5" />
+                {isId ? 'Polling' : 'Poll'}
+              </span>
+            ) : null}
+            {!poll && isQuestionPost ? (
+              <span className="inline-flex items-center gap-1">
+                <MessageCircle className="h-3.5 w-3.5" />
+                {isId ? 'Pertanyaan' : 'Question'}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* ================= POST BODY ================= */}
 
@@ -3225,20 +3698,20 @@ export function CommunityPostCard({
 
         {item.tags.length > 0 ? (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {item.tags.slice(0, 3).map(tag => (
+            {item.tags.slice(0, 2).map(tag => (
               <button
                 key={tag.id}
                 type="button"
                 onClick={openDetail}
-                className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] transition hover:bg-emerald-50 hover:text-[color:var(--app-accent)]"
+                className="text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)]"
               >
                 #{tag.slug || tag.name}
               </button>
             ))}
 
-            {item.tags.length > 3 ? (
-              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-bold text-[color:var(--app-text-muted)] ring-1 ring-[color:var(--app-border)]">
-                +{item.tags.length - 3}
+            {item.tags.length > 2 ? (
+              <span className="text-[11px] font-semibold text-[color:var(--app-text-muted)]">
+                +{item.tags.length - 2}
               </span>
             ) : null}
           </div>
@@ -3285,7 +3758,7 @@ export function CommunityPostCard({
           }
           title={isId ? 'Suka' : 'Like'}
           className={cn(
-            'inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-[12px] px-3 transition',
+            'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition',
             localVote === 1
               ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'
               : 'hover:bg-slate-50 hover:text-[color:var(--app-accent)]',
@@ -3316,7 +3789,7 @@ export function CommunityPostCard({
               : `Comment, ${commentCount} comments`
           }
           title={isId ? 'Komentar' : 'Comment'}
-          className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
+          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
         >
           <MessageCircle className="h-4 w-4 shrink-0" />
 
@@ -3338,7 +3811,7 @@ export function CommunityPostCard({
               : `Share, ${item.stats.shares} shares`
           }
           title={isId ? 'Bagikan' : 'Share'}
-          className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
+          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
         >
           <Share2 className="h-4 w-4 shrink-0" />
 
@@ -3649,7 +4122,15 @@ export function CommunityPostCard({
           </div>
         </form>
       ) : null}
-    </article>
+      </article>
+      {reportOpen ? (
+        <CommunityReportDialog
+          item={item}
+          isId={isId}
+          onClose={() => setReportOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -3675,7 +4156,9 @@ export function CommunityDetailModal({
   const [comment, setComment] = useState('');
   const [replyTarget, setReplyTarget] = useState<ForumPostDetail | null>(null);
   const [saving, setSaving] = useState(false);
+  const [solutionSavingId, setSolutionSavingId] = useState<string | null>(null);
   const trackedThreadViewRef = useRef<string | null>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
   const loginHref = buildLoginHref(pathname, searchParams.toString());
   useBodyScrollLock(Boolean(threadId));
 
@@ -3784,9 +4267,15 @@ export function CommunityDetailModal({
     },
     {},
   );
-  const topLevelComments = comments.filter(
-    post => !post.replyToPostId || post.replyToPostId === rootPost?.id,
-  );
+  const topLevelComments = comments
+    .filter(post => !post.replyToPostId || post.replyToPostId === rootPost?.id)
+    .sort((a, b) => {
+      if (Boolean(a.isAnswer) !== Boolean(b.isAnswer)) return a.isAnswer ? -1 : 1;
+      const scoreA = Math.max(Number(a.voteScore ?? a.likeCount ?? 0), 0);
+      const scoreB = Math.max(Number(b.voteScore ?? b.likeCount ?? 0), 0);
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
   const detailPoll =
     thread && rootPost
       ? parseCommunityPoll(thread.title, rootPost.content, thread.tags)
@@ -3948,12 +4437,68 @@ export function CommunityDetailModal({
     }
   };
 
+  const viewerOwnsThread = Boolean(
+    thread?.author?.id && isSameCommunityUser(String(user?.id || ''), thread.author.id),
+  );
+
+  const setSolution = async (postId: string | null) => {
+    if (!thread || !isAuthenticated || solutionSavingId) {
+      if (!isAuthenticated) router.push(loginHref);
+      return;
+    }
+
+    setSolutionSavingId(postId || 'clear');
+    try {
+      const response = await authFetch(
+        `/api/forum/threads/${encodeURIComponent(threadId)}/solution`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: postId || undefined }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        thread?: ForumThreadDetail;
+        solutionPost?: ForumPostDetail | null;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.thread) {
+        notify({
+          title: isId ? 'Status jawaban belum berubah' : 'Answer status unchanged',
+          description: payload.error || '',
+          variant: 'error',
+        });
+        return;
+      }
+
+      setThread(payload.thread);
+      setPosts(current =>
+        current.map(item => ({ ...item, isAnswer: Boolean(postId && item.id === postId) })),
+      );
+      notify({
+        title: postId
+          ? isId
+            ? 'Jawaban ditandai sebagai solusi'
+            : 'Answer marked as solution'
+          : isId
+            ? 'Status solusi dibatalkan'
+            : 'Solution cleared',
+        variant: 'success',
+      });
+      onChanged();
+    } finally {
+      setSolutionSavingId(null);
+    }
+  };
+
   const renderComment = (post: ForumPostDetail, nested = false) => (
     <article
       key={post.id}
       className={cn(
-        'rounded-[18px] bg-slate-50 p-3',
-        nested && 'ml-8 border border-[color:var(--app-border)] bg-white',
+        'rounded-[16px] border border-transparent bg-slate-50 p-3',
+        post.isAnswer && 'border-emerald-200 bg-emerald-50/70',
+        nested && 'ml-8 border-[color:var(--app-border)] bg-white',
       )}
     >
       <div className="flex items-center gap-2.5">
@@ -3977,17 +4522,51 @@ export function CommunityDetailModal({
           </p>
         </div>
       </div>
+      {post.isAnswer ? (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
+          <CheckCircle2 className="h-4 w-4" />
+          {isId ? 'Jawaban membantu' : 'Helpful answer'}
+        </div>
+      ) : null}
       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[color:var(--app-text)]">
         {post.content}
       </p>
       {!nested ? (
-        <button
-          type="button"
-          onClick={() => setReplyTarget(post)}
-          className="mt-2 text-[11px] font-bold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-accent)]"
-        >
-          {isId ? 'Balas' : 'Reply'}
-        </button>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-bold">
+          <button
+            type="button"
+            onClick={() => setReplyTarget(post)}
+            className="text-[color:var(--app-text-soft)] hover:text-[color:var(--app-accent)]"
+          >
+            {isId ? 'Balas' : 'Reply'}
+          </button>
+          {viewerOwnsThread ? (
+            <button
+              type="button"
+              disabled={Boolean(solutionSavingId)}
+              onClick={() => void setSolution(post.isAnswer ? null : post.id)}
+              className={cn(
+                'inline-flex items-center gap-1.5 disabled:opacity-50',
+                post.isAnswer
+                  ? 'text-emerald-700'
+                  : 'text-[color:var(--app-text-soft)] hover:text-emerald-700',
+              )}
+            >
+              {solutionSavingId === post.id || (post.isAnswer && solutionSavingId === 'clear') ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              )}
+              {post.isAnswer
+                ? isId
+                  ? 'Batalkan solusi'
+                  : 'Clear solution'
+                : isId
+                  ? 'Tandai sebagai solusi'
+                  : 'Mark as solution'}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {(repliesByParent[post.id] || []).length ? (
         <div className="mt-2 space-y-2">
@@ -4008,7 +4587,7 @@ export function CommunityDetailModal({
       }}
     >
       <section
-        className={cn(COMMUNITY_MODAL_SURFACE_CLASS, 'bg-white sm:max-w-2xl')}
+        className={cn(COMMUNITY_MODAL_SURFACE_CLASS, 'bg-white sm:max-w-3xl')}
         data-testid="community-detail-surface"
       >
         <header className="flex min-h-[58px] items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4">
@@ -4057,12 +4636,34 @@ export function CommunityDetailModal({
                       {thread.author?.name || 'Community Member'}
                     </p>
                     <p className="text-xs text-[color:var(--app-text-soft)]">
-                      {thread.author?.title || 'Member'} Â·{' '}
+                      {thread.author?.title || 'Member'} ·{' '}
                       {timeAgo(thread.createdAt, isId)}
                     </p>
                   </div>
                 </div>
-                <h1 className="mt-3 text-[1.2rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+                {(thread.isPinned || thread.isSolved || detailPoll) ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-[color:var(--app-text-soft)]">
+                    {thread.isPinned ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Pin className="h-3.5 w-3.5" />
+                        {isId ? 'Disematkan' : 'Pinned'}
+                      </span>
+                    ) : null}
+                    {thread.isSolved ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {isId ? 'Masalah terjawab' : 'Answered'}
+                      </span>
+                    ) : null}
+                    {detailPoll ? (
+                      <span className="inline-flex items-center gap-1">
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        {isId ? 'Polling' : 'Poll'}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                <h1 className="mt-2 text-[1.2rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
                   {thread.title}
                 </h1>
                 {rootPostBody ? (
@@ -4123,7 +4724,7 @@ export function CommunityDetailModal({
                           : 'Like'
                     }
                     className={cn(
-                      'inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50',
+                      'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50',
                       thread.viewerVote === 1
                         ? 'bg-emerald-50 text-emerald-700'
                         : 'hover:text-[color:var(--app-accent)]',
@@ -4159,7 +4760,7 @@ export function CommunityDetailModal({
                           }`
                     }
                     title={isId ? 'Komentar' : 'Comment'}
-                    className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
                   >
                     <MessageCircle className="h-4 w-4 shrink-0" />
 
@@ -4222,7 +4823,7 @@ export function CommunityDetailModal({
                           }`
                     }
                     title={isId ? 'Bagikan' : 'Share'}
-                    className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[12px] px-3 transition hover:bg-slate-50 hover:text-[color:var(--app-accent)]"
                   >
                     <Share2 className="h-4 w-4 shrink-0" />
 
@@ -4237,7 +4838,7 @@ export function CommunityDetailModal({
 
               <section className="space-y-3">
                 <h2 className="text-sm font-bold text-[color:var(--app-text)]">
-                  {isId ? 'Komentar' : 'Comments'}
+                  {thread.isSolved ? (isId ? 'Jawaban & diskusi' : 'Answers & discussion') : isId ? 'Diskusi' : 'Discussion'}
                 </h2>
                 {comments.length === 0 ? (
                   <p className="rounded-[16px] bg-slate-50 px-4 py-5 text-center text-sm text-[color:var(--app-text-soft)]">
@@ -4280,6 +4881,7 @@ export function CommunityDetailModal({
           ) : null}
           <div className="flex gap-2">
             <input
+              ref={commentInputRef}
               value={comment}
               onChange={event => setComment(event.target.value)}
               placeholder={
@@ -4540,7 +5142,7 @@ export function CommunityGroupCreateForm({
               </label>
               <p className="pb-1 text-right text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
                 {isId
-                  ? 'Cover untuk suasana, foto untuk identitas group.'
+                  ? 'Cover untuk suasana, foto untuk identitas grup.'
                   : 'Cover sets the mood, photo identifies the group.'}
               </p>
             </div>
@@ -5060,7 +5662,7 @@ export function GroupMembersModal({
       kick: {
         title: isId ? 'Keluarkan anggota?' : 'Remove member?',
         description: isId
-          ? `Tulis alasan kenapa ${member.name} dikeluarkan atau diblokir dari group.`
+          ? `Tulis alasan kenapa ${member.name} dikeluarkan atau diblokir dari grup.`
           : `Write why ${member.name} is removed or blocked from the group.`,
         confirmLabel: isId ? 'Keluarkan' : 'Remove',
         reasonRequired: true,
@@ -5068,7 +5670,7 @@ export function GroupMembersModal({
       restore: {
         title: isId ? 'Aktifkan anggota?' : 'Restore member?',
         description: isId
-          ? `${member.name} akan bisa mengakses group lagi.`
+          ? `${member.name} akan bisa mengakses grup lagi.`
           : `${member.name} will be able to access the group again.`,
         confirmLabel: isId ? 'Aktifkan' : 'Restore',
         reasonRequired: false,
@@ -5386,8 +5988,8 @@ function GroupDetailPanel({
   if (!group) return null;
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-      <div className="relative min-h-[132px] bg-[linear-gradient(135deg,#ecfdf5,#eff6ff)] p-4">
+    <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-white sm:rounded-[18px] sm:border-x">
+      <div className="relative min-h-[120px] bg-slate-100 p-4">
         {group.coverUrl ? (
           <Image
             src={group.coverUrl}
@@ -5443,19 +6045,22 @@ function GroupDetailPanel({
             onOpenMembers={() => onOpenMembers(group)}
           />
           {group.rules.length ? (
-            <div className="rounded-[18px] bg-slate-50 p-3">
-              <p className="text-xs font-bold text-[color:var(--app-text)]">
-                {isId ? 'Aturan grup' : 'Group rules'}
-              </p>
-              <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                {group.rules.slice(0, 4).map(rule => (
+            <details className="rounded-[16px] border border-[color:var(--app-border)] bg-slate-50/70 p-3">
+              <summary className="cursor-pointer list-none text-xs font-bold text-[color:var(--app-text)]">
+                <span className="inline-flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-[color:var(--app-accent)]" />
+                  {isId ? `Aturan grup (${group.rules.length})` : `Group rules (${group.rules.length})`}
+                </span>
+              </summary>
+              <ul className="mt-3 space-y-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                {group.rules.map((rule, index) => (
                   <li key={rule} className="flex gap-2">
-                    <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" />
+                    <span className="font-bold text-[color:var(--app-text-muted)]">{index + 1}.</span>
                     <span>{rule}</span>
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ) : null}
         </div>
 
@@ -5477,7 +6082,7 @@ function GroupDetailPanel({
           </button>
           <div className="rounded-[18px] bg-slate-50 p-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
-              {isId ? 'Permission' : 'Permissions'}
+              {isId ? 'Akses' : 'Access'}
             </p>
             <div className="mt-2 space-y-2 text-xs text-[color:var(--app-text)]">
               <p className="flex items-center justify-between gap-2">
@@ -5574,13 +6179,13 @@ function GroupCard({
   return (
     <article
       className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white text-left shadow-[0_18px_34px_-32px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_40px_-34px_rgba(15,23,42,0.28)]',
+        'group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white text-left shadow-[0_18px_34px_-32px_rgba(15,23,42,0.22)] transition hover:border-[color:var(--app-accent-border)]',
         compact && 'min-w-0 rounded-[20px]',
       )}
     >
       <div
         className={cn(
-          'relative overflow-hidden bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_52%,#fff7ed_100%)]',
+          'relative overflow-hidden bg-slate-100',
           compact ? 'h-[72px]' : 'h-24',
         )}
       >
@@ -5732,7 +6337,7 @@ function GroupCard({
             )}
             {pending
               ? isId
-                ? 'Menunggu approve'
+                ? 'Menunggu persetujuan'
                 : 'Pending approval'
               : joined
                 ? isId
@@ -5779,14 +6384,14 @@ function GroupStrip({
     .slice(0, 8);
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_100%)] p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] sm:p-3.5">
+    <section className="overflow-hidden border-y border-[color:var(--app-border)] bg-white p-3 sm:rounded-[18px] sm:border-x sm:p-3.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
-            {isId ? 'Ruang diskusi' : 'Discussion rooms'}
+            {isId ? 'Temukan ruang yang relevan' : 'Find relevant spaces'}
           </p>
           <h2 className="mt-0.5 text-base font-bold tracking-[-0.025em] text-[color:var(--app-text)]">
-            {isId ? 'Grup untuk kamu' : 'Groups for you'}
+            {isId ? 'Grup usaha' : 'Business groups'}
           </h2>
           <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
             {isId
@@ -6161,10 +6766,10 @@ function SearchMarketplaceResult({
   isId: boolean;
 }) {
   return (
-    <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[linear-gradient(145deg,#ffffff,#fff7ed)] p-4 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.13)]">
+    <section className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-4">
       <div className="flex items-start gap-3">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[16px] bg-amber-100 text-amber-700">
-          <BarChart3 className="h-5 w-5" />
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <Store className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
@@ -6180,13 +6785,13 @@ function SearchMarketplaceResult({
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <Link
           href={`/explore?q=${encodeURIComponent(query)}`}
-          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] bg-amber-500 px-3 text-xs font-bold text-white"
+          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white"
         >
           {isId ? 'Cari di marketplace' : 'Search marketplace'}
         </Link>
         <Link
           href="/umkm"
-          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] border border-amber-200 bg-white px-3 text-xs font-bold text-amber-700"
+          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)]"
         >
           UMKM
         </Link>
@@ -6233,7 +6838,7 @@ function CommunitySearchPanel({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_56%,#eff6ff_100%)] p-3.5 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.2)] sm:p-4">
+      <section className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
@@ -6303,10 +6908,10 @@ function CommunitySearchPanel({
           <div className="space-y-3">
             {results.posts.map(item => (
               <CommunityPostCard
-                variant="home" // atau "feed"
+                key={item.id}
                 item={item}
-                inlineComment
-                clickableCard
+                isId={isId}
+                onOpenDetail={onOpenThread}
               />
             ))}
           </div>
@@ -6343,7 +6948,7 @@ function LeftRail({
         className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pr-1 pt-2"
         data-auto-scrollbar
       >
-        <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
           <h1 className="text-[1.1rem] font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
             {searchMode
               ? isId
@@ -6396,7 +7001,7 @@ function LeftRail({
           </div>
         </section>
 
-        <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Grup aktif' : 'Active groups'}
@@ -6454,7 +7059,25 @@ function RightRail({
         className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pl-1 pt-2"
         data-auto-scrollbar
       >
-        <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-muted)]">
+            {isId ? 'Aktivitas komunitas' : 'Community activity'}
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[
+              [isId ? 'Diskusi' : 'Threads', overview?.stats.totalThreads],
+              [isId ? 'Jawaban' : 'Replies', overview?.stats.totalPosts],
+              [isId ? 'Member' : 'Members', overview?.stats.totalUsers],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="min-w-0 rounded-[12px] bg-slate-50 px-2 py-2 text-center">
+                <p className="text-sm font-bold text-[color:var(--app-text)]">{compactNumber(Number(value || 0))}</p>
+                <p className="mt-0.5 truncate text-[9px] font-semibold text-[color:var(--app-text-soft)]">{label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[color:var(--app-accent)]" />
             <h2 className="text-sm font-bold text-[color:var(--app-text)]">
@@ -6463,7 +7086,7 @@ function RightRail({
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {trendingTags.length ? (
-              trendingTags.slice(0, 10).map(tag => (
+              trendingTags.slice(0, 6).map(tag => (
                 <Link
                   key={tag.id}
                   href={`/community?tag=${encodeURIComponent(tag.slug)}`}
@@ -6482,7 +7105,7 @@ function RightRail({
           </div>
         </section>
 
-        <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
+        <section className="shrink-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3.5">
           <h2 className="text-sm font-bold text-[color:var(--app-text)]">
             {isId ? 'Rekomendasi grup' : 'Recommended groups'}
           </h2>
@@ -6545,9 +7168,11 @@ export default function CommunityFeedClient({
   const [searchResults, setSearchResults] =
     useState<CommunitySearchResponse | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<number | null>(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [feedError, setFeedError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -6645,17 +7270,34 @@ export default function CommunityFeedClient({
       if (alive) {
         setLoading(true);
         setLoadMoreError(null);
+        setFeedError(null);
       }
     });
 
     fetch(feedUrl, { cache: 'no-store', credentials: 'include' })
-      .then(response => response.json())
-      .then((payload: CommunityFeedResponse) => {
+      .then(async response => {
+        const payload = (await response.json().catch(() => ({}))) as Partial<CommunityFeedResponse> & {
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to load community feed');
+        }
+        return payload;
+      })
+      .then(payload => {
         if (!alive) return;
         setItems(communityDiscussionItems(payload.items));
         setOverview(payload.overview || null);
-        setNextCursor(payload.nextCursor);
+        setNextCursor(payload.nextCursor ?? null);
         setHasMore(Boolean(payload.hasMore));
+      })
+      .catch(() => {
+        if (!alive) return;
+        setFeedError(
+          isId
+            ? 'Komunitas belum bisa dimuat. Coba lagi.'
+            : 'The community feed could not be loaded. Try again.',
+        );
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -6664,7 +7306,7 @@ export default function CommunityFeedClient({
     return () => {
       alive = false;
     };
-  }, [feedUrl]);
+  }, [feedUrl, isId]);
 
   useEffect(() => {
     if (!searchUrl) {
@@ -6673,6 +7315,7 @@ export default function CommunityFeedClient({
         if (!alive) return;
         setSearchResults(null);
         setSearchLoading(false);
+        setSearchError(null);
       });
       return () => {
         alive = false;
@@ -6681,17 +7324,35 @@ export default function CommunityFeedClient({
 
     let alive = true;
     queueMicrotask(() => {
-      if (alive) setSearchLoading(true);
+      if (alive) {
+        setSearchLoading(true);
+        setSearchError(null);
+      }
     });
 
     fetch(searchUrl, { cache: 'no-store', credentials: 'include' })
-      .then(response => response.json())
+      .then(async response => {
+        const payload = (await response.json().catch(() => ({}))) as CommunitySearchResponse & {
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to search community');
+        }
+        return payload;
+      })
       .then((payload: CommunitySearchResponse) => {
         if (!alive) return;
         setSearchResults(sanitizeCommunitySearchResults(payload));
       })
       .catch(() => {
-        if (alive) setSearchResults(null);
+        if (alive) {
+          setSearchResults(null);
+          setSearchError(
+            isId
+              ? 'Pencarian komunitas gagal. Coba lagi.'
+              : 'Community search failed. Try again.',
+          );
+        }
       })
       .finally(() => {
         if (alive) setSearchLoading(false);
@@ -6700,7 +7361,7 @@ export default function CommunityFeedClient({
     return () => {
       alive = false;
     };
-  }, [searchUrl]);
+  }, [isId, searchUrl]);
 
   const loadMore = async () => {
     if (!hasMore || nextCursor == null || loadingMore) return;
@@ -6828,7 +7489,7 @@ export default function CommunityFeedClient({
   };
 
   return (
-    <main className="lajukan-home-compact min-h-screen min-h-[100svh] bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <main className="lajukan-home-compact min-h-screen min-h-[100svh] bg-[color:var(--app-surface-muted)] px-0 pb-6 pt-2 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell mx-auto flex h-full flex-col lg:overflow-hidden">
         <div className="lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1700px] flex-1 gap-4 lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_320px] 2xl:grid-cols-[280px_minmax(0,1fr)_340px]">
           <LeftRail
@@ -6847,64 +7508,33 @@ export default function CommunityFeedClient({
             className="min-w-0 space-y-3 pt-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
             data-auto-scrollbar
           >
-            <section className="overflow-hidden rounded-[20px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_58%,#eff6ff_100%)] p-3 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.25)] sm:p-3.5">
-              <div className="flex flex-col gap-2.5">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="inline-flex min-h-[28px] items-center rounded-full bg-white/86 px-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
-                    {isId ? 'Forum Lajukan' : 'Lajukan Forum'}
-                  </span>
-                  <h1 className="min-w-0 flex-1 truncate text-[1.12rem] font-bold tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.32rem]">
-                    {isId ? 'Komunitas Usaha' : 'Business Community'}
+            <section className="border-y border-[color:var(--app-border)] bg-white px-3 py-3 sm:rounded-[18px] sm:border-x sm:px-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-[1.2rem] font-bold tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.35rem]">
+                    {isSearchMode
+                      ? isId
+                        ? 'Cari di Komunitas'
+                        : 'Search Community'
+                      : isId
+                        ? 'Komunitas'
+                        : 'Community'}
                   </h1>
-                </div>
-
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  {!isSearchMode ? (
-                    <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
-                      {isId ? activeFeedTab.captionId : activeFeedTab.captionEn}
-                    </p>
-                  ) : (
-                    <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
-                      {isId
-                        ? 'Cari diskusi, orang, dan grup usaha.'
-                        : 'Search discussions, people, and groups.'}
-                    </p>
-                  )}
-
-                  <div className="flex shrink-0 gap-1.5 overflow-x-auto pb-0.5 sm:overflow-visible">
-                    {[
-                      {
-                        label: isId ? 'Diskusi' : 'Threads',
-                        value: overview?.stats.totalThreads,
-                      },
-                      {
-                        label: isId ? 'Jawaban' : 'Replies',
-                        value: overview?.stats.totalPosts,
-                      },
-                      {
-                        label: isId ? 'Member' : 'Members',
-                        value: overview?.stats.totalUsers,
-                      },
-                    ].map(item => (
-                      <div
-                        key={item.label}
-                        className="inline-flex min-h-[30px] shrink-0 items-center gap-1.5 rounded-full bg-white/88 px-2.5 text-left ring-1 ring-emerald-100"
-                      >
-                        <span className="text-xs font-bold text-[color:var(--app-text)]">
-                          {compactNumber(item.value)}
-                        </span>
-                        <span className="truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="mt-1 max-w-2xl text-xs font-medium leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
+                    {isSearchMode
+                      ? isId
+                        ? 'Temukan diskusi, orang, grup, lalu lanjutkan ke marketplace jika kebutuhanmu sudah jelas.'
+                        : 'Find discussions, people, groups, then continue to the marketplace when your need is clear.'
+                      : isId
+                        ? activeFeedTab.captionId
+                        : activeFeedTab.captionEn}
+                  </p>
                 </div>
               </div>
 
               <form
                 onSubmit={handleSearch}
-                className="mt-2.5 flex min-h-[42px] items-center gap-2 rounded-full bg-white/92 px-3 ring-1 ring-emerald-100"
+                className="mt-3 flex min-h-11 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 focus-within:border-[color:var(--app-accent-border)] focus-within:bg-white"
               >
                 <Search className="h-4 w-4 text-[color:var(--app-text-soft)]" />
                 <input
@@ -6912,24 +7542,21 @@ export default function CommunityFeedClient({
                   onChange={event => setQuery(event.target.value)}
                   placeholder={
                     isId
-                      ? 'Cari diskusi atau grup...'
-                      : 'Search discussions or groups...'
+                      ? 'Cari pertanyaan, pengalaman, orang, grup, atau peluang...'
+                      : 'Search questions, experience, people, groups, or opportunities...'
                   }
                   className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--app-text)] outline-none"
                 />
                 <button
                   type="submit"
-                  className="min-h-[32px] rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white"
+                  className="min-h-9 rounded-[11px] bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white"
                 >
                   {isId ? 'Cari' : 'Search'}
                 </button>
               </form>
 
               {isSearchMode ? (
-                <div
-                  className="mt-3 flex gap-2 overflow-x-auto pb-1.5 lg:hidden"
-                  data-auto-scrollbar
-                >
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" data-auto-scrollbar>
                   {SEARCH_TABS.map(tab => (
                     <SearchFilterButton
                       key={tab.id}
@@ -6942,30 +7569,24 @@ export default function CommunityFeedClient({
                   ))}
                 </div>
               ) : (
-                <div
-                  className="mt-3 flex items-center gap-2 overflow-x-auto pb-1.5"
-                  data-auto-scrollbar
-                >
+                <div className="mt-3 flex items-center gap-5 overflow-x-auto border-t border-[color:var(--app-border)] pt-2" data-auto-scrollbar>
                   {TABS.map(tab => {
                     const Icon = tab.icon;
                     const active = activeTab === tab.id;
-
                     return (
                       <button
                         key={tab.id}
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
                         className={cn(
-                          'relative inline-flex min-h-[38px] min-w-[104px] shrink-0 items-center gap-2 rounded-full border px-3 text-left transition',
+                          'inline-flex min-h-10 shrink-0 items-center gap-2 border-b-2 px-1 text-xs font-bold transition',
                           active
-                            ? 'border-[color:var(--app-accent)] bg-white text-[color:var(--app-accent)] shadow-[0_14px_26px_-24px_rgba(4,120,87,0.6)]'
-                            : 'border-white/70 bg-white/72 text-[color:var(--app-text-soft)] hover:bg-white',
+                            ? 'border-[color:var(--app-accent)] text-[color:var(--app-accent)]'
+                            : 'border-transparent text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
                         )}
                       >
-                        <Icon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate text-xs font-bold">
-                          {isId ? tab.labelId : tab.labelEn}
-                        </span>
+                        <Icon className="h-4 w-4" />
+                        {isId ? tab.labelId : tab.labelEn}
                       </button>
                     );
                   })}
@@ -6974,25 +7595,44 @@ export default function CommunityFeedClient({
             </section>
 
             {isSearchMode ? (
-              <CommunitySearchPanel
-                isId={isId}
-                query={submittedQuery.trim()}
-                kind={searchKind}
-                results={searchResults}
-                loading={searchLoading}
-                onOpenThread={openThreadDetail}
-                onOpenMembers={setMembersModalGroup}
-                onRefresh={() => setRefreshKey(value => value + 1)}
-              />
+              searchError && !searchLoading ? (
+                <section
+                  role="alert"
+                  className="rounded-[20px] border border-amber-200 bg-amber-50 p-4 text-center"
+                >
+                  <p className="text-sm font-bold text-amber-900">{searchError}</p>
+                  <button
+                    type="button"
+                    onClick={() => setRefreshKey(value => value + 1)}
+                    className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-amber-900 px-4 text-xs font-bold text-white"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    {isId ? 'Coba lagi' : 'Try again'}
+                  </button>
+                </section>
+              ) : (
+                <CommunitySearchPanel
+                  isId={isId}
+                  query={submittedQuery.trim()}
+                  kind={searchKind}
+                  results={searchResults}
+                  loading={searchLoading}
+                  onOpenThread={openThreadDetail}
+                  onOpenMembers={setMembersModalGroup}
+                  onRefresh={() => setRefreshKey(value => value + 1)}
+                />
+              )
             ) : (
               <>
-                <GroupStrip
-                  isId={isId}
-                  overview={overview}
-                  onChanged={() => setRefreshKey(value => value + 1)}
-                  onCreateGroup={() => router.push('/community/groups/new')}
-                  onOpenMembers={setMembersModalGroup}
-                />
+                {!activeGroup ? (
+                  <GroupStrip
+                    isId={isId}
+                    overview={overview}
+                    onChanged={() => setRefreshKey(value => value + 1)}
+                    onCreateGroup={() => router.push('/community/groups/new')}
+                    onOpenMembers={setMembersModalGroup}
+                  />
+                ) : null}
 
                 <GroupDetailPanel
                   group={activeGroup}
@@ -7005,11 +7645,28 @@ export default function CommunityFeedClient({
                   userAvatar={avatar}
                   isAuthenticated={isAuthenticated}
                   overview={overview}
+                  lockedGroup={activeGroup}
                   onCreated={handleComposerCreated}
                 />
 
                 {loading ? <CommunityFeedSkeleton /> : null}
-                {!loading && items.length === 0 ? (
+                {!loading && feedError ? (
+                  <section
+                    role="alert"
+                    className="rounded-[20px] border border-amber-200 bg-amber-50 p-4 text-center"
+                  >
+                    <p className="text-sm font-bold text-amber-900">{feedError}</p>
+                    <button
+                      type="button"
+                      onClick={() => setRefreshKey(value => value + 1)}
+                      className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-amber-900 px-4 text-xs font-bold text-white"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      {isId ? 'Coba lagi' : 'Try again'}
+                    </button>
+                  </section>
+                ) : null}
+                {!loading && !feedError && items.length === 0 ? (
                   <section className="overflow-hidden rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#eff6ff_100%)] p-5 text-center shadow-[0_20px_40px_-32px_rgba(15,23,42,0.22)]">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[color:var(--app-accent)] shadow-[0_16px_30px_-24px_rgba(15,23,42,0.3)] ring-1 ring-emerald-100">
                       <MessageCircle className="h-5 w-5" />
@@ -7022,22 +7679,22 @@ export default function CommunityFeedClient({
                     </p>
                     <button
                       type="button"
-                      onClick={() => router.push('/community?compose=post')}
+                      onClick={() => router.push('/community?compose=question')}
                       className="mt-4 inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-bold text-white shadow-[0_18px_30px_-22px_rgba(16,185,129,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(16,185,129,0.95)]"
                     >
                       <Plus className="h-4 w-4" />
-                      {isId ? 'Mulai diskusi' : 'Start a discussion'}
+                      {isId ? 'Ajukan pertanyaan' : 'Ask a question'}
                     </button>
                   </section>
                 ) : null}
 
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {items.map(item => (
                     <CommunityPostCard
-                      variant="home" // atau "feed"
+                      key={item.id}
                       item={item}
-                      inlineComment
-                      clickableCard
+                      isId={isId}
+                      onOpenDetail={openThreadDetail}
                     />
                   ))}
                 </div>

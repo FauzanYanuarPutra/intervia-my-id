@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -11,7 +11,7 @@ use sqlx::{FromRow, PgPool};
 use std::{collections::HashMap, sync::Arc};
 use uuid::Uuid;
 
-use crate::AppState;
+use crate::{auth_claims_from_headers, has_agent_access, AppState};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -137,6 +137,9 @@ pub struct OrderResponse {
 
 #[derive(Debug)]
 pub enum OrderEngineError {
+    Disabled,
+    Unauthorized,
+    Forbidden,
     InvalidTransition(String),
     Validation(String),
     Db(sqlx::Error),
@@ -151,6 +154,18 @@ impl From<sqlx::Error> for OrderEngineError {
 impl IntoResponse for OrderEngineError {
     fn into_response(self) -> axum::response::Response {
         let (status, message) = match self {
+            OrderEngineError::Disabled => (
+                StatusCode::NOT_FOUND,
+                "order engine API is not available".to_string(),
+            ),
+            OrderEngineError::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                "authentication is required".to_string(),
+            ),
+            OrderEngineError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                "operator access is required".to_string(),
+            ),
             OrderEngineError::InvalidTransition(msg) => (StatusCode::CONFLICT, msg),
             OrderEngineError::Validation(msg) => (StatusCode::BAD_REQUEST, msg),
             OrderEngineError::Db(err) => {
@@ -164,6 +179,34 @@ impl IntoResponse for OrderEngineError {
 
         (status, Json(json!({ "error": message }))).into_response()
     }
+}
+
+fn order_engine_api_enabled() -> bool {
+    std::env::var("ORDER_ENGINE_API_ENABLED")
+        .ok()
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+/// The generic order engine is an internal operations surface. Public commerce
+/// flows use the category-specific APIs, which can resolve catalog prices and
+/// ownership authoritatively. Keeping this API disabled by default prevents a
+/// caller from supplying arbitrary actors or monetary values.
+fn require_order_operator(
+    headers: &HeaderMap,
+    state: &AppState,
+) -> Result<Uuid, OrderEngineError> {
+    if !order_engine_api_enabled() {
+        return Err(OrderEngineError::Disabled);
+    }
+
+    let claims = auth_claims_from_headers(headers, &state.jwt_secret)
+        .ok_or(OrderEngineError::Unauthorized)?;
+    if !has_agent_access(&claims) {
+        return Err(OrderEngineError::Forbidden);
+    }
+
+    Uuid::parse_str(&claims.sub).map_err(|_| OrderEngineError::Unauthorized)
 }
 
 fn parse_base_status(value: &str) -> Option<OrderBaseStatus> {
@@ -549,8 +592,10 @@ async fn load_order_with_items(
 
 pub async fn create_order(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(payload): Json<CreateOrderRequest>,
 ) -> Result<impl IntoResponse, OrderEngineError> {
+    let operator_id = require_order_operator(&headers, &state)?;
     let strategy = strategy_for(payload.category_type);
     strategy.validate_on_create(&payload)?;
 
@@ -709,8 +754,8 @@ pub async fn create_order(
         "DRAFT",
         base_status_label(base_status),
         "create",
-        "system",
-        Some(payload.user_id),
+        "operator",
+        Some(operator_id),
         Some("order created"),
         json!({ "category_type": category_type_label(payload.category_type) }),
     )
@@ -724,17 +769,21 @@ pub async fn create_order(
 
 pub async fn get_order(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(order_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, OrderEngineError> {
+    require_order_operator(&headers, &state)?;
     let (order, items) = load_order_with_items(&state.db, order_id).await?;
     Ok(Json(OrderResponse { order, items }))
 }
 
 pub async fn transition_order(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(order_id): Path<Uuid>,
     Json(payload): Json<TransitionOrderRequest>,
 ) -> Result<impl IntoResponse, OrderEngineError> {
+    let operator_id = require_order_operator(&headers, &state)?;
     let mut tx = state.db.begin().await?;
 
     let order = sqlx::query_as::<_, OrderRow>(
@@ -805,8 +854,8 @@ pub async fn transition_order(
         &order.base_status,
         &updated.base_status,
         "manual",
-        payload.actor_type.as_deref().unwrap_or("system"),
-        payload.actor_id,
+        "operator",
+        Some(operator_id),
         payload.reason.as_deref(),
         payload.metadata.unwrap_or_else(|| json!({})),
     )
@@ -838,7 +887,9 @@ pub async fn transition_order(
 
 pub async fn list_orders(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, OrderEngineError> {
+    require_order_operator(&headers, &state)?;
     let orders = sqlx::query_as::<_, OrderRow>(
         r#"
         SELECT

@@ -1,0 +1,72 @@
+{
+    email {$ADMIN_EMAIL}
+}
+
+(security_headers) {
+    header {
+        -Server
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+    }
+}
+
+http://{$APP_DOMAIN} {
+    redir https://www.{$APP_DOMAIN}{uri} permanent
+}
+
+http://www.{$APP_DOMAIN} {
+    import security_headers
+    @chat_socket path /socket /socket/*
+    reverse_proxy @chat_socket chat_service:4000
+    @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
+    reverse_proxy @notifications_socket marketplace_service:8081
+    reverse_proxy www:3000
+    encode zstd gzip
+}
+
+http://usaha.{$APP_DOMAIN} {
+    import security_headers
+    @chat_socket path /socket /socket/*
+    reverse_proxy @chat_socket chat_service:4000
+    @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
+    reverse_proxy @notifications_socket marketplace_service:8081
+    reverse_proxy usaha:3003
+    encode zstd gzip
+}
+
+http://api.{$APP_DOMAIN} {
+    import security_headers
+    reverse_proxy marketplace_service:8081
+    encode zstd gzip
+}
+
+http://chat.{$APP_DOMAIN} {
+    import security_headers
+    @socket path /socket /socket/*
+    handle @socket {
+        reverse_proxy chat_service:4000
+    }
+    handle {
+        respond 404
+    }
+}
+
+http://cms.{$APP_DOMAIN} {
+    import security_headers
+    reverse_proxy cms:3001
+    encode zstd gzip
+}
+
+http://crm.{$APP_DOMAIN} {
+    import security_headers
+    reverse_proxy crm:3002
+    encode zstd gzip
+}
+
+http://cdn.{$APP_DOMAIN} {
+    import security_headers
+    reverse_proxy minio:9002
+    encode zstd gzip
+}

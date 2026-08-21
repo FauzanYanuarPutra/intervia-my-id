@@ -40,6 +40,7 @@ const EXT_BY_MIME: Record<string, string> = {
   'audio/mp4': '.m4a',
   'audio/ogg': '.ogg',
   'audio/wav': '.wav',
+  'audio/webm': '.webm',
   'application/pdf': '.pdf',
 };
 
@@ -127,10 +128,10 @@ export async function uploadToMinIO(
   // Prefer proxy URL so client fetches via our API (no CORS, MinIO stays internal)
   const url = personalAiUserId
     ? `/api/ai/personal/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
-    : publicUrl
-    ? `${publicUrl.replace(/\/$/, '')}/${bucket}/${key}`
     : roomId === 'content' || roomId === 'forum'
-      ? `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
+      ? publicUrl
+        ? `${publicUrl.replace(/\/$/, '')}/${bucket}/${key}`
+        : `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
       : `/api/chat/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`;
 
   return { url, key };

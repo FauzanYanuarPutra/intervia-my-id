@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next';
 import { buildContentHref } from '@/lib/content/routes';
-import { BLOG_ARTICLES } from '@/lib/seo/blog';
+import { BLOG_ARTICLES, isBlogArticleIndexable } from '@/lib/seo/blog';
 import { LAJUKAN_EXPLORE_CATEGORIES } from '@/lib/discovery/lajukanCategories';
 
 export const revalidate = 900;
@@ -145,7 +145,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   });
 
-  BLOG_ARTICLES.forEach(article => {
+  BLOG_ARTICLES.filter(isBlogArticleIndexable).forEach(article => {
     const lastModified = safeDate(article.updatedAt);
     locales.forEach(lang => {
       sitemapEntries.push({

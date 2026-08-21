@@ -933,20 +933,45 @@ export const PERSONAL_AI_BUILDER_TEMPLATES: Array<{
 ];
 
 export function createDefaultPersonalAiBuilderConfig(): PersonalAiBuilderConfig {
-  return PERSONAL_AI_BUILDER_TEMPLATES[0].config;
+  // Never hand callers the mutable template singleton. Builder forms mutate
+  // nested arrays/objects heavily, so each agent needs an isolated copy.
+  return structuredClone(PERSONAL_AI_BUILDER_TEMPLATES[0]!.config);
 }
 
 function cleanText(value: unknown, maxLength: number): string {
   if (typeof value !== 'string') return '';
-  return value.replace(/\u0000/g, '').replace(/[<>]/g, '').trim().slice(0, maxLength);
+  return value
+    .replace(/\u0000/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function cleanAccentColor(value: unknown, fallback?: string) {
+  const color = cleanText(value, 32);
+  if (/^#[0-9a-f]{6}$/i.test(color) || /^#[0-9a-f]{3}$/i.test(color)) {
+    return color.toLowerCase();
+  }
+  return fallback && (/^#[0-9a-f]{6}$/i.test(fallback) || /^#[0-9a-f]{3}$/i.test(fallback))
+    ? fallback.toLowerCase()
+    : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function cleanStringList(value: unknown, limit: number, maxLength: number): string[] {
   if (!Array.isArray(value)) return [];
   const result: string[] = [];
+  const seen = new Set<string>();
   for (const item of value) {
     const text = cleanText(item, maxLength);
-    if (text) result.push(text);
+    const key = text.toLocaleLowerCase('id-ID');
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
     if (result.length >= limit) break;
   }
   return result;
@@ -1014,8 +1039,8 @@ function cleanBlocks(value: unknown): AIBuilderBlock[] {
         placeholder: cleanText(record.placeholder, 180) || undefined,
         helpText: cleanText(record.helpText, 260) || undefined,
         required: record.required === true,
-        min: typeof record.min === 'number' ? record.min : undefined,
-        max: typeof record.max === 'number' ? record.max : undefined,
+        min: finiteNumber(record.min),
+        max: finiteNumber(record.max),
         defaultValue:
           typeof record.defaultValue === 'string' ||
             typeof record.defaultValue === 'number' ||
@@ -1081,7 +1106,10 @@ export function sanitizePersonalAiBuilderConfig(value: unknown): PersonalAiBuild
       description: cleanText(branding.description, 1200) || undefined,
       category: cleanText(branding.category, 80) || undefined,
       tags: cleanStringList(branding.tags, 12, 40),
-      accentColor: cleanText(branding.accentColor, 32) || fallback.branding.accentColor,
+      accentColor: cleanAccentColor(
+        branding.accentColor,
+        fallback.branding.accentColor,
+      ),
     },
     instructions: {
       baseInstruction:
@@ -1125,13 +1153,18 @@ export function sanitizePersonalAiBuilderConfig(value: unknown): PersonalAiBuild
           ? modelPolicy.mode
           : 'auto',
       preferredModelId: cleanText(modelPolicy.preferredModelId, 80) || undefined,
-      requiredCapabilities: cleanStringList(
-        modelPolicy.requiredCapabilities,
-        6,
-        30,
-      ).filter(value =>
-        ['text', 'image', 'video', 'audio', 'document', 'vision'].includes(value),
-      ) as AIModelDefinition['capabilities'],
+      requiredCapabilities: (() => {
+        const capabilities = cleanStringList(
+          modelPolicy.requiredCapabilities,
+          6,
+          30,
+        ).filter(value =>
+          ['text', 'image', 'video', 'audio', 'document', 'vision'].includes(value),
+        ) as AIModelDefinition['capabilities'];
+        return capabilities.length > 0
+          ? capabilities
+          : [...fallback.modelPolicy.requiredCapabilities];
+      })(),
     },
   };
 }

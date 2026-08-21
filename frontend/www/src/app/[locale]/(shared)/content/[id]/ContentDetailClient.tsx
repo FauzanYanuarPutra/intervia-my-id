@@ -16,21 +16,27 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  CircleCheck,
   ExternalLink,
   FileText,
+  Flag,
   Gift,
   Globe2,
   Heart,
+  Handshake,
   MapPin,
   MessageCircle,
   Navigation,
   Package,
+  Pencil,
+  Search,
   Share2,
   ShieldCheck,
-  Target,
+  Store,
   Trophy,
   User,
   Wrench,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getSectorLabel, useSectors } from '@/context/SectorContext';
@@ -65,7 +71,7 @@ import { TransactionVerificationPromptModal } from '@/components/verification/Tr
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
-  PHONE_VERIFICATION_SETTINGS_PATH,
+  // PHONE_VERIFICATION_SETTINGS_PATH,
   readTransactionVerification,
   type TransactionVerificationState,
 } from '@/lib/identityVerification';
@@ -241,7 +247,7 @@ function resolveRelatedTxnGuidance(
   if (!txn) {
     return locale === 'id'
       ? 'Belum ada order. Mulai dari tombol aksi.'
-      : 'No order yet. Start from the action button to keep chat and payments tidy.';
+      : 'No order yet. Start from the action button to keep chat and transaction details tidy.';
   }
 
   const status = resolveTxnStatusText(txn);
@@ -254,14 +260,14 @@ function resolveRelatedTxnGuidance(
         : 'Buyer funds are protected. Continue in chat.';
     }
     return locale === 'id'
-      ? 'Lanjut order untuk bayar aman.'
-      : 'Continue to the order workspace for safe payment and organized transaction details.';
+      ? 'Lanjut order untuk cek pembayaran dan langkah berikutnya.'
+      : 'Continue to the order workspace to check payment availability and the next step.';
   }
 
   if (status === 'accepted') {
     return locale === 'id'
-      ? 'Order disetujui. Lanjut bayar lalu atur kerja atau pengiriman di chat.'
-      : 'The order is accepted. Finish payment, then coordinate work or delivery in chat.';
+      ? 'Order disetujui. Cek status pembayaran, lalu atur kerja atau pengiriman di chat.'
+      : 'The order is accepted. Check payment status, then coordinate work or delivery in chat.';
   }
 
   if (status === 'in_progress') {
@@ -655,6 +661,53 @@ function formatMetaList(value: unknown): string {
   return readMetaList(value).join(', ');
 }
 
+function formatDetailValue(value: unknown): string {
+  if (value == null) return '';
+
+  if (typeof value === 'string') {
+    return value
+      .replace(/\u00A0/g, ' ')
+      .replace(/\u00C2/g, '')
+      .trim();
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map(entry => formatDetailValue(entry))
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  const record = asContentRecord(value);
+  if (record) {
+    const primaryLabel = readMetaText(
+      record,
+      'label',
+      'name',
+      'title',
+      'value',
+      'text',
+      'full_address',
+      'formatted_address',
+    );
+    if (primaryLabel) return primaryLabel;
+
+    return Object.entries(record)
+      .map(([key, entryValue]) => {
+        const formatted = formatDetailValue(entryValue);
+        return formatted ? `${humanizeToken(key)}: ${formatted}` : '';
+      })
+      .filter(Boolean)
+      .join(' • ');
+  }
+
+  return String(value);
+}
+
 function collapseWhitespace(value?: string | null): string {
   if (typeof value !== 'string') return '';
   return value.replace(/\s+/g, ' ').trim();
@@ -842,6 +895,7 @@ export default function ContentDetailClient({
   const [shareError, setShareError] = useState<string | null>(null);
   const [contentLiked, setContentLiked] = useState(false);
   const [contentLikeCount, setContentLikeCount] = useState<number | null>(null);
+  const [showFullDescription, setShowFullDescription] = useState(false);
   const [relatedTx, setRelatedTx] = useState<RelatedTransaction | null>(null);
   const [relatedTxLoading, setRelatedTxLoading] = useState(false);
   const [nowTs, setNowTs] = useState<number>(Date.now());
@@ -1099,6 +1153,10 @@ export default function ContentDetailClient({
       // ignore storage failures
     }
   }, [contentLiked, resolvedContentId]);
+
+  useEffect(() => {
+    setShowFullDescription(false);
+  }, [resolvedContentId]);
 
   useEffect(() => {
     const timer = setInterval(() => setNowTs(Date.now()), 1000);
@@ -2114,8 +2172,8 @@ export default function ContentDetailClient({
   if (!item) {
     return (
       <div className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
-        <div className="content-width py-8 text-center text-xs text-[color:var(--app-text)]">
-          Content not found.
+        <div className="content-width py-12 text-center text-sm text-[color:var(--app-text-soft)]">
+          {locale === 'id' ? 'Listing tidak ditemukan.' : 'Listing not found.'}
         </div>
       </div>
     );
@@ -2153,23 +2211,37 @@ export default function ContentDetailClient({
   const documents = getDocuments(item);
   const contentType = item.type || item.content_type || 'product';
   const rawType = String(contentType || '').toLowerCase();
-  const displayType = rawType.includes('job')
-    ? 'job'
-    : rawType.includes('tool_rental') || rawType.includes('rental')
-      ? 'tool_rental'
-      : rawType.includes('company')
-        ? 'company'
-        : rawType.includes('service')
-          ? 'service'
-          : rawType.includes('property')
-            ? 'property'
-            : rawType.includes('product')
-              ? 'product'
-              : rawType.includes('profile') ||
-                  rawType.includes('user') ||
-                  rawType.includes('talent')
-                ? 'profile'
-                : 'product';
+  const isOpportunityType =
+    rawType.includes('opportun') ||
+    rawType.includes('franchise') ||
+    rawType.includes('reseller') ||
+    rawType.includes('distributor') ||
+    rawType.includes('partnership') ||
+    rawType.includes('kemitra');
+  const displayType =
+    rawType.includes('job') || rawType.includes('vacancy') || rawType.includes('loker')
+      ? 'job'
+      : rawType.includes('tool_rental') || rawType.includes('rental')
+        ? 'tool_rental'
+        : rawType.includes('company') ||
+            rawType.includes('business') ||
+            rawType.includes('umkm') ||
+            isOpportunityType
+          ? 'company'
+          : rawType.includes('service')
+            ? 'service'
+            : rawType.includes('property') || rawType.includes('place')
+              ? 'property'
+              : rawType.includes('product') || rawType.includes('material')
+                ? 'product'
+                : rawType.includes('profile') ||
+                    rawType.includes('user') ||
+                    rawType.includes('talent') ||
+                    rawType.includes('freelancer') ||
+                    rawType.includes('mentor') ||
+                    rawType.includes('expert')
+                  ? 'profile'
+                  : 'product';
   const dealKind: DealKind =
     displayType === 'job'
       ? 'job'
@@ -2209,12 +2281,12 @@ export default function ContentDetailClient({
   const ListingSideIcon = publicReference
     ? Globe2
     : isDemandListing
-      ? Target
-      : Package;
+      ? Search
+      : Store;
   const listingSideVisual = publicReference
     ? {
-        chip: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/12 dark:text-blue-200 dark:ring-blue-400/20',
-        price: 'text-blue-600 dark:text-blue-300',
+        chip: 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] ring-[color:var(--app-border)]',
+        price: 'text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]',
       }
     : isDemandListing
       ? {
@@ -2225,17 +2297,6 @@ export default function ContentDetailClient({
           chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
           price: 'text-emerald-600 dark:text-emerald-300',
         };
-  const listingSideDescription = publicReference
-    ? locale === 'id'
-      ? 'Data ini adalah rujukan non-transaksi. Ketersediaan, harga, kontak, dan status verifikasi tidak dinyatakan oleh Lajukan.'
-      : 'This is a non-transactional reference. Lajukan does not imply availability, price, contact details, or verification.'
-    : isDemandListing
-      ? locale === 'id'
-        ? 'Pemilik listing sedang mencari pemasok, jasa, lokasi, atau partner yang bisa memenuhi kebutuhan ini.'
-        : 'This listing owner is looking for a provider, service, place, or partner to fulfill this need.'
-      : locale === 'id'
-        ? 'Pemilik listing menawarkan produk, jasa, lokasi, atau aset yang bisa langsung ditanyakan.'
-        : 'This listing owner is offering a product, service, place, or asset that can be contacted directly.';
   const listingHref = buildContentHref(
     resolvedContentId || item.id,
     item.title,
@@ -2497,7 +2558,7 @@ export default function ContentDetailClient({
                 : 'Chat provider'
               : displayType === 'property'
                 ? locale === 'id'
-                  ? 'Jadwalkan survey'
+                  ? 'Jadwalkan survei'
                   : 'Schedule viewing'
                 : displayType === 'profile'
                   ? locale === 'id'
@@ -2637,9 +2698,11 @@ export default function ContentDetailClient({
     displayType === 'job'
       ? Briefcase
       : displayType === 'tool_rental'
-        ? ShieldCheck
+        ? Wrench
         : displayType === 'company'
-          ? Building2
+          ? isOpportunityType
+            ? Handshake
+            : Building2
           : displayType === 'service'
             ? Wrench
             : displayType === 'property'
@@ -3264,7 +3327,7 @@ export default function ContentDetailClient({
             ? Building2
             : displayType === 'tool_rental'
               ? Wrench
-              : ShieldCheck,
+              : CircleCheck,
       label: isDemandListing
         ? locale === 'id'
           ? 'Status kebutuhan'
@@ -3431,14 +3494,8 @@ export default function ContentDetailClient({
     },
   ].filter(item => item.value && !isMoneyDetail(item));
   const tags = item.tags ?? [];
-  const heroHighlightLimit = PROMO_ONLY_MODE ? 1 : 2;
-  const heroTagLimit = PROMO_ONLY_MODE ? 2 : 3;
-  const previewHighlightItems = visibleHighlightItems.slice(
-    0,
-    heroHighlightLimit,
-  );
   const expandedDetailItems = [
-    ...visibleHighlightItems.slice(previewHighlightItems.length).map(entry => ({
+    ...visibleHighlightItems.map(entry => ({
       key: `highlight-${entry.key}`,
       label: entry.label,
       value: entry.value,
@@ -3451,16 +3508,13 @@ export default function ContentDetailClient({
         label: locale === 'id' ? field.labelId : field.labelEn,
         value:
           field.kind === 'date'
-            ? formatDate(String(value)) || String(value)
-            : String(value),
+            ? formatDate(String(value)) || formatDetailValue(value)
+            : formatDetailValue(value),
       };
     }),
   ];
-  const visibleExpandedDetailItems = PROMO_ONLY_MODE
-    ? expandedDetailItems.slice(0, 6)
-    : expandedDetailItems;
-  const previewTags = tags.slice(0, heroTagLimit);
-  const extraTagCount = Math.max(0, tags.length - previewTags.length);
+  const visibleExpandedDetailItems = expandedDetailItems;
+  const visibleTags = tags;
   const normalizeText = (text?: string) =>
     (text || '')
       .replace(/\u00A0/g, ' ')
@@ -3471,34 +3525,135 @@ export default function ContentDetailClient({
   const safeSummary = normalizeText(
     cleanListingCopyText(item.summary, item.title),
   );
-
-  const summaryPreview = safeSummary;
-  const bodyDisplayText =
+  const cleanedBody =
     cleanListingCopyText(item.body, item.title) || item.body || '';
+  const normalizedBody = normalizeText(cleanedBody);
+  const summaryMatchesBody =
+    Boolean(safeSummary) &&
+    Boolean(normalizedBody) &&
+    safeSummary.localeCompare(normalizedBody, undefined, { sensitivity: 'base' }) === 0;
+
+  // Summary is only the short intro near the title. If it is identical to the
+  // full body, do not render the same description again in the detail section.
+  const summaryPreview = safeSummary;
+  const bodyDisplayText = summaryMatchesBody ? '' : cleanedBody;
+
+  const detailSectionTitle = isDemandListing
+    ? locale === 'id'
+      ? 'Detail kebutuhan'
+      : 'Need details'
+    : displayType === 'job'
+      ? locale === 'id'
+        ? 'Detail pekerjaan'
+        : 'Job details'
+      : displayType === 'service'
+        ? locale === 'id'
+          ? 'Detail layanan'
+          : 'Service details'
+        : displayType === 'property'
+          ? locale === 'id'
+            ? 'Detail tempat'
+            : 'Place details'
+          : displayType === 'tool_rental'
+            ? locale === 'id'
+              ? 'Detail alat & sewa'
+              : 'Rental details'
+            : displayType === 'profile'
+              ? locale === 'id'
+                ? 'Tentang penyedia'
+                : 'About the provider'
+              : displayType === 'company'
+                ? isOpportunityType
+                  ? locale === 'id'
+                    ? 'Detail peluang usaha'
+                    : 'Business opportunity details'
+                  : locale === 'id'
+                    ? 'Tentang usaha'
+                    : 'About the business'
+                : locale === 'id'
+                  ? 'Detail produk'
+                  : 'Product details';
+
+  const ownerRoleLabel = isDemandListing
+    ? locale === 'id'
+      ? 'Pemilik kebutuhan'
+      : 'Need owner'
+    : displayType === 'job'
+      ? locale === 'id'
+        ? 'Perekrut / perusahaan'
+        : 'Recruiter / company'
+      : displayType === 'service' || displayType === 'profile'
+        ? locale === 'id'
+          ? 'Penyedia'
+          : 'Provider'
+        : displayType === 'product'
+          ? locale === 'id'
+            ? 'Penjual'
+            : 'Seller'
+          : displayType === 'tool_rental' || displayType === 'property'
+            ? locale === 'id'
+              ? 'Pemilik'
+              : 'Owner'
+            : displayType === 'company' && isOpportunityType
+              ? locale === 'id'
+                ? 'Penyedia peluang'
+                : 'Opportunity provider'
+              : locale === 'id'
+                ? 'Usaha'
+                : 'Business';
+
+  const locationSectionLabel = isDemandListing
+    ? locale === 'id'
+      ? 'Area kebutuhan'
+      : 'Need area'
+    : displayType === 'job'
+      ? locale === 'id'
+        ? 'Lokasi kerja'
+        : 'Work location'
+      : displayType === 'tool_rental'
+        ? locale === 'id'
+          ? 'Lokasi alat / pickup'
+          : 'Asset / pickup location'
+        : displayType === 'property'
+          ? locale === 'id'
+            ? 'Lokasi tempat'
+            : 'Place location'
+          : displayType === 'company' && isOpportunityType
+            ? locale === 'id'
+              ? 'Area peluang'
+              : 'Opportunity area'
+            : locale === 'id'
+            ? 'Lokasi'
+            : 'Location';
+
   const primaryActionLabel = PROMO_ONLY_MODE
     ? chatLabel
     : displayType === 'job'
       ? locale === 'id'
-        ? 'Lanjutkan Lamaran'
+        ? 'Lanjutkan lamaran'
         : 'Continue Application'
       : displayType === 'company'
-        ? locale === 'id'
-          ? 'Mulai Percakapan'
-          : 'Start Conversation'
+        ? isOpportunityType
+          ? locale === 'id'
+            ? 'Bahas peluang'
+            : 'Discuss opportunity'
+          : locale === 'id'
+            ? 'Mulai percakapan'
+            : 'Start Conversation'
         : isDemandListing
           ? locale === 'id'
-            ? 'Tanggapi Kebutuhan'
+            ? 'Tanggapi kebutuhan'
             : 'Respond to Need'
           : displayType === 'service'
             ? locale === 'id'
-              ? 'Minta Penawaran'
+              ? 'Minta penawaran'
               : 'Request Quote'
             : pricingMode === 'fixed'
               ? locale === 'id'
-                ? 'Lanjutkan Deal'
+                ? 'Lanjutkan deal'
                 : 'Continue Deal'
               : locale === 'id'
-                ? 'Pilih Respons'
+                ? 'Pilih respons'
                 : 'Choose Action';
   const primaryActionHint = PROMO_ONLY_MODE
     ? locale === 'id'
@@ -3509,9 +3664,13 @@ export default function ContentDetailClient({
         ? 'Chat dulu. Lanjut apply.'
         : 'Apply fast or chat the recruiter.'
       : displayType === 'company'
-        ? locale === 'id'
-          ? 'Chat dulu. Lanjut profil/listing.'
-          : 'Start with chat or the owner profile.'
+        ? isOpportunityType
+          ? locale === 'id'
+            ? 'Cek model, modal, area, dan dukungan lewat chat.'
+            : 'Check the model, capital, area, and support in chat.'
+          : locale === 'id'
+            ? 'Chat dulu. Lanjut profil usaha.'
+            : 'Start with chat or the business profile.'
         : isDemandListing
           ? locale === 'id'
             ? 'Chat dulu. Baru kirim respons yang sesuai.'
@@ -3522,7 +3681,7 @@ export default function ContentDetailClient({
               : 'Check schedule and rate, then send a rental request.'
             : displayType === 'property'
               ? locale === 'id'
-                ? 'Chat survey. Lanjut deal.'
+                ? 'Chat survei. Lanjut deal.'
                 : 'Start by chatting about the viewing first, then continue the deal.'
               : displayType === 'service' || displayType === 'profile'
                 ? locale === 'id'
@@ -3530,8 +3689,8 @@ export default function ContentDetailClient({
                   : 'Align scope, timeline, and price in chat before continuing.'
                 : displayType === 'product'
                   ? locale === 'id'
-                    ? 'Chat stok. Lanjut bayar.'
-                    : 'Start by confirming stock in chat, then continue to offers or safe payment.'
+                    ? 'Chat stok. Lanjut deal.'
+                    : 'Confirm stock in chat, then continue the deal when ready.'
                   : locale === 'id'
                     ? 'Chat dulu. Deal kalau cocok.'
                     : 'Start with chat first, then continue the deal when ready.';
@@ -3564,9 +3723,14 @@ export default function ContentDetailClient({
     }
 
     if (displayType === 'company') {
+      if (isOpportunityType) {
+        return locale === 'id'
+          ? `Halo kak, saya tertarik ${title}. Boleh info model kemitraan, kebutuhan modal, area, dan dukungannya?`
+          : `Hi, I am interested in ${title}. Can you share the partnership model, capital needs, area, and support?`;
+      }
       return locale === 'id'
-        ? `Halo kak, mau tanya ${title}.`
-        : `Hi, I saw ${title}. I want to ask more about the business and the opportunity.`;
+        ? `Halo kak, saya mau tanya tentang ${title}.`
+        : `Hi, I saw ${title}. I want to ask more about the business.`;
     }
 
     if (isDemandListing) {
@@ -3583,7 +3747,7 @@ export default function ContentDetailClient({
 
     if (displayType === 'property') {
       return locale === 'id'
-        ? `Halo kak, ${title} tersedia? Survey dan harganya?`
+        ? `Halo kak, ${title} tersedia? Survei dan harganya?`
         : `Hi, is ${title} still available? I want to ask about viewing, price, and terms.`;
     }
 
@@ -3615,7 +3779,7 @@ export default function ContentDetailClient({
             : 'Chat about schedule first'
           : displayType === 'property'
             ? locale === 'id'
-              ? 'Chat survey dulu'
+              ? 'Chat survei dulu'
               : 'Chat about viewing first'
             : displayType === 'product'
               ? locale === 'id'
@@ -3650,7 +3814,7 @@ export default function ContentDetailClient({
                 : 'Confirm stock, delivery, and ordering first so the chat stays simple.'
               : locale === 'id'
                 ? 'Chat dulu. Deal kalau cocok.'
-                : 'Start with a short WhatsApp-like chat first, then continue the deal when ready.';
+                : 'Start with a short chat, then continue the deal when ready.';
   const offerCardTitle =
     displayType === 'job'
       ? locale === 'id'
@@ -3756,38 +3920,59 @@ export default function ContentDetailClient({
   const detailPageShellClass =
     'lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden bg-[color:var(--app-bg)] py-0 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:py-2 lg:pb-8';
   const detailShellStackClass =
-    'mx-auto flex w-full max-w-[1200px] flex-col gap-3 !px-0';
+    'mx-auto flex w-full max-w-[1200px] flex-col gap-2.5 !px-0 sm:gap-3';
   const detailSectionClass =
-    'relative overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3.5 py-3.5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)] sm:rounded-[22px] sm:p-4';
+    'relative overflow-hidden border-y border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-4 py-4 sm:rounded-[20px] sm:border sm:px-4 sm:shadow-[0_12px_28px_-28px_rgba(15,23,42,0.28)]';
   const detailInsetClass =
-    'rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-3';
+    'rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-3';
   const detailInsetCompactClass =
-    'rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-2.5 sm:rounded-[16px]';
+    'rounded-[12px] bg-[color:var(--app-surface-muted)] px-3 py-2.5 sm:rounded-[14px]';
   const detailPrimaryButtonClass =
-    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-[color:var(--app-accent)] px-5 py-3 text-sm font-bold text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_60%,transparent)] transition hover:brightness-110';
+    'inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto';
 
   const detailSecondaryButtonClass =
-    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-white px-5 py-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]';
+    'inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2.5 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 sm:w-auto';
 
   const detailTextLinkClass =
     'text-sm font-bold text-[color:var(--app-accent)] transition hover:underline';
-  const actionCardClass = `${detailSectionClass} border-[color:var(--app-accent-border)]`;
+  const actionCardClass =
+    'relative overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-4 shadow-[0_16px_38px_-30px_rgba(15,23,42,0.4)]';
   const priceValueClass = isDemandListing
     ? `break-words text-2xl font-bold leading-tight tracking-normal sm:text-3xl ${listingSideVisual.price}`
-    : `text-4xl font-bold leading-none tracking-tight sm:text-5xl ${listingSideVisual.price}`;
+    : `text-3xl font-bold leading-tight tracking-tight sm:text-4xl ${listingSideVisual.price}`;
   const detailChatButtonClass =
-    '!inline-flex !min-h-[44px] !items-center !justify-center !gap-2 !rounded-full !bg-emerald-800 !px-4 !text-sm !font-bold !text-white !shadow-[0_18px_34px_-24px_rgba(16,185,129,0.6)] !ring-1 !ring-transparent !transition !duration-200 hover:!-translate-y-0.5 hover:!bg-emerald-700 active:!translate-y-0 active:!scale-[0.98] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-emerald-500 focus-visible:!ring-offset-2 disabled:!cursor-not-allowed disabled:!opacity-60';
+    '!inline-flex !min-h-[44px] !w-full !items-center !justify-center !gap-2 !rounded-[14px] !border !border-[color:var(--app-border)] !bg-[color:var(--app-surface-strong)] !px-4 !py-2.5 !text-sm !font-bold !text-[color:var(--app-text)] !shadow-none !transition hover:!bg-[color:var(--app-surface-muted)] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[color:var(--app-accent)] focus-visible:!ring-offset-2 disabled:!cursor-not-allowed disabled:!opacity-60 sm:!w-auto';
   const canStartChat = !publicReference && !isOwner && Boolean(peerUserId);
   const typeLabel = ct
     ? getContentTypeName(ct, locale)
     : humanizeToken(displayType);
   const chatOwnerActionLabel = isDemandListing
     ? locale === 'id'
-      ? 'Chat pembeli'
-      : 'Chat buyer'
-    : locale === 'id'
-      ? 'Chat penyedia'
-      : 'Chat provider';
+      ? 'Chat pemilik kebutuhan'
+      : 'Chat need owner'
+    : displayType === 'job'
+      ? locale === 'id'
+        ? 'Chat perekrut'
+        : 'Chat recruiter'
+      : displayType === 'product'
+        ? locale === 'id'
+          ? 'Chat penjual'
+          : 'Chat seller'
+        : displayType === 'tool_rental'
+          ? locale === 'id'
+            ? 'Chat pemilik alat'
+            : 'Chat asset owner'
+          : displayType === 'property'
+            ? locale === 'id'
+              ? 'Chat pemilik'
+              : 'Chat owner'
+            : displayType === 'company'
+              ? locale === 'id'
+                ? 'Chat usaha'
+                : 'Chat business'
+              : locale === 'id'
+                ? 'Chat penyedia'
+                : 'Chat provider';
 
   const actionButtons = publicReference ? (
     <a
@@ -3806,6 +3991,7 @@ export default function ContentDetailClient({
           href={`/create?draft=${item.id}`}
           className={detailPrimaryButtonClass}
         >
+          <Pencil className="h-4 w-4" />
           {locale === 'id' ? 'Edit listing' : 'Edit listing'}
         </Link>
       )}
@@ -3873,7 +4059,7 @@ export default function ContentDetailClient({
     !publicReference && ownerProfileHref && ownerDisplayName ? (
       <section className={detailSectionClass}>
         <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
             <NextImage
               src={profileAvatarSrc(
                 ownerAvatarUrl,
@@ -3889,13 +4075,13 @@ export default function ContentDetailClient({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-              {locale === 'id' ? 'Profil pemilik' : 'Owner profile'}
+              {ownerRoleLabel}
             </p>
-            <p className="mt-1 truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <p className="mt-1 break-words text-sm font-semibold text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-inverse)]">
               {ownerDisplayName}
             </p>
             {ownerHeadline ? (
-              <p className="mt-1 line-clamp-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              <p className="mt-1 whitespace-pre-line break-words text-xs leading-5 text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-soft)]">
                 {ownerHeadline}
               </p>
             ) : null}
@@ -3904,12 +4090,12 @@ export default function ContentDetailClient({
                 href={ownerProfileHref}
                 className="inline-flex items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--app-accent-soft)_52%,white)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))]"
               >
-                {locale === 'id' ? 'Lihat profile' : 'View profile'}
+                {locale === 'id' ? 'Lihat profil' : 'View profile'}
               </Link>
               {ownerProfile?.identity_verified && (
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                   <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-                  {locale === 'id' ? 'Identity verified' : 'Identity verified'}
+                  {locale === 'id' ? 'Identitas terverifikasi' : 'Identity verified'}
                 </span>
               )}
             </div>
@@ -3955,16 +4141,10 @@ export default function ContentDetailClient({
           {typeLabel}
         </span>
       </div>
-      <p className="mt-3 line-clamp-2 text-base font-bold leading-6 text-[color:var(--app-text)]">
-        {item.title}
-      </p>
       <p className="mt-4 text-xs font-semibold text-[color:var(--app-text-soft)]">
         {displayPriceHeading}
       </p>
       <div className={`mt-1 ${priceValueClass}`}>{primaryPrice}</div>
-      <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-        {listingSideDescription}
-      </p>
       {publicReference ? (
         <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-950 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100">
           <p className="font-bold">{publicReference.sourceTitle}</p>
@@ -4029,10 +4209,10 @@ export default function ContentDetailClient({
       )}
 
       {!PROMO_ONLY_MODE && promotionSnapshot?.offerType && (
-        <div className="mt-3 rounded-[20px] bg-[color:var(--app-warning-soft)] p-3">
+        <div className="mt-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[color:var(--app-warning)] dark:bg-slate-950">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]">
                 <PromotionIcon className="h-4 w-4" />
               </span>
               <div>
@@ -4356,8 +4536,14 @@ export default function ContentDetailClient({
     'overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] sm:rounded-[22px]';
   const mediaAspectClassName =
     images.length > 0
-      ? 'aspect-[4/3] w-full min-[480px]:aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/3] xl:aspect-[16/10]'
-      : 'h-[280px] w-full sm:h-[340px] lg:h-[360px]';
+      ? displayType === 'property'
+        ? 'aspect-[16/10] w-full sm:aspect-[16/9]'
+        : displayType === 'product' || displayType === 'tool_rental'
+          ? 'aspect-[4/3] w-full sm:aspect-[4/3]'
+          : 'aspect-[16/10] w-full sm:aspect-[16/9]'
+      : displayType === 'job' || displayType === 'service' || displayType === 'profile'
+        ? 'h-[220px] w-full sm:h-[280px] lg:h-[300px]'
+        : 'h-[260px] w-full sm:h-[320px] lg:h-[340px]';
 
   return (
     <div className={detailPageShellClass}>
@@ -4410,8 +4596,8 @@ export default function ContentDetailClient({
 
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1.85fr)_minmax(300px,332px)] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1.95fr)_minmax(312px,348px)]">
               <div className="min-w-0 space-y-3">
-                <section className={detailSurfaceClass + ' p-1'}>
-                  <div className="relative overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-900 sm:rounded-[18px]">
+                <section className="overflow-hidden bg-[color:var(--app-surface)] sm:rounded-[20px] sm:border sm:border-[color:var(--app-border)]">
+                  <div className="relative overflow-hidden bg-[color:var(--app-surface-muted)] sm:rounded-[18px]">
                     <MediaPreviewCarousel
                       items={images}
                       alt={item.title}
@@ -4449,40 +4635,36 @@ export default function ContentDetailClient({
                         aria-label={
                           contentLiked
                             ? locale === 'id'
-                              ? 'Hapus dari favorit'
-                              : 'Remove from favorites'
+                              ? 'Hapus dari tersimpan'
+                              : 'Remove from saved'
                             : locale === 'id'
-                              ? 'Simpan ke favorit'
-                              : 'Save to favorites'
+                              ? 'Simpan listing'
+                              : 'Save listing'
                         }
                         className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] ${
                           contentLiked
-                            ? 'bg-rose-500 text-white'
+                            ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]'
                             : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
                         }`}
                       >
                         <Heart
                           className={`h-4 w-4 ${contentLiked ? 'fill-current' : ''}`}
                         />
-                        <span>{listingLikeCount}</span>
+                        <span>{locale === 'id' ? 'Simpan' : 'Save'}</span>
+                        {listingLikeCount > 0 ? (
+                          <span className="font-semibold text-[color:var(--app-text-soft)]">
+                            {listingLikeCount}
+                          </span>
+                        ) : null}
                       </button>
-                      {!isOwner ? (
-                        <button
-                          type="button"
-                          onClick={openReportListingModal}
-                          className="inline-flex min-h-10 items-center rounded-full px-3 text-xs font-semibold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]"
-                        >
-                          {locale === 'id' ? 'Laporkan' : 'Report'}
-                        </button>
-                      ) : null}
                     </div>
                   </div>
 
-                  <h1 className="mt-3 text-2xl font-bold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl lg:text-4xl">
+                  <h1 className="mt-3 break-words text-2xl font-bold leading-tight text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-inverse)] sm:text-3xl lg:text-4xl">
                     {item.title}
                   </h1>
                   {summaryPreview ? (
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)] sm:text-base">
+                    <p className="mt-2 max-w-3xl whitespace-pre-line break-words text-sm leading-6 text-[color:var(--app-text-soft)] [overflow-wrap:anywhere] sm:text-base">
                       {summaryPreview}
                     </p>
                   ) : null}
@@ -4512,7 +4694,10 @@ export default function ContentDetailClient({
                               <dt className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                                 {spec.label}
                               </dt>
-                              <dd className="mt-0.5 line-clamp-2 text-sm font-semibold text-[color:var(--app-text)]">
+                              <dd
+                                title={String(spec.value)}
+                                className="mt-0.5 whitespace-pre-line break-words text-sm font-semibold leading-5 text-[color:var(--app-text)] [overflow-wrap:anywhere]"
+                              >
                                 {spec.value}
                               </dd>
                             </div>
@@ -4522,21 +4707,16 @@ export default function ContentDetailClient({
                     </dl>
                   ) : null}
 
-                  {previewTags.length > 0 ? (
+                  {visibleTags.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {previewTags.map(tag => (
+                      {visibleTags.map(tag => (
                         <span
                           key={tag}
-                          className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]"
+                          className="max-w-full whitespace-normal break-words rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)] [overflow-wrap:anywhere]"
                         >
                           {tag}
                         </span>
                       ))}
-                      {extraTagCount > 0 ? (
-                        <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                          +{extraTagCount}
-                        </span>
-                      ) : null}
                     </div>
                   ) : null}
                 </section>
@@ -4544,31 +4724,41 @@ export default function ContentDetailClient({
                 {bodyDisplayText || visibleExpandedDetailItems.length > 0 ? (
                   <section className={`${detailSurfaceClass} p-3 sm:p-4`}>
                     <h2 className="text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
-                      {locale === 'id'
-                        ? 'Tentang listing ini'
-                        : 'About this listing'}
+                      {detailSectionTitle}
                     </h2>
 
                     {bodyDisplayText ? (
                       <div className="mt-3">
                         {bodyDisplayText.length > 320 ? (
                           <>
-                            <p className="line-clamp-5 whitespace-pre-line text-sm leading-6 text-[color:var(--app-text)]">
+                            <p
+                              id="listing-description"
+                              className={`${
+                                showFullDescription ? '' : 'line-clamp-5'
+                              } whitespace-pre-line break-words text-sm leading-6 text-[color:var(--app-text)] [overflow-wrap:anywhere]`}
+                            >
                               {bodyDisplayText}
                             </p>
-                            <details className="group mt-2">
-                              <summary className="min-h-10 cursor-pointer list-none py-2 text-sm font-bold text-[color:var(--app-accent)]">
-                                {locale === 'id'
+                            <button
+                              type="button"
+                              aria-controls="listing-description"
+                              aria-expanded={showFullDescription}
+                              onClick={() =>
+                                setShowFullDescription(current => !current)
+                              }
+                              className="mt-2 inline-flex min-h-10 items-center py-2 text-sm font-bold text-[color:var(--app-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]"
+                            >
+                              {showFullDescription
+                                ? locale === 'id'
+                                  ? 'Tampilkan lebih sedikit'
+                                  : 'Show less'
+                                : locale === 'id'
                                   ? 'Baca deskripsi lengkap'
                                   : 'Read full description'}
-                              </summary>
-                              <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[color:var(--app-text)]">
-                                {bodyDisplayText}
-                              </p>
-                            </details>
+                            </button>
                           </>
                         ) : (
-                          <p className="whitespace-pre-line text-sm leading-6 text-[color:var(--app-text)]">
+                          <p className="whitespace-pre-line break-words text-sm leading-6 text-[color:var(--app-text)] [overflow-wrap:anywhere]">
                             {bodyDisplayText}
                           </p>
                         )}
@@ -4577,29 +4767,23 @@ export default function ContentDetailClient({
 
                     {visibleExpandedDetailItems.length > 0 ? (
                       <dl className="mt-4 divide-y divide-[color:var(--app-border)] border-y border-[color:var(--app-border)]">
-                        {visibleExpandedDetailItems
-                          .slice(0, PROMO_ONLY_MODE ? 6 : 8)
-                          .map(entry => (
-                            <div
-                              key={entry.key}
-                              className="grid gap-1 py-3 sm:grid-cols-[minmax(140px,0.42fr)_minmax(0,1fr)] sm:gap-4"
+                        {visibleExpandedDetailItems.map(entry => (
+                          <div
+                            key={entry.key}
+                            className="grid min-w-0 gap-1 py-3 sm:grid-cols-[minmax(140px,0.34fr)_minmax(0,1fr)] sm:gap-4"
+                          >
+                            <dt className="min-w-0 break-words text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] [overflow-wrap:anywhere]">
+                              {entry.label}
+                            </dt>
+                            <dd
+                              title={entry.value}
+                              className="min-w-0 whitespace-pre-line break-words text-sm font-medium leading-6 text-[color:var(--app-text)] [overflow-wrap:anywhere] sm:font-semibold"
                             >
-                              <dt className="text-xs font-semibold text-[color:var(--app-text-soft)]">
-                                {entry.label}
-                              </dt>
-                              <dd className="text-sm font-semibold leading-5 text-[color:var(--app-text)]">
-                                {entry.value}
-                              </dd>
-                            </div>
-                          ))}
+                              {entry.value}
+                            </dd>
+                          </div>
+                        ))}
                       </dl>
-                    ) : null}
-                    {expandedDetailItems.length > (PROMO_ONLY_MODE ? 6 : 8) ? (
-                      <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? `+${expandedDetailItems.length - (PROMO_ONLY_MODE ? 6 : 8)} info lain bisa ditanyakan lewat chat.`
-                          : `+${expandedDetailItems.length - (PROMO_ONLY_MODE ? 6 : 8)} more details can be asked in chat.`}
-                      </p>
                     ) : null}
                   </section>
                 ) : null}
@@ -4608,14 +4792,15 @@ export default function ContentDetailClient({
                   <section
                     className={`${detailSurfaceClass} isolate p-3 sm:p-3.5`}
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]">
+                        <MapPin className="h-4 w-4" />
+                      </span>
                       <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                          {locale === 'id'
-                            ? 'Lokasi listing'
-                            : 'Listing location'}
+                        <p className="text-sm font-bold text-[color:var(--app-text)]">
+                          {locationSectionLabel}
                         </p>
-                        <h2 className="mt-1 text-base font-bold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-lg">
+                        <h2 className="mt-1 break-words text-base font-semibold leading-6 text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-inverse)] sm:text-lg">
                           {contentLocationAddress}
                         </h2>
                         <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -4624,18 +4809,12 @@ export default function ContentDetailClient({
                               ? `${contentDistanceLabel} dari lokasimu`
                               : `${contentDistanceLabel} from you`
                             : locale === 'id'
-                              ? 'Titik lokasi sudah tersedia untuk membantu rute dan estimasi jarak.'
-                              : 'Location point is available for routes and distance context.'}
+                              ? 'Gunakan peta untuk melihat area dan rute.'
+                              : 'Use the map to understand the area and route.'}
                         </p>
                       </div>
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${listingSideVisual.chip}`}
-                      >
-                        <MapPin className="h-3.5 w-3.5" />
-                        {locale === 'id' ? 'Titik lokasi' : 'Location point'}
-                      </span>
                     </div>
-                    <div className="relative z-0 mt-3 h-[224px] isolate overflow-hidden rounded-[18px] bg-emerald-50 ring-1 ring-emerald-100 dark:bg-slate-950 dark:ring-slate-800 sm:h-[276px]">
+                    <div className="relative z-0 mt-3 h-[224px] isolate overflow-hidden rounded-[18px] bg-[color:var(--app-surface-muted)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950 dark:ring-slate-800 sm:h-[276px]">
                       <ContentLocationMap
                         point={contentLocationPoint}
                         title={item.title}
@@ -4647,7 +4826,7 @@ export default function ContentDetailClient({
                         href={contentDirectionsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white shadow-[0_14px_28px_-20px_rgba(5,150,105,0.8)] transition hover:bg-emerald-800"
+                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[12px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-white transition hover:brightness-105"
                       >
                         <Navigation className="h-4 w-4" />
                         {locale === 'id' ? 'Lihat rute' : 'Directions'}
@@ -4656,7 +4835,7 @@ export default function ContentDetailClient({
                         href={contentGoogleMapsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50 dark:bg-slate-950 dark:text-emerald-300 dark:ring-slate-800"
+                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)]"
                       >
                         <ExternalLink className="h-4 w-4" />
                         {locale === 'id'
@@ -4670,7 +4849,7 @@ export default function ContentDetailClient({
                 <div className="min-w-0 space-y-3">
                   {documents.length > 0 ? (
                     <section className={`${detailSurfaceClass} p-3.5 sm:p-4`}>
-                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                      <div className="flex items-center gap-2 text-base font-bold text-[color:var(--app-text)]">
                         <FileText className="h-4 w-4" />
                         {locale === 'id' ? 'Dokumen' : 'Documents'}
                       </div>
@@ -4684,7 +4863,10 @@ export default function ContentDetailClient({
                             className={`group flex min-h-12 items-center justify-between gap-3 rounded-[16px] px-3 py-2.5 text-sm transition ${detailRowClass}`}
                           >
                             <div className="min-w-0">
-                              <p className="truncate font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              <p
+                                title={doc.name}
+                                className="break-words font-semibold leading-5 text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-inverse)]"
+                              >
                                 {doc.name}
                               </p>
                               <p className="text-xs text-[color:var(--app-text-soft)]">
@@ -4704,6 +4886,19 @@ export default function ContentDetailClient({
                 </div>
 
                 <div className="lg:hidden">{ownerProfileCard}</div>
+
+                {!isOwner ? (
+                  <div className="px-4 pb-1 sm:px-0">
+                    <button
+                      type="button"
+                      onClick={openReportListingModal}
+                      className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+                    >
+                      <Flag className="h-3.5 w-3.5" />
+                      {locale === 'id' ? 'Laporkan listing' : 'Report listing'}
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <aside className="hidden lg:block lg:self-start">
@@ -4723,7 +4918,7 @@ export default function ContentDetailClient({
               paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)',
             }}
           >
-            <div className="mx-auto max-w-md rounded-[20px] border border-slate-200/80 bg-white/96 p-1.5 shadow-[0_18px_44px_-26px_rgba(15,23,42,0.36)] dark:border-slate-800 dark:bg-slate-950/94">
+            <div className="mx-auto max-w-md rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]/96 p-1.5 shadow-[0_18px_44px_-30px_rgba(15,23,42,0.32)] backdrop-blur-xl">
               {actionButtons}
             </div>
           </div>
@@ -4735,7 +4930,7 @@ export default function ContentDetailClient({
           <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-info)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                   {locale === 'id' ? 'Share listing' : 'Share listing'}
                 </p>
                 <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
@@ -4750,10 +4945,10 @@ export default function ContentDetailClient({
               <button
                 type="button"
                 onClick={() => setShowShareModal(false)}
-                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)]"
                 aria-label={locale === 'id' ? 'Tutup' : 'Close'}
               >
-                X
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -4765,7 +4960,7 @@ export default function ContentDetailClient({
                 <select
                   value={shareRoomId}
                   onChange={e => setShareRoomId(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-info-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)] dark:focus:ring-[color:color-mix(in_srgb,_var(--app-info)_40%,_transparent)]"
+                  className="h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)] dark:focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_40%,_transparent)]"
                 >
                   <option value="">
                     {locale === 'id'
@@ -4793,7 +4988,7 @@ export default function ContentDetailClient({
                       ? 'Contoh: Lagi buka slot untuk listing ini.'
                       : 'Example: We have open slots for this listing.'
                   }
-                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-info-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)] dark:focus:ring-[color:color-mix(in_srgb,_var(--app-info)_40%,_transparent)]"
+                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)] dark:focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_40%,_transparent)]"
                 />
               </div>
             </div>
@@ -4807,14 +5002,14 @@ export default function ContentDetailClient({
             <div className="mt-5 flex flex-wrap gap-2">
               <button
                 onClick={() => setShowShareModal(false)}
-                className="rounded-full border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                className="rounded-[12px] border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
               >
                 {locale === 'id' ? 'Batal' : 'Cancel'}
               </button>
               <button
                 onClick={handleShareListingToRoom}
                 disabled={shareSubmitting || !shareRoomId}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-info)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-info)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex flex-1 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {shareSubmitting
                   ? locale === 'id'
@@ -4852,7 +5047,7 @@ export default function ContentDetailClient({
                 className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)]"
                 aria-label={locale === 'id' ? 'Tutup' : 'Close'}
               >
-                X
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -4908,7 +5103,7 @@ export default function ContentDetailClient({
               <button
                 type="button"
                 onClick={() => setShowReportModal(false)}
-                className="min-h-10 rounded-full border border-[color:var(--app-border)] px-4 text-xs font-semibold text-[color:var(--app-text)]"
+                className="min-h-10 rounded-[12px] border border-[color:var(--app-border)] px-4 text-xs font-semibold text-[color:var(--app-text)]"
               >
                 {locale === 'id' ? 'Batal' : 'Cancel'}
               </button>
@@ -4916,7 +5111,7 @@ export default function ContentDetailClient({
                 type="button"
                 onClick={() => void submitListingReport()}
                 disabled={reportSubmitting}
-                className="min-h-10 flex-1 rounded-full bg-[color:var(--app-danger)] px-4 text-xs font-semibold text-white disabled:opacity-60"
+                className="min-h-10 flex-1 rounded-[12px] bg-[color:var(--app-danger)] px-4 text-xs font-semibold text-white disabled:opacity-60"
               >
                 {reportSubmitting
                   ? locale === 'id'
@@ -4951,10 +5146,10 @@ export default function ContentDetailClient({
               <button
                 type="button"
                 onClick={() => setShowApplyModal(false)}
-                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)]"
                 aria-label={locale === 'id' ? 'Tutup' : 'Close'}
               >
-                X
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -5095,14 +5290,14 @@ export default function ContentDetailClient({
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={() => setShowApplyModal(false)}
-                className="rounded-full border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                className="rounded-[12px] border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
               >
                 {locale === 'id' ? 'Batal' : 'Cancel'}
               </button>
               <button
                 onClick={() => handleApplySubmit(false)}
                 disabled={applySubmitting}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex flex-1 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {applySubmitting
                   ? locale === 'id'
@@ -5145,10 +5340,10 @@ export default function ContentDetailClient({
               <button
                 type="button"
                 onClick={() => setShowDealChoiceModal(false)}
-                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)]"
                 aria-label={locale === 'id' ? 'Tutup' : 'Close'}
               >
-                X
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -5166,7 +5361,7 @@ export default function ContentDetailClient({
                         }
                         setShowApplyModal(true);
                       }}
-                      className="rounded-[24px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_48%,white)] p-4 text-left transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_62%,white)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_20%,rgba(15,23,42,0.96))]"
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
                     >
                       <p className="text-xs font-bold text-[color:var(--app-accent)]">
                         {locale === 'id' ? 'Lamar cepat' : 'Quick apply'}
@@ -5192,9 +5387,9 @@ export default function ContentDetailClient({
                         setShowDealChoiceModal(false);
                         setShowApplyModal(true);
                       }}
-                      className="rounded-[24px] bg-[color:color-mix(in_srgb,var(--app-info-soft)_56%,white)] p-4 text-left transition hover:bg-[color:color-mix(in_srgb,var(--app-info-soft)_72%,white)] dark:bg-[color:color-mix(in_srgb,var(--app-info)_18%,rgba(15,23,42,0.96))]"
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
                     >
-                      <p className="text-xs font-bold text-[color:var(--app-info)]">
+                      <p className="text-xs font-bold text-[color:var(--app-accent)]">
                         {locale === 'id'
                           ? 'Isi data lamaran'
                           : 'Fill application form'}
@@ -5217,7 +5412,7 @@ export default function ContentDetailClient({
                       setShowDealChoiceModal(false);
                       void handleStartChat();
                     }}
-                    className="w-full rounded-[22px] bg-slate-100 px-4 py-3 text-left text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                    className="w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-left text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)]"
                   >
                     {locale === 'id'
                       ? 'Chat recruiter dulu'
@@ -5230,9 +5425,9 @@ export default function ContentDetailClient({
                     <button
                       type="button"
                       onClick={() => void startDealFlow('offer')}
-                      className="rounded-[24px] bg-[color:color-mix(in_srgb,var(--app-info-soft)_56%,white)] p-4 text-left transition hover:bg-[color:color-mix(in_srgb,var(--app-info-soft)_72%,white)] dark:bg-[color:color-mix(in_srgb,var(--app-info)_18%,rgba(15,23,42,0.96))]"
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
                     >
-                      <p className="text-xs font-bold text-[color:var(--app-info)]">
+                      <p className="text-xs font-bold text-[color:var(--app-accent)]">
                         {offerCardTitle}
                       </p>
                       <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
@@ -5248,7 +5443,7 @@ export default function ContentDetailClient({
                         setShowDealChoiceModal(false);
                         void handleStartChat();
                       }}
-                      className="rounded-[24px] bg-slate-100 p-4 text-left transition hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800"
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
                     >
                       <p className="text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                         {chatFirstLabel}
@@ -5271,7 +5466,7 @@ export default function ContentDetailClient({
                       <button
                         type="button"
                         onClick={() => void startDealFlow('direct')}
-                        className="rounded-[24px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_48%,white)] p-4 text-left transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_62%,white)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_20%,rgba(15,23,42,0.96))]"
+                        className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
                       >
                         <p className="text-xs font-bold text-[color:var(--app-accent)]">
                           {directDealTitle}
@@ -5289,9 +5484,9 @@ export default function ContentDetailClient({
                     <button
                       type="button"
                       onClick={() => void startDealFlow('offer')}
-                      className="rounded-[24px] bg-[color:color-mix(in_srgb,var(--app-info-soft)_56%,white)] p-4 text-left transition hover:bg-[color:color-mix(in_srgb,var(--app-info-soft)_72%,white)] dark:bg-[color:color-mix(in_srgb,var(--app-info)_18%,rgba(15,23,42,0.96))]"
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
                     >
-                      <p className="text-xs font-bold text-[color:var(--app-info)]">
+                      <p className="text-xs font-bold text-[color:var(--app-accent)]">
                         {offerCardTitle}
                       </p>
                       <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
@@ -5308,7 +5503,7 @@ export default function ContentDetailClient({
                       setShowDealChoiceModal(false);
                       void handleStartChat();
                     }}
-                    className="w-full rounded-[22px] bg-slate-100 px-4 py-3 text-left text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                    className="w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-left text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)]"
                   >
                     {chatFirstLabel}
                   </button>
@@ -5329,11 +5524,11 @@ export default function ContentDetailClient({
             verificationPrompt?.hasPhone && !verificationPrompt.phoneReady,
           );
           setVerificationPrompt(null);
-          router.push(
-            shouldOpenPhoneVerification
-              ? PHONE_VERIFICATION_SETTINGS_PATH
-              : '/profile/edit',
-          );
+          // router.push(
+          //   shouldOpenPhoneVerification
+          //     ? PHONE_VERIFICATION_SETTINGS_PATH
+          //     : '/profile/edit',
+          // );
         }}
         onOpenProfile={() => {
           setVerificationPrompt(null);
@@ -5364,11 +5559,11 @@ export default function ContentDetailClient({
                   );
                   setCreatedDealHandoff(null);
                 }}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                className="inline-flex flex-1 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
               >
                 {createdDealHandoff.flowMode === 'direct'
                   ? locale === 'id'
-                    ? 'Bayar aman sekarang'
+                    ? 'Buka transaksi'
                     : 'Pay safely now'
                   : locale === 'id'
                     ? 'Buka workspace order'
@@ -5386,7 +5581,7 @@ export default function ContentDetailClient({
                   }
                   setCreatedDealHandoff(null);
                 }}
-                className="inline-flex flex-1 items-center justify-center rounded-full border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                className="inline-flex flex-1 items-center justify-center rounded-[12px] border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
               >
                 {createdDealHandoff.roomId
                   ? locale === 'id'
@@ -5470,7 +5665,7 @@ export default function ContentDetailClient({
               ))}
             </div>
 
-            <div className="rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-info-soft)_62%,white)] p-3 text-xs text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,var(--app-info)_18%,rgba(15,23,42,0.96))]">
+            <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] p-3 text-xs text-[color:var(--app-text)]">
               {createdDealHandoff.flowMode === 'direct'
                 ? locale === 'id'
                   ? 'Lanjut ke order untuk mencatat nominal, status, dan kesepakatan. Ketersediaan pembayaran ditandai jelas di halaman transaksi.'
@@ -5509,10 +5704,10 @@ export default function ContentDetailClient({
                   setShowOfferModal(false);
                   setOfferFlowMode('offer');
                 }}
-                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)]"
                 aria-label={locale === 'id' ? 'Tutup' : 'Close'}
               >
-                X
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -5626,7 +5821,7 @@ export default function ContentDetailClient({
                     ? !offerAmount.trim() && !offerMessage.trim()
                     : !offerAmount.trim())
                 }
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex flex-1 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting
                   ? locale === 'id'

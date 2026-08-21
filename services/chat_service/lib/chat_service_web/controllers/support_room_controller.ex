@@ -3,6 +3,8 @@ defmodule ChatServiceWeb.SupportRoomController do
 
   alias ChatService.{AidaBot, Repo}
 
+  require Logger
+
   @support_roles ~w(admin super_admin support ops agent sales)
   @support_perms ~w(support:chat support:manage support:rooms chat:join)
 
@@ -53,17 +55,20 @@ defmodule ChatServiceWeb.SupportRoomController do
       members = maybe_include_support_bot(room_id, members)
 
       now = DateTime.utc_now()
-      ensure_room(room_id, room_name, current_user_id_bin, now)
-      Enum.each(members, &ensure_room_member(room_id, &1, "member", now))
-      Enum.each(members, &seed_user_room(room_id, room_name, &1, current_user_id_bin, now))
 
-      json(conn, %{
-        data: %{
-          room_id: room_id,
-          room_name: room_name,
-          members: Enum.map(members, &Ecto.UUID.cast!/1)
-        }
-      })
+      case provision_room(room_id, room_name, members, current_user_id_bin, now) do
+        :ok ->
+          json(conn, %{
+            data: %{
+              room_id: room_id,
+              room_name: room_name,
+              members: Enum.map(members, &Ecto.UUID.cast!/1)
+            }
+          })
+
+        {:error, _reason} ->
+          storage_unavailable(conn)
+      end
     end
   end
 
@@ -106,17 +111,20 @@ defmodule ChatServiceWeb.SupportRoomController do
       members = maybe_include_support_bot(room_id, members)
 
       now = DateTime.utc_now()
-      ensure_room(room_id, room_name, current_user_id_bin, now)
-      Enum.each(members, &ensure_room_member(room_id, &1, "member", now))
-      Enum.each(members, &seed_user_room(room_id, room_name, &1, current_user_id_bin, now))
 
-      json(conn, %{
-        data: %{
-          room_id: room_id,
-          room_name: room_name,
-          members: Enum.map(members, &Ecto.UUID.cast!/1)
-        }
-      })
+      case provision_room(room_id, room_name, members, current_user_id_bin, now) do
+        :ok ->
+          json(conn, %{
+            data: %{
+              room_id: room_id,
+              room_name: room_name,
+              members: Enum.map(members, &Ecto.UUID.cast!/1)
+            }
+          })
+
+        {:error, _reason} ->
+          storage_unavailable(conn)
+      end
     end
   end
 
@@ -199,13 +207,14 @@ defmodule ChatServiceWeb.SupportRoomController do
   defp seed_user_room(room_id, room_name, user_id_bin, sender_id_bin, now) do
     Repo.execute(
       """
-      INSERT INTO user_rooms (user_id, last_message_at, room_id, room_type, room_name, room_avatar, last_message, last_sender, unread_count, is_pinned)
+      INSERT INTO user_room_state (user_id, room_id, last_message_at, room_type, room_name, room_avatar, last_message, last_sender, unread_count, is_pinned)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      IF NOT EXISTS
       """,
       [
         {"uuid", user_id_bin},
-        {"timestamp", now},
         {"text", room_id},
+        {"timestamp", now},
         {"text", "support"},
         {"text", room_name},
         {"text", ""},
@@ -215,5 +224,37 @@ defmodule ChatServiceWeb.SupportRoomController do
         {"boolean", false}
       ]
     )
+  end
+
+  defp provision_room(room_id, room_name, members, current_user_id_bin, now) do
+    with {:ok, _} <- ensure_room(room_id, room_name, current_user_id_bin, now),
+         :ok <-
+           execute_each(members, fn member_id ->
+             ensure_room_member(room_id, member_id, "member", now)
+           end),
+         :ok <-
+           execute_each(members, fn member_id ->
+             seed_user_room(room_id, room_name, member_id, current_user_id_bin, now)
+           end) do
+      :ok
+    end
+  end
+
+  defp execute_each(values, operation) do
+    Enum.reduce_while(values, :ok, fn value, :ok ->
+      case operation.(value) do
+        {:ok, _result} -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+        other -> {:halt, {:error, other}}
+      end
+    end)
+  end
+
+  defp storage_unavailable(conn) do
+    Logger.error("Support room provisioning failed because chat storage was unavailable")
+
+    conn
+    |> put_status(:service_unavailable)
+    |> json(%{error: "chat storage unavailable"})
   end
 end

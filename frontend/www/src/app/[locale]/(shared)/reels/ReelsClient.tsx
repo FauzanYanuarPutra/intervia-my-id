@@ -27,14 +27,17 @@ import {
   Clapperboard,
   Compass,
   Download,
+  Eye,
   Flag,
   Forward,
   Hash,
   Heart,
   Home,
+  Images,
   Info,
   Link2,
   Loader2,
+  MapPin,
   Megaphone,
   MessageCircle,
   MessageSquareText,
@@ -94,12 +97,12 @@ import {
   type ReelPreferenceProfile as PreferenceProfile,
 } from '@/lib/reels/preferences';
 import {
-  appendHrefQuery as appendQuery,
   buildLocalizedHref as localizedHref,
   formatReelCommentTime as formatCommentTime,
   isDirectReelVideoUrl as isDirectVideoMediaUrl,
   isReelImageUrl as isImageMediaUrl,
 } from '@/lib/reels/presentation';
+import { resolveCanonicalReelContentHref } from '@/lib/reels/conversionLinks';
 import { PROFILE_SOCIAL_STORAGE_KEY } from '@/components/profile/profile-hub/services/profileStorage.service';
 import {
   mapDiscoverUserToSocialUser,
@@ -121,6 +124,12 @@ import type {
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
+import {
+  TRUST_REPORT_REASONS,
+  markReelNotInterested,
+  submitTrustReport,
+  type TrustReportReason,
+} from '@/lib/community/trustSafety';
 import {
   openNativeReelsStudio,
   requestNativePermissions,
@@ -144,7 +153,7 @@ const iconMap: Partial<Record<LajukanReel['iconKey'] | string, LucideIcon>> = {
   frozen: ShoppingBag,
 };
 
-type ReelsSignal = 'watch' | 'share' | 'detail' | 'product';
+type ReelsSignal = 'watch' | 'share' | 'detail' | 'product' | 'store';
 
 type ReelUserAction = 'like' | 'save' | 'follow';
 
@@ -175,10 +184,13 @@ type ReelCommentsBucket = {
   error: string | null;
 };
 
+type ReelVisibility = 'public' | 'followers' | 'private';
+
 type UploadReelForm = {
   captureMode: NonNullable<LajukanReel['captureMode']>;
   filterPreset: NonNullable<LajukanReel['filterPreset']>;
   musicTrack: string;
+  /** Internal compatibility fields. The publish UI derives these automatically. */
   title: string;
   caption: string;
   tag: string;
@@ -189,9 +201,27 @@ type UploadReelForm = {
   productName: string;
   productPrice: string;
   productHref: string;
+  contentGoal: ReelContentGoal;
+  location: string;
+  visibility: ReelVisibility;
+  allowComments: boolean;
+  shareToMainFeed: boolean;
+  promotionalContent: boolean;
+  aiGenerated: boolean;
+  coverTimestampMs: number;
 };
 
 type UploadReelStep = 'media' | 'edit' | 'post';
+
+type ReelContentGoal = 'discover' | 'product' | 'education' | 'promo' | 'process';
+
+type ReelStoreOption = {
+  id: string;
+  name: string;
+  slug: string;
+  city?: string | null;
+  phone?: string | null;
+};
 
 type ReelsFeedTab = 'fyp' | 'friends' | 'following';
 
@@ -225,6 +255,8 @@ type NotificationData = Record<string, unknown>;
 const REELS_SNAP_LOCK_MS = 520;
 const REELS_AUTO_SCROLL_MS = 11000;
 const REELS_FEED_REQUEST_TIMEOUT_MS = 8_000;
+const REELS_LIVE_ENABLED =
+  process.env.NEXT_PUBLIC_REELS_LIVE_ENABLED === 'true';
 const REEL_SLIDE_LOADED_STYLE: CSSProperties = {
   contentVisibility: 'visible',
 };
@@ -311,7 +343,9 @@ function resolveNotificationReelId(notification: InboxNotification): string {
         ? window.location.origin
         : 'http://localhost';
     const parsed = new URL(directHref, base);
-    const queryReel = parsed.searchParams.get('reel')?.trim();
+    const queryReel =
+      parsed.searchParams.get('video')?.trim() ||
+      parsed.searchParams.get('reel')?.trim();
     if (queryReel) return queryReel;
     const pathParts = parsed.pathname.split('/').filter(Boolean);
     if (pathParts[0] === 'reels' && pathParts[1]?.trim()) {
@@ -319,7 +353,7 @@ function resolveNotificationReelId(notification: InboxNotification): string {
     }
     return '';
   } catch {
-    const match = directHref.match(/[?&]reel=([^&#]+)/i);
+    const match = directHref.match(/[?&](?:video|reel)=([^&#]+)/i);
     if (match?.[1]) {
       try {
         return decodeURIComponent(match[1]).trim();
@@ -360,32 +394,6 @@ function isReelCommentNotification(notification: InboxNotification): boolean {
   return false;
 }
 
-function resolveCommunityDirectBaseUrl(): string | null {
-  const base = process.env.NEXT_PUBLIC_COMMUNITY_URL?.trim();
-  if (!base) return null;
-  return base.replace(/\/$/, '');
-}
-
-function buildCommunityReelCommentsUrl(
-  reelId: string,
-  cursor: number,
-): string | null {
-  const base = resolveCommunityDirectBaseUrl();
-  if (!base) return null;
-
-  try {
-    const url = new URL(
-      `/v1/reels/${encodeURIComponent(reelId)}/comments`,
-      base.endsWith('/') ? base : `${base}/`,
-    );
-    url.searchParams.set('cursor', String(cursor));
-    url.searchParams.set('limit', '20');
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
 const EMPTY_UPLOAD_FORM: UploadReelForm = {
   captureMode: 'camera',
   filterPreset: 'natural',
@@ -400,6 +408,14 @@ const EMPTY_UPLOAD_FORM: UploadReelForm = {
   productName: '',
   productPrice: '',
   productHref: '',
+  contentGoal: 'discover',
+  location: '',
+  visibility: 'public',
+  allowComments: true,
+  shareToMainFeed: true,
+  promotionalContent: false,
+  aiGenerated: false,
+  coverTimestampMs: 0,
 };
 
 const REELS_VIDEO_EXTENSIONS = /\.(m4v|mov|mp4|webm)$/i;
@@ -420,70 +436,6 @@ function buildCleanReelTitleFromFile(file: File) {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1, 90);
 }
 
-const REEL_CAPTURE_MODES: Array<{
-  id: NonNullable<LajukanReel['captureMode']>;
-  label: string;
-  helper: string;
-  icon: LucideIcon;
-}> = [
-  {
-    id: 'camera',
-    label: 'Kamera',
-    helper: 'Rekam cepat',
-    icon: Camera,
-  },
-  {
-    id: 'upload',
-    label: 'Galeri',
-    helper: 'Pilih file',
-    icon: Upload,
-  },
-  {
-    id: 'live',
-    label: 'Live',
-    helper: 'Jadwal siaran',
-    icon: Radio,
-  },
-];
-
-const REELS_STUDIO_MODES: Array<{
-  id: ReelsStudioMode;
-  label: string;
-  helper: string;
-  icon: LucideIcon;
-}> = [
-  {
-    id: 'gallery',
-    label: 'Galeri',
-    helper: 'Ambil file',
-    icon: Upload,
-  },
-  {
-    id: 'photo',
-    label: 'Foto',
-    helper: 'Jepret cepat',
-    icon: Camera,
-  },
-  {
-    id: 'video',
-    label: 'Video',
-    helper: 'Rekam',
-    icon: Clapperboard,
-  },
-  {
-    id: 'link',
-    label: 'Link',
-    helper: 'Video URL',
-    icon: Link2,
-  },
-  {
-    id: 'live',
-    label: 'Live',
-    helper: 'Siaran',
-    icon: Radio,
-  },
-];
-
 const REELS_MUSIC_TRACKS = [
   'Original sound',
   'Beat UMKM',
@@ -493,7 +445,7 @@ const REELS_MUSIC_TRACKS = [
 ];
 
 const REELS_STUDIO_SPEEDS = ['0,25x', '0,5x', '1x', '1,5x', '2x'] as const;
-const REELS_STUDIO_DURATIONS = ['60s', '15s', '05s'] as const;
+const REELS_STUDIO_DURATIONS = ['15s', '30s', '60s', '90s'] as const;
 
 const REEL_FILTER_PRESETS: Array<{
   id: NonNullable<LajukanReel['filterPreset']>;
@@ -607,6 +559,7 @@ const SIGNAL_WEIGHT: Record<ReelsSignal | ReelUserAction, number> = {
   follow: 5,
   detail: 2.4,
   product: 6,
+  store: 5.6,
 };
 
 const BACKEND_SIGNAL_EVENT: Record<ReelsSignal, string> = {
@@ -614,6 +567,7 @@ const BACKEND_SIGNAL_EVENT: Record<ReelsSignal, string> = {
   share: 'share',
   detail: 'view',
   product: 'open_product',
+  store: 'open_store',
 };
 
 const EMPTY_REEL_ACTION_STATE: ReelActionState = {
@@ -899,6 +853,7 @@ function drawStudioCanvasEffect(
 }
 
 function getLiveLabel(reel: Pick<LajukanReel, 'liveStatus' | 'captureMode'>) {
+  if (!REELS_LIVE_ENABLED) return null;
   if (reel.liveStatus === 'live') return 'LIVE';
   if (reel.liveStatus === 'scheduled' || reel.captureMode === 'live') {
     return 'Live siap';
@@ -953,9 +908,10 @@ function buildReelShareUrl(locale: string, reel: LajukanReel | null) {
   const url = new URL(window.location.href);
   url.pathname = fallbackPath;
 
-  if (!url.searchParams.get('video') && reel) {
+  if (reel) {
     const fallbackVideo = reel.baseId || reel.id.split(':').at(-1) || '1';
     url.searchParams.set('video', fallbackVideo);
+    url.searchParams.delete('reel');
   }
 
   return url.toString();
@@ -1002,6 +958,147 @@ function readReelMetadataNumber(reel: LajukanReel, ...keys: string[]): number {
   }
 
   return 0;
+}
+
+function readReelMetadataBoolean(
+  reel: LajukanReel,
+  ...keys: string[]
+): boolean {
+  const metadata = reel.metadata;
+  if (!metadata) return false;
+
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['1', 'true', 'yes', 'friend', 'mutual'].includes(normalized)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function getReelCreatorKey(reel: LajukanReel): string {
+  return String(reel.creatorUserId || reel.creator || '')
+    .trim()
+    .toLowerCase();
+}
+
+function isFriendOrMutualReel(reel: LajukanReel): boolean {
+  const relationship = readReelMetadataText(
+    reel,
+    'relationship',
+    'viewer_relationship',
+    'social_relationship',
+  ).toLowerCase();
+
+  return (
+    ['friend', 'friends', 'mutual', 'mutual_follow'].includes(relationship) ||
+    readReelMetadataBoolean(
+      reel,
+      'is_friend',
+      'friend',
+      'mutual_follow',
+      'mutualFollow',
+      'viewer_mutual_follow',
+    )
+  );
+}
+
+function diversifyReelSequence(source: LajukanReel[]): LajukanReel[] {
+  if (source.length < 3) return source;
+
+  const remaining = [...source];
+  const result: LajukanReel[] = [];
+
+  while (remaining.length > 0) {
+    const previous = result[result.length - 1];
+    const previousCreator = previous ? getReelCreatorKey(previous) : '';
+    const previousTag = previous?.tag?.trim().toLowerCase() || '';
+
+    let candidateIndex = 0;
+    if (previous) {
+      const differentCreatorAndTopic = remaining.findIndex(candidate => {
+        const candidateCreator = getReelCreatorKey(candidate);
+        const candidateTag = candidate.tag?.trim().toLowerCase() || '';
+        return (
+          candidateCreator !== previousCreator &&
+          (!previousTag || !candidateTag || candidateTag !== previousTag)
+        );
+      });
+      const differentCreator = remaining.findIndex(
+        candidate => getReelCreatorKey(candidate) !== previousCreator,
+      );
+      candidateIndex =
+        differentCreatorAndTopic >= 0
+          ? differentCreatorAndTopic
+          : differentCreator >= 0
+            ? differentCreator
+            : 0;
+    }
+
+    const [candidate] = remaining.splice(candidateIndex, 1);
+    if (candidate) result.push(candidate);
+  }
+
+  return result;
+}
+
+function getReelBusinessPresentation(reel: LajukanReel) {
+  const raw = reel as unknown as Record<string, unknown>;
+  const readRaw = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = raw[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+  };
+
+  const name =
+    readRaw('storeName', 'store_name', 'businessName', 'business_name') ||
+    readReelMetadataText(reel, 'store_name', 'storeName', 'business_name');
+  const href =
+    readRaw('storefrontPath', 'storefront_path', 'storeHref', 'store_href') ||
+    readReelMetadataText(
+      reel,
+      'storefront_path',
+      'storefrontPath',
+      'store_href',
+    );
+  const city =
+    readRaw('storeCity', 'store_city') ||
+    readReelMetadataText(reel, 'store_city', 'storeCity');
+  const storeId =
+    readRaw('storeId', 'store_id') ||
+    readReelMetadataText(reel, 'linkedStoreId', 'linked_store_id', 'store_id');
+  const explicit = Boolean(
+    readReelMetadataText(reel, 'linkedStoreId', 'linked_store_id') ||
+      (storeId && !storeId.toLowerCase().startsWith('store-')),
+  );
+
+  return { name, href, city, storeId, explicit };
+}
+
+function getReelMusicLabel(reel: LajukanReel): string {
+  const direct = readReelMetadataText(
+    reel,
+    'musicTrack',
+    'music_track',
+    'audio_title',
+    'sound_title',
+  );
+  if (direct) return direct;
+
+  const metadata = reel.metadata;
+  if (!metadata || typeof metadata !== 'object') return '';
+  const studio = metadata.studio;
+  if (!studio || typeof studio !== 'object' || Array.isArray(studio)) return '';
+  const value = (studio as Record<string, unknown>).musicTrack;
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function getReelCreatorStats(reel: LajukanReel) {
@@ -1105,6 +1202,7 @@ export default function ReelsClient({
     Math.max(initialIndex, 0),
     Math.max(normalizedInitialItems.length - 1, 0),
   );
+  const initialReelId = normalizedInitialItems[safeInitialIndex]?.id || '';
 
   const [items, setItems] = useState<LajukanReel[]>(normalizedInitialItems);
   const [cursor, setCursor] = useState<number | null>(initialCursor);
@@ -1117,6 +1215,8 @@ export default function ReelsClient({
   );
 
   const [activeIndex, setActiveIndex] = useState(safeInitialIndex);
+  const [feedTab, setFeedTab] = useState<ReelsFeedTab>('fyp');
+  const [followedCreatorIds, setFollowedCreatorIds] = useState<string[]>([]);
   const [searchContextQuery, setSearchContextQuery] = useState(
     initialSearchQuery.trim(),
   );
@@ -1138,6 +1238,7 @@ export default function ReelsClient({
   const [actionsReel, setActionsReel] = useState<LajukanReel | null>(null);
   const [creatorProfileReel, setCreatorProfileReel] =
     useState<LajukanReel | null>(null);
+  const [whyReel, setWhyReel] = useState<LajukanReel | null>(null);
   const [commentsByReel, setCommentsByReel] = useState<
     Record<string, ReelCommentsBucket>
   >({});
@@ -1156,6 +1257,66 @@ export default function ReelsClient({
   useEffect(() => {
     commentsByReelRef.current = commentsByReel;
   }, [commentsByReel]);
+
+
+  const followingStorageKey = useMemo(
+    () => `${PROFILE_SOCIAL_STORAGE_KEY}:${user?.id || 'me'}`,
+    [user?.id],
+  );
+
+  const syncFollowedCreatorIds = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(followingStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setFollowedCreatorIds(
+        Array.isArray(parsed)
+          ? parsed.map(item => String(item).trim()).filter(Boolean)
+          : [],
+      );
+    } catch {
+      setFollowedCreatorIds([]);
+    }
+  }, [followingStorageKey]);
+
+  useEffect(() => {
+    syncFollowedCreatorIds();
+    if (typeof window === 'undefined') return;
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === followingStorageKey) {
+        syncFollowedCreatorIds();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', syncFollowedCreatorIds);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', syncFollowedCreatorIds);
+    };
+  }, [followingStorageKey, syncFollowedCreatorIds]);
+
+  const persistFollowedCreator = useCallback(
+    (creatorUserId: string | null | undefined, active: boolean) => {
+      const creatorId = String(creatorUserId || '').trim();
+      if (!creatorId) return;
+
+      setFollowedCreatorIds(current => {
+        const nextSet = new Set(current);
+        if (active) nextSet.add(creatorId);
+        else nextSet.delete(creatorId);
+        const next = Array.from(nextSet);
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(followingStorageKey, JSON.stringify(next));
+          } catch {
+            // Best effort: server action remains the source of truth.
+          }
+        }
+        return next;
+      });
+    },
+    [followingStorageKey],
+  );
 
   useEffect(() => {
     const updateProfile = () =>
@@ -1187,6 +1348,29 @@ export default function ReelsClient({
       document.removeEventListener('visibilitychange', updateVisibility);
   }, []);
 
+  useEffect(() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+    const previousRootOverflow = root.style.overflow;
+    const previousRootOverscroll = root.style.overscrollBehavior;
+
+    // Reels owns the viewport while mounted. Lock both scrolling roots so
+    // wheel/touch input cannot leak to the page behind the snap container.
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    root.style.overflow = 'hidden';
+    root.style.overscrollBehavior = 'none';
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+      root.style.overflow = previousRootOverflow;
+      root.style.overscrollBehavior = previousRootOverscroll;
+    };
+  }, []);
+
   const overlayOpen =
     searchOpen ||
     detailReel !== null ||
@@ -1195,6 +1379,7 @@ export default function ReelsClient({
     shareReel !== null ||
     actionsReel !== null ||
     creatorProfileReel !== null ||
+    whyReel !== null ||
     uploadOpen ||
     authPrompt !== null;
 
@@ -1231,14 +1416,44 @@ export default function ReelsClient({
     [],
   );
 
-  const hasEndSlide = !hasMore && items.length > 0;
-  const reelPageCount = items.length + (hasEndSlide ? 1 : 0);
+  const followedCreatorSet = useMemo(
+    () => new Set(followedCreatorIds.map(id => id.trim()).filter(Boolean)),
+    [followedCreatorIds],
+  );
+
+  const fypItems = useMemo(() => diversifyReelSequence(items), [items]);
+  const initialFypIndex = useMemo(() => {
+    if (!initialReelId) return 0;
+    const index = fypItems.findIndex(item => item.id === initialReelId);
+    return index >= 0 ? index : 0;
+  }, [fypItems, initialReelId]);
+
+  const visibleItems = useMemo(() => {
+    if (feedTab === 'fyp') return fypItems;
+
+    if (feedTab === 'following') {
+      return diversifyReelSequence(
+        items.filter(reel => {
+          const creatorId = String(reel.creatorUserId || '').trim();
+          return (
+            (creatorId && followedCreatorSet.has(creatorId)) ||
+            Boolean(actionsByReel[reel.id]?.followed)
+          );
+        }),
+      );
+    }
+
+    return diversifyReelSequence(items.filter(isFriendOrMutualReel));
+  }, [actionsByReel, feedTab, followedCreatorSet, fypItems, items]);
+
+  const hasEndSlide = !hasMore && visibleItems.length > 0;
+  const reelPageCount = visibleItems.length + (hasEndSlide ? 1 : 0);
 
   const activeReel = useMemo(() => {
-    if (items.length === 0) return null;
-    if (activeIndex >= items.length) return null;
-    return items[activeIndex] || null;
-  }, [activeIndex, items]);
+    if (visibleItems.length === 0) return null;
+    if (activeIndex >= visibleItems.length) return null;
+    return visibleItems[activeIndex] || null;
+  }, [activeIndex, visibleItems]);
   const activeReelId = activeReel?.id ?? null;
 
   const learnedTerms = useMemo(() => topProfileTerms(profile), [profile]);
@@ -1255,7 +1470,6 @@ export default function ReelsClient({
     user?.full_name ||
     user?.name ||
     user?.username ||
-    user?.email ||
     'Akun Lajukan';
 
   const replaceReel = useCallback((nextReel: LajukanReel) => {
@@ -1290,8 +1504,52 @@ export default function ReelsClient({
     });
   }, []);
 
+  const sendReelEvent = useCallback(
+    (
+      reel: LajukanReel,
+      event: string,
+      metadata: Record<string, unknown> = {},
+    ) => {
+      const request = isAuthenticated ? authFetch : fetch;
+      void request(`/api/reels/${encodeURIComponent(reel.id)}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event,
+          metadata: {
+            ...metadata,
+            feed_tab: feedTab,
+            source_query: activeSearchQuery || undefined,
+            performance_tier: performanceProfile.tier,
+          },
+        }),
+        keepalive: true,
+      })
+        .then(async response => {
+          if (!response.ok) return;
+          const payload = (await response.json().catch(() => null)) as {
+            reel?: LajukanReel;
+          } | null;
+          if (payload?.reel) replaceReel(payload.reel);
+        })
+        .catch(() => undefined);
+    },
+    [
+      activeSearchQuery,
+      authFetch,
+      feedTab,
+      isAuthenticated,
+      performanceProfile.tier,
+      replaceReel,
+    ],
+  );
+
   const recordSignal = useCallback(
-    (reel: LajukanReel, signal: ReelsSignal) => {
+    (
+      reel: LajukanReel,
+      signal: ReelsSignal,
+      metadata: Record<string, unknown> = {},
+    ) => {
       setProfile(current => {
         const next = boostProfile(
           current,
@@ -1311,12 +1569,12 @@ export default function ReelsClient({
         void trackLajukanEvent('reels.viewed', {
           entityType: 'reel',
           entityId: reel.id,
-          page: `/reels?reel=${encodeURIComponent(reel.id)}`,
+          page: `/reels?video=${encodeURIComponent(reel.id)}`,
           properties: {
             target_user_id: reel.creatorUserId,
             target_username: reel.creator,
             target_name: reel.creator,
-            target_href: `/reels?reel=${encodeURIComponent(reel.id)}`,
+            target_href: `/reels?video=${encodeURIComponent(reel.id)}`,
             entity_label: reel.title,
             actor_user_id: user.id,
             actor_username: user.username || '',
@@ -1327,29 +1585,13 @@ export default function ReelsClient({
         });
       }
 
-      const request = isAuthenticated ? authFetch : fetch;
-      void request(`/api/reels/${encodeURIComponent(reel.id)}/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: BACKEND_SIGNAL_EVENT[signal],
-          metadata: { signal },
-        }),
-        keepalive: true,
-      })
-        .then(async response => {
-          if (!response.ok) return;
-          const payload = (await response.json().catch(() => null)) as {
-            reel?: LajukanReel;
-          } | null;
-          if (payload?.reel) replaceReel(payload.reel);
-        })
-        .catch(() => undefined);
+      sendReelEvent(reel, BACKEND_SIGNAL_EVENT[signal], {
+        signal,
+        ...metadata,
+      });
     },
     [
-      authFetch,
-      isAuthenticated,
-      replaceReel,
+      sendReelEvent,
       user?.avatarUrl,
       user?.avatar_url,
       user?.fullName,
@@ -1357,6 +1599,50 @@ export default function ReelsClient({
       user?.name,
       user?.username,
     ],
+  );
+
+  const recordWatchObservation = useCallback(
+    (
+      reel: LajukanReel,
+      observation: {
+        watchMs: number;
+        durationMs: number | null;
+        completionRatio: number | null;
+        outcome: 'skip' | 'engaged' | 'complete';
+        muted: boolean;
+      },
+    ) => {
+      const weight =
+        observation.outcome === 'complete'
+          ? 1.65
+          : observation.outcome === 'engaged'
+            ? 0.72
+            : 0;
+
+      if (weight > 0) {
+        setProfile(current => {
+          const next = boostProfile(current, reelTokens(reel), weight);
+          writeProfile(next);
+          return next;
+        });
+      }
+
+      sendReelEvent(reel, 'watch', {
+        signal: 'watch',
+        watch_ms: Math.max(0, Math.round(observation.watchMs)),
+        duration_ms:
+          observation.durationMs == null
+            ? undefined
+            : Math.max(0, Math.round(observation.durationMs)),
+        completion_ratio:
+          observation.completionRatio == null
+            ? undefined
+            : Number(observation.completionRatio.toFixed(4)),
+        outcome: observation.outcome,
+        muted: observation.muted,
+      });
+    },
+    [sendReelEvent],
   );
 
   const loadReelActionState = useCallback(
@@ -1443,6 +1729,9 @@ export default function ReelsClient({
         }
 
         if (payload.reel) replaceReel(payload.reel);
+        if (action === 'follow') {
+          persistFollowedCreator(reel.creatorUserId, nextActive);
+        }
         if (
           nextActive &&
           action === 'like' &&
@@ -1453,12 +1742,12 @@ export default function ReelsClient({
           void trackLajukanEvent('reels.liked', {
             entityType: 'reel',
             entityId: reel.id,
-            page: `/reels?reel=${encodeURIComponent(reel.id)}`,
+          page: `/reels?video=${encodeURIComponent(reel.id)}`,
             properties: {
               target_user_id: reel.creatorUserId,
               target_username: reel.creator,
               target_name: reel.creator,
-              target_href: `/reels?reel=${encodeURIComponent(reel.id)}`,
+              target_href: `/reels?video=${encodeURIComponent(reel.id)}`,
               entity_label: reel.title,
               actor_user_id: user.id,
               actor_username: user.username || '',
@@ -1486,6 +1775,7 @@ export default function ReelsClient({
       actionsByReel,
       authFetch,
       isAuthenticated,
+      persistFollowedCreator,
       replaceReel,
       user?.avatarUrl,
       user?.avatar_url,
@@ -1498,10 +1788,22 @@ export default function ReelsClient({
 
   const openShareSheet = useCallback(
     (reel: LajukanReel) => {
-      recordSignal(reel, 'share');
       setShareReel(reel);
     },
-    [recordSignal],
+    [],
+  );
+
+  const dismissNotInterestedReel = useCallback(
+    (reelId: string) => {
+      setItems(current => current.filter(item => item.id !== reelId));
+      setActiveIndex(current =>
+        Math.min(current, Math.max(items.length - 2, 0)),
+      );
+      setShareReel(current => (current?.id === reelId ? null : current));
+      setActionsReel(current => (current?.id === reelId ? null : current));
+      setDetailReel(current => (current?.id === reelId ? null : current));
+    },
+    [items.length],
   );
 
   useEffect(() => {
@@ -1575,6 +1877,13 @@ export default function ReelsClient({
     }
   }, [cursor, hasMore, initialSearchQuery, locale, profile]);
 
+  useEffect(() => {
+    if (feedTab === 'fyp' || visibleItems.length >= 3 || !hasMore || loadingMore) {
+      return;
+    }
+    void loadMore();
+  }, [feedTab, hasMore, loadMore, loadingMore, visibleItems.length]);
+
   const loadComments = useCallback(async (reelId: string, reset = false) => {
     const current = commentsByReelRef.current[reelId];
     if (current?.loading) return;
@@ -1609,29 +1918,16 @@ export default function ReelsClient({
         cache: 'no-store' as const,
         headers: { Accept: 'application/json' },
       };
-      let response = await fetch(
+      const response = await fetch(
         `/api/reels/${encodeURIComponent(reelId)}/comments?${params.toString()}`,
         requestOptions,
       );
-      let payload = (await response.json().catch(() => ({}))) as {
+      const payload = (await response.json().catch(() => ({}))) as {
         items?: ReelComment[];
         nextCursor?: number | null;
         hasMore?: boolean;
         error?: string;
       };
-
-      if (!response.ok || !Array.isArray(payload.items)) {
-        const fallbackUrl = buildCommunityReelCommentsUrl(reelId, cursorValue);
-        if (fallbackUrl) {
-          response = await fetch(fallbackUrl, requestOptions);
-          payload = (await response.json().catch(() => ({}))) as {
-            items?: ReelComment[];
-            nextCursor?: number | null;
-            hasMore?: boolean;
-            error?: string;
-          };
-        }
-      }
 
       if (!response.ok || !Array.isArray(payload.items)) {
         throw new Error(payload.error || 'Gagal memuat komentar');
@@ -1788,6 +2084,16 @@ export default function ReelsClient({
           },
         ).catch(() => undefined);
 
+        void trackLajukanEvent('reels.chat_started', {
+          entityType: 'reel',
+          entityId: reel.id,
+          properties: {
+            target_user_id: targetUserId,
+            source: sourceComment ? 'reels_comment' : 'reels',
+            room_id: roomId,
+          },
+        });
+
         router.push(`/${locale}/chat/${encodeURIComponent(roomId)}`);
       } catch (error) {
         setAuthPrompt(
@@ -1804,7 +2110,7 @@ export default function ReelsClient({
 
   const startChatFromReel = useCallback(
     (reel: LajukanReel, sourceComment?: ReelComment | null) =>
-      void startChatWithUser(reel.creatorUserId, reel, sourceComment),
+      startChatWithUser(reel.creatorUserId, reel, sourceComment),
     [startChatWithUser],
   );
 
@@ -1830,27 +2136,15 @@ export default function ReelsClient({
         body: requestBody,
       };
 
-      let response = await authFetch(
+      const response = await authFetch(
         `/api/reels/${encodeURIComponent(commentsReel.id)}/comments`,
         requestOptions,
       );
-      let payload = (await response.json().catch(() => ({}))) as {
+      const payload = (await response.json().catch(() => ({}))) as {
         comment?: ReelComment;
         reel?: LajukanReel;
         error?: string;
       };
-
-      if (!response.ok || !payload.comment) {
-        const fallbackUrl = buildCommunityReelCommentsUrl(commentsReel.id, 0);
-        if (fallbackUrl) {
-          response = await authFetch(fallbackUrl, requestOptions);
-          payload = (await response.json().catch(() => ({}))) as {
-            comment?: ReelComment;
-            reel?: LajukanReel;
-            error?: string;
-          };
-        }
-      }
 
       if (!response.ok || !payload.comment) {
         throw new Error(payload.error || 'Komentar gagal dikirim');
@@ -1885,12 +2179,12 @@ export default function ReelsClient({
           {
             entityType: 'reel',
             entityId: commentsReel.id,
-            page: `/reels?reel=${encodeURIComponent(commentsReel.id)}`,
+            page: `/reels?video=${encodeURIComponent(commentsReel.id)}`,
             properties: {
               target_user_id: commentsReel.creatorUserId,
               target_username: commentsReel.creator,
               target_name: commentsReel.creator,
-              target_href: `/reels?reel=${encodeURIComponent(commentsReel.id)}`,
+              target_href: `/reels?video=${encodeURIComponent(commentsReel.id)}`,
               entity_label: commentsReel.title,
               actor_user_id: user.id,
               actor_username: user.username || '',
@@ -1991,7 +2285,7 @@ export default function ReelsClient({
   }, [commentsReel?.id, loadComments, refreshReelFromServer]);
 
   const scrollToIndex = useCallback(
-    (index: number, behavior: ScrollBehavior = 'smooth') => {
+    (index: number, behavior: ScrollBehavior = 'auto') => {
       const container = containerRef.current;
       if (!container) return;
 
@@ -2035,6 +2329,10 @@ export default function ReelsClient({
   const handleReelsKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (overlayOpen) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input,textarea,select,[contenteditable=\"true\"]')) {
+        return;
+      }
 
       if (event.key === 'ArrowDown' || event.key === 'PageDown') {
         event.preventDefault();
@@ -2045,9 +2343,33 @@ export default function ReelsClient({
       if (event.key === 'ArrowUp' || event.key === 'PageUp') {
         event.preventDefault();
         snapToAdjacent(-1);
+        return;
+      }
+
+      if (event.key === ' ' || event.code === 'Space') {
+        event.preventDefault();
+        toggleCurrentVideo();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'm') {
+        event.preventDefault();
+        toggleSound();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'l' && activeReel) {
+        event.preventDefault();
+        void handleReelAction(activeReel, 'like');
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'c' && activeReel) {
+        event.preventDefault();
+        openComments(activeReel);
       }
     },
-    [overlayOpen, snapToAdjacent],
+    [activeReel, handleReelAction, openComments, overlayOpen, snapToAdjacent],
   );
 
   const handleReelCreated = useCallback(
@@ -2068,11 +2390,12 @@ export default function ReelsClient({
         reel,
         ...current.filter(item => item.id !== reel.id),
       ]);
+      setFeedTab('fyp');
       setActiveIndex(0);
       setPausedByUser(false);
       setUploadOpen(false);
       window.requestAnimationFrame(() => {
-        containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        containerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
       });
     },
     [locale, notify],
@@ -2115,20 +2438,21 @@ export default function ReelsClient({
     firstScrollDoneRef.current = true;
 
     const frame = requestAnimationFrame(() => {
+      setActiveIndex(initialFypIndex);
       container.scrollTo({
-        top: safeInitialIndex * container.clientHeight,
+        top: initialFypIndex * container.clientHeight,
         behavior: 'auto',
       });
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [safeInitialIndex]);
+  }, [initialFypIndex]);
 
   useEffect(() => {
-    if (activeIndex >= items.length - 3) {
+    if (activeIndex >= visibleItems.length - 3) {
       void loadMore();
     }
-  }, [activeIndex, items.length, loadMore]);
+  }, [activeIndex, loadMore, visibleItems.length]);
 
   useEffect(() => {
     if (activeReel) {
@@ -2141,14 +2465,46 @@ export default function ReelsClient({
   }, [activeReel, locale]);
 
   useEffect(() => {
-    if (!activeReel || overlayOpen || !pageVisible) return;
+    if (!activeReel || overlayOpen || !pageVisible || pausedByUser) return;
 
-    const timer = window.setTimeout(() => {
-      recordSignal(activeReel, 'watch');
-    }, 2200);
+    const startedAt = performance.now();
+    const startedMuted = muted;
+    const reel = activeReel;
 
-    return () => window.clearTimeout(timer);
-  }, [activeReel, overlayOpen, pageVisible, recordSignal]);
+    return () => {
+      const watchMs = Math.max(0, performance.now() - startedAt);
+      if (watchMs < 350) return;
+
+      const video = videoRefs.current[reel.id];
+      const durationMs =
+        video && Number.isFinite(video.duration) && video.duration > 0
+          ? video.duration * 1000
+          : null;
+      const completionRatio =
+        durationMs && durationMs > 0 ? Math.min(1, watchMs / durationMs) : null;
+      const outcome: 'skip' | 'engaged' | 'complete' =
+        completionRatio != null && completionRatio >= 0.9
+          ? 'complete'
+          : watchMs >= 2200
+            ? 'engaged'
+            : 'skip';
+
+      recordWatchObservation(reel, {
+        watchMs,
+        durationMs,
+        completionRatio,
+        outcome,
+        muted: startedMuted,
+      });
+    };
+  }, [
+    activeReel,
+    muted,
+    overlayOpen,
+    pageVisible,
+    pausedByUser,
+    recordWatchObservation,
+  ]);
 
   useEffect(() => {
     if (
@@ -2156,12 +2512,13 @@ export default function ReelsClient({
       overlayOpen ||
       pausedByUser ||
       !pageVisible ||
-      items.length <= 1
+      visibleItems.length <= 1
     )
       return;
 
     const timer = window.setTimeout(() => {
-      const nextIndex = activeIndex >= items.length - 1 ? 0 : activeIndex + 1;
+      const nextIndex =
+        activeIndex >= visibleItems.length - 1 ? 0 : activeIndex + 1;
       scrollToIndex(nextIndex);
     }, REELS_AUTO_SCROLL_MS);
 
@@ -2169,7 +2526,7 @@ export default function ReelsClient({
   }, [
     activeIndex,
     autoScroll,
-    items.length,
+    visibleItems.length,
     overlayOpen,
     pageVisible,
     pausedByUser,
@@ -2298,6 +2655,71 @@ export default function ReelsClient({
     }
   }
 
+  const changeFeedTab = useCallback(
+    (nextTab: ReelsFeedTab) => {
+      if (nextTab !== 'fyp' && !isAuthenticated) {
+        setAuthPrompt(
+          locale === 'id'
+            ? 'Masuk dulu untuk melihat Reels dari teman atau akun yang kamu ikuti.'
+            : 'Sign in to see Reels from friends or accounts you follow.',
+        );
+        return;
+      }
+
+      setFeedTab(nextTab);
+      setActiveIndex(0);
+      setPausedByUser(false);
+      setPlaybackError(null);
+      window.requestAnimationFrame(() => {
+        containerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+      });
+    },
+    [isAuthenticated, locale],
+  );
+
+  const resetRecommendations = useCallback(() => {
+    const next = emptyProfile();
+    setProfile(next);
+    writeProfile(next);
+    setSearchContextQuery('');
+    notify({
+      title: locale === 'id' ? 'Rekomendasi direset' : 'Recommendations reset',
+      description:
+        locale === 'id'
+          ? 'FYP akan belajar lagi dari tontonan dan interaksi berikutnya.'
+          : 'For You will learn again from your next watches and interactions.',
+      variant: 'success',
+    });
+  }, [locale, notify]);
+
+  const openStoreFromReel = useCallback(
+    (reel: LajukanReel) => {
+      const business = getReelBusinessPresentation(reel);
+      if (!business.href) {
+        recordSignal(reel, 'detail', { source: 'store_cta_fallback' });
+        setDetailReel(reel);
+        return;
+      }
+      recordSignal(reel, 'store', {
+        source: 'reel_business_cta',
+        store_name: business.name || undefined,
+      });
+      const storeHref = localizedHref(locale, business.href);
+      void trackLajukanEvent('reels.marketplace_clicked', {
+        entityType: 'reel',
+        entityId: reel.id,
+        page: storeHref,
+        properties: {
+          source: 'reel_business_cta',
+          target_type: 'store',
+          target_href: storeHref,
+        },
+      });
+      router.push(storeHref);
+    },
+    [locale, recordSignal, router],
+  );
+
   const openSearchOverlay = (seed = activeSearchQuery) => {
     setSearchSeed(seed);
     setSearchOpen(true);
@@ -2325,15 +2747,30 @@ export default function ReelsClient({
 
   return (
     <main
-      className="ui-layer-header fixed inset-x-0 top-[var(--app-viewport-offset-top)] isolate h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-0 overflow-hidden bg-[#090909] text-white"
+      className="ui-layer-header fixed inset-x-0 bottom-0 top-[var(--app-viewport-offset-top)] isolate min-h-0 w-full min-w-0 overflow-hidden overscroll-none bg-[#090909] text-white [touch-action:pan-y]"
       data-reels-performance={performanceProfile.tier}
     >
       <div className="relative h-full min-h-0 w-full overflow-hidden bg-[#090909]">
-        <div className="relative h-full min-h-0 min-w-0 overflow-hidden bg-[#090909]">
-          <div className="relative mx-auto h-full min-h-0 w-full max-w-[520px] overflow-hidden bg-black shadow-[0_0_70px_rgba(0,0,0,0.38)] sm:border-x sm:border-white/10">
+        <div className="relative mx-auto grid h-full min-h-0 w-full min-w-0 grid-cols-1 overflow-hidden bg-[#090909] sm:max-w-[560px] sm:justify-center xl:max-w-[1040px] xl:grid-cols-[220px_minmax(0,600px)] 2xl:max-w-[1380px] 2xl:grid-cols-[240px_minmax(0,620px)_360px]">
+          <ReelsDesktopSidebar
+            locale={locale}
+            feedTab={feedTab}
+            learnedTerms={learnedTerms}
+            muted={muted}
+            displayName={displayName}
+            onFeedTabChange={changeFeedTab}
+            onToggleSound={toggleSound}
+            onOpenSearch={openSearchOverlay}
+            onOpenUpload={requestUpload}
+            onResetRecommendations={resetRecommendations}
+          />
+
+          <section className="relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-black sm:border-x sm:border-white/10 lg:w-full">
             <ReelsTopBar
               locale={locale}
               searchQuery={activeSearchQuery}
+              feedTab={feedTab}
+              onFeedTabChange={changeFeedTab}
               onOpenSearch={() => openSearchOverlay(activeSearchQuery)}
               onOpenUpload={requestUpload}
             />
@@ -2343,11 +2780,16 @@ export default function ReelsClient({
               onScroll={handleScroll}
               onKeyDown={handleReelsKeyDown}
               tabIndex={0}
-              className="h-full min-h-0 max-h-full snap-y snap-mandatory overflow-y-auto overscroll-contain scroll-smooth outline-none motion-reduce:scroll-auto [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden"
+              aria-label={
+                locale === 'id'
+                  ? 'Feed Reels Lajukan. Gunakan panah atas dan bawah untuk berpindah video.'
+                  : 'Lajukan Reels feed. Use up and down arrows to move between videos.'
+              }
+              className="h-full min-h-0 max-h-full w-full min-w-0 snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-y-none outline-none [scroll-behavior:auto] [scrollbar-width:none] [touch-action:pan-y] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
             >
-              {items.length > 0 ? (
+              {visibleItems.length > 0 ? (
                 <>
-                  {items.map((reel, index) => (
+                  {visibleItems.map((reel, index) => (
                     <ReelSlide
                       key={reel.id}
                       locale={locale}
@@ -2361,18 +2803,13 @@ export default function ReelsClient({
                       muted={muted}
                       soundUnlocked={soundUnlocked}
                       paused={pausedByUser && index === activeIndex}
-                      buffering={
-                        bufferingId === reel.id && index === activeIndex
-                      }
+                      buffering={bufferingId === reel.id && index === activeIndex}
                       actionState={
                         actionsByReel[reel.id] || EMPTY_REEL_ACTION_STATE
                       }
                       setVideoRef={node => {
-                        if (node) {
-                          videoRefs.current[reel.id] = node;
-                        } else {
-                          delete videoRefs.current[reel.id];
-                        }
+                        if (node) videoRefs.current[reel.id] = node;
+                        else delete videoRefs.current[reel.id];
                       }}
                       onWaiting={() => {
                         if (index === activeIndex) setBufferingId(reel.id);
@@ -2393,6 +2830,7 @@ export default function ReelsClient({
                       }}
                       onTogglePlay={toggleCurrentVideo}
                       onToggleSound={toggleSound}
+                      onOpenCreatorProfile={() => setCreatorProfileReel(reel)}
                       onOpenDetail={() => {
                         recordSignal(reel, 'detail');
                         setDetailReel(reel);
@@ -2402,6 +2840,7 @@ export default function ReelsClient({
                         recordSignal(reel, 'product');
                         setProductReel(reel);
                       }}
+                      onOpenStore={() => openStoreFromReel(reel)}
                       onOpenShare={() => openShareSheet(reel)}
                       onOpenActions={() => setActionsReel(reel)}
                       onAction={(action, active) =>
@@ -2412,12 +2851,10 @@ export default function ReelsClient({
                   {hasEndSlide ? (
                     <ReelsEndSlide
                       locale={locale}
-                      totalCount={items.length}
+                      totalCount={visibleItems.length}
                       learnedTerms={learnedTerms}
                       onRestart={() => scrollToIndex(0)}
-                      onSearch={(seed?: string) =>
-                        openSearchOverlay(seed ?? '')
-                      }
+                      onSearch={(seed?: string) => openSearchOverlay(seed ?? '')}
                       onUpload={requestUpload}
                     />
                   ) : null}
@@ -2425,6 +2862,8 @@ export default function ReelsClient({
               ) : (
                 <ReelsEmptyState
                   locale={locale}
+                  feedTab={feedTab}
+                  onGoFyp={() => changeFeedTab('fyp')}
                   onUpload={requestUpload}
                   onSearch={() => openSearchOverlay('')}
                 />
@@ -2437,7 +2876,48 @@ export default function ReelsClient({
               error={playbackError || loadError}
               onRetry={retryCurrentVideo}
             />
-          </div>
+          </section>
+
+          <ReelsDesktopInfoSidebar
+            locale={locale}
+            reel={activeReel}
+            actionState={
+              activeReel
+                ? actionsByReel[activeReel.id] || EMPTY_REEL_ACTION_STATE
+                : EMPTY_REEL_ACTION_STATE
+            }
+            commentsBucket={
+              activeReel ? commentsByReel[activeReel.id] : undefined
+            }
+            chatBusy={chatBusyReelId === activeReel?.id}
+            onOpenDetail={() => {
+              if (!activeReel) return;
+              recordSignal(activeReel, 'detail');
+              setDetailReel(activeReel);
+            }}
+            onOpenComments={() => activeReel && openComments(activeReel)}
+            onOpenProduct={() => {
+              if (!activeReel) return;
+              recordSignal(activeReel, 'product');
+              setProductReel(activeReel);
+            }}
+            onOpenStore={() => activeReel && openStoreFromReel(activeReel)}
+            onOpenShare={() => activeReel && openShareSheet(activeReel)}
+            onOpenCreatorProfile={() =>
+              activeReel && setCreatorProfileReel(activeReel)
+            }
+            onMessageCreator={() =>
+              activeReel ? void startChatFromReel(activeReel) : undefined
+            }
+            onSave={() =>
+              activeReel ? void handleReelAction(activeReel, 'save') : undefined
+            }
+            onFollow={() =>
+              activeReel ? void handleReelAction(activeReel, 'follow') : undefined
+            }
+            onOpenUpload={requestUpload}
+            onOpenSearch={() => openSearchOverlay(activeSearchQuery)}
+          />
         </div>
 
         <SearchOverlay
@@ -2453,11 +2933,23 @@ export default function ReelsClient({
           onClose={() => setSearchOpen(false)}
           onLoadMore={() => void loadMore()}
           onSearchIntent={recordSearchIntent}
-          onSignal={recordSignal}
-          onSelect={(index, query) => {
+          onResetRecommendations={resetRecommendations}
+          onSelect={(reelId, query) => {
             setSearchOpen(false);
             setSearchContextQuery(query.trim());
-            scrollToIndex(index);
+            setFeedTab('fyp');
+            const nextIndex = fypItems.findIndex(item => item.id === reelId);
+            const resolvedIndex = Math.max(0, nextIndex);
+            setActiveIndex(resolvedIndex);
+            setPausedByUser(false);
+            window.requestAnimationFrame(() => {
+              const container = containerRef.current;
+              if (!container) return;
+              container.scrollTo({
+                top: resolvedIndex * container.clientHeight,
+                behavior: 'auto',
+              });
+            });
           }}
         />
 
@@ -2540,23 +3032,46 @@ export default function ReelsClient({
         <ProductSheet
           locale={locale}
           reel={productReel}
-          isAuthenticated={isAuthenticated}
+          chatBusy={chatBusyReelId === productReel?.id}
+          onMessageCreator={reel => startChatFromReel(reel)}
+          onOpenListing={(reel, href) => {
+            void trackLajukanEvent('reels.marketplace_clicked', {
+              entityType: 'reel',
+              entityId: reel.id,
+              page: href,
+              properties: {
+                source: 'reels_product_sheet',
+                target_type: 'listing',
+                target_href: href,
+              },
+            });
+          }}
           onClose={() => setProductReel(null)}
-          onRequireLogin={() =>
-            setAuthPrompt('Masuk dulu untuk mulai transaksi dari reels.')
-          }
         />
 
         <ShareSheet
           locale={locale}
           reel={shareReel}
           chatBusy={chatBusyReelId === shareReel?.id}
-          onMessageCreator={reel => void startChatFromReel(reel)}
-          onMessageUser={(userId, reel) => void startChatWithUser(userId, reel)}
+          onMessageCreator={reel => startChatFromReel(reel)}
+          onMessageUser={(userId, reel) => startChatWithUser(userId, reel)}
+          onShareCompleted={(reel, source) =>
+            recordSignal(reel, 'share', { source })
+          }
+          onNotInterested={dismissNotInterestedReel}
+          onRequireLogin={() => {
+            setShareReel(null);
+            setAuthPrompt(
+              locale === 'id'
+                ? 'Masuk dulu untuk melaporkan atau mengatur rekomendasi reels.'
+                : 'Sign in to report or tune reel recommendations.',
+            );
+          }}
           onClose={() => setShareReel(null)}
         />
 
         <MoreActionsSheet
+          locale={locale}
           reel={actionsReel}
           actionState={
             actionsReel
@@ -2583,10 +3098,24 @@ export default function ReelsClient({
             setActionsReel(null);
             openShareSheet(reel);
           }}
+          onWhyRecommended={reel => {
+            setActionsReel(null);
+            setWhyReel(reel);
+          }}
           onMessageCreator={reel => void startChatFromReel(reel)}
           onAction={(reel, action, active) =>
             void handleReelAction(reel, action, active)
           }
+        />
+
+        <WhyRecommendationSheet
+          locale={locale}
+          reel={whyReel}
+          feedTab={feedTab}
+          searchQuery={activeSearchQuery}
+          learnedTerms={learnedTerms}
+          onReset={resetRecommendations}
+          onClose={() => setWhyReel(null)}
         />
 
         <UploadReelSheet
@@ -2624,6 +3153,7 @@ function ReelsDesktopSidebar({
   onToggleSound,
   onOpenSearch,
   onOpenUpload,
+  onResetRecommendations,
 }: {
   locale: string;
   feedTab: ReelsFeedTab;
@@ -2634,7 +3164,9 @@ function ReelsDesktopSidebar({
   onToggleSound: () => void;
   onOpenSearch: (seed?: string) => void;
   onOpenUpload: () => void;
+  onResetRecommendations: () => void;
 }) {
+  const isId = locale === 'id';
   const feedItems: Array<{
     id: ReelsFeedTab;
     label: string;
@@ -2643,21 +3175,21 @@ function ReelsDesktopSidebar({
   }> = [
     {
       id: 'fyp',
-      label: 'Untukmu',
-      helper: 'FYP bisnis yang paling relevan',
+      label: isId ? 'Untukmu' : 'For You',
+      helper: isId ? 'Rekomendasi sesuai minat' : 'Recommendations for you',
       icon: Compass,
     },
     {
-      id: 'friends',
-      label: 'Friend',
-      helper: 'Aktivitas akun yang sering interaksi',
-      icon: Users,
+      id: 'following',
+      label: isId ? 'Mengikuti' : 'Following',
+      helper: isId ? 'Akun yang kamu ikuti' : 'Accounts you follow',
+      icon: UserPlus,
     },
     {
-      id: 'following',
-      label: 'Following',
-      helper: 'Creator dan usaha yang kamu ikuti',
-      icon: UserPlus,
+      id: 'friends',
+      label: isId ? 'Teman' : 'Friends',
+      helper: isId ? 'Konten dari relasi mutual' : 'Content from mutuals',
+      icon: Users,
     },
   ];
   const trendTerms =
@@ -2666,11 +3198,11 @@ function ReelsDesktopSidebar({
       : ['supplier', 'packaging', 'kuliner', 'reseller', 'export', 'cashflow'];
 
   return (
-    <aside className="hidden h-full min-h-0 flex-col border-r border-white/10 bg-[#080808] px-4 py-4 text-white lg:flex xl:px-5">
+    <aside className="hidden h-full min-h-0 flex-col border-r border-white/10 bg-[#080808] px-4 py-4 text-white xl:flex xl:px-5">
       <div className="flex items-center gap-3">
         <Link
           href={`/${locale}/home`}
-          className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-slate-950"
+          className="grid h-11 w-11 place-items-center rounded-[14px] bg-white text-slate-950"
           aria-label="Lajukan home"
           data-testid="reels-home-link"
         >
@@ -2678,8 +3210,8 @@ function ReelsDesktopSidebar({
         </Link>
         <div className="min-w-0">
           <p className="truncate text-base font-bold">Lajukan</p>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/42">
-            Reels
+          <p className="text-[11px] font-semibold text-white/42">
+            {isId ? 'Video usaha & discovery' : 'Business video discovery'}
           </p>
         </div>
       </div>
@@ -2687,35 +3219,27 @@ function ReelsDesktopSidebar({
       <button
         type="button"
         onClick={() => onOpenSearch()}
-        className="mt-5 flex h-12 items-center gap-3 rounded-full bg-white/10 px-4 text-left text-sm font-bold text-white/76 ring-1 ring-white/10 transition hover:bg-white/14"
+        className="mt-5 flex min-h-11 items-center gap-3 rounded-[14px] bg-white/8 px-3.5 text-left text-sm font-semibold text-white/72 ring-1 ring-white/10 transition hover:bg-white/12 hover:text-white"
         data-testid="reels-search-button"
       >
         <Search className="h-4.5 w-4.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">
-          Cari reels, produk, supplier...
+          {isId ? 'Cari video, produk, supplier...' : 'Search videos, products, suppliers...'}
         </span>
       </button>
 
-      <nav className="mt-5 space-y-1.5">
-        <Link
-          href={`/${locale}/home`}
-          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-white/72 transition hover:bg-white/8 hover:text-white"
-        >
-          <Home className="h-5 w-5" />
-          Beranda
-        </Link>
-
+      <nav className="mt-4 space-y-1">
         {feedItems.map(item => {
           const ItemIcon = item.icon;
           const active = feedTab === item.id;
-
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => onFeedTabChange(item.id)}
+              aria-pressed={active}
               className={cn(
-                'flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition',
+                'flex min-h-12 w-full items-center gap-3 rounded-[14px] px-3 text-left transition',
                 active
                   ? 'bg-white text-slate-950'
                   : 'text-white/72 hover:bg-white/8 hover:text-white',
@@ -2723,11 +3247,11 @@ function ReelsDesktopSidebar({
             >
               <span
                 className={cn(
-                  'grid h-10 w-10 shrink-0 place-items-center rounded-full',
-                  active ? 'bg-slate-950 text-white' : 'bg-white/10 text-white',
+                  'grid h-9 w-9 shrink-0 place-items-center rounded-full',
+                  active ? 'bg-slate-950 text-white' : 'bg-white/8 text-white',
                 )}
               >
-                <ItemIcon className="h-5 w-5" />
+                <ItemIcon className="h-4.5 w-4.5" />
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-bold">
@@ -2735,7 +3259,7 @@ function ReelsDesktopSidebar({
                 </span>
                 <span
                   className={cn(
-                    'block truncate text-[11px] font-semibold',
+                    'block truncate text-[11px] font-medium',
                     active ? 'text-slate-500' : 'text-white/38',
                   )}
                 >
@@ -2748,25 +3272,35 @@ function ReelsDesktopSidebar({
 
         <Link
           href={`/${locale}/community`}
-          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-white/72 transition hover:bg-white/8 hover:text-white"
+          className="flex min-h-11 items-center gap-3 rounded-[14px] px-3 text-sm font-semibold text-white/68 transition hover:bg-white/8 hover:text-white"
         >
           <MessageCircle className="h-5 w-5" />
-          Komunitas
+          {isId ? 'Komunitas' : 'Community'}
         </Link>
-
         <Link
           href={`/${locale}/manage/reels`}
-          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-white/72 transition hover:bg-white/8 hover:text-white"
+          className="flex min-h-11 items-center gap-3 rounded-[14px] px-3 text-sm font-semibold text-white/68 transition hover:bg-white/8 hover:text-white"
         >
           <SlidersHorizontal className="h-5 w-5" />
-          Manage Reels
+          {isId ? 'Kelola Reels' : 'Manage Reels'}
         </Link>
       </nav>
 
-      <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-        <div className="flex items-center gap-2 text-sm font-bold">
-          <Sparkles className="h-4 w-4 text-yellow-300" />
-          Lagi relevan
+      <div className="mt-5 border-t border-white/10 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-bold">
+            <Sparkles className="h-4 w-4 shrink-0 text-emerald-300" />
+            <span className="truncate">{isId ? 'Minat yang dipelajari' : 'Learned interests'}</span>
+          </div>
+          {learnedTerms.length > 0 ? (
+            <button
+              type="button"
+              onClick={onResetRecommendations}
+              className="shrink-0 text-[11px] font-bold text-white/45 underline-offset-4 hover:text-white hover:underline"
+            >
+              {isId ? 'Reset' : 'Reset'}
+            </button>
+          ) : null}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {trendTerms.map(term => (
@@ -2774,7 +3308,7 @@ function ReelsDesktopSidebar({
               key={term}
               type="button"
               onClick={() => onOpenSearch(term)}
-              className="rounded-full bg-white/8 px-3 py-1.5 text-[11px] font-bold text-white/70 transition hover:bg-white/14 hover:text-white"
+              className="rounded-full bg-white/7 px-2.5 py-1.5 text-[11px] font-semibold text-white/62 ring-1 ring-white/8 transition hover:bg-white/12 hover:text-white"
             >
               #{term}
             </button>
@@ -2786,37 +3320,35 @@ function ReelsDesktopSidebar({
         <button
           type="button"
           onClick={onOpenUpload}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-400 px-4 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-400/15 transition active:scale-[0.98]"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-sm font-bold text-slate-950 transition active:scale-[0.98]"
           data-testid="reels-upload-button"
         >
           <Camera className="h-4.5 w-4.5" />
-          Buat Reels
+          {isId ? 'Buat Reels' : 'Create Reel'}
         </button>
 
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10">
-              <User className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">{displayName}</p>
-              <p className="truncate text-[11px] font-semibold text-white/40">
-                Mode creator usaha
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onToggleSound}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/8 text-white/75 transition hover:bg-white/14 hover:text-white"
-              aria-label={muted ? 'Nyalakan suara' : 'Matikan suara'}
-            >
-              {muted ? (
-                <VolumeX className="h-4.5 w-4.5" />
-              ) : (
-                <Volume2 className="h-4.5 w-4.5" />
-              )}
-            </button>
+        <div className="flex items-center gap-3 rounded-[14px] bg-white/5 p-3 ring-1 ring-white/8">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/8">
+            <User className="h-4.5 w-4.5" />
           </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold">{displayName}</p>
+            <p className="truncate text-[11px] font-medium text-white/40">
+              {isId ? 'Creator Lajukan' : 'Lajukan creator'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onToggleSound}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/8 text-white/75 transition hover:bg-white/14 hover:text-white"
+            aria-label={muted ? (isId ? 'Nyalakan suara' : 'Turn on sound') : isId ? 'Matikan suara' : 'Mute'}
+          >
+            {muted ? (
+              <VolumeX className="h-4.5 w-4.5" />
+            ) : (
+              <Volume2 className="h-4.5 w-4.5" />
+            )}
+          </button>
         </div>
       </div>
     </aside>
@@ -2832,6 +3364,7 @@ function ReelsDesktopInfoSidebar({
   onOpenDetail,
   onOpenComments,
   onOpenProduct,
+  onOpenStore,
   onOpenShare,
   onOpenCreatorProfile,
   onMessageCreator,
@@ -2848,6 +3381,7 @@ function ReelsDesktopInfoSidebar({
   onOpenDetail: () => void;
   onOpenComments: () => void;
   onOpenProduct: () => void;
+  onOpenStore: () => void;
   onOpenShare: () => void;
   onOpenCreatorProfile: () => void;
   onMessageCreator: () => void;
@@ -2858,7 +3392,7 @@ function ReelsDesktopInfoSidebar({
 }) {
   if (!reel) {
     return (
-      <aside className="hidden h-full min-h-0 flex-col border-l border-white/10 bg-[#080808] text-white lg:flex">
+      <aside className="hidden h-full min-h-0 flex-col border-l border-white/10 bg-[#080808] text-white 2xl:flex">
         <div className="grid min-h-0 flex-1 place-items-center px-5 text-center">
           <div>
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white/10">
@@ -2874,10 +3408,8 @@ function ReelsDesktopInfoSidebar({
     );
   }
 
-  const imageMedia = isImageMediaUrl(reel.videoSrc);
-  const mediaStyle = getReelMediaStyle(reel.filterPreset);
-  const studioEffect = getReelStudioEffect(reel);
   const liveLabel = getLiveLabel(reel);
+  const business = getReelBusinessPresentation(reel);
   const recentComments = commentsBucket?.items.slice(0, 2) ?? [];
   const productHref = reel.productHref
     ? localizedHref(locale, reel.productHref)
@@ -2901,7 +3433,7 @@ function ReelsDesktopInfoSidebar({
   ];
 
   return (
-    <aside className="hidden h-full min-h-0 flex-col border-l border-white/10 bg-[#080808] text-white lg:flex">
+    <aside className="hidden h-full min-h-0 flex-col border-l border-white/10 bg-[#080808] text-white 2xl:flex">
       <div
         className="min-h-0 flex-1 overflow-y-auto px-4 py-4 overscroll-contain xl:px-5"
         data-auto-scrollbar
@@ -2909,7 +3441,7 @@ function ReelsDesktopInfoSidebar({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-yellow-300">
-              Sekarang diputar
+              {locale === 'id' ? 'Sekarang diputar' : 'Now playing'}
             </p>
             <h2 className="mt-1 truncate text-lg font-bold">{reel.title}</h2>
           </div>
@@ -2923,46 +3455,16 @@ function ReelsDesktopInfoSidebar({
           </button>
         </div>
 
-        <div className="relative mt-4 aspect-[16/10] overflow-hidden rounded-[24px] bg-white/8 ring-1 ring-white/10">
-          {imageMedia ? (
-            <img
-              src={reel.videoSrc}
-              alt={reel.title}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={mediaStyle}
-            />
-          ) : (
-            <video
-              src={reel.videoSrc}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={mediaStyle}
-              muted
-              loop
-              playsInline
-              preload="none"
-            />
-          )}
-          <StudioEffectOverlay effect={studioEffect} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/14 to-black/20" />
-          <div className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-bold ">
-            {reel.tag}
-          </div>
-          {liveLabel && (
-            <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-lg shadow-rose-950/20">
-              <Radio className="h-3.5 w-3.5" />
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/58">
+          <span className="rounded-full bg-white/8 px-2.5 py-1 ring-1 ring-white/8">
+            #{reel.tag.replace(/^#/, '')}
+          </span>
+          {liveLabel ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/16 px-2.5 py-1 text-rose-200 ring-1 ring-rose-400/20">
+              <Radio className="h-3 w-3" />
               {liveLabel}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onOpenDetail}
-            className="absolute inset-0 grid place-items-center"
-            aria-label="Lihat detail reels"
-          >
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/18 ">
-              <Play className="h-5 w-5 fill-white" />
             </span>
-          </button>
+          ) : null}
         </div>
 
         <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
@@ -2983,7 +3485,7 @@ function ReelsDesktopInfoSidebar({
                 {reel.creator}
               </Link>
               <p className="truncate text-[11px] font-semibold text-white/42">
-                Creator bisnis dan supplier
+                {locale === 'id' ? 'Creator Lajukan' : 'Lajukan creator'}
               </p>
             </div>
             <button
@@ -3074,19 +3576,19 @@ function ReelsDesktopInfoSidebar({
         </div>
 
         {reel.productName && reel.productPrice ? (
-          <div className="mt-3 rounded-[24px] border border-yellow-300/25 bg-yellow-400 p-4 text-slate-950 shadow-lg shadow-yellow-400/10">
+          <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.06] p-4 text-white">
             <div className="flex items-start gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-yellow-300">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 text-white">
                 <ShoppingBag className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-white/48">
                   Produk terkait
                 </p>
                 <h3 className="mt-1 truncate text-sm font-bold">
                   {reel.productName}
                 </h3>
-                <p className="truncate text-xs font-bold text-slate-700">
+                <p className="truncate text-xs font-bold text-white/48">
                   {reel.productPrice}
                 </p>
               </div>
@@ -3096,14 +3598,14 @@ function ReelsDesktopInfoSidebar({
               <button
                 type="button"
                 onClick={onOpenProduct}
-                className="rounded-2xl bg-slate-950 px-3 py-2.5 text-xs font-bold text-white"
+                className="rounded-[14px] bg-white px-3 py-2.5 text-xs font-bold text-slate-950"
               >
                 Detail
               </button>
               {productHref ? (
                 <Link
                   href={productHref}
-                  className="rounded-2xl bg-white px-3 py-2.5 text-center text-xs font-bold text-slate-950"
+                  className="rounded-[14px] bg-white/10 px-3 py-2.5 text-center text-xs font-bold text-white ring-1 ring-white/10"
                 >
                   Lihat produk
                 </Link>
@@ -3111,21 +3613,44 @@ function ReelsDesktopInfoSidebar({
                 <button
                   type="button"
                   onClick={onOpenProduct}
-                  className="rounded-2xl bg-white px-3 py-2.5 text-xs font-bold text-slate-950"
+                  className="rounded-[14px] bg-white/10 px-3 py-2.5 text-xs font-bold text-white ring-1 ring-white/10"
                 >
                   Lihat produk
                 </button>
               )}
             </div>
           </div>
-        ) : (
-          <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <Info className="h-4.5 w-4.5 text-yellow-300" />
-              Info bisnis
+        ) : business.explicit && business.name ? (
+          <div className="mt-3 rounded-[18px] border border-white/10 bg-white/[0.05] p-4">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-white/10">
+                <Store className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-white/45">Usaha terkait</p>
+                <p className="mt-0.5 truncate text-sm font-bold">{business.name}</p>
+                {business.city ? (
+                  <p className="mt-0.5 truncate text-xs font-medium text-white/45">{business.city}</p>
+                ) : null}
+              </div>
             </div>
-            <p className="mt-1.5 text-xs font-semibold leading-relaxed text-white/48">
-              Reels ini fokus edukasi, tips operasional, atau insight supplier.
+            <button
+              type="button"
+              onClick={onOpenStore}
+              className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[12px] bg-white px-3 text-xs font-bold text-slate-950"
+            >
+              <Store className="h-4 w-4" />
+              Lihat usaha
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-[18px] border border-white/10 bg-white/[0.05] p-4">
+            <div className="flex items-center gap-2 text-sm font-bold">
+              <Info className="h-4.5 w-4.5 text-white/60" />
+              Info Reels
+            </div>
+            <p className="mt-1.5 text-xs font-medium leading-relaxed text-white/48">
+              Video ini belum dihubungkan ke profil usaha atau produk Lajukan.
             </p>
           </div>
         )}
@@ -3142,7 +3667,7 @@ function ReelsDesktopInfoSidebar({
                 className={cn(
                   'flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] px-3 text-xs font-bold transition active:scale-[0.98]',
                   action.featured
-                    ? 'bg-yellow-400 text-slate-950 shadow-lg shadow-yellow-400/10'
+                    ? 'bg-white text-slate-950'
                     : 'bg-white/[0.07] text-white/78 ring-1 ring-white/10 hover:bg-white/12 hover:text-white',
                 )}
               >
@@ -3156,7 +3681,7 @@ function ReelsDesktopInfoSidebar({
         <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-bold">Komentar cepat</p>
+              <p className="text-sm font-bold">{locale === 'id' ? 'Komentar terbaru' : 'Recent comments'}</p>
               <p className="text-[11px] font-semibold text-white/42">
                 {formatCompactMetric(metricCount(reel, 'comments'))} komentar
               </p>
@@ -3228,11 +3753,15 @@ function ReelsDesktopInfoSidebar({
 function ReelsTopBar({
   locale,
   searchQuery,
+  feedTab,
+  onFeedTabChange,
   onOpenSearch,
   onOpenUpload,
 }: {
   locale: string;
   searchQuery: string;
+  feedTab: ReelsFeedTab;
+  onFeedTabChange: (tab: ReelsFeedTab) => void;
   onOpenSearch: () => void;
   onOpenUpload: () => void;
 }) {
@@ -3240,108 +3769,188 @@ function ReelsTopBar({
   const isId = locale === 'id';
   const hasSearchContext = searchQuery.trim().length > 0;
   const handleBack = useAppBack(router, `/${locale}/home`);
+  const tabs: Array<{ id: ReelsFeedTab; idLabel: string; enLabel: string }> = [
+    { id: 'following', idLabel: 'Mengikuti', enLabel: 'Following' },
+    { id: 'fyp', idLabel: 'Untukmu', enLabel: 'For You' },
+    { id: 'friends', idLabel: 'Teman', enLabel: 'Friends' },
+  ];
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/[0.78] via-black/[0.18] to-transparent px-2.5 pb-5 pt-[calc(env(safe-area-inset-top)+7px)] sm:px-3.5">
-      <div className="pointer-events-auto grid h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/85 via-black/35 to-transparent pb-6 pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] pt-[calc(env(safe-area-inset-top)+6px)] sm:pl-[calc(env(safe-area-inset-left)+14px)] sm:pr-[calc(env(safe-area-inset-right)+14px)]">
+      <div className="pointer-events-auto grid min-h-11 min-w-0 grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-1.5">
         <button
           type="button"
           onClick={handleBack}
           aria-label={isId ? 'Kembali' : 'Back'}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.34] font-bold text-white ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-95"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/38 font-bold text-white ring-1 ring-white/12 transition hover:bg-black/55 active:scale-95"
         >
-          <ArrowLeft className="h-[18px] w-[18px]" />
+          <ArrowLeft className="h-[19px] w-[19px]" />
         </button>
 
-        <div className="flex min-w-0 justify-center">
-          {hasSearchContext ? (
-            <button
-              type="button"
-              onClick={onOpenSearch}
-              className="inline-flex h-9 min-w-0 max-w-full items-center gap-1.5 rounded-full bg-black/[0.34] px-3 text-left text-[11px] font-bold text-white/[0.92] ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-[0.98] sm:text-xs"
-            >
-              <Search className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{searchQuery}</span>
-            </button>
-          ) : (
-            <span className="inline-flex h-9 items-center border-b-2 border-white px-2 text-[13px] font-bold text-white">
-              Reels
-            </span>
-          )}
+        <div className="flex min-w-0 items-center justify-center">
+          <div className="inline-flex max-w-full min-w-0 items-center rounded-full bg-black/34 p-1 ring-1 ring-white/10 xl:hidden">
+            {tabs.map(tab => {
+              const active = feedTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => onFeedTabChange(tab.id)}
+                  aria-pressed={active}
+                  className={cn(
+                    'relative min-h-8 min-w-0 rounded-full px-1.5 text-[9px] font-bold transition min-[360px]:px-2 min-[360px]:text-[10px] min-[390px]:px-2.5 min-[390px]:text-[11px]',
+                    active
+                      ? 'bg-white text-slate-950 shadow-sm'
+                      : 'text-white/70 hover:text-white',
+                  )}
+                >
+                  {isId ? tab.idLabel : tab.enLabel}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="hidden h-9 min-w-0 max-w-full items-center gap-1.5 rounded-full bg-black/34 px-3 text-left text-xs font-bold text-white/92 ring-1 ring-white/12 transition hover:bg-black/52 active:scale-[0.98] xl:inline-flex"
+          >
+            {hasSearchContext ? (
+              <>
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{searchQuery}</span>
+              </>
+            ) : (
+              <span>Reels</span>
+            )}
+          </button>
         </div>
 
-        <div className="flex h-10 shrink-0 items-center justify-end gap-1">
+        <div className="flex h-11 min-w-0 shrink-0 items-center justify-end gap-1">
           <Link
             href={`/${locale}/manage/reels`}
             aria-label={isId ? 'Kelola Reels' : 'Manage Reels'}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.34] text-white ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-95"
+            className="hidden h-10 w-10 shrink-0 place-items-center rounded-full bg-black/38 text-white ring-1 ring-white/12 transition hover:bg-black/55 active:scale-95 lg:grid xl:hidden"
           >
-            <SlidersHorizontal className="h-[17px] w-[17px]" />
+            <SlidersHorizontal className="h-[18px] w-[18px]" />
           </Link>
           <button
             type="button"
             onClick={onOpenSearch}
             aria-label={isId ? 'Cari Reels' : 'Search Reels'}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.34] text-white ring-1 ring-white/[0.12] transition hover:bg-black/[0.52] active:scale-95"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/38 text-white ring-1 ring-white/12 transition hover:bg-black/55 active:scale-95 max-[350px]:h-9 max-[350px]:w-9"
           >
-            <Search className="h-[17px] w-[17px]" />
+            <Search className="h-[18px] w-[18px]" />
           </button>
           <button
             type="button"
             onClick={onOpenUpload}
             aria-label={isId ? 'Buat Reels' : 'Create Reels'}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-lg shadow-black/25 transition hover:bg-emerald-100 active:scale-95"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-lg shadow-black/25 transition hover:bg-emerald-100 active:scale-95 max-[350px]:h-9 max-[350px]:w-9"
             data-testid="reels-create-button"
           >
-            <Plus className="h-[18px] w-[18px] stroke-[2.8]" />
+            <Plus className="h-[19px] w-[19px] stroke-[2.8]" />
           </button>
         </div>
       </div>
+
+      {hasSearchContext ? (
+        <div className="pointer-events-auto mt-1.5 flex justify-center lg:hidden">
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="inline-flex max-w-[72vw] items-center gap-1.5 rounded-full bg-black/38 px-2.5 py-1 text-[10px] font-semibold text-white/76 ring-1 ring-white/10"
+          >
+            <Search className="h-3 w-3" />
+            <span className="truncate">{searchQuery}</span>
+          </button>
+        </div>
+      ) : null}
     </header>
   );
 }
 
 function ReelsEmptyState({
   locale,
+  feedTab,
+  onGoFyp,
   onUpload,
   onSearch,
 }: {
   locale: string;
+  feedTab: ReelsFeedTab;
+  onGoFyp: () => void;
   onUpload: () => void;
   onSearch: () => void;
 }) {
   const isId = locale === 'id';
+  const contextual =
+    feedTab === 'following'
+      ? {
+          Icon: UserPlus,
+          title: isId
+            ? 'Belum ada Reels dari akun yang kamu ikuti'
+            : 'No Reels from accounts you follow yet',
+          description: isId
+            ? 'Ikuti creator, supplier, atau usaha yang relevan. Reels mereka akan terkumpul di sini.'
+            : 'Follow relevant creators, suppliers, or businesses. Their Reels will collect here.',
+        }
+      : feedTab === 'friends'
+        ? {
+            Icon: Users,
+            title: isId ? 'Belum ada aktivitas Teman' : 'No Friends activity yet',
+            description: isId
+              ? 'Tab Teman hanya menampilkan konten dari relasi mutual/teman yang tersedia di data sosial Lajukan.'
+              : 'Friends only shows content from mutual/friend relationships available in Lajukan social data.',
+          }
+        : {
+            Icon: Clapperboard,
+            title: isId ? 'Belum ada Reels untuk ditampilkan' : 'No Reels to show yet',
+            description: isId
+              ? 'Coba cari topik lain atau buat Reels usaha pertama dari kamera atau galeri.'
+              : 'Try another topic or create the first business Reel from camera or gallery.',
+          };
+  const EmptyIcon = contextual.Icon;
 
   return (
-    <div className="flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always items-center justify-center px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+4.5rem)] text-center">
-      <div className="w-full max-w-[320px] rounded-[22px] border border-white/10 bg-white/[0.07] p-5 text-white shadow-[0_24px_58px_-36px_rgba(0,0,0,0.85)] ">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-950/20">
-          <Clapperboard className="h-7 w-7" />
+    <div className="flex h-full max-h-full min-h-full snap-start items-center justify-center px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+4.5rem)] text-center">
+      <div className="w-full max-w-[340px] rounded-[22px] border border-white/10 bg-white/[0.07] p-5 text-white shadow-[0_24px_58px_-36px_rgba(0,0,0,0.85)]">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/10 text-white ring-1 ring-white/10">
+          <EmptyIcon className="h-7 w-7" />
         </div>
         <h2 className="mt-4 text-lg font-bold leading-tight">
-          {isId ? 'Belum ada reels untuk ditampilkan' : 'No reels to show yet'}
+          {contextual.title}
         </h2>
-        <p className="mt-2 text-sm font-semibold leading-6 text-white/62">
-          {isId
-            ? 'Coba cari topik lain atau buat reels usaha pertama dari kamera/galeri.'
-            : 'Try another topic or create the first business reel from camera/gallery.'}
+        <p className="mt-2 text-sm font-medium leading-6 text-white/62">
+          {contextual.description}
         </p>
         <div className="mt-4 grid gap-2">
-          <button
-            type="button"
-            onClick={onUpload}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-rose-500 px-4 text-sm font-bold text-white transition active:scale-[0.98]"
-          >
-            <Camera className="h-4.5 w-4.5" />
-            {isId ? 'Buat Reels' : 'Create Reels'}
-          </button>
+          {feedTab !== 'fyp' ? (
+            <button
+              type="button"
+              onClick={onGoFyp}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-sm font-bold text-slate-950 transition active:scale-[0.98]"
+            >
+              <Compass className="h-4.5 w-4.5" />
+              {isId ? 'Buka Untukmu' : 'Open For You'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onUpload}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-sm font-bold text-slate-950 transition active:scale-[0.98]"
+            >
+              <Camera className="h-4.5 w-4.5" />
+              {isId ? 'Buat Reels' : 'Create Reels'}
+            </button>
+          )}
           <button
             type="button"
             onClick={onSearch}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/36 px-4 text-sm font-bold text-white transition active:scale-[0.98]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-white/12 bg-black/36 px-4 text-sm font-bold text-white transition active:scale-[0.98]"
           >
             <Search className="h-4.5 w-4.5" />
-            {isId ? 'Cari reels' : 'Search reels'}
+            {isId ? 'Cari Reels' : 'Search Reels'}
           </button>
         </div>
       </div>
@@ -3371,7 +3980,7 @@ function ReelsEndSlide({
       : ['supplier', 'kuliner', 'packaging', 'cashflow', 'reseller', 'promo'];
 
   return (
-    <article className="relative h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_34%),linear-gradient(180deg,#f8fafc_0%,#f6f9f4_46%,#eef2ff_100%)] text-slate-900">
+    <article className="relative h-full max-h-full min-h-full snap-start overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_34%),linear-gradient(180deg,#f8fafc_0%,#f6f9f4_46%,#eef2ff_100%)] text-slate-900">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.6)_0%,rgba(255,255,255,0.16)_42%,rgba(255,255,255,0.38)_100%)]" />
 
       <div
@@ -3551,9 +4160,11 @@ function ReelSlide({
   onTogglePlay,
   onToggleSound,
   actionState,
+  onOpenCreatorProfile,
   onOpenDetail,
   onOpenComments,
   onOpenProduct,
+  onOpenStore,
   onOpenShare,
   onOpenActions,
   onAction,
@@ -3574,9 +4185,11 @@ function ReelSlide({
   onTogglePlay: () => void;
   onToggleSound: () => void;
   actionState: ReelActionState;
+  onOpenCreatorProfile: () => void;
   onOpenDetail: () => void;
   onOpenComments: () => void;
   onOpenProduct: () => void;
+  onOpenStore: () => void;
   onOpenShare: () => void;
   onOpenActions: () => void;
   onAction: (action: ReelUserAction, active?: boolean) => void;
@@ -3584,17 +4197,78 @@ function ReelSlide({
   const mediaStyle = getReelMediaStyle(reel.filterPreset);
   const studioEffect = getReelStudioEffect(reel);
   const liveLabel = getLiveLabel(reel);
+  const musicLabel = getReelMusicLabel(reel);
+  const business = getReelBusinessPresentation(reel);
+  const locationLabel =
+    readReelMetadataText(reel, 'location', 'location_name', 'locationName') ||
+    business.city;
+  const disclosureLabel = readReelMetadataBoolean(
+    reel,
+    'promotionalContent',
+    'promotional_content',
+  )
+    ? locale === 'id'
+      ? 'Promosi'
+      : 'Promotional'
+    : readReelMetadataBoolean(reel, 'aiGenerated', 'ai_generated')
+      ? locale === 'id'
+        ? 'Dibuat dengan AI'
+        : 'Made with AI'
+      : '';
   const [mediaFit, setMediaFit] = useState<'cover' | 'contain'>('cover');
+  const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [likeBurst, setLikeBurst] = useState(false);
+  const lastTapAtRef = useRef(0);
+  const tapTimerRef = useRef<number | null>(null);
+  const likeBurstTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (tapTimerRef.current !== null) window.clearTimeout(tapTimerRef.current);
+      if (likeBurstTimerRef.current !== null) {
+        window.clearTimeout(likeBurstTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleMediaTap = () => {
+    const now = Date.now();
+    const isDoubleTap = now - lastTapAtRef.current <= 290;
+
+    if (isDoubleTap) {
+      if (tapTimerRef.current !== null) {
+        window.clearTimeout(tapTimerRef.current);
+        tapTimerRef.current = null;
+      }
+      lastTapAtRef.current = 0;
+      onAction('like', true);
+      setLikeBurst(true);
+      if (likeBurstTimerRef.current !== null) {
+        window.clearTimeout(likeBurstTimerRef.current);
+      }
+      likeBurstTimerRef.current = window.setTimeout(() => {
+        setLikeBurst(false);
+        likeBurstTimerRef.current = null;
+      }, 650);
+      return;
+    }
+
+    lastTapAtRef.current = now;
+    tapTimerRef.current = window.setTimeout(() => {
+      tapTimerRef.current = null;
+      onTogglePlay();
+    }, 235);
+  };
 
   if (!shouldLoad) {
     return (
       <article
-        className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden bg-black px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-2 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
+        className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden bg-black pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[calc(env(safe-area-inset-left)+12px)] pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
         style={REEL_SLIDE_PLACEHOLDER_STYLE}
         aria-hidden="true"
       >
         <div className="absolute inset-0 bg-[#050505]" />
-        <div className="relative z-10 mt-auto min-w-0 flex-1 pr-[58px] opacity-0 sm:pr-[70px]">
+        <div className="relative z-10 mt-auto min-w-0 flex-1 pr-[64px] opacity-0">
           <h1 className="line-clamp-2 text-[16px] font-bold leading-tight">
             {reel.title}
           </h1>
@@ -3605,8 +4279,9 @@ function ReelSlide({
 
   return (
     <article
-      className="relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] min-h-[var(--app-visual-viewport-height)] snap-start snap-always overflow-hidden !bg-black !text-white px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:px-2 sm:pb-[calc(env(safe-area-inset-bottom)+14px)]"
+      className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden !bg-black !text-white pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[calc(env(safe-area-inset-left)+12px)] pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
       style={REEL_SLIDE_LOADED_STYLE}
+      data-reel-id={reel.id}
     >
       <video
         ref={setVideoRef}
@@ -3639,6 +4314,15 @@ function ReelSlide({
               ? video.videoWidth / video.videoHeight
               : 9 / 16;
           setMediaFit(aspect > 0.68 || aspect < 0.46 ? 'contain' : 'cover');
+          setPlaybackProgress(0);
+        }}
+        onTimeUpdate={event => {
+          if (!active) return;
+          const video = event.currentTarget;
+          if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+          setPlaybackProgress(
+            Math.min(100, Math.max(0, (video.currentTime / video.duration) * 100)),
+          );
         }}
         onWaiting={onWaiting}
         onPlaying={onPlaying}
@@ -3649,27 +4333,27 @@ function ReelSlide({
 
       <button
         type="button"
-        onClick={onTogglePlay}
-        className="absolute inset-0 z-10"
+        onClick={handleMediaTap}
+        className="absolute inset-0 z-10 cursor-default"
         aria-label={
           paused
             ? locale === 'id'
-              ? 'Putar video'
-              : 'Play video'
+              ? 'Putar video. Ketuk dua kali untuk suka.'
+              : 'Play video. Double tap to like.'
             : locale === 'id'
-              ? 'Jeda video'
-              : 'Pause video'
+              ? 'Jeda video. Ketuk dua kali untuk suka.'
+              : 'Pause video. Double tap to like.'
         }
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/[0.88] via-black/[0.12] to-black/[0.24]" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-black/30" />
 
-      {liveLabel && (
-        <div className="absolute left-3 top-[calc(env(safe-area-inset-top)+52px)] z-20 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-bold text-white shadow-lg shadow-rose-950/25 sm:left-4">
+      {liveLabel ? (
+        <div className="absolute left-3 top-[calc(env(safe-area-inset-top)+58px)] z-20 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg shadow-black/25 sm:left-4">
           <Radio className="h-3.5 w-3.5" />
           {liveLabel}
         </div>
-      )}
+      ) : null}
 
       <ActionRail
         locale={locale}
@@ -3677,95 +4361,126 @@ function ReelSlide({
         actionState={actionState}
         onOpenComments={onOpenComments}
         onOpenShare={onOpenShare}
+        onOpenActions={onOpenActions}
         onAction={onAction}
       />
 
-      {buffering && (
+      {likeBurst ? (
         <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
-          <div className="grid h-16 w-16 place-items-center rounded-full bg-black/[0.35] ">
-            <Loader2 className="h-8 w-8 animate-spin" />
+          <Heart className="h-24 w-24 fill-white text-white drop-shadow-[0_10px_28px_rgba(0,0,0,0.38)] animate-[ping_650ms_ease-out_1]" />
+        </div>
+      ) : null}
+
+      {buffering ? (
+        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-black/40 ring-1 ring-white/10">
+            <Loader2 className="h-7 w-7 animate-spin" />
           </div>
         </div>
-      )}
+      ) : null}
 
-      {paused && active && !buffering && (
+      {paused && active && !buffering ? (
         <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
-          <div className="grid h-20 w-20 place-items-center rounded-full bg-white/20 ">
-            <Play className="h-9 w-9 fill-white" />
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-black/38 ring-1 ring-white/16">
+            <Play className="h-7 w-7 fill-white" />
           </div>
         </div>
-      )}
+      ) : null}
 
-      {active && muted && !soundUnlocked && !buffering && (
+      {active && muted && !soundUnlocked && !buffering ? (
         <button
           type="button"
           onClick={event => {
             event.stopPropagation();
             onToggleSound();
           }}
-          className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+55px)] z-40 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/[0.48] px-2.5 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/[0.14] transition active:scale-95"
+          className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+58px)] z-40 inline-flex min-h-9 -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/52 px-3 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/14 transition active:scale-95"
         >
           <Volume2 className="h-3.5 w-3.5" />
           {locale === 'id' ? 'Nyalakan suara' : 'Turn on sound'}
         </button>
-      )}
+      ) : null}
 
-      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 px-3 pb-[calc(env(safe-area-inset-bottom)+13px)] pr-[62px] text-white sm:px-2 sm:pr-[68px]">
+      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[max(10px,env(safe-area-inset-left))] pr-[calc(env(safe-area-inset-right)+66px)] text-white min-[390px]:pl-[max(12px,env(safe-area-inset-left))] min-[390px]:pr-[calc(env(safe-area-inset-right)+72px)] sm:pl-[max(16px,env(safe-area-inset-left))] sm:pr-[calc(env(safe-area-inset-right)+80px)]">
         <div className="flex min-w-0 items-center gap-1.5">
           <button
             type="button"
-            onClick={onOpenDetail}
-            className="min-w-0 truncate text-left text-[14px] font-bold drop-shadow"
+            onClick={onOpenCreatorProfile}
+            className="min-h-8 min-w-0 truncate text-left text-[14px] font-extrabold drop-shadow"
           >
             @{reel.creator}
           </button>
-          <span className="h-1 w-1 shrink-0 rounded-full bg-white/50" />
-          <span className="min-w-0 truncate text-[10px] font-bold text-white/[0.72]">
-            #{reel.tag.replace(/^#/, '')}
-          </span>
-          <button
-            type="button"
-            onClick={onOpenActions}
-            className="ml-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/30 text-white ring-1 ring-white/10 transition active:scale-95"
-            aria-label={locale === 'id' ? 'Aksi lainnya' : 'More actions'}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
+          {locationLabel ? (
+            <>
+              <span className="h-1 w-1 shrink-0 rounded-full bg-white/50" />
+              <span className="inline-flex min-w-0 items-center gap-1 truncate text-[10px] font-semibold text-white/68">
+                <MapPin className="h-3 w-3 shrink-0" />
+                <span className="truncate">{locationLabel}</span>
+              </span>
+            </>
+          ) : null}
+          {disclosureLabel ? (
+            <>
+              <span className="h-1 w-1 shrink-0 rounded-full bg-white/50" />
+              <span className="shrink-0 rounded-full bg-white/12 px-1.5 py-0.5 text-[9px] font-bold text-white/72 ring-1 ring-white/10">
+                {disclosureLabel}
+              </span>
+            </>
+          ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenDetail}
-          className="mt-1 block max-w-full text-left"
-        >
-          <h1 className="line-clamp-1 text-[14px] font-bold leading-5 drop-shadow">
-            {reel.title}
-          </h1>
-        </button>
-
-        <div className="mt-0.5 text-[12px] font-medium leading-[18px] text-white/[0.88] drop-shadow sm:text-[13px]">
+        <div className="mt-0.5 text-[12px] font-medium leading-[18px] text-white/92 drop-shadow sm:text-[13px]">
           <ExpandableCaption
-            text={reel.caption}
-            maxLength={76}
+            text={
+              reel.caption.toLowerCase().includes(`#${reel.tag.replace(/^#/, '').toLowerCase()}`)
+                ? reel.caption
+                : `${reel.caption}${reel.caption.trim() ? ' ' : ''}#${reel.tag.replace(/^#/, '')}`
+            }
+            maxLength={112}
             locale={locale}
           />
         </div>
+
+        {musicLabel ? (
+          <div className="mt-1 flex max-w-[90%] items-center gap-1.5 text-[10px] font-semibold text-white/74">
+            <Music className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{musicLabel}</span>
+          </div>
+        ) : null}
 
         {reel.productName ? (
           <button
             type="button"
             onClick={onOpenProduct}
-            className="mt-2 inline-flex h-9 max-w-full items-center gap-2 rounded-lg bg-white/[0.94] px-2.5 text-left text-[11px] font-bold text-slate-950 shadow-lg ring-1 ring-white/70 transition active:scale-[0.98]"
+            className="mt-2 inline-flex min-h-10 max-w-full items-center gap-2 rounded-[12px] bg-white/95 px-3 text-left text-[11px] font-bold text-slate-950 shadow-lg ring-1 ring-white/60 transition active:scale-[0.98]"
           >
             <ShoppingBag className="h-4 w-4 shrink-0 text-emerald-700" />
             <span className="min-w-0 truncate">{reel.productName}</span>
             {reel.productPrice ? (
-              <span className="shrink-0 text-[10px] text-slate-600">
+              <span className="shrink-0 text-[10px] font-semibold text-slate-600">
                 {reel.productPrice}
               </span>
             ) : null}
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+          </button>
+        ) : business.explicit && business.name ? (
+          <button
+            type="button"
+            onClick={onOpenStore}
+            className="mt-2 inline-flex min-h-10 max-w-full items-center gap-2 rounded-[12px] bg-black/46 px-3 text-left text-[11px] font-bold text-white ring-1 ring-white/18 transition active:scale-[0.98]"
+          >
+            <Store className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 truncate">{business.name}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/56" />
           </button>
         ) : null}
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[2px] bg-white/12">
+        <div
+          className="h-full bg-white transition-[width] duration-100 ease-linear"
+          style={{ width: `${playbackProgress}%` }}
+        />
       </div>
     </article>
   );
@@ -3800,7 +4515,7 @@ function ExpandableCaption({
             ? ' lebih sedikit'
             : ' less'
           : locale === 'id'
-            ? ' lainnya'
+            ? ' selengkapnya'
             : ' more'}
       </button>
     </p>
@@ -3813,6 +4528,7 @@ function ActionRail({
   actionState,
   onOpenComments,
   onOpenShare,
+  onOpenActions,
   onAction,
 }: {
   locale: string;
@@ -3820,10 +4536,14 @@ function ActionRail({
   actionState: ReelActionState;
   onOpenComments: () => void;
   onOpenShare: () => void;
+  onOpenActions: () => void;
   onAction: (action: ReelUserAction, active?: boolean) => void;
 }) {
   const isId = locale === 'id';
   const profileHref = buildReelCreatorProfileHref(locale, reel);
+  const commentsDisabled =
+    reel.metadata?.allowComments === false ||
+    reel.metadata?.allow_comments === false;
   const actions: Array<{
     key: string;
     label?: string;
@@ -3831,6 +4551,7 @@ function ActionRail({
     icon: LucideIcon;
     active?: boolean;
     loading?: boolean;
+    disabled?: boolean;
     onClick: () => void;
   }> = [
     {
@@ -3845,9 +4566,16 @@ function ActionRail({
     {
       key: 'comments',
       label: formatCompactMetric(metricCount(reel, 'comments')),
-      ariaLabel: isId ? 'Buka komentar' : 'Open comments',
+      ariaLabel: commentsDisabled
+        ? isId
+          ? 'Komentar dinonaktifkan'
+          : 'Comments are disabled'
+        : isId
+          ? 'Buka komentar'
+          : 'Open comments',
       icon: MessageCircle,
-      onClick: onOpenComments,
+      disabled: commentsDisabled,
+      onClick: commentsDisabled ? () => undefined : onOpenComments,
     },
     {
       key: 'save',
@@ -3870,10 +4598,16 @@ function ActionRail({
       icon: Forward,
       onClick: onOpenShare,
     },
+    {
+      key: 'more',
+      ariaLabel: isId ? 'Lainnya' : 'More',
+      icon: MoreHorizontal,
+      onClick: onOpenActions,
+    },
   ];
 
   return (
-    <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+88px)] right-1.5 z-30 flex flex-col items-center gap-1.5 sm:right-2.5">
+    <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+82px)] right-[max(6px,env(safe-area-inset-right))] z-30 flex origin-bottom-right flex-col items-center gap-1.5 sm:right-[calc(env(safe-area-inset-right)+10px)] max-[370px]:scale-[0.9]">
       <div className="relative mb-1.5 flex h-[50px] w-[50px] items-center justify-center">
         <Link
           href={profileHref}
@@ -3905,7 +4639,7 @@ function ActionRail({
                 : 'Follow creator'
           }
           className={cn(
-            'absolute -bottom-1 left-1/2 z-20 flex !h-6 !max-h-6 !min-h-0 !w-6 !min-w-0 !max-w-6 -translate-x-1/2 items-center justify-center rounded-full p-0 !text-white shadow-lg shadow-black/45 transition active:scale-95 disabled:opacity-60',
+            'absolute -bottom-1 left-1/2 z-20 flex !h-7 !max-h-7 !min-h-0 !w-7 !min-w-0 !max-w-7 -translate-x-1/2 items-center justify-center rounded-full p-0 !text-white shadow-lg shadow-black/45 transition active:scale-95 disabled:opacity-60',
             actionState.followed ? '!bg-emerald-500' : '!bg-[#ff2d55]',
           )}
         >
@@ -3927,15 +4661,15 @@ function ActionRail({
             key={action.key}
             type="button"
             onClick={action.onClick}
-            disabled={action.loading}
+            disabled={action.loading || action.disabled}
             aria-label={action.ariaLabel}
             title={action.ariaLabel}
-            className="flex max-w-[44px] flex-col items-center gap-0.5 transition active:scale-95"
+            className="flex max-w-[48px] flex-col items-center gap-0.5 transition active:scale-95 disabled:opacity-45"
             data-testid={`reels-action-${action.key}`}
           >
             <span
               className={cn(
-                '!grid !h-10 !w-10 place-items-center rounded-full !bg-black/[0.32] !text-white shadow-md shadow-black/25 ring-1 ring-white/10 transition',
+                '!grid !h-11 !w-11 place-items-center rounded-full !bg-black/[0.32] !text-white shadow-md shadow-black/25 ring-1 ring-white/10 transition',
                 action.key === 'like' && action.active && '!text-rose-500',
                 action.key === 'save' && action.active && '!text-yellow-300',
               )}
@@ -3979,7 +4713,7 @@ function SearchOverlay({
   onClose,
   onLoadMore,
   onSearchIntent,
-  onSignal,
+  onResetRecommendations,
   onSelect,
 }: {
   open: boolean;
@@ -3993,8 +4727,8 @@ function SearchOverlay({
   onClose: () => void;
   onLoadMore: () => void;
   onSearchIntent: (query: string) => void;
-  onSignal: (reel: LajukanReel, signal: ReelsSignal) => void;
-  onSelect: (index: number, query: string) => void;
+  onResetRecommendations: () => void;
+  onSelect: (reelId: string, query: string) => void;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const {
@@ -4092,9 +4826,9 @@ function SearchOverlay({
   if (!open) return null;
 
   return (
-    <section className="ui-layer-header fixed inset-0 flex min-h-0 flex-col bg-[#050505] text-white">
-      <header className="shrink-0 border-b border-white/10 bg-black/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] ">
-        <div className="mx-auto flex w-full max-w-[1440px] items-center gap-3">
+    <section className="ui-layer-header fixed inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050505] text-white">
+      <header className="shrink-0 border-b border-white/10 bg-black/95 pb-3 pl-[calc(env(safe-area-inset-left)+12px)] pr-[calc(env(safe-area-inset-right)+12px)] pt-[calc(env(safe-area-inset-top)+10px)] sm:pb-4 sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]">
+        <div className="mx-auto flex w-full min-w-0 max-w-[1440px] items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -4164,18 +4898,26 @@ function SearchOverlay({
           })}
         </div>
 
-        <div className="mx-auto mt-3 flex w-full max-w-[1440px] items-center gap-2 rounded-2xl bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/60 ring-1 ring-white/10">
-          <Sparkles className="h-3.5 w-3.5 shrink-0 text-yellow-300" />
-          <span className="truncate">
-            AI For You memprioritaskan hasil dari keyword, watch time, like,
-            simpan, share, dan produk yang kamu buka.
+        <div className="mx-auto mt-3 flex w-full max-w-[1440px] items-center gap-2 rounded-[14px] bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/60 ring-1 ring-white/10">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+          <span className="min-w-0 flex-1 truncate">
+            Watch time, like, simpan, share, pencarian, dan buka produk membantu menyesuaikan Untukmu.
           </span>
+          {learnedTerms.length > 0 ? (
+            <button
+              type="button"
+              onClick={onResetRecommendations}
+              className="shrink-0 font-bold text-white/72 underline-offset-4 hover:text-white hover:underline"
+            >
+              Reset
+            </button>
+          ) : null}
         </div>
       </header>
 
       <div
         onScroll={handleResultsScroll}
-        className="min-h-0 flex-1 overflow-y-auto px-3 pb-8 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-5"
+        className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+24px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:pl-[calc(env(safe-area-inset-left)+20px)] sm:pr-[calc(env(safe-area-inset-right)+20px)]"
       >
         <div className="mx-auto w-full max-w-[1440px]">
           <div className="mb-4 flex items-end justify-between gap-4">
@@ -4194,15 +4936,12 @@ function SearchOverlay({
           </div>
 
           {results.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+            <div className="grid min-w-0 grid-cols-2 gap-2 min-[480px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
               {results.map(({ item, index }) => (
                 <SearchVideoCard
                   key={item.id}
                   reel={item}
-                  onClick={() => {
-                    onSignal(item, 'watch');
-                    onSelect(index, query);
-                  }}
+                  onClick={() => onSelect(item.id, query)}
                 />
               ))}
             </div>
@@ -4287,7 +5026,7 @@ function SearchVideoCard({
           video.currentTime = 0;
         }
       }}
-      className="group relative aspect-[9/14] overflow-hidden rounded-2xl bg-white/10 text-left ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:ring-white/20 active:scale-[0.98]"
+      className="group relative min-w-0 aspect-[9/16] overflow-hidden rounded-[18px] bg-white/10 text-left ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:ring-white/20 active:scale-[0.98] sm:rounded-2xl"
     >
       <video
         src={reel.videoSrc}
@@ -4394,7 +5133,7 @@ function DetailOverlay({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/68 p-0 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 "
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/68 p-0 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
@@ -4405,9 +5144,9 @@ function DetailOverlay({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[30px] bg-[#080808] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[460px] lg:rounded-none lg:border-l lg:border-white/10">
+      <section className="relative flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[30px] bg-[#080808] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[620px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[440px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/24 lg:hidden" />
-        <div className="relative min-h-[180px] max-h-[min(calc(var(--app-viewport-height)-20rem),340px)] overflow-hidden bg-black lg:min-h-[220px] lg:max-h-[260px]">
+        <div className="relative h-[clamp(180px,34dvh,340px)] shrink-0 overflow-hidden bg-black lg:h-[260px]">
           {imageMedia ? (
             <img
               src={reel.videoSrc}
@@ -4694,7 +5433,7 @@ function CreatorProfileSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white lg:items-center lg:justify-center"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white sm:items-center sm:justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -4705,7 +5444,7 @@ function CreatorProfileSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative w-full overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl ring-1 ring-white/10 lg:max-w-[430px] lg:rounded-[24px]">
+      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl ring-1 ring-white/10 sm:max-h-[calc(100dvh-32px)] sm:max-w-[460px] sm:rounded-[24px]">
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">
@@ -4816,16 +5555,23 @@ function ShareSheet({
   chatBusy,
   onMessageCreator,
   onMessageUser,
+  onShareCompleted,
+  onNotInterested,
+  onRequireLogin,
   onClose,
 }: {
   locale: string;
   reel: LajukanReel | null;
   chatBusy: boolean;
-  onMessageCreator: (reel: LajukanReel) => void;
+  onMessageCreator: (reel: LajukanReel) => Promise<void> | void;
   onMessageUser: (userId: string, reel: LajukanReel) => Promise<void> | void;
+  onShareCompleted: (reel: LajukanReel, source: string) => void;
+  onNotInterested: (reelId: string) => void;
+  onRequireLogin: () => void;
   onClose: () => void;
 }) {
-  const { authFetch, user } = useAuth();
+  const { authFetch, isAuthenticated, user } = useAuth();
+  const { notify } = useToast();
   const isId = locale === 'id';
   const [copied, setCopied] = useState(false);
   const [followedIds, setFollowedIds] = useState<string[]>([]);
@@ -4834,6 +5580,14 @@ function ShareSheet({
   const [sendingRecipientId, setSendingRecipientId] = useState<string | null>(
     null,
   );
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] =
+    useState<TrustReportReason>('spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [trustAction, setTrustAction] = useState<'report' | 'hide' | null>(null);
+  const [trustError, setTrustError] = useState('');
+  const [reportReceipt, setReportReceipt] = useState('');
+  const sharedReelRef = useRef<string | null>(null);
   const shareUrl = useMemo(
     () => buildReelShareUrl(locale, reel),
     [locale, reel],
@@ -4849,10 +5603,26 @@ function ShareSheet({
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setCopied(false);
+      setReportOpen(false);
+      setReportReason('spam');
+      setReportDetails('');
+      setTrustAction(null);
+      setTrustError('');
+      setReportReceipt('');
+      sharedReelRef.current = null;
     });
 
     return () => window.cancelAnimationFrame(frame);
   }, [reelId]);
+
+  const markShareCompleted = useCallback(
+    (source: string) => {
+      if (!reel || sharedReelRef.current === reel.id) return;
+      sharedReelRef.current = reel.id;
+      onShareCompleted(reel, source);
+    },
+    [onShareCompleted, reel],
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -5063,17 +5833,150 @@ function ShareSheet({
     if (!shareUrl) return;
 
     try {
-      await navigator.clipboard?.writeText(shareUrl);
-    } catch {}
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      notify({
+        title: isId ? 'Link belum tersalin' : 'Link not copied',
+        description: isId
+          ? 'Izinkan akses clipboard lalu coba lagi.'
+          : 'Allow clipboard access and try again.',
+        variant: 'error',
+      });
+      return;
+    }
 
+    markShareCompleted('copy_link');
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
-  }, [shareUrl]);
+  }, [isId, markShareCompleted, notify, shareUrl]);
 
-  const openExternal = useCallback((url: string) => {
-    if (typeof window === 'undefined') return;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }, []);
+  const submitReport = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!reel || trustAction) return;
+      if (!isAuthenticated) {
+        onRequireLogin();
+        return;
+      }
+
+      setTrustAction('report');
+      setTrustError('');
+      try {
+        const receipt = await submitTrustReport(authFetch, 'reel', reel.id, {
+          reason: reportReason,
+          details: reportDetails,
+        });
+        setReportReceipt(receipt.reportId);
+        void trackLajukanEvent('report.submitted', {
+          entityType: 'reel',
+          entityId: reel.id,
+          properties: {
+            reason: reportReason,
+            source: 'reels_share_sheet',
+            receipt_id: receipt.reportId,
+          },
+        });
+        notify({
+          title: isId ? 'Laporan diterima' : 'Report received',
+          description: `${isId ? 'Nomor laporan' : 'Report ID'}: ${receipt.reportId}`,
+          variant: 'success',
+        });
+      } catch (error) {
+        setTrustError(
+          error instanceof Error
+            ? error.message
+            : isId
+              ? 'Laporan belum terkirim. Coba lagi.'
+              : 'The report was not sent. Try again.',
+        );
+      } finally {
+        setTrustAction(null);
+      }
+    },
+    [
+      authFetch,
+      isAuthenticated,
+      isId,
+      notify,
+      onRequireLogin,
+      reel,
+      reportDetails,
+      reportReason,
+      trustAction,
+    ],
+  );
+
+  const hideAsNotInterested = useCallback(async () => {
+    if (!reel || trustAction) return;
+    if (!isAuthenticated) {
+      onRequireLogin();
+      return;
+    }
+
+    setTrustAction('hide');
+    setTrustError('');
+    try {
+      await markReelNotInterested(authFetch, reel.id);
+      void trackLajukanEvent('reels.not_interested', {
+        entityType: 'reel',
+        entityId: reel.id,
+        properties: { source: 'reels_share_sheet' },
+      });
+      notify({
+        title: isId ? 'Reel disembunyikan' : 'Reel hidden',
+        description: isId
+          ? 'Rekomendasi berikutnya akan menyesuaikan.'
+          : 'Future recommendations will adjust.',
+        variant: 'success',
+      });
+      onNotInterested(reel.id);
+    } catch (error) {
+      setTrustError(
+        error instanceof Error
+          ? error.message
+          : isId
+            ? 'Preferensi belum tersimpan. Coba lagi.'
+            : 'The preference was not saved. Try again.',
+      );
+      setTrustAction(null);
+    }
+  }, [
+    authFetch,
+    isAuthenticated,
+    isId,
+    notify,
+    onNotInterested,
+    onRequireLogin,
+    reel,
+    trustAction,
+  ]);
+
+  const reportReasonLabel = (reason: TrustReportReason) => {
+    const labels: Record<TrustReportReason, [string, string]> = {
+      spam: ['Spam', 'Spam'],
+      scam: ['Penipuan', 'Scam or fraud'],
+      harassment: ['Perundungan', 'Harassment'],
+      hate: ['Ujaran kebencian', 'Hate speech'],
+      sexual: ['Konten seksual', 'Sexual content'],
+      violence: ['Kekerasan', 'Violence'],
+      illegal: ['Barang/aktivitas ilegal', 'Illegal activity'],
+      privacy: ['Pelanggaran privasi', 'Privacy violation'],
+      other: ['Lainnya', 'Other'],
+    };
+    return labels[reason][isId ? 0 : 1];
+  };
+
+  const openExternal = useCallback(
+    (url: string, shareSource?: string) => {
+      if (typeof window === 'undefined') return;
+      if (shareSource) markShareCompleted(shareSource);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    },
+    [markShareCompleted],
+  );
 
   const handleRecipientPress = useCallback(
     async (recipient: ShareSheetRecipient) => {
@@ -5086,12 +5989,20 @@ function ShareSheet({
         } else {
           await Promise.resolve(onMessageCreator(reel));
         }
+        markShareCompleted('internal_message');
         onClose();
       } finally {
         setSendingRecipientId(null);
       }
     },
-    [onClose, onMessageCreator, onMessageUser, reel, sendingRecipientId],
+    [
+      markShareCompleted,
+      onClose,
+      onMessageCreator,
+      onMessageUser,
+      reel,
+      sendingRecipientId,
+    ],
   );
 
   if (!reel) return null;
@@ -5140,27 +6051,22 @@ function ShareSheet({
     onClick: () => void;
   }> = [
     {
-      label: 'Repost',
-      icon: RefreshCcw,
-      className: 'bg-yellow-400 text-white',
-      onClick: () => void copyLink(),
-    },
-    {
       label: 'WhatsApp',
       icon: MessageCircle,
       className: 'bg-[#25D366] text-white',
-      onClick: () => openExternal(`https://wa.me/?text=${encodedText}`),
+      onClick: () =>
+        openExternal(`https://wa.me/?text=${encodedText}`, 'whatsapp'),
     },
     {
-      label: copied ? 'Copied' : 'Copy link',
+      label: copied
+        ? isId
+          ? 'Tersalin'
+          : 'Copied'
+        : isId
+          ? 'Salin link'
+          : 'Copy link',
       icon: Link2,
       className: 'bg-emerald-600 text-white',
-      onClick: () => void copyLink(),
-    },
-    {
-      label: 'Status',
-      icon: Plus,
-      className: 'bg-emerald-500 text-white',
       onClick: () => void copyLink(),
     },
     {
@@ -5170,36 +6076,45 @@ function ShareSheet({
       onClick: () =>
         openExternal(
           `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+          'facebook',
         ),
-    },
-    {
-      label: 'Instagram',
-      icon: Send,
-      className:
-        'bg-gradient-to-br from-emerald-600 via-lime-500 to-orange-400 text-white',
-      onClick: () => void copyLink(),
     },
   ];
   const utilityActions: Array<{
     label: string;
     icon: LucideIcon;
     onClick: () => void;
+    disabled?: boolean;
   }> = [
-    { label: 'Report', icon: Flag, onClick: onClose },
-    { label: 'Not interested', icon: X, onClick: onClose },
     {
-      label: 'Download',
+      label: isId ? 'Laporkan' : 'Report',
+      icon: Flag,
+      onClick: () => {
+        if (!isAuthenticated) {
+          onRequireLogin();
+          return;
+        }
+        setTrustError('');
+        setReportReceipt('');
+        setReportOpen(true);
+      },
+    },
+    {
+      label: isId ? 'Tidak tertarik' : 'Not interested',
+      icon: X,
+      onClick: () => void hideAsNotInterested(),
+      disabled: trustAction === 'hide',
+    },
+    {
+      label: isId ? 'Buka video' : 'Open video',
       icon: Download,
       onClick: () => openExternal(reel.videoSrc),
     },
-    { label: 'Add to Story', icon: Plus, onClick: () => void copyLink() },
-    { label: 'Promote', icon: Megaphone, onClick: onClose },
-    { label: 'Cast', icon: Radio, onClick: onClose },
   ];
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
@@ -5210,15 +6125,27 @@ function ShareSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+      <section className="relative flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[620px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-white">
-            <Search className="h-5 w-5" />
+            {reportOpen ? (
+              <Flag className="h-5 w-5" />
+            ) : (
+              <Search className="h-5 w-5" />
+            )}
           </div>
 
           <div className="min-w-0 flex-1 text-center">
-            <h2 className="text-xl font-bold tracking-[-0.03em]">Send to</h2>
+            <h2 className="text-xl font-bold tracking-[-0.03em]">
+              {reportOpen
+                ? isId
+                  ? 'Laporkan reel'
+                  : 'Report reel'
+                : isId
+                  ? 'Bagikan ke'
+                  : 'Send to'}
+            </h2>
             <p className="truncate text-xs font-semibold text-white/60">
               {reel.title}
             </p>
@@ -5235,6 +6162,111 @@ function ShareSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] sm:px-5 sm:pb-5">
+          {reportOpen ? (
+            <form onSubmit={submitReport} className="space-y-4 py-2">
+              {reportReceipt ? (
+                <div
+                  role="status"
+                  className="rounded-[22px] border border-emerald-400/25 bg-emerald-400/10 p-4 text-center"
+                >
+                  <Check className="mx-auto h-8 w-8 text-emerald-300" />
+                  <p className="mt-2 text-sm font-bold text-white">
+                    {isId ? 'Laporan diterima' : 'Report received'}
+                  </p>
+                  <p className="mt-1 break-all text-xs font-semibold text-white/60">
+                    {isId ? 'Nomor laporan' : 'Report ID'}: {reportReceipt}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setReportOpen(false)}
+                    className="mt-4 min-h-11 rounded-full bg-white px-5 text-sm font-bold text-slate-950"
+                  >
+                    {isId ? 'Selesai' : 'Done'}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <fieldset>
+                    <legend className="text-sm font-bold text-white">
+                      {isId ? 'Alasan laporan' : 'Report reason'}
+                    </legend>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {TRUST_REPORT_REASONS.map(reason => (
+                        <label
+                          key={reason}
+                          className={cn(
+                            'flex min-h-11 cursor-pointer items-center gap-2 rounded-2xl border px-3 text-xs font-semibold',
+                            reportReason === reason
+                              ? 'border-emerald-400 bg-emerald-400/15 text-white'
+                              : 'border-white/10 bg-white/5 text-white/70',
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="reel-report-reason"
+                            value={reason}
+                            checked={reportReason === reason}
+                            onChange={() => setReportReason(reason)}
+                            className="accent-emerald-500"
+                          />
+                          {reportReasonLabel(reason)}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <label className="block text-sm font-bold text-white">
+                    {isId ? 'Keterangan (opsional)' : 'Details (optional)'}
+                    <textarea
+                      value={reportDetails}
+                      onChange={event => setReportDetails(event.target.value)}
+                      maxLength={1000}
+                      rows={3}
+                      className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-medium text-white outline-none placeholder:text-white/35 focus:border-emerald-400"
+                      placeholder={
+                        isId
+                          ? 'Jelaskan singkat agar moderator bisa meninjau.'
+                          : 'Add context to help moderators review it.'
+                      }
+                    />
+                  </label>
+
+                  {trustError ? (
+                    <p
+                      role="alert"
+                      className="rounded-2xl border border-rose-300/20 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200"
+                    >
+                      {trustError}
+                    </p>
+                  ) : null}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReportOpen(false)}
+                      disabled={trustAction === 'report'}
+                      className="min-h-11 rounded-full bg-white/10 px-4 text-sm font-bold text-white disabled:opacity-60"
+                    >
+                      {isId ? 'Batal' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={trustAction === 'report'}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-rose-500 px-4 text-sm font-bold text-white disabled:opacity-60"
+                    >
+                      {trustAction === 'report' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Flag className="h-4 w-4" />
+                      )}
+                      {isId ? 'Kirim laporan' : 'Submit report'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </form>
+          ) : (
+            <>
           <div
             ref={recipientsRail.ref}
             onClickCapture={recipientsRail.onClickCapture}
@@ -5359,7 +6391,8 @@ function ShareSheet({
                   key={action.label}
                   type="button"
                   onClick={action.onClick}
-                  className="w-[76px] shrink-0 text-center transition active:scale-95"
+                  disabled={action.disabled}
+                  className="w-[76px] shrink-0 text-center transition active:scale-95 disabled:cursor-wait disabled:opacity-50"
                 >
                   <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white">
                     <ActionIcon className="h-6 w-6" />
@@ -5374,9 +6407,19 @@ function ShareSheet({
 
           {copied && (
             <div className="mb-2 rounded-full bg-emerald-500 px-4 py-2 text-center text-xs font-bold text-white">
-              Link reels disalin
+              {isId ? 'Link reels disalin' : 'Reel link copied'}
             </div>
           )}
+            </>
+          )}
+          {!reportOpen && trustError ? (
+            <p
+              role="alert"
+              className="mb-2 rounded-2xl border border-rose-300/20 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200"
+            >
+              {trustError}
+            </p>
+          ) : null}
         </div>
       </section>
     </div>
@@ -5388,6 +6431,7 @@ function ShareSheet({
 ========================= */
 
 function MoreActionsSheet({
+  locale,
   reel,
   actionState,
   chatBusy,
@@ -5396,9 +6440,11 @@ function MoreActionsSheet({
   onOpenProduct,
   onOpenComments,
   onOpenShare,
+  onWhyRecommended,
   onMessageCreator,
   onAction,
 }: {
+  locale: string;
   reel: LajukanReel | null;
   actionState: ReelActionState;
   chatBusy: boolean;
@@ -5407,6 +6453,7 @@ function MoreActionsSheet({
   onOpenProduct: (reel: LajukanReel) => void;
   onOpenComments: (reel: LajukanReel) => void;
   onOpenShare: (reel: LajukanReel) => void;
+  onWhyRecommended: (reel: LajukanReel) => void;
   onMessageCreator: (reel: LajukanReel) => void;
   onAction: (
     reel: LajukanReel,
@@ -5415,6 +6462,7 @@ function MoreActionsSheet({
   ) => void;
 }) {
   if (!reel) return null;
+  const isId = locale === 'id';
 
   const actions: Array<{
     label: string;
@@ -5425,37 +6473,48 @@ function MoreActionsSheet({
     disabled?: boolean;
   }> = [
     {
-      label: actionState.saved ? 'Tersimpan' : 'Simpan',
+      label: actionState.saved ? (isId ? 'Tersimpan' : 'Saved') : isId ? 'Simpan' : 'Save',
       icon: Bookmark,
       active: actionState.saved,
       disabled: actionState.loading === 'save',
       onClick: () => onAction(reel, 'save'),
     },
     {
-      label: 'Detail',
+      label: isId ? 'Detail' : 'Details',
       icon: Info,
       onClick: () => onOpenDetail(reel),
     },
     {
-      label: 'Komentar',
+      label: isId ? 'Komentar' : 'Comments',
       icon: MessageCircle,
       onClick: () => onOpenComments(reel),
     },
     {
-      label: 'Share',
+      label: isId ? 'Bagikan' : 'Share',
       icon: Forward,
       featured: true,
       onClick: () => onOpenShare(reel),
     },
     {
-      label: actionState.followed ? 'Diikuti' : 'Ikuti',
+      label: isId ? 'Kenapa ini?' : 'Why this?',
+      icon: Sparkles,
+      onClick: () => onWhyRecommended(reel),
+    },
+    {
+      label: actionState.followed
+        ? isId
+          ? 'Diikuti'
+          : 'Following'
+        : isId
+          ? 'Ikuti'
+          : 'Follow',
       icon: actionState.followed ? Check : UserPlus,
       active: actionState.followed,
       disabled: actionState.loading === 'follow',
       onClick: () => onAction(reel, 'follow'),
     },
     {
-      label: 'Chat',
+      label: isId ? 'Chat' : 'Message',
       icon: chatBusy ? Loader2 : MessageSquareText,
       disabled: chatBusy,
       onClick: () => onMessageCreator(reel),
@@ -5464,7 +6523,7 @@ function MoreActionsSheet({
 
   if (reel.productName) {
     actions.splice(2, 0, {
-      label: 'Produk',
+      label: isId ? 'Produk' : 'Product',
       icon: ShoppingBag,
       featured: true,
       onClick: () => onOpenProduct(reel),
@@ -5473,31 +6532,31 @@ function MoreActionsSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white  sm:items-end lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
       <button
         type="button"
-        aria-label="Tutup aksi reels"
+        aria-label={isId ? 'Tutup aksi Reels' : 'Close Reel actions'}
         onClick={onClose}
         className="absolute inset-0"
       />
 
-      <section className="relative w-full overflow-hidden rounded-t-[26px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:w-[420px] lg:rounded-none lg:border-l lg:border-white/10">
+      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[26px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[520px] sm:rounded-[24px] lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10">
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
-              Aksi reels
+            <p className="text-[11px] font-semibold text-white/48">
+              {isId ? 'Aksi Reels' : 'Reel actions'}
             </p>
             <h2 className="truncate text-base font-bold">{reel.title}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 transition active:scale-95"
-            aria-label="Tutup aksi"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 transition active:scale-95"
+            aria-label={isId ? 'Tutup aksi' : 'Close actions'}
           >
             <X className="h-5 w-5" />
           </button>
@@ -5513,17 +6572,17 @@ function MoreActionsSheet({
                 disabled={action.disabled}
                 onClick={action.onClick}
                 className={cn(
-                  'flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] px-2 text-xs font-bold transition active:scale-[0.98] disabled:opacity-60',
+                  'flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[16px] px-2 text-xs font-bold transition active:scale-[0.98] disabled:opacity-60',
                   action.featured
-                    ? 'bg-emerald-600 text-white shadow-[0_10px_22px_-18px_rgba(16,185,129,0.65)]'
+                    ? 'bg-white text-slate-950'
                     : action.active
-                      ? 'bg-rose-600 text-white shadow-[0_10px_22px_-18px_rgba(225,29,72,0.65)]'
-                      : 'bg-zinc-800 text-white shadow-[0_10px_22px_-18px_rgba(0,0,0,0.68)]',
+                      ? 'bg-emerald-500/18 text-emerald-100 ring-1 ring-emerald-400/25'
+                      : 'bg-white/8 text-white ring-1 ring-white/8',
                 )}
               >
                 <ActionIcon
                   className={cn(
-                    'h-5 w-5 fill-current stroke-current stroke-[2.5]',
+                    'h-5 w-5 stroke-[2.3]',
                     action.icon === Loader2 && chatBusy && 'animate-spin',
                   )}
                 />
@@ -5531,6 +6590,106 @@ function MoreActionsSheet({
               </button>
             );
           })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function WhyRecommendationSheet({
+  locale,
+  reel,
+  feedTab,
+  searchQuery,
+  learnedTerms,
+  onReset,
+  onClose,
+}: {
+  locale: string;
+  reel: LajukanReel | null;
+  feedTab: ReelsFeedTab;
+  searchQuery: string;
+  learnedTerms: string[];
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  if (!reel) return null;
+  const isId = locale === 'id';
+  const reelTokensSet = new Set(reelTokens(reel));
+  const matchingTerms = learnedTerms.filter(term => reelTokensSet.has(term)).slice(0, 3);
+  const reasons = [
+    feedTab === 'following'
+      ? isId
+        ? 'Kamu mengikuti creator atau usaha ini.'
+        : 'You follow this creator or business.'
+      : feedTab === 'friends'
+        ? isId
+          ? 'Konten ini berasal dari aktivitas relasi Teman/mutual.'
+          : 'This content comes from Friends or mutual activity.'
+        : null,
+    searchQuery.trim()
+      ? isId
+        ? `Sesuai pencarian “${searchQuery.trim()}”.`
+        : `Related to your search “${searchQuery.trim()}”.`
+      : null,
+    matchingTerms.length > 0
+      ? isId
+        ? `Topiknya mirip minatmu: ${matchingTerms.join(', ')}.`
+        : `Its topic matches your interests: ${matchingTerms.join(', ')}.`
+      : null,
+    isId
+      ? 'FYP juga menyelingi creator dan topik berbeda agar feed tidak terlalu berulang.'
+      : 'For You also mixes creators and topics so the feed does not become repetitive.',
+  ].filter((reason): reason is string => Boolean(reason));
+
+  return (
+    <div
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white sm:items-center sm:justify-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button type="button" className="absolute inset-0" onClick={onClose} aria-label={isId ? 'Tutup' : 'Close'} />
+      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[26px] bg-[#0b0f14] p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-white/10 sm:max-h-[calc(100dvh-32px)] sm:max-w-[460px] sm:rounded-[22px]">
+        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-bold">
+              <Sparkles className="h-4.5 w-4.5 text-emerald-300" />
+              {isId ? 'Kenapa Reels ini muncul?' : 'Why are you seeing this Reel?'}
+            </div>
+            <p className="mt-1 line-clamp-1 text-xs font-medium text-white/48">{reel.title}</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/8" aria-label={isId ? 'Tutup' : 'Close'}>
+            <X className="h-4.5 w-4.5" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {reasons.map(reason => (
+            <div key={reason} className="flex gap-2.5 rounded-[14px] bg-white/6 p-3 ring-1 ring-white/8">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <p className="text-xs font-medium leading-5 text-white/72">{reason}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <p className="text-xs font-medium leading-5 text-white/48">
+            {isId
+              ? 'Suka, simpan, bagikan, ikuti, pencarian, waktu tonton, dan “Tidak tertarik” membantu menyesuaikan rekomendasi berikutnya.'
+              : 'Likes, saves, shares, follows, searches, watch time, and Not interested help tune future recommendations.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              onReset();
+              onClose();
+            }}
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-white/8 px-4 text-sm font-bold text-white ring-1 ring-white/10 transition active:scale-[0.98]"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            {isId ? 'Reset rekomendasi saya' : 'Reset my recommendations'}
+          </button>
         </div>
       </section>
     </div>
@@ -5598,7 +6757,7 @@ function CommentsSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
@@ -5609,7 +6768,7 @@ function CommentsSheet({
         className="absolute inset-0 z-0"
       />
 
-      <section className="relative z-10 flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+      <section className="relative z-10 flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[620px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
   <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
 
   <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -5785,7 +6944,7 @@ function CommentsSheet({
       event.preventDefault();
       onSubmit();
     }}
-    className="border-t border-white/10 bg-[#0b0f14] p-3"
+    className="border-t border-white/10 bg-[#0b0f14] px-3 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]"
   >
     {isAuthenticated ? (
       <div className="space-y-2">
@@ -5859,24 +7018,29 @@ function CommentsSheet({
 function ProductSheet({
   locale,
   reel,
-  isAuthenticated,
+  chatBusy,
+  onMessageCreator,
+  onOpenListing,
   onClose,
-  onRequireLogin,
 }: {
   locale: string;
   reel: LajukanReel | null;
-  isAuthenticated: boolean;
+  chatBusy: boolean;
+  onMessageCreator: (reel: LajukanReel) => Promise<void> | void;
+  onOpenListing: (reel: LajukanReel, href: string) => void;
   onClose: () => void;
-  onRequireLogin: () => void;
 }) {
   if (!reel) return null;
 
-  const productHref = localizedHref(locale, reel.productHref || '/home');
-  const checkoutHref = appendQuery(productHref, 'checkout', '1');
+  const productHref = resolveCanonicalReelContentHref(
+    reel.productHref,
+    locale,
+  );
+  const isId = locale === 'id';
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
@@ -5887,7 +7051,7 @@ function ProductSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
+      <section className="relative flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[560px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-start justify-between gap-3 p-4">
           <div className="min-w-0">
@@ -5926,35 +7090,41 @@ function ProductSheet({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Link
-              href={productHref}
-              className="rounded-2xl bg-white/10 px-4 py-3 text-center text-sm font-bold text-white ring-1 ring-white/10"
-            >
-              Lihat produk
-            </Link>
-
-            {isAuthenticated ? (
-              <Link
-                href={checkoutHref}
-                className="rounded-2xl bg-emerald-500 px-4 py-3 text-center text-sm font-bold text-white"
-              >
-                Mulai transaksi
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={onRequireLogin}
-                className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white"
-              >
-                Mulai transaksi
-              </button>
+          <div
+            className={cn(
+              'mt-3 grid gap-2',
+              productHref ? 'grid-cols-2' : 'grid-cols-1',
             )}
+          >
+            {productHref ? (
+              <Link
+                href={productHref}
+                onClick={() => onOpenListing(reel, productHref)}
+                className="rounded-2xl bg-white/10 px-4 py-3 text-center text-sm font-bold text-white ring-1 ring-white/10"
+              >
+                {isId ? 'Lihat listing' : 'View listing'}
+              </Link>
+            ) : null}
+
+            <button
+              type="button"
+              disabled={chatBusy}
+              onClick={() => void onMessageCreator(reel)}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
+            >
+              {chatBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isId ? 'Tanya penyedia' : 'Ask provider'}
+            </button>
           </div>
 
           <div className="mt-3 rounded-2xl bg-white/6 px-3 py-2 text-xs font-semibold leading-relaxed text-white/55 ring-1 ring-white/10">
-            Produk dibuka dari reels. Detail stok, ongkir, dan pembayaran tetap
-            diproses di halaman produk.
+            {productHref
+              ? isId
+                ? 'Cek detail, ketersediaan, dan ketentuan langsung di listing Lajukan.'
+                : 'Check details, availability, and terms on the Lajukan listing.'
+              : isId
+                ? 'Listing belum ditautkan. Hubungi penyedia untuk memastikan detail dan ketersediaan.'
+                : 'No listing is linked yet. Ask the provider to confirm details and availability.'}
           </div>
         </div>
       </section>
@@ -5993,6 +7163,15 @@ function UploadReelSheet({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [storeOptions, setStoreOptions] = useState<ReelStoreOption[]>([]);
+  const [storesLoading, setStoresLoading] = useState(false);
+  const [linkedStoreId, setLinkedStoreId] = useState('');
+  const [previewDurationMs, setPreviewDurationMs] = useState(0);
+  const postPreviewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const selectedStore = useMemo(
+    () => storeOptions.find(store => store.id === linkedStoreId) || null,
+    [linkedStoreId, storeOptions],
+  );
   const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -6012,9 +7191,6 @@ function UploadReelSheet({
   const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const hasMedia = Boolean(file || form.mediaUrl.trim());
-  const studioPanelRail = useHorizontalDragScroll<HTMLDivElement>();
-  const studioFilterRail = useHorizontalDragScroll<HTMLDivElement>();
-  const studioMusicRail = useHorizontalDragScroll<HTMLDivElement>();
 
   const setField = useCallback(
     <K extends keyof UploadReelForm>(field: K, value: UploadReelForm[K]) => {
@@ -6156,6 +7332,15 @@ function UploadReelSheet({
 
   const selectStudioMode = useCallback(
     (mode: ReelsStudioMode) => {
+      if (mode === 'live' && !REELS_LIVE_ENABLED) {
+        setError(
+          locale === 'id'
+            ? 'Live belum tersedia. Posting video dulu, ya.'
+            : 'Live is not available yet. Post a video instead.',
+        );
+        return;
+      }
+
       setStudioMode(mode);
       setStudioPanel(null);
       setError(null);
@@ -6456,6 +7641,7 @@ function UploadReelSheet({
       setStudioEffect('none');
       setCameraFacingMode('environment');
       setForm(EMPTY_UPLOAD_FORM);
+      setLinkedStoreId('');
       setCameraError(null);
       setRecordingStartedAt(null);
       setRecordingElapsedMs(0);
@@ -6463,6 +7649,44 @@ function UploadReelSheet({
       stopCamera();
     }
   }, [open, setStudioMode, stopCamera]);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    let cancelled = false;
+    setStoresLoading(true);
+
+    void authFetch('/api/super-app/umkm/stores?mine=1&limit=80', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async response => {
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: { items?: Array<Record<string, unknown>> };
+        };
+        if (!response.ok || cancelled) return;
+        const stores = (Array.isArray(payload.data?.items) ? payload.data!.items! : [])
+          .map(item => ({
+            id: typeof item.id === 'string' ? item.id.trim() : '',
+            name: typeof item.name === 'string' ? item.name.trim() : '',
+            slug: typeof item.slug === 'string' ? item.slug.trim() : '',
+            city: typeof item.city === 'string' ? item.city.trim() : '',
+            phone: typeof item.phone === 'string' ? item.phone.trim() : null,
+          }))
+          .filter(store => store.id && store.name);
+        setStoreOptions(stores);
+        setLinkedStoreId(current => current || (stores.length === 1 ? stores[0]!.id : ''));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setStoresLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [authFetch, open]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
@@ -6627,9 +7851,6 @@ function UploadReelSheet({
     ? file.type.startsWith('image/')
     : isImageMediaUrl(mediaPreviewSrc);
   const previewMediaStyle = getReelMediaStyle(form.filterPreset);
-  const activeStudioEffect =
-    REELS_STUDIO_EFFECTS.find(effect => effect.id === studioEffect) ||
-    REELS_STUDIO_EFFECTS[0];
   const recordingLimitMs = getStudioDurationMs(studioDuration);
   const recordingProgress = recording
     ? Math.min(recordingElapsedMs / recordingLimitMs, 1)
@@ -6638,35 +7859,13 @@ function UploadReelSheet({
     Math.ceil((recordingLimitMs - recordingElapsedMs) / 1000),
     0,
   );
-  const selectedCaptureMode = REEL_CAPTURE_MODES.find(
-    mode => mode.id === form.captureMode,
-  );
   const directVideoUrl = form.mediaUrl.trim();
   const isExternalVideoLink = Boolean(
     !file && directVideoUrl && isDirectVideoMediaUrl(directVideoUrl),
   );
-  const selectedCaptureLabel = isExternalVideoLink
-    ? 'Link video'
-    : (selectedCaptureMode?.label ?? 'Kamera');
-  const SelectedCaptureIcon = isExternalVideoLink
-    ? Link2
-    : (selectedCaptureMode?.icon ?? Camera);
-  const activeStudioMode =
-    REELS_STUDIO_MODES.find(mode => mode.id === studioMode) ||
-    REELS_STUDIO_MODES[2];
-  const ActiveStudioIcon = activeStudioMode.icon;
   const fieldLabelClass = 'text-xs font-bold text-slate-900 dark:text-white/84';
   const inputClass =
     'mt-1 h-10 w-full rounded-[13px] border border-slate-200 bg-white px-3 text-[13px] font-semibold !text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-300/50 focus:bg-white dark:border-white/10 dark:bg-white/[0.08] dark:!text-white dark:placeholder:text-white/38 dark:focus:bg-white/[0.11]';
-  const textareaClass =
-    'mt-1 w-full resize-none rounded-[13px] border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold !text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-300/50 focus:bg-white dark:border-white/10 dark:bg-white/[0.08] dark:!text-white dark:placeholder:text-white/38 dark:focus:bg-white/[0.11]';
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024 * 1024) {
-      return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-    }
-    return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
-  };
-
   const handleFile = (nextFile: File | null) => {
     if (nextFile && nextFile.size > MEDIA_UPLOAD_RAW_MAX_BYTES) {
       setFile(null);
@@ -6774,19 +7973,33 @@ function UploadReelSheet({
     event.preventDefault();
     if (submitting) return;
 
+    const cleanCaption = form.caption.trim();
+    const firstCaptionLine = cleanCaption
+      .split(/\n+/)
+      .map(line => line.trim())
+      .find(Boolean) || '';
+    const fallbackTitle = file
+      ? buildCleanReelTitleFromFile(file)
+      : form.captureMode === 'live'
+        ? form.liveTitle.trim() || 'Live usaha'
+        : 'Video usaha';
     const title =
       form.title.trim() ||
-      form.hook.trim() ||
-      (file ? buildCleanReelTitleFromFile(file) : 'Video usaha');
-    const caption =
-      form.caption.trim() || form.hook.trim() || `${title} dari ${displayName}`;
-    const tag = form.tag.trim();
+      firstCaptionLine.replace(/(^|\s)[#@][^\s]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) ||
+      fallbackTitle;
+    const caption = cleanCaption || title;
+    const captionHashtag = cleanCaption.match(/(?:^|\s)#([A-Za-z0-9_]+)/)?.[1];
+    const inferredContentGoal: ReelContentGoal =
+      form.productName.trim() || form.productHref.trim()
+        ? 'product'
+        : form.promotionalContent
+          ? 'promo'
+          : form.contentGoal;
+    const tag =
+      form.tag.trim() ||
+      captionHashtag ||
+      (inferredContentGoal === 'product' ? 'Produk' : 'UMKM');
     let mediaUrl = form.mediaUrl.trim();
-
-    if (!caption || !tag) {
-      setError('Caption dan kategori wajib diisi.');
-      return;
-    }
     if (!hasMedia) {
       setError('Pilih atau upload media dulu.');
       return;
@@ -6812,6 +8025,24 @@ function UploadReelSheet({
     }
     if (form.captureMode === 'live' && !form.liveTitle.trim()) {
       setError('Judul live wajib diisi biar penonton langsung paham.');
+      setStep('post');
+      return;
+    }
+    if (form.captureMode === 'live' && !REELS_LIVE_ENABLED) {
+      setError('Live belum tersedia. Pilih video untuk diposting.');
+      setStep('media');
+      return;
+    }
+
+    const productHref = form.productHref.trim()
+      ? resolveCanonicalReelContentHref(form.productHref, locale)
+      : null;
+    if (form.productHref.trim() && !productHref) {
+      setError(
+        locale === 'id'
+          ? 'Link produk harus menuju listing Lajukan dengan format /content/...'
+          : 'Product links must point to a Lajukan listing using /content/...',
+      );
       setStep('post');
       return;
     }
@@ -6871,9 +8102,19 @@ function UploadReelSheet({
           videoSrc: mediaUrl,
           sourceUrl: mediaUrl,
           mediaType: isImageMedia ? 'image' : 'video',
-          hook: (form.hook.trim() || caption).slice(0, 150),
+          hook: (form.hook.trim() || firstCaptionLine || caption).slice(0, 150),
+          productName: form.productName.trim() || undefined,
+          productPrice: form.productPrice.trim() || undefined,
+          productHref: productHref || undefined,
+          storeId: selectedStore?.id || undefined,
+          storeSlug: selectedStore?.slug || undefined,
+          storeName: selectedStore?.name || undefined,
+          storeCity: selectedStore?.city || undefined,
           tone: 'emerald',
-          iconKey: 'marketing',
+          iconKey:
+            inferredContentGoal === 'product' || inferredContentGoal === 'promo'
+              ? 'supplier'
+              : 'marketing',
           filterPreset: form.filterPreset,
           captureMode: form.captureMode,
           liveStatus: form.captureMode === 'live' ? 'scheduled' : 'none',
@@ -6890,6 +8131,25 @@ function UploadReelSheet({
             sourceKind,
             external: mediaSource === 'external_direct_video',
             sourceUrl: mediaUrl,
+            contentGoal: inferredContentGoal,
+            location: form.location.trim() || selectedStore?.city || undefined,
+            visibility: form.visibility,
+            allowComments: form.allowComments,
+            shareToMainFeed: form.shareToMainFeed,
+            promotionalContent: form.promotionalContent,
+            aiGenerated: form.aiGenerated,
+            coverTimestampMs: form.coverTimestampMs,
+            publishingPreferences: {
+              visibility: form.visibility,
+              allowComments: form.allowComments,
+              shareToMainFeed: form.shareToMainFeed,
+              promotionalContent: form.promotionalContent,
+              aiGenerated: form.aiGenerated,
+              coverTimestampMs: form.coverTimestampMs,
+            },
+            linkedStoreId: selectedStore?.id || undefined,
+            linkedStoreName: selectedStore?.name || undefined,
+            productLinked: Boolean(form.productName.trim() || productHref),
             studio: {
               filterPreset: form.filterPreset,
               captureMode: form.captureMode,
@@ -6926,15 +8186,43 @@ function UploadReelSheet({
     }
   };
 
+  const postingCaptionLength = form.caption.length;
+  const coverPercent = previewDurationMs > 0
+    ? Math.min(100, Math.max(0, (form.coverTimestampMs / previewDurationMs) * 100))
+    : 0;
+
+  const setCoverTimestamp = (value: number) => {
+    const next = Math.max(0, Math.min(value, previewDurationMs || value));
+    setField('coverTimestampMs', Math.round(next));
+    if (postPreviewVideoRef.current && Number.isFinite(next)) {
+      try {
+        postPreviewVideoRef.current.currentTime = next / 1000;
+      } catch {
+        // Seeking is best-effort while metadata is still loading.
+      }
+    }
+  };
+
+  const appendCaptionToken = (token: '#' | '@') => {
+    setField(
+      'caption',
+      `${form.caption}${form.caption && !form.caption.endsWith(' ') ? ' ' : ''}${token}`,
+    );
+  };
+
+  const toggleRowClass =
+    'flex min-h-12 w-full items-center justify-between gap-3 rounded-[16px] px-3.5 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-white/5';
+
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-[color:color-mix(in_srgb,_var(--app-overlay)_86%,_transparent)] text-[color:var(--app-text)]  dark:bg-black/86 lg:items-center lg:justify-center lg:p-4"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/80 text-slate-950 md:items-center md:justify-center md:p-4 dark:text-white"
       role="dialog"
       aria-modal="true"
+      aria-label={locale === 'id' ? 'Buat Reels' : 'Create Reel'}
     >
       <button
         type="button"
-        aria-label="Tutup upload reels"
+        aria-label={locale === 'id' ? 'Tutup' : 'Close'}
         onClick={onClose}
         className="absolute inset-0"
       />
@@ -6943,1076 +8231,628 @@ function UploadReelSheet({
         onSubmit={submit}
         data-lajukan-reels-studio="true"
         className={cn(
-          'relative flex h-[var(--app-visual-viewport-height)] max-h-[var(--app-visual-viewport-height)] w-full flex-col overflow-hidden bg-[color:var(--app-surface)] text-[color:var(--app-text)] shadow-2xl dark:bg-[#050505] dark:text-white',
+          'relative flex h-[100dvh] max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-white shadow-2xl dark:bg-[#050505] md:h-[min(900px,calc(100dvh-2rem))] md:max-h-[calc(100dvh-2rem)]',
           step === 'media'
-            ? 'lg:max-w-[460px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10'
-            : 'lg:h-[calc(var(--app-visual-viewport-height)-2rem)] lg:max-w-[960px] lg:rounded-[30px] lg:ring-1 lg:ring-white/10',
+            ? 'md:max-w-[470px] md:rounded-[30px]'
+            : 'md:max-w-[1000px] md:rounded-[28px]',
         )}
       >
-        <div
-          className={cn(
-            'mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-[color:var(--app-border)]/60 dark:bg-white/20 lg:hidden',
-            step === 'media' && 'hidden',
-          )}
-        />
-        <div
-          className={cn(
-            'items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5 sm:px-2 dark:border-white/10',
-            step === 'media' ? 'hidden' : 'flex',
-          )}
-        >
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:text-emerald-300">
-              Reels
-            </p>
-            <h2 className="text-base font-bold">Kamera Reels</h2>
-          </div>
-
-          <div className="hidden items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] p-1 sm:flex dark:bg-white/10">
-            {(['media', 'edit', 'post'] as UploadReelStep[]).map(
-              (item, index) => (
-                <span
-                  key={item}
-                  className={cn(
-                    'rounded-full px-3 py-1.5 text-[11px] font-bold',
-                    step === item
-                      ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] shadow-sm dark:bg-white dark:text-slate-950'
-                      : 'text-[color:var(--app-text-soft)] dark:text-white/58',
-                  )}
-                >
-                  {index + 1}.{' '}
-                  {item === 'media'
-                    ? 'Media'
-                    : item === 'edit'
-                      ? 'Edit'
-                      : 'Post'}
-                </span>
-              ),
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:bg-white/10 dark:text-white"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div
-          className={cn(
-            'min-h-0 flex-1',
-            step === 'media'
-              ? 'overflow-hidden p-0 sm:grid sm:place-items-center sm:p-3'
-              : 'overflow-y-auto p-2 sm:p-3',
-          )}
-        >
-          <div
-            className={cn(
-              'min-h-0 gap-2.5',
-              step === 'media'
-                ? 'h-full w-full'
-                : 'grid lg:grid-cols-[minmax(250px,360px)_minmax(0,1fr)] lg:gap-3',
-            )}
-          >
-            <div
-              className={cn(
-                'mx-auto',
-                step === 'media'
-                  ? 'h-full w-full max-w-none sm:aspect-[9/16] sm:h-auto sm:max-h-[calc(var(--app-visual-viewport-height)-1.5rem)] sm:max-w-[420px] sm:self-center'
-                  : 'w-full max-w-[340px]',
-              )}
-            >
-              <div
-                className={cn(
-                  'relative overflow-hidden bg-[color:var(--app-surface-strong)] shadow-2xl ring-1 ring-[color:var(--app-border)] dark:bg-[#2d374b] dark:ring-white/10',
-                  step === 'media'
-                    ? 'h-full w-full rounded-none sm:rounded-[32px]'
-                    : 'aspect-[9/16] max-h-[calc(var(--app-viewport-height)-128px)] rounded-[24px] lg:max-h-[calc(var(--app-viewport-height)-150px)]',
-                )}
-              >
-                {mediaPreviewSrc ? (
-                  isImageMedia ? (
-                    <img
-                      src={mediaPreviewSrc}
-                      alt="Preview reels"
-                      className="h-full w-full object-cover"
-                      style={previewMediaStyle}
-                    />
-                  ) : (
-                    <video
-                      src={mediaPreviewSrc}
-                      className="h-full w-full object-cover"
-                      style={previewMediaStyle}
-                      controls
-                      playsInline
-                      preload="metadata"
-                    />
-                  )
-                ) : form.captureMode === 'camera' ? (
-                  <>
-                    <video
-                      ref={cameraVideoRef}
-                      className="h-full w-full object-cover object-center"
-                      style={previewMediaStyle}
-                      muted
-                      playsInline
-                      autoPlay
-                      aria-busy={cameraOpening}
-                    />
-                    {!cameraReady && (
-                      <div className="absolute inset-0 grid place-items-center p-5 text-center text-white">
-                        <div>
-                          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-black/[0.34] ring-1 ring-white/[0.12]">
-                            {cameraOpening ? (
-                              <Loader2 className="h-7 w-7 animate-spin" />
-                            ) : (
-                              <Camera className="h-7 w-7" />
-                            )}
-                          </div>
-                          <p className="mt-3 text-xs font-bold text-white/[0.84]">
-                            {cameraOpening
-                              ? locale === 'id'
-                                ? 'Menyiapkan kamera...'
-                                : 'Preparing camera...'
-                              : locale === 'id'
-                                ? 'Ketuk rekam untuk buka kamera'
-                                : 'Tap record to open the camera'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </>
+        {step === 'media' ? (
+          <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-black text-white">
+            <div className="absolute inset-0">
+              {mediaPreviewSrc ? (
+                isImageMedia ? (
+                  <img
+                    src={mediaPreviewSrc}
+                    alt="Preview Reels"
+                    className="h-full w-full object-cover"
+                    style={previewMediaStyle}
+                  />
                 ) : (
-                  <div className="grid h-full place-items-center p-6 text-center text-white">
-                    <div>
-                      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/[0.12]">
-                        <Clapperboard className="h-8 w-8" />
-                      </div>
-                      <p className="mt-4 text-sm font-bold">Pilih media dulu</p>
-                      <p className="mt-1 text-xs font-semibold text-white/[0.55]">
-                        Reels tampil 9:16, video asli bisa langsung diputar.
-                      </p>
-                    </div>
+                  <video
+                    src={mediaPreviewSrc}
+                    className="h-full w-full object-cover"
+                    style={previewMediaStyle}
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                  />
+                )
+              ) : form.captureMode === 'camera' ? (
+                <video
+                  ref={cameraVideoRef}
+                  className="h-full w-full object-cover"
+                  style={previewMediaStyle}
+                  muted
+                  playsInline
+                  autoPlay
+                  aria-busy={cameraOpening}
+                />
+              ) : (
+                <div className="grid h-full place-items-center bg-[#111] px-8 text-center">
+                  <div>
+                    <Clapperboard className="mx-auto h-10 w-10 text-white/55" />
+                    <p className="mt-3 text-sm font-bold text-white/82">
+                      {locale === 'id' ? 'Pilih video dari galeri' : 'Choose a video'}
+                    </p>
                   </div>
-                )}
-                <StudioEffectOverlay effect={studioEffect} />
+                </div>
+              )}
+              <StudioEffectOverlay effect={studioEffect} />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/70" />
+            </div>
 
-                {step !== 'media' && (form.hook || form.title) && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
-                    <p className="text-[11px] font-bold text-yellow-300">
-                      {form.tag}
-                    </p>
-                    <p className="mt-1 line-clamp-2 text-base font-bold leading-tight">
-                      {form.hook || form.title}
-                    </p>
-                  </div>
-                )}
-                {step !== 'media' && (
-                  <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 text-[11px] font-bold text-white ">
-                    <SelectedCaptureIcon className="h-3.5 w-3.5" />
-                    {selectedCaptureLabel}
-                  </div>
-                )}
-                {step !== 'media' && form.captureMode === 'live' && (
-                  <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-xl">
-                    <Radio className="h-3.5 w-3.5" />
+            <div className="relative z-20 flex items-center justify-between gap-2 px-[max(12px,env(safe-area-inset-left))] pt-[max(10px,env(safe-area-inset-top))] pr-[max(12px,env(safe-area-inset-right))]">
+              <button
+                type="button"
+                onClick={onClose}
+                className="grid h-10 w-10 place-items-center rounded-full bg-black/40 ring-1 ring-white/15"
+                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStudioPanel('music')}
+                className="inline-flex min-h-9 min-w-0 max-w-[58vw] items-center gap-1.5 rounded-full bg-black/38 px-3 text-xs font-bold ring-1 ring-white/12"
+              >
+                <Music className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{form.musicTrack || 'Original sound'}</span>
+              </button>
+
+              {hasMedia ? (
+                <button
+                  type="button"
+                  onClick={() => setStep('edit')}
+                  className="min-h-10 rounded-full bg-white px-4 text-xs font-extrabold text-slate-950"
+                >
+                  {locale === 'id' ? 'Lanjut' : 'Next'}
+                </button>
+              ) : (
+                <span className="h-10 w-10" aria-hidden="true" />
+              )}
+            </div>
+
+            <div className="absolute right-[max(10px,env(safe-area-inset-right))] top-[calc(env(safe-area-inset-top)+66px)] z-20 flex flex-col items-center gap-2.5">
+              {[
+                {
+                  label: locale === 'id' ? 'Balik' : 'Flip',
+                  icon: RefreshCcw,
+                  onClick: flipCamera,
+                  hidden: studioMode === 'live',
+                },
+                {
+                  label: 'Filter',
+                  icon: Sparkles,
+                  onClick: () => setStudioPanel('filters'),
+                },
+                {
+                  label: locale === 'id' ? 'Efek' : 'Effects',
+                  icon: SlidersHorizontal,
+                  onClick: () => setStudioPanel('effects'),
+                },
+                {
+                  label: 'Link',
+                  icon: Link2,
+                  onClick: openLinkPanel,
+                },
+              ].filter(tool => !tool.hidden).map(tool => {
+                const ToolIcon = tool.icon;
+                return (
+                  <button
+                    key={tool.label}
+                    type="button"
+                    onClick={tool.onClick}
+                    className="flex w-[48px] flex-col items-center gap-1 text-[9px] font-bold text-white drop-shadow min-[390px]:w-[52px] min-[390px]:text-[10px]"
+                  >
+                    <span className="grid h-9 w-9 place-items-center rounded-full bg-black/42 ring-1 ring-white/12 min-[390px]:h-10 min-[390px]:w-10">
+                      <ToolIcon className="h-[18px] w-[18px]" />
+                    </span>
+                    <span className="max-w-full truncate">{tool.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {recording ? (
+              <div className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+58px)] z-20">
+                <div className="h-1 overflow-hidden rounded-full bg-white/24">
+                  <div
+                    className="h-full rounded-full bg-rose-500 transition-[width] duration-100"
+                    style={{ width: `${recordingProgress * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-center text-[10px] font-bold text-white/78">
+                  {recordingRemainingSeconds}s
+                </p>
+              </div>
+            ) : null}
+
+            {cameraError ? (
+              <div className="absolute inset-x-3 top-[calc(env(safe-area-inset-top)+58px)] z-30 rounded-2xl bg-amber-950/88 px-3 py-2 text-xs font-semibold text-amber-100 ring-1 ring-amber-300/20">
+                {cameraError}
+              </div>
+            ) : null}
+
+            <div className="relative z-20 mt-auto pb-[max(14px,env(safe-area-inset-bottom))]">
+              <div className="mb-3 flex justify-center gap-5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => selectStudioMode('video')}
+                  className={cn('min-h-8 px-2', studioMode === 'video' ? 'text-white' : 'text-white/55')}
+                >
+                  Video
+                </button>
+                {REELS_LIVE_ENABLED ? (
+                  <button
+                    type="button"
+                    onClick={() => selectStudioMode('live')}
+                    className={cn('min-h-8 px-2', studioMode === 'live' ? 'text-rose-300' : 'text-white/55')}
+                  >
                     Live
-                  </div>
-                )}
-                {step !== 'media' && (
-                  <div className="absolute right-3 top-14 z-20 flex flex-col gap-2">
-                    {[
-                      {
-                        label: 'Filter',
-                        icon: Sparkles,
-                        action: () => setStep('edit'),
-                      },
-                      {
-                        label: form.musicTrack || 'Original',
-                        icon: Volume2,
-                        action: () =>
-                          setField(
-                            'musicTrack',
-                            form.musicTrack === 'Original sound'
-                              ? 'Suara toko'
-                              : 'Original sound',
-                          ),
-                      },
-                      {
-                        label: 'Balik',
-                        icon: RefreshCcw,
-                        action: flipCamera,
-                      },
-                    ].map(tool => {
-                      const ToolIcon = tool.icon;
-                      return (
-                        <button
-                          key={tool.label}
-                          type="button"
-                          onClick={tool.action}
-                          className="grid h-10 w-10 place-items-center rounded-full bg-black/[0.38] text-white shadow-xl ring-1 ring-white/[0.12] transition active:scale-95"
-                          aria-label={tool.label}
-                        >
-                          <ToolIcon className="h-4.5 w-4.5" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {step !== 'media' && (
-                  <div className="absolute inset-x-2 bottom-3 z-20">
-                    <div className="mx-auto flex max-w-[240px] items-center justify-center rounded-full bg-black/[0.42] px-3 py-2 text-white shadow-2xl ring-1 ring-white/[0.12]">
-                      <div className="flex items-center gap-2 text-[11px] font-bold">
-                        <Camera className="h-4 w-4 text-emerald-200" />
-                        <span>{selectedCaptureLabel}</span>
-                        <span className="rounded-full bg-white/[0.12] px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/[0.74]">
-                          {locale === 'id' ? 'Mode cepat' : 'Quick mode'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {step === 'media' && (
-                  <>
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/[0.42] via-transparent to-black/[0.74]" />
+                  </button>
+                ) : null}
+              </div>
 
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="absolute left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 grid h-10 w-10 place-items-center rounded-full bg-black/[0.34] text-white ring-1 ring-white/[0.12]"
-                      aria-label="Tutup"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 min-[390px]:px-7">
+                <label className="justify-self-start cursor-pointer">
+                  <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-[14px] bg-white/14 ring-1 ring-white/15">
+                    <Images className="h-5 w-5" />
+                  </span>
+                  <input
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
+                    onChange={event => handleFile(event.target.files?.[0] ?? null)}
+                    className="sr-only"
+                  />
+                </label>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setStudioPanel(current =>
-                          current === 'music' ? null : 'music',
-                        )
-                      }
-                      className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] z-30 inline-flex max-w-[210px] -translate-x-1/2 items-center gap-2 rounded-full bg-black/[0.24] px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10"
-                    >
-                      <Music className="h-4 w-4" />
-                      <span className="truncate">
-                        {form.musicTrack === 'Original sound'
-                          ? 'Suara'
-                          : form.musicTrack}
-                      </span>
-                    </button>
+                <button
+                  type="button"
+                  onClick={handleStudioCapture}
+                  className={cn(
+                    'grid h-[68px] w-[68px] place-items-center rounded-full border-4 border-white shadow-2xl transition active:scale-95 min-[390px]:h-[76px] min-[390px]:w-[76px] min-[390px]:border-[5px]',
+                    recording ? 'bg-rose-500' : studioMode === 'live' ? 'bg-rose-500/85' : 'bg-white/18',
+                  )}
+                  aria-label={locale === 'id' ? 'Rekam video' : 'Record video'}
+                >
+                  {recording ? (
+                    <span className="h-7 w-7 rounded-[7px] bg-white" />
+                  ) : studioMode === 'live' ? (
+                    <Radio className="h-7 w-7" />
+                  ) : (
+                    <span className="h-11 w-11 rounded-full bg-rose-500" />
+                  )}
+                </button>
 
-                    {hasMedia && (
-                      <button
-                        type="button"
-                        onClick={goNext}
-                        className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 grid h-10 w-10 place-items-center rounded-full bg-white text-slate-950 shadow-xl"
-                        aria-label="Lanjut edit"
-                      >
-                        <Check className="h-5 w-5" />
-                      </button>
+                <button
+                  type="button"
+                  onClick={() => setStudioPanel('speed')}
+                  className="justify-self-end rounded-full bg-black/38 px-3 py-2 text-xs font-extrabold ring-1 ring-white/12"
+                >
+                  {studioSpeed}
+                </button>
+              </div>
+
+              <div className="mt-3 flex justify-center gap-1.5">
+                {REELS_STUDIO_DURATIONS.map(duration => (
+                  <button
+                    key={duration}
+                    type="button"
+                    onClick={() => setStudioDuration(duration)}
+                    className={cn(
+                      'rounded-full px-2.5 py-1 text-[10px] font-bold',
+                      studioDuration === duration ? 'bg-white text-slate-950' : 'bg-black/35 text-white/70',
                     )}
-
-                    <div className="absolute right-2 top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 flex w-11 flex-col items-center gap-2 text-white">
-                      {[
-                        {
-                          key: 'filters' as const,
-                          label: 'Filter',
-                          icon: SlidersHorizontal,
-                          onClick: () =>
-                            setStudioPanel(current =>
-                              current === 'filters' ? null : 'filters',
-                            ),
-                          active: studioPanel === 'filters',
-                        },
-                        {
-                          key: 'effects' as const,
-                          label: 'Efek',
-                          icon: Sparkles,
-                          onClick: () =>
-                            setStudioPanel(current =>
-                              current === 'effects' ? null : 'effects',
-                            ),
-                          active: studioPanel === 'effects',
-                        },
-                        {
-                          key: 'speed' as const,
-                          label: studioSpeed,
-                          icon: Clapperboard,
-                          onClick: () =>
-                            setStudioPanel(current =>
-                              current === 'speed' ? null : 'speed',
-                            ),
-                          active: studioPanel === 'speed',
-                        },
-                        {
-                          key: 'link' as const,
-                          label: 'Link',
-                          icon: Link2,
-                          onClick: openLinkPanel,
-                          active: studioPanel === 'link',
-                        },
-                        {
-                          key: 'flip' as const,
-                          label: 'Flip',
-                          icon: RefreshCcw,
-                          onClick: flipCamera,
-                          active: false,
-                        },
-                      ].map(tool => {
-                        const ToolIcon = tool.icon;
-                        return (
-                          <button
-                            key={tool.key}
-                            type="button"
-                            onClick={tool.onClick}
-                            className={cn(
-                              'grid h-10 w-10 place-items-center rounded-full text-white shadow-lg ring-1 ring-white/[0.12] transition active:scale-95',
-                              tool.active
-                                ? 'bg-white text-slate-950'
-                                : 'bg-black/[0.32]',
-                            )}
-                            aria-label={tool.label}
-                            title={tool.label}
-                          >
-                            <ToolIcon className="h-4.5 w-4.5" />
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {cameraError && (
-                      <div
-                        className={cn(
-                          'absolute inset-x-4 z-40 rounded-[16px] bg-amber-300/[0.18] px-3 py-2 text-center text-xs font-bold text-amber-50 ring-1 ring-amber-200/20',
-                          studioPanel
-                            ? 'bottom-[calc(env(safe-area-inset-bottom)+258px)]'
-                            : 'bottom-[calc(env(safe-area-inset-bottom)+196px)]',
-                        )}
-                      >
-                        {cameraError}
-                      </div>
-                    )}
-
-                    <div className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+148px)] z-30 flex justify-center px-3">
-                      {studioPanel ? (
-                        <div className="w-full max-w-[340px] rounded-[24px] bg-black/[0.58] p-2 shadow-2xl ring-1 ring-white/[0.12]">
-                          <div className="mb-2 flex items-center justify-between gap-2 px-1 text-white">
-                            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/[0.64]">
-                              {studioPanel === 'filters'
-                                ? 'Filter'
-                                : studioPanel === 'effects'
-                                  ? 'Efek'
-                                  : studioPanel === 'music'
-                                    ? 'Audio'
-                                    : studioPanel === 'link'
-                                      ? 'Link video'
-                                      : 'Speed'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setStudioPanel(null)}
-                              className="grid h-7 w-7 place-items-center rounded-full bg-white/10 text-white/70"
-                              aria-label="Tutup panel"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                          {studioPanel === 'link' ? (
-                            <div className="space-y-2">
-                              <input
-                                value={form.mediaUrl}
-                                onChange={event => {
-                                  setFile(null);
-                                  setError(null);
-                                  setStudioMode('link');
-                                  setField('captureMode', 'upload');
-                                  setField('mediaUrl', event.target.value);
-                                }}
-                                inputMode="url"
-                                placeholder="https://.../video.mp4"
-                                className="h-10 w-full rounded-[15px] border border-white/12 bg-white px-3 text-[12px] font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-300"
-                              />
-                              <p className="px-1 text-[10px] font-semibold leading-4 text-white/[0.62]">
-                                Pakai direct link video HTTPS: MP4, WebM, MOV,
-                                atau M4V. Link YouTube/TikTok belum diputar
-                                langsung.
-                              </p>
-                            </div>
-                          ) : (
-                            <div
-                              ref={studioPanelRail.ref}
-                              onClickCapture={studioPanelRail.onClickCapture}
-                              onPointerCancel={studioPanelRail.onPointerCancel}
-                              onPointerDown={studioPanelRail.onPointerDown}
-                              onPointerLeave={studioPanelRail.onPointerLeave}
-                              onPointerMove={studioPanelRail.onPointerMove}
-                              onPointerUp={studioPanelRail.onPointerUp}
-                              onWheel={studioPanelRail.onWheel}
-                              className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
-                            >
-                              {studioPanel === 'filters'
-                                ? REEL_FILTER_PRESETS.map(filter => {
-                                    const active =
-                                      form.filterPreset === filter.id;
-                                    return (
-                                      <button
-                                        key={filter.id}
-                                        type="button"
-                                        onClick={() =>
-                                          setField('filterPreset', filter.id)
-                                        }
-                                        className={cn(
-                                          'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
-                                          active
-                                            ? 'bg-white text-slate-950'
-                                            : 'bg-white/[0.09] text-white/[0.72]',
-                                        )}
-                                      >
-                                        <span
-                                          className={cn(
-                                            'h-9 w-9 rounded-full ring-1 ring-white/[0.18]',
-                                            filter.swatch,
-                                          )}
-                                        />
-                                        <span className="max-w-full truncate">
-                                          {filter.label}
-                                        </span>
-                                      </button>
-                                    );
-                                  })
-                                : studioPanel === 'effects'
-                                  ? REELS_STUDIO_EFFECTS.map(effect => {
-                                      const active = studioEffect === effect.id;
-                                      return (
-                                        <button
-                                          key={effect.id}
-                                          type="button"
-                                          onClick={() =>
-                                            setStudioEffect(effect.id)
-                                          }
-                                          className={cn(
-                                            'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
-                                            active
-                                              ? 'bg-yellow-300 text-slate-950'
-                                              : 'bg-white/[0.09] text-white/[0.72]',
-                                          )}
-                                        >
-                                          <span
-                                            className={cn(
-                                              'h-9 w-9 rounded-full ring-1 ring-white/[0.18]',
-                                              effect.swatch,
-                                            )}
-                                          />
-                                          <span className="max-w-full truncate">
-                                            {effect.label}
-                                          </span>
-                                        </button>
-                                      );
-                                    })
-                                  : studioPanel === 'music'
-                                    ? REELS_MUSIC_TRACKS.map(track => (
-                                        <button
-                                          key={track}
-                                          type="button"
-                                          onClick={() =>
-                                            setField('musicTrack', track)
-                                          }
-                                          className={cn(
-                                            'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-bold transition active:scale-95',
-                                            form.musicTrack === track
-                                              ? 'bg-yellow-300 text-slate-950'
-                                              : 'bg-white/[0.09] text-white/[0.72]',
-                                          )}
-                                        >
-                                          {track}
-                                        </button>
-                                      ))
-                                    : REELS_STUDIO_SPEEDS.map(speed => (
-                                        <button
-                                          key={speed}
-                                          type="button"
-                                          onClick={() => setStudioSpeed(speed)}
-                                          className={cn(
-                                            'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-bold transition active:scale-95',
-                                            studioSpeed === speed
-                                              ? 'bg-white text-slate-950'
-                                              : 'bg-white/[0.09] text-white/[0.72]',
-                                          )}
-                                        >
-                                          {speed}
-                                        </button>
-                                      ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : recording ? (
-                        <div className="w-[210px] overflow-hidden rounded-full bg-black/[0.52] px-3 py-2 text-[12px] font-bold text-white shadow-xl ring-1 ring-white/[0.12]">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="h-2 w-2 rounded-full bg-rose-500" />
-                              REC
-                            </span>
-                            <span>{recordingRemainingSeconds}s</span>
-                          </div>
-                          <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/[0.16]">
-                            <span
-                              className="block h-full origin-left rounded-full bg-rose-500"
-                              style={{
-                                transform: `scaleX(${recordingProgress})`,
-                              }}
-                            />
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-black/[0.42] p-1 text-[12px] font-bold text-white/50 shadow-xl ring-1 ring-white/[0.12]">
-                          {REELS_STUDIO_DURATIONS.map(duration => (
-                            <button
-                              key={duration}
-                              type="button"
-                              onClick={() => setStudioDuration(duration)}
-                              className={cn(
-                                'h-8 rounded-full px-3 transition',
-                                studioDuration === duration
-                                  ? 'bg-white text-slate-950'
-                                  : 'text-white/[0.62]',
-                              )}
-                            >
-                              {duration}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="absolute inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 grid grid-cols-[54px_minmax(76px,1fr)_54px_54px] items-end gap-2 text-white min-[390px]:inset-x-5 min-[390px]:grid-cols-[58px_minmax(82px,1fr)_58px_58px]">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setStudioPanel(current =>
-                            current === 'effects' ? null : 'effects',
-                          )
-                        }
-                        className="flex flex-col items-center gap-1 text-[11px] font-bold"
-                      >
-                        <span className="grid h-11 w-11 place-items-center rounded-xl bg-black/[0.32] ring-1 ring-white/[0.14]">
-                          <Sparkles className="h-5 w-5 text-yellow-200" />
-                        </span>
-                        <span className="max-w-[64px] truncate">
-                          {studioEffect === 'none'
-                            ? 'Efek'
-                            : activeStudioEffect.label}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        data-lajukan-reels-camera="true"
-                        onClick={handleStudioCapture}
-                        disabled={cameraOpening || submitting}
-                        className={cn(
-                          'mx-auto grid h-[76px] w-[76px] place-items-center rounded-full border-4 border-white shadow-2xl transition active:scale-95 disabled:cursor-wait disabled:opacity-70',
-                          recording ? 'bg-rose-500' : 'bg-white/[0.12]',
-                        )}
-                        aria-label={
-                          locale === 'id'
-                            ? 'Ambil media Reels'
-                            : 'Capture Reels media'
-                        }
-                      >
-                        {cameraOpening ? (
-                          <Loader2 className="h-7 w-7 animate-spin" />
-                        ) : recording ? (
-                          <span className="h-8 w-8 rounded-[8px] bg-white" />
-                        ) : studioMode === 'photo' ? (
-                          <Camera className="h-8 w-8" />
-                        ) : studioMode === 'live' ? (
-                          <Radio className="h-8 w-8" />
-                        ) : (
-                          <span className="h-14 w-14 rounded-full bg-rose-500 ring-4 ring-rose-400/35" />
-                        )}
-                      </button>
-
-                      <label className="flex cursor-pointer flex-col items-center gap-1 text-[11px] font-bold">
-                        <span className="grid h-11 w-11 place-items-center rounded-xl bg-black/[0.32] ring-1 ring-white/[0.14]">
-                          <Upload className="h-5 w-5 text-orange-200" />
-                        </span>
-                        Upload
-                        <input
-                          type="file"
-                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
-                          onChange={event =>
-                            handleFile(event.target.files?.[0] ?? null)
-                          }
-                          className="sr-only"
-                        />
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={openLinkPanel}
-                        className="flex flex-col items-center gap-1 text-[11px] font-bold"
-                      >
-                        <span
-                          className={cn(
-                            'grid h-11 w-11 place-items-center rounded-xl ring-1 ring-white/[0.14]',
-                            isExternalVideoLink
-                              ? 'bg-emerald-300 text-slate-950'
-                              : 'bg-white/[0.18] text-white',
-                          )}
-                        >
-                          <Link2 className="h-5 w-5 text-inherit" />
-                        </span>
-                        Link
-                      </button>
-                    </div>
-                  </>
-                )}
+                  >
+                    {duration}
+                  </button>
+                ))}
               </div>
             </div>
-
-            <div
-              className={cn(
-                'min-w-0 !text-slate-950 dark:!text-white',
-                step === 'media' && 'hidden',
-              )}
-            >
-              {step === 'media' && (
-                <div className="space-y-3">
-                  <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
-                          {activeStudioMode.label}
-                        </p>
-                        <h3 className="truncate text-base font-bold">
-                          {studioMode === 'gallery'
-                            ? 'Pilih dari galeri'
-                            : studioMode === 'photo'
-                              ? 'Ambil foto produk'
-                              : studioMode === 'link'
-                                ? 'Tempel link video'
-                                : studioMode === 'live'
-                                  ? 'Siapkan live'
-                                  : 'Rekam video vertikal'}
-                        </h3>
-                      </div>
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-950">
-                        <ActiveStudioIcon className="h-4.5 w-4.5" />
-                      </span>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                      <label className="inline-flex h-12 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/10 px-3 text-xs font-bold text-white ring-1 ring-white/10 transition active:scale-[0.98]">
-                        <Upload className="h-4 w-4" />
-                        Galeri
-                        <input
-                          type="file"
-                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
-                          onChange={event =>
-                            handleFile(event.target.files?.[0] ?? null)
-                          }
-                          className="sr-only"
-                        />
-                      </label>
-
-                      <button
-                        type="button"
-                        data-lajukan-reels-camera="true"
-                        onClick={() => {
-                          if (studioMode === 'gallery') {
-                            selectStudioMode('video');
-                            return;
-                          }
-                          if (studioMode === 'link') {
-                            openLinkPanel();
-                            return;
-                          }
-                          if (studioMode === 'live') {
-                            setStep('post');
-                            return;
-                          }
-                          if (!cameraReady) {
-                            void openCamera();
-                            return;
-                          }
-                          if (studioMode === 'photo') {
-                            captureCameraPhoto();
-                            return;
-                          }
-                          if (recording) {
-                            stopCameraRecording();
-                          } else {
-                            startCameraRecording();
-                          }
-                        }}
-                        className={cn(
-                          'grid h-16 w-16 place-items-center rounded-full border-4 border-white text-white shadow-2xl transition active:scale-95',
-                          recording ? 'bg-rose-500' : 'bg-white/[0.18]',
-                        )}
-                        aria-label="Ambil media reels"
-                      >
-                        {recording ? (
-                          <span className="h-6 w-6 rounded-[6px] bg-white" />
-                        ) : studioMode === 'photo' ? (
-                          <Camera className="h-7 w-7" />
-                        ) : studioMode === 'link' ? (
-                          <Link2 className="h-7 w-7" />
-                        ) : studioMode === 'live' ? (
-                          <Radio className="h-7 w-7" />
-                        ) : (
-                          <span className="h-9 w-9 rounded-full bg-rose-500" />
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => void openCamera()}
-                        disabled={
-                          studioMode === 'gallery' ||
-                          studioMode === 'link' ||
-                          studioMode === 'live'
-                        }
-                        className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-xs font-bold text-slate-950 transition active:scale-[0.98] disabled:bg-white/10 disabled:text-white/38"
-                      >
-                        <RefreshCcw className="h-4 w-4" />
-                        {cameraReady ? 'Reset' : 'Kamera'}
-                      </button>
-                    </div>
-
-                    {cameraError && (
-                      <p className="mt-3 rounded-[13px] bg-amber-300/12 px-3 py-2 text-xs font-bold text-amber-100">
-                        {cameraError}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="rounded-[20px] border border-white/10 bg-white/[0.05] p-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-white/82">
-                      <SlidersHorizontal className="h-4 w-4 text-emerald-300" />
-                      Filter
-                    </div>
-                    <div
-                      ref={studioFilterRail.ref}
-                      onClickCapture={studioFilterRail.onClickCapture}
-                      onPointerCancel={studioFilterRail.onPointerCancel}
-                      onPointerDown={studioFilterRail.onPointerDown}
-                      onPointerLeave={studioFilterRail.onPointerLeave}
-                      onPointerMove={studioFilterRail.onPointerMove}
-                      onPointerUp={studioFilterRail.onPointerUp}
-                      onWheel={studioFilterRail.onWheel}
-                      className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
-                    >
-                      {REEL_FILTER_PRESETS.map(filter => {
-                        const active = form.filterPreset === filter.id;
-                        return (
-                          <button
-                            key={filter.id}
-                            type="button"
-                            onClick={() => setField('filterPreset', filter.id)}
-                            className={cn(
-                              'inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-[11px] font-bold ring-1 transition active:scale-95',
-                              active
-                                ? 'bg-white text-slate-950 ring-white'
-                                : 'bg-white/8 text-white/70 ring-white/10',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'h-5 w-5 rounded-full ring-1 ring-black/5',
-                                filter.swatch,
-                              )}
-                            />
-                            {filter.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="rounded-[20px] border border-white/10 bg-white/[0.05] p-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-white/82">
-                      <Music className="h-4 w-4 text-yellow-300" />
-                      Musik
-                    </div>
-                    <div
-                      ref={studioMusicRail.ref}
-                      onClickCapture={studioMusicRail.onClickCapture}
-                      onPointerCancel={studioMusicRail.onPointerCancel}
-                      onPointerDown={studioMusicRail.onPointerDown}
-                      onPointerLeave={studioMusicRail.onPointerLeave}
-                      onPointerMove={studioMusicRail.onPointerMove}
-                      onPointerUp={studioMusicRail.onPointerUp}
-                      onWheel={studioMusicRail.onWheel}
-                      className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
-                    >
-                      {REELS_MUSIC_TRACKS.map(track => (
-                        <button
-                          key={track}
-                          type="button"
-                          onClick={() => setField('musicTrack', track)}
-                          className={cn(
-                            'h-9 shrink-0 rounded-full px-3 text-[11px] font-bold ring-1 transition active:scale-95',
-                            form.musicTrack === track
-                              ? 'bg-yellow-300 text-slate-950 ring-yellow-200'
-                              : 'bg-white/8 text-white/70 ring-white/10',
-                          )}
-                        >
-                          {track}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2 text-xs leading-5 text-white/60">
-                    Media bisa dari kamera, file video perangkat, atau direct
-                    link video yang bisa diputar browser.
-                  </div>
-
-                  {studioMode === 'live' && (
-                    <div className="rounded-[18px] border border-rose-400/20 bg-rose-500/10 p-3 text-xs font-semibold leading-5 text-rose-50">
-                      Pilih poster dari galeri, lalu isi judul dan jadwal live.
-                    </div>
-                  )}
-
-                  <label className="hidden cursor-pointer rounded-[18px] border-2 border-dashed border-white/12 bg-white/[0.05] p-4 text-center transition hover:border-emerald-300">
-                    <input
-                      type="file"
-                      accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
-                      onChange={event =>
-                        handleFile(event.target.files?.[0] ?? null)
-                      }
-                      className="sr-only"
-                    />
-                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-100 text-emerald-700">
-                      <Upload className="h-6 w-6" />
-                    </div>
-                    <p className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
-                      {form.captureMode === 'camera'
-                        ? 'Atau pilih dari galeri'
-                        : form.captureMode === 'live'
-                          ? 'Pilih poster / teaser live'
-                          : 'Pilih dari perangkat'}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
-                      MP4, WebM, MOV, JPG, PNG, WebP
-                    </p>
-                    <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                      Video sampai 80 MB aman, jadi 16 MB harusnya lolos kalau
-                      file-nya valid.
-                    </p>
-                  </label>
-
-                  {file && (
-                    <div className="rounded-2xl bg-white/[0.08] px-3 py-2 text-xs font-bold text-white/62">
-                      Terpilih: {file.name} · {formatFileSize(file.size)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {step === 'edit' && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
-                      Langkah 2
-                    </p>
-                    <h3 className="text-lg font-bold leading-tight">
-                      Rapikan reels
-                    </h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-white/52">
-                      Media sudah dipilih, jadi fokusnya tinggal caption dan
-                      kategori.
-                    </p>
-                  </div>
-
-                  {file && (
-                    <div className="rounded-[18px] border border-emerald-300/20 bg-emerald-500/10 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-200">
-                            Media terpilih
-                          </p>
-                          <p className="truncate text-sm font-bold text-slate-950 dark:text-white">
-                            {file.name}
-                          </p>
-                          <p className="text-xs font-semibold text-slate-500 dark:text-white/58">
-                            {file.type || 'Media'} | {formatFileSize(file.size)}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setStep('media')}
-                          className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-950"
-                        >
-                          Ganti
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <label className="block">
-                    <span
-                      className={`${fieldLabelClass} inline-flex items-center gap-1`}
-                    >
-                      <Hash className="h-3.5 w-3.5" />
-                      Kategori
-                    </span>
-                    <input
-                      value={form.tag}
-                      onChange={event => setField('tag', event.target.value)}
-                      maxLength={48}
-                      placeholder="UMKM, Supplier, Packaging, Coffee Shop..."
-                      className={inputClass}
-                    />
-                  </label>
-
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      'UMKM',
-                      'Supplier',
-                      'Packaging',
-                      'Kuliner',
-                      'Promo',
-                      'Behind the scene',
-                    ].map(chip => (
-                      <button
-                        key={chip}
-                        type="button"
-                        onClick={() => setField('tag', chip)}
-                        className={cn(
-                          'rounded-full px-3 py-2 text-xs font-bold',
-                          form.tag === chip
-                            ? 'bg-emerald-700 text-white'
-                            : 'bg-slate-100 text-slate-700 dark:bg-white/[0.08] dark:text-white/64',
-                        )}
-                      >
-                        {chip}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {step === 'post' && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
-                      Posting
-                    </p>
-                    <h3 className="text-lg font-bold leading-tight">
-                      Teks singkat
-                    </h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-white/52">
-                      Isi yang penting saja. Sisanya opsional.
-                    </p>
-                  </div>
-
-                  {form.captureMode === 'live' && (
-                    <div className="rounded-[18px] border border-rose-100 bg-rose-50/80 p-3">
-                      <div className="flex items-center gap-2 text-rose-700">
-                        <Radio className="h-4 w-4" />
-                        <p className="text-xs font-bold uppercase tracking-wide">
-                          Setup live
-                        </p>
-                      </div>
-                      <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                        <label>
-                          <span className={fieldLabelClass}>Judul live</span>
-                          <input
-                            value={form.liveTitle}
-                            onChange={event =>
-                              setField('liveTitle', event.target.value)
-                            }
-                            maxLength={120}
-                            placeholder="Contoh: Live stok baju lebaran jam 8"
-                            className={inputClass}
-                          />
-                        </label>
-                        <label>
-                          <span className={fieldLabelClass}>Jadwal</span>
-                          <input
-                            type="datetime-local"
-                            value={form.liveSchedule}
-                            onChange={event =>
-                              setField('liveSchedule', event.target.value)
-                            }
-                            className={inputClass}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  <label className="block">
-                    <span className={fieldLabelClass}>Caption</span>
-                    <textarea
-                      value={form.caption}
-                      onChange={event =>
-                        setField('caption', event.target.value)
-                      }
-                      maxLength={700}
-                      rows={3}
-                      placeholder="Ceritakan produk, proses, promo, atau tips singkat."
-                      className={textareaClass}
-                    />
-                  </label>
-                </div>
-              )}
-
-              {error && (
-                <div className="mt-3 rounded-2xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
-                  {error}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div
-          className={cn(
-            'border-t border-white/10 p-3.5',
-            step === 'media' && 'hidden',
-          )}
-        >
-          <div className="flex items-center gap-2">
-            {step !== 'media' && (
+          </section>
+        ) : (
+          <>
+            <header className="flex min-h-[58px] shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-3 dark:border-white/10 sm:px-4">
               <button
                 type="button"
                 onClick={() => setStep(step === 'post' ? 'edit' : 'media')}
-                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 dark:border-white/14 dark:bg-transparent dark:text-white"
+                className="grid h-10 w-10 place-items-center rounded-full hover:bg-slate-100 dark:hover:bg-white/8"
+                aria-label={locale === 'id' ? 'Kembali' : 'Back'}
               >
-                Kembali
+                <ArrowLeft className="h-5 w-5" />
               </button>
-            )}
+              <h2 className="min-w-0 flex-1 truncate text-center text-sm font-extrabold sm:text-base">
+                {step === 'edit'
+                  ? locale === 'id' ? 'Edit Reels' : 'Edit Reel'
+                  : locale === 'id' ? 'Posting baru' : 'New post'}
+              </h2>
+              {step === 'edit' ? (
+                <button
+                  type="button"
+                  onClick={() => setStep('post')}
+                  className="min-h-10 rounded-full bg-emerald-700 px-4 text-xs font-extrabold text-white"
+                >
+                  {locale === 'id' ? 'Lanjut' : 'Next'}
+                </button>
+              ) : (
+                <span className="h-10 w-10" aria-hidden="true" />
+              )}
+            </header>
 
-            {step !== 'post' ? (
-              <button
-                type="button"
-                onClick={goNext}
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white shadow-lg shadow-emerald-700/20"
-              >
-                Lanjut
-                <ChevronRight className="h-4 w-4" />
-              </button>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 dark:bg-[#0b0b0b]">
+              {step === 'edit' ? (
+                <div className="mx-auto grid min-h-full w-full max-w-[900px] gap-4 p-3 sm:p-4 md:grid-cols-[minmax(250px,340px)_minmax(0,1fr)] md:items-start">
+                  <div className="mx-auto w-full max-w-[260px] md:max-w-[340px]">
+                    <div className="relative aspect-[9/16] max-h-[46dvh] overflow-hidden rounded-[20px] bg-black shadow-xl sm:max-h-[52dvh] md:max-h-[calc(100dvh-8rem)] md:rounded-[22px]">
+                      {mediaPreviewSrc ? (
+                        isImageMedia ? (
+                          <img src={mediaPreviewSrc} alt="Preview" className="h-full w-full object-cover" style={previewMediaStyle} />
+                        ) : (
+                          <video src={mediaPreviewSrc} className="h-full w-full object-cover" style={previewMediaStyle} controls playsInline preload="metadata" />
+                        )
+                      ) : null}
+                      <StudioEffectOverlay effect={studioEffect} />
+                      <div className="absolute left-2 top-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold text-white">
+                        {studioDuration} · {studioSpeed}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 rounded-[22px] bg-white p-3 shadow-sm ring-1 ring-slate-200 dark:bg-[#151515] dark:ring-white/10 sm:p-4">
+                    <div>
+                      <p className="text-sm font-extrabold">{locale === 'id' ? 'Edit cepat' : 'Quick edit'}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {[
+                          { label: 'Audio', icon: Music, action: () => setStudioPanel('music') },
+                          { label: 'Filter', icon: Sparkles, action: () => setStudioPanel('filters') },
+                          { label: locale === 'id' ? 'Efek' : 'Effects', icon: SlidersHorizontal, action: () => setStudioPanel('effects') },
+                          { label: locale === 'id' ? 'Kecepatan' : 'Speed', icon: Play, action: () => setStudioPanel('speed') },
+                        ].map(item => {
+                          const Icon = item.icon;
+                          return (
+                            <button
+                              key={item.label}
+                              type="button"
+                              onClick={item.action}
+                              className="flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[16px] bg-slate-100 text-xs font-bold text-slate-800 transition active:scale-[0.98] dark:bg-white/8 dark:text-white"
+                            >
+                              <Icon className="h-5 w-5" />
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+
+                    <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-[16px] border border-slate-200 px-3.5 text-sm font-bold dark:border-white/10">
+                      <span className="inline-flex items-center gap-2"><Images className="h-4 w-4" />{locale === 'id' ? 'Ganti video' : 'Replace video'}</span>
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
+                        onChange={event => handleFile(event.target.files?.[0] ?? null)}
+                        className="sr-only"
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="mx-auto grid w-full max-w-[920px] gap-3 p-3 pb-4 sm:gap-4 sm:p-4 md:grid-cols-[170px_minmax(0,1fr)] md:items-start md:gap-5 lg:grid-cols-[210px_minmax(0,1fr)]">
+                  <div className="mx-auto w-full max-w-[112px] sm:max-w-[140px] md:sticky md:top-4 md:max-w-[170px] lg:max-w-[210px]">
+                    <div className="relative aspect-[9/16] overflow-hidden rounded-[18px] bg-black shadow-lg">
+                      {mediaPreviewSrc ? (
+                        isImageMedia ? (
+                          <img src={mediaPreviewSrc} alt="Cover preview" className="h-full w-full object-cover" style={previewMediaStyle} />
+                        ) : (
+                          <video
+                            ref={postPreviewVideoRef}
+                            src={mediaPreviewSrc}
+                            className="h-full w-full object-cover"
+                            style={previewMediaStyle}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            onLoadedMetadata={event => {
+                              const duration = Number.isFinite(event.currentTarget.duration)
+                                ? Math.max(0, event.currentTarget.duration * 1000)
+                                : 0;
+                              setPreviewDurationMs(duration);
+                              if (form.coverTimestampMs > 0 && duration > 0) {
+                                setCoverTimestamp(Math.min(form.coverTimestampMs, duration));
+                              }
+                            }}
+                          />
+                        )
+                      ) : null}
+                      <StudioEffectOverlay effect={studioEffect} />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 space-y-3">
+                    {REELS_LIVE_ENABLED && form.captureMode === 'live' ? (
+                      <section className="rounded-[18px] bg-white p-3.5 ring-1 ring-slate-200 dark:bg-[#151515] dark:ring-white/10">
+                        <label className="block">
+                          <span className={fieldLabelClass}>{locale === 'id' ? 'Judul live' : 'Live title'}</span>
+                          <input
+                            value={form.liveTitle}
+                            onChange={event => setField('liveTitle', event.target.value)}
+                            maxLength={90}
+                            placeholder={locale === 'id' ? 'Contoh: Packing pesanan sore ini' : 'Example: Packing orders live'}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="mt-3 block">
+                          <span className={fieldLabelClass}>{locale === 'id' ? 'Jadwal' : 'Schedule'}</span>
+                          <input
+                            type="datetime-local"
+                            value={form.liveSchedule}
+                            onChange={event => setField('liveSchedule', event.target.value)}
+                            className={inputClass}
+                          />
+                        </label>
+                      </section>
+                    ) : null}
+
+                    <section className="rounded-[18px] bg-white p-3.5 ring-1 ring-slate-200 dark:bg-[#151515] dark:ring-white/10 sm:p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-100 text-sm font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+                          {displayName.trim().charAt(0).toUpperCase() || 'L'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-slate-500 dark:text-white/55">{displayName}</p>
+                          <textarea
+                            value={form.caption}
+                            onChange={event => setField('caption', event.target.value)}
+                            maxLength={2200}
+                            rows={5}
+                            placeholder={locale === 'id' ? 'Tulis caption... #hashtag @akun' : 'Write a caption... #hashtag @account'}
+                            className="mt-1 min-h-[120px] w-full resize-none bg-transparent text-[15px] font-medium leading-6 text-slate-950 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/35"
+                          />
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <div className="flex gap-1.5">
+                              <button type="button" onClick={() => appendCaptionToken('#')} className="min-h-8 rounded-full bg-slate-100 px-3 text-xs font-bold text-slate-700 dark:bg-white/8 dark:text-white"># Hashtag</button>
+                              <button type="button" onClick={() => appendCaptionToken('@')} className="min-h-8 rounded-full bg-slate-100 px-3 text-xs font-bold text-slate-700 dark:bg-white/8 dark:text-white">@ {locale === 'id' ? 'Sebut' : 'Mention'}</button>
+                            </div>
+                            <span className="text-[10px] font-semibold tabular-nums text-slate-400">{postingCaptionLength}/2200</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    {!isImageMedia && previewDurationMs > 0 ? (
+                      <section className="rounded-[18px] bg-white p-3.5 ring-1 ring-slate-200 dark:bg-[#151515] dark:ring-white/10">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold">{locale === 'id' ? 'Pilih sampul' : 'Choose cover'}</p>
+                            <p className="mt-0.5 text-[11px] font-medium text-slate-500 dark:text-white/45">
+                              {Math.round(form.coverTimestampMs / 100) / 10}s
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400">{Math.round(coverPercent)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={Math.max(1, previewDurationMs)}
+                          step={100}
+                          value={Math.min(form.coverTimestampMs, previewDurationMs)}
+                          onChange={event => setCoverTimestamp(Number(event.target.value))}
+                          className="mt-3 w-full accent-emerald-600"
+                          aria-label={locale === 'id' ? 'Waktu sampul video' : 'Video cover time'}
+                        />
+                      </section>
+                    ) : null}
+
+                    <section className="overflow-hidden rounded-[18px] bg-white ring-1 ring-slate-200 dark:bg-[#151515] dark:ring-white/10">
+                      <details className="group border-b border-slate-100 dark:border-white/8">
+                        <summary className={toggleRowClass}>
+                          <span className="inline-flex min-w-0 items-center gap-3">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/12 dark:text-emerald-200"><ShoppingBag className="h-4 w-4" /></span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-bold">{locale === 'id' ? 'Tambahkan produk / usaha' : 'Add product / business'}</span>
+                              <span className="block truncate text-[11px] font-medium text-slate-400">{selectedStore?.name || form.productName || (locale === 'id' ? 'Opsional' : 'Optional')}</span>
+                            </span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-90" />
+                        </summary>
+                        <div className="space-y-3 border-t border-slate-100 p-3.5 dark:border-white/8">
+                          <select value={linkedStoreId} onChange={event => setLinkedStoreId(event.target.value)} className={inputClass} disabled={storesLoading}>
+                            <option value="">{storesLoading ? 'Memuat usaha...' : locale === 'id' ? 'Pilih usaha (opsional)' : 'Choose business (optional)'}</option>
+                            {storeOptions.map(store => <option key={store.id} value={store.id}>{store.name}{store.city ? ` · ${store.city}` : ''}</option>)}
+                          </select>
+                          <input value={form.productName} onChange={event => setField('productName', event.target.value)} maxLength={90} placeholder={locale === 'id' ? 'Nama produk / layanan' : 'Product / service name'} className={inputClass} />
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <input value={form.productPrice} onChange={event => setField('productPrice', event.target.value)} maxLength={60} placeholder={locale === 'id' ? 'Harga, contoh Rp25.000' : 'Price'} className={inputClass} />
+                            <input value={form.productHref} onChange={event => setField('productHref', event.target.value)} maxLength={500} placeholder={locale === 'id' ? 'Link listing (opsional)' : 'Listing link (optional)'} className={inputClass} />
+                          </div>
+                        </div>
+                      </details>
+
+                      <details className="group border-b border-slate-100 dark:border-white/8">
+                        <summary className={toggleRowClass}>
+                          <span className="inline-flex min-w-0 items-center gap-3">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sky-50 text-sky-700 dark:bg-sky-500/12 dark:text-sky-200"><MapPin className="h-4 w-4" /></span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-bold">{locale === 'id' ? 'Tambahkan lokasi' : 'Add location'}</span>
+                              <span className="block truncate text-[11px] font-medium text-slate-400">{form.location || selectedStore?.city || (locale === 'id' ? 'Opsional' : 'Optional')}</span>
+                            </span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-90" />
+                        </summary>
+                        <div className="border-t border-slate-100 p-3.5 dark:border-white/8">
+                          <input value={form.location} onChange={event => setField('location', event.target.value)} maxLength={120} placeholder={locale === 'id' ? 'Contoh: Bandung' : 'Example: Bandung'} className={inputClass} />
+                        </div>
+                      </details>
+
+                      <div className={toggleRowClass}>
+                        <span className="inline-flex min-w-0 items-center gap-3">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-50 text-violet-700 dark:bg-violet-500/12 dark:text-violet-200"><Eye className="h-4 w-4" /></span>
+                          <span className="text-sm font-bold">{locale === 'id' ? 'Siapa yang bisa melihat' : 'Who can view'}</span>
+                        </span>
+                        <select
+                          value={form.visibility}
+                          onChange={event => setField('visibility', event.target.value as ReelVisibility)}
+                          className="max-w-[150px] bg-transparent text-right text-xs font-bold text-slate-600 outline-none dark:text-white/70"
+                        >
+                          <option value="public">{locale === 'id' ? 'Semua orang' : 'Everyone'}</option>
+                          <option value="followers">{locale === 'id' ? 'Pengikut' : 'Followers'}</option>
+                          <option value="private">{locale === 'id' ? 'Hanya saya' : 'Only me'}</option>
+                        </select>
+                      </div>
+
+                      <details className="group border-t border-slate-100 dark:border-white/8">
+                        <summary className={toggleRowClass}>
+                          <span className="inline-flex items-center gap-3">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 dark:bg-white/8 dark:text-white"><SlidersHorizontal className="h-4 w-4" /></span>
+                            <span className="text-sm font-bold">{locale === 'id' ? 'Opsi lainnya' : 'More options'}</span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-400 transition group-open:rotate-90" />
+                        </summary>
+                        <div className="space-y-1 border-t border-slate-100 p-2 dark:border-white/8">
+                          {[
+                            { key: 'allowComments' as const, label: locale === 'id' ? 'Izinkan komentar' : 'Allow comments', value: form.allowComments },
+                            { key: 'shareToMainFeed' as const, label: locale === 'id' ? 'Tampilkan juga di profil' : 'Also show on profile', value: form.shareToMainFeed },
+                            { key: 'promotionalContent' as const, label: locale === 'id' ? 'Konten promosi / kerja sama' : 'Promotional / branded content', value: form.promotionalContent },
+                            { key: 'aiGenerated' as const, label: locale === 'id' ? 'Dibuat atau diubah dengan AI' : 'Made or altered with AI', value: form.aiGenerated },
+                          ].map(option => (
+                            <label key={option.key} className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-2.5 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-white/5">
+                              <span>{option.label}</span>
+                              <span
+                                className={cn(
+                                  'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition',
+                                  option.value ? 'bg-emerald-600' : 'bg-slate-200 dark:bg-white/15',
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={option.value}
+                                  onChange={event => setField(option.key, event.target.checked)}
+                                  className="sr-only"
+                                />
+                                <span
+                                  className={cn(
+                                    'h-5 w-5 rounded-full bg-white shadow-sm transition',
+                                    option.value && 'translate-x-5',
+                                  )}
+                                />
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </details>
+                    </section>
+
+                    {error ? (
+                      <div role="alert" className="rounded-[16px] bg-rose-50 px-3.5 py-3 text-xs font-bold text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/20">
+                        {error}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {step === 'post' ? (
+              <div className="relative z-30 shrink-0 border-t border-slate-200 bg-white/96 px-3 pt-2.5 pb-[max(10px,env(safe-area-inset-bottom))] backdrop-blur dark:border-white/10 dark:bg-[#090909]/96 sm:px-4">
+                <div className="mx-auto flex max-w-[920px] items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep('edit')}
+                    className="h-11 rounded-full border border-slate-200 px-4 text-sm font-bold dark:border-white/14"
+                  >
+                    {locale === 'id' ? 'Kembali' : 'Back'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !hasMedia}
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-extrabold text-white shadow-lg shadow-emerald-700/20 disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {submitting
+                      ? locale === 'id' ? 'Memposting...' : 'Posting...'
+                      : REELS_LIVE_ENABLED && form.captureMode === 'live'
+                        ? locale === 'id' ? 'Jadwalkan live' : 'Schedule live'
+                        : locale === 'id' ? 'Posting' : 'Post'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {studioPanel && step !== 'post' ? (
+          <div className="absolute inset-x-0 bottom-0 z-50 max-h-[48dvh] overflow-y-auto rounded-t-[24px] bg-[#111] p-3 pb-[max(14px,env(safe-area-inset-bottom))] text-white shadow-2xl ring-1 ring-white/10 md:absolute md:left-auto md:right-3 md:bottom-3 md:w-[360px] md:rounded-[22px]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-extrabold">
+                {studioPanel === 'filters' ? 'Filter' : studioPanel === 'effects' ? (locale === 'id' ? 'Efek' : 'Effects') : studioPanel === 'music' ? 'Audio' : studioPanel === 'speed' ? (locale === 'id' ? 'Kecepatan' : 'Speed') : 'Link video'}
+              </p>
+              <button type="button" onClick={() => setStudioPanel(null)} className="grid h-9 w-9 place-items-center rounded-full bg-white/10"><X className="h-4 w-4" /></button>
+            </div>
+
+            {studioPanel === 'filters' ? (
+              <div className="grid grid-cols-3 gap-2">
+                {REEL_FILTER_PRESETS.map(filter => (
+                  <button key={filter.id} type="button" onClick={() => { setField('filterPreset', filter.id); setStudioPanel(null); }} className={cn('rounded-[14px] p-2 text-[11px] font-bold', form.filterPreset === filter.id ? 'bg-white text-slate-950' : 'bg-white/8 text-white')}>
+                    <span className={cn('mx-auto mb-2 block h-12 w-full rounded-[10px]', filter.swatch)} />{filter.label}
+                  </button>
+                ))}
+              </div>
+            ) : studioPanel === 'effects' ? (
+              <div className="grid grid-cols-3 gap-2">
+                {REELS_STUDIO_EFFECTS.map(effect => (
+                  <button key={effect.id} type="button" onClick={() => { setStudioEffect(effect.id); setStudioPanel(null); }} className={cn('rounded-[14px] p-2 text-[11px] font-bold', studioEffect === effect.id ? 'bg-white text-slate-950' : 'bg-white/8 text-white')}>
+                    <span className={cn('mx-auto mb-2 block h-12 w-full rounded-[10px]', effect.swatch)} />{effect.label}
+                  </button>
+                ))}
+              </div>
+            ) : studioPanel === 'music' ? (
+              <div className="space-y-1.5">
+                {REELS_MUSIC_TRACKS.map(track => (
+                  <button key={track} type="button" onClick={() => { setField('musicTrack', track); setStudioPanel(null); }} className={cn('flex min-h-11 w-full items-center gap-3 rounded-[13px] px-3 text-left text-sm font-bold', form.musicTrack === track ? 'bg-white text-slate-950' : 'bg-white/8 text-white')}><Music className="h-4 w-4" />{track}</button>
+                ))}
+              </div>
+            ) : studioPanel === 'speed' ? (
+              <div className="grid grid-cols-5 gap-1.5">
+                {REELS_STUDIO_SPEEDS.map(speed => (
+                  <button key={speed} type="button" onClick={() => { setStudioSpeed(speed); setStudioPanel(null); }} className={cn('min-h-11 rounded-[13px] text-xs font-extrabold', studioSpeed === speed ? 'bg-white text-slate-950' : 'bg-white/8 text-white')}>{speed}</button>
+                ))}
+              </div>
             ) : (
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white shadow-lg shadow-emerald-700/20 disabled:opacity-60"
-              >
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {submitting
-                  ? 'Mengirim...'
-                  : form.captureMode === 'live'
-                    ? 'Jadwalkan live'
-                    : 'Publish reels'}
-              </button>
+              <div>
+                <input value={form.mediaUrl} onChange={event => setField('mediaUrl', event.target.value)} placeholder="https://.../video.mp4" className="h-11 w-full rounded-[13px] border border-white/15 bg-white/10 px-3 text-sm font-semibold text-white outline-none placeholder:text-white/35" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = form.mediaUrl.trim();
+                    if (!isDirectVideoMediaUrl(url)) {
+                      setError(locale === 'id' ? 'Gunakan link langsung video HTTPS (.mp4/.webm/.mov/.m4v).' : 'Use a direct HTTPS video URL.');
+                      return;
+                    }
+                    setFile(null);
+                    setField('captureMode', 'upload');
+                    setStudioMode('link');
+                    setStudioPanel(null);
+                    setStep('edit');
+                  }}
+                  className="mt-2 h-11 w-full rounded-full bg-white text-sm font-extrabold text-slate-950"
+                >
+                  {locale === 'id' ? 'Gunakan video ini' : 'Use this video'}
+                </button>
+              </div>
             )}
           </div>
-        </div>
+        ) : null}
+
+        {error && step !== 'post' ? (
+          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-[60] rounded-[16px] bg-rose-600 px-3 py-2.5 text-xs font-bold text-white shadow-xl md:left-1/2 md:right-auto md:w-[420px] md:-translate-x-1/2">
+            {error}
+          </div>
+        ) : null}
       </form>
     </div>
   );
@@ -8032,14 +8872,14 @@ function AuthPromptSheet({
   if (!message) return null;
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex items-end bg-black/65 text-slate-950  sm:items-center sm:justify-center sm:p-5">
+    <div className="ui-layer-modal fixed inset-0 flex items-end bg-black/65 text-slate-950 sm:items-center sm:justify-center sm:p-4">
       <button
         type="button"
         aria-label="Tutup"
         onClick={onClose}
         className="absolute inset-0"
       />
-      <section className="relative w-full rounded-t-[28px] bg-white p-4 shadow-2xl sm:max-w-[420px] sm:rounded-[28px]">
+      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[28px] bg-white p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[420px] sm:rounded-[28px]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">

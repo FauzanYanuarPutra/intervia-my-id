@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -25,6 +25,74 @@ export function Modal({
   className,
 }: ModalProps) {
   useBodyScrollLock(open);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusableSelector = [
+      'button:not([disabled])',
+      'a[href]',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+
+    const focusFirstControl = window.requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      const first = dialog?.querySelector<HTMLElement>(focusableSelector);
+      (first || dialog)?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const openDialogs = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[role="dialog"][aria-modal="true"]',
+        ),
+      );
+      if (openDialogs[openDialogs.length - 1] !== dialog) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const controls = Array.from(
+        dialog.querySelectorAll<HTMLElement>(focusableSelector),
+      ).filter(element => !element.hasAttribute('disabled'));
+      if (controls.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFirstControl);
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [open]);
 
   if (typeof document === 'undefined') return null;
 
@@ -39,9 +107,11 @@ export function Modal({
           className="ui-layer-modal fixed inset-0 z-[10000] flex h-[var(--app-visual-viewport-height)] w-screen items-end justify-center overflow-hidden bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-0  sm:items-center sm:p-4"
         >
           <motion.section
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label={title}
+            tabIndex={-1}
             initial={{ opacity: 0, y: 32, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.98 }}

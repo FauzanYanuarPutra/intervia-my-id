@@ -4,12 +4,14 @@ defmodule ChatServiceWeb.InboxController do
   alias ChatService.{IdentityClient, Repo}
   alias ChatService.DmRoom
 
-  # Fetch more rows then dedupe by room_id so we show one room per conversation (not one row per message).
+  # Keep legacy reads during the rolling migration to user_room_state. The
+  # canonical table has one row per room; legacy user_rooms has one per message.
   @inbox_fetch_limit 500
   @inbox_return_limit 100
 
   def index(conn, params) do
     user_id_bin = conn.assigns.current_user_id_bin
+
     limit =
       params
       |> Map.get("limit", "30")
@@ -17,45 +19,24 @@ defmodule ChatServiceWeb.InboxController do
       |> min(@inbox_return_limit)
       |> max(1)
 
-    query = "SELECT * FROM user_rooms WHERE user_id = ? ORDER BY last_message_at DESC LIMIT ?"
-
-    case Repo.execute(query, [{"uuid", user_id_bin}, {"int", @inbox_fetch_limit}]) do
+    case fetch_inbox_rows(user_id_bin) do
       {:ok, rows} ->
         unread_map = fetch_unread_map(user_id_bin)
 
-        # Deduplicate by room_id: keep the row with latest last_message_at (first in DESC order).
-        {unique_rows, _seen} =
-          Enum.reduce(Enum.to_list(rows), {[], MapSet.new()}, fn row, {acc, seen} ->
-            rid = row["room_id"]
-            if MapSet.member?(seen, rid) do
-              {acc, seen}
-            else
-              {[row | acc], MapSet.put(seen, rid)}
-            end
-          end)
         unique_rows =
-          unique_rows
-          |> Enum.sort_by(
-            fn row ->
-              case row["last_message_at"] do
-                %DateTime{} = dt -> DateTime.to_unix(dt, :microsecond)
-                %NaiveDateTime{} = ndt ->
-                  ndt
-                  |> DateTime.from_naive!("Etc/UTC")
-                  |> DateTime.to_unix(:microsecond)
-                _ -> 0
-              end
-            end,
-            :desc
-          )
+          rows
+          |> newest_row_per_room()
+          |> Enum.sort_by(&row_timestamp/1, :desc)
           |> Enum.take(limit)
 
         data =
           Enum.map(unique_rows, fn row ->
             room_id = row["room_id"]
             room_type = row["room_type"] || "dm"
+
             {resolved_name, room_avatar, room_avatar_style} =
               resolve_room_display(room_id, room_type, user_id_bin)
+
             room_name = resolved_name || row["room_name"] || room_id
             last_sender = row["last_sender"]
             unread_from_counter = to_nonneg_int(Map.get(unread_map, room_id))
@@ -80,8 +61,86 @@ defmodule ChatServiceWeb.InboxController do
 
         json(conn, %{data: data})
 
+      {:error, _reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{error: "chat storage unavailable"})
+    end
+  end
+
+  defp fetch_inbox_rows(user_id_bin) do
+    current =
+      Repo.execute(
+        "SELECT * FROM user_room_state WHERE user_id = ?",
+        [{"uuid", user_id_bin}]
+      )
+
+    legacy =
+      Repo.execute(
+        "SELECT * FROM user_rooms WHERE user_id = ? ORDER BY last_message_at DESC LIMIT ?",
+        [{"uuid", user_id_bin}, {"int", @inbox_fetch_limit}]
+      )
+
+    case {rows_from(current), rows_from(legacy)} do
+      {{:ok, current_rows}, {:ok, legacy_rows}} -> {:ok, current_rows ++ legacy_rows}
+      {{:ok, current_rows}, {:error, _}} -> {:ok, current_rows}
+      {{:error, _}, {:ok, legacy_rows}} -> {:ok, legacy_rows}
+      {{:error, reason}, {:error, _}} -> {:error, reason}
+    end
+  end
+
+  defp rows_from({:ok, rows}), do: {:ok, Enum.to_list(rows)}
+  defp rows_from({:error, reason}), do: {:error, reason}
+  defp rows_from(other), do: {:error, other}
+
+  defp newest_row_per_room(rows) do
+    rows
+    |> Enum.reduce(%{}, fn row, acc ->
+      case row["room_id"] do
+        room_id when is_binary(room_id) and room_id != "" ->
+          Map.update(acc, room_id, row, fn current ->
+            prefer_inbox_row(row, current)
+          end)
+
+        _ ->
+          acc
+      end
+    end)
+    |> Map.values()
+  end
+
+  # During the rolling migration, an idempotent room-open may seed an empty
+  # canonical row after a real legacy message. Preserve the meaningful legacy
+  # state until the first canonical message projection arrives.
+  defp prefer_inbox_row(candidate, current) do
+    case {meaningful_message?(candidate), meaningful_message?(current)} do
+      {true, false} -> candidate
+      {false, true} -> current
+
       _ ->
-        conn |> put_status(:internal_server_error) |> json(%{error: "db error"})
+        if row_timestamp(candidate) > row_timestamp(current), do: candidate, else: current
+    end
+  end
+
+  defp meaningful_message?(row) do
+    case row["last_message"] do
+      message when is_binary(message) -> String.trim(message) != ""
+      _ -> false
+    end
+  end
+
+  defp row_timestamp(row) do
+    case row["last_message_at"] do
+      %DateTime{} = datetime ->
+        DateTime.to_unix(datetime, :microsecond)
+
+      %NaiveDateTime{} = datetime ->
+        datetime
+        |> DateTime.from_naive!("Etc/UTC")
+        |> DateTime.to_unix(:microsecond)
+
+      _ ->
+        0
     end
   end
 
@@ -91,34 +150,47 @@ defmodule ChatServiceWeb.InboxController do
       peer_id_bin -> get_user_display(peer_id_bin)
     end
   end
+
   defp resolve_room_display(_room_id, _type, _user_id_bin), do: {nil, nil, nil}
 
   defp get_user_display(user_id_bin) do
     user_id = Ecto.UUID.cast!(user_id_bin)
 
-    case IdentityClient.fetch_public_profile(user_id) do
-      {:ok, profile} ->
-        name =
-          IdentityClient.display_name(profile, user_id) ||
-            user_id
+    case local_user_display(user_id_bin, user_id) do
+      {:ok, display} ->
+        display
 
-        avatar = IdentityClient.avatar_url(profile)
-        style = IdentityClient.avatar_style(profile)
-
-        {name, avatar, style}
-
-      _ ->
-        case Repo.execute(
-               "SELECT display_name, username, avatar_url FROM core.users WHERE user_id = ? LIMIT 1",
-               [{"uuid", user_id_bin}]
-             ) do
-          {:ok, [row | _]} ->
-            name = row["display_name"] || row["username"] || user_id
-            {name, row["avatar_url"], nil}
+      :miss ->
+        case IdentityClient.fetch_public_profile(user_id) do
+          {:ok, profile} ->
+            name = IdentityClient.display_name(profile, user_id) || user_id
+            {name, IdentityClient.avatar_url(profile), IdentityClient.avatar_style(profile)}
 
           _ ->
             {user_id, nil, nil}
         end
+    end
+  end
+
+  # The local identity projection is populated when users connect and avoids a
+  # sequential network request for every DM in a large inbox.
+  defp local_user_display(user_id_bin, user_id) do
+    case Repo.execute(
+           "SELECT display_name, username, avatar_url FROM users WHERE user_id = ? LIMIT 1",
+           [{"uuid", user_id_bin}]
+         ) do
+      {:ok, rows} ->
+        case Enum.take(rows, 1) do
+          [row] ->
+            name = row["display_name"] || row["username"] || user_id
+            {:ok, {name, row["avatar_url"], nil}}
+
+          [] ->
+            :miss
+        end
+
+      _ ->
+        :miss
     end
   end
 
@@ -139,11 +211,14 @@ defmodule ChatServiceWeb.InboxController do
   defp same_uuid_bin?(_, _), do: false
 
   defp fetch_unread_map(user_id_bin) do
-    case Repo.execute("SELECT room_id, unread FROM unread_counters WHERE user_id = ?", [{"uuid", user_id_bin}]) do
+    case Repo.execute("SELECT room_id, unread FROM unread_counters WHERE user_id = ?", [
+           {"uuid", user_id_bin}
+         ]) do
       {:ok, rows} ->
         Enum.reduce(rows, %{}, fn row, acc ->
           room_id = row["room_id"]
           unread = to_nonneg_int(row["unread"])
+
           if is_binary(room_id) and room_id != "" do
             Map.put(acc, room_id, unread)
           else
@@ -156,4 +231,3 @@ defmodule ChatServiceWeb.InboxController do
     end
   end
 end
-

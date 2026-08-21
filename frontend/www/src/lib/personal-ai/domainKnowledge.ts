@@ -418,8 +418,10 @@ export function normalizeDomainKnowledgeItems(
       : [];
 
   return rawItems
+    .slice(0, 1_000)
     .map(item => normalizeItem(item))
-    .filter((item): item is LajukanDomainKnowledgeItem => Boolean(item));
+    .filter((item): item is LajukanDomainKnowledgeItem => Boolean(item))
+    .slice(0, 500);
 }
 
 export function mergeDomainKnowledgeItems(
@@ -428,11 +430,14 @@ export function mergeDomainKnowledgeItems(
 ) {
   const seen = new Set<string>();
   const merged: LajukanDomainKnowledgeItem[] = [];
-  for (const item of [...primary, ...secondary]) {
-    const key = `${item.id || item.name}`.toLowerCase();
-    if (!key || seen.has(key)) continue;
+  for (const item of [...primary, ...secondary].slice(0, 1_000)) {
+    const key = `${item.id || item.name}`.trim().toLocaleLowerCase('id-ID');
+    const nameKey = item.name.trim().toLocaleLowerCase('id-ID');
+    if (!key || seen.has(key) || seen.has(`name:${nameKey}`)) continue;
     seen.add(key);
+    seen.add(`name:${nameKey}`);
     merged.push(item);
+    if (merged.length >= 500) break;
   }
   return merged;
 }
@@ -445,12 +450,21 @@ export function buildLajukanDomainKnowledgePrompt({
   limit = 8,
 }: KnowledgePromptInput) {
   const isId = locale === 'id';
-  const queryText = [
-    query,
-    ...media.map(item => `${item.name} ${item.mime} ${item.text || ''}`),
-  ].join('\n');
+  const queryText = cleanString(
+    [
+      query,
+      ...media.slice(0, 8).map(item =>
+        `${cleanString(item.name, 180)} ${cleanString(item.mime, 100)} ${cleanString(item.text, 4_000)}`,
+      ),
+    ].join('\n'),
+    12_000,
+  );
   const tokens = tokenize(queryText);
-  const ranked = rankItems(items, tokens).slice(0, limit);
+  const safeLimit = Math.max(1, Math.min(12, Math.floor(limit) || 8));
+  const ranked = rankItems(items.slice(0, 500), tokens, queryText).slice(
+    0,
+    safeLimit,
+  );
 
   const guardrail = isId
     ? [
@@ -473,11 +487,14 @@ export function buildLajukanDomainKnowledgePrompt({
     ].join('\n');
   }
 
-  return [
-    ...guardrail,
-    isId ? 'Item referensi paling relevan:' : 'Most relevant reference items:',
-    ...ranked.map(item => formatItemForPrompt(item, isId)),
-  ].join('\n');
+  return cleanString(
+    [
+      ...guardrail,
+      isId ? 'Item referensi paling relevan:' : 'Most relevant reference items:',
+      ...ranked.map(item => formatItemForPrompt(item, isId)),
+    ].join('\n'),
+    12_000,
+  );
 }
 
 function normalizeItem(value: unknown): LajukanDomainKnowledgeItem | null {
@@ -487,6 +504,8 @@ function normalizeItem(value: unknown): LajukanDomainKnowledgeItem | null {
   if (!name) return null;
   const id = cleanString(item.id, 120) || slugify(name);
   const category = normalizeCategory(item.category);
+  const sourceUrl = normalizeHttpUrl(item.sourceUrl || item.source_url, 300);
+  const imageUrl = normalizeHttpUrl(item.imageUrl || item.image_url, 500);
   return {
     id,
     category,
@@ -506,8 +525,10 @@ function normalizeItem(value: unknown): LajukanDomainKnowledgeItem | null {
     verify: cleanStringArray(item.verify, 8, 180),
     searchTerms: cleanStringArray(item.searchTerms || item.search_terms, 12, 80),
     sourceName: cleanString(item.sourceName || item.source_name, 120),
-    sourceUrl: cleanString(item.sourceUrl || item.source_url, 300),
-    imageUrl: cleanString(item.imageUrl || item.image_url, 500),
+    // Keep URL fields deterministic for callers/tests: invalid or unsupported
+    // schemes become an empty string rather than disappearing as undefined.
+    sourceUrl,
+    imageUrl,
     license: cleanString(item.license, 120),
   };
 }
@@ -531,6 +552,19 @@ function normalizeCategory(value: unknown): LajukanDomainKnowledgeItem['category
 function cleanString(value: unknown, maxLength: number) {
   if (typeof value !== 'string') return '';
   return value.replace(/\u0000/g, '').trim().slice(0, maxLength);
+}
+
+function normalizeHttpUrl(value: unknown, maxLength: number) {
+  const text = cleanString(value, maxLength);
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    return url.protocol === 'https:' || url.protocol === 'http:'
+      ? url.toString().slice(0, maxLength)
+      : '';
+  } catch {
+    return '';
+  }
 }
 
 function cleanStringArray(value: unknown, maxItems: number, maxLength: number) {
@@ -559,17 +593,47 @@ function tokenize(value: string) {
   return new Set(tokens);
 }
 
-function rankItems(items: LajukanDomainKnowledgeItem[], tokens: Set<string>) {
+function rankItems(
+  items: LajukanDomainKnowledgeItem[],
+  tokens: Set<string>,
+  queryText: string,
+) {
+  const normalizedQuery = normalizeForMatch(queryText);
   const scored = items
-    .map(item => ({ item, score: scoreItem(item, tokens) }))
+    .map(item => ({
+      item,
+      score: scoreItem(item, tokens, normalizedQuery),
+    }))
     .filter(entry => entry.score > 0)
-    .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name));
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.item.name.localeCompare(b.item.name, 'id-ID'),
+    );
   return scored.map(entry => entry.item);
 }
 
-function scoreItem(item: LajukanDomainKnowledgeItem, tokens: Set<string>) {
-  if (tokens.size === 0) return 0;
+function scoreItem(
+  item: LajukanDomainKnowledgeItem,
+  tokens: Set<string>,
+  normalizedQuery: string,
+) {
+  if (tokens.size === 0 && !normalizedQuery) return 0;
   let score = 0;
+
+  const exactCandidates = [
+    item.name,
+    ...item.aliases,
+    ...item.searchTerms,
+  ]
+    .map(normalizeForMatch)
+    .filter(candidate => candidate.length >= 3);
+  for (const candidate of exactCandidates) {
+    if (normalizedQuery.includes(candidate)) {
+      score += candidate === normalizeForMatch(item.name) ? 18 : 12;
+    }
+  }
+
   const fields = [
     [item.name, 6],
     [item.category, 4],
@@ -586,6 +650,15 @@ function scoreItem(item: LajukanDomainKnowledgeItem, tokens: Set<string>) {
     }
   }
   return score;
+}
+
+function normalizeForMatch(value: string) {
+  return value
+    .toLocaleLowerCase('id-ID')
+    .normalize('NFKD')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function formatItemForPrompt(item: LajukanDomainKnowledgeItem, isId: boolean) {

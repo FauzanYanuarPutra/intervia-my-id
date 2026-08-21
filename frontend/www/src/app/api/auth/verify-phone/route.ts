@@ -3,7 +3,7 @@ import {
   authSecurityHeaders,
   enforceAuthRouteSecurity,
 } from '@/lib/authSecurity';
-import { consumeOTPVerificationToken } from '@/lib/redis';
+import { hasOTPVerificationTokenForPurposes } from '@/lib/redis';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { z } from 'zod';
@@ -78,11 +78,14 @@ export async function POST(req: NextRequest) {
     });
     if (!rl.ok) return rl.response;
 
-    const validVerification = await consumeOTPVerificationToken(phoneOtpToken, {
-      type: 'phone',
-      target: normalizedPhone,
-      purpose: 'profile',
-    });
+    const validVerification = await hasOTPVerificationTokenForPurposes(
+      phoneOtpToken,
+      {
+        type: 'phone',
+        target: normalizedPhone,
+      },
+      ['profile'],
+    );
 
     if (!validVerification) {
       return NextResponse.json(
@@ -100,9 +103,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         phone: normalizedPhone,
-        verification: {
-          phone_verified: true,
-        },
+        phone_otp_token: phoneOtpToken,
       }),
     });
 

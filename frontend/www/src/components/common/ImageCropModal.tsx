@@ -10,7 +10,8 @@ import {
   type PointerEvent,
   type WheelEvent,
 } from 'react';
-import { Loader2, Minus, Move, Plus, RotateCcw, X } from 'lucide-react';
+import { Loader2, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
@@ -52,7 +53,7 @@ type PinchGesture = {
   startScale: number;
 };
 
-const MIN_FRAME_SIZE = 220;
+const MIN_FRAME_EDGE = 96;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
@@ -107,7 +108,6 @@ export function ImageCropModal({
 
   const imageRef = useRef<HTMLImageElement | null>(null);
   const stageShellRef = useRef<HTMLDivElement | null>(null);
-  const frameRef = useRef<HTMLDivElement | null>(null);
   const pointersRef = useRef<Map<number, Point>>(new Map());
   const gestureRef = useRef<DragGesture | PinchGesture | null>(null);
 
@@ -120,6 +120,12 @@ export function ImageCropModal({
   const [position, setPosition] = useState<Point>({ x: 0, y: 0 });
   const [imageReady, setImageReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const frameClass = shape === 'round' ? 'rounded-full' : 'rounded-[24px]';
   const minScale = useMemo(() => {
@@ -141,49 +147,50 @@ export function ImageCropModal({
     if (!open) return;
 
     const updateFrame = () => {
-      const shellWidth =
-        stageShellRef.current?.clientWidth || Math.max(260, window.innerWidth);
+      const shell = stageShellRef.current;
+      const shellWidth = Math.max(1, shell?.clientWidth || window.innerWidth);
+      const shellHeight = Math.max(1, shell?.clientHeight || window.innerHeight);
       const desktop = window.innerWidth >= 640;
-      const availableWidth = Math.max(240, shellWidth - (desktop ? 8 : 0));
-      const maxFrameWidth = Math.min(desktop ? 640 : 520, availableWidth);
-      const reservedHeight = desktop ? 250 : 320;
-      const maxFrameHeight = Math.max(
-        MIN_FRAME_SIZE,
-        Math.min(desktop ? 620 : 520, window.innerHeight - reservedHeight),
-      );
+      const inset = desktop ? 28 : 16;
+      const availableWidth = Math.max(MIN_FRAME_EDGE, shellWidth - inset * 2);
+      const availableHeight = Math.max(MIN_FRAME_EDGE, shellHeight - inset * 2);
 
-      let width = maxFrameWidth;
+      let width = Math.min(desktop ? 720 : 560, availableWidth);
       let height = width / aspect;
-      if (height > maxFrameHeight) {
-        height = maxFrameHeight;
+
+      if (height > availableHeight) {
+        height = availableHeight;
         width = height * aspect;
       }
 
       const next = {
-        width: Math.max(MIN_FRAME_SIZE, Math.floor(width)),
-        height: Math.max(MIN_FRAME_SIZE / aspect, Math.floor(height)),
+        width: Math.max(1, Math.floor(width)),
+        height: Math.max(1, Math.floor(height)),
       };
 
       setFrameSize(prev =>
         Math.abs(prev.width - next.width) > 1 ||
-          Math.abs(prev.height - next.height) > 1
+        Math.abs(prev.height - next.height) > 1
           ? next
           : prev,
       );
     };
 
-    updateFrame();
+    const frame = window.requestAnimationFrame(updateFrame);
     const observer =
       typeof ResizeObserver !== 'undefined'
         ? new ResizeObserver(updateFrame)
         : null;
+
     if (stageShellRef.current && observer) {
       observer.observe(stageShellRef.current);
     }
+
     window.addEventListener('resize', updateFrame);
     window.addEventListener('orientationchange', updateFrame);
 
     return () => {
+      window.cancelAnimationFrame(frame);
       observer?.disconnect();
       window.removeEventListener('resize', updateFrame);
       window.removeEventListener('orientationchange', updateFrame);
@@ -196,6 +203,7 @@ export function ImageCropModal({
     gestureRef.current = null;
     setNaturalSize({ width: 0, height: 0 });
     setImageReady(false);
+    setError('');
     setScale(1);
     setPosition({ x: 0, y: 0 });
   }, [imageSrc, open]);
@@ -263,6 +271,7 @@ export function ImageCropModal({
 
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (loading) return;
         onCancel();
         return;
       }
@@ -282,7 +291,7 @@ export function ImageCropModal({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onCancel, open, resetCrop, scale, zoomTo]);
+  }, [loading, onCancel, open, resetCrop, scale, zoomTo]);
 
   const startPinchGesture = (element: HTMLDivElement) => {
     const points = Array.from(pointersRef.current.values()).slice(0, 2);
@@ -420,8 +429,9 @@ export function ImageCropModal({
   };
 
   const handleConfirm = async () => {
-    if (!imageRef.current || !naturalSize.width || !naturalSize.height) return;
+    if (loading || !imageRef.current || !naturalSize.width || !naturalSize.height) return;
 
+    setError('');
     setLoading(true);
     try {
       const cropW = Math.min(naturalSize.width, frameSize.width / scale);
@@ -476,226 +486,230 @@ export function ImageCropModal({
           type: 'image/jpeg',
         }),
       );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Gambar belum berhasil disimpan. Coba lagi.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  const modal = (
     <div
-      className="ui-layer-modal fixed inset-0 z-[1400] flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_68%,_transparent)] p-2  sm:items-center sm:p-4"
+      className="ui-layer-modal fixed inset-0 z-[1600] flex items-stretch justify-center overflow-hidden bg-slate-950/78 backdrop-blur-[3px] sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
-      <div className="flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[26px] border border-white/15 bg-[color:var(--app-surface-strong)] shadow-[0_24px_90px_-30px_rgba(0,0,0,0.55)] sm:max-w-[1040px] sm:rounded-[32px]">
-        <div className="shrink-0 border-b border-[color:var(--app-border)] px-3 pb-3 pt-3 sm:px-5">
-          <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-[color:var(--app-surface-muted)] sm:hidden" />
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                {shape === 'round' ? 'Foto profil' : 'Cover image'}
-              </p>
-              <h3 className="mt-1 truncate text-lg font-bold text-[color:var(--app-text)] sm:text-xl">
-                {title}
-              </h3>
-              <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
-                Geser gambar, pinch dua jari, pakai tombol, atau scroll mouse
-                untuk zoom.
-              </p>
+      <button
+        type="button"
+        aria-label="Tutup crop"
+        onClick={onCancel}
+        disabled={loading}
+        tabIndex={-1}
+        className="absolute inset-0 hidden cursor-default sm:block"
+      />
+
+      <div className="relative z-10 flex h-[100dvh] max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-[#090b0f] text-white shadow-2xl sm:h-[min(760px,calc(100dvh-2rem))] sm:max-w-[780px] sm:rounded-[26px] sm:ring-1 sm:ring-white/12">
+        <header className="grid min-h-14 shrink-0 grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/8 bg-[#090b0f]/94 px-[max(0.75rem,env(safe-area-inset-left))] pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur-xl sm:min-h-16 sm:px-4 sm:py-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="grid h-10 w-10 place-items-center rounded-full text-white/82 transition hover:bg-white/8 hover:text-white active:scale-95 disabled:opacity-40"
+            aria-label="Batal"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <h3 className="truncate text-center text-[15px] font-bold tracking-[-0.01em] text-white sm:text-left sm:text-base">
+            {title}
+          </h3>
+
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={loading || !imageReady}
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-500 px-4 text-xs font-extrabold text-white shadow-[0_10px_28px_-16px_rgba(16,185,129,0.9)] transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-wait disabled:opacity-45 sm:min-h-10 sm:text-sm"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {loading ? 'Menyimpan' : 'Simpan'}
+          </button>
+        </header>
+
+        <div
+          ref={stageShellRef}
+          className="relative grid min-h-0 flex-1 place-items-center overflow-hidden overscroll-none bg-[radial-gradient(circle_at_50%_36%,rgba(255,255,255,0.045),transparent_42%),#050609]"
+        >
+          <div
+            className="relative select-none"
+            style={{
+              width: `${frameSize.width}px`,
+              height: `${frameSize.height}px`,
+              maxWidth: '100%',
+              maxHeight: '100%',
+            }}
+          >
+            <div
+              tabIndex={0}
+              autoFocus
+              className={cn(
+                'relative h-full w-full touch-none overflow-hidden bg-black outline-none ring-offset-2 ring-offset-black focus-visible:ring-2 focus-visible:ring-emerald-400',
+                frameClass,
+              )}
+              onDoubleClick={handleDoubleClick}
+              onKeyDown={handleFrameKeyDown}
+              onPointerCancel={handlePointerUp}
+              onPointerDown={handlePointerDown}
+              onPointerLeave={event => {
+                if (pointersRef.current.size <= 1) handlePointerUp(event);
+              }}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onWheel={handleWheel}
+              style={{ cursor: 'grab' }}
+              aria-label="Area crop. Geser gambar untuk mengatur posisi."
+            >
+              {!imageReady ? (
+                <div className="absolute inset-0 z-20 grid place-items-center text-white">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : null}
+
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                ref={imageRef}
+                src={imageSrc}
+                alt="Preview crop"
+                className="absolute left-1/2 top-1/2 max-w-none select-none"
+                draggable={false}
+                onLoad={event => {
+                  const image = event.currentTarget;
+                  const nextNaturalSize = {
+                    width: image.naturalWidth,
+                    height: image.naturalHeight,
+                  };
+                  const nextMinScale = Math.max(
+                    frameSize.width / nextNaturalSize.width,
+                    frameSize.height / nextNaturalSize.height,
+                  );
+
+                  setNaturalSize(nextNaturalSize);
+                  setScale(nextMinScale);
+                  setPosition({ x: 0, y: 0 });
+                  setImageReady(true);
+                }}
+                onError={() => {
+                  setImageReady(false);
+                  setError('Gambar tidak bisa dibuka. Pilih gambar lain.');
+                }}
+                style={{
+                  transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                  transformOrigin: 'center',
+                  width: naturalSize.width ? `${naturalSize.width}px` : 'auto',
+                  willChange: 'transform',
+                }}
+              />
+
+              {shape !== 'round' ? (
+                <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-25">
+                  {Array.from({ length: 9 }).map((_, index) => (
+                    <span key={index} className="border border-white/40" />
+                  ))}
+                </div>
+              ) : null}
             </div>
+
+            <div
+              className={cn(
+                'pointer-events-none absolute inset-0 ring-2 ring-white/95 shadow-[0_0_0_9999px_rgba(0,0,0,0.62)]',
+                frameClass,
+              )}
+            />
+          </div>
+
+          <div className="pointer-events-none absolute bottom-3 left-1/2 max-w-[calc(100%-2rem)] -translate-x-1/2 truncate rounded-full bg-black/58 px-3 py-1.5 text-[10px] font-semibold text-white/78 ring-1 ring-white/8 backdrop-blur-md sm:bottom-4 sm:text-[11px]">
+            Geser foto • cubit untuk zoom
+          </div>
+        </div>
+
+        <footer className="shrink-0 border-t border-white/8 bg-[#090b0f]/96 px-[max(0.875rem,env(safe-area-inset-left))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:px-5 sm:pb-4 sm:pt-4">
+          <div className="mx-auto flex w-full max-w-[560px] items-center gap-2.5 rounded-full bg-white/[0.055] px-2 py-1.5 ring-1 ring-white/8 sm:px-2.5">
+            <CropIconButton
+              label="Perkecil"
+              disabled={!imageReady || loading || scale <= minScale + 0.0001}
+              onClick={() => zoomTo(scale * 0.9)}
+            >
+              <Minus className="h-4 w-4" />
+            </CropIconButton>
+
+            <input
+              type="range"
+              min={minScale}
+              max={maxScale}
+              step={Math.max((maxScale - minScale) / 180, 0.0001)}
+              value={scale}
+              onChange={event => zoomTo(Number(event.target.value))}
+              disabled={!imageReady || loading}
+              className="min-w-0 flex-1 accent-emerald-500 disabled:opacity-40"
+              aria-label={`Zoom ${zoomPercent}%`}
+            />
+
+            <CropIconButton
+              label="Perbesar"
+              disabled={!imageReady || loading || scale >= maxScale - 0.0001}
+              onClick={() => zoomTo(scale * 1.1)}
+            >
+              <Plus className="h-4 w-4" />
+            </CropIconButton>
+
             <button
               type="button"
-              onClick={onCancel}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] transition hover:bg-[color:color-mix(in_srgb,var(--app-surface-muted)_82%,var(--app-text)_8%)]"
-              aria-label="Close crop"
+              onClick={resetCrop}
+              disabled={!imageReady || loading}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/58 transition hover:bg-white/8 hover:text-white active:scale-95 disabled:opacity-30"
+              aria-label="Reset crop"
+              title="Reset"
             >
-              <X className="h-4.5 w-4.5" />
+              <RotateCcw className="h-4 w-4" />
             </button>
           </div>
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-          <div className="grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1fr)_310px] lg:gap-4">
-            <div ref={stageShellRef} className="min-w-0">
-              <div className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.2),transparent_28%),linear-gradient(135deg,rgba(2,6,23,0.92),rgba(15,23,42,0.78))] p-2 shadow-inner sm:rounded-[30px] sm:p-3">
-                <div
-                  ref={frameRef}
-                  className="relative mx-auto select-none"
-                  style={{
-                    width: `${frameSize.width}px`,
-                    height: `${frameSize.height}px`,
-                    maxWidth: '100%',
-                  }}
-                >
-                  <div
-                    tabIndex={0}
-                    className={cn(
-                      'relative h-full w-full touch-none overflow-hidden bg-slate-950 outline-none ring-offset-2 ring-offset-slate-950 focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
-                      frameClass,
-                    )}
-                    onDoubleClick={handleDoubleClick}
-                    onKeyDown={handleFrameKeyDown}
-                    onPointerCancel={handlePointerUp}
-                    onPointerDown={handlePointerDown}
-                    onPointerLeave={event => {
-                      if (pointersRef.current.size <= 1) handlePointerUp(event);
-                    }}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onWheel={handleWheel}
-                    style={{ cursor: 'grab' }}
-                  >
-                    {!imageReady ? (
-                      <div className="absolute inset-0 grid place-items-center text-white">
-                        <Loader2 className="h-7 w-7 animate-spin" />
-                      </div>
-                    ) : null}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      ref={imageRef}
-                      src={imageSrc}
-                      alt="Crop preview"
-                      className="absolute left-1/2 top-1/2 max-w-none select-none"
-                      draggable={false}
-                      onLoad={event => {
-                        const image = event.currentTarget;
-                        const nextNaturalSize = {
-                          width: image.naturalWidth,
-                          height: image.naturalHeight,
-                        };
-                        const nextMinScale = Math.max(
-                          frameSize.width / nextNaturalSize.width,
-                          frameSize.height / nextNaturalSize.height,
-                        );
-                        setNaturalSize(nextNaturalSize);
-                        setScale(nextMinScale);
-                        setPosition({ x: 0, y: 0 });
-                        setImageReady(true);
-                      }}
-                      style={{
-                        transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transformOrigin: 'center',
-                        width: naturalSize.width
-                          ? `${naturalSize.width}px`
-                          : 'auto',
-                        willChange: 'transform',
-                      }}
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.16),transparent_20%,transparent_80%,rgba(0,0,0,0.20))]" />
-                    <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-50">
-                      {Array.from({ length: 9 }).map((_, index) => (
-                        <span key={index} className="border border-white/28" />
-                      ))}
-                    </div>
-                    <div className="pointer-events-none absolute inset-0 grid place-items-center text-white/80">
-                      <Move className="h-6 w-6 drop-shadow" />
-                    </div>
-                  </div>
-
-                  <div
-                    className={cn(
-                      'pointer-events-none absolute inset-0 ring-2 ring-white/90 shadow-[0_0_0_9999px_rgba(2,6,23,0.52)]',
-                      frameClass,
-                    )}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <aside className="space-y-3 rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 sm:p-4">
-              <div className="rounded-[20px] bg-[color:var(--app-surface-strong)] p-3 shadow-sm">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    Zoom
-                  </span>
-                  <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[color:var(--app-accent)]">
-                    {zoomPercent}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={minScale}
-                  max={maxScale}
-                  step={(maxScale - minScale) / 160}
-                  value={scale}
-                  onChange={event => zoomTo(Number(event.target.value))}
-                  className="w-full accent-[color:var(--app-accent)]"
-                  aria-label="Zoom crop"
-                />
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <CropToolButton
-                    label="Zoom out"
-                    onClick={() => zoomTo(scale * 0.88)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </CropToolButton>
-                  <CropToolButton label="Reset" onClick={resetCrop}>
-                    <RotateCcw className="h-4 w-4" />
-                  </CropToolButton>
-                  <CropToolButton
-                    label="Zoom in"
-                    onClick={() => zoomTo(scale * 1.12)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </CropToolButton>
-                </div>
-              </div>
-
-              <div className="rounded-[20px] bg-[color:var(--app-surface-strong)] p-3 text-xs font-semibold leading-6 text-[color:var(--app-text)] shadow-sm">
-                <p className="font-bold text-[color:var(--app-text)]">
-                  Tips crop cepat
-                </p>
-                <p className="mt-2 text-[color:var(--app-text-soft)]">
-                  Untuk foto profil, posisikan wajah/logo sedikit di tengah dan
-                  sisakan ruang tipis di atas kepala. Di HP bisa pinch dua jari.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="rounded-full border border-[color:var(--app-border-strong)] px-4 py-2 text-xs font-bold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-strong)]"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirm}
-                  disabled={loading || !imageReady}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-60"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : null}
-                  Simpan Crop
-                </button>
-              </div>
-            </aside>
-          </div>
-        </div>
+          {error ? (
+            <p className="mx-auto mt-2 max-w-[560px] text-center text-[11px] font-semibold text-rose-300">
+              {error}
+            </p>
+          ) : null}
+        </footer>
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
 
-function CropToolButton({
+function CropIconButton({
   children,
   label,
+  disabled = false,
   onClick,
 }: {
   children: React.ReactNode;
   label: string;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
+      disabled={disabled}
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white/72 transition hover:bg-white/8 hover:text-white active:scale-95 disabled:cursor-default disabled:opacity-30"
       aria-label={label}
       title={label}
     >

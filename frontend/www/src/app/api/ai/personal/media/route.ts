@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MEDIA_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
+import {
+  MEDIA_UPLOAD_RAW_MAX_BYTES,
+  VOICE_NOTE_UPLOAD_MAX_BYTES,
+} from '@/lib/media/uploadStandard';
 import { safeErrorCode } from '@/lib/server/safeLog';
 import { guardUploadRequest } from '@/lib/server/uploadGuard';
 import {
@@ -44,7 +47,10 @@ export async function POST(req: NextRequest) {
   if (!guard.ok) return guard.response;
 
   try {
-    const incomingFiles = collectUploadFiles(await req.formData(), PERSONAL_AI_MEDIA_KEYS);
+    const incomingFiles = collectUploadFiles(
+      await req.formData(),
+      PERSONAL_AI_MEDIA_KEYS,
+    );
     const rejected: UploadRejection[] = [];
     const files = incomingFiles.filter(file => {
       if (!isUnsafePersonalAiUpload(file)) return true;
@@ -72,6 +78,7 @@ export async function POST(req: NextRequest) {
       concurrency: 2,
       folder: `personal-ai/${guard.auth.userId}`,
       maxBytes: MEDIA_UPLOAD_RAW_MAX_BYTES,
+      maxBytesByType: { audio: VOICE_NOTE_UPLOAD_MAX_BYTES },
       minioTarget: `personal-ai/${guard.auth.userId}`,
       requireMinio: true,
       minioTimeoutMs: 20_000,

@@ -1,6 +1,6 @@
 # AI Creation Hub
 
-Status: phase 1 implemented 2026-07-14.
+Status: phase 1 implemented 2026-07-14; persistence audit updated 2026-08-13.
 
 ## Purpose
 
@@ -21,6 +21,29 @@ Community posts, reels, opportunities, and jobs remain reserved creation targets
 - Every service query includes both the random draft ID and authenticated `owner_id`.
 - Draft IDs are non-sequential `drf_<uuid-simple>` values.
 - Drafts expire after 30 days and can be `ready`, `editing`, `consumed`, `expired`, or `discarded`.
+
+## Personal AI Conversation Persistence
+
+- Marketplace Postgres is the canonical production store for Personal AI agents, threads, messages, and memories. The marketplace migration runner must finish before the WWW application serves Profile AI traffic.
+- WWW requests do not run schema DDL. Personal AI schema changes belong in additive `services/marketplace_service/migrations` files so application credentials do not require table-creation or alteration privileges.
+- A missing or unavailable configured Postgres store fails the Profile AI request; it never silently forks production conversations into a local file.
+- File storage is a local development/test fallback. A production operator must set both `PERSONAL_AI_ALLOW_FILE_STORE=true` and an explicit, absolute, non-temporary `PERSONAL_AI_STORE_DIR`; that directory must be backed by durable storage and is unsuitable for multiple WWW replicas.
+- A missing file initializes an empty local store. An unreadable or malformed file is treated as a storage failure instead of being overwritten as empty state.
+- Shared-agent memory is consented per `(agent_id, viewer_id)` and defaults off. The assistant owner's memory setting never grants consent for a link recipient. A recipient can inspect the summary stored for their account, disable future updates, or delete the summary without deleting chat history.
+- Every chat send carries a stable `client_ref`. Postgres claims `(viewer_id, client_ref)` before invoking a provider, rejects the same reference with a different request hash, and atomically stores the user/assistant messages with the replay response. Concurrent retries receive an in-progress response; completed retries replay without another provider call.
+- Quick-button hidden instructions never cross the non-owner DTO boundary and are never accepted as browser input. Shared clients submit only a response-local public button ID; the server resolves the owner's stored instruction after authorizing the agent.
+- Owners can rotate a share token without changing visibility or revoke all link access by rotating the token and switching the assistant to `private`. Old links stop resolving immediately after the database update.
+- The browser may hydrate display-safe agent metadata, thread metadata, and the
+  most recent message text from a bounded, per-user IndexedDB cache before one
+  server revalidation. PostgreSQL remains canonical; inference is never treated
+  as offline-capable. Hidden instructions, builder/provider configuration,
+  creation-draft payloads, media references, and memory summaries are not
+  cached. Loading agents/threads/messages is single-path and stale async results
+  cannot replace a newer selection.
+- A shared recipient's memory summary is injected only after that recipient's
+  viewer-scoped opt-in check. It is independent from the creator's own
+  `memory_enabled` preference; an owner setting cannot grant or revoke consent
+  for another account.
 
 ## Flow
 

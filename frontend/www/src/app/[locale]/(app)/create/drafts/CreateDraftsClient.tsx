@@ -62,11 +62,17 @@ export default function CreateDraftsClient() {
   const params = useParams<{ locale?: string }>();
   const locale = params?.locale === 'en' ? 'en' : 'id';
   const router = useRouter();
-  const { authFetch, isAuthenticated } = useAuth();
+  const { authFetch, isAuthenticated, loading: authLoading, user } = useAuth();
+  const draftOwnerId = user?.id?.trim() || '';
   const [localDraft, setLocalDraft] = useState<TemporaryCreateDraft | null>(
-    () => readTemporaryCreateDraft(),
+    null,
   );
   const [serverDrafts, setServerDrafts] = useState<ServerDraft[]>([]);
+
+  useEffect(() => {
+    if (authLoading || !draftOwnerId) return;
+    setLocalDraft(readTemporaryCreateDraft(draftOwnerId));
+  }, [authLoading, draftOwnerId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -153,7 +159,7 @@ export default function CreateDraftsClient() {
                         <button
                           type="button"
                           onClick={() => {
-                            clearTemporaryCreateDraft();
+                            clearTemporaryCreateDraft(draftOwnerId);
                             setLocalDraft(null);
                           }}
                           className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold dark:border-slate-700"

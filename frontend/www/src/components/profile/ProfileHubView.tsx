@@ -2,12 +2,14 @@
 
 import type { ChangeEvent, ComponentType, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { CompactSeeAllLink } from '@/components/common/CompactSectionAction';
 import { usePathname } from 'next/navigation';
 import { Modal } from '@/components/common/Modal';
 import { IdentityVerificationPanel } from '@/components/profile/IdentityVerificationPanel';
 import { LocalizedLink } from '@/components/ui-kit';
+import { useAuth } from '@/context/AuthContext';
 import {
   useNotificationInbox,
   type InboxNotification,
@@ -60,6 +62,7 @@ import {
   UserPen,
   UserPlus,
   Users,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -164,7 +167,7 @@ export type ProfileHubViewProps = {
   onPhoneChange: (value: string) => void;
   onLocationChange: (value: string) => void;
   onBioChange: (value: string) => void;
-  onSaveProfile: () => void;
+  onSaveProfile: () => void | Promise<void>;
   onCoverFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onAvatarFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   listings: ListingItem[];
@@ -196,6 +199,15 @@ type HubTab =
   | 'komunitas'
   | 'trust';
 type SocialModalTab = 'followers' | 'following';
+
+type ProfileEditorSection =
+  | 'menu'
+  | 'main'
+  | 'contact'
+  | 'professional'
+  | 'history'
+  | 'links'
+  | 'media';
 
 type DiscoverUser = {
   id?: string;
@@ -340,7 +352,7 @@ function buildNotificationTargetHref(notification: InboxNotification): string {
   ]);
   if (entityType === 'profile' && entityId) return `/profile/${entityId}`;
   if ((entityType === 'reel' || entityType === 'reels') && entityId) {
-    return `/reels?reel=${encodeURIComponent(entityId)}`;
+    return `/reels?video=${encodeURIComponent(entityId)}`;
   }
   if (entityType === 'content' && entityId) {
     return `/content/${encodeURIComponent(entityId)}`;
@@ -1055,6 +1067,491 @@ function ProfileGameProgress({
   );
 }
 
+
+function InlineProfileEditorModal({
+  section,
+  isId,
+  saving,
+  message,
+  fullNameInput,
+  usernameInput,
+  phoneInput,
+  locationInput,
+  bioInput,
+  email,
+  professionalDraft,
+  onFullNameChange,
+  onUsernameChange,
+  onPhoneChange,
+  onLocationChange,
+  onBioChange,
+  onProfessionalDraftChange,
+  onSaveCore,
+  onSaveProfessional,
+  onCoverFileChange,
+  onAvatarFileChange,
+  coverUploading,
+  avatarUploading,
+  onOpenTrust,
+  onSectionChange,
+  onClose,
+}: {
+  section: ProfileEditorSection | null;
+  isId: boolean;
+  saving: boolean;
+  message: string | null;
+  fullNameInput: string;
+  usernameInput: string;
+  phoneInput: string;
+  locationInput: string;
+  bioInput: string;
+  email: string;
+  professionalDraft: ProfessionalData;
+  onFullNameChange: (value: string) => void;
+  onUsernameChange: (value: string) => void;
+  onPhoneChange: (value: string) => void;
+  onLocationChange: (value: string) => void;
+  onBioChange: (value: string) => void;
+  onProfessionalDraftChange: (value: ProfessionalData) => void;
+  onSaveCore: () => void | Promise<void>;
+  onSaveProfessional: () => void | Promise<void>;
+  onCoverFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onAvatarFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  coverUploading: boolean;
+  avatarUploading: boolean;
+  onOpenTrust: () => void;
+  onSectionChange: (section: ProfileEditorSection) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!section || typeof document === 'undefined') return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [section]);
+
+  if (!section || typeof document === 'undefined') return null;
+
+  const titles: Record<ProfileEditorSection, string> = {
+    menu: isId ? 'Edit profil' : 'Edit profile',
+    main: isId ? 'Profil utama' : 'Main profile',
+    contact: isId ? 'Kontak' : 'Contact',
+    professional: isId ? 'Keahlian profesional' : 'Professional profile',
+    history: isId ? 'Pengalaman & pendidikan' : 'Experience & education',
+    links: isId ? 'Link & portofolio' : 'Links & portfolio',
+    media: isId ? 'Foto profil' : 'Profile photos',
+  };
+
+  const updateDraft = (patch: Partial<ProfessionalData>) => {
+    onProfessionalDraftChange({ ...professionalDraft, ...patch });
+  };
+
+  const updateEntry = (
+    key: 'experiences' | 'education' | 'certifications',
+    index: number,
+    field: keyof ProfessionalEntry,
+    value: string,
+  ) => {
+    updateDraft({
+      [key]: professionalDraft[key].map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    } as Partial<ProfessionalData>);
+  };
+
+  const addEntry = (key: 'experiences' | 'education' | 'certifications') => {
+    updateDraft({
+      [key]: [...professionalDraft[key], { title: '', subtitle: '', meta: '', url: '' }],
+    } as Partial<ProfessionalData>);
+  };
+
+  const removeEntry = (
+    key: 'experiences' | 'education' | 'certifications',
+    index: number,
+  ) => {
+    updateDraft({
+      [key]: professionalDraft[key].filter((_, itemIndex) => itemIndex !== index),
+    } as Partial<ProfessionalData>);
+  };
+
+  const editorInput =
+    'min-h-11 w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]';
+  const editorTextarea = `${editorInput} min-h-28 resize-y py-3 leading-6`;
+  const labelClass =
+    'mb-1.5 block text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]';
+
+  const menuItems: Array<{
+    key: ProfileEditorSection;
+    title: string;
+    description: string;
+    icon: LucideIcon;
+  }> = [
+    {
+      key: 'main',
+      title: isId ? 'Profil utama' : 'Main profile',
+      description: isId ? 'Nama, username, lokasi, dan bio.' : 'Name, username, location, and bio.',
+      icon: User2,
+    },
+    {
+      key: 'contact',
+      title: isId ? 'Kontak' : 'Contact',
+      description: isId ? 'Nomor WhatsApp dan email akun.' : 'WhatsApp number and account email.',
+      icon: Phone,
+    },
+    {
+      key: 'professional',
+      title: isId ? 'Keahlian profesional' : 'Professional profile',
+      description: isId ? 'Headline, ringkasan, skill, dan bahasa.' : 'Headline, summary, skills, and languages.',
+      icon: BriefcaseBusiness,
+    },
+    {
+      key: 'history',
+      title: isId ? 'Pengalaman & pendidikan' : 'Experience & education',
+      description: isId ? 'Pengalaman, pendidikan, dan sertifikat.' : 'Experience, education, and certificates.',
+      icon: ClipboardList,
+    },
+    {
+      key: 'links',
+      title: isId ? 'Link & portofolio' : 'Links & portfolio',
+      description: isId ? 'Website, LinkedIn, GitHub, katalog, atau portofolio.' : 'Website, LinkedIn, GitHub, catalog, or portfolio.',
+      icon: Link2,
+    },
+    {
+      key: 'media',
+      title: isId ? 'Foto profil & sampul' : 'Profile photo & cover',
+      description: isId ? 'Ganti foto tanpa meninggalkan profil.' : 'Change photos without leaving the profile.',
+      icon: Camera,
+    },
+  ];
+
+  const renderEntries = (
+    key: 'experiences' | 'education' | 'certifications',
+    title: string,
+    addLabel: string,
+  ) => (
+    <section className="rounded-[18px] border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          {title}
+        </h3>
+        <button
+          type="button"
+          onClick={() => addEntry(key)}
+          className={TONAL_ACTION_CLASS}
+        >
+          <UserPlus className="h-4 w-4" />
+          {addLabel}
+        </button>
+      </div>
+      <div className="mt-3 space-y-2.5">
+        {professionalDraft[key].length === 0 ? (
+          <p className="rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-4 text-center text-xs font-semibold text-[color:var(--app-text-soft)]">
+            {isId ? 'Belum ada data.' : 'No data yet.'}
+          </p>
+        ) : (
+          professionalDraft[key].map((entry, index) => (
+            <div
+              key={`${key}-${index}`}
+              className="rounded-[16px] bg-[color:var(--app-surface-muted)] p-3 dark:bg-[color:var(--app-surface)]"
+            >
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <label>
+                  <span className={labelClass}>{isId ? 'Judul' : 'Title'}</span>
+                  <input
+                    className={editorInput}
+                    value={entry.title}
+                    onChange={event => updateEntry(key, index, 'title', event.target.value)}
+                    placeholder={isId ? 'Contoh: Application Developer' : 'Example: Application Developer'}
+                  />
+                </label>
+                <label>
+                  <span className={labelClass}>{isId ? 'Tempat / bidang' : 'Place / field'}</span>
+                  <input
+                    className={editorInput}
+                    value={entry.subtitle || ''}
+                    onChange={event => updateEntry(key, index, 'subtitle', event.target.value)}
+                    placeholder={isId ? 'Perusahaan, kampus, atau bidang' : 'Company, school, or field'}
+                  />
+                </label>
+                <label>
+                  <span className={labelClass}>{isId ? 'Tahun / status' : 'Year / status'}</span>
+                  <input
+                    className={editorInput}
+                    value={entry.meta || ''}
+                    onChange={event => updateEntry(key, index, 'meta', event.target.value)}
+                    placeholder="2024–sekarang"
+                  />
+                </label>
+                <label>
+                  <span className={labelClass}>{isId ? 'Link pendukung' : 'Supporting link'}</span>
+                  <input
+                    className={editorInput}
+                    value={entry.url || ''}
+                    onChange={event => updateEntry(key, index, 'url', event.target.value)}
+                    placeholder="https://..."
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeEntry(key, index)}
+                className="mt-2.5 text-xs font-bold text-rose-600 hover:text-rose-700"
+              >
+                {isId ? 'Hapus' : 'Remove'}
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+
+  const isProfessionalSection =
+    section === 'professional' || section === 'history' || section === 'links';
+
+  return createPortal(
+    <div className="fixed inset-0 z-[1600] flex items-end justify-center bg-slate-950/55 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[color:var(--app-surface-strong)] shadow-2xl sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl sm:rounded-[26px] sm:border sm:border-[color:var(--app-border)] dark:sm:border-[color:var(--app-border-strong)]">
+        <header className="flex shrink-0 items-center gap-3 border-b border-[color:var(--app-border)] px-3.5 py-3 dark:border-[color:var(--app-border-strong)] sm:px-4">
+          {section !== 'menu' ? (
+            <button
+              type="button"
+              onClick={() => onSectionChange('menu')}
+              className="inline-flex min-h-10 items-center justify-center rounded-full px-3 text-xs font-bold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
+            >
+              {isId ? 'Kembali' : 'Back'}
+            </button>
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-base font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-lg">
+              {titles[section]}
+            </h2>
+            {section === 'menu' ? (
+              <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                {isId ? 'Ubah bagian yang kamu perlukan saja.' : 'Edit only what you need.'}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label={isId ? 'Tutup editor' : 'Close editor'}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] disabled:opacity-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-4">
+          {section === 'menu' ? (
+            <div className="space-y-2">
+              {menuItems.map(item => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => onSectionChange(item.key)}
+                    className="flex min-h-[68px] w-full items-center gap-3 rounded-[17px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]"
+                  >
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                      <Icon className="h-[18px] w-[18px]" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {item.title}
+                      </span>
+                      <span className="mt-0.5 block line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                        {item.description}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={onOpenTrust}
+                className="flex min-h-[68px] w-full items-center gap-3 rounded-[17px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]"
+              >
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <ShieldCheck className="h-[18px] w-[18px]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {isId ? 'Kepercayaan & verifikasi' : 'Trust & verification'}
+                  </span>
+                  <span className="mt-0.5 block line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                    {isId ? 'Buka status verifikasi tanpa pindah halaman.' : 'Open verification status without leaving the page.'}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+              </button>
+            </div>
+          ) : null}
+
+          {section === 'main' ? (
+            <div className="grid gap-3.5">
+              <label>
+                <span className={labelClass}>{isId ? 'Nama' : 'Name'}</span>
+                <input className={editorInput} value={fullNameInput} onChange={event => onFullNameChange(event.target.value)} />
+              </label>
+              <label>
+                <span className={labelClass}>Username</span>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[color:var(--app-text-soft)]">@</span>
+                  <input className={`${editorInput} pl-8`} value={usernameInput} onChange={event => onUsernameChange(event.target.value)} />
+                </div>
+              </label>
+              <label>
+                <span className={labelClass}>{isId ? 'Lokasi' : 'Location'}</span>
+                <input className={editorInput} value={locationInput} onChange={event => onLocationChange(event.target.value)} placeholder={isId ? 'Contoh: Bandung' : 'Example: Bandung'} />
+              </label>
+              <label>
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Bio</span>
+                  <span className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">{bioInput.length}/500</span>
+                </div>
+                <textarea className={editorTextarea} maxLength={500} value={bioInput} onChange={event => onBioChange(event.target.value)} />
+              </label>
+            </div>
+          ) : null}
+
+          {section === 'contact' ? (
+            <div className="space-y-3.5">
+              <label>
+                <span className={labelClass}>WhatsApp</span>
+                <input className={editorInput} inputMode="tel" value={phoneInput} onChange={event => onPhoneChange(event.target.value)} placeholder="08xxxxxxxxxx" />
+                <span className="mt-1.5 block text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+                  {isId ? 'Verifikasi nomor tetap mengikuti status verifikasi akun.' : 'Phone verification still follows your account verification status.'}
+                </span>
+              </label>
+              <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] p-3 dark:bg-[color:var(--app-surface)]">
+                <p className="text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Email</p>
+                <p className="mt-1 break-all text-sm font-semibold text-[color:var(--app-text-soft)]">{email || '-'}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {section === 'professional' ? (
+            <div className="grid gap-3.5">
+              <label>
+                <span className={labelClass}>{isId ? 'Judul keahlian' : 'Professional headline'}</span>
+                <input className={editorInput} value={professionalDraft.headline} onChange={event => updateDraft({ headline: event.target.value })} placeholder={isId ? 'Contoh: Fullstack Developer' : 'Example: Fullstack Developer'} />
+              </label>
+              <label>
+                <span className={labelClass}>{isId ? 'Ringkasan profesional' : 'Professional summary'}</span>
+                <textarea className={editorTextarea} value={professionalDraft.summary} onChange={event => updateDraft({ summary: event.target.value })} />
+              </label>
+              <label>
+                <span className={labelClass}>{isId ? 'Skill' : 'Skills'}</span>
+                <input className={editorInput} value={professionalDraft.skills.join(', ')} onChange={event => updateDraft({ skills: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })} placeholder="Java, Spring Boot, Next.js" />
+              </label>
+              <label>
+                <span className={labelClass}>{isId ? 'Bahasa' : 'Languages'}</span>
+                <input className={editorInput} value={professionalDraft.languages.join(', ')} onChange={event => updateDraft({ languages: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })} placeholder={isId ? 'Indonesia, Inggris' : 'Indonesian, English'} />
+              </label>
+            </div>
+          ) : null}
+
+          {section === 'history' ? (
+            <div className="space-y-3">
+              {renderEntries('experiences', isId ? 'Pengalaman' : 'Experience', isId ? 'Tambah' : 'Add')}
+              {renderEntries('education', isId ? 'Pendidikan' : 'Education', isId ? 'Tambah' : 'Add')}
+              {renderEntries('certifications', isId ? 'Sertifikat' : 'Certificates', isId ? 'Tambah' : 'Add')}
+            </div>
+          ) : null}
+
+          {section === 'links' ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                  {isId ? 'Tambahkan hanya link yang membantu orang mengenal atau mengecek pekerjaanmu.' : 'Add only links that help people understand or verify your work.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => updateDraft({ links: [...professionalDraft.links, { label: '', url: '' }] })}
+                  className={TONAL_ACTION_CLASS}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {isId ? 'Tambah' : 'Add'}
+                </button>
+              </div>
+              {professionalDraft.links.length === 0 ? (
+                <p className="rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-5 text-center text-xs font-semibold text-[color:var(--app-text-soft)]">
+                  {isId ? 'Belum ada link.' : 'No links yet.'}
+                </p>
+              ) : (
+                professionalDraft.links.map((item, index) => (
+                  <div key={`profile-link-${index}`} className="rounded-[16px] bg-[color:var(--app-surface-muted)] p-3 dark:bg-[color:var(--app-surface)]">
+                    <div className="grid gap-2.5 sm:grid-cols-[160px_minmax(0,1fr)]">
+                      <label>
+                        <span className={labelClass}>{isId ? 'Nama' : 'Label'}</span>
+                        <input className={editorInput} value={item.label} onChange={event => updateDraft({ links: professionalDraft.links.map((link, itemIndex) => itemIndex === index ? { ...link, label: event.target.value } : link) })} placeholder="LinkedIn" />
+                      </label>
+                      <label>
+                        <span className={labelClass}>URL</span>
+                        <input className={editorInput} value={item.url} onChange={event => updateDraft({ links: professionalDraft.links.map((link, itemIndex) => itemIndex === index ? { ...link, url: event.target.value } : link) })} placeholder="https://..." />
+                      </label>
+                    </div>
+                    <button type="button" onClick={() => updateDraft({ links: professionalDraft.links.filter((_, itemIndex) => itemIndex !== index) })} className="mt-2.5 text-xs font-bold text-rose-600 hover:text-rose-700">
+                      {isId ? 'Hapus' : 'Remove'}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
+
+          {section === 'media' ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-center transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                {avatarUploading ? <Loader2 className="h-5 w-5 animate-spin text-[color:var(--app-accent)]" /> : <Camera className="h-5 w-5 text-[color:var(--app-accent)]" />}
+                <span className="mt-2 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{isId ? 'Ganti foto profil' : 'Change profile photo'}</span>
+                <span className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">{isId ? 'Pilih foto lalu atur crop.' : 'Choose an image then crop it.'}</span>
+                <input type="file" accept="image/*" className="sr-only" onChange={onAvatarFileChange} />
+              </label>
+              <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-center transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                {coverUploading ? <Loader2 className="h-5 w-5 animate-spin text-[color:var(--app-accent)]" /> : <Camera className="h-5 w-5 text-[color:var(--app-accent)]" />}
+                <span className="mt-2 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{isId ? 'Ganti foto sampul' : 'Change cover photo'}</span>
+                <span className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">{isId ? 'Gunakan gambar lebar yang bersih.' : 'Use a clean wide image.'}</span>
+                <input type="file" accept="image/*" className="sr-only" onChange={onCoverFileChange} />
+              </label>
+            </div>
+          ) : null}
+
+          {message ? (
+            <p className="mt-3 rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-2.5 text-xs font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface)]">
+              {message}
+            </p>
+          ) : null}
+        </div>
+
+        {section !== 'menu' && section !== 'media' ? (
+          <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] dark:border-[color:var(--app-border-strong)] sm:flex sm:justify-end sm:p-4">
+            <button type="button" onClick={onClose} disabled={saving} className={SECONDARY_ACTION_CLASS}>
+              {isId ? 'Batal' : 'Cancel'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void (isProfessionalSection ? onSaveProfessional() : onSaveCore())}
+              disabled={saving}
+              className={PRIMARY_ACTION_CLASS}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {isId ? 'Simpan' : 'Save'}
+            </button>
+          </footer>
+        ) : null}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ProfileHubView(props: ProfileHubViewProps) {
   const pathname = usePathname();
   const { items: inboxNotifications } = useNotificationInbox();
@@ -1080,7 +1577,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     saving,
     saveMessage,
     profileError,
-    professionalData,
+    professionalData: initialProfessionalData,
     statItems,
     fullNameInput,
     usernameInput,
@@ -1111,6 +1608,21 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     onSaveQuickApply,
     dialPhone,
   } = props;
+
+  const { authFetch, refreshUser } = useAuth();
+  const [profileEditorSection, setProfileEditorSection] =
+    useState<ProfileEditorSection | null>(null);
+  const [editorSaving, setEditorSaving] = useState(false);
+  const [editorMessage, setEditorMessage] = useState<string | null>(null);
+  const [professionalData, setProfessionalData] =
+    useState<ProfessionalData>(initialProfessionalData);
+  const [professionalDraft, setProfessionalDraft] =
+    useState<ProfessionalData>(initialProfessionalData);
+
+  useEffect(() => {
+    setProfessionalData(initialProfessionalData);
+    setProfessionalDraft(initialProfessionalData);
+  }, [initialProfessionalData]);
 
   useEffect(() => {
     if (!copyMessage) return;
@@ -1702,15 +2214,15 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             : 'Store + orders',
         actionLabel: copy.manage,
       },
-      {
-        key: 'profile',
-        title: copy.profileAction,
-        description: copy.profileDesc,
-        href: '/profile/edit?focus=talent',
-        icon: ShieldCheck,
-        metric: `${setupPercent}% ${isId ? 'siap' : 'ready'}`,
-        actionLabel: copy.open,
-      },
+      // {
+      //   key: 'profile',
+      //   title: copy.profileAction,
+      //   description: copy.profileDesc,
+      //   opens the inline profile editor
+      //   icon: ShieldCheck,
+      //   metric: `${setupPercent}% ${isId ? 'siap' : 'ready'}`,
+      //   actionLabel: copy.open,
+      // },
     ],
     [
       copy,
@@ -1825,13 +2337,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     }
 
     if (setupPercent > 0) {
-      rows.push({
-        key: 'profile-setup',
-        title: isId ? 'Profil makin siap' : 'Profile getting ready',
-        description: `${setupPercent}% ${isId ? 'kelengkapan profil' : 'profile completion'}`,
-        href: '/profile/edit?focus=identity',
-        icon: Sparkles,
-      });
+      // rows.push({
+      //   key: 'profile-setup',
+      //   title: isId ? 'Profil makin siap' : 'Profile getting ready',
+      //   description: `${setupPercent}% ${isId ? 'kelengkapan profil' : 'profile completion'}`,
+      //   opens the inline profile editor
+      //   icon: Sparkles,
+      // });
     }
 
     return rows.slice(0, 6);
@@ -1864,6 +2376,132 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       setCopyMessage(copy.copyFailed);
     }
   };
+
+
+  const closeProfileEditor = useCallback(() => {
+    setEditorMessage(null);
+    setProfileEditorSection(null);
+    setProfessionalDraft(professionalData);
+  }, [professionalData]);
+
+  const saveInlineCoreProfile = useCallback(async () => {
+    setEditorSaving(true);
+    setEditorMessage(null);
+    try {
+      await Promise.resolve(onSaveProfile());
+      setEditorMessage(isId ? 'Perubahan disimpan.' : 'Changes saved.');
+      setProfileEditorSection(null);
+    } catch (error) {
+      setEditorMessage(
+        error instanceof Error
+          ? error.message
+          : isId
+            ? 'Gagal menyimpan profil.'
+            : 'Failed to save profile.',
+      );
+    } finally {
+      setEditorSaving(false);
+    }
+  }, [isId, onSaveProfile]);
+
+  const saveInlineProfessionalProfile = useCallback(async () => {
+    setEditorSaving(true);
+    setEditorMessage(null);
+    try {
+      const baseMetadata = asSocialRecord(detail?.metadata) || {};
+      const existingFreelancer =
+        asSocialRecord(baseMetadata.freelancer_profile) || {};
+      const existingProfile = asSocialRecord(baseMetadata.profile) || {};
+
+      const cleanEntries = (items: ProfessionalEntry[]) =>
+        items
+          .map(item => ({
+            title: item.title.trim(),
+            subtitle: item.subtitle?.trim() || undefined,
+            meta: item.meta?.trim() || undefined,
+            url: item.url?.trim() || undefined,
+          }))
+          .filter(item => item.title);
+
+      const nextFreelancer = {
+        ...existingFreelancer,
+        professional_title: professionalDraft.headline.trim() || undefined,
+        tagline: professionalDraft.headline.trim() || undefined,
+        summary: professionalDraft.summary.trim() || undefined,
+        skills: professionalDraft.skills.map(item => item.trim()).filter(Boolean),
+        languages: professionalDraft.languages
+          .map(item => item.trim())
+          .filter(Boolean),
+        experiences: cleanEntries(professionalDraft.experiences),
+        education: cleanEntries(professionalDraft.education),
+        certifications: cleanEntries(professionalDraft.certifications),
+      };
+
+      const nextLinks = professionalDraft.links
+        .map(item => ({
+          label: item.label.trim() || 'Link',
+          url: item.url.trim(),
+        }))
+        .filter(item => item.url);
+
+      const nextProfile = {
+        ...existingProfile,
+        links: nextLinks,
+      };
+      const nextMetadata = {
+        ...baseMetadata,
+        freelancer_profile: nextFreelancer,
+        profile: nextProfile,
+      };
+
+      const response = await authFetch('/api/auth/update-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          freelancer_profile: nextFreelancer,
+          profile: nextProfile,
+          metadata: nextMetadata,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+            (isId
+              ? 'Gagal menyimpan data profesional.'
+              : 'Failed to save professional profile.'),
+        );
+      }
+
+      setProfessionalData(professionalDraft);
+      await refreshUser();
+      setEditorMessage(isId ? 'Data profesional disimpan.' : 'Professional profile saved.');
+      setProfileEditorSection(null);
+    } catch (error) {
+      setEditorMessage(
+        error instanceof Error
+          ? error.message
+          : isId
+            ? 'Gagal menyimpan data profesional.'
+            : 'Failed to save professional profile.',
+      );
+    } finally {
+      setEditorSaving(false);
+    }
+  }, [
+    authFetch,
+    detail?.metadata,
+    isId,
+    professionalDraft,
+    refreshUser,
+  ]);
+
+  const openTrustFromEditor = useCallback(() => {
+    setProfileEditorSection(null);
+    setActiveHubTab('trust');
+  }, []);
 
   const importantSetup = [
     {
@@ -2120,13 +2758,14 @@ transition  "
                     {isId ? 'Lihat Profil Publik' : 'View Public'}
                   </LocalizedLink>
 
-                  <LocalizedLink
-                    href="/profile/edit"
+                  <button
+                    type="button"
+                    onClick={() => setProfileEditorSection('menu')}
                     className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
                   >
                     <UserPen className="h-3.5 w-3.5" />
                     {isId ? 'Edit Profil' : 'Edit Profile'}
-                  </LocalizedLink>
+                  </button>
                 </div>
                 <section className="col-span-3 lg:col-span-1 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 w-[calc(100%-1rem)] lg:w-[calc(100%-2.5rem)] mx-auto">
                   {/* Header */}
@@ -2661,13 +3300,14 @@ transition  "
                 </div>
 
                 <div className="grid w-full shrink-0 grid-cols-2 gap-2 lg:w-[330px] xl:w-[370px]">
-                  <LocalizedLink
-                    href="/profile/edit?focus=identity"
+                  <button
+                    type="button"
+                    onClick={() => setProfileEditorSection('menu')}
                     className={PRIMARY_ACTION_CLASS}
                   >
                     <User2 className="h-4 w-4" />
                     {isId ? 'Edit profil' : 'Edit profile'}
-                  </LocalizedLink>
+                  </button>
                   <a
                     href={publicProfileUrl}
                     target="_blank"
@@ -2744,13 +3384,14 @@ transition  "
                     title={copy.mainData}
                     tone="profile"
                     action={
-                      <LocalizedLink
-                        href="/profile/edit?focus=identity"
+                      <button
+                        type="button"
+                        onClick={() => setProfileEditorSection('main')}
                         className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--app-accent)]"
                       >
-                        {copy.editFull}
+                        {isId ? 'Edit' : 'Edit'}
                         <ChevronRight className="h-4 w-4" />
-                      </LocalizedLink>
+                      </button>
                     }
                   >
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -3338,13 +3979,14 @@ transition  "
                         : 'Reads like LinkedIn/Upwork, but compact.'
                     }
                     action={
-                      <LocalizedLink
-                        href="/profile/edit?focus=talent"
+                      <button
+                        type="button"
+                        onClick={() => setProfileEditorSection('professional')}
                         className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--app-accent)]"
                       >
-                        {copy.editFull}
+                        {isId ? 'Edit' : 'Edit'}
                         <ChevronRight className="h-4 w-4" />
-                      </LocalizedLink>
+                      </button>
                     }
                   >
                     <div className="space-y-3">
@@ -3537,13 +4179,14 @@ transition  "
                   <ProgressBar value={setupPercent} />
                 </div>
                 <div className="mt-2.5 grid gap-1.5">
-                  <LocalizedLink
-                    href="/profile/edit?focus=identity"
+                  <button
+                    type="button"
+                    onClick={() => setProfileEditorSection('menu')}
                     className={PRIMARY_ACTION_CLASS}
                   >
                     <User2 className="h-4 w-4" />
                     {copy.editQuick}
-                  </LocalizedLink>
+                  </button>
                   <button
                     type="button"
                     onClick={copyPublicProfileUrl}
@@ -3642,6 +4285,35 @@ transition  "
           </div>
         </div>
       </div>
+
+      <InlineProfileEditorModal
+        section={profileEditorSection}
+        isId={isId}
+        saving={editorSaving || saving}
+        message={editorMessage}
+        fullNameInput={fullNameInput}
+        usernameInput={usernameInput}
+        phoneInput={phoneInput}
+        locationInput={locationInput}
+        bioInput={bioInput}
+        email={user.email || detail?.email || ''}
+        professionalDraft={professionalDraft}
+        onFullNameChange={onFullNameChange}
+        onUsernameChange={onUsernameChange}
+        onPhoneChange={onPhoneChange}
+        onLocationChange={onLocationChange}
+        onBioChange={onBioChange}
+        onProfessionalDraftChange={setProfessionalDraft}
+        onSaveCore={saveInlineCoreProfile}
+        onSaveProfessional={saveInlineProfessionalProfile}
+        onCoverFileChange={onCoverFileChange}
+        onAvatarFileChange={onAvatarFileChange}
+        coverUploading={coverUploading}
+        avatarUploading={avatarUploading}
+        onOpenTrust={openTrustFromEditor}
+        onSectionChange={setProfileEditorSection}
+        onClose={closeProfileEditor}
+      />
 
       <Modal
         open={Boolean(socialModal)}

@@ -770,6 +770,16 @@ html[data-keyboard-open='true'] .lajukan-visual-viewport-shell {
   );
 }
 
+/* LG ≥ 1024px */
+@media (min-width: 1024px) {
+  .lajukan-chat-composer {
+    --chat-composer-bottom-pad: max(
+      3rem,
+      var(--app-shell-safe-bottom, env(safe-area-inset-bottom))
+    );
+  }
+}
+
 html[data-keyboard-open='true'] .lajukan-chat-composer {
   --chat-composer-bottom-pad: 0.375rem;
 }

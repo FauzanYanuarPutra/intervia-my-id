@@ -1,353 +1,411 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LAJUKAN_SYSTEM_PROMPT } from '@/lib/aiSystemPrompt';
+
+import { AI_CHAT_ENABLED } from '@/lib/featureFlags';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
-import { AI_CHAT_ENABLED } from '@/lib/featureFlags';
 
-const INTERNAL_AI_URL = process.env.INTERNAL_AI_URL || '';
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || 'gpt-3.5-turbo';
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
-const USE_OLLAMA = process.env.USE_OLLAMA === 'true';
-const MARKETPLACE_URL = process.env.INTERNAL_MARKETPLACE_URL || process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8081';
+const INTERNAL_AI_URL = (process.env.INTERNAL_AI_URL || '').replace(/\/+$/, '');
+const AI_SERVICE_TOKEN = process.env.AI_SERVICE_TOKEN || '';
 
-type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
+const CHAT_RATE_LIMIT_WINDOW_SEC = 60;
+const CHAT_RATE_LIMIT_MAX = 30;
 
-function buildOpenAIMessages(message: string, context?: ChatMessage[]): ChatMessage[] {
-  const system: ChatMessage = { role: 'system', content: LAJUKAN_SYSTEM_PROMPT };
-  const history = (context || [])
-    .filter((m) => m.role === 'user' || m.role === 'assistant')
-    .slice(-10)
-    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-  const userMsg: ChatMessage = { role: 'user', content: message };
-  return [system, ...history, userMsg];
-}
+const MAX_MESSAGE_CHARS = 6_000;
+const MAX_HISTORY_MESSAGES = 18;
+const MAX_HISTORY_MESSAGE_CHARS = 6_000;
 
-async function callGroq(messages: ChatMessage[], dbContext?: string): Promise<string> {
-  // Enhance system message with database context if available
-  const enhancedMessages = messages.map((m, idx) => {
-    if (idx === 0 && m.role === 'system' && dbContext) {
-      return { ...m, content: m.content + dbContext };
-    }
-    return m;
-  });
+const AI_REQUEST_TIMEOUT_MS = parsePositiveInt(
+  process.env.AI_REQUEST_TIMEOUT_MS,
+  90_000,
+  3_000,
+  180_000,
+);
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
-      messages: enhancedMessages.map((m) => ({ role: m.role, content: m.content })),
-      max_tokens: 1024,
-      temperature: 0.7,
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Groq: ${res.status} ${err}`);
+type ChatRole = 'user' | 'assistant';
+
+type IncomingChatMessage = {
+  role?: unknown;
+  content?: unknown;
+};
+
+type ChatRequestBody = {
+  message?: unknown;
+
+  /**
+   * Backward compatibility with the current frontend.
+   * The old route used `context` for chat history.
+   */
+  context?: unknown;
+
+  /**
+   * Preferred field going forward.
+   */
+  messages?: unknown;
+
+  locale?: unknown;
+  use_rag?: unknown;
+  useRag?: unknown;
+
+  /**
+   * Optional authorized business/product context.
+   * This is forwarded as AI context, not as instructions.
+   */
+  ai_context?: unknown;
+  memory?: unknown;
+};
+
+type RateLimitResult = Awaited<ReturnType<typeof enforceRateLimit>>;
+
+function parsePositiveInt(
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
   }
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const text = data.choices?.[0]?.message?.content?.trim();
-  return text || "Maaf, saya tidak bisa menghasilkan jawaban saat ini. Coba lagi ya.";
+
+  return Math.min(max, Math.max(min, parsed));
 }
 
-async function callOpenAI(messages: ChatMessage[], dbContext?: string): Promise<string> {
-  // Enhance system message with database context if available
-  const enhancedMessages = messages.map((m, idx) => {
-    if (idx === 0 && m.role === 'system' && dbContext) {
-      return { ...m, content: m.content + dbContext };
-    }
-    return m;
-  });
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages: enhancedMessages.map((m) => ({ role: m.role, content: m.content })),
-      max_tokens: 1024,
-      temperature: 0.7,
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI: ${res.status} ${err}`);
+function normalizeLocale(value: unknown): 'id' | 'en' {
+  if (typeof value !== 'string') {
+    return 'id';
   }
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const text = data.choices?.[0]?.message?.content?.trim();
-  return text || "Maaf, saya tidak bisa menghasilkan jawaban saat ini. Coba lagi ya.";
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'en' || normalized === 'en-us' || normalized === 'en_us'
+    ? 'en'
+    : 'id';
 }
 
-async function fetchDatabaseContext(query: string): Promise<string> {
-  try {
-    // Extract keywords from query untuk search
-    const keywords = query
-      .toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 2)
-      .slice(0, 5)
-      .join(' ');
+function normalizeHistory(value: unknown): Array<{
+  role: ChatRole;
+  content: string;
+}> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
 
-    if (!keywords) return '';
+  return value
+    .slice(-MAX_HISTORY_MESSAGES)
+    .flatMap((item) => {
+      if (!item || typeof item !== 'object') {
+        return [];
+      }
 
-    const params = new URLSearchParams({
-      q: keywords,
-      limit: '10',
-      offset: '0',
+      const message = item as IncomingChatMessage;
+
+      const role: ChatRole | null =
+        message.role === 'assistant'
+          ? 'assistant'
+          : message.role === 'user'
+            ? 'user'
+            : null;
+
+      if (!role || typeof message.content !== 'string') {
+        return [];
+      }
+
+      const content = message.content
+        .replace(/\u0000/g, '')
+        .trim()
+        .slice(0, MAX_HISTORY_MESSAGE_CHARS);
+
+      if (!content) {
+        return [];
+      }
+
+      return [{ role, content }];
     });
+}
 
-    const res = await fetch(`${MARKETPLACE_URL}/v1/content?${params.toString()}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!res.ok) return '';
-
-    const data = await res.json().catch(() => []);
-    if (!Array.isArray(data) || data.length === 0) return '';
-
-    // Build context from database results
-    const context = data
-      .slice(0, 5)
-      .map((item: Record<string, unknown>, idx: number) => {
-        const metadata =
-          item.metadata && typeof item.metadata === 'object'
-            ? (item.metadata as Record<string, unknown>)
-            : {};
-        const title = typeof item.title === 'string' ? item.title : '';
-        const type = typeof item.type === 'string' ? item.type : '';
-        const summary = typeof item.summary === 'string' ? item.summary : '';
-        const sector =
-          typeof metadata.sector === 'string' ? metadata.sector : '';
-        const tags = Array.isArray(item.tags)
-          ? item.tags.slice(0, 3).map(String).join(', ')
-          : '';
-        
-        return `${idx + 1}. [${type}] ${title}${summary ? ` - ${summary.slice(0, 80)}` : ''}${sector ? ` (Sector: ${sector})` : ''}${tags ? ` [Tags: ${tags}]` : ''}`;
-      })
-      .join('\n');
-
-    return `\n\nData terkait dari database Lajukan:\n${context}\n\nGunakan informasi ini untuk memberikan jawaban yang lebih akurat dan relevan.`;
-  } catch (error) {
-    console.warn('[AI Chat] Failed to fetch database context:', error);
+function normalizeMessage(value: unknown): string {
+  if (typeof value !== 'string') {
     return '';
   }
+
+  return value
+    .replace(/\u0000/g, '')
+    .trim()
+    .slice(0, MAX_MESSAGE_CHARS);
 }
 
-async function callOllama(message: string, context?: ChatMessage[], dbContext?: string): Promise<string> {
-  const messages: Array<{ role: string; content: string }> = [];
-  
-  // Build enhanced system prompt with database context
-  let systemPrompt = LAJUKAN_SYSTEM_PROMPT;
-  if (dbContext) {
-    systemPrompt += dbContext;
-  }
-  
-  // Add system prompt
-  messages.push({ role: 'system', content: systemPrompt });
-  
-  // Add context/history
-  if (context && context.length > 0) {
-    for (const msg of context.slice(-10)) {
-      messages.push({ role: msg.role, content: msg.content });
-    }
-  }
-  
-  // Add current message
-  messages.push({ role: 'user', content: message });
-
-  const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      messages,
-      stream: false,
-      options: {
-        temperature: 0.7,
-        num_predict: 500,
-      },
-    }),
-    signal: AbortSignal.timeout(30000), // 30s timeout
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Ollama: ${res.status} ${err}`);
+function normalizeBoolean(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') {
+    return value;
   }
 
-  const data = await res.json();
-  return data.message?.content?.trim() || "Maaf, saya tidak bisa menghasilkan jawaban saat ini.";
+  return undefined;
 }
 
-async function callInternalAI(body: Record<string, unknown>): Promise<string> {
-  const url = INTERNAL_AI_URL.replace(/\/$/, '') + '/v1/chat';
-  const res = await fetch(url, {
+function applyRateLimitHeaders<T extends NextResponse>(
+  response: T,
+  rate: RateLimitResult,
+): T {
+  response.headers.set('X-RateLimit-Limit', String(rate.limit));
+  response.headers.set('X-RateLimit-Remaining', String(rate.remaining));
+  response.headers.set('X-RateLimit-Reset', String(rate.resetInSec));
+
+  return response;
+}
+
+function jsonWithRateLimit(
+  body: unknown,
+  status: number,
+  rate: RateLimitResult,
+): NextResponse {
+  return applyRateLimitHeaders(
+    NextResponse.json(body, { status }),
+    rate,
+  );
+}
+
+async function callInternalAi(
+  body: Record<string, unknown>,
+  requestId: string,
+): Promise<{
+  ok: boolean;
+  status: number;
+  data: Record<string, unknown>;
+}> {
+  if (!INTERNAL_AI_URL) {
+    throw new Error('INTERNAL_AI_URL_NOT_CONFIGURED');
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'x-request-id': requestId,
+  };
+
+  if (AI_SERVICE_TOKEN) {
+    headers.Authorization = `Bearer ${AI_SERVICE_TOKEN}`;
+  }
+
+  const response = await fetch(`${INTERNAL_AI_URL}/v1/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
   });
-  const data = (await res.json().catch(() => ({}))) as { response?: string; message?: string; error?: string };
-  const text = data.response ?? data.message;
-  if (res.ok && typeof text === 'string') return text.trim();
-  throw new Error(data?.error ?? `Internal AI: ${res.status}`);
+
+  const data = (await response.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    data,
+  };
 }
 
-const CHAT_RATE_LIMIT_WINDOW_SEC = 60; // 1 minute
-const CHAT_RATE_LIMIT_MAX = 30; // 30 requests per minute
+function mapUpstreamStatus(status: number): number {
+  if (status === 400) return 400;
+  if (status === 413) return 413;
+  if (status === 429) return 429;
+
+  // Do not expose internal auth/provider/service errors as if they were
+  // authentication failures belonging to the browser user.
+  return 502;
+}
+
+function friendlyUpstreamError(
+  status: number,
+  data: Record<string, unknown>,
+): string {
+  if (typeof data.response === 'string' && data.response.trim()) {
+    return data.response.trim();
+  }
+
+  if (status === 429) {
+    return 'Layanan AI sedang penuh. Coba lagi sebentar.';
+  }
+
+  if (status === 400) {
+    return 'Permintaan AI belum valid. Periksa pesan lalu coba lagi.';
+  }
+
+  return 'Layanan AI sedang tidak tersedia. Coba lagi sebentar.';
+}
 
 export async function POST(req: NextRequest) {
-  try {
-    if (!AI_CHAT_ENABLED) {
-      return NextResponse.json(
-        { response: 'AI chat is disabled for now.' },
-        { status: 404 },
-      );
-    }
-    const auth = await requireAuth(req);
-    if (!auth.ok) return auth.res;
-
-    const ip = getClientIp(req.headers);
-    const rate = await enforceRateLimit(
-      `rl:ai:chat:${auth.ctx.userId}:${ip}`,
-      CHAT_RATE_LIMIT_MAX,
-      CHAT_RATE_LIMIT_WINDOW_SEC,
-    );
-    if (!rate.allowed) {
-      const limited = NextResponse.json(
-        { response: 'Terlalu banyak permintaan. Silakan coba lagi sebentar ya.' },
-        { status: 429 },
-      );
-      limited.headers.set('X-RateLimit-Limit', String(rate.limit));
-      limited.headers.set('X-RateLimit-Remaining', String(rate.remaining));
-      limited.headers.set('X-RateLimit-Reset', String(rate.resetInSec));
-      return limited;
-    }
-
-    const body = (await req.json()) as {
-      message?: string;
-      context?: Array<{ role?: string; content?: string }>;
-    };
-    const message = typeof body.message === 'string' ? body.message.trim() : '';
-    if (!message) {
-      return NextResponse.json(
-        { response: 'Kirim dulu pertanyaan atau kalimat yang ingin kamu tanyakan ya.' },
-        { status: 400 }
-      );
-    }
-
-    // Security: Sanitize message length
-    const sanitizedMessage = message.slice(0, 2000);
-
-    const context = Array.isArray(body.context)
-      ? body.context.map((m) => ({
-          role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
-          content: String(m.content ?? ''),
-        }))
-      : undefined;
-
-    // Fetch database context untuk memberikan konteks yang lebih baik
-    // Hanya fetch jika query mengandung kata kunci yang relevan (bukan hanya sapaan)
-    const shouldFetchContext = sanitizedMessage.length > 5 && 
-      !/^(hi|hai|halo|hello|hey|hallo|selamat|good|morning|afternoon|evening)/i.test(sanitizedMessage);
-    
-    const dbContext = shouldFetchContext 
-      ? await fetchDatabaseContext(sanitizedMessage).catch(() => '')
-      : '';
-
-    const openAIMessages = buildOpenAIMessages(sanitizedMessage, context);
-
-    // 1) Coba Ollama (custom AI) dulu jika diaktifkan
-    if (USE_OLLAMA) {
-      try {
-        const text = await callOllama(sanitizedMessage, context, dbContext);
-        const ok = NextResponse.json({ response: text });
-        ok.headers.set('X-RateLimit-Limit', String(rate.limit));
-        ok.headers.set('X-RateLimit-Remaining', String(rate.remaining));
-        ok.headers.set('X-RateLimit-Reset', String(rate.resetInSec));
-        return ok;
-      } catch (e) {
-        console.warn('[AI] Ollama unavailable, falling back:', (e as Error).message);
-      }
-    }
-
-    // 2) Coba internal AI (kalau URL diset dan body cocok)
-    if (INTERNAL_AI_URL) {
-      try {
-        const internalBody = { message: sanitizedMessage, context: body.context };
-        const text = await callInternalAI(internalBody);
-        const ok = NextResponse.json({ response: text });
-        ok.headers.set('X-RateLimit-Limit', String(rate.limit));
-        ok.headers.set('X-RateLimit-Remaining', String(rate.remaining));
-        ok.headers.set('X-RateLimit-Reset', String(rate.resetInSec));
-        return ok;
-      } catch (e) {
-        console.warn('[AI] Internal AI unavailable, falling back:', (e as Error).message);
-      }
-    }
-
-    // 3) Groq (gratis) — prioritas kalau ada key
-    if (GROQ_API_KEY) {
-      try {
-        const text = await callGroq(openAIMessages, dbContext);
-        const ok = NextResponse.json({ response: text });
-        ok.headers.set('X-RateLimit-Limit', String(rate.limit));
-        ok.headers.set('X-RateLimit-Remaining', String(rate.remaining));
-        ok.headers.set('X-RateLimit-Reset', String(rate.resetInSec));
-        return ok;
-      } catch (e) {
-        console.warn('[AI] Groq failed:', (e as Error).message);
-      }
-    }
-
-    // 4) OpenAI
-    if (OPENAI_API_KEY) {
-      try {
-        const text = await callOpenAI(openAIMessages, dbContext);
-        const ok = NextResponse.json({ response: text });
-        ok.headers.set('X-RateLimit-Limit', String(rate.limit));
-        ok.headers.set('X-RateLimit-Remaining', String(rate.remaining));
-        ok.headers.set('X-RateLimit-Reset', String(rate.resetInSec));
-        return ok;
-      } catch (e) {
-        console.warn('[AI] OpenAI failed:', (e as Error).message);
-      }
-    }
-
-    const unavailable = NextResponse.json(
-      {
-        response:
-          'Fitur AI belum dikonfigurasi. Tambahkan GROQ_API_KEY (gratis di console.groq.com) atau OPENAI_API_KEY di env agar asisten bisa menjawab.',
-      },
-      { status: 503 }
-    );
-    unavailable.headers.set('X-RateLimit-Limit', String(rate.limit));
-    unavailable.headers.set('X-RateLimit-Remaining', String(rate.remaining));
-    unavailable.headers.set('X-RateLimit-Reset', String(rate.resetInSec));
-    return unavailable;
-  } catch (error) {
-    console.error('[AI_CHAT_ERROR]', error);
-    const errMsg = error instanceof Error ? error.message : '';
-    const isNetwork =
-      (error instanceof TypeError || (errMsg && (errMsg === 'fetch failed' || errMsg.includes('ECONNREFUSED'))));
+  if (!AI_CHAT_ENABLED) {
     return NextResponse.json(
+      { response: 'AI chat is disabled for now.' },
+      { status: 404 },
+    );
+  }
+
+  const auth = await requireAuth(req);
+  if (!auth.ok) {
+    return auth.res;
+  }
+
+  const ip = getClientIp(req.headers);
+  const rate = await enforceRateLimit(
+    `rl:ai:chat:${auth.ctx.userId}:${ip}`,
+    CHAT_RATE_LIMIT_MAX,
+    CHAT_RATE_LIMIT_WINDOW_SEC,
+  );
+
+  if (!rate.allowed) {
+    return jsonWithRateLimit(
       {
-        response: isNetwork
-          ? 'Koneksi ke layanan AI gagal. Cek koneksi internet atau coba lagi sebentar.'
-          : 'Terjadi kesalahan. Coba lagi ya.',
+        status: 'busy',
+        response: 'Terlalu banyak permintaan. Silakan coba lagi sebentar ya.',
+        error: 'RATE_LIMITED',
       },
-      { status: 500 }
+      429,
+      rate,
+    );
+  }
+
+  try {
+    const body = (await req.json()) as ChatRequestBody;
+
+    const message = normalizeMessage(body.message);
+
+    // Support both the old frontend payload (`context`) and the new one
+    // (`messages`). Both are normalized into ai_service's `messages` field.
+    const historySource = Array.isArray(body.messages)
+      ? body.messages
+      : body.context;
+
+    const messages = normalizeHistory(historySource);
+
+    if (!message && messages.length === 0) {
+      return jsonWithRateLimit(
+        {
+          status: 'error',
+          response: 'Kirim dulu pertanyaan atau pesan yang ingin kamu tanyakan ya.',
+          error: 'MESSAGE_REQUIRED',
+        },
+        400,
+        rate,
+      );
+    }
+
+    const requestId =
+      req.headers.get('x-request-id')?.trim() || crypto.randomUUID();
+
+    const useRag =
+      normalizeBoolean(body.use_rag) ??
+      normalizeBoolean(body.useRag);
+
+    const aiPayload: Record<string, unknown> = {
+      task: 'chat',
+      message,
+      messages,
+      locale: normalizeLocale(body.locale),
+    };
+
+    if (typeof useRag === 'boolean') {
+      aiPayload.use_rag = useRag;
+    }
+
+    if (
+      body.ai_context !== undefined &&
+      body.ai_context !== null
+    ) {
+      aiPayload.context = body.ai_context;
+    }
+
+    if (body.memory !== undefined && body.memory !== null) {
+      aiPayload.memory = body.memory;
+    }
+
+    const upstream = await callInternalAi(aiPayload, requestId);
+
+    if (!upstream.ok) {
+      console.warn('[AI_CHAT_UPSTREAM_ERROR]', {
+        requestId,
+        status: upstream.status,
+        error:
+          typeof upstream.data.error === 'string'
+            ? upstream.data.error
+            : undefined,
+      });
+
+      return jsonWithRateLimit(
+        {
+          ...upstream.data,
+          status: 'error',
+          request_id: requestId,
+          response: friendlyUpstreamError(
+            upstream.status,
+            upstream.data,
+          ),
+        },
+        mapUpstreamStatus(upstream.status),
+        rate,
+      );
+    }
+
+    const response = jsonWithRateLimit(
+      {
+        ...upstream.data,
+
+        // Compatibility contract for existing Lajukan chat UI.
+        response:
+          typeof upstream.data.response === 'string'
+            ? upstream.data.response
+            : typeof upstream.data.message === 'string'
+              ? upstream.data.message
+              : '',
+      },
+      200,
+      rate,
+    );
+
+    response.headers.set('x-request-id', requestId);
+    response.headers.set('Cache-Control', 'no-store');
+
+    return response;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'UNKNOWN_ERROR';
+
+    console.error('[AI_CHAT_ERROR]', error);
+
+    const isTimeout =
+      error instanceof DOMException && error.name === 'TimeoutError';
+
+    const isNetwork =
+      error instanceof TypeError ||
+      message === 'fetch failed' ||
+      message.includes('ECONNREFUSED') ||
+      message.includes('ENOTFOUND');
+
+    const isMissingConfig =
+      message === 'INTERNAL_AI_URL_NOT_CONFIGURED';
+
+    return jsonWithRateLimit(
+      {
+        status: 'error',
+        response: isMissingConfig
+          ? 'Layanan AI internal belum dikonfigurasi.'
+          : isTimeout
+            ? 'Layanan AI membutuhkan waktu terlalu lama. Coba lagi sebentar.'
+            : isNetwork
+              ? 'Koneksi ke layanan AI gagal. Coba lagi sebentar.'
+              : 'Terjadi kesalahan saat memproses permintaan AI.',
+        error: isMissingConfig
+          ? 'AI_NOT_CONFIGURED'
+          : isTimeout
+            ? 'AI_TIMEOUT'
+            : isNetwork
+              ? 'AI_UNREACHABLE'
+              : 'AI_REQUEST_FAILED',
+      },
+      isMissingConfig ? 503 : 502,
+      rate,
     );
   }
 }

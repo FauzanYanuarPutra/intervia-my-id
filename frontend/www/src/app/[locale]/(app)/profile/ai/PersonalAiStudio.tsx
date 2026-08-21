@@ -27,7 +27,11 @@ import {
   Loader2,
   Lock,
   MessageSquarePlus,
+  Mic,
+  MoreVertical,
   Paperclip,
+  Pause,
+  Play,
   Plus,
   RefreshCcw,
   Reply,
@@ -44,6 +48,10 @@ import {
   X,
 } from 'lucide-react';
 import { AICreationCard } from '@/components/ai/AICreationCard';
+import { useDialog } from '@/components/system/feedback/DialogProvider';
+import { useVoiceNoteRecorder } from '@/hooks/useVoiceNoteRecorder';
+import { formatVoiceNoteDuration } from '@/lib/media/voiceNote';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import type {
   AICreationDraft,
   SupportedCreationTarget,
@@ -55,7 +63,6 @@ import {
 } from '@/lib/creation-drafts/conversation';
 import {
   PERSONAL_AI_BUILDER_TEMPLATES,
-  PERSONAL_AI_MODEL_REGISTRY,
   createDefaultPersonalAiBuilderConfig,
   type AIBuilderBlock,
   type AIBuilderBlockType,
@@ -63,6 +70,16 @@ import {
   type PersonalAiBuilderConfig,
   type AIBuilderStep,
 } from '@/lib/personal-ai/builder';
+import {
+  clearPersonalAiCache,
+  loadPersonalAiAgentsCache,
+  loadPersonalAiMessagesCache,
+  loadPersonalAiThreadsCache,
+  savePersonalAiAgentsCache,
+  savePersonalAiMessagesCache,
+  savePersonalAiThreadsCache,
+  type CachedPersonalAiAgent,
+} from '@/lib/personal-ai/browserCache';
 
 type QuickButton = {
   id: string;
@@ -89,6 +106,7 @@ type PersonalAgent = {
   share_id: string;
   usage_count: number;
   can_edit?: boolean;
+  cache_only?: boolean;
 };
 
 type ChatThread = {
@@ -112,6 +130,20 @@ type MessageReplyReference = {
   excerpt: string;
 };
 
+type ViewerMemoryState = {
+  enabled: boolean;
+  can_manage_recipient_consent: boolean;
+  memory: {
+    summary: string;
+    facts: {
+      topics?: string[];
+      user_terms?: string[];
+      last_messages?: string[];
+    };
+    updated_at: string;
+  } | null;
+};
+
 type PersonalAiPanel = 'chat' | 'builder' | 'settings' | 'share' | 'memory';
 
 type AiAttachmentKind = 'image' | 'video' | 'audio' | 'document' | 'file';
@@ -126,6 +158,13 @@ type AiDraftAttachment = {
   dataUrl?: string;
   previewUrl?: string;
   text?: string;
+};
+
+type PersonalAiComposerDraft = {
+  input: string;
+  attachments: AiDraftAttachment[];
+  replyingTo: ChatMessage | null;
+  editingCreationDraft: AICreationDraft | null;
 };
 
 type AiStoredMedia = {
@@ -152,7 +191,6 @@ type SettingsDraft = {
   visibility: 'private' | 'unlisted' | 'public';
   instructions: string;
   tone: string;
-  model_preference: 'auto' | 'ollama' | 'groq' | 'openai';
   temperature: number;
   memory_enabled: boolean;
   builder_config: PersonalAiBuilderConfig;
@@ -166,9 +204,8 @@ const DEFAULT_DRAFT: SettingsDraft = {
   visibility: 'private',
   instructions: '',
   tone: 'ramah, praktis, lokal Indonesia, to the point',
-  model_preference: 'auto',
   temperature: 0.4,
-  memory_enabled: true,
+  memory_enabled: false,
   builder_config: createDefaultPersonalAiBuilderConfig(),
   quick_buttons_text: '',
   starter_prompts_text: '',
@@ -177,6 +214,7 @@ const DEFAULT_DRAFT: SettingsDraft = {
 const MAX_AI_ATTACHMENTS = 4;
 const MAX_INLINE_IMAGE_BYTES = 1_600_000;
 const MAX_TEXT_FILE_BYTES = 90_000;
+const PERSONAL_AI_CHAT_TIMEOUT_MS = 120_000;
 const BUILDER_BLOCK_TYPES: AIBuilderBlockType[] = [
   'text',
   'textarea',
@@ -215,9 +253,10 @@ function visibilityLabel(
   isId: boolean,
 ) {
   const normalized = normalizeUiVisibility(value || 'private');
-  if (normalized === 'public') return isId ? 'Public' : 'Public';
-  if (normalized === 'unlisted') return isId ? 'Unlisted' : 'Unlisted';
-  return isId ? 'Private' : 'Private';
+  if (normalized === 'public') return isId ? 'Publik' : 'Public';
+  if (normalized === 'unlisted')
+    return isId ? 'Siapa pun dengan tautan' : 'Anyone with the link';
+  return isId ? 'Hanya saya' : 'Only me';
 }
 
 function variableKeyFromLabel(label: string) {
@@ -528,6 +567,34 @@ function MessageMediaList({ media }: { media: AiStoredMedia[] }) {
             </div>
           );
         }
+        if (kind === 'audio' && item.url) {
+          return (
+            <div
+              key={key}
+              className="min-w-[220px] rounded-[14px] bg-black/6 p-2 dark:bg-white/10"
+            >
+              <audio
+                src={item.url}
+                controls
+                preload="metadata"
+                className="h-10 w-full"
+                aria-label={label}
+              />
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 flex min-w-0 items-center gap-2 text-[11px] font-semibold"
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                <span className="shrink-0 opacity-70">
+                  {formatBytes(item.size)}
+                </span>
+              </a>
+            </div>
+          );
+        }
         return (
           <a
             key={key}
@@ -607,7 +674,6 @@ function makeDraft(agent: PersonalAgent | null): SettingsDraft {
     visibility: normalizeUiVisibility(agent.visibility),
     instructions: agent.instructions,
     tone: agent.tone,
-    model_preference: agent.model_preference,
     temperature: agent.temperature,
     memory_enabled: agent.memory_enabled,
     builder_config:
@@ -626,10 +692,79 @@ function compactTime(input: string) {
   });
 }
 
+function compactMessageTime(input: string, isId: boolean) {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString(isId ? 'id-ID' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function createPersonalAiClientRef() {
+  const random = globalThis.crypto?.randomUUID?.();
+  return random
+    ? `profile-ai:${random}`
+    : `profile-ai:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`;
+}
+
+function voiceRecorderErrorMessage(error: string | null, isId: boolean) {
+  if (!error) return '';
+  if (error === 'permission-denied') {
+    return isId
+      ? 'Izin mikrofon ditolak. Izinkan mikrofon di pengaturan browser lalu coba lagi.'
+      : 'Microphone permission was denied. Allow it in browser settings and try again.';
+  }
+  if (error === 'microphone-not-found') {
+    return isId ? 'Mikrofon tidak ditemukan.' : 'No microphone was found.';
+  }
+  if (error === 'microphone-busy') {
+    return isId
+      ? 'Mikrofon sedang dipakai aplikasi lain.'
+      : 'The microphone is being used by another app.';
+  }
+  if (error === 'too-large') {
+    return isId
+      ? 'Rekaman terlalu besar. Coba rekam lebih singkat.'
+      : 'The recording is too large. Try a shorter recording.';
+  }
+  if (error === 'insecure-context') {
+    return isId
+      ? 'Perekaman suara hanya tersedia melalui koneksi HTTPS yang aman.'
+      : 'Voice recording is only available over a secure HTTPS connection.';
+  }
+  return isId
+    ? 'Perekaman suara belum didukung atau gagal dimulai di perangkat ini.'
+    : 'Voice recording is unavailable or could not start on this device.';
+}
+
 function creationTargetLabel(target: SupportedCreationTarget, isId: boolean) {
   if (target === 'offering_listing') return isId ? 'penawaran' : 'offer';
   if (target === 'looking_for_listing') return isId ? 'kebutuhan' : 'request';
   return isId ? 'profil usaha' : 'business profile';
+}
+
+function personalAgentFromCache(agent: CachedPersonalAiAgent): PersonalAgent {
+  return {
+    id: agent.id,
+    owner_id: '',
+    name: agent.name,
+    description: agent.description,
+    visibility: agent.visibility,
+    instructions: '',
+    tone: DEFAULT_DRAFT.tone,
+    model_preference: 'auto',
+    temperature: DEFAULT_DRAFT.temperature,
+    quick_buttons: [],
+    starter_prompts: agent.starter_prompts,
+    builder_config: createDefaultPersonalAiBuilderConfig(),
+    memory_enabled: false,
+    share_id: '',
+    usage_count: agent.usage_count,
+    can_edit: agent.can_edit,
+    cache_only: true,
+  };
 }
 
 export default function PersonalAiStudio() {
@@ -638,10 +773,46 @@ export default function PersonalAiStudio() {
   const locale = getLocaleFromPath(pathname);
   const isId = locale === 'id';
   const { user, authFetch, loading: authLoading } = useAuth();
+  const { confirm } = useDialog();
+  const voiceRecorder = useVoiceNoteRecorder();
+  const cancelVoiceRecording = voiceRecorder.cancel;
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const mobileToolsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const mobileToolsMenuRef = useRef<HTMLDivElement | null>(null);
   const draftAttachmentsRef = useRef<AiDraftAttachment[]>([]);
+  const loadAgentsRequestRef = useRef(0);
+  const loadThreadsRequestRef = useRef(0);
+  const loadMessagesRequestRef = useRef(0);
+  const agentsRef = useRef<PersonalAgent[]>([]);
+  const threadsRef = useRef<ChatThread[]>([]);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const selectedAgentIdRef = useRef('');
+  const selectedThreadIdRef = useRef('');
+  const agentsLoadContextRef = useRef('');
+  const threadsLoadContextRef = useRef('');
+  const messagesLoadContextRef = useRef('');
+  const threadsViewAgentIdRef = useRef('');
+  const messagesViewThreadIdRef = useRef('');
+  const previousUserIdRef = useRef('');
+  const voiceDraftContextRef = useRef('');
+  const inputRef = useRef('');
+  const replyingToRef = useRef<ChatMessage | null>(null);
+  const editingCreationDraftRef = useRef<AICreationDraft | null>(null);
+  const composerDraftContextRef = useRef('');
+  const composerDraftsRef = useRef<Map<string, PersonalAiComposerDraft>>(
+    new Map(),
+  );
+  const createAgentInFlightRef = useRef(false);
+  const createThreadInFlightRef = useRef(false);
+  const sendInFlightRef = useRef(false);
+  const attachmentsInFlightRef = useRef(false);
+  const sendRetryRef = useRef<{
+    fingerprint: string;
+    clientRef: string;
+  } | null>(null);
+  const viewerMemoryRequestRef = useRef(0);
 
   const [agents, setAgents] = useState<PersonalAgent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState('');
@@ -656,10 +827,17 @@ export default function PersonalAiStudio() {
   const [activePanel, setActivePanel] = useState<PersonalAiPanel>('chat');
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [selectedBuilderStepId, setSelectedBuilderStepId] = useState('');
   const [loadingAgents, setLoadingAgents] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [creatingAgent, setCreatingAgent] = useState(false);
+  const [creatingThread, setCreatingThread] = useState(false);
+  const [deletingThreadId, setDeletingThreadId] = useState('');
+  const [attaching, setAttaching] = useState(false);
+  const [transcribingVoice, setTranscribingVoice] = useState(false);
   const [saving, setSaving] = useState(false);
   const [composerFocused, setComposerFocused] = useState(false);
   const [notice, setNotice] = useState('');
@@ -672,62 +850,343 @@ export default function PersonalAiStudio() {
     useState<AICreationDraft | null>(null);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [reactionMessageId, setReactionMessageId] = useState('');
+  const [openMessageMenuId, setOpenMessageMenuId] = useState('');
   const [forwardingMessage, setForwardingMessage] =
     useState<ChatMessage | null>(null);
   const [forwarding, setForwarding] = useState(false);
+  const forwardDialogRef = useRef<HTMLDivElement | null>(null);
+  const forwardingRef = useRef(false);
+  forwardingRef.current = forwarding;
+  const [viewerMemory, setViewerMemory] = useState<ViewerMemoryState>({
+    enabled: false,
+    can_manage_recipient_consent: false,
+    memory: null,
+  });
+  const [loadingViewerMemory, setLoadingViewerMemory] = useState(false);
+  const [savingViewerMemory, setSavingViewerMemory] = useState(false);
+  const [savingShare, setSavingShare] = useState(false);
 
   useEffect(() => {
     draftAttachmentsRef.current = draftAttachments;
   }, [draftAttachments]);
 
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
+    replyingToRef.current = replyingTo;
+  }, [replyingTo]);
+
+  useEffect(() => {
+    editingCreationDraftRef.current = editingCreationDraft;
+  }, [editingCreationDraft]);
+
+  useEffect(() => {
+    agentsRef.current = agents;
+  }, [agents]);
+
+  useEffect(() => {
+    threadsRef.current = threads;
+  }, [threads]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    const previousUserId = previousUserIdRef.current;
+    const nextUserId = user?.id || '';
+    if (previousUserId && previousUserId !== nextUserId) {
+      void clearPersonalAiCache(previousUserId);
+    }
+    previousUserIdRef.current = nextUserId;
+  }, [authLoading, user?.id]);
+
+  useEffect(() => {
+    if (!openMessageMenuId) return;
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('[data-personal-ai-message-actions]')
+      ) {
+        return;
+      }
+      setOpenMessageMenuId('');
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenMessageMenuId('');
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [openMessageMenuId]);
+
+  useEffect(() => {
+    if (!mobileToolsOpen) return;
+    const menu = mobileToolsMenuRef.current;
+    const focusFirst = window.requestAnimationFrame(() => {
+      menu
+        ?.querySelector<HTMLElement>('[role="menuitemradio"]')
+        ?.focus({ preventScroll: true });
+    });
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        mobileToolsMenuRef.current?.contains(target) ||
+        mobileToolsTriggerRef.current?.contains(target)
+      )
+        return;
+      setMobileToolsOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileToolsOpen(false);
+        mobileToolsTriggerRef.current?.focus({ preventScroll: true });
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      const items = Array.from(
+        mobileToolsMenuRef.current?.querySelectorAll<HTMLElement>(
+          '[role="menuitemradio"]',
+        ) || [],
+      );
+      if (items.length === 0) return;
+      event.preventDefault();
+      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+      const offset = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex =
+        (Math.max(currentIndex, 0) + offset + items.length) % items.length;
+      items[nextIndex]?.focus({ preventScroll: true });
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFirst);
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileToolsOpen]);
+
+  useEffect(() => {
+    if (!forwardingMessage) return;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusInitialControl = window.requestAnimationFrame(() => {
+      const dialog = forwardDialogRef.current;
+      const initial = dialog?.querySelector<HTMLElement>(
+        '[data-forward-initial-focus]',
+      );
+      (initial || dialog)?.focus({ preventScroll: true });
+    });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !forwardingRef.current) {
+        event.preventDefault();
+        setForwardingMessage(null);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const dialog = forwardDialogRef.current;
+      if (!dialog) return;
+      const controls = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter(control => control.getClientRects().length > 0);
+      if (controls.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusInitialControl);
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus({ preventScroll: true });
+    };
+  }, [forwardingMessage]);
+
+  useEffect(() => {
+    selectedAgentIdRef.current = selectedAgentId;
+  }, [selectedAgentId]);
+
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
+
+  useEffect(() => {
+    const nextContext = `${selectedAgentId}:${selectedThreadId}`;
+    if (
+      voiceDraftContextRef.current &&
+      voiceDraftContextRef.current !== nextContext
+    ) {
+      cancelVoiceRecording();
+    }
+    voiceDraftContextRef.current = nextContext;
+  }, [cancelVoiceRecording, selectedAgentId, selectedThreadId]);
+
   useEffect(
     () => () => {
-      draftAttachmentsRef.current.forEach(revokeAttachmentPreview);
+      const attachments = new Map<string, AiDraftAttachment>();
+      draftAttachmentsRef.current.forEach(attachment =>
+        attachments.set(attachment.id, attachment),
+      );
+      composerDraftsRef.current.forEach(draft => {
+        draft.attachments.forEach(attachment =>
+          attachments.set(attachment.id, attachment),
+        );
+      });
+      attachments.forEach(revokeAttachmentPreview);
+      composerDraftsRef.current.clear();
     },
     [],
   );
 
+  useEffect(() => {
+    const nextContext = `${selectedAgentId || 'none'}:${
+      selectedThreadId || 'new'
+    }`;
+    const previousContext = composerDraftContextRef.current;
+    if (previousContext === nextContext) return;
+
+    if (previousContext) {
+      composerDraftsRef.current.delete(previousContext);
+      composerDraftsRef.current.set(previousContext, {
+        input: inputRef.current,
+        attachments: draftAttachmentsRef.current,
+        replyingTo: replyingToRef.current,
+        editingCreationDraft: editingCreationDraftRef.current,
+      });
+
+      while (composerDraftsRef.current.size > 32) {
+        const oldestKey = composerDraftsRef.current.keys().next().value;
+        if (typeof oldestKey !== 'string') break;
+        const oldestDraft = composerDraftsRef.current.get(oldestKey);
+        oldestDraft?.attachments.forEach(revokeAttachmentPreview);
+        composerDraftsRef.current.delete(oldestKey);
+      }
+    }
+
+    const restored = composerDraftsRef.current.get(nextContext);
+    const nextInput = restored?.input || '';
+    const nextAttachments = restored?.attachments || [];
+    const nextReply = restored?.replyingTo || null;
+    const nextEditingDraft = restored?.editingCreationDraft || null;
+    inputRef.current = nextInput;
+    draftAttachmentsRef.current = nextAttachments;
+    replyingToRef.current = nextReply;
+    editingCreationDraftRef.current = nextEditingDraft;
+    setInput(nextInput);
+    setDraftAttachments(nextAttachments);
+    setReplyingTo(nextReply);
+    setEditingCreationDraft(nextEditingDraft);
+    setQuickActionsOpen(false);
+    setOpenMessageMenuId('');
+    setReactionMessageId('');
+    composerDraftContextRef.current = nextContext;
+  }, [selectedAgentId, selectedThreadId]);
+
   const shareId = searchParams.get('share') || '';
+
+  const replaceAgents = useCallback(
+    (nextAgents: PersonalAgent[], persist = true) => {
+      agentsRef.current = nextAgents;
+      setAgents(nextAgents);
+      if (persist && user?.id) {
+        void savePersonalAiAgentsCache(
+          user.id,
+          nextAgents.filter(agent => agent.can_edit && !agent.cache_only),
+        );
+      }
+    },
+    [user?.id],
+  );
+
+  const replaceThreads = useCallback(
+    (agentId: string, nextThreads: ChatThread[], persist = true) => {
+      threadsViewAgentIdRef.current = agentId;
+      threadsRef.current = nextThreads;
+      setThreads(nextThreads);
+      if (persist && user?.id && agentId) {
+        void savePersonalAiThreadsCache(user.id, agentId, nextThreads);
+      }
+    },
+    [user?.id],
+  );
+
+  const replaceMessages = useCallback(
+    (threadId: string, nextMessages: ChatMessage[], persist = true) => {
+      messagesViewThreadIdRef.current = threadId;
+      messagesRef.current = nextMessages;
+      setMessages(nextMessages);
+      if (persist && user?.id && threadId) {
+        void savePersonalAiMessagesCache(user.id, threadId, nextMessages);
+      }
+    },
+    [user?.id],
+  );
+
   const selectedAgent =
     agents.find(agent => agent.id === selectedAgentId) || null;
-  const canEditSelected = Boolean(selectedAgent?.can_edit);
+  const canEditSelected = Boolean(
+    selectedAgent?.can_edit && !selectedAgent.cache_only,
+  );
 
   const copy = useMemo(
     () =>
       isId
         ? {
-            title: 'AI Pribadi',
-            newAi: 'AI baru',
-            newTab: 'Tab baru',
-            settings: 'Setting',
-            builder: 'Builder',
-            share: 'Share',
-            memory: 'Memory',
-            private: 'Private',
-            shared: 'Unlisted',
-            public: 'Public',
+            title: 'Asisten AI Lajukan',
+            newAi: 'Asisten baru',
+            newTab: 'Chat baru',
+            settings: 'Pengaturan',
+            builder: 'Cara kerja',
+            share: 'Bagikan',
+            memory: 'Ingatan',
+            private: 'Hanya saya',
+            shared: 'Dengan tautan',
+            public: 'Publik',
             save: 'Simpan',
             send: 'Kirim',
             placeholder:
               'Tanya apa pun tentang usaha, supplier, modal, risiko, atau langkah berikutnya...',
-            empty: 'Mulai chat dari tab ini.',
-            noAgent: 'AI belum siap.',
+            empty: 'Apa yang ingin dibantu hari ini?',
+            noAgent: 'Asisten AI belum siap.',
             copied: 'Link disalin',
-            saved: 'Setting tersimpan',
+            saved: 'Pengaturan tersimpan',
             createFailed: 'Gagal membuat AI.',
-            saveFailed: 'Gagal menyimpan setting.',
+            saveFailed: 'Gagal menyimpan pengaturan.',
             sendFailed: 'Gagal mengirim pesan.',
             delete: 'Hapus',
-            back: 'Profile',
+            back: 'Profil',
           }
         : {
-            title: 'Personal AI',
-            newAi: 'New AI',
-            newTab: 'New tab',
+            title: 'Lajukan AI Assistant',
+            newAi: 'New assistant',
+            newTab: 'New chat',
             settings: 'Settings',
-            builder: 'Builder',
+            builder: 'How it works',
             share: 'Share',
-            memory: 'Memory',
+            memory: 'What it remembers',
             private: 'Private',
             shared: 'Unlisted',
             public: 'Public',
@@ -735,8 +1194,8 @@ export default function PersonalAiStudio() {
             send: 'Send',
             placeholder:
               'Ask about business ideas, suppliers, capital, risk, or next steps...',
-            empty: 'Start chatting in this tab.',
-            noAgent: 'AI is not ready.',
+            empty: 'What can I help you with today?',
+            noAgent: 'The AI assistant is not ready.',
             copied: 'Link copied',
             saved: 'Settings saved',
             createFailed: 'Failed to create AI.',
@@ -748,12 +1207,110 @@ export default function PersonalAiStudio() {
     [isId],
   );
 
+  const suggestedPrompts = useMemo(() => {
+    const configured = selectedAgent?.starter_prompts
+      ?.map(prompt => prompt.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    if (configured?.length) return configured;
+    return isId
+      ? [
+          'Bantu buat deskripsi usaha saya',
+          'Buat balasan ramah untuk pelanggan',
+          'Apa langkah usaha saya berikutnya?',
+        ]
+      : [
+          'Help me describe my business',
+          'Write a friendly customer reply',
+          'What should I do next for my business?',
+        ];
+  }, [isId, selectedAgent?.starter_prompts]);
+
   const shareUrl = useMemo(() => {
     if (!selectedAgent || typeof window === 'undefined') return '';
     return `${window.location.origin}/${locale}/profile/ai?share=${encodeURIComponent(
       selectedAgent.share_id,
     )}`;
   }, [locale, selectedAgent]);
+
+  useEffect(() => {
+    const requestId = ++viewerMemoryRequestRef.current;
+    const agent = selectedAgent;
+    if (
+      activePanel !== 'memory' ||
+      !agent ||
+      agent.can_edit ||
+      agent.cache_only
+    ) {
+      setLoadingViewerMemory(false);
+      setViewerMemory({
+        enabled: false,
+        can_manage_recipient_consent: false,
+        memory: null,
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    const agentId = agent.id;
+    const shareId = agent.share_id;
+    setLoadingViewerMemory(true);
+
+    void (async () => {
+      try {
+        const response = await authFetch(
+          `/api/ai/personal/agents/${encodeURIComponent(agentId)}/memory?share_id=${encodeURIComponent(shareId)}`,
+          { cache: 'no-store', signal: controller.signal },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: ViewerMemoryState;
+          error?: string;
+        };
+        if (
+          !response.ok ||
+          !payload.data ||
+          payload.data.can_manage_recipient_consent !== true
+        ) {
+          throw new Error(payload.error || 'Memory unavailable.');
+        }
+        if (
+          controller.signal.aborted ||
+          requestId !== viewerMemoryRequestRef.current ||
+          selectedAgentIdRef.current !== agentId
+        ) {
+          return;
+        }
+        setViewerMemory(payload.data);
+      } catch (memoryError) {
+        if (
+          controller.signal.aborted ||
+          (memoryError instanceof Error && memoryError.name === 'AbortError') ||
+          requestId !== viewerMemoryRequestRef.current
+        ) {
+          return;
+        }
+        setViewerMemory({
+          enabled: false,
+          can_manage_recipient_consent: false,
+          memory: null,
+        });
+        setError(
+          isId
+            ? 'Pengaturan ingatan belum dapat dimuat.'
+            : 'Memory settings could not be loaded.',
+        );
+      } finally {
+        if (
+          !controller.signal.aborted &&
+          requestId === viewerMemoryRequestRef.current
+        ) {
+          setLoadingViewerMemory(false);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [activePanel, authFetch, isId, selectedAgent]);
 
   const latestCreationMessageByDraftId = useMemo(() => {
     const result = new Map<string, string>();
@@ -778,17 +1335,22 @@ export default function PersonalAiStudio() {
 
   const scrollMessagesToBottom = useCallback(
     (behavior: ScrollBehavior = 'auto') => {
+      const resolvedBehavior =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : behavior;
       const viewport = messagesViewportRef.current;
       if (viewport) {
         viewport.scrollTo({
           top: viewport.scrollHeight,
-          behavior,
+          behavior: resolvedBehavior,
         });
         return;
       }
 
       messagesEndRef.current?.scrollIntoView({
-        behavior,
+        behavior: resolvedBehavior,
         block: 'end',
       });
     },
@@ -797,9 +1359,42 @@ export default function PersonalAiStudio() {
 
   const loadAgents = useCallback(async () => {
     if (!user?.id) return;
+    const contextKey = `${user.id}:${shareId || 'owned'}`;
+    if (agentsLoadContextRef.current === contextKey) return;
+    agentsLoadContextRef.current = contextKey;
+    const requestId = ++loadAgentsRequestRef.current;
+    loadThreadsRequestRef.current += 1;
+    loadMessagesRequestRef.current += 1;
+    threadsLoadContextRef.current = '';
+    messagesLoadContextRef.current = '';
+    selectedAgentIdRef.current = '';
+    selectedThreadIdRef.current = '';
     setLoadingAgents(true);
     setError('');
+    replaceAgents([], false);
+    replaceThreads('', [], false);
+    replaceMessages('', [], false);
+    setSelectedAgentId('');
+    setSelectedThreadId('');
+    setCreationDrafts({});
     try {
+      if (!shareId) {
+        const cached = await loadPersonalAiAgentsCache(user.id);
+        if (
+          requestId !== loadAgentsRequestRef.current ||
+          agentsLoadContextRef.current !== contextKey
+        ) {
+          return;
+        }
+        if (cached) {
+          const cachedAgents = cached.data.map(personalAgentFromCache);
+          replaceAgents(cachedAgents, false);
+          const cachedSelectedId = cachedAgents[0]?.id || '';
+          selectedAgentIdRef.current = cachedSelectedId;
+          setSelectedAgentId(cachedSelectedId);
+        }
+      }
+
       const params = shareId ? `?share_id=${encodeURIComponent(shareId)}` : '';
       const res = await authFetch(`/api/ai/personal/agents${params}`, {
         cache: 'no-store',
@@ -813,6 +1408,12 @@ export default function PersonalAiStudio() {
       };
       if (!res.ok || !payload.data)
         throw new Error(payload.error || copy.noAgent);
+      if (
+        requestId !== loadAgentsRequestRef.current ||
+        agentsLoadContextRef.current !== contextKey
+      ) {
+        return;
+      }
       const nextAgents = [...(payload.data.agents || [])];
       if (
         payload.data.shared_agent &&
@@ -820,101 +1421,207 @@ export default function PersonalAiStudio() {
       ) {
         nextAgents.unshift(payload.data.shared_agent);
       }
-      setAgents(nextAgents);
-      setSelectedAgentId(
-        current =>
-          payload.data?.shared_agent?.id || current || nextAgents[0]?.id || '',
-      );
+      replaceAgents(nextAgents);
+      const currentAgentId = selectedAgentIdRef.current;
+      const nextSelectedAgentId =
+        payload.data.shared_agent?.id ||
+        nextAgents.find(agent => agent.id === currentAgentId)?.id ||
+        nextAgents[0]?.id ||
+        '';
+      selectedAgentIdRef.current = nextSelectedAgentId;
+      setSelectedAgentId(nextSelectedAgentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : copy.noAgent);
+      if (
+        requestId === loadAgentsRequestRef.current &&
+        agentsLoadContextRef.current === contextKey
+      ) {
+        agentsLoadContextRef.current = '';
+        setError(err instanceof Error ? err.message : copy.noAgent);
+      }
     } finally {
-      setLoadingAgents(false);
+      if (requestId === loadAgentsRequestRef.current) {
+        setLoadingAgents(false);
+      }
     }
-  }, [authFetch, copy.noAgent, shareId, user?.id]);
+  }, [
+    authFetch,
+    copy.noAgent,
+    replaceAgents,
+    replaceMessages,
+    replaceThreads,
+    shareId,
+    user?.id,
+  ]);
 
   const loadThreads = useCallback(
     async (agentId: string) => {
       if (!agentId || !user?.id) return;
+      const contextKey = `${user.id}:${agentId}`;
+      if (threadsLoadContextRef.current === contextKey) return;
+      threadsLoadContextRef.current = contextKey;
+      const requestId = ++loadThreadsRequestRef.current;
+      loadMessagesRequestRef.current += 1;
+      messagesLoadContextRef.current = '';
+      selectedThreadIdRef.current = '';
       setLoadingThreads(true);
+      setLoadingMessages(false);
+      replaceThreads(agentId, [], false);
+      replaceMessages('', [], false);
+      setSelectedThreadId('');
+      setCreationDrafts({});
       try {
+        const cached = await loadPersonalAiThreadsCache(user.id, agentId);
+        if (
+          requestId !== loadThreadsRequestRef.current ||
+          selectedAgentIdRef.current !== agentId
+        ) {
+          return;
+        }
+        if (cached) {
+          const cachedThreads = cached.data as ChatThread[];
+          replaceThreads(agentId, cachedThreads, false);
+          const cachedThreadId = cachedThreads[0]?.id || '';
+          selectedThreadIdRef.current = cachedThreadId;
+          setSelectedThreadId(cachedThreadId);
+        }
+
         const res = await authFetch(
           `/api/ai/personal/threads?agent_id=${encodeURIComponent(agentId)}`,
           { cache: 'no-store' },
         );
         const payload = (await res.json().catch(() => ({}))) as {
           data?: { threads?: ChatThread[] };
+          error?: string;
         };
+        if (!res.ok || !payload.data) {
+          throw new Error(
+            payload.error ||
+              (isId
+                ? 'Daftar chat belum dapat dimuat.'
+                : 'The chat list could not be loaded.'),
+          );
+        }
+        if (
+          requestId !== loadThreadsRequestRef.current ||
+          selectedAgentIdRef.current !== agentId
+        )
+          return;
         const nextThreads = payload.data?.threads || [];
-        setThreads(nextThreads);
-        setSelectedThreadId(current => {
-          const nextThreadId =
-            nextThreads.find(thread => thread.id === current)?.id ||
-            nextThreads[0]?.id ||
-            '';
-          if (!nextThreadId) setMessages([]);
-          return nextThreadId;
-        });
+        replaceThreads(agentId, nextThreads);
+        const currentThreadId = selectedThreadIdRef.current;
+        const nextThreadId =
+          nextThreads.find(thread => thread.id === currentThreadId)?.id ||
+          nextThreads[0]?.id ||
+          '';
+        selectedThreadIdRef.current = nextThreadId;
+        setSelectedThreadId(nextThreadId);
+        if (!nextThreadId) {
+          messagesLoadContextRef.current = '';
+          replaceMessages('', [], false);
+          setCreationDrafts({});
+        }
+      } catch (loadError) {
+        if (
+          requestId === loadThreadsRequestRef.current &&
+          selectedAgentIdRef.current === agentId
+        ) {
+          threadsLoadContextRef.current = '';
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : isId
+                ? 'Daftar chat belum dapat dimuat.'
+                : 'The chat list could not be loaded.',
+          );
+        }
       } finally {
-        setLoadingThreads(false);
+        if (requestId === loadThreadsRequestRef.current) {
+          setLoadingThreads(false);
+        }
       }
     },
-    [authFetch, user?.id],
+    [authFetch, isId, replaceMessages, replaceThreads, user?.id],
   );
 
   const loadThreadMessages = useCallback(
     async (threadId: string) => {
       if (!threadId || !user?.id) return;
-      setReplyingTo(null);
+      const contextKey = `${user.id}:${threadId}`;
+      if (messagesLoadContextRef.current === contextKey) return;
+      messagesLoadContextRef.current = contextKey;
+      const requestId = ++loadMessagesRequestRef.current;
+      setLoadingMessages(true);
+      setError('');
+      replaceMessages(threadId, [], false);
+      setCreationDrafts({});
       setReactionMessageId('');
-      const res = await authFetch(
-        `/api/ai/personal/threads/${encodeURIComponent(threadId)}`,
-        {
-          cache: 'no-store',
-        },
-      );
-      const payload = (await res.json().catch(() => ({}))) as {
-        data?: { messages?: ChatMessage[] };
-      };
-      const nextMessages = payload.data?.messages || [];
-      setMessages(nextMessages);
-      const linkedDrafts = nextMessages
-        .map(message => ({
-          messageId: message.id,
-          draft: creationDraftFromMessage(message),
-        }))
-        .filter((item): item is { messageId: string; draft: AICreationDraft } =>
-          Boolean(item.draft),
-        )
-        .slice(-20);
-      const hydratedDrafts = await Promise.all(
-        linkedDrafts.map(async item => {
-          const response = await authFetch(
-            `/api/creation-drafts/${encodeURIComponent(item.draft.id)}`,
-            { cache: 'no-store' },
+      setOpenMessageMenuId('');
+      try {
+        const cached = await loadPersonalAiMessagesCache(user.id, threadId);
+        if (
+          requestId !== loadMessagesRequestRef.current ||
+          selectedThreadIdRef.current !== threadId
+        ) {
+          return;
+        }
+        if (cached) {
+          replaceMessages(threadId, cached.data as ChatMessage[], false);
+        }
+
+        const res = await authFetch(
+          `/api/ai/personal/threads/${encodeURIComponent(threadId)}`,
+          {
+            cache: 'no-store',
+          },
+        );
+        const payload = (await res.json().catch(() => ({}))) as {
+          data?: { messages?: ChatMessage[] };
+          error?: string;
+        };
+        if (!res.ok || !payload.data) {
+          throw new Error(
+            payload.error ||
+              (isId
+                ? 'Riwayat chat belum dapat dibuka.'
+                : 'The chat history could not be opened.'),
           );
-          const draftPayload = (await response.json().catch(() => ({}))) as {
-            data?: AICreationDraft;
-          };
-          return response.ok && draftPayload.data
-            ? ([
-                item.messageId,
-                {
-                  ...draftPayload.data,
-                  continueUrl: item.draft.continueUrl,
-                },
-              ] as const)
-            : null;
-        }),
-      );
-      setCreationDrafts(
-        Object.fromEntries(
-          hydratedDrafts.filter((item): item is NonNullable<typeof item> =>
-            Boolean(item),
+        }
+        if (
+          requestId !== loadMessagesRequestRef.current ||
+          selectedThreadIdRef.current !== threadId
+        )
+          return;
+        const nextMessages = payload.data?.messages || [];
+        replaceMessages(threadId, nextMessages);
+        setCreationDrafts(
+          Object.fromEntries(
+            nextMessages.flatMap(message => {
+              const draft = creationDraftFromMessage(message);
+              return draft ? [[message.id, draft] as const] : [];
+            }),
           ),
-        ),
-      );
+        );
+      } catch (loadError) {
+        if (
+          requestId === loadMessagesRequestRef.current &&
+          selectedThreadIdRef.current === threadId
+        ) {
+          messagesLoadContextRef.current = '';
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : isId
+                ? 'Riwayat chat belum dapat dibuka.'
+                : 'The chat history could not be opened.',
+          );
+        }
+      } finally {
+        if (requestId === loadMessagesRequestRef.current) {
+          setLoadingMessages(false);
+        }
+      }
     },
-    [authFetch, user?.id],
+    [authFetch, isId, replaceMessages, user?.id],
   );
 
   useEffect(() => {
@@ -946,6 +1653,9 @@ export default function PersonalAiStudio() {
   }, [composerFocused, messages.length, scrollMessagesToBottom, sending]);
 
   async function createAgent() {
+    if (createAgentInFlightRef.current) return;
+    createAgentInFlightRef.current = true;
+    setCreatingAgent(true);
     setError('');
     try {
       const res = await authFetch('/api/ai/personal/agents', {
@@ -964,12 +1674,21 @@ export default function PersonalAiStudio() {
       };
       if (!res.ok || !payload.data?.agent)
         throw new Error(payload.error || copy.createFailed);
-      setAgents(current => [payload.data!.agent!, ...current]);
+      replaceAgents([
+        payload.data.agent,
+        ...agentsRef.current.filter(
+          agent => agent.id !== payload.data!.agent!.id,
+        ),
+      ]);
+      selectedAgentIdRef.current = payload.data.agent.id;
       setSelectedAgentId(payload.data.agent.id);
       setActivePanel('settings');
       setMobileLibraryOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : copy.createFailed);
+    } finally {
+      createAgentInFlightRef.current = false;
+      setCreatingAgent(false);
     }
   }
 
@@ -990,7 +1709,7 @@ export default function PersonalAiStudio() {
             visibility: draft.visibility,
             instructions: draft.instructions,
             tone: draft.tone,
-            model_preference: draft.model_preference,
+            model_preference: 'auto',
             temperature: draft.temperature,
             memory_enabled: draft.memory_enabled,
             builder_config: draft.builder_config,
@@ -1005,8 +1724,8 @@ export default function PersonalAiStudio() {
       };
       if (!res.ok || !payload.data?.agent)
         throw new Error(payload.error || copy.saveFailed);
-      setAgents(current =>
-        current.map(agent =>
+      replaceAgents(
+        agentsRef.current.map(agent =>
           agent.id === payload.data!.agent!.id ? payload.data!.agent! : agent,
         ),
       );
@@ -1030,49 +1749,153 @@ export default function PersonalAiStudio() {
       { method: 'DELETE' },
     );
     if (res.ok) {
-      setAgents(current =>
-        current.filter(agent => agent.id !== selectedAgent.id),
+      const nextAgents = agentsRef.current.filter(
+        agent => agent.id !== selectedAgent.id,
       );
-      setSelectedAgentId(
-        agents.find(agent => agent.id !== selectedAgent.id)?.id || '',
-      );
+      replaceAgents(nextAgents);
+      const nextAgentId = nextAgents[0]?.id || '';
+      selectedAgentIdRef.current = nextAgentId;
+      setSelectedAgentId(nextAgentId);
     }
   }
 
   async function createThread() {
-    if (!selectedAgent) return null;
-    const res = await authFetch('/api/ai/personal/threads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        agent_id: selectedAgent.can_edit ? selectedAgent.id : undefined,
-        share_id: selectedAgent.can_edit ? undefined : selectedAgent.share_id,
-        title: isId ? 'Chat baru' : 'New chat',
-      }),
-    });
-    const payload = (await res.json().catch(() => ({}))) as {
-      data?: { thread?: ChatThread };
-    };
-    if (payload.data?.thread) {
-      setThreads(current => [payload.data!.thread!, ...current]);
-      setSelectedThreadId(payload.data.thread.id);
-      setMessages([]);
-      return payload.data.thread;
+    if (
+      !selectedAgent ||
+      selectedAgent.cache_only ||
+      !user?.id ||
+      createThreadInFlightRef.current
+    )
+      return null;
+    createThreadInFlightRef.current = true;
+    setCreatingThread(true);
+    try {
+      const res = await authFetch('/api/ai/personal/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: selectedAgent.can_edit ? selectedAgent.id : undefined,
+          share_id: selectedAgent.can_edit ? undefined : selectedAgent.share_id,
+          title: isId ? 'Chat baru' : 'New chat',
+        }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        data?: { thread?: ChatThread };
+        error?: string;
+      };
+      if (!res.ok || !payload.data?.thread) {
+        throw new Error(
+          payload.error ||
+            (isId
+              ? 'Chat baru belum dapat dibuat.'
+              : 'The new chat could not be created.'),
+        );
+      }
+      const nextThread = payload.data.thread;
+      replaceThreads(selectedAgent.id, [
+        nextThread,
+        ...threadsRef.current.filter(thread => thread.id !== nextThread.id),
+      ]);
+      loadMessagesRequestRef.current += 1;
+      messagesLoadContextRef.current = `${user.id}:${nextThread.id}`;
+      selectedThreadIdRef.current = nextThread.id;
+      setSelectedThreadId(nextThread.id);
+      replaceMessages(nextThread.id, []);
+      setCreationDrafts({});
+      return nextThread;
+    } catch (threadError) {
+      setError(
+        threadError instanceof Error
+          ? threadError.message
+          : isId
+            ? 'Chat baru belum dapat dibuat.'
+            : 'The new chat could not be created.',
+      );
+      return null;
+    } finally {
+      createThreadInFlightRef.current = false;
+      setCreatingThread(false);
     }
-    return null;
+  }
+
+  async function deleteThread(thread: ChatThread) {
+    if (!selectedAgent || deletingThreadId) return;
+    const approved = await confirm({
+      title: isId ? 'Hapus chat AI?' : 'Delete AI chat?',
+      description: isId
+        ? `Chat "${thread.title}" dan seluruh pesannya akan dihapus permanen dari riwayat server.`
+        : `"${thread.title}" and all of its messages will be permanently deleted from server history.`,
+      confirmLabel: isId ? 'Hapus chat' : 'Delete chat',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+
+    setDeletingThreadId(thread.id);
+    setError('');
+    try {
+      const response = await authFetch(
+        `/api/ai/personal/threads/${encodeURIComponent(thread.id)}`,
+        { method: 'DELETE' },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+            (isId
+              ? 'Chat belum dapat dihapus.'
+              : 'The chat could not be deleted.'),
+        );
+      }
+
+      const nextThreads = threadsRef.current.filter(
+        item => item.id !== thread.id,
+      );
+      replaceThreads(selectedAgent.id, nextThreads);
+      const deletedDraftKey = `${selectedAgent.id}:${thread.id}`;
+      const deletedDraft = composerDraftsRef.current.get(deletedDraftKey);
+      deletedDraft?.attachments.forEach(revokeAttachmentPreview);
+      composerDraftsRef.current.delete(deletedDraftKey);
+
+      if (selectedThreadIdRef.current === thread.id) {
+        const nextThreadId = nextThreads[0]?.id || '';
+        loadMessagesRequestRef.current += 1;
+        messagesLoadContextRef.current = '';
+        selectedThreadIdRef.current = nextThreadId;
+        setSelectedThreadId(nextThreadId);
+        replaceMessages(nextThreadId, [], false);
+        setCreationDrafts({});
+      }
+      setNotice(isId ? 'Chat sudah dihapus' : 'Chat deleted');
+    } catch (threadError) {
+      setError(
+        threadError instanceof Error
+          ? threadError.message
+          : isId
+            ? 'Chat belum dapat dihapus.'
+            : 'The chat could not be deleted.',
+      );
+    } finally {
+      setDeletingThreadId('');
+    }
   }
 
   const removeDraftAttachment = useCallback((attachmentId: string) => {
     setDraftAttachments(current => {
       const target = current.find(attachment => attachment.id === attachmentId);
       if (target) revokeAttachmentPreview(target);
-      return current.filter(attachment => attachment.id !== attachmentId);
+      const next = current.filter(attachment => attachment.id !== attachmentId);
+      draftAttachmentsRef.current = next;
+      return next;
     });
   }, []);
 
   const clearDraftAttachments = useCallback((shouldRevoke = true) => {
     setDraftAttachments(current => {
       if (shouldRevoke) current.forEach(revokeAttachmentPreview);
+      draftAttachmentsRef.current = [];
       return [];
     });
   }, []);
@@ -1100,88 +1923,212 @@ export default function PersonalAiStudio() {
     return payload.data || payload.files?.[0] || null;
   }
 
+  async function addAttachments(files: File[]) {
+    if (files.length === 0 || attachmentsInFlightRef.current) return false;
+    attachmentsInFlightRef.current = true;
+    setAttaching(true);
+    const targetAgentId = selectedAgentIdRef.current;
+    const targetThreadId = selectedThreadIdRef.current;
+
+    try {
+      const availableSlots = Math.max(
+        0,
+        MAX_AI_ATTACHMENTS - draftAttachmentsRef.current.length,
+      );
+      if (availableSlots <= 0) {
+        setError(
+          isId ? 'Maksimal 4 media per pesan.' : 'Maximum 4 media per message.',
+        );
+        return false;
+      }
+
+      const acceptedFiles = files.slice(0, availableSlots);
+      const next: AiDraftAttachment[] = [];
+
+      for (const file of acceptedFiles) {
+        const kind = fileKind(file);
+        if (file.size > 5_000_000) {
+          setError(
+            isId
+              ? 'File terlalu besar. Batas sementara 5 MB per file.'
+              : 'File is too large. Current limit is 5 MB per file.',
+          );
+          continue;
+        }
+
+        const attachment: AiDraftAttachment = {
+          id: `media_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          name: file.name,
+          mime: file.type || 'application/octet-stream',
+          size: file.size,
+          kind,
+        };
+
+        if (kind === 'image') {
+          if (file.size <= MAX_INLINE_IMAGE_BYTES) {
+            attachment.dataUrl = await readAsDataUrl(file);
+          } else {
+            setError(
+              isId
+                ? 'Gambar besar tetap dilampirkan sebagai metadata. Untuk dibaca AI vision, kompres di bawah 1.6 MB.'
+                : 'Large image attached as metadata. Compress below 1.6 MB for vision reading.',
+            );
+          }
+          attachment.previewUrl = URL.createObjectURL(file);
+        } else if (kind === 'video' || kind === 'audio') {
+          attachment.previewUrl = URL.createObjectURL(file);
+        }
+
+        if (canReadText(file)) {
+          attachment.text = (await readAsText(file)).slice(0, 1600);
+        }
+
+        try {
+          const stored = await uploadPersonalAiMedia(file);
+          if (stored?.url) {
+            attachment.url = stored.url;
+            attachment.mime = stored.mime || attachment.mime;
+            attachment.size = stored.size || attachment.size;
+          }
+        } catch (uploadError) {
+          setError(
+            uploadError instanceof Error
+              ? uploadError.message
+              : isId
+                ? 'Upload media gagal.'
+                : 'Media upload failed.',
+          );
+          revokeAttachmentPreview(attachment);
+          continue;
+        }
+
+        next.push(attachment);
+      }
+
+      if (next.length > 0) {
+        if (
+          selectedAgentIdRef.current !== targetAgentId ||
+          selectedThreadIdRef.current !== targetThreadId
+        ) {
+          next.forEach(revokeAttachmentPreview);
+          setNotice(
+            isId
+              ? 'Chat sudah berpindah. Media tidak dimasukkan agar tidak salah percakapan.'
+              : 'The chat changed. Media was not attached to another conversation.',
+          );
+          return false;
+        }
+        setDraftAttachments(current => {
+          const merged = [...current, ...next].slice(0, MAX_AI_ATTACHMENTS);
+          draftAttachmentsRef.current = merged;
+          return merged;
+        });
+        return true;
+      }
+      return false;
+    } finally {
+      attachmentsInFlightRef.current = false;
+      setAttaching(false);
+    }
+  }
+
+  async function transcribeVoiceNote(file: File) {
+    if (transcribingVoice) return;
+    const targetAgentId = selectedAgentIdRef.current;
+    const targetThreadId = selectedThreadIdRef.current;
+    setTranscribingVoice(true);
+    setError('');
+    void trackLajukanEvent('personal_ai.voice_transcription.started', {
+      locale,
+      entityType: 'personal_ai_agent',
+      entityId: targetAgentId || undefined,
+      properties: {
+        duration_seconds: Math.round(voiceRecorder.durationMs / 1_000),
+        size_bucket:
+          file.size < 512 * 1024
+            ? 'under_512kb'
+            : file.size < 2 * 1024 * 1024
+              ? 'under_2mb'
+              : '2mb_or_more',
+      },
+    });
+    try {
+      const form = new FormData();
+      form.set('file', file, file.name);
+      const res = await authFetch(
+        `/api/ai/personal/transcribe?locale=${encodeURIComponent(locale)}`,
+        {
+          method: 'POST',
+          body: form,
+        },
+      );
+      const payload = (await res.json().catch(() => ({}))) as {
+        data?: { text?: string };
+        error?: string;
+      };
+      const transcript = payload.data?.text?.trim() || '';
+      if (!res.ok || !transcript) {
+        throw new Error(
+          payload.error ||
+            (isId
+              ? 'Rekaman belum bisa diubah menjadi teks.'
+              : 'The recording could not be converted to text.'),
+        );
+      }
+      if (
+        selectedAgentIdRef.current !== targetAgentId ||
+        selectedThreadIdRef.current !== targetThreadId
+      ) {
+        setNotice(
+          isId
+            ? 'Chat sudah berpindah. Hasil rekaman tidak dimasukkan agar tidak salah percakapan.'
+            : 'The chat changed. The transcript was not inserted into another conversation.',
+        );
+        return;
+      }
+      const currentInput = inputRef.current;
+      const nextInput = [currentInput.trim(), transcript]
+        .filter(Boolean)
+        .join(currentInput.trim() ? '\n' : '')
+        .slice(0, 3_500);
+      inputRef.current = nextInput;
+      setInput(nextInput);
+      voiceRecorder.cancel();
+      void trackLajukanEvent('personal_ai.voice_transcription.completed', {
+        locale,
+        entityType: 'personal_ai_agent',
+        entityId: targetAgentId || undefined,
+        properties: {
+          duration_seconds: Math.round(voiceRecorder.durationMs / 1_000),
+        },
+      });
+      setNotice(
+        isId
+          ? 'Rekaman sudah menjadi teks. Periksa sebelum dikirim.'
+          : 'The recording is now text. Review it before sending.',
+      );
+    } catch (transcriptionError) {
+      void trackLajukanEvent('personal_ai.voice_transcription.failed', {
+        locale,
+        entityType: 'personal_ai_agent',
+        entityId: targetAgentId || undefined,
+      });
+      setError(
+        transcriptionError instanceof Error
+          ? transcriptionError.message
+          : isId
+            ? 'Transkripsi suara gagal. Coba lagi.'
+            : 'Voice transcription failed. Please try again.',
+      );
+    } finally {
+      setTranscribingVoice(false);
+    }
+  }
+
   async function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if (files.length === 0) return;
-
-    const availableSlots = Math.max(
-      0,
-      MAX_AI_ATTACHMENTS - draftAttachments.length,
-    );
-    if (availableSlots <= 0) {
-      setError(
-        isId ? 'Maksimal 4 media per pesan.' : 'Maximum 4 media per message.',
-      );
-      return;
-    }
-
-    const acceptedFiles = files.slice(0, availableSlots);
-    const next: AiDraftAttachment[] = [];
-
-    for (const file of acceptedFiles) {
-      const kind = fileKind(file);
-      if (file.size > 5_000_000) {
-        setError(
-          isId
-            ? 'File terlalu besar. Batas sementara 5 MB per file.'
-            : 'File is too large. Current limit is 5 MB per file.',
-        );
-        continue;
-      }
-
-      const attachment: AiDraftAttachment = {
-        id: `media_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        name: file.name,
-        mime: file.type || 'application/octet-stream',
-        size: file.size,
-        kind,
-      };
-
-      if (kind === 'image') {
-        if (file.size <= MAX_INLINE_IMAGE_BYTES) {
-          attachment.dataUrl = await readAsDataUrl(file);
-        } else {
-          setError(
-            isId
-              ? 'Gambar besar tetap dilampirkan sebagai metadata. Untuk dibaca AI vision, kompres di bawah 1.6 MB.'
-              : 'Large image attached as metadata. Compress below 1.6 MB for vision reading.',
-          );
-        }
-        attachment.previewUrl = URL.createObjectURL(file);
-      } else if (kind === 'video' || kind === 'audio') {
-        attachment.previewUrl = URL.createObjectURL(file);
-      }
-
-      if (canReadText(file)) {
-        attachment.text = (await readAsText(file)).slice(0, 1600);
-      }
-
-      try {
-        const stored = await uploadPersonalAiMedia(file);
-        if (stored?.url) {
-          attachment.url = stored.url;
-          attachment.mime = stored.mime || attachment.mime;
-          attachment.size = stored.size || attachment.size;
-        }
-      } catch (uploadError) {
-        setError(
-          uploadError instanceof Error
-            ? uploadError.message
-            : isId
-              ? 'Upload media gagal.'
-              : 'Media upload failed.',
-        );
-      }
-
-      next.push(attachment);
-    }
-
-    if (next.length > 0) {
-      setDraftAttachments(current =>
-        [...current, ...next].slice(0, MAX_AI_ATTACHMENTS),
-      );
-    }
+    await addAttachments(files);
   }
 
   function attachmentPayload(attachment: AiDraftAttachment) {
@@ -1229,7 +2176,8 @@ export default function PersonalAiStudio() {
   async function sendMessage(
     text = input,
     options: {
-      actionInstruction?: string;
+      quickButtonId?: string;
+      clientRef?: string;
       clearInput?: boolean;
       creationTarget?: SupportedCreationTarget;
       creationIntent?: SupportedCreationTarget;
@@ -1258,12 +2206,44 @@ export default function PersonalAiStudio() {
     if (
       (!message && activeAttachments.length === 0) ||
       !selectedAgent ||
-      sending
+      selectedAgent.cache_only ||
+      !user?.id ||
+      sending ||
+      sendInFlightRef.current
     )
       return;
+    sendInFlightRef.current = true;
+    const targetAgent = selectedAgent;
+    const targetAgentId = selectedAgent.id;
+    const targetThreadId = selectedThreadId;
+    const requestFingerprint = JSON.stringify({
+      agentId: targetAgentId,
+      threadId: targetThreadId,
+      message,
+      quickButtonId: options.quickButtonId || '',
+      replyToMessageId: activeReply?.id || '',
+      creationTarget: guidedCreationTarget || '',
+      attachments: activeAttachments.map(attachmentPayload),
+    });
+    const clientRef =
+      options.clientRef ||
+      (sendRetryRef.current?.fingerprint === requestFingerprint
+        ? sendRetryRef.current.clientRef
+        : createPersonalAiClientRef());
+    const isRequestStillVisible = (resolvedThreadId = targetThreadId) =>
+      selectedAgentIdRef.current === targetAgentId &&
+      (targetThreadId
+        ? selectedThreadIdRef.current === targetThreadId
+        : !selectedThreadIdRef.current ||
+          selectedThreadIdRef.current === resolvedThreadId);
     setSending(true);
     setError('');
-    if (options.clearInput !== false) setInput('');
+    if (options.clearInput !== false) {
+      inputRef.current = '';
+      setInput('');
+    }
+    draftAttachmentsRef.current = [];
+    replyingToRef.current = null;
     setDraftAttachments([]);
     setReplyingTo(null);
     const optimisticReply = activeReply
@@ -1278,27 +2258,31 @@ export default function PersonalAiStudio() {
       role: 'user',
       content: message,
       created_at: new Date().toISOString(),
-      metadata:
-        activeAttachments.length > 0 || optimisticReply
-          ? {
-              ...(activeAttachments.length > 0
-                ? { media: activeAttachments.map(attachmentMetadata) }
-                : {}),
-              ...(optimisticReply ? { reply_to: optimisticReply } : {}),
-            }
-          : undefined,
+      metadata: {
+        client_ref: clientRef,
+        ...(activeAttachments.length > 0
+          ? { media: activeAttachments.map(attachmentMetadata) }
+          : {}),
+        ...(optimisticReply ? { reply_to: optimisticReply } : {}),
+      },
     };
-    setMessages(current => [...current, optimistic]);
+    replaceMessages(
+      targetThreadId,
+      [...messagesRef.current, optimistic],
+      Boolean(targetThreadId),
+    );
     try {
       const res = await authFetch('/api/ai/personal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(PERSONAL_AI_CHAT_TIMEOUT_MS),
         body: JSON.stringify({
-          agent_id: selectedAgent.can_edit ? selectedAgent.id : undefined,
-          share_id: selectedAgent.can_edit ? undefined : selectedAgent.share_id,
-          thread_id: selectedThreadId || undefined,
+          agent_id: targetAgent.can_edit ? targetAgent.id : undefined,
+          share_id: targetAgent.can_edit ? undefined : targetAgent.share_id,
+          thread_id: targetThreadId || undefined,
+          client_ref: clientRef,
           message,
-          action_instruction: options.actionInstruction || '',
+          quick_button_id: options.quickButtonId || '',
           creation_target: guidedCreationTarget,
           reply_to_message_id: activeReply?.id,
           attachments: activeAttachments.map(attachmentPayload),
@@ -1315,20 +2299,43 @@ export default function PersonalAiStudio() {
       if (!res.ok || !payload.data?.messages) {
         throw new Error(payload.error || `${copy.sendFailed} (${res.status})`);
       }
+      const resolvedThreadId = payload.data.thread?.id || targetThreadId;
+      if (!isRequestStillVisible(resolvedThreadId)) {
+        activeAttachments.forEach(revokeAttachmentPreview);
+        return;
+      }
       if (payload.data.thread) {
-        setSelectedThreadId(payload.data.thread.id);
-        setThreads(current => {
-          const without = current.filter(
-            thread => thread.id !== payload.data!.thread!.id,
-          );
-          return [payload.data!.thread!, ...without];
-        });
+        const returnedThread = payload.data.thread;
+        if (!targetThreadId) {
+          loadMessagesRequestRef.current += 1;
+          messagesLoadContextRef.current = `${user.id}:${returnedThread.id}`;
+        }
+        selectedThreadIdRef.current = returnedThread.id;
+        setSelectedThreadId(returnedThread.id);
+        replaceThreads(targetAgentId, [
+          returnedThread,
+          ...threadsRef.current.filter(
+            thread => thread.id !== returnedThread.id,
+          ),
+        ]);
       }
       const savedMessages = payload.data.messages;
-      setMessages(current => [
-        ...current.filter(messageItem => messageItem.id !== optimistic.id),
-        ...savedMessages,
-      ]);
+      if (sendRetryRef.current?.clientRef === clientRef) {
+        sendRetryRef.current = null;
+      }
+      const savedMessageIds = new Set(savedMessages.map(item => item.id));
+      replaceMessages(
+        resolvedThreadId,
+        [
+          ...messagesRef.current.filter(
+            messageItem =>
+              messageItem.id !== optimistic.id &&
+              !savedMessageIds.has(messageItem.id),
+          ),
+          ...savedMessages,
+        ],
+        Boolean(resolvedThreadId),
+      );
       const assistantMessage = savedMessages.find(
         item => item.role === 'assistant',
       );
@@ -1354,7 +2361,7 @@ export default function PersonalAiStudio() {
               instruction: assistantCreationFlow?.draftInstruction || message,
               assistantContext: assistantMessage.content,
               conversationId:
-                payload.data.thread?.id || selectedThreadId || undefined,
+                payload.data.thread?.id || targetThreadId || undefined,
               assistantMessageId: assistantMessage.id,
               idempotencyKey: `profile-ai:${assistantMessage.id}:${draftCreationTarget}`,
               media: creationMedia,
@@ -1375,44 +2382,78 @@ export default function PersonalAiStudio() {
                   : 'The draft could not be created.'),
             );
           }
-          setCreationDrafts(current => ({
-            ...current,
-            [assistantMessage.id]: draftPayload.data!,
-          }));
-          setMessages(current =>
-            current.map(item =>
-              item.id === assistantMessage.id
-                ? {
-                    ...item,
-                    metadata: {
-                      ...item.metadata,
-                      creation_draft: draftPayload.data,
-                    },
-                  }
-                : item,
-            ),
-          );
-          setEditingCreationDraft(null);
+          if (isRequestStillVisible(resolvedThreadId)) {
+            setCreationDrafts(current => ({
+              ...current,
+              [assistantMessage.id]: draftPayload.data!,
+            }));
+            replaceMessages(
+              resolvedThreadId,
+              messagesRef.current.map(item =>
+                item.id === assistantMessage.id
+                  ? {
+                      ...item,
+                      metadata: {
+                        ...item.metadata,
+                        creation_draft: draftPayload.data,
+                      },
+                    }
+                  : item,
+              ),
+              Boolean(resolvedThreadId),
+            );
+            editingCreationDraftRef.current = null;
+            setEditingCreationDraft(null);
+          }
         } catch (draftError) {
-          setError(
-            draftError instanceof Error
-              ? draftError.message
-              : isId
-                ? 'Jawaban AI berhasil, tetapi draft belum tersimpan.'
-                : 'The AI replied, but the draft was not saved.',
-          );
+          if (isRequestStillVisible(resolvedThreadId)) {
+            setError(
+              draftError instanceof Error
+                ? draftError.message
+                : isId
+                  ? 'Jawaban AI berhasil, tetapi draft belum tersimpan.'
+                  : 'The AI replied, but the draft was not saved.',
+            );
+          }
         }
       }
       activeAttachments.forEach(revokeAttachmentPreview);
     } catch (err) {
-      setError(readableSendError(err));
-      setMessages(current =>
-        current.filter(messageItem => messageItem.id !== optimistic.id),
-      );
-      setInput(message);
-      setDraftAttachments(activeAttachments);
-      setReplyingTo(activeReply);
+      if (isRequestStillVisible()) {
+        sendRetryRef.current = { fingerprint: requestFingerprint, clientRef };
+        setError(readableSendError(err));
+        if (activeAttachments.length === 0) {
+          replaceMessages(
+            targetThreadId,
+            messagesRef.current.map(messageItem =>
+              messageItem.id === optimistic.id
+                ? {
+                    ...messageItem,
+                    metadata: {
+                      ...messageItem.metadata,
+                      send_status: 'failed',
+                    },
+                  }
+                : messageItem,
+            ),
+            Boolean(targetThreadId),
+          );
+        } else {
+          replaceMessages(
+            targetThreadId,
+            messagesRef.current.filter(
+              messageItem => messageItem.id !== optimistic.id,
+            ),
+            Boolean(targetThreadId),
+          );
+          draftAttachmentsRef.current = activeAttachments;
+          setDraftAttachments(activeAttachments);
+        }
+        replyingToRef.current = activeReply;
+        setReplyingTo(activeReply);
+      }
     } finally {
+      sendInFlightRef.current = false;
       setSending(false);
     }
   }
@@ -1429,6 +2470,7 @@ export default function PersonalAiStudio() {
         ? 'Saya ingin mendaftarkan profil usaha dari informasi dan media yang saya kirim.'
         : 'I want to register a business profile from the information and media I send.',
     };
+    editingCreationDraftRef.current = null;
     setEditingCreationDraft(null);
     void sendMessage(input.trim() || fallbackPrompt[target], {
       creationIntent: target,
@@ -1437,11 +2479,12 @@ export default function PersonalAiStudio() {
 
   function improveCreationDraft(draft: AICreationDraft) {
     setEditingCreationDraft(draft);
-    setInput(
-      isId
-        ? `Perbaiki draft "${draft.title}". Bagian yang ingin saya ubah: `
-        : `Improve the draft "${draft.title}". I want to change: `,
-    );
+    editingCreationDraftRef.current = draft;
+    const nextInput = isId
+      ? `Perbaiki draft "${draft.title}". Bagian yang ingin saya ubah: `
+      : `Improve the draft "${draft.title}". I want to change: `;
+    inputRef.current = nextInput;
+    setInput(nextInput);
     requestAnimationFrame(() => scrollMessagesToBottom('smooth'));
   }
 
@@ -1459,8 +2502,9 @@ export default function PersonalAiStudio() {
     const previousReaction = messageReaction(message);
     const nextReaction = previousReaction === reaction ? '' : reaction;
     setReactionMessageId('');
-    setMessages(current =>
-      current.map(item =>
+    replaceMessages(
+      selectedThreadId,
+      messagesRef.current.map(item =>
         item.id === message.id
           ? {
               ...item,
@@ -1483,8 +2527,9 @@ export default function PersonalAiStudio() {
       );
       if (!response.ok) throw new Error('reaction failed');
     } catch {
-      setMessages(current =>
-        current.map(item =>
+      replaceMessages(
+        selectedThreadId,
+        messagesRef.current.map(item =>
           item.id === message.id
             ? {
                 ...item,
@@ -1524,20 +2569,24 @@ export default function PersonalAiStudio() {
         );
       }
       if (payload.data.thread) {
-        setThreads(current => {
-          const without = current.filter(
-            thread => thread.id !== payload.data!.thread!.id,
-          );
-          return [payload.data!.thread!, ...without];
-        });
+        const returnedThread = payload.data.thread;
+        replaceThreads(returnedThread.agent_id, [
+          returnedThread,
+          ...threadsRef.current.filter(
+            thread => thread.id !== returnedThread.id,
+          ),
+        ]);
       }
       setForwardingMessage(null);
       setNotice(isId ? 'Pesan diteruskan' : 'Message forwarded');
-      if (targetThreadId === selectedThreadId) {
-        setMessages(current => [...current, payload.data!.message!]);
+      if (targetThreadId === selectedThreadIdRef.current) {
+        replaceMessages(targetThreadId, [
+          ...messagesRef.current,
+          payload.data.message,
+        ]);
       } else {
+        selectedThreadIdRef.current = targetThreadId;
         setSelectedThreadId(targetThreadId);
-        await loadThreadMessages(targetThreadId);
       }
     } catch (forwardError) {
       setError(
@@ -1583,8 +2632,9 @@ export default function PersonalAiStudio() {
           Object.entries(current).filter(([, item]) => item.id !== draft.id),
         );
       });
-      setMessages(current =>
-        current.map(message => {
+      replaceMessages(
+        selectedThreadId,
+        messagesRef.current.map(message => {
           const linkedDraft = creationDraftFromMessage(message);
           if (
             !message.metadata ||
@@ -1809,10 +2859,211 @@ export default function PersonalAiStudio() {
     setNotice(copy.copied);
   }
 
-  if (authLoading || loadingAgents) {
+  async function changeViewerMemory(enabled: boolean) {
+    if (
+      !selectedAgent ||
+      selectedAgent.can_edit ||
+      !viewerMemory.can_manage_recipient_consent ||
+      savingViewerMemory
+    )
+      return;
+    const targetAgentId = selectedAgent.id;
+    const targetShareId = selectedAgent.share_id;
+    setSavingViewerMemory(true);
+    setError('');
+    try {
+      const response = await authFetch(
+        `/api/ai/personal/agents/${encodeURIComponent(targetAgentId)}/memory?share_id=${encodeURIComponent(targetShareId)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { enabled?: boolean };
+        error?: string;
+      };
+      if (!response.ok || typeof payload.data?.enabled !== 'boolean') {
+        throw new Error(payload.error || 'Memory change failed.');
+      }
+      if (selectedAgentIdRef.current !== targetAgentId) return;
+      setViewerMemory(current => ({
+        ...current,
+        enabled: payload.data!.enabled!,
+      }));
+      setNotice(
+        payload.data.enabled
+          ? isId
+            ? 'Ingatan untuk asisten ini diaktifkan'
+            : 'Memory is on for this assistant'
+          : isId
+            ? 'Ingatan untuk asisten ini dimatikan'
+            : 'Memory is off for this assistant',
+      );
+    } catch (memoryError) {
+      if (selectedAgentIdRef.current !== targetAgentId) return;
+      setError(
+        memoryError instanceof Error
+          ? memoryError.message
+          : isId
+            ? 'Pengaturan ingatan gagal diubah.'
+            : 'Failed to change memory settings.',
+      );
+    } finally {
+      setSavingViewerMemory(false);
+    }
+  }
+
+  async function removeViewerMemory() {
+    if (
+      !selectedAgent ||
+      selectedAgent.can_edit ||
+      !viewerMemory.can_manage_recipient_consent ||
+      savingViewerMemory
+    )
+      return;
+    const targetAgentId = selectedAgent.id;
+    const targetShareId = selectedAgent.share_id;
+    const approved = await confirm({
+      title: isId ? 'Hapus ingatan asisten?' : 'Delete assistant memory?',
+      description: isId
+        ? 'Ringkasan yang tersimpan untuk akun Anda akan dihapus permanen dan ingatan dimatikan. Riwayat chat tidak ikut terhapus.'
+        : 'Saved summaries for your account will be permanently deleted and memory will be turned off. Chat history is kept.',
+      confirmLabel: isId ? 'Hapus ingatan' : 'Delete memory',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+    setSavingViewerMemory(true);
+    setError('');
+    try {
+      const response = await authFetch(
+        `/api/ai/personal/agents/${encodeURIComponent(targetAgentId)}/memory?share_id=${encodeURIComponent(targetShareId)}`,
+        { method: 'DELETE' },
+      );
+      if (!response.ok) throw new Error('Memory deletion failed.');
+      if (selectedAgentIdRef.current !== targetAgentId) return;
+      setViewerMemory({
+        enabled: false,
+        can_manage_recipient_consent: true,
+        memory: null,
+      });
+      setNotice(isId ? 'Ingatan sudah dihapus' : 'Memory deleted');
+    } catch {
+      if (selectedAgentIdRef.current !== targetAgentId) return;
+      setError(isId ? 'Ingatan gagal dihapus.' : 'Failed to delete memory.');
+    } finally {
+      setSavingViewerMemory(false);
+    }
+  }
+
+  async function clearLocalPersonalAiData() {
+    if (!user?.id) return;
+    const approved = await confirm({
+      title: isId
+        ? 'Hapus data AI dari perangkat ini?'
+        : 'Clear AI data from this device?',
+      description: isId
+        ? 'Snapshot agent, tab chat, dan pesan yang dipakai untuk membuka lebih cepat akan dihapus dari browser ini. Riwayat server dan ingatan akun tidak ikut terhapus.'
+        : 'Browser snapshots of assistants, chat tabs, and messages will be removed from this device. Server history and account memory are kept.',
+      confirmLabel: isId ? 'Hapus data lokal' : 'Clear local data',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+    await clearPersonalAiCache(user.id);
+    setNotice(
+      isId
+        ? 'Data AI lokal sudah dihapus. Riwayat server tidak berubah.'
+        : 'Local AI data was cleared. Server history was not changed.',
+    );
+  }
+
+  async function changeShareLink(action: 'rotate' | 'revoke') {
+    if (!selectedAgent || !selectedAgent.can_edit || savingShare) return;
+    const approved = await confirm({
+      title:
+        action === 'revoke'
+          ? isId
+            ? 'Cabut semua akses tautan?'
+            : 'Revoke all link access?'
+          : isId
+            ? 'Ganti tautan berbagi?'
+            : 'Replace the share link?',
+      description:
+        action === 'revoke'
+          ? isId
+            ? 'Tautan lama langsung tidak berlaku dan asisten diubah menjadi Hanya saya.'
+            : 'The old link will stop working immediately and the assistant becomes private.'
+          : isId
+            ? 'Tautan lama langsung tidak berlaku. Orang lain perlu menerima tautan baru.'
+            : 'The old link will stop working immediately. Recipients will need the new link.',
+      confirmLabel:
+        action === 'revoke'
+          ? isId
+            ? 'Cabut akses'
+            : 'Revoke access'
+          : isId
+            ? 'Ganti tautan'
+            : 'Replace link',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: action === 'revoke' ? 'danger' : 'default',
+    });
+    if (!approved) return;
+    setSavingShare(true);
+    setError('');
+    try {
+      const response = await authFetch(
+        `/api/ai/personal/agents/${encodeURIComponent(selectedAgent.id)}/share`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { agent?: PersonalAgent };
+        error?: string;
+      };
+      if (!response.ok || !payload.data?.agent) {
+        throw new Error(payload.error || 'Share-link change failed.');
+      }
+      replaceAgents(
+        agentsRef.current.map(agent =>
+          agent.id === payload.data!.agent!.id ? payload.data!.agent! : agent,
+        ),
+      );
+      setNotice(
+        action === 'revoke'
+          ? isId
+            ? 'Akses tautan sudah dicabut'
+            : 'Link access revoked'
+          : isId
+            ? 'Tautan baru sudah dibuat'
+            : 'New link created',
+      );
+    } catch (shareError) {
+      setError(
+        shareError instanceof Error
+          ? shareError.message
+          : isId
+            ? 'Tautan gagal diubah.'
+            : 'Failed to change the link.',
+      );
+    } finally {
+      setSavingShare(false);
+    }
+  }
+
+  if (authLoading || (loadingAgents && agents.length === 0)) {
     return (
-      <main className="lajukan-visual-viewport-shell flex min-h-0 items-center justify-center overflow-hidden bg-[color:var(--app-surface-muted)] px-4">
-        <div className="inline-flex items-center gap-2 text-sm font-bold text-[color:var(--app-text-soft)]">
+      <main className="lajukan-visual-viewport-shell flex min-h-0 items-center justify-center overflow-hidden bg-[color:var(--app-surface-muted)] px-4 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+        <div
+          className="inline-flex items-center gap-2 text-sm font-bold text-[color:var(--app-text-soft)]"
+          role="status"
+          aria-live="polite"
+        >
           <Loader2 className="h-4 w-4 animate-spin" />
           {isId ? 'Menyiapkan AI...' : 'Preparing AI...'}
         </div>
@@ -1822,25 +3073,21 @@ export default function PersonalAiStudio() {
 
   if (!user) {
     return (
-      <main className="lajukan-visual-viewport-shell flex min-h-0 items-center justify-center overflow-hidden bg-[color:var(--app-surface-muted)] px-4">
+      <main className="lajukan-visual-viewport-shell flex min-h-0 items-center justify-center overflow-hidden bg-[color:var(--app-surface-muted)] px-4 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
         <Link
           href="/login"
-          className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-sm font-bold text-white"
+          className="inline-flex min-h-11 items-center rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-sm font-bold text-white"
         >
-          Login
+          {isId ? 'Masuk' : 'Login'}
         </Link>
       </main>
     );
   }
 
   const showMobileLibrary = mobileLibraryOpen || !selectedAgent;
-  const panels: PersonalAiPanel[] = [
-    'chat',
-    'builder',
-    'settings',
-    'share',
-    'memory',
-  ];
+  const panels: PersonalAiPanel[] = canEditSelected
+    ? ['chat', 'builder', 'settings', 'share', 'memory']
+    : ['chat', 'memory'];
   const panelLabel = (panel: PersonalAiPanel) =>
     panel === 'chat'
       ? 'Chat'
@@ -1874,14 +3121,14 @@ export default function PersonalAiStudio() {
         <div className="flex h-full w-full min-w-0 overflow-hidden bg-[#f7f5f3] shadow-none dark:bg-[#111b21] lg:rounded-[18px] lg:border lg:border-black/5 lg:shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)] dark:lg:border-white/10">
           <aside
             className={cn(
-              'h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden border-r border-black/5 bg-white p-3 dark:border-white/6 dark:bg-[#111b21] lg:flex lg:w-[320px] lg:shrink-0',
+              'h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden border-r border-black/5 bg-white px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:border-white/6 dark:bg-[#111b21] lg:flex lg:w-[320px] lg:shrink-0',
               showMobileLibrary ? 'flex' : 'hidden lg:flex',
             )}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
               <Link
                 href="/profile"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[color:var(--app-text-soft)]"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-xs font-bold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
               >
                 <ChevronLeft className="h-4 w-4" />
                 {copy.back}
@@ -1889,10 +3136,15 @@ export default function PersonalAiStudio() {
               <button
                 type="button"
                 onClick={() => void createAgent()}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white"
+                disabled={creatingAgent}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={copy.newAi}
               >
-                <Plus className="h-4 w-4" />
+                {creatingAgent ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
               </button>
             </div>
 
@@ -1902,18 +3154,60 @@ export default function PersonalAiStudio() {
             </h1>
 
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5">
+              {agents.length === 0 ? (
+                <div className="rounded-[16px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-center">
+                  <Bot className="mx-auto h-6 w-6 text-[color:var(--app-accent)]" />
+                  <p className="mt-2 text-sm font-bold">
+                    {error
+                      ? isId
+                        ? 'Asisten belum dapat dimuat'
+                        : 'Assistants could not be loaded'
+                      : isId
+                        ? 'Belum ada asisten'
+                        : 'No assistant yet'}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    {error
+                      ? isId
+                        ? 'Periksa koneksi, lalu coba sinkronkan lagi.'
+                        : 'Check your connection, then try syncing again.'
+                      : isId
+                        ? 'Buat satu asisten untuk membantu tugas usaha sehari-hari.'
+                        : 'Create an assistant for everyday business tasks.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      error ? void loadAgents() : void createAgent()
+                    }
+                    disabled={creatingAgent || loadingAgents}
+                    className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-xs font-bold text-[color:var(--app-text-inverse)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {creatingAgent || loadingAgents ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : error ? (
+                      <RefreshCcw className="h-4 w-4" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    {error ? (isId ? 'Coba lagi' : 'Try again') : copy.newAi}
+                  </button>
+                </div>
+              ) : null}
               {agents.map(agent => (
                 <button
                   key={agent.id}
                   type="button"
+                  aria-pressed={selectedAgentId === agent.id}
                   onClick={() => {
+                    selectedAgentIdRef.current = agent.id;
                     setSelectedAgentId(agent.id);
                     setActivePanel('chat');
                     setMobileLibraryOpen(false);
                     setMobileToolsOpen(false);
                   }}
                   className={cn(
-                    'min-w-0 rounded-[14px] border p-3 text-left transition',
+                    'w-full min-w-0 rounded-[14px] border p-3 text-left transition',
                     selectedAgentId === agent.id
                       ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
                       : 'border-[color:var(--app-border)] bg-[color:var(--app-surface)] hover:border-[color:var(--app-accent-border)]',
@@ -1930,7 +3224,10 @@ export default function PersonalAiStudio() {
                     )}
                   </div>
                   <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
-                    {agent.description || agent.instructions}
+                    {agent.description ||
+                      (isId
+                        ? 'Asisten AI untuk membantu kebutuhan usaha.'
+                        : 'An AI assistant for everyday business needs.')}
                   </p>
                 </button>
               ))}
@@ -1943,7 +3240,7 @@ export default function PersonalAiStudio() {
               showMobileLibrary ? 'hidden lg:flex' : 'flex',
             )}
           >
-            <div className="relative shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 py-2 dark:border-white/6 dark:bg-[#202c33]">
+            <div className="relative shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] dark:border-white/6 dark:bg-[#202c33]">
               <div className="flex min-w-0 items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <button
@@ -1952,7 +3249,7 @@ export default function PersonalAiStudio() {
                       setMobileLibraryOpen(true);
                       setMobileToolsOpen(false);
                     }}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/8 lg:hidden"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/8 lg:hidden"
                     aria-label={isId ? 'Buka daftar AI' : 'Open AI list'}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1963,29 +3260,53 @@ export default function PersonalAiStudio() {
                     </p>
                     <p className="text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
                       {visibilityLabel(selectedAgent?.visibility, isId)}
-                      {selectedAgent?.can_edit ? '' : ' · shared AI'}
+                      {' · '}
+                      <span className="font-bold text-[color:var(--app-accent)]">
+                        AI
+                      </span>
+                      {selectedAgent?.can_edit
+                        ? ''
+                        : isId
+                          ? ' · dibagikan kepada Anda'
+                          : ' · shared with you'}
                     </p>
+                    {selectedAgent?.cache_only ? (
+                      <p className="mt-0.5 truncate text-[10px] font-bold text-amber-700 dark:text-amber-200">
+                        {isId
+                          ? 'Snapshot perangkat · menyinkronkan'
+                          : 'Device snapshot · syncing'}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <button
+                  ref={mobileToolsTriggerRef}
                   type="button"
                   onClick={() => setMobileToolsOpen(value => !value)}
-                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-bold text-[#54656f] shadow-sm dark:bg-[#111b21] dark:text-[#aebac1] sm:hidden"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-bold text-[#54656f] shadow-sm dark:bg-[#111b21] dark:text-[#aebac1] sm:hidden"
                   aria-expanded={mobileToolsOpen}
+                  aria-haspopup="menu"
+                  aria-controls="personal-ai-tools-menu"
                 >
                   {panelIcon(activePanel)}
                   {panelLabel(activePanel)}
                 </button>
-                <div className="hidden min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden">
+                <div
+                  className="hidden min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden"
+                  role="tablist"
+                  aria-label={isId ? 'Panel AI' : 'AI panels'}
+                >
                   {panels.map(panel => (
                     <button
                       key={panel}
                       type="button"
+                      role="tab"
+                      aria-selected={activePanel === panel}
                       onClick={() => selectPanel(panel)}
                       className={cn(
-                        'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold',
+                        'inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold',
                         activePanel === panel
-                          ? 'bg-[#25d366] text-[#111b21]'
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                           : 'bg-white text-[#54656f] hover:text-[#128c7e] dark:bg-[#111b21] dark:text-[#aebac1]',
                       )}
                     >
@@ -1996,16 +3317,23 @@ export default function PersonalAiStudio() {
                 </div>
               </div>
               {mobileToolsOpen ? (
-                <div className="absolute left-3 right-3 top-[calc(100%+0.4rem)] z-50 grid grid-cols-2 gap-1.5 rounded-[18px] border border-black/10 bg-white p-2 shadow-[0_24px_70px_-34px_rgba(17,27,33,0.5)] dark:border-white/10 dark:bg-[#111b21] sm:hidden">
+                <div
+                  ref={mobileToolsMenuRef}
+                  id="personal-ai-tools-menu"
+                  role="menu"
+                  className="absolute left-3 right-3 top-[calc(100%+0.4rem)] z-50 grid grid-cols-2 gap-1.5 rounded-[18px] border border-black/10 bg-white p-2 shadow-[0_24px_70px_-34px_rgba(17,27,33,0.5)] dark:border-white/10 dark:bg-[#111b21] sm:hidden"
+                >
                   {panels.map(panel => (
                     <button
                       key={panel}
                       type="button"
+                      role="menuitemradio"
+                      aria-checked={activePanel === panel}
                       onClick={() => selectPanel(panel)}
                       className={cn(
-                        'inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[14px] px-3 text-[11px] font-bold',
+                        'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[14px] px-3 text-xs font-bold',
                         activePanel === panel
-                          ? 'bg-[#25d366] text-[#111b21]'
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                           : 'bg-[#f0f2f5] text-[#54656f] dark:bg-[#202c33] dark:text-[#aebac1]',
                       )}
                     >
@@ -2020,25 +3348,37 @@ export default function PersonalAiStudio() {
             {notice || error ? (
               <div className="grid gap-2 border-b border-[color:var(--app-border)] px-3 py-2 lg:hidden">
                 {notice ? (
-                  <div className="flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+                  <div
+                    className="flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"
+                    role="status"
+                  >
                     <Check className="h-4 w-4" />
                     {notice}
                     <button
                       type="button"
                       onClick={() => setNotice('')}
-                      className="ml-auto"
+                      className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-emerald-100"
+                      aria-label={
+                        isId ? 'Tutup pemberitahuan' : 'Dismiss notice'
+                      }
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ) : null}
                 {error ? (
-                  <div className="flex items-center gap-2 rounded-[14px] border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                  <div
+                    className="flex items-center gap-2 rounded-[14px] border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
+                    role="alert"
+                  >
                     {error}
                     <button
                       type="button"
                       onClick={() => setError('')}
-                      className="ml-auto"
+                      className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-rose-100"
+                      aria-label={
+                        isId ? 'Tutup pesan kesalahan' : 'Dismiss error'
+                      }
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -2053,59 +3393,124 @@ export default function PersonalAiStudio() {
                   <button
                     type="button"
                     onClick={() => void createThread()}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold text-[color:var(--app-accent)]"
+                    disabled={
+                      !selectedAgent ||
+                      selectedAgent.cache_only ||
+                      creatingThread
+                    }
+                    className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)] disabled:opacity-50"
                   >
-                    <MessageSquarePlus className="h-3.5 w-3.5" />
+                    {creatingThread ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <MessageSquarePlus className="h-3.5 w-3.5" />
+                    )}
                     {copy.newTab}
                   </button>
                   {loadingThreads ? (
                     <Loader2 className="h-4 w-4 animate-spin text-[color:var(--app-text-soft)]" />
                   ) : null}
-                  {threads.map(thread => (
-                    <button
-                      key={thread.id}
-                      type="button"
-                      onClick={() => setSelectedThreadId(thread.id)}
-                      className={cn(
-                        'inline-flex h-9 max-w-[180px] shrink-0 items-center gap-2 rounded-full px-3 text-[11px] font-bold',
-                        selectedThreadId === thread.id
-                          ? 'bg-[color:var(--app-text)] text-[color:var(--app-surface-strong)]'
-                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
-                      )}
-                    >
-                      <span className="truncate">{thread.title}</span>
-                      <span className="text-[9px] opacity-70">
-                        {compactTime(thread.updated_at)}
-                      </span>
-                    </button>
-                  ))}
+                  {threads.map(thread => {
+                    const isSelected = selectedThreadId === thread.id;
+                    const isDeleting = deletingThreadId === thread.id;
+                    return (
+                      <div
+                        key={thread.id}
+                        className={cn(
+                          'inline-flex min-h-11 max-w-[220px] shrink-0 items-center rounded-full text-xs font-bold',
+                          isSelected
+                            ? 'bg-[color:var(--app-text)] text-[color:var(--app-surface-strong)]'
+                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+                        )}
+                      >
+                        <button
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => {
+                            selectedThreadIdRef.current = thread.id;
+                            setSelectedThreadId(thread.id);
+                          }}
+                          className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-l-full py-2 pl-3 pr-2"
+                        >
+                          <span className="truncate">{thread.title}</span>
+                          <span className="shrink-0 text-[9px] opacity-70">
+                            {compactTime(thread.updated_at)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteThread(thread)}
+                          disabled={Boolean(deletingThreadId)}
+                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full opacity-70 transition hover:bg-black/10 hover:opacity-100 disabled:opacity-40 dark:hover:bg-white/10"
+                          aria-label={
+                            isId
+                              ? `Hapus chat ${thread.title}`
+                              : `Delete chat ${thread.title}`
+                          }
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div
                   ref={messagesViewportRef}
                   className="min-h-0 flex-1 touch-pan-y overflow-y-auto px-2 py-4 [-webkit-overflow-scrolling:touch] sm:px-2"
                   data-auto-scrollbar
+                  role="log"
+                  aria-live="polite"
+                  aria-relevant="additions"
+                  aria-busy={loadingMessages}
+                  aria-label={
+                    isId
+                      ? 'Percakapan dengan asisten AI'
+                      : 'Conversation with the AI assistant'
+                  }
                 >
-                  {messages.length === 0 ? (
+                  {loadingMessages && messages.length === 0 ? (
+                    <div
+                      className="grid min-h-[220px] place-items-center"
+                      role="status"
+                    >
+                      <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-[color:var(--app-text-soft)] shadow-sm dark:bg-[#202c33]">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {isId
+                          ? 'Membuka riwayat chat...'
+                          : 'Opening chat history...'}
+                      </div>
+                    </div>
+                  ) : messages.length === 0 ? (
                     <div className="mx-auto mt-10 max-w-lg rounded-[18px] border border-dashed border-black/10 bg-white/80 p-4 text-center shadow-[0_14px_34px_-28px_rgba(17,27,33,0.35)]  dark:border-white/10 dark:bg-[#202c33]/84">
                       <Sparkles className="mx-auto h-6 w-6 text-[color:var(--app-accent)]" />
                       <p className="mt-2 text-sm font-bold">{copy.empty}</p>
-                      {selectedAgent?.starter_prompts?.length ? (
-                        <div className="mt-3 flex flex-wrap justify-center gap-2">
-                          {selectedAgent.starter_prompts
-                            .slice(0, 3)
-                            .map(prompt => (
-                              <button
-                                key={prompt}
-                                type="button"
-                                onClick={() => void sendMessage(prompt)}
-                                className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]"
-                              >
-                                {prompt}
-                              </button>
-                            ))}
-                        </div>
-                      ) : null}
+                      <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {isId
+                          ? 'AI membantu menyusun ide dan draf. Periksa kembali jawabannya sebelum dipakai.'
+                          : 'AI helps draft ideas and responses. Review its answer before using it.'}
+                      </p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        {suggestedPrompts.map(prompt => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => void sendMessage(prompt)}
+                            className="min-h-11 rounded-[14px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-xs font-bold leading-4 text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft-strong,var(--app-accent-soft))]"
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-[11px] font-semibold leading-4 text-amber-700 dark:text-amber-200">
+                        {isId
+                          ? 'Jangan kirim PIN, OTP, kata sandi, atau data rahasia.'
+                          : 'Do not send PINs, one-time codes, passwords, or confidential data.'}
+                      </p>
                     </div>
                   ) : (
                     <div className="mx-auto grid max-w-3xl gap-3">
@@ -2161,10 +3566,49 @@ export default function PersonalAiStudio() {
                                 media={mediaFromMessage(message)}
                               />
                               <MarkdownMessage content={message.content} />
+                              <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px] font-semibold opacity-60">
+                                <span>
+                                  {compactMessageTime(message.created_at, isId)}
+                                </span>
+                                {message.id.startsWith('local_') &&
+                                message.metadata?.send_status !== 'failed' ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    {isId ? 'Mengirim' : 'Sending'}
+                                  </span>
+                                ) : null}
+                              </div>
+                              {message.metadata?.send_status === 'failed' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    replaceMessages(
+                                      selectedThreadId,
+                                      messagesRef.current.filter(
+                                        item => item.id !== message.id,
+                                      ),
+                                    );
+                                    void sendMessage(message.content, {
+                                      clientRef:
+                                        typeof message.metadata?.client_ref ===
+                                        'string'
+                                          ? message.metadata.client_ref
+                                          : undefined,
+                                    });
+                                  }}
+                                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-rose-50 px-3 text-xs font-bold text-rose-700 dark:bg-rose-500/15 dark:text-rose-200"
+                                >
+                                  <RefreshCcw className="h-3.5 w-3.5" />
+                                  {isId
+                                    ? 'Coba kirim lagi'
+                                    : 'Try sending again'}
+                                </button>
+                              ) : null}
                             </div>
                             <div
+                              data-personal-ai-message-actions
                               className={cn(
-                                'mt-1 flex items-center gap-0.5 text-[#667781] dark:text-[#8696a0]',
+                                'relative mt-1 flex items-center gap-1 text-[#667781] dark:text-[#8696a0]',
                                 message.role === 'user'
                                   ? 'justify-end'
                                   : 'justify-start',
@@ -2173,66 +3617,97 @@ export default function PersonalAiStudio() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setReplyingTo(message);
-                                  requestAnimationFrame(() =>
-                                    scrollMessagesToBottom('smooth'),
+                                  setReactionMessageId('');
+                                  setOpenMessageMenuId(current =>
+                                    current === message.id ? '' : message.id,
                                   );
                                 }}
                                 disabled={message.id.startsWith('local_')}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5 hover:text-[#128c7e] disabled:opacity-35 dark:hover:bg-white/10"
+                                className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-black/5 hover:text-[color:var(--app-accent)] disabled:opacity-35 dark:hover:bg-white/10"
                                 aria-label={
-                                  isId ? 'Balas pesan' : 'Reply to message'
+                                  isId ? 'Tindakan pesan' : 'Message actions'
                                 }
-                                title={isId ? 'Balas' : 'Reply'}
+                                aria-haspopup="menu"
+                                aria-expanded={openMessageMenuId === message.id}
+                                onKeyDown={event => {
+                                  if (event.key === 'Escape') {
+                                    setOpenMessageMenuId('');
+                                  }
+                                }}
                               >
-                                <Reply className="h-3.5 w-3.5" />
+                                <MoreVertical className="h-4 w-4" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setReactionMessageId(current =>
-                                    current === message.id ? '' : message.id,
-                                  )
-                                }
-                                disabled={message.id.startsWith('local_')}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5 hover:text-[#128c7e] disabled:opacity-35 dark:hover:bg-white/10"
-                                aria-label={
-                                  isId ? 'Beri reaksi' : 'React to message'
-                                }
-                                title={isId ? 'Reaksi' : 'React'}
-                              >
-                                <Smile className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setForwardingMessage(message)}
-                                disabled={message.id.startsWith('local_')}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5 hover:text-[#128c7e] disabled:opacity-35 dark:hover:bg-white/10"
-                                aria-label={
-                                  isId ? 'Teruskan pesan' : 'Forward message'
-                                }
-                                title={isId ? 'Teruskan' : 'Forward'}
-                              >
-                                <Forward className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void copyMessage(message)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5 hover:text-[#128c7e] dark:hover:bg-white/10"
-                                aria-label={
-                                  isId ? 'Salin pesan' : 'Copy message'
-                                }
-                                title={isId ? 'Salin' : 'Copy'}
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </button>
+                              {openMessageMenuId === message.id ? (
+                                <div
+                                  role="menu"
+                                  className={cn(
+                                    'absolute bottom-full z-30 mb-1 min-w-[168px] overflow-hidden rounded-[14px] border border-black/10 bg-white py-1 shadow-xl dark:border-white/10 dark:bg-[#202c33]',
+                                    message.role === 'user'
+                                      ? 'right-0'
+                                      : 'left-0',
+                                  )}
+                                >
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                      setOpenMessageMenuId('');
+                                      replyingToRef.current = message;
+                                      setReplyingTo(message);
+                                      requestAnimationFrame(() =>
+                                        scrollMessagesToBottom('smooth'),
+                                      );
+                                    }}
+                                    className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold hover:bg-black/5 dark:hover:bg-white/10"
+                                  >
+                                    <Reply className="h-4 w-4" />
+                                    {isId ? 'Balas' : 'Reply'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                      setOpenMessageMenuId('');
+                                      setReactionMessageId(message.id);
+                                    }}
+                                    className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold hover:bg-black/5 dark:hover:bg-white/10"
+                                  >
+                                    <Smile className="h-4 w-4" />
+                                    {isId ? 'Beri reaksi' : 'React'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                      setOpenMessageMenuId('');
+                                      setForwardingMessage(message);
+                                    }}
+                                    className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold hover:bg-black/5 dark:hover:bg-white/10"
+                                  >
+                                    <Forward className="h-4 w-4" />
+                                    {isId ? 'Teruskan' : 'Forward'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                      setOpenMessageMenuId('');
+                                      void copyMessage(message);
+                                    }}
+                                    className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold hover:bg-black/5 dark:hover:bg-white/10"
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                    {isId ? 'Salin' : 'Copy'}
+                                  </button>
+                                </div>
+                              ) : null}
                               {reaction ? (
                                 <button
                                   type="button"
                                   onClick={() =>
                                     void reactToMessage(message, reaction)
                                   }
-                                  className="ml-1 inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-1.5 text-sm shadow-sm ring-1 ring-black/5 dark:bg-[#202c33] dark:ring-white/10"
+                                  className="ml-1 inline-flex h-11 min-w-11 items-center justify-center rounded-full bg-white px-2 text-sm shadow-sm ring-1 ring-black/5 dark:bg-[#202c33] dark:ring-white/10"
                                   aria-label={
                                     isId ? 'Hapus reaksi' : 'Remove reaction'
                                   }
@@ -2261,7 +3736,7 @@ export default function PersonalAiStudio() {
                                       onClick={() =>
                                         void reactToMessage(message, emoji)
                                       }
-                                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-base hover:bg-black/5 dark:hover:bg-white/10"
+                                      className="inline-flex h-11 w-11 items-center justify-center rounded-full text-base hover:bg-black/5 dark:hover:bg-white/10"
                                       aria-label={`${isId ? 'Reaksi' : 'React'} ${emoji}`}
                                     >
                                       {emoji}
@@ -2295,8 +3770,8 @@ export default function PersonalAiStudio() {
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           <span className="truncate">
                             {isId
-                              ? 'AI sedang menganalisis. Foto bisa butuh 1-3 menit.'
-                              : 'AI is analyzing. Photos can take 1-3 minutes.'}
+                              ? 'AI sedang menyusun jawaban...'
+                              : 'AI is preparing an answer...'}
                           </span>
                         </div>
                       ) : null}
@@ -2305,7 +3780,7 @@ export default function PersonalAiStudio() {
                   )}
                 </div>
 
-                <div className="lajukan-chat-composer shrink-0 border-t border-black/5 bg-[#f0f2f5] px-2 pb-[var(--chat-composer-bottom-pad)] pt-2 dark:border-white/6 dark:bg-[#202c33] sm:px-3 lg:pb-3">
+                <div className="lajukan-chat-composer max-h-[min(70%,calc(var(--app-visual-viewport-height)_-_4rem))] shrink-0 overflow-y-auto overscroll-contain border-t border-black/5 bg-[#f0f2f5] px-2 pb-[var(--chat-composer-bottom-pad)] pt-2 dark:border-white/6 dark:bg-[#202c33] sm:px-3 lg:pb-3">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -2332,8 +3807,11 @@ export default function PersonalAiStudio() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setReplyingTo(null)}
-                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+                        onClick={() => {
+                          replyingToRef.current = null;
+                          setReplyingTo(null);
+                        }}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
                         aria-label={isId ? 'Batalkan balasan' : 'Cancel reply'}
                         title={isId ? 'Batalkan balasan' : 'Cancel reply'}
                       >
@@ -2350,8 +3828,11 @@ export default function PersonalAiStudio() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setEditingCreationDraft(null)}
-                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+                        onClick={() => {
+                          editingCreationDraftRef.current = null;
+                          setEditingCreationDraft(null);
+                        }}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
                         aria-label={
                           isId ? 'Batalkan perbaikan' : 'Cancel improvement'
                         }
@@ -2376,7 +3857,7 @@ export default function PersonalAiStudio() {
                           void sendMessage(isId ? 'batal' : 'cancel')
                         }
                         disabled={sending}
-                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
                         aria-label={
                           isId ? 'Batalkan pembuatan' : 'Cancel creation'
                         }
@@ -2386,58 +3867,102 @@ export default function PersonalAiStudio() {
                       </button>
                     </div>
                   ) : null}
-                  <div className="mb-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <button
-                      type="button"
-                      onClick={() => startCreation('offering_listing')}
-                      disabled={sending}
-                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#ecfdf5] px-3 text-[11px] font-bold text-[#047857] ring-1 ring-[#a7f3d0] disabled:opacity-50 dark:bg-[rgba(5,150,105,0.16)] dark:text-[#a7f3d0] dark:ring-[rgba(52,211,153,0.28)]"
+                  {quickActionsOpen ? (
+                    <div
+                      className="mb-2 rounded-[18px] border border-black/5 bg-white p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21]"
+                      role="region"
+                      aria-label={
+                        isId ? 'Pilihan bantuan cepat' : 'Quick help options'
+                      }
                     >
-                      <ShoppingBag className="h-3.5 w-3.5" />
-                      {isId ? 'Buat Penawaran' : 'Create Offer'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => startCreation('looking_for_listing')}
-                      disabled={sending}
-                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#eff6ff] px-3 text-[11px] font-bold text-[#1d4ed8] ring-1 ring-[#bfdbfe] disabled:opacity-50 dark:bg-[rgba(37,99,235,0.16)] dark:text-[#bfdbfe] dark:ring-[rgba(96,165,250,0.28)]"
-                    >
-                      <Search className="h-3.5 w-3.5" />
-                      {isId ? 'Buat Kebutuhan' : 'Create Request'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => startCreation('business_profile')}
-                      disabled={sending}
-                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#fffbeb] px-3 text-[11px] font-bold text-[#a16207] ring-1 ring-[#fde68a] disabled:opacity-50 dark:bg-[rgba(180,83,9,0.16)] dark:text-[#fde68a] dark:ring-[rgba(245,158,11,0.28)]"
-                    >
-                      <Building2 className="h-3.5 w-3.5" />
-                      {isId ? 'Daftarkan Usaha' : 'Register Business'}
-                    </button>
-                  </div>
-                  {selectedAgent?.quick_buttons?.length ? (
-                    <div className="mb-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {selectedAgent.quick_buttons.map(button => (
+                      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                        <p className="text-xs font-bold text-[#111b21] dark:text-[#e9edef]">
+                          {isId
+                            ? 'Pilih yang ingin dibantu'
+                            : 'Choose what you need'}
+                        </p>
                         <button
-                          key={button.id}
                           type="button"
-                          onClick={() =>
-                            void sendMessage(button.prompt, {
-                              actionInstruction: [
-                                button.instructionAppend,
-                                button.negativeInstruction
-                                  ? `Negative instruction: ${button.negativeInstruction}`
-                                  : '',
-                              ]
-                                .filter(Boolean)
-                                .join('\n'),
-                            })
-                          }
-                          className="inline-flex min-h-8 shrink-0 items-center rounded-full bg-white px-3 text-[11px] font-bold text-[#54656f] hover:text-[#128c7e] dark:bg-[#111b21] dark:text-[#aebac1]"
+                          onClick={() => setQuickActionsOpen(false)}
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#54656f] hover:bg-[#f0f2f5] dark:text-[#aebac1] dark:hover:bg-[#202c33]"
+                          aria-label={isId ? 'Tutup pilihan' : 'Close options'}
                         >
-                          {button.label}
+                          <X className="h-4 w-4" />
                         </button>
-                      ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickActionsOpen(false);
+                            fileInputRef.current?.click();
+                          }}
+                          disabled={
+                            sending ||
+                            attaching ||
+                            draftAttachments.length >= MAX_AI_ATTACHMENTS
+                          }
+                          className="flex min-h-12 items-center gap-2 rounded-[14px] bg-[#f0f2f5] px-3 text-left text-xs font-bold text-[#54656f] disabled:opacity-50 dark:bg-[#202c33] dark:text-[#aebac1]"
+                        >
+                          <Paperclip className="h-4 w-4 shrink-0" />
+                          {isId ? 'Foto atau file' : 'Photo or file'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickActionsOpen(false);
+                            startCreation('offering_listing');
+                          }}
+                          disabled={sending}
+                          className="flex min-h-12 items-center gap-2 rounded-[14px] bg-[#ecfdf5] px-3 text-left text-xs font-bold text-[#047857] disabled:opacity-50 dark:bg-[rgba(5,150,105,0.16)] dark:text-[#a7f3d0]"
+                        >
+                          <ShoppingBag className="h-4 w-4 shrink-0" />
+                          {isId ? 'Buat penawaran' : 'Create offer'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickActionsOpen(false);
+                            startCreation('looking_for_listing');
+                          }}
+                          disabled={sending}
+                          className="flex min-h-12 items-center gap-2 rounded-[14px] bg-[#eff6ff] px-3 text-left text-xs font-bold text-[#1d4ed8] disabled:opacity-50 dark:bg-[rgba(37,99,235,0.16)] dark:text-[#bfdbfe]"
+                        >
+                          <Search className="h-4 w-4 shrink-0" />
+                          {isId ? 'Buat kebutuhan' : 'Create request'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickActionsOpen(false);
+                            startCreation('business_profile');
+                          }}
+                          disabled={sending}
+                          className="flex min-h-12 items-center gap-2 rounded-[14px] bg-[#fffbeb] px-3 text-left text-xs font-bold text-[#a16207] disabled:opacity-50 dark:bg-[rgba(180,83,9,0.16)] dark:text-[#fde68a]"
+                        >
+                          <Building2 className="h-4 w-4 shrink-0" />
+                          {isId ? 'Daftarkan usaha' : 'Register business'}
+                        </button>
+                      </div>
+                      {selectedAgent?.quick_buttons?.length ? (
+                        <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                          {selectedAgent.quick_buttons.map(button => (
+                            <button
+                              key={button.id}
+                              type="button"
+                              onClick={() => {
+                                setQuickActionsOpen(false);
+                                void sendMessage(button.prompt, {
+                                  quickButtonId: button.id,
+                                });
+                              }}
+                              className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
+                            >
+                              {button.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                   {draftAttachments.length > 0 ? (
@@ -2469,16 +3994,30 @@ export default function PersonalAiStudio() {
                               {attachment.name}
                             </span>
                             <span className="block truncate text-[10px] font-semibold text-[#667781] dark:text-[#8696a0]">
-                              {attachment.kind}
-                              {attachment.url ? ' / stored' : ''}
-                              {attachment.dataUrl ? ' / vision' : ''}
-                              {attachment.text ? ' / text' : ''}
+                              {attachment.kind === 'image'
+                                ? isId
+                                  ? 'gambar'
+                                  : 'image'
+                                : attachment.kind === 'video'
+                                  ? 'video'
+                                  : attachment.kind === 'audio'
+                                    ? isId
+                                      ? 'suara'
+                                      : 'audio'
+                                    : isId
+                                      ? 'dokumen'
+                                      : 'document'}
+                              {attachment.url
+                                ? isId
+                                  ? ' · siap'
+                                  : ' · ready'
+                                : ''}
                             </span>
                           </span>
                           <button
                             type="button"
                             onClick={() => removeDraftAttachment(attachment.id)}
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f0f2f5] text-[#54656f] dark:bg-[#111b21] dark:text-[#aebac1]"
+                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f0f2f5] text-[#54656f] dark:bg-[#111b21] dark:text-[#aebac1]"
                             aria-label={isId ? 'Hapus media' : 'Remove media'}
                           >
                             <X className="h-3.5 w-3.5" />
@@ -2496,22 +4035,211 @@ export default function PersonalAiStudio() {
                       ) : null}
                     </div>
                   ) : null}
+                  {voiceRecorder.status !== 'idle' ? (
+                    <div
+                      className="mb-2 rounded-[18px] border border-black/5 bg-white p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21]"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {voiceRecorder.status === 'error' ? (
+                        <div className="flex items-center gap-2">
+                          <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-rose-700 dark:text-rose-200">
+                            {voiceRecorderErrorMessage(
+                              voiceRecorder.error,
+                              isId,
+                            )}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void voiceRecorder.start()}
+                            className="inline-flex min-h-11 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
+                          >
+                            {isId ? 'Coba lagi' : 'Try again'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={voiceRecorder.cancel}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#54656f] hover:bg-[#f0f2f5] dark:text-[#aebac1] dark:hover:bg-[#202c33]"
+                            aria-label={isId ? 'Tutup' : 'Close'}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : voiceRecorder.status === 'ready' &&
+                        voiceRecorder.recording ? (
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <audio
+                              src={voiceRecorder.recording.previewUrl}
+                              controls
+                              preload="metadata"
+                              className="h-10 min-w-[180px] flex-1"
+                              aria-label={
+                                isId
+                                  ? 'Pratinjau pesan suara'
+                                  : 'Voice note preview'
+                              }
+                            />
+                            <span className="text-xs font-bold tabular-nums text-[#54656f] dark:text-[#aebac1]">
+                              {formatVoiceNoteDuration(
+                                voiceRecorder.durationMs,
+                              )}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={voiceRecorder.cancel}
+                              disabled={transcribingVoice}
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-rose-50 px-3 text-xs font-bold text-rose-700 disabled:opacity-50 dark:bg-rose-500/15 dark:text-rose-200"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {isId ? 'Hapus' : 'Delete'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const recording = voiceRecorder.recording;
+                                if (!recording) return;
+                                void transcribeVoiceNote(recording.file);
+                              }}
+                              disabled={transcribingVoice}
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] disabled:opacity-60"
+                            >
+                              {transcribingVoice ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <FileText className="h-3.5 w-3.5" />
+                              )}
+                              {transcribingVoice
+                                ? isId
+                                  ? 'Mengubah...'
+                                  : 'Converting...'
+                                : isId
+                                  ? 'Ubah jadi teks'
+                                  : 'Convert to text'}
+                            </button>
+                          </div>
+                          <p className="mt-2 px-1 text-[10px] font-semibold leading-4 text-[#667781] dark:text-[#8696a0]">
+                            {isId
+                              ? 'Rekaman dapat dikirim ke satu atau lebih penyedia AI yang dikonfigurasi untuk transkripsi. Periksa hasil teks sebelum dikirim dan jangan rekam data rahasia.'
+                              : 'The recording may be sent to one or more configured AI providers for transcription. Review the text before sending and do not record confidential data.'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              'inline-flex h-3 w-3 shrink-0 rounded-full',
+                              voiceRecorder.status === 'recording'
+                                ? 'animate-pulse bg-rose-500'
+                                : 'bg-amber-400',
+                            )}
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-[#111b21] dark:text-[#e9edef]">
+                              {voiceRecorder.status === 'requesting-permission'
+                                ? isId
+                                  ? 'Meminta izin mikrofon...'
+                                  : 'Requesting microphone access...'
+                                : voiceRecorder.status === 'processing'
+                                  ? isId
+                                    ? 'Menyiapkan rekaman...'
+                                    : 'Preparing recording...'
+                                  : voiceRecorder.status === 'paused'
+                                    ? isId
+                                      ? 'Rekaman dijeda'
+                                      : 'Recording paused'
+                                    : isId
+                                      ? 'Merekam pesan suara'
+                                      : 'Recording voice note'}
+                            </p>
+                            <p className="text-[11px] font-semibold tabular-nums text-[#667781] dark:text-[#8696a0]">
+                              {formatVoiceNoteDuration(
+                                voiceRecorder.durationMs,
+                              )}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={voiceRecorder.cancel}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-rose-600 hover:bg-rose-50 dark:text-rose-200 dark:hover:bg-rose-500/15"
+                            aria-label={
+                              isId ? 'Batalkan rekaman' : 'Cancel recording'
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          {voiceRecorder.status === 'recording' ? (
+                            <button
+                              type="button"
+                              onClick={voiceRecorder.pause}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f0f2f5] text-[#54656f] dark:bg-[#202c33] dark:text-[#aebac1]"
+                              aria-label={
+                                isId ? 'Jeda rekaman' : 'Pause recording'
+                              }
+                            >
+                              <Pause className="h-4 w-4" />
+                            </button>
+                          ) : voiceRecorder.status === 'paused' ? (
+                            <button
+                              type="button"
+                              onClick={voiceRecorder.resume}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f0f2f5] text-[#54656f] dark:bg-[#202c33] dark:text-[#aebac1]"
+                              aria-label={
+                                isId ? 'Lanjut merekam' : 'Resume recording'
+                              }
+                            >
+                              <Play className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                          {voiceRecorder.status === 'recording' ||
+                          voiceRecorder.status === 'paused' ? (
+                            <button
+                              type="button"
+                              onClick={voiceRecorder.stop}
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)]"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              {isId ? 'Selesai' : 'Finish'}
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                  <p className="mb-1 px-1 text-[10px] font-semibold leading-4 text-[#667781] dark:text-[#8696a0]">
+                    {isId
+                      ? 'AI dapat keliru. Jangan bagikan PIN, OTP, kata sandi, atau data rahasia.'
+                      : 'AI can be wrong. Do not share PINs, one-time codes, passwords, or confidential data.'}
+                  </p>
                   <div className="flex min-w-0 items-end gap-2">
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={
-                        sending || draftAttachments.length >= MAX_AI_ATTACHMENTS
-                      }
+                      onClick={() => setQuickActionsOpen(value => !value)}
+                      disabled={sending || selectedAgent?.cache_only}
                       className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[#54656f] shadow-sm transition hover:bg-[#e9edef] disabled:opacity-50 dark:bg-[#2a3942] dark:text-[#aebac1] dark:hover:bg-[#33444f]"
-                      aria-label={isId ? 'Lampirkan media' : 'Attach media'}
-                      title={isId ? 'Lampirkan media' : 'Attach media'}
+                      aria-label={
+                        isId
+                          ? 'Buka bantuan cepat dan lampiran'
+                          : 'Open quick help and attachments'
+                      }
+                      aria-expanded={quickActionsOpen}
+                      title={isId ? 'Bantuan cepat' : 'Quick help'}
                     >
-                      <Paperclip className="h-5 w-5" />
+                      <Plus
+                        className={cn(
+                          'h-5 w-5 transition-transform',
+                          quickActionsOpen && 'rotate-45',
+                        )}
+                      />
                     </button>
                     <textarea
                       value={input}
-                      onChange={event => setInput(event.target.value)}
+                      onChange={event => {
+                        inputRef.current = event.target.value;
+                        setInput(event.target.value);
+                      }}
+                      disabled={!selectedAgent || selectedAgent.cache_only}
                       onFocus={() => {
                         setComposerFocused(true);
                         requestAnimationFrame(() =>
@@ -2536,46 +4264,94 @@ export default function PersonalAiStudio() {
                             : 'Fill in the labels requested by the AI...'
                           : copy.placeholder
                       }
-                      rows={2}
-                      className="min-h-[46px] min-w-0 flex-1 resize-none rounded-[18px] border border-transparent bg-white px-3 py-2 text-sm text-[#111b21] outline-none transition placeholder:text-[#667781] focus:border-[#25d366] focus:ring-2 focus:ring-[#25d366]/14 dark:bg-[#2a3942] dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
+                      aria-label={
+                        isId
+                          ? 'Tulis pesan untuk asisten AI'
+                          : 'Write a message to the AI assistant'
+                      }
+                      maxLength={3500}
+                      rows={1}
+                      onInput={event => {
+                        const target = event.currentTarget;
+                        target.style.height = 'auto';
+                        target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                      }}
+                      className="max-h-[120px] min-h-12 min-w-0 flex-1 resize-none rounded-[18px] border border-transparent bg-white px-3 py-3 text-sm leading-5 text-[#111b21] outline-none transition placeholder:text-[#667781] focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:bg-[#2a3942] dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
                       onKeyDown={event => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
+                        const hasFinePointer =
+                          typeof window !== 'undefined' &&
+                          window.matchMedia('(pointer: fine)').matches;
+                        if (
+                          event.key === 'Enter' &&
+                          !event.shiftKey &&
+                          !event.nativeEvent.isComposing &&
+                          hasFinePointer
+                        ) {
                           event.preventDefault();
                           void sendMessage();
                         }
                       }}
                     />
-                    <button
-                      type="button"
-                      onClick={() => void sendMessage()}
-                      disabled={
-                        sending ||
-                        (!input.trim() && draftAttachments.length === 0)
-                      }
-                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#25d366] text-[#111b21] shadow-[0_10px_24px_-16px_rgba(37,211,102,0.65)] disabled:opacity-50"
-                      aria-label={copy.send}
-                    >
-                      {sending ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Send className="h-5 w-5" />
-                      )}
-                    </button>
+                    {input.trim() || draftAttachments.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => void sendMessage()}
+                        disabled={sending || selectedAgent?.cache_only}
+                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_10px_24px_-16px_rgba(15,118,110,0.55)] disabled:opacity-50"
+                        aria-label={copy.send}
+                      >
+                        {sending ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Send className="h-5 w-5" />
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickActionsOpen(false);
+                          void voiceRecorder.start();
+                        }}
+                        disabled={
+                          sending ||
+                          selectedAgent?.cache_only ||
+                          transcribingVoice ||
+                          !(
+                            voiceRecorder.status === 'idle' ||
+                            voiceRecorder.status === 'error'
+                          )
+                        }
+                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_10px_24px_-16px_rgba(15,118,110,0.55)] disabled:opacity-50"
+                        aria-label={
+                          isId ? 'Rekam pesan suara' : 'Record a voice note'
+                        }
+                        title={
+                          isId ? 'Rekam pesan suara' : 'Record a voice note'
+                        }
+                      >
+                        <Mic className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 {forwardingMessage ? (
                   <div
-                    className="fixed inset-0 z-[120] flex items-end justify-center bg-black/45 sm:items-center sm:p-6"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label={isId ? 'Teruskan pesan' : 'Forward message'}
+                    className="ui-layer-modal fixed inset-0 z-[120] flex items-end justify-center bg-black/45 px-0 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] sm:items-center sm:p-6"
                     onMouseDown={event => {
                       if (event.target === event.currentTarget && !forwarding) {
                         setForwardingMessage(null);
                       }
                     }}
                   >
-                    <div className="flex max-h-[82dvh] w-full flex-col bg-white shadow-2xl dark:bg-[#202c33] sm:max-w-md sm:rounded-lg">
+                    <div
+                      ref={forwardDialogRef}
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label={isId ? 'Teruskan pesan' : 'Forward message'}
+                      tabIndex={-1}
+                      className="flex max-h-[min(82dvh,var(--app-visual-viewport-height))] w-full flex-col bg-white shadow-2xl outline-none dark:bg-[#202c33] sm:max-w-md sm:rounded-lg"
+                    >
                       <div className="flex items-center gap-3 border-b border-black/5 px-4 py-3 dark:border-white/8">
                         <Forward className="h-4 w-4 text-[#128c7e]" />
                         <div className="min-w-0 flex-1">
@@ -2588,9 +4364,10 @@ export default function PersonalAiStudio() {
                         </div>
                         <button
                           type="button"
+                          data-forward-initial-focus
                           onClick={() => setForwardingMessage(null)}
                           disabled={forwarding}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
                           aria-label={isId ? 'Tutup' : 'Close'}
                         >
                           <X className="h-4 w-4" />
@@ -2650,7 +4427,7 @@ export default function PersonalAiStudio() {
             ) : null}
 
             {activePanel !== 'chat' ? (
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(1rem+var(--app-shell-safe-bottom))]">
                 {activePanel === 'builder'
                   ? (() => {
                       const config =
@@ -2665,8 +4442,8 @@ export default function PersonalAiStudio() {
                           {!canEditSelected ? (
                             <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
                               {isId
-                                ? 'Builder hanya bisa diedit pemilik AI.'
-                                : 'Only the AI owner can edit the builder.'}
+                                ? 'Cara kerja ini hanya bisa diubah oleh pemilik asisten.'
+                                : 'Only the assistant owner can change how it works.'}
                             </div>
                           ) : null}
 
@@ -2675,20 +4452,20 @@ export default function PersonalAiStudio() {
                               <div>
                                 <p className="text-sm font-bold">
                                   {isId
-                                    ? 'AI Studio Builder'
-                                    : 'AI Studio Builder'}
+                                    ? 'Atur cara AI membantu'
+                                    : 'Choose how the AI helps'}
                                 </p>
                                 <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--app-text-soft)]">
                                   {isId
-                                    ? 'Pilih tool siap pakai, lalu sesuaikan bahan baku, instruksi tersembunyi, upload gambar, model target, dan output yang ingin dihasilkan.'
-                                    : 'Pick a ready-to-use tool, then adjust the source material, hidden instructions, image upload, target model, and desired output.'}
+                                    ? 'Mulai dari contoh siap pakai, lalu sesuaikan pertanyaan yang diajukan dan bentuk jawaban yang diinginkan.'
+                                    : 'Start with a ready-made example, then adjust the questions it asks and the answer format you want.'}
                                 </p>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => void saveSettings()}
                                 disabled={!canEditSelected || saving}
-                                className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white disabled:opacity-50"
+                                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white disabled:opacity-50"
                               >
                                 {saving ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2726,17 +4503,17 @@ export default function PersonalAiStudio() {
                             </div>
                           </section>
 
-                          <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_280px]">
+                          <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_260px]">
                             <section className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3">
                               <div className="mb-2 flex items-center justify-between gap-2">
                                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                                  Steps
+                                  {isId ? 'Tahapan' : 'Steps'}
                                 </p>
                                 <button
                                   type="button"
                                   disabled={!canEditSelected}
                                   onClick={addBuilderStep}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] disabled:opacity-50"
+                                  className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] disabled:opacity-50"
                                   aria-label={isId ? 'Tambah step' : 'Add step'}
                                 >
                                   <Plus className="h-4 w-4" />
@@ -2751,7 +4528,7 @@ export default function PersonalAiStudio() {
                                       setSelectedBuilderStepId(step.id)
                                     }
                                     className={cn(
-                                      'rounded-[14px] px-3 py-2 text-left text-xs transition',
+                                      'min-h-11 rounded-[14px] px-3 py-2 text-left text-xs transition',
                                       selectedStep?.id === step.id
                                         ? 'bg-[color:var(--app-text)] text-[color:var(--app-surface-strong)]'
                                         : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]',
@@ -2826,7 +4603,7 @@ export default function PersonalAiStudio() {
                                 />
                               </label>
                               <label className="mt-3 grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
-                                Base instruction
+                                {isId ? 'Instruksi dasar' : 'Base instruction'}
                                 <textarea
                                   value={config.instructions.baseInstruction}
                                   disabled={!canEditSelected}
@@ -2847,7 +4624,7 @@ export default function PersonalAiStudio() {
                               {selectedStep ? (
                                 <div className="mt-4 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3">
                                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                                    Canvas step
+                                    {isId ? 'Kanvas tahap' : 'Step canvas'}
                                   </p>
                                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                                     <label className="grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
@@ -2880,7 +4657,9 @@ export default function PersonalAiStudio() {
                                     </label>
                                   </div>
                                   <label className="mt-3 grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
-                                    Step instruction
+                                    {isId
+                                      ? 'Instruksi tahap'
+                                      : 'Step instruction'}
                                     <textarea
                                       value={selectedStep.instruction || ''}
                                       disabled={!canEditSelected}
@@ -2904,7 +4683,7 @@ export default function PersonalAiStudio() {
                                       type="button"
                                       disabled={!canEditSelected}
                                       onClick={() => addBuilderBlock('text')}
-                                      className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold text-[color:var(--app-accent)] disabled:opacity-50"
+                                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold text-[color:var(--app-accent)] disabled:opacity-50"
                                     >
                                       <Plus className="h-3.5 w-3.5" />
                                       {isId ? 'Tambah field' : 'Add field'}
@@ -2968,7 +4747,7 @@ export default function PersonalAiStudio() {
                                                   },
                                                 )
                                               }
-                                              className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)]"
+                                              className="min-h-11 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)]"
                                             >
                                               {BUILDER_BLOCK_TYPES.map(type => (
                                                 <option key={type} value={type}>
@@ -2985,7 +4764,7 @@ export default function PersonalAiStudio() {
                                               onClick={() =>
                                                 removeBuilderBlock(block.id)
                                               }
-                                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-rose-600 disabled:opacity-40"
+                                              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 text-rose-600 disabled:opacity-40"
                                               aria-label={
                                                 isId
                                                   ? 'Hapus field'
@@ -2998,7 +4777,9 @@ export default function PersonalAiStudio() {
                                         </div>
                                         <div className="mt-2 grid gap-2 sm:grid-cols-2">
                                           <label className="grid gap-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
-                                            Variable key
+                                            {isId
+                                              ? 'Kunci variabel'
+                                              : 'Variable key'}
                                             <input
                                               value={block.variable || ''}
                                               disabled={!canEditSelected}
@@ -3014,11 +4795,13 @@ export default function PersonalAiStudio() {
                                                   }),
                                                 )
                                               }
-                                              className="rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 py-1.5 text-xs text-[color:var(--app-text)]"
+                                              className="min-h-11 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 py-1.5 text-xs text-[color:var(--app-text)]"
                                             />
                                           </label>
                                           <label className="grid gap-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
-                                            Placeholder / help
+                                            {isId
+                                              ? 'Contoh / bantuan'
+                                              : 'Placeholder / help'}
                                             <input
                                               value={
                                                 block.placeholder ||
@@ -3036,7 +4819,7 @@ export default function PersonalAiStudio() {
                                                   }),
                                                 )
                                               }
-                                              className="rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 py-1.5 text-xs text-[color:var(--app-text)]"
+                                              className="min-h-11 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 py-1.5 text-xs text-[color:var(--app-text)]"
                                             />
                                           </label>
                                         </div>
@@ -3079,11 +4862,11 @@ export default function PersonalAiStudio() {
                                                   }),
                                                 )
                                               }
-                                              className="resize-y rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 py-1.5 text-xs leading-5 text-[color:var(--app-text)]"
+                                              className="min-h-11 resize-y rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 py-1.5 text-xs leading-5 text-[color:var(--app-text)]"
                                               placeholder={
                                                 isId
-                                                  ? 'Label :: value :: instruksi tersembunyi'
-                                                  : 'Label :: value :: hidden instruction'
+                                                  ? 'Label :: nilai :: konteks tambahan'
+                                                  : 'Label :: value :: extra context'
                                               }
                                             />
                                           </label>
@@ -3111,12 +4894,12 @@ export default function PersonalAiStudio() {
 
                             <section className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3">
                               <p className="text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                                Quick actions
+                                {isId ? 'Tombol bantuan' : 'Help buttons'}
                               </p>
                               <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
                                 {isId
-                                  ? 'Format: Label :: pesan user :: instruksi tersembunyi.'
-                                  : 'Format: Label :: user message :: hidden instruction.'}
+                                  ? 'Satu tombol per baris: nama tombol :: pesan yang dikirim.'
+                                  : 'One button per line: button name :: message to send.'}
                               </p>
                               <textarea
                                 value={draft.quick_buttons_text}
@@ -3134,13 +4917,13 @@ export default function PersonalAiStudio() {
                               <div className="mt-4 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3">
                                 <div className="flex items-center justify-between gap-2">
                                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                                    {isId ? 'Output tool' : 'Tool output'}
+                                    {isId ? 'Bentuk jawaban' : 'Answer format'}
                                   </p>
                                   <button
                                     type="button"
                                     disabled={!canEditSelected}
                                     onClick={addOutputSection}
-                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] disabled:opacity-50"
+                                    className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] disabled:opacity-50"
                                     aria-label={
                                       isId ? 'Tambah output' : 'Add output'
                                     }
@@ -3174,7 +4957,7 @@ export default function PersonalAiStudio() {
                                                 }),
                                               )
                                             }
-                                            className="min-w-0 flex-1 rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[11px] font-bold text-[color:var(--app-text)]"
+                                            className="min-h-11 min-w-0 flex-1 rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[11px] font-bold text-[color:var(--app-text)]"
                                           />
                                           <button
                                             type="button"
@@ -3185,7 +4968,7 @@ export default function PersonalAiStudio() {
                                             onClick={() =>
                                               removeOutputSection(section.id)
                                             }
-                                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600 disabled:opacity-40"
+                                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600 disabled:opacity-40"
                                             aria-label={
                                               isId
                                                 ? 'Hapus output'
@@ -3209,7 +4992,7 @@ export default function PersonalAiStudio() {
                                                 }),
                                               )
                                             }
-                                            className="rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]"
+                                            className="min-h-11 rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]"
                                           >
                                             {OUTPUT_SECTION_TYPES.map(type => (
                                               <option key={type} value={type}>
@@ -3231,7 +5014,7 @@ export default function PersonalAiStudio() {
                                                 }),
                                               )
                                             }
-                                            className="rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]"
+                                            className="min-h-11 rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]"
                                             placeholder="output_key"
                                           />
                                         </div>
@@ -3248,7 +5031,7 @@ export default function PersonalAiStudio() {
                                               }),
                                             )
                                           }
-                                          className="resize-y rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[10px] leading-4 text-[color:var(--app-text)]"
+                                          className="min-h-11 resize-y rounded-[10px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1.5 text-[10px] leading-4 text-[color:var(--app-text)]"
                                           placeholder={
                                             isId
                                               ? 'Instruksi khusus untuk bagian output ini'
@@ -3260,39 +5043,47 @@ export default function PersonalAiStudio() {
                                 </div>
                                 <p className="mt-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
                                   {isId
-                                    ? `Mode: ${config.modelPolicy.mode} - Target: ${config.modelPolicy.preferredModelId || 'auto'}`
-                                    : `Mode: ${config.modelPolicy.mode} - Target: ${config.modelPolicy.preferredModelId || 'auto'}`}
+                                    ? 'Pemrosesan jawaban diatur otomatis oleh gateway Lajukan sesuai kemampuan yang dibutuhkan.'
+                                    : 'Answer processing is automatically handled by the Lajukan gateway based on the capabilities required.'}
                                 </p>
                               </div>
 
-                              <p className="mt-4 text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                                AI model registry
-                              </p>
-                              <div className="mt-2 grid gap-2">
-                                {PERSONAL_AI_MODEL_REGISTRY.slice(0, 6).map(
-                                  model => (
-                                    <div
-                                      key={model.id}
-                                      className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2"
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <p className="truncate text-xs font-bold">
-                                          {model.name}
-                                        </p>
-                                        <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[9px] font-bold text-[color:var(--app-text-soft)]">
-                                          {model.status}
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                                        {model.provider} -{' '}
-                                        {model.capabilities.join(', ')}
-                                      </p>
-                                    </div>
-                                  ),
-                                )}
+                              <div className="mt-4 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3">
+                                <div className="flex items-start gap-2">
+                                  <Bot className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                                  <div>
+                                    <p className="text-xs font-bold text-[color:var(--app-text)]">
+                                      {isId
+                                        ? 'Satu gateway untuk semua kemampuan AI'
+                                        : 'One gateway for all AI capabilities'}
+                                    </p>
+                                    <p className="mt-1 text-[10px] font-medium leading-4 text-[color:var(--app-text-soft)]">
+                                      {isId
+                                        ? 'Chat, vision, memory, dan konteks asisten dikirim melalui gateway AI Lajukan. Detail provider tidak perlu diatur dari browser dan dapat berubah tanpa mengubah asistenmu.'
+                                        : 'Chat, vision, memory, and assistant context go through the Lajukan AI gateway. Provider details are not configured in the browser and may change without changing your assistant.'}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                             </section>
                           </div>
+                          {canEditSelected ? (
+                            <div className="sticky bottom-0 z-10 flex justify-end rounded-[16px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_-12px_28px_-24px_rgba(15,23,42,0.45)] backdrop-blur">
+                              <button
+                                type="button"
+                                onClick={() => void saveSettings()}
+                                disabled={saving}
+                                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-xs font-bold text-white disabled:opacity-50"
+                              >
+                                {saving ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Save className="h-3.5 w-3.5" />
+                                )}
+                                {copy.save}
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })()
@@ -3303,13 +5094,13 @@ export default function PersonalAiStudio() {
                     {!canEditSelected ? (
                       <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
                         {isId
-                          ? 'AI ini dibagikan. Setting hanya bisa diedit pemilik.'
-                          : 'This AI is shared. Only the owner can edit settings.'}
+                          ? 'Asisten ini dibagikan kepada Anda. Hanya pemilik yang dapat mengubah pengaturannya.'
+                          : 'This assistant was shared with you. Only its owner can change the settings.'}
                       </div>
                     ) : null}
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
-                        Nama AI
+                        {isId ? 'Nama asisten' : 'Assistant name'}
                         <input
                           value={draft.name}
                           disabled={!canEditSelected}
@@ -3322,26 +5113,33 @@ export default function PersonalAiStudio() {
                           className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2 text-sm text-[color:var(--app-text)]"
                         />
                       </label>
-                      <label className="grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
-                        Model
-                        <select
-                          value={draft.model_preference}
-                          disabled={!canEditSelected}
-                          onChange={event =>
-                            setDraft(current => ({
-                              ...current,
-                              model_preference: event.target
-                                .value as SettingsDraft['model_preference'],
-                            }))
-                          }
-                          className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2 text-sm text-[color:var(--app-text)]"
-                        >
-                          <option value="auto">Auto</option>
-                          <option value="ollama">Ollama lokal</option>
-                          <option value="groq">Groq</option>
-                          <option value="openai">OpenAI</option>
-                        </select>
-                      </label>
+                      <details className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 sm:col-span-2">
+                        <summary className="min-h-11 cursor-pointer text-xs font-bold text-[color:var(--app-text-soft)]">
+                          {isId
+                            ? 'Pengaturan jawaban lanjutan'
+                            : 'Advanced answer settings'}
+                        </summary>
+                        <div className="mt-2 grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
+                          <span>
+                            {isId ? 'Pemrosesan AI' : 'AI processing'}
+                          </span>
+                          <div className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3">
+                            <div className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
+                              <Sparkles className="h-4 w-4 text-[color:var(--app-accent)]" />
+                              <span>
+                                {isId
+                                  ? 'Lajukan AI — otomatis'
+                                  : 'Lajukan AI — automatic'}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[11px] font-medium leading-5 text-[color:var(--app-text-soft)]">
+                              {isId
+                                ? 'Lajukan memilih model dan kemampuan yang sesuai di server berdasarkan pesan, gambar, dan kebutuhan asisten. Kamu cukup mengatur instruksi, gaya, kreativitas, memory, dan format output.'
+                                : 'Lajukan selects the appropriate model and capabilities on the server based on the message, image, and assistant needs. You only configure instructions, style, creativity, memory, and output format.'}
+                            </p>
+                          </div>
+                        </div>
+                      </details>
                     </div>
                     <label className="grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
                       Deskripsi
@@ -3358,7 +5156,9 @@ export default function PersonalAiStudio() {
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
-                      Instruksi
+                      {isId
+                        ? 'Cara asisten menjawab'
+                        : 'How the assistant should answer'}
                       <textarea
                         value={draft.instructions}
                         disabled={!canEditSelected}
@@ -3406,7 +5206,7 @@ export default function PersonalAiStudio() {
                       </label>
                     </div>
                     <label className="grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
-                      Quick buttons
+                      {isId ? 'Tombol bantuan' : 'Help buttons'}
                       <textarea
                         value={draft.quick_buttons_text}
                         disabled={!canEditSelected}
@@ -3421,7 +5221,9 @@ export default function PersonalAiStudio() {
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-bold text-[color:var(--app-text-soft)]">
-                      Starter prompts
+                      {isId
+                        ? 'Contoh pertanyaan awal'
+                        : 'Suggested first questions'}
                       <textarea
                         value={draft.starter_prompts_text}
                         disabled={!canEditSelected}
@@ -3436,7 +5238,7 @@ export default function PersonalAiStudio() {
                       />
                     </label>
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3">
-                      <label className="inline-flex items-center gap-2 text-xs font-bold">
+                      <label className="inline-flex min-h-11 items-center gap-2 text-xs font-bold">
                         <input
                           type="checkbox"
                           checked={draft.memory_enabled}
@@ -3447,8 +5249,16 @@ export default function PersonalAiStudio() {
                               memory_enabled: event.target.checked,
                             }))
                           }
+                          className="h-5 w-5"
                         />
-                        {copy.memory}
+                        <span>
+                          <span className="block">{copy.memory}</span>
+                          <span className="mt-0.5 block text-[10px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+                            {isId
+                              ? 'Jika aktif, ringkasan percakapan dipakai untuk chat berikutnya.'
+                              : 'When enabled, conversation summaries are used in future chats.'}
+                          </span>
+                        </span>
                       </label>
                       <div className="inline-flex rounded-full bg-[color:var(--app-surface-muted)] p-1">
                         {(['private', 'unlisted', 'public'] as const).map(
@@ -3464,7 +5274,7 @@ export default function PersonalAiStudio() {
                                 }))
                               }
                               className={cn(
-                                'rounded-full px-3 py-1 text-[11px] font-bold',
+                                'min-h-11 rounded-full px-3 py-2 text-[11px] font-bold',
                                 draft.visibility === value
                                   ? 'bg-[color:var(--app-accent)] text-white'
                                   : 'text-[color:var(--app-text-soft)]',
@@ -3478,8 +5288,8 @@ export default function PersonalAiStudio() {
                     </div>
                     <p className="text-[11px] leading-5 text-[color:var(--app-text-soft)]">
                       {isId
-                        ? 'Private hanya pemilik. Unlisted bisa dibuka lewat link. Public disiapkan untuk tampil di profil/pencarian AI Tools Lajukan.'
-                        : 'Private is owner-only. Unlisted opens by link. Public is ready for profile and Explore discovery.'}
+                        ? 'Hanya saya: tidak dibagikan. Dengan tautan: dapat dibuka penerima tautan yang masuk ke Lajukan. Publik: link dapat dibagikan, tetapi direktori publik belum tersedia.'
+                        : 'Only me: not shared. Anyone with the link: accessible to signed-in link recipients. Public: the link can be shared, but public discovery is not available yet.'}
                     </p>
                     {canEditSelected ? (
                       <div className="flex flex-wrap gap-2">
@@ -3487,7 +5297,7 @@ export default function PersonalAiStudio() {
                           type="button"
                           onClick={() => void saveSettings()}
                           disabled={saving}
-                          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-sm font-bold text-white disabled:opacity-60"
+                          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-sm font-bold text-white disabled:opacity-60"
                         >
                           {saving ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -3499,7 +5309,7 @@ export default function PersonalAiStudio() {
                         <button
                           type="button"
                           onClick={() => void deleteAgent()}
-                          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-rose-200 px-4 text-sm font-bold text-rose-600"
+                          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-sm font-bold text-rose-600"
                         >
                           <Trash2 className="h-4 w-4" />
                           {copy.delete}
@@ -3520,17 +5330,17 @@ export default function PersonalAiStudio() {
                           selectedAgent?.visibility || 'private',
                         ) === 'private'
                           ? isId
-                            ? 'AI ini masih private dan tidak bisa dibuka orang lain.'
-                            : 'This AI is private and cannot be opened by others.'
+                            ? 'Asisten ini hanya dapat dibuka oleh Anda.'
+                            : 'This assistant can only be opened by you.'
                           : normalizeUiVisibility(
                                 selectedAgent?.visibility || 'private',
                               ) === 'public'
                             ? isId
-                              ? 'AI ini public. Link bisa dibagikan, dan siap ditampilkan di AI Tools publik Lajukan.'
-                              : 'This AI is public. The link can be shared and it is ready for public AI Tools discovery.'
+                              ? 'Link asisten ini dapat dibagikan. Direktori asisten publik belum tersedia.'
+                              : 'This assistant link can be shared. Public assistant discovery is not available yet.'
                             : isId
-                              ? 'AI ini unlisted. Orang lain hanya bisa membuka lewat link.'
-                              : 'This AI is unlisted. Others can open it only with the link.'}
+                              ? 'Asisten ini hanya dapat dibuka oleh pengguna yang menerima tautannya.'
+                              : 'This assistant can only be opened by people who receive its link.'}
                       </p>
                       <div className="mt-3 flex gap-2">
                         <input
@@ -3542,7 +5352,7 @@ export default function PersonalAiStudio() {
                               ? shareUrl
                               : ''
                           }
-                          className="min-w-0 flex-1 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-xs"
+                          className="min-h-11 min-w-0 flex-1 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-xs"
                         />
                         <button
                           type="button"
@@ -3552,12 +5362,41 @@ export default function PersonalAiStudio() {
                               selectedAgent?.visibility || 'private',
                             ) === 'private'
                           }
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white disabled:opacity-40"
-                          aria-label="Copy"
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white disabled:opacity-40"
+                          aria-label={isId ? 'Salin tautan' : 'Copy link'}
                         >
                           <Copy className="h-4 w-4" />
                         </button>
                       </div>
+                      {canEditSelected &&
+                      normalizeUiVisibility(
+                        selectedAgent?.visibility || 'private',
+                      ) !== 'private' ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void changeShareLink('rotate')}
+                            disabled={savingShare}
+                            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[color:var(--app-border)] px-4 text-xs font-bold disabled:opacity-50"
+                          >
+                            {savingShare ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCcw className="h-4 w-4" />
+                            )}
+                            {isId ? 'Ganti tautan' : 'Replace link'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void changeShareLink('revoke')}
+                            disabled={savingShare}
+                            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-xs font-bold text-rose-600 disabled:opacity-50 dark:border-rose-900 dark:text-rose-300"
+                          >
+                            <Lock className="h-4 w-4" />
+                            {isId ? 'Cabut akses' : 'Revoke access'}
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -3566,28 +5405,128 @@ export default function PersonalAiStudio() {
                   <div className="mx-auto grid max-w-2xl gap-3">
                     <div className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-4">
                       <p className="text-sm font-bold">{copy.memory}</p>
-                      <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                        {selectedAgent?.memory_enabled
-                          ? isId
-                            ? 'Memory aktif. AI memakai ringkasan percakapanmu di tab ini dan tab lain untuk memahami konteks berikutnya.'
-                            : 'Memory is active. AI uses compact conversation memory across your tabs for future context.'
-                          : isId
-                            ? 'Memory dimatikan di setting AI ini.'
-                            : 'Memory is disabled for this AI.'}
-                      </p>
-                      <div className="mt-3 grid gap-2">
-                        {messages
-                          .filter(message => message.role === 'user')
-                          .slice(-5)
-                          .map(message => (
-                            <div
-                              key={message.id}
-                              className="rounded-[12px] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"
-                            >
-                              {message.content}
+                      {selectedAgent?.can_edit ? (
+                        <>
+                          <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                            {selectedAgent?.cache_only
+                              ? isId
+                                ? 'Status ingatan sedang disinkronkan. Snapshot perangkat tidak menyimpan pengaturan ingatan.'
+                                : 'Memory status is syncing. The device snapshot does not retain memory settings.'
+                              : selectedAgent?.memory_enabled
+                                ? isId
+                                  ? 'Ingatan aktif untuk percakapan Anda sendiri. Penerima tautan tetap harus memberi izin untuk akun mereka masing-masing.'
+                                  : 'Memory is on for your own conversations. Link recipients must still opt in separately for their accounts.'
+                                : isId
+                                  ? 'Ingatan untuk percakapan Anda dimatikan di pengaturan asisten ini.'
+                                  : 'Memory for your conversations is disabled in this assistant’s settings.'}
+                          </p>
+                          <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                            {isId
+                              ? 'Pesan terbaru di chat ini'
+                              : 'Recent messages in this chat'}
+                          </p>
+                          <div className="mt-3 grid gap-2">
+                            {messages
+                              .filter(message => message.role === 'user')
+                              .slice(-5)
+                              .map(message => (
+                                <div
+                                  key={message.id}
+                                  className="rounded-[12px] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]"
+                                >
+                                  {message.content}
+                                </div>
+                              ))}
+                          </div>
+                        </>
+                      ) : loadingViewerMemory ? (
+                        <div className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm text-[color:var(--app-text-soft)]">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {isId
+                            ? 'Memuat pengaturan...'
+                            : 'Loading settings...'}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                            {isId
+                              ? 'Default-nya mati. Jika diaktifkan, Lajukan menyimpan ringkasan percakapan Anda dengan asisten ini untuk membantu jawaban berikutnya. Pembuat asisten tidak dapat mengaktifkannya untuk Anda.'
+                              : 'It is off by default. If enabled, Lajukan stores a summary of your conversations with this assistant to help future answers. The assistant creator cannot enable it for you.'}
+                          </p>
+                          <label className="mt-4 flex min-h-12 items-center justify-between gap-3 rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-2">
+                            <span className="text-sm font-bold">
+                              {isId
+                                ? 'Izinkan ingatan untuk akun saya'
+                                : 'Allow memory for my account'}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={viewerMemory.enabled}
+                              disabled={
+                                savingViewerMemory ||
+                                !viewerMemory.can_manage_recipient_consent
+                              }
+                              onChange={event =>
+                                void changeViewerMemory(event.target.checked)
+                              }
+                              className="h-5 w-5 accent-[color:var(--app-accent)]"
+                            />
+                          </label>
+                          {viewerMemory.memory?.summary ? (
+                            <div className="mt-4 rounded-[14px] border border-[color:var(--app-border)] p-3">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                                {isId ? 'Yang tersimpan' : 'Saved summary'}
+                              </p>
+                              <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                                {viewerMemory.memory.summary}
+                              </p>
                             </div>
-                          ))}
-                      </div>
+                          ) : (
+                            <p className="mt-3 text-xs text-[color:var(--app-text-soft)]">
+                              {isId
+                                ? 'Belum ada ringkasan yang tersimpan untuk akun Anda.'
+                                : 'There is no saved summary for your account yet.'}
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void removeViewerMemory()}
+                            disabled={
+                              savingViewerMemory ||
+                              !viewerMemory.can_manage_recipient_consent ||
+                              (!viewerMemory.enabled && !viewerMemory.memory)
+                            }
+                            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-xs font-bold text-rose-600 disabled:opacity-40 dark:border-rose-900 dark:text-rose-300"
+                          >
+                            {savingViewerMemory ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                            {isId ? 'Hapus ingatan saya' : 'Delete my memory'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <div className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-4">
+                      <p className="text-sm font-bold">
+                        {isId
+                          ? 'Penyimpanan di perangkat'
+                          : 'On-device storage'}
+                      </p>
+                      <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {isId
+                          ? 'Cache browser dibatasi dan hanya mempercepat pembukaan. Cache bukan riwayat kanonis dan bukan ingatan AI.'
+                          : 'The bounded browser cache only speeds up opening. It is neither canonical history nor AI memory.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void clearLocalPersonalAiData()}
+                        className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-xs font-bold text-rose-600 transition hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {isId ? 'Hapus data AI lokal' : 'Clear local AI data'}
+                      </button>
                     </div>
                   </div>
                 ) : null}
@@ -3595,7 +5534,7 @@ export default function PersonalAiStudio() {
             ) : null}
           </section>
 
-          <aside className="hidden h-full min-h-0 w-[320px] shrink-0 overflow-y-auto border-l border-black/5 bg-white p-3 dark:border-white/6 dark:bg-[#111b21] lg:block">
+          <aside className="hidden h-full min-h-0 w-[320px] shrink-0 overflow-y-auto border-l border-black/5 bg-white p-3 dark:border-white/6 dark:bg-[#111b21] 2xl:block">
             <div className="rounded-[16px] bg-[color:var(--app-surface)] p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-bold">
@@ -3611,42 +5550,50 @@ export default function PersonalAiStudio() {
               </div>
               <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
                 {selectedAgent?.description ||
-                  selectedAgent?.instructions ||
-                  copy.noAgent}
+                  (isId
+                    ? 'Asisten AI untuk membantu kebutuhan usaha.'
+                    : 'An AI assistant for everyday business needs.')}
               </p>
               <p className="mt-2 inline-flex rounded-full bg-[color:var(--app-surface-muted)] px-2 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
                 {visibilityLabel(selectedAgent?.visibility, isId)}
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2 text-center text-[11px] font-bold">
                 <div className="rounded-[12px] bg-[color:var(--app-surface-muted)] px-2 py-2">
-                  {threads.length} tabs
+                  {threads.length} {isId ? 'chat' : 'chats'}
                 </div>
                 <div className="rounded-[12px] bg-[color:var(--app-surface-muted)] px-2 py-2">
-                  {selectedAgent?.usage_count || 0} chats
+                  {selectedAgent?.usage_count || 0}{' '}
+                  {isId ? 'pemakaian' : 'uses'}
                 </div>
               </div>
             </div>
 
             {notice ? (
-              <div className="mt-3 flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+              <div
+                className="mt-3 flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"
+                role="status"
+              >
                 <Check className="h-4 w-4" />
                 {notice}
                 <button
                   type="button"
                   onClick={() => setNotice('')}
-                  className="ml-auto"
+                  className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-emerald-100"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             ) : null}
             {error ? (
-              <div className="mt-3 flex items-center gap-2 rounded-[14px] border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+              <div
+                className="mt-3 flex items-center gap-2 rounded-[14px] border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
+                role="alert"
+              >
                 {error}
                 <button
                   type="button"
                   onClick={() => setError('')}
-                  className="ml-auto"
+                  className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-rose-100"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>

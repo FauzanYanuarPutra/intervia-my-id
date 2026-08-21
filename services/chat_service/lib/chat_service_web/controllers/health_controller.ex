@@ -2,12 +2,14 @@ defmodule ChatServiceWeb.HealthController do
   use ChatServiceWeb, :controller
 
   def index(conn, _params) do
-    # Cek apakah ScyllaDB hidup
-    status = case ChatService.Repo.execute("SELECT now() FROM system.local") do
-      {:ok, _} -> "up"
-      _ -> "database_error"
-    end
+    case ChatService.Repo.execute("SELECT now() FROM system.local") do
+      {:ok, _} ->
+        json(conn, %{status: "ready", timestamp: DateTime.utc_now()})
 
-    json(conn, %{status: status, timestamp: DateTime.utc_now()})
+      _ ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{status: "not_ready", dependency: "scylladb", timestamp: DateTime.utc_now()})
+    end
   end
 end

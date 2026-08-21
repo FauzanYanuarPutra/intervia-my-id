@@ -8,6 +8,119 @@ import { getListingValueFallback } from '@/lib/content/listingSide';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { cn } from '@/lib/utils';
 
+/**
+ * Public Lajukan media proxy.
+ *
+ * Storage/object URLs returned by the API such as:
+ *
+ *   http://localhost:9002/laju-chat/content/foo.png
+ *
+ * are converted to:
+ *
+ *   https://www.lajukan.com/api/content/media/laju-chat/content/foo.png
+ *
+ * so the browser never tries to resolve "localhost" on the user's device.
+ */
+const PUBLIC_MEDIA_BASE =
+  'https://www.lajukan.com/api/content/media';
+
+/**
+ * Normalize media URLs returned by the API.
+ *
+ * Supported inputs:
+ *
+ *   /api/content/media/laju-chat/content/foo.png
+ *   https://www.lajukan.com/api/content/media/laju-chat/content/foo.png
+ *   /laju-chat/content/foo.png
+ *   http://localhost:9002/laju-chat/content/foo.png
+ *   http://127.0.0.1:9002/laju-chat/content/foo.png
+ *   https://storage.example.com/laju-chat/content/foo.png
+ *
+ * Public output:
+ *
+ *   https://www.lajukan.com/api/content/media/laju-chat/content/foo.png
+ */
+function normalizeMediaUrl(value?: string | null): string | null {
+  if (!value) return null;
+
+  const raw = value.trim();
+
+  if (!raw) return null;
+
+  // Already a fully-qualified public Lajukan media URL.
+  if (raw.startsWith(`${PUBLIC_MEDIA_BASE}/`)) {
+    return raw;
+  }
+
+  // Already a relative public Lajukan media URL.
+  if (raw.startsWith('/api/content/media/')) {
+    return `https://www.lajukan.com${raw}`;
+  }
+
+  /**
+   * Direct object-storage path without a hostname.
+   *
+   * /laju-chat/content/foo.png
+   */
+  if (raw.startsWith('/laju-chat/')) {
+    return `${PUBLIC_MEDIA_BASE}${raw}`;
+  }
+
+  try {
+    const url = new URL(raw);
+
+    const pathname = url.pathname;
+
+    /**
+     * Any URL whose path points to the private object-storage
+     * bucket should go through the public Lajukan media proxy.
+     *
+     * Example:
+     *
+     * http://localhost:9002/laju-chat/content/foo.png
+     *
+     * becomes:
+     *
+     * https://www.lajukan.com/api/content/media/laju-chat/content/foo.png
+     */
+    if (pathname.startsWith('/laju-chat/')) {
+      return `${PUBLIC_MEDIA_BASE}${pathname}${url.search}${url.hash}`;
+    }
+
+    /**
+     * Local storage host fallback.
+     *
+     * This covers cases where the API may return a local storage URL
+     * with a different object path.
+     */
+    const isLocalHost =
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      url.hostname === '0.0.0.0';
+
+    if (isLocalHost) {
+      return `${PUBLIC_MEDIA_BASE}${pathname}${url.search}${url.hash}`;
+    }
+
+    /**
+     * Keep unrelated/external absolute URLs unchanged.
+     *
+     * This prevents external image/CDN URLs from being incorrectly
+     * rewritten through the Lajukan media proxy.
+     */
+    return url.toString();
+  } catch {
+    /**
+     * Last fallback for malformed-but-path-like media URLs.
+     */
+    if (raw.startsWith('laju-chat/')) {
+      return `${PUBLIC_MEDIA_BASE}/${raw}`;
+    }
+
+    return raw;
+  }
+}
+
 export function ExploreListingCard({
   item,
   locale,
@@ -18,9 +131,14 @@ export function ExploreListingCard({
   interactive?: boolean;
 }) {
   const isNeed = item.side === 'demand' || item.kind === 'needs';
+
   if (isNeed) {
     return (
-      <NeedSearchCard item={item} locale={locale} interactive={interactive} />
+      <NeedSearchCard
+        item={item}
+        locale={locale}
+        interactive={interactive}
+      />
     );
   }
 
@@ -28,13 +146,28 @@ export function ExploreListingCard({
     typeof item.metadata.imageAttribution === 'string'
       ? item.metadata.imageAttribution
       : '';
+
+  /**
+   * Search API may return storage URLs such as:
+   *
+   * http://localhost:9002/laju-chat/content/foo.png
+   *
+   * Always normalize them before passing to the image component.
+   */
+  const imageSrc = normalizeMediaUrl(item.image);
+
   const listingType = item.metadata.contentType || item.kind;
+
   const isService =
     item.kind === 'services' ||
     String(listingType).toLowerCase().includes('service');
+
   const ListingIcon = isService ? Wrench : Package2;
+
   const sideLabel =
-    getSideLabel(item, locale) || (locale === 'id' ? 'Menawarkan' : 'Offering');
+    getSideLabel(item, locale) ||
+    (locale === 'id' ? 'Menawarkan' : 'Offering');
+
   const typeLabel =
     item.label ||
     (isService
@@ -44,9 +177,14 @@ export function ExploreListingCard({
       : locale === 'id'
         ? 'Produk'
         : 'Product');
+
   const valueLabel =
     item.priceLabel ||
-    getListingValueFallback('supply', locale, String(listingType));
+    getListingValueFallback(
+      'supply',
+      locale,
+      String(listingType),
+    );
 
   const card = (
     <article
@@ -59,12 +197,15 @@ export function ExploreListingCard({
     >
       <div className="relative">
         <ExploreCardMedia
-          src={item.image}
+          src={imageSrc}
           alt={item.title}
           attribution={imageAttribution}
-          fallbackLabel={locale === 'id' ? 'Belum ada foto' : 'No photo yet'}
+          fallbackLabel={
+            locale === 'id' ? 'Belum ada foto' : 'No photo yet'
+          }
           className="aspect-[4/3] w-full sm:aspect-[16/10]"
         />
+
         <span className="absolute left-2 top-2 inline-flex min-h-7 items-center rounded-full border border-white/70 bg-white/90 px-2.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur">
           {sideLabel}
         </span>
@@ -72,16 +213,24 @@ export function ExploreListingCard({
 
       <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-3">
         <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)] sm:text-[11px]">
-          <ListingIcon className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" />
+          <ListingIcon
+            className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]"
+            aria-hidden="true"
+          />
+
           <span className="truncate">{typeLabel}</span>
+
           {item.verified ? (
             <>
               <BadgeCheck
                 className="h-3.5 w-3.5 shrink-0 text-emerald-600"
                 aria-hidden="true"
               />
+
               <span className="sr-only">
-                {locale === 'id' ? 'Terverifikasi' : 'Verified'}
+                {locale === 'id'
+                  ? 'Terverifikasi'
+                  : 'Verified'}
               </span>
             </>
           ) : null}
@@ -90,7 +239,8 @@ export function ExploreListingCard({
         <h3
           className={cn(
             'mt-1.5 line-clamp-2 min-h-10 text-sm font-bold leading-5 text-[color:var(--app-text)]',
-            interactive && 'group-hover:text-[color:var(--app-accent)]',
+            interactive &&
+              'group-hover:text-[color:var(--app-accent)]',
           )}
         >
           {item.title}
@@ -103,14 +253,27 @@ export function ExploreListingCard({
         <div className="mt-2 min-h-9 space-y-1 text-[10px] font-medium text-[color:var(--app-text-soft)] sm:text-[11px]">
           {item.ownerName ? (
             <p className="flex min-w-0 items-center gap-1.5">
-              <Store className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{item.ownerName}</span>
+              <Store
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              />
+
+              <span className="truncate">
+                {item.ownerName}
+              </span>
             </p>
           ) : null}
+
           {item.location ? (
             <p className="flex min-w-0 items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{item.location}</span>
+              <MapPin
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              />
+
+              <span className="truncate">
+                {item.location}
+              </span>
             </p>
           ) : null}
         </div>
@@ -118,7 +281,9 @@ export function ExploreListingCard({
     </article>
   );
 
-  if (!interactive) return card;
+  if (!interactive) {
+    return card;
+  }
 
   return (
     <Link

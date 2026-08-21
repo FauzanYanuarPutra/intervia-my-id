@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
+import type { Channel } from 'phoenix';
 import { Mic, MicOff, PhoneOff, User } from 'lucide-react';
-import { getIceServers } from '@/lib/webrtc';
+import { getIceConfiguration } from '@/lib/webrtc';
+import {
+  createCallLifecycle,
+  type CallLifecycle,
+} from '@/lib/webrtcCallLifecycle';
+import { useAuth } from '@/context/AuthContext';
 import { soundManager } from '@/lib/soundManager';
 import { describeGetUserMediaError, getMediaEnvironmentError } from '@/lib/mediaDevices';
 import { MediaPermissionGate } from '@/components/common/MediaPermissionGate';
@@ -13,7 +19,7 @@ interface VoiceCallProps {
   roomId: string;
   userId: string;
   callId: string;
-  channel: any; // Phoenix Channel
+  channel: Channel | null;
   isCaller?: boolean; // true jika ini yang initiate call
   userName?: string;
   onClose: () => void;
@@ -22,17 +28,101 @@ interface VoiceCallProps {
 export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, userName, onClose }: VoiceCallProps) {
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isRemoteAudioEnabled, setIsRemoteAudioEnabled] = useState(false);
+  const [hasLocalAudioTrack, setHasLocalAudioTrack] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'failed'>('connecting');
   const [permissionGranted, setPermissionGranted] = useState(false);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
-  const iceServers = useMemo(() => getIceServers(), []);
+  const lifecycleRef = useRef<CallLifecycle | null>(null);
+  const { authFetch } = useAuth();
+  const [iceConfiguration, setIceConfiguration] =
+    useState<RTCConfiguration | null>(null);
   const lastConnectionSoundRef = useRef(connectionStatus);
   const pathname = usePathname();
   const isId = pathname.startsWith('/id');
   const { notify } = useToast();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const requestClose = useCallback(() => {
+    onCloseRef.current();
+  }, []);
+
+  const releaseCallResources = useCallback(() => {
+    lifecycleRef.current?.dispose();
+    lifecycleRef.current = null;
+    localStreamRef.current = null;
+    setHasLocalAudioTrack(false);
+    peerConnectionRef.current = null;
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.pause();
+      remoteAudioRef.current.srcObject = null;
+    }
+    pendingCandidatesRef.current = [];
+  }, []);
+
+  const closeCallWithError = useCallback(
+    (message: string) => {
+      try {
+        channel?.push('call_end', { call_id: callId });
+      } catch {
+        // Ignore signaling failure.
+      }
+      releaseCallResources();
+      notify({
+        title: isId ? 'Panggilan gagal' : 'Call failed',
+        description: message,
+        variant: 'error',
+        durationMs: 5000,
+      });
+      requestClose();
+    },
+    [callId, channel, isId, notify, releaseCallResources, requestClose],
+  );
+
+  const handlePermissionDenied = useCallback(() => {
+    try {
+      channel?.push('call_end', { call_id: callId });
+    } catch {
+      // ignore
+    }
+    releaseCallResources();
+    requestClose();
+  }, [callId, channel, releaseCallResources, requestClose]);
+
+  const endCall = useCallback(() => {
+    try {
+      channel?.push('call_end', { call_id: callId });
+    } catch {
+      // ignore
+    }
+    soundManager.play('callEnd');
+    soundManager.stopLoop('outgoingRing');
+    soundManager.stopLoop('incomingRing');
+    releaseCallResources();
+    requestClose();
+  }, [callId, channel, releaseCallResources, requestClose]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getIceConfiguration(authFetch)
+      .then(configuration => {
+        if (!cancelled) setIceConfiguration(configuration);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        closeCallWithError(
+          isId
+            ? 'Panggilan aman sedang tidak tersedia. Coba lagi nanti.'
+            : 'Secure calling is temporarily unavailable. Please try again later.',
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch, closeCallWithError, isId]);
 
   useEffect(() => {
     soundManager.play('callStart');
@@ -68,32 +158,14 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
     });
   };
 
-  const closeCallWithError = useCallback((message: string) => {
-    try {
-      channel?.push('call_end', { call_id: callId });
-    } catch {
-      // Ignore signaling failure.
-    }
-    notify({
-      title: isId ? 'Panggilan gagal' : 'Call failed',
-      description: message,
-      variant: 'error',
-      durationMs: 5000,
-    });
-    onClose();
-  }, [callId, channel, isId, notify, onClose]);
-
-  const handlePermissionDenied = useCallback(() => {
-    try {
-      channel?.push('call_end', { call_id: callId });
-    } catch {
-      // ignore
-    }
-    onClose();
-  }, [callId, channel, onClose]);
-
   useEffect(() => {
-    if (!channel || !permissionGranted) return;
+    if (!channel || !permissionGranted || !iceConfiguration) return;
+
+    const lifecycle = createCallLifecycle();
+    lifecycleRef.current = lifecycle;
+    let ownedStream: MediaStream | null = null;
+    let ownedPeer: RTCPeerConnection | null = null;
+    const remoteAudioElement = remoteAudioRef.current;
 
     // Initialize WebRTC for voice only dengan signaling
     const initCall = async () => {
@@ -108,12 +180,15 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
           video: false,
           audio: true,
         });
+        if (!lifecycle.registerStream(stream)) return;
+        ownedStream = stream;
         localStreamRef.current = stream;
+        setHasLocalAudioTrack(stream.getAudioTracks().length > 0);
 
         // Create peer connection
-        const pc = new RTCPeerConnection({
-          iceServers,
-        });
+        const pc = new RTCPeerConnection(iceConfiguration);
+        if (!lifecycle.registerPeer(pc)) return;
+        ownedPeer = pc;
 
         // Add local audio tracks
         stream.getTracks().forEach((track) => {
@@ -122,6 +197,7 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
 
         // Handle remote stream
         pc.ontrack = (event) => {
+          if (!lifecycle.isActive()) return;
           setIsRemoteAudioEnabled(true);
           // Play remote audio
           if (remoteAudioRef.current) {
@@ -131,6 +207,7 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
         };
 
         pc.oniceconnectionstatechange = () => {
+          if (!lifecycle.isActive()) return;
           const state = pc.iceConnectionState;
           console.log('[VoiceCall] ICE state:', state);
           if (state === 'connected' || state === 'completed') {
@@ -145,6 +222,7 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
         };
 
         pc.onconnectionstatechange = () => {
+          if (!lifecycle.isActive()) return;
           const state = pc.connectionState;
           console.log('[VoiceCall] Peer state:', state);
           if (state === 'connected') {
@@ -157,7 +235,7 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
 
         // Handle ICE candidates
         pc.onicecandidate = (event) => {
-          if (event.candidate && channel) {
+          if (lifecycle.isActive() && event.candidate) {
             channel.push('call_ice_candidate', {
               call_id: callId,
               candidate: JSON.stringify(event.candidate),
@@ -169,22 +247,27 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
 
         // Listen untuk signaling events
         const offerRef = channel.on('call_offer_received', (payload: { offer: string; from_user_id: string; call_id?: string }) => {
+          if (!lifecycle.isActive()) return;
           if (payload.call_id && payload.call_id !== callId) return; // Ignore offers for other calls
-          if (payload.from_user_id !== userId && peerConnectionRef.current && !isCaller) {
+          if (payload.from_user_id !== userId && !isCaller) {
             try {
               const offer = JSON.parse(payload.offer);
-              peerConnectionRef.current
+              pc
                 .setRemoteDescription(new RTCSessionDescription(offer))
                 .then(() => {
+                  if (!lifecycle.isActive()) return undefined;
                   flushPendingCandidates();
-                  return peerConnectionRef.current!.createAnswer();
+                  return pc.createAnswer();
                 })
-                .then((answer) => peerConnectionRef.current!.setLocalDescription(answer))
+                .then(answer => {
+                  if (!answer || !lifecycle.isActive()) return undefined;
+                  return pc.setLocalDescription(answer);
+                })
                 .then(() => {
-                  if (channel && peerConnectionRef.current?.localDescription) {
+                  if (lifecycle.isActive() && pc.localDescription) {
                     channel.push('call_answer', {
                       call_id: callId,
-                      answer: JSON.stringify(peerConnectionRef.current.localDescription),
+                      answer: JSON.stringify(pc.localDescription),
                     });
                   }
                 })
@@ -198,14 +281,15 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
         });
 
         const answerRef = channel.on('call_answer_received', (payload: { answer: string; from_user_id: string; call_id?: string }) => {
+          if (!lifecycle.isActive()) return;
           if (payload.call_id && payload.call_id !== callId) return; // Ignore answers for other calls
-          if (payload.from_user_id !== userId && peerConnectionRef.current && isCaller) {
+          if (payload.from_user_id !== userId && isCaller) {
             try {
               const answer = JSON.parse(payload.answer);
-              peerConnectionRef.current
+              pc
                 .setRemoteDescription(new RTCSessionDescription(answer))
                 .then(() => {
-                  flushPendingCandidates();
+                  if (lifecycle.isActive()) flushPendingCandidates();
                 })
                 .catch((err) => {
                   console.error('[VoiceCall] Error setting remote description:', err);
@@ -217,15 +301,16 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
         });
 
         const iceRef = channel.on('call_ice_candidate_received', (payload: { candidate: string; from_user_id: string; call_id?: string }) => {
+          if (!lifecycle.isActive()) return;
           if (payload.call_id && payload.call_id !== callId) return; // Ignore ICE candidates for other calls
-          if (payload.from_user_id !== userId && peerConnectionRef.current) {
+          if (payload.from_user_id !== userId) {
             try {
               const candidate = JSON.parse(payload.candidate);
-              if (!peerConnectionRef.current.remoteDescription) {
+              if (!pc.remoteDescription) {
                 pendingCandidatesRef.current.push(candidate);
                 return;
               }
-              peerConnectionRef.current
+              pc
                 .addIceCandidate(new RTCIceCandidate(candidate))
                 .catch((err) => {
                   console.error('[VoiceCall] Error adding ICE candidate:', err);
@@ -237,60 +322,88 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
         });
 
         const endedRef = channel.on('call_ended', (payload: { call_id: string }) => {
-          if (payload.call_id === callId) {
+          if (lifecycle.isActive() && payload.call_id === callId) {
             endCall();
           }
         });
 
+        lifecycle.addCleanup(() => {
+          pc.ontrack = null;
+          pc.oniceconnectionstatechange = null;
+          pc.onconnectionstatechange = null;
+          pc.onicecandidate = null;
+          channel.off('call_offer_received', offerRef);
+          channel.off('call_answer_received', answerRef);
+          channel.off('call_ice_candidate_received', iceRef);
+          channel.off('call_ended', endedRef);
+        });
+
         // Jika caller, create offer setelah delay
         if (isCaller) {
-          setTimeout(async () => {
+          const offerTimer = window.setTimeout(async () => {
             try {
-              if (!peerConnectionRef.current || !channel) return;
-              const offer = await peerConnectionRef.current.createOffer({
+              if (!lifecycle.isActive()) return;
+              const offer = await pc.createOffer({
                 offerToReceiveAudio: true,
               });
-              await peerConnectionRef.current.setLocalDescription(offer);
+              if (!lifecycle.isActive()) return;
+              await pc.setLocalDescription(offer);
+              if (!lifecycle.isActive()) return;
               channel.push('call_offer', {
                 call_id: callId,
                 offer: JSON.stringify(offer),
               });
             } catch (error) {
+              if (!lifecycle.isActive()) return;
               console.error('[VoiceCall] Failed to create offer:', error);
-              onClose(); // Close call UI on error
+              closeCallWithError(
+                isId
+                  ? 'Gagal memulai panggilan. Coba lagi.'
+                  : 'Could not start the call. Please try again.',
+              );
             }
           }, 1500); // Increased delay for better reliability
+          lifecycle.setOfferTimer(offerTimer);
         }
-
-        return () => {
-          channel.off('call_offer_received', offerRef);
-          channel.off('call_answer_received', answerRef);
-          channel.off('call_ice_candidate_received', iceRef);
-          channel.off('call_ended', endedRef);
-        };
       } catch (error) {
+        if (!lifecycle.isActive()) return;
         console.error('Failed to initialize call:', error);
         closeCallWithError(describeGetUserMediaError(error, { audio: true, video: false }));
       }
     };
 
-    const cleanupPromise = initCall();
+    void initCall();
 
     return () => {
-      cleanupPromise.then((cleanupFn) => cleanupFn?.()).catch(() => {});
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop());
+      lifecycle.dispose();
+      if (localStreamRef.current === ownedStream) {
+        localStreamRef.current = null;
+        setHasLocalAudioTrack(false);
       }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
+      if (peerConnectionRef.current === ownedPeer) {
+        peerConnectionRef.current = null;
       }
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.pause();
-        remoteAudioRef.current.srcObject = null;
+      if (lifecycleRef.current === lifecycle) {
+        lifecycleRef.current = null;
+      }
+      if (lifecycleRef.current === null && remoteAudioElement) {
+        remoteAudioElement.pause();
+        remoteAudioElement.srcObject = null;
       }
       pendingCandidatesRef.current = [];
     };
-  }, [roomId, userId, callId, channel, isCaller, onClose, closeCallWithError, permissionGranted]);
+  }, [
+    roomId,
+    userId,
+    callId,
+    channel,
+    isCaller,
+    closeCallWithError,
+    endCall,
+    iceConfiguration,
+    isId,
+    permissionGranted,
+  ]);
 
   const toggleAudio = () => {
     if (localStreamRef.current) {
@@ -302,35 +415,14 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
     }
   };
 
-  const endCall = () => {
-    // Notify via channel
-    if (channel) {
-      try {
-        channel.push('call_end', { call_id: callId });
-      } catch {
-        // ignore
-      }
-    }
-    soundManager.play('callEnd');
-    soundManager.stopLoop('outgoingRing');
-    soundManager.stopLoop('incomingRing');
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
-    }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-    }
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.pause();
-      remoteAudioRef.current.srcObject = null;
-    }
-    onClose();
-  };
-
-  const hasLocalAudioTrack = Boolean(localStreamRef.current?.getAudioTracks()[0]);
-
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-br from-[color:var(--app-accent)] to-[color:var(--app-accent-strong)] flex flex-col items-center justify-center">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="voice-call-title"
+      aria-describedby="voice-call-status"
+      className="fixed inset-0 z-50 bg-gradient-to-br from-[color:var(--app-accent)] to-[color:var(--app-accent-strong)] flex flex-col items-center justify-center"
+    >
       <MediaPermissionGate
         enabled={!permissionGranted}
         isId={isId}
@@ -353,8 +445,15 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
 
         {/* User name */}
         <div>
-          <h2 className="text-2xl font-semibold">{userName || 'Calling...'}</h2>
-          <p className="text-[color:color-mix(in_srgb,_var(--app-text-inverse)_80%,_transparent)] mt-2">
+          <h2 id="voice-call-title" className="text-2xl font-semibold">
+            {userName || 'Calling...'}
+          </h2>
+          <p
+            id="voice-call-status"
+            role="status"
+            aria-live="polite"
+            className="text-[color:color-mix(in_srgb,_var(--app-text-inverse)_80%,_transparent)] mt-2"
+          >
             {isRemoteAudioEnabled
               ? 'Connected'
               : connectionStatus === 'failed'

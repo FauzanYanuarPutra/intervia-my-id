@@ -1,20 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { useAuth } from '@/context/AuthContext';
 import { useChatInbox, type InboxRoom } from '@/context/ChatInboxContext';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowLeft,
   BadgeCheck,
   Camera,
   Check,
-  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -22,18 +22,24 @@ import {
   ChevronUp,
   Clock,
   Copy,
-  Forward,
   Loader2,
+  Mic,
   MoreVertical,
   Paperclip,
+  Pause,
   Phone,
+  Play,
+  Quote,
   ReceiptText,
+  RefreshCw,
   Reply,
   Send,
   ShieldAlert,
   Smile,
   Sparkles,
+  Square,
   Sticker,
+  Trash2,
   Video,
   Wallet,
   X,
@@ -76,12 +82,53 @@ import { buildContentHref } from '@/lib/content/routes';
 import { buildCreatePath } from '@/lib/createRoutes';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { soundManager } from '@/lib/soundManager';
-import { CameraCaptureModal } from '@/components/chat/CameraCaptureModal';
-import { VideoCall } from '@/components/chat/VideoCall';
-import { VoiceCall } from '@/components/chat/VoiceCall';
-import { IncomingCall } from '@/components/chat/IncomingCall';
 import { ChatDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
+import { ChatSafetyControls } from '@/components/chat/ChatSafetyControls';
+import { Modal } from '@/components/common/Modal';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
+import {
+  useVoiceNoteRecorder,
+  type VoiceNoteRecorderErrorCode,
+} from '@/hooks/useVoiceNoteRecorder';
+import { formatVoiceNoteDuration } from '@/lib/media/voiceNote';
+import {
+  canUseOfflineChatSnapshot,
+  classifyChatRoomAccessResponse,
+  formatChatDayLabel,
+  formatChatMessageTime,
+  reconcileOptimisticChatMessage,
+  shouldSubmitChatComposer,
+  type ChatRoomAccessResult,
+} from '@/lib/chatPresentation';
+import { safeChatMediaReference } from '@/lib/chatAttachments';
+import {
+  clearChatMessageCacheForRoom,
+  loadChatMessageCache,
+  saveChatMessageCache,
+} from '@/lib/chatMessageCache';
+
+const CameraCaptureModal = dynamic(
+  () =>
+    import('@/components/chat/CameraCaptureModal').then(
+      module => module.CameraCaptureModal,
+    ),
+  { ssr: false },
+);
+const IncomingCall = dynamic(
+  () =>
+    import('@/components/chat/IncomingCall').then(
+      module => module.IncomingCall,
+    ),
+  { ssr: false },
+);
+const VideoCall = dynamic(
+  () => import('@/components/chat/VideoCall').then(module => module.VideoCall),
+  { ssr: false },
+);
+const VoiceCall = dynamic(
+  () => import('@/components/chat/VoiceCall').then(module => module.VoiceCall),
+  { ssr: false },
+);
 
 type PublicProfile = {
   id: string;
@@ -89,7 +136,18 @@ type PublicProfile = {
   full_name?: string | null;
 };
 
-type MessageStatus = 'sending' | 'sent' | 'read' | 'failed';
+type MessageStatus = 'sending' | 'sent' | 'failed';
+
+type MessageReference = {
+  message_id: string;
+  mode: 'reply' | 'quote';
+  sender_id?: string;
+  sender_name?: string;
+  content: string;
+  message_type?: string;
+  attachments?: string[];
+  created_at?: string;
+};
 
 type Message = {
   id: string;
@@ -99,10 +157,11 @@ type Message = {
   attachments?: string[];
   created_at: string;
   status?: MessageStatus;
+  reference?: MessageReference | null;
 };
 
 type MessageComposerAction = {
-  mode: 'reply' | 'forward';
+  mode: 'reply' | 'quote';
   message: Message;
 };
 
@@ -123,11 +182,11 @@ const MAX_COMPOSER_ATTACHMENTS = 10;
 const CHAT_FIELD_LABEL_CLASS =
   'block text-[12px] font-bold tracking-[0.005em] text-[color:var(--app-text)]';
 const CHAT_CONTROL_CLASS =
-  'mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+  'mt-1.5 min-h-11 w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_TEXTAREA_CLASS =
   'mt-1.5 min-h-[96px] w-full resize-y rounded-[12px] border border-slate-300 bg-white px-3 py-2.5 text-[13px] font-medium leading-5 text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_COMPOSER_SHELL_CLASS =
-  'flex min-w-0 flex-1 items-end gap-1 rounded-[20px] border border-slate-300 bg-white px-2 py-1 shadow-none transition focus-within:border-[#25d366] focus-within:ring-2 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366]';
+  'flex min-w-0 flex-1 items-end gap-0.5 overflow-visible rounded-[20px] border border-slate-300 bg-white px-1 py-1 shadow-none transition focus-within:border-[#25d366] focus-within:ring-2 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366] sm:gap-1 sm:px-1.5';
 
 const QUICK_EMOJIS = [
   '\u{1F600}',
@@ -147,33 +206,33 @@ const QUICK_EMOJIS = [
 const STICKER_PACK = [
   {
     id: 'celebrate',
-    label: 'Celebration',
-    url: 'https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f389.png',
+    label: 'Perayaan',
+    emoji: '\u{1F389}',
   },
   {
     id: 'party',
-    label: 'Party Parrot',
-    url: 'https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f973.png',
+    label: 'Pesta',
+    emoji: '\u{1F973}',
   },
   {
     id: 'sparkles',
-    label: 'Sparkles',
-    url: 'https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u2728.png',
+    label: 'Berkilau',
+    emoji: '\u{2728}',
   },
   {
     id: 'thumbs',
-    label: 'Thumbs Up',
-    url: 'https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f44d.png',
+    label: 'Jempol',
+    emoji: '\u{1F44D}',
   },
   {
     id: 'heart',
-    label: 'Heart',
-    url: 'https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u2764.png',
+    label: 'Hati',
+    emoji: '\u{2764}\u{FE0F}',
   },
   {
     id: 'fire',
-    label: 'Fire',
-    url: 'https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f525.png',
+    label: 'Semangat',
+    emoji: '\u{1F525}',
   },
 ] as const;
 
@@ -414,57 +473,55 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024 ** idx).toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
 }
 
-function formatMessageTime(iso: string): string {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const now = new Date();
-    const sameDay =
-      d.getDate() === now.getDate() &&
-      d.getMonth() === now.getMonth() &&
-      d.getFullYear() === now.getFullYear();
-    if (sameDay)
-      return d.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (
-      d.getDate() === yesterday.getDate() &&
-      d.getMonth() === yesterday.getMonth()
-    ) {
-      return `Yesterday ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+function voiceNoteErrorMessage(
+  error: VoiceNoteRecorderErrorCode | null,
+  locale: 'id' | 'en',
+): string {
+  if (locale === 'en') {
+    switch (error) {
+      case 'insecure-context':
+        return 'Voice notes require a secure connection.';
+      case 'unsupported':
+        return 'Voice recording is not supported in this browser.';
+      case 'permission-denied':
+        return 'Microphone permission was denied.';
+      case 'microphone-not-found':
+        return 'No microphone was found.';
+      case 'microphone-busy':
+        return 'The microphone is being used by another app.';
+      case 'too-large':
+        return 'This voice note is too large. Record a shorter message.';
+      case 'empty':
+        return 'No sound was recorded.';
+      case 'unsupported-format':
+      case 'mime-mismatch':
+        return 'This recording format cannot be uploaded.';
+      default:
+        return 'Voice recording failed. Please try again.';
     }
-    return d.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return '';
   }
-}
 
-function formatDayLabel(iso: string): string {
-  if (!iso) return '';
-  const target = new Date(iso);
-  if (Number.isNaN(target.getTime())) return '';
-  const today = new Date();
-  const normalize = (value: Date) =>
-    new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
-  const diffDays = Math.round(
-    (normalize(today) - normalize(target)) / 86_400_000,
-  );
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  return target.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  switch (error) {
+    case 'insecure-context':
+      return 'Pesan suara memerlukan koneksi yang aman.';
+    case 'unsupported':
+      return 'Perekaman suara tidak didukung di browser ini.';
+    case 'permission-denied':
+      return 'Izin mikrofon ditolak.';
+    case 'microphone-not-found':
+      return 'Mikrofon tidak ditemukan.';
+    case 'microphone-busy':
+      return 'Mikrofon sedang dipakai aplikasi lain.';
+    case 'too-large':
+      return 'Pesan suara terlalu besar. Rekam pesan yang lebih singkat.';
+    case 'empty':
+      return 'Tidak ada suara yang terekam.';
+    case 'unsupported-format':
+    case 'mime-mismatch':
+      return 'Format rekaman ini belum dapat diunggah.';
+    default:
+      return 'Perekaman suara gagal. Silakan coba lagi.';
+  }
 }
 
 function summarizeMessageForAction(message: Message): string {
@@ -478,65 +535,130 @@ function summarizeMessageForAction(message: Message): string {
   if (kind === 'file') return 'File';
   if (kind === 'listing') return 'Listing';
   if (kind === 'transaction') return 'Transaksi';
-  if (kind === 'offer') return 'Offer';
+  if (kind === 'offer') return 'Penawaran';
   if (kind === 'application') return 'Lamaran';
   if (message.attachments?.length) return 'Lampiran';
   return 'Pesan';
 }
 
-function composeActionMessage(
+function createMessageReference(
   action: MessageComposerAction | null,
-  body: string,
-  senderLabel: string,
-  locale: 'id' | 'en',
-): string {
-  const cleanBody = body.trim();
-  if (!action) return cleanBody;
-  const preview = summarizeMessageForAction(action.message);
-  const heading =
-    action.mode === 'reply'
-      ? locale === 'id'
-        ? `Membalas ${senderLabel}`
-        : `Replying to ${senderLabel}`
-      : locale === 'id'
-        ? `Meneruskan dari ${senderLabel}`
-        : `Forwarded from ${senderLabel}`;
-  return [`> ${heading}: ${preview}`, cleanBody].filter(Boolean).join('\n\n');
+  getSenderLabel?: (message: Message) => string,
+): MessageReference | null {
+  if (!action?.message?.id) return null;
+  const message = action.message;
+  return {
+    message_id: String(message.id),
+    mode: action.mode,
+    sender_id: message.sender_id,
+    sender_name: getSenderLabel?.(message),
+    content: summarizeMessageForAction(message),
+    message_type: message.message_type,
+    attachments: message.attachments?.slice(0, 1),
+    created_at: message.created_at,
+  };
+}
+
+function parseLegacyMessageReference(message: Message): {
+  content: string;
+  reference: MessageReference | null;
+} {
+  if (message.reference) {
+    return { content: message.content, reference: message.reference };
+  }
+
+  const raw = String(message.content || '');
+  const match = raw.match(/^>\s*(Membalas|Mengutip|Replying to|Quoting)\s+([^:]+):\s*([\s\S]*?)(?:\n\s*\n|$)/i);
+  if (!match) return { content: raw, reference: null };
+
+  const mode = /^(Membalas|Replying to)$/i.test(match[1]) ? 'reply' : 'quote';
+  const preview = String(match[3] || '').trim();
+  const content = raw.slice(match[0].length).trim();
+
+  return {
+    content,
+    reference: {
+      message_id: '',
+      mode,
+      sender_name: String(match[2] || '').trim(),
+      content: preview.replace(/^>\s*(Membalas|Mengutip|Replying to|Quoting)\s+[^:]+:\s*/i, '').trim(),
+    },
+  };
+}
+
+function getMessageDisplayContent(message: Message): string {
+  return parseLegacyMessageReference(message).content;
+}
+
+function getMessageDisplayReference(message: Message): MessageReference | null {
+  return parseLegacyMessageReference(message).reference;
+}
+
+function readMessageReference(raw: Record<string, unknown>, content: string): MessageReference | null {
+  const candidate =
+    raw.reference && typeof raw.reference === 'object'
+      ? (raw.reference as Record<string, unknown>)
+      : raw.reply_to && typeof raw.reply_to === 'object'
+        ? (raw.reply_to as Record<string, unknown>)
+        : null;
+
+  const id = String(
+    candidate?.message_id ??
+      candidate?.id ??
+      raw.reply_to_message_id ??
+      raw.reply_to_id ??
+      '',
+  ).trim();
+  const hasReference = Boolean(candidate || id);
+
+  if (!hasReference) {
+    return parseLegacyMessageReference({
+      id: '',
+      content,
+      sender_id: String(raw.sender_id ?? ''),
+      created_at: String(raw.created_at ?? raw.sent_at ?? ''),
+    }).reference;
+  }
+
+  const modeRaw = String(
+    candidate?.mode ?? raw.reply_mode ?? raw.quote_mode ?? 'reply',
+  ).toLowerCase();
+
+  return {
+    message_id: id,
+    mode: modeRaw === 'quote' ? 'quote' : 'reply',
+    sender_id: candidate?.sender_id != null ? String(candidate.sender_id) : undefined,
+    sender_name:
+      candidate?.sender_name != null
+        ? String(candidate.sender_name)
+        : candidate?.sender_label != null
+          ? String(candidate.sender_label)
+          : undefined,
+    content: String(
+      candidate?.content ??
+        candidate?.preview ??
+        candidate?.body ??
+        raw.reply_to_content ??
+        '',
+    ).trim(),
+    message_type:
+      typeof (candidate?.message_type ?? candidate?.type) === 'string'
+        ? String(candidate?.message_type ?? candidate?.type)
+        : undefined,
+    attachments: Array.isArray(candidate?.attachments)
+      ? candidate.attachments.map(String).slice(0, 1)
+      : undefined,
+    created_at:
+      candidate?.created_at != null
+        ? String(candidate.created_at)
+        : undefined,
+  };
 }
 
 function normalizeAttachmentUrl(raw: unknown): string {
-  const value = String(raw ?? '').trim();
-  if (!value) return '';
-  if (
-    value.startsWith('/api/chat/media/') ||
-    value.startsWith('/api/content/media/') ||
-    value.startsWith('/uploads/')
-  ) {
-    return value;
-  }
-  if (!/^https?:\/\//i.test(value)) return value;
-
-  try {
-    const parsed = new URL(value);
-    const segments = parsed.pathname
-      .split('/')
-      .filter(Boolean)
-      .map(part => decodeURIComponent(part));
-    if (segments.length < 2) return value;
-    const bucket = encodeURIComponent(segments[0]);
-    const keyParts = segments.slice(1);
-    const encodedKey = keyParts.map(part => encodeURIComponent(part)).join('/');
-    const firstKey = keyParts[0]?.toLowerCase();
-    if (firstKey === 'content' || firstKey === 'forum') {
-      return `/api/content/media/${bucket}/${encodedKey}`;
-    }
-    if (firstKey === 'chat') {
-      return `/api/chat/media/${bucket}/${encodedKey}`;
-    }
-    return value;
-  } catch {
-    return value;
-  }
+  const appOrigins =
+    typeof window !== 'undefined' ? [window.location.origin] : [];
+  return safeChatMediaReference(raw, { appOrigins }) || '';
 }
 
 type TimelineItem =
@@ -606,23 +728,6 @@ type RoomTransactionTimelineItem = NonNullable<
 type FraudSignal = {
   severity: 'high' | 'medium';
   message: string;
-};
-
-type DiscoverUser = {
-  id: string;
-  email?: string | null;
-  phone?: string | null;
-  full_name?: string | null;
-  username?: string | null;
-};
-
-type InvitePayload = {
-  room_id?: string;
-  room_name?: string;
-  inviter_id?: string;
-  inviter_name?: string;
-  member_count?: number;
-  invite_token?: string;
 };
 
 function parseStructuredAttachment(raw?: string): StructuredChatPayload | null {
@@ -731,19 +836,6 @@ function getListingActionDefaults(
                   ? 'Halo kak, saya tertarik. Saya kirim penawaran awal.'
                   : 'Hi, I am interested. Here is my initial offer so we can discuss it quickly.',
   };
-}
-
-function parseInvitePayload(message: Message): InvitePayload | null {
-  if (message.message_type !== 'invite') return null;
-  const raw = message.attachments?.[0] || message.content;
-  if (!raw || typeof raw !== 'string') return null;
-  try {
-    const parsed = JSON.parse(raw) as InvitePayload;
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
 }
 
 function formatValidationIssues(issues: string[], locale: 'id' | 'en'): string {
@@ -1683,6 +1775,7 @@ function detectFraudSignals(content: string): FraudSignal[] {
 }
 
 export default function ChatRoomPage() {
+  const reduceMotion = useReducedMotion();
   const params = useParams() ?? {};
   const searchParams = useSearchParams();
   const rawId = (params as { id?: unknown })?.id;
@@ -1695,15 +1788,22 @@ export default function ChatRoomPage() {
     [canonicalRoomId],
   );
   const isDraftRoom = Boolean(draftContact);
-  const isSupportRoom = canonicalRoomId.startsWith('support:');
+  const roomKind: 'support' | 'direct' | 'group' = canonicalRoomId.startsWith(
+    'support:',
+  )
+    ? 'support'
+    : canonicalRoomId.startsWith('dm:') || canonicalRoomId.startsWith('draft:')
+      ? 'direct'
+      : 'group';
+  const isSupportRoom = roomKind === 'support';
 
   const router = useRouter();
   const { confirm, prompt } = useDialog();
   const { notify } = useToast();
   const { user, authFetch, accessToken, loading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? '';
   const {
     rooms: inboxRooms,
-    loading: inboxLoading,
     refetch: refetchInbox,
     markRoomRead,
   } = useChatInbox();
@@ -1755,66 +1855,50 @@ export default function ChatRoomPage() {
     [authFetch, chatLocale, notify, router],
   );
 
-  // Allowed rooms based on inbox (anti URL injection)
-  const allowedRoomIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of inboxRooms) {
-      const rid = inboxRoomId(r);
-      if (rid) set.add(rid);
-    }
-    return set;
-  }, [inboxRooms]);
   const currentInboxRoom = useMemo(
     () =>
       inboxRooms.find(room => inboxRoomId(room) === canonicalRoomId) ?? null,
     [canonicalRoomId, inboxRooms],
   );
+  const hasCachedInboxRoom = currentInboxRoom !== null;
   const roomAvatarUrl = profileAvatarSrc(
     isDraftRoom ? null : inboxRoomAvatar(currentInboxRoom),
     isDraftRoom ? undefined : readProfileAvatarStyle(currentInboxRoom),
     currentInboxRoom?.room_name || currentInboxRoom?.name,
   );
 
-  const [roomValidationPending, setRoomValidationPending] = useState(true);
-  const roomValidationAttemptRef = useRef<string>('');
-
-  useEffect(() => {
-    roomValidationAttemptRef.current = '';
-    setRoomValidationPending(Boolean(canonicalRoomId));
-  }, [canonicalRoomId]);
+  const [roomAccessState, setRoomAccessState] = useState<
+    'checking' | 'offline-cached' | ChatRoomAccessResult
+  >('checking');
+  const [roomAccessRetryKey, setRoomAccessRetryKey] = useState(0);
+  const [validatedRoomName, setValidatedRoomName] = useState('');
 
   useEffect(() => {
     if (!canonicalRoomId) {
-      setRoomValidationPending(false);
+      setRoomAccessState('denied');
+      setValidatedRoomName('');
       return;
     }
     if (isDraftRoom) {
-      setRoomValidationPending(false);
+      setRoomAccessState('allowed');
+      setValidatedRoomName('');
+      return;
+    }
+    if (authLoading || !user?.id) {
+      setRoomAccessState('checking');
       return;
     }
 
-    if (inboxLoading) {
-      setRoomValidationPending(true);
-      return;
-    }
+    let cancelled = false;
+    setRoomAccessState(current =>
+      current === 'offline-cached' ? current : 'checking',
+    );
+    setValidatedRoomName('');
 
-    if (allowedRoomIds.has(canonicalRoomId)) {
-      setRoomValidationPending(false);
-      return;
-    }
-
-    if (roomValidationAttemptRef.current === canonicalRoomId) {
-      setRoomValidationPending(false);
-      return;
-    }
-
-    roomValidationAttemptRef.current = canonicalRoomId;
-    setRoomValidationPending(true);
-
-    const timer = setTimeout(async () => {
+    const validateRoomMembership = async () => {
       try {
         if (isSupportRoom && user?.id) {
-          await authFetch('/api/chat/support-room', {
+          const supportResponse = await authFetch('/api/chat/support-room', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1826,63 +1910,177 @@ export default function ChatRoomPage() {
               member_ids: [user.id],
             }),
           }).catch(() => {});
+          if (supportResponse?.ok) {
+            void refetchInbox().catch(() => {});
+          }
         }
-        await refetchInbox();
-      } finally {
-        setRoomValidationPending(false);
-      }
-    }, 700);
 
-    return () => clearTimeout(timer);
+        const response = await authFetch(
+          `/api/chat/rooms/${encodeURIComponent(canonicalRoomId)}/messages?limit=1`,
+          { cache: 'no-store' },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          room_name?: unknown;
+        };
+        if (cancelled) return;
+
+        const access = classifyChatRoomAccessResponse(
+          response.status,
+          response.ok,
+        );
+        if (access === 'allowed') {
+          const serverRoomName =
+            typeof payload.room_name === 'string'
+              ? payload.room_name.trim()
+              : '';
+          setValidatedRoomName(serverRoomName);
+        }
+        const canUseOfflineSnapshot = canUseOfflineChatSnapshot(
+          response.status,
+          hasCachedInboxRoom,
+        );
+        setRoomAccessState(
+          access === 'error' && canUseOfflineSnapshot
+            ? 'offline-cached'
+            : access,
+        );
+      } catch {
+        if (!cancelled) {
+          setRoomAccessState(hasCachedInboxRoom ? 'offline-cached' : 'error');
+        }
+      }
+    };
+
+    void validateRoomMembership();
+    return () => {
+      cancelled = true;
+    };
   }, [
     canonicalRoomId,
-    inboxLoading,
-    allowedRoomIds,
     authFetch,
+    authLoading,
     isSupportRoom,
     refetchInbox,
     user?.id,
     isDraftRoom,
+    roomAccessRetryKey,
+    hasCachedInboxRoom,
   ]);
 
-  const roomAllowed = useMemo(() => {
-    if (!canonicalRoomId) return false;
-    if (isDraftRoom) return true;
-    if (inboxLoading || roomValidationPending) return null; // not decided yet
-    return allowedRoomIds.has(canonicalRoomId);
-  }, [
-    canonicalRoomId,
-    inboxLoading,
-    roomValidationPending,
-    allowedRoomIds,
-    isDraftRoom,
-  ]);
+  const roomAllowed = isDraftRoom
+    ? true
+    : roomAccessState === 'checking'
+      ? null
+      : roomAccessState === 'allowed' || roomAccessState === 'offline-cached';
+  const roomReadOnly = roomAccessState === 'offline-cached';
+  const roomAccessFocusRetryAtRef = useRef(0);
+
+  useEffect(() => {
+    if (!roomReadOnly) return;
+    const retryNow = () => setRoomAccessRetryKey(value => value + 1);
+    const retryWhenVisible = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState !== 'visible'
+      )
+        return;
+      const now = Date.now();
+      if (now - roomAccessFocusRetryAtRef.current < 15_000) return;
+      roomAccessFocusRetryAtRef.current = now;
+      retryNow();
+    };
+    const retryWhenOnline = () => {
+      roomAccessFocusRetryAtRef.current = Date.now();
+      retryNow();
+    };
+    window.addEventListener('online', retryWhenOnline);
+    window.addEventListener('focus', retryWhenVisible);
+    document.addEventListener('visibilitychange', retryWhenVisible);
+    return () => {
+      window.removeEventListener('online', retryWhenOnline);
+      window.removeEventListener('focus', retryWhenVisible);
+      document.removeEventListener('visibilitychange', retryWhenVisible);
+    };
+  }, [roomReadOnly]);
 
   // Resolve room title from inbox + DM peer profile
   const [dmNamesByUserId, setDmNamesByUserId] = useState<
     Record<string, string>
   >({});
+  const dmNameLookupUserRef = useRef('');
+  const dmNameLookupPendingRef = useRef<Set<string>>(new Set());
+  const dmNameLookupRetryAfterRef = useRef<Map<string, number>>(new Map());
   const [roomName, setRoomName] = useState('Chat');
   const peerUserId = useMemo(
     () => parseDmPeerId(canonicalRoomId, user?.id),
     [canonicalRoomId, user?.id],
   );
+  const [isPeerBlocked, setIsPeerBlocked] = useState(false);
 
   useEffect(() => {
-    if (!user?.id || inboxRooms.length === 0) return;
+    dmNameLookupUserRef.current = user?.id ?? '';
+    dmNameLookupPendingRef.current.clear();
+    dmNameLookupRetryAfterRef.current.clear();
+    setDmNamesByUserId(previous =>
+      Object.keys(previous).length > 0 ? {} : previous,
+    );
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!peerUserId) {
+      setIsPeerBlocked(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPeerBlocked(false);
+    void authFetch(`/api/chat/blocks/${encodeURIComponent(peerUserId)}`, {
+      cache: 'no-store',
+    })
+      .then(async response => {
+        const payload = (await response.json().catch(() => null)) as {
+          data?: { blocked?: unknown };
+        } | null;
+        if (
+          !cancelled &&
+          response.ok &&
+          typeof payload?.data?.blocked === 'boolean'
+        ) {
+          setIsPeerBlocked(payload.data.blocked);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch, peerUserId]);
+
+  useEffect(() => {
+    if (!user?.id) return;
 
     const peerIds = Array.from(
       new Set(
-        inboxRooms
-          .map(room => parseDmPeerId(inboxRoomId(room), user.id))
-          .filter((id): id is string => Boolean(id)),
+        [
+          ...inboxRooms.map(room => parseDmPeerId(inboxRoomId(room), user.id)),
+          parseDmPeerId(canonicalRoomId, user.id),
+        ].filter((id): id is string => Boolean(id)),
       ),
     );
 
-    const missing = peerIds.filter(id => !dmNamesByUserId[id]);
+    const now = Date.now();
+    const missing = peerIds.filter(id => {
+      if (dmNamesByUserId[id]) return false;
+      if (dmNameLookupPendingRef.current.has(id)) return false;
+      return (dmNameLookupRetryAfterRef.current.get(id) ?? 0) <= now;
+    });
     if (missing.length === 0) return;
 
-    let cancelled = false;
+    for (const id of missing) {
+      dmNameLookupPendingRef.current.add(id);
+    }
+
+    const lookupUserId = user.id;
     const run = async () => {
       const results = await Promise.all(
         missing.map(async id => {
@@ -1891,7 +2089,14 @@ export default function ChatRoomPage() {
               `/api/users/public/${encodeURIComponent(id)}`,
               { cache: 'no-store' },
             );
-            if (!res.ok) return null;
+            if (!res.ok) {
+              return {
+                id,
+                label: null,
+                retryAfter:
+                  Date.now() + (res.status === 404 ? 5 * 60_000 : 30_000),
+              };
+            }
             const payload = (await res
               .json()
               .catch(() => ({}))) as PublicProfile;
@@ -1902,36 +2107,63 @@ export default function ChatRoomPage() {
                     payload.full_name.trim()
                   ? payload.full_name.trim()
                   : null) || null;
-            return label ? { id, label } : null;
+            return {
+              id,
+              label,
+              retryAfter: label ? 0 : Date.now() + 5 * 60_000,
+            };
           } catch {
-            return null;
+            return { id, label: null, retryAfter: Date.now() + 30_000 };
           }
         }),
       );
-      if (cancelled) return;
+      if (dmNameLookupUserRef.current !== lookupUserId) return;
+
+      for (const row of results) {
+        dmNameLookupPendingRef.current.delete(row.id);
+        if (row.label) {
+          dmNameLookupRetryAfterRef.current.delete(row.id);
+        } else {
+          dmNameLookupRetryAfterRef.current.set(row.id, row.retryAfter);
+        }
+      }
+
+      const resolved = results.filter(
+        (row): row is { id: string; label: string; retryAfter: number } =>
+          Boolean(row.label),
+      );
+      if (resolved.length === 0) return;
       setDmNamesByUserId(prev => {
-        const next = { ...prev };
-        for (const row of results) {
-          if (!row) continue;
+        let next = prev;
+        for (const row of resolved) {
+          if (prev[row.id] === row.label) continue;
+          if (next === prev) next = { ...prev };
           next[row.id] = row.label;
         }
         return next;
       });
     };
     void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [inboxRooms, user?.id, dmNamesByUserId]);
+  }, [canonicalRoomId, inboxRooms, user?.id, dmNamesByUserId]);
 
   useEffect(() => {
     if (isDraftRoom) {
-      setRoomName('Direct Message');
+      setRoomName(chatLocale === 'id' ? 'Pesan langsung' : 'Direct message');
       return;
     }
-    if (!canonicalRoomId || inboxLoading) return;
+    if (!canonicalRoomId) return;
     const found = currentInboxRoom;
-    if (!found) return;
+    if (!found) {
+      const peerId = parseDmPeerId(canonicalRoomId, user?.id);
+      if (peerId && dmNamesByUserId[peerId]) {
+        setRoomName(dmNamesByUserId[peerId]);
+      } else if (validatedRoomName && !validatedRoomName.startsWith('dm:')) {
+        setRoomName(validatedRoomName);
+      } else if (canonicalRoomId.startsWith('dm:')) {
+        setRoomName(chatLocale === 'id' ? 'Pesan langsung' : 'Direct message');
+      }
+      return;
+    }
 
     const rawRoomId = String(found.room_id ?? found.id ?? '');
     const rawRoomName = String(found.room_name ?? found.name ?? '');
@@ -1942,17 +2174,18 @@ export default function ChatRoomPage() {
     } else if (rawRoomName && !rawRoomName.startsWith('dm:')) {
       setRoomName(rawRoomName);
     } else if (rawRoomId.startsWith('dm:')) {
-      setRoomName('Direct Message');
+      setRoomName(chatLocale === 'id' ? 'Pesan langsung' : 'Direct message');
     } else {
       setRoomName(rawRoomName || 'Chat');
     }
   }, [
     canonicalRoomId,
     currentInboxRoom,
-    inboxLoading,
     user?.id,
     dmNamesByUserId,
     isDraftRoom,
+    chatLocale,
+    validatedRoomName,
   ]);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1961,6 +2194,21 @@ export default function ChatRoomPage() {
   const [newMessage, setNewMessage] = useState('');
   const [composerAction, setComposerAction] =
     useState<MessageComposerAction | null>(null);
+  const [openMessageActionsId, setOpenMessageActionsId] = useState<
+    string | null
+  >(null);
+  const {
+    status: voiceNoteStatus,
+    durationMs: voiceNoteDurationMs,
+    error: voiceNoteError,
+    recording: voiceNoteRecording,
+    start: startVoiceNote,
+    pause: pauseVoiceNote,
+    resume: resumeVoiceNote,
+    stop: stopVoiceNote,
+    cancel: cancelVoiceNote,
+    reset: resetVoiceNote,
+  } = useVoiceNoteRecorder();
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [channelReady, setChannelReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -2007,10 +2255,7 @@ export default function ChatRoomPage() {
   const [aiToneId, setAiToneId] = useState<AiToneId>(AI_TONES[0].id);
   const [aiLengthId, setAiLengthId] = useState<AiLengthId>(AI_LENGTHS[0].id);
   const [aiInstruction, setAiInstruction] = useState('');
-  const [aiAutoSend, setAiAutoSend] = useState(false);
-  const [aiUseContext, setAiUseContext] = useState(true);
-  const [aiProfileName, setAiProfileName] = useState('AI Pribadi');
-  const [aiDraft, setAiDraft] = useState('');
+  const [aiUseContext, setAiUseContext] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiLastGeneratedAt, setAiLastGeneratedAt] = useState<string | null>(
@@ -2049,6 +2294,12 @@ export default function ChatRoomPage() {
     activeDraftAttachmentIndex >= 0
       ? draftAttachments[activeDraftAttachmentIndex]
       : null;
+  const voiceNoteComposerOpen = voiceNoteStatus !== 'idle';
+  const voiceNoteIsCapturing =
+    voiceNoteStatus === 'requesting-permission' ||
+    voiceNoteStatus === 'recording' ||
+    voiceNoteStatus === 'paused' ||
+    voiceNoteStatus === 'processing';
   const canSendMessage =
     newMessage.trim().length > 0 || hasComposerAttachments || !!composerAction;
   const composerFraudSignals = useMemo(
@@ -2139,30 +2390,40 @@ export default function ChatRoomPage() {
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [activeCallIsCaller, setActiveCallIsCaller] = useState(false);
   const [composerFocused, setComposerFocused] = useState(false);
+  const [showAttachmentActions, setShowAttachmentActions] = useState(false);
 
   const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasInitialRoomScrollRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const sendPointerHandledRef = useRef(false);
   const sendShouldRefocusComposerRef = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const stickerPanelRef = useRef<HTMLDivElement>(null);
   const attachmentTouchStartXRef = useRef<number | null>(null);
+  const canonicalRoomIdRef = useRef(canonicalRoomId);
+  const aiDraftAbortRef = useRef<AbortController | null>(null);
+  const aiStructuredAbortRef = useRef<AbortController | null>(null);
+  canonicalRoomIdRef.current = canonicalRoomId;
 
   const channelRef = useRef<Awaited<ReturnType<typeof joinRoom>> | null>(null);
+  const messagesRef = useRef<Message[]>([]);
+  const messageLoadRequestRef = useRef(0);
+  const messageFetchInFlightRoomsRef = useRef<Set<string>>(new Set());
+  const fallbackSyncAtRef = useRef(0);
   const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSentRef = useRef<number>(0);
 
   const hasSentReadRef = useRef(false);
-  const lastReadInboxSyncRef = useRef(0);
   const isJoiningRef = useRef(false);
   const lastJoinAttemptRef = useRef<number>(0);
   const lastErrorTimeRef = useRef<number>(0);
   const activeCallIdRef = useRef<string | null>(null);
   const prefilledDraftRef = useRef<string>('');
+  const draftRoomResolutionRef = useRef<Promise<string> | null>(null);
   const incomingCallRefState = useRef<{
     callId: string;
     callerId: string;
@@ -2177,21 +2438,22 @@ export default function ChatRoomPage() {
 
   const scrollMessagesToBottom = useCallback(
     (behavior: ScrollBehavior = 'auto') => {
+      const resolvedBehavior = reduceMotion ? 'auto' : behavior;
       const viewport = messagesViewportRef.current;
       if (viewport) {
         viewport.scrollTo({
           top: viewport.scrollHeight,
-          behavior,
+          behavior: resolvedBehavior,
         });
         return;
       }
 
       messagesEndRef.current?.scrollIntoView({
-        behavior,
+        behavior: resolvedBehavior,
         block: 'end',
       });
     },
-    [],
+    [reduceMotion],
   );
 
   useEffect(() => {
@@ -2203,9 +2465,56 @@ export default function ChatRoomPage() {
   }, [incomingCall]);
 
   useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    aiDraftAbortRef.current?.abort();
+    aiStructuredAbortRef.current?.abort();
+    aiDraftAbortRef.current = null;
+    aiStructuredAbortRef.current = null;
+    messageLoadRequestRef.current += 1;
+    messagesRef.current = [];
+    setMessages([]);
     setNewMessage('');
+    setOpenMessageActionsId(null);
+    setShowAttachmentActions(false);
+    setShowAiQuickPanel(false);
+    setAiUseContext(false);
+    setAiInstruction('');
+    setAiError(null);
+    setAiLoading(false);
+    setAiStructuredPrompt('');
+    setAiStructuredDraft(null);
+    setAiStructuredError(null);
+    setAiStructuredLoading(false);
+    setAiLastGeneratedAt(null);
+    draftRoomResolutionRef.current = null;
+    hasSentReadRef.current = false;
+    hasInitialRoomScrollRef.current = false;
     prefilledDraftRef.current = '';
-  }, [canonicalRoomId]);
+  }, [canonicalRoomId, user?.id]);
+
+  useEffect(() => {
+    cancelVoiceNote();
+  }, [cancelVoiceNote, canonicalRoomId]);
+
+  useEffect(
+    () => () => {
+      aiDraftAbortRef.current?.abort();
+      aiStructuredAbortRef.current?.abort();
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const input = messageInputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    const nextHeight = Math.min(Math.max(input.scrollHeight, 44), 120);
+    input.style.height = `${nextHeight}px`;
+    input.style.overflowY = input.scrollHeight > 120 ? 'auto' : 'hidden';
+  }, [newMessage]);
 
   useEffect(() => {
     if (!canonicalRoomId || !draftComposerPrefill) return;
@@ -2228,10 +2537,6 @@ export default function ChatRoomPage() {
         templateId: string;
         toneId: string;
         lengthId: string;
-        instruction: string;
-        autoSend: boolean;
-        useContext: boolean;
-        profileName: string;
       }>;
       if (payload.templateId && isAiTemplateId(payload.templateId))
         setAiTemplateId(payload.templateId);
@@ -2239,18 +2544,6 @@ export default function ChatRoomPage() {
         setAiToneId(payload.toneId);
       if (payload.lengthId && isAiLengthId(payload.lengthId))
         setAiLengthId(payload.lengthId);
-      if (typeof payload.instruction === 'string')
-        setAiInstruction(payload.instruction);
-      if (typeof payload.autoSend === 'boolean')
-        setAiAutoSend(payload.autoSend);
-      if (typeof payload.useContext === 'boolean')
-        setAiUseContext(payload.useContext);
-      if (
-        typeof payload.profileName === 'string' &&
-        payload.profileName.trim()
-      ) {
-        setAiProfileName(payload.profileName.trim());
-      }
     } catch {
       // ignore corrupted storage
     }
@@ -2263,22 +2556,9 @@ export default function ChatRoomPage() {
       templateId: aiTemplateId,
       toneId: aiToneId,
       lengthId: aiLengthId,
-      instruction: aiInstruction,
-      autoSend: aiAutoSend,
-      useContext: aiUseContext,
-      profileName: aiProfileName,
     };
     window.localStorage.setItem(key, JSON.stringify(payload));
-  }, [
-    aiAutoSend,
-    aiInstruction,
-    aiLengthId,
-    aiProfileName,
-    aiTemplateId,
-    aiToneId,
-    aiUseContext,
-    user?.id,
-  ]);
+  }, [aiLengthId, aiTemplateId, aiToneId, user?.id]);
 
   useEffect(() => {
     if (!isSupportRoom && aiTemplateId.startsWith('support-')) {
@@ -2312,6 +2592,7 @@ export default function ChatRoomPage() {
 
   const openAiWorkspace = useCallback(
     (workspace: 'reply' | AiRoomDraftWorkspace) => {
+      if (roomReadOnly) return;
       setShowAiQuickPanel(true);
       setAiWorkspaceMode(workspace);
       if (workspace === 'reply') return;
@@ -2321,7 +2602,7 @@ export default function ChatRoomPage() {
       setAiStructuredDraft(null);
       setAiStructuredError(null);
     },
-    [chatLocale],
+    [chatLocale, roomReadOnly],
   );
 
   const applyStructuredPromptExample = useCallback(
@@ -2346,7 +2627,8 @@ export default function ChatRoomPage() {
   );
 
   const handleGenerateStructuredDraft = useCallback(async () => {
-    if (aiWorkspaceMode === 'reply' || aiStructuredLoading) return;
+    if (aiWorkspaceMode === 'reply' || aiStructuredLoading || roomReadOnly)
+      return;
     const prompt = aiStructuredPrompt.trim();
     if (!prompt) {
       setAiStructuredError(
@@ -2360,6 +2642,10 @@ export default function ChatRoomPage() {
     setAiStructuredLoading(true);
     setAiStructuredError(null);
     setAiStructuredDraft(null);
+    aiStructuredAbortRef.current?.abort();
+    const controller = new AbortController();
+    const requestRoomId = canonicalRoomId;
+    aiStructuredAbortRef.current = controller;
 
     try {
       const instruction = buildAiRoomDraftInstruction({
@@ -2374,11 +2660,17 @@ export default function ChatRoomPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       const data = (await res.json().catch(() => ({}))) as {
         response?: string;
       };
       const raw = String(data.response ?? '').trim();
+      if (
+        controller.signal.aborted ||
+        canonicalRoomIdRef.current !== requestRoomId
+      )
+        return;
       if (!raw) {
         throw new Error(
           res.ok
@@ -2401,6 +2693,12 @@ export default function ChatRoomPage() {
       setAiStructuredDraft(structured);
       setAiLastGeneratedAt(new Date().toISOString());
     } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === 'AbortError') ||
+        canonicalRoomIdRef.current !== requestRoomId
+      )
+        return;
       setAiStructuredError(
         error instanceof Error
           ? error.message
@@ -2409,7 +2707,10 @@ export default function ChatRoomPage() {
             : 'Failed to create the AI draft.',
       );
     } finally {
-      setAiStructuredLoading(false);
+      if (aiStructuredAbortRef.current === controller) {
+        aiStructuredAbortRef.current = null;
+        setAiStructuredLoading(false);
+      }
     }
   }, [
     aiContextMessages,
@@ -2418,76 +2719,159 @@ export default function ChatRoomPage() {
     aiStructuredPrompt,
     aiWorkspaceMode,
     authFetch,
+    canonicalRoomId,
     chatLocale,
     newMessage,
+    roomReadOnly,
   ]);
 
-  const notifyRead = async () => {
-    if (isDraftRoom) return;
+  const notifyRead = useCallback(() => {
+    if (isDraftRoom || roomReadOnly) return;
     if (!canonicalRoomId) return;
-    markRoomRead(canonicalRoomId);
-    authFetch(`/api/chat/rooms/${encodeURIComponent(canonicalRoomId)}/read`, {
-      method: 'POST',
-    })
-      .then(() => {
-        const now = Date.now();
-        if (now - lastReadInboxSyncRef.current < 2500) return;
-        lastReadInboxSyncRef.current = now;
-        return refetchInbox();
-      })
-      .catch(() => {});
-    try {
-      channelRef.current?.push('read', {});
-    } catch {
-      // ignore
+    if (hasSentReadRef.current) return;
+    if (
+      typeof document !== 'undefined' &&
+      document.visibilityState === 'hidden'
+    ) {
+      return;
     }
+    markRoomRead(canonicalRoomId);
+    void authFetch(
+      `/api/chat/rooms/${encodeURIComponent(canonicalRoomId)}/read`,
+      {
+        method: 'POST',
+      },
+    )
+      .then(response => {
+        if (!response.ok) {
+          hasSentReadRef.current = false;
+        }
+      })
+      .catch(() => {
+        hasSentReadRef.current = false;
+      });
     hasSentReadRef.current = true;
-  };
+  }, [authFetch, canonicalRoomId, isDraftRoom, markRoomRead, roomReadOnly]);
 
   const loadMessages = useCallback(async () => {
-    if (!user || !canonicalRoomId || isDraftRoom) return;
+    if (!currentUserId || !canonicalRoomId || isDraftRoom) return;
     if (roomAllowed !== true) return;
+    if (messageFetchInFlightRoomsRef.current.has(canonicalRoomId)) return;
 
+    const requestId = ++messageLoadRequestRef.current;
+    const requestRoomId = canonicalRoomId;
+    messageFetchInFlightRoomsRef.current.add(requestRoomId);
+    fallbackSyncAtRef.current = Date.now();
     setLoadError(null);
-    setLoading(true);
+    setLoading(messagesRef.current.length === 0);
     try {
-      const encodedRoomId = encodeURIComponent(canonicalRoomId);
-      const res = await authFetch(`/api/chat/rooms/${encodedRoomId}/messages`);
-      const data = await res.json().catch(() => ({}));
-      const list = Array.isArray((data as any).messages)
-        ? (data as any).messages
-        : (data as any).data || [];
-      if (res.ok) {
-        setMessages(
-          list.map((m: any) => ({
-            id: String(m.id ?? m.message_id ?? m.sent_at ?? ''),
-            content: String(m.content ?? ''),
-            sender_id: m.sender_id != null ? String(m.sender_id) : '',
-            message_type: m.message_type ?? 'text',
-            attachments: Array.isArray(m.attachments)
-              ? m.attachments.map(normalizeAttachmentUrl).filter(Boolean)
-              : [],
-            created_at: m.created_at ?? m.sent_at ?? '',
-            status: 'sent' as MessageStatus,
-          })),
-        );
-      } else {
-        setMessages([]);
-        setLoadError((data as any)?.error || 'Could not load messages');
+      const cached = await loadChatMessageCache(currentUserId, requestRoomId);
+      if (
+        requestId !== messageLoadRequestRef.current ||
+        requestRoomId !== canonicalRoomId
+      ) {
+        return;
       }
-      notifyRead();
+      if (cached?.messages.length && messagesRef.current.length === 0) {
+        const hydrated = cached.messages as Message[];
+        messagesRef.current = hydrated;
+        setMessages(hydrated);
+        setLoading(false);
+      }
+      if (roomReadOnly) {
+        if (!cached?.messages.length && messagesRef.current.length === 0) {
+          setLoadError(
+            chatLocale === 'id'
+              ? 'Belum ada snapshot pesan di perangkat ini. Sambungkan internet untuk memuat riwayat.'
+              : 'No message snapshot is stored on this device yet. Reconnect to load history.',
+          );
+        }
+        return;
+      }
+
+      const encodedRoomId = encodeURIComponent(canonicalRoomId);
+      const res = await authFetch(
+        `/api/chat/rooms/${encodedRoomId}/messages?limit=80`,
+        { cache: 'no-store' },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (
+        requestId !== messageLoadRequestRef.current ||
+        requestRoomId !== canonicalRoomId
+      ) {
+        return;
+      }
+      const payload = asObject(data);
+      const list = Array.isArray(payload.messages)
+        ? payload.messages
+        : Array.isArray(payload.data)
+          ? payload.data
+          : [];
+      if (res.ok) {
+        const serverMessages = list.map(row => {
+          const message = asObject(row);
+          return {
+            id: String(
+              message.id ?? message.message_id ?? message.sent_at ?? '',
+            ),
+            content: String(message.content ?? ''),
+            sender_id:
+              message.sender_id != null ? String(message.sender_id) : '',
+            message_type:
+              typeof message.message_type === 'string'
+                ? message.message_type
+                : 'text',
+            attachments: Array.isArray(message.attachments)
+              ? message.attachments.map(normalizeAttachmentUrl).filter(Boolean)
+              : [],
+            created_at: String(message.created_at ?? message.sent_at ?? ''),
+            status: 'sent' as MessageStatus,
+            reference: readMessageReference(message, String(message.content ?? '')),
+          };
+        });
+        messagesRef.current = serverMessages;
+        setMessages(serverMessages);
+        void saveChatMessageCache(currentUserId, requestRoomId, serverMessages);
+        notifyRead();
+      } else {
+        if (messagesRef.current.length === 0) {
+          setLoadError(
+            typeof payload.error === 'string'
+              ? payload.error
+              : 'Could not load messages',
+          );
+        }
+      }
     } catch {
-      setMessages([]);
-      setLoadError('Connection error. Check chat service.');
+      if (
+        requestId === messageLoadRequestRef.current &&
+        messagesRef.current.length === 0
+      ) {
+        setLoadError('Connection error. Check chat service.');
+      }
     } finally {
-      setLoading(false);
+      messageFetchInFlightRoomsRef.current.delete(requestRoomId);
+      if (requestId === messageLoadRequestRef.current) setLoading(false);
     }
-  }, [user, canonicalRoomId, authFetch, roomAllowed, isDraftRoom]);
+  }, [
+    currentUserId,
+    canonicalRoomId,
+    authFetch,
+    chatLocale,
+    roomAllowed,
+    roomReadOnly,
+    isDraftRoom,
+    notifyRead,
+  ]);
 
   const refreshMessagesSilently = useCallback(async () => {
-    if (!user || !canonicalRoomId || isDraftRoom) return;
-    if (roomAllowed !== true) return;
+    if (!currentUserId || !canonicalRoomId || isDraftRoom) return;
+    if (roomAllowed !== true || roomReadOnly) return;
+    if (messageFetchInFlightRoomsRef.current.has(canonicalRoomId)) return;
 
+    const requestId = messageLoadRequestRef.current;
+    const requestRoomId = canonicalRoomId;
+    messageFetchInFlightRoomsRef.current.add(requestRoomId);
     try {
       const encodedRoomId = encodeURIComponent(canonicalRoomId);
       const res = await authFetch(
@@ -2507,6 +2891,12 @@ export default function ChatRoomPage() {
           ? payload.data
           : [];
       if (!res.ok) return;
+      if (
+        requestId !== messageLoadRequestRef.current ||
+        requestRoomId !== canonicalRoomId
+      ) {
+        return;
+      }
 
       const fromServer: Message[] = list.map(row => {
         const m =
@@ -2524,6 +2914,7 @@ export default function ChatRoomPage() {
             : [],
           created_at: String(m.created_at ?? m.sent_at ?? ''),
           status: 'sent' as MessageStatus,
+          reference: readMessageReference(m, String(m.content ?? '')),
         };
       });
 
@@ -2551,39 +2942,95 @@ export default function ChatRoomPage() {
       });
     } catch {
       // ignore silent refresh failures
+    } finally {
+      messageFetchInFlightRoomsRef.current.delete(requestRoomId);
     }
-  }, [user, canonicalRoomId, roomAllowed, authFetch, isDraftRoom]);
-
-  useEffect(() => {
-    if (!user || !canonicalRoomId || isDraftRoom) return;
-    if (roomAllowed !== true) return;
-    loadMessages();
-  }, [user, canonicalRoomId, loadMessages, roomAllowed, isDraftRoom]);
-
-  useEffect(() => {
-    if (!user || !canonicalRoomId || isDraftRoom) return;
-    if (roomAllowed !== true) return;
-    if (connectionStatus === 'connected') return;
-
-    const timer = setInterval(() => {
-      void refreshMessagesSilently();
-    }, 3500);
-
-    return () => clearInterval(timer);
   }, [
-    user,
+    currentUserId,
     canonicalRoomId,
     roomAllowed,
+    roomReadOnly,
+    authFetch,
+    isDraftRoom,
+  ]);
+
+  useEffect(() => {
+    if (!currentUserId || !canonicalRoomId || isDraftRoom) return;
+    if (roomAllowed !== true) return;
+    loadMessages();
+  }, [currentUserId, canonicalRoomId, loadMessages, roomAllowed, isDraftRoom]);
+
+  useEffect(() => {
+    if (!currentUserId || !canonicalRoomId || isDraftRoom) return;
+    if (roomAllowed !== true || roomReadOnly) return;
+    if (connectionStatus !== 'error' && connectionStatus !== 'disconnected')
+      return;
+    if (
+      typeof document !== 'undefined' &&
+      document.visibilityState !== 'visible'
+    )
+      return;
+    const now = Date.now();
+    if (now - fallbackSyncAtRef.current < 15_000) return;
+    fallbackSyncAtRef.current = now;
+    void refreshMessagesSilently();
+  }, [
+    currentUserId,
+    canonicalRoomId,
+    roomAllowed,
+    roomReadOnly,
     connectionStatus,
     refreshMessagesSilently,
     isDraftRoom,
   ]);
 
+  useEffect(() => {
+    if (!currentUserId || !canonicalRoomId || isDraftRoom) return;
+    if (roomAllowed !== true || roomReadOnly) return;
+
+    const syncVisibleRoom = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - fallbackSyncAtRef.current < 15_000) return;
+      fallbackSyncAtRef.current = now;
+      void refreshMessagesSilently();
+    };
+
+    window.addEventListener('focus', syncVisibleRoom);
+    document.addEventListener('visibilitychange', syncVisibleRoom);
+    return () => {
+      window.removeEventListener('focus', syncVisibleRoom);
+      document.removeEventListener('visibilitychange', syncVisibleRoom);
+    };
+  }, [
+    canonicalRoomId,
+    currentUserId,
+    isDraftRoom,
+    refreshMessagesSilently,
+    roomAllowed,
+    roomReadOnly,
+  ]);
+
+  useEffect(() => {
+    if (!currentUserId || !canonicalRoomId || isDraftRoom) return;
+    if (messages.length === 0) return;
+    const timer = window.setTimeout(() => {
+      void saveChatMessageCache(currentUserId, canonicalRoomId, messages);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [canonicalRoomId, currentUserId, isDraftRoom, messages]);
+
   // Join socket channel
   useEffect(() => {
-    if (!canonicalRoomId || !user || authLoading || !accessToken || isDraftRoom)
+    if (
+      !canonicalRoomId ||
+      !currentUserId ||
+      authLoading ||
+      !accessToken ||
+      isDraftRoom
+    )
       return;
-    if (roomAllowed !== true) return;
+    if (roomAllowed !== true || roomReadOnly) return;
 
     let cancelled = false;
     let teardown: (() => void) | null = null;
@@ -2636,8 +3083,8 @@ export default function ChatRoomPage() {
             setConnectionStatus('disconnected');
           };
 
-          channel.onError(onErr);
-          channel.onClose(onClose);
+          const channelErrorRef = channel.onError(onErr);
+          const channelCloseRef = channel.onClose(onClose);
 
           const typingRef = channel.on(
             'typing',
@@ -2648,8 +3095,8 @@ export default function ChatRoomPage() {
             }) => {
               if (
                 cancelled ||
-                !user ||
-                normId(payload.user_id) === normId(user.id)
+                !currentUserId ||
+                normId(payload.user_id) === normId(currentUserId)
               )
                 return;
               setTypingUser(
@@ -2658,109 +3105,102 @@ export default function ChatRoomPage() {
             },
           ) as number;
 
-          const readRef = channel.on(
-            'read',
-            (payload: { user_id?: string }) => {
-              if (
-                cancelled ||
-                !user ||
-                normId(payload.user_id) === normId(user.id)
-              )
-                return;
-              setMessages(prev =>
-                prev.map(m =>
-                  normId(m.sender_id) === normId(user.id) &&
-                  (m.status === 'sent' || m.status === 'sending')
-                    ? { ...m, status: 'read' as MessageStatus }
-                    : m,
-                ),
-              );
-            },
-          ) as number;
-
           const incomingCallRef = channel.on(
             'call_incoming',
-            (payload: any) => {
+            (rawPayload: unknown) => {
+              const payload = asObject(rawPayload);
+              const callId =
+                typeof payload.call_id === 'string'
+                  ? payload.call_id.trim()
+                  : '';
+              const callerId =
+                typeof payload.caller_id === 'string'
+                  ? payload.caller_id.trim()
+                  : '';
+              const callType =
+                payload.call_type === 'video' || payload.call_type === 'voice'
+                  ? payload.call_type
+                  : null;
               if (
                 cancelled ||
-                !user ||
-                normId(payload.caller_id) === normId(user.id)
+                roomKind !== 'direct' ||
+                !callId ||
+                !callerId ||
+                !callType ||
+                normId(callerId) === normId(currentUserId)
               )
                 return;
               setIncomingCall({
-                callId: payload.call_id,
-                callerId: payload.caller_id,
-                callerName: payload.caller_username,
-                callerAvatar: payload.caller_avatar,
+                callId,
+                callerId,
+                callerName:
+                  typeof payload.caller_username === 'string' &&
+                  payload.caller_username.trim()
+                    ? payload.caller_username.trim()
+                    : chatLocale === 'id'
+                      ? 'Pengguna Lajukan'
+                      : 'Lajukan user',
+                callerAvatar:
+                  typeof payload.caller_avatar === 'string'
+                    ? payload.caller_avatar
+                    : undefined,
                 callerAvatarStyle:
                   payload.caller_avatar_style ?? payload.avatar_style,
-                callType: payload.call_type,
+                callType,
               });
             },
           ) as number;
 
           const callRejectedRef = channel.on(
             'call_rejected',
-            (payload: any) => {
+            (rawPayload: unknown) => {
               if (cancelled) return;
+              const payload = asObject(rawPayload);
+              const callId =
+                typeof payload.call_id === 'string' ? payload.call_id : '';
+              if (!callId) return;
               soundManager.stopLoop('outgoingRing');
               soundManager.stopLoop('incomingRing');
-              if (activeCallIdRef.current === payload.call_id) {
+              if (activeCallIdRef.current === callId) {
                 setShowVideoCall(false);
                 setShowVoiceCall(false);
                 setActiveCallId(null);
                 setActiveCallIsCaller(false);
               }
-              if (incomingCallRefState.current?.callId === payload.call_id)
+              if (incomingCallRefState.current?.callId === callId)
                 setIncomingCall(null);
             },
           ) as number;
 
-          const callEndedRef = channel.on('call_ended', (payload: any) => {
-            if (cancelled) return;
-            soundManager.stopLoop('outgoingRing');
-            soundManager.stopLoop('incomingRing');
-            if (activeCallIdRef.current === payload.call_id) {
-              setShowVideoCall(false);
-              setShowVoiceCall(false);
-              setActiveCallId(null);
-              setActiveCallIsCaller(false);
-            }
-            if (incomingCallRefState.current?.callId === payload.call_id)
-              setIncomingCall(null);
-          }) as number;
+          const callEndedRef = channel.on(
+            'call_ended',
+            (rawPayload: unknown) => {
+              if (cancelled) return;
+              const payload = asObject(rawPayload);
+              const callId =
+                typeof payload.call_id === 'string' ? payload.call_id : '';
+              if (!callId) return;
+              soundManager.stopLoop('outgoingRing');
+              soundManager.stopLoop('incomingRing');
+              if (activeCallIdRef.current === callId) {
+                setShowVideoCall(false);
+                setShowVoiceCall(false);
+                setActiveCallId(null);
+                setActiveCallIsCaller(false);
+              }
+              if (incomingCallRefState.current?.callId === callId)
+                setIncomingCall(null);
+            },
+          ) as number;
 
-          const messageHandlerDispose = onMessage(channel, (payload: any) => {
+          const messageHandlerDispose = onMessage(channel, payload => {
             if (cancelled) return;
 
             const msgId =
               payload.message_id ?? payload.sent_at ?? `socket-${Date.now()}`;
-            const isOwn = normId(payload.sender_id) === normId(user?.id);
+            const isOwn = normId(payload.sender_id) === normId(currentUserId);
 
             setMessages(prev => {
-              const exists = prev.some(
-                m =>
-                  m.id === msgId ||
-                  (payload.client_ref && m.id === payload.client_ref),
-              );
-              if (exists) return prev;
-
-              // own messages: ignore if not matching client_ref (we already optimistically render)
-              if (isOwn && !payload.client_ref) return prev;
-
-              if (isOwn && payload.client_ref) {
-                return prev.map(m =>
-                  m.id === payload.client_ref
-                    ? {
-                        ...m,
-                        id: msgId,
-                        status: 'sent' as MessageStatus,
-                        created_at: payload.sent_at ?? m.created_at,
-                      }
-                    : m,
-                );
-              }
-
               const newMsg: Message = {
                 id: msgId,
                 content: payload.content ?? payload.body ?? '',
@@ -2773,21 +3213,55 @@ export default function ChatRoomPage() {
                   : [],
                 created_at: payload.sent_at ?? new Date().toISOString(),
                 status: 'sent',
+                reference: readMessageReference(
+                  payload as unknown as Record<string, unknown>,
+                  String(payload.content ?? payload.body ?? ''),
+                ),
               };
+
+              const serverMessageAlreadyPresent = prev.some(
+                message => message.id === msgId,
+              );
+
+              if (isOwn) {
+                const clientRef = String(payload.client_ref || '').trim();
+                if (!clientRef) return prev;
+                const optimistic = prev.find(
+                  message => message.id === clientRef,
+                );
+                if (!optimistic) {
+                  return serverMessageAlreadyPresent ? prev : [...prev, newMsg];
+                }
+
+                return reconcileOptimisticChatMessage(prev, clientRef, {
+                  ...optimistic,
+                  ...newMsg,
+                  content: newMsg.content || optimistic.content,
+                  message_type: newMsg.message_type || optimistic.message_type,
+                  attachments:
+                    (newMsg.attachments?.length ?? 0) > 0
+                      ? newMsg.attachments
+                      : optimistic.attachments,
+                });
+              }
+
+              if (serverMessageAlreadyPresent) return prev;
 
               return [...prev, newMsg];
             });
 
             if (!isOwn) {
               soundManager.play('messageReceive');
+              hasSentReadRef.current = false;
               notifyRead();
             }
           });
 
           teardown = () => {
             try {
+              channel.off('phx_error', channelErrorRef);
+              channel.off('phx_close', channelCloseRef);
               channel.off('typing', typingRef);
-              channel.off('read', readRef);
               channel.off('call_incoming', incomingCallRef);
               channel.off('call_rejected', callRejectedRef);
               channel.off('call_ended', callEndedRef);
@@ -2831,24 +3305,63 @@ export default function ChatRoomPage() {
     };
   }, [
     canonicalRoomId,
-    user?.id,
+    currentUserId,
     accessToken,
     authLoading,
     roomAllowed,
+    roomReadOnly,
     isDraftRoom,
+    roomKind,
+    chatLocale,
+    notifyRead,
   ]);
 
   useEffect(() => {
-    if (!canonicalRoomId || !user || messages.length === 0 || isDraftRoom)
+    if (
+      !canonicalRoomId ||
+      !currentUserId ||
+      messages.length === 0 ||
+      isDraftRoom
+    )
       return;
-    if (roomAllowed !== true) return;
-    if (!hasSentReadRef.current) notifyRead();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.length, canonicalRoomId, user?.id, roomAllowed, isDraftRoom]);
+    if (roomAllowed !== true || roomReadOnly) return;
+
+    const acknowledgeVisibleRoom = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'hidden'
+      ) {
+        return;
+      }
+      if (!hasSentReadRef.current) notifyRead();
+    };
+
+    acknowledgeVisibleRoom();
+    window.addEventListener('focus', acknowledgeVisibleRoom);
+    document.addEventListener('visibilitychange', acknowledgeVisibleRoom);
+
+    return () => {
+      window.removeEventListener('focus', acknowledgeVisibleRoom);
+      document.removeEventListener('visibilitychange', acknowledgeVisibleRoom);
+    };
+  }, [
+    messages.length,
+    canonicalRoomId,
+    currentUserId,
+    roomAllowed,
+    roomReadOnly,
+    isDraftRoom,
+    notifyRead,
+  ]);
 
   useEffect(() => {
     if (messages.length === 0) return;
     const raf = window.requestAnimationFrame(() => {
+      if (!hasInitialRoomScrollRef.current) {
+        hasInitialRoomScrollRef.current = true;
+        scrollMessagesToBottom('auto');
+        return;
+      }
       const viewport = messagesViewportRef.current;
       if (viewport) {
         const distanceFromBottom =
@@ -2862,6 +3375,8 @@ export default function ChatRoomPage() {
 
   const startOutgoingCall = useCallback(
     async (type: 'video' | 'voice') => {
+      if (roomKind !== 'direct') return;
+      if (isPeerBlocked || roomReadOnly) return;
       if (!channelRef.current || !channelReady || !canonicalRoomId) return;
       if (showVideoCall || showVoiceCall || incomingCall) return;
 
@@ -2889,8 +3404,12 @@ export default function ChatRoomPage() {
 
         if (!reply.ok) {
           notify({
-            title: 'Failed to start call',
-            description: 'Please try again.',
+            title:
+              chatLocale === 'id'
+                ? 'Panggilan gagal dimulai'
+                : 'Failed to start call',
+            description:
+              chatLocale === 'id' ? 'Silakan coba lagi.' : 'Please try again.',
             variant: 'error',
           });
           return;
@@ -2908,17 +3427,25 @@ export default function ChatRoomPage() {
         }
       } catch {
         notify({
-          title: 'Failed to start call',
-          description: 'Please try again.',
+          title:
+            chatLocale === 'id'
+              ? 'Panggilan gagal dimulai'
+              : 'Failed to start call',
+          description:
+            chatLocale === 'id' ? 'Silakan coba lagi.' : 'Please try again.',
           variant: 'error',
         });
       }
     },
     [
       channelReady,
+      chatLocale,
       canonicalRoomId,
       incomingCall,
+      isPeerBlocked,
       notify,
+      roomKind,
+      roomReadOnly,
       showVideoCall,
       showVoiceCall,
     ],
@@ -2927,7 +3454,7 @@ export default function ChatRoomPage() {
   const handleTypingChange = useCallback(
     (value: string) => {
       setNewMessage(value);
-      if (!channelRef.current || !channelReady) return;
+      if (roomReadOnly || !channelRef.current || !channelReady) return;
 
       const now = Date.now();
       if (now - lastTypingSentRef.current >= TYPING_DEBOUNCE_MS) {
@@ -2953,8 +3480,52 @@ export default function ChatRoomPage() {
         typingDebounceRef.current = null;
       }, 100);
     },
-    [channelReady],
+    [channelReady, roomReadOnly],
   );
+
+  const ensureWritableRoomId = useCallback(async (): Promise<string> => {
+    if (!isDraftRoom || !draftContact) return canonicalRoomId;
+    if (draftRoomResolutionRef.current) {
+      return await draftRoomResolutionRef.current;
+    }
+
+    const pending = (async () => {
+      const createRes = await authFetch('/api/chat/create-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: draftContact,
+          lead: { source: 'manual_chat', name: `@${draftContact}` },
+        }),
+        credentials: 'include',
+      });
+      const createData = (await createRes.json().catch(() => ({}))) as {
+        room_id?: unknown;
+        error?: unknown;
+      };
+      const newRoomId =
+        typeof createData.room_id === 'string' ? createData.room_id.trim() : '';
+      if (!createRes.ok || !newRoomId) {
+        throw new Error(
+          typeof createData.error === 'string'
+            ? createData.error
+            : 'Failed to create chat',
+        );
+      }
+      await refetchInbox().catch(() => {});
+      return newRoomId;
+    })();
+
+    draftRoomResolutionRef.current = pending;
+    try {
+      return await pending;
+    } catch (error) {
+      if (draftRoomResolutionRef.current === pending) {
+        draftRoomResolutionRef.current = null;
+      }
+      throw error;
+    }
+  }, [authFetch, canonicalRoomId, draftContact, isDraftRoom, refetchInbox]);
 
   // Upload
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -2968,22 +3539,24 @@ export default function ChatRoomPage() {
     }
   }, []);
   useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
     return () => {
-      previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      previewUrlsRef.current.clear();
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+      previewUrls.clear();
     };
   }, []);
 
   const uploadAttachment = useCallback(
     async (file: File, attachmentId: string) => {
-      if (!canonicalRoomId) return;
-      const encodedRoomId = encodeURIComponent(canonicalRoomId);
+      if (!canonicalRoomId || roomReadOnly) return;
       setDraftAttachments(prev =>
         prev.map(att =>
           att.id === attachmentId ? { ...att, status: 'uploading' } : att,
         ),
       );
       try {
+        const writableRoomId = await ensureWritableRoomId();
+        const encodedRoomId = encodeURIComponent(writableRoomId);
         const optimizedFile = await prepareUploadFile(file);
         const form = new FormData();
         form.append('file', optimizedFile);
@@ -2991,13 +3564,25 @@ export default function ChatRoomPage() {
           `/api/chat/rooms/${encodedRoomId}/upload`,
           { method: 'POST', body: form },
         );
-        const uploadData = await uploadRes.json().catch(() => ({}));
-        if (!uploadRes.ok)
-          throw new Error((uploadData as any).error || 'upload failed');
-        const payload = (uploadData as any).data || {};
-        const fileUrl = payload.url as string;
+        const uploadData = asObject(await uploadRes.json().catch(() => ({})));
+        if (!uploadRes.ok) {
+          throw new Error(
+            typeof uploadData.error === 'string'
+              ? uploadData.error
+              : 'upload failed',
+          );
+        }
+        const payload = asObject(uploadData.data);
+        const fileUrl =
+          typeof payload.url === 'string' ? payload.url.trim() : '';
+        if (!fileUrl) throw new Error('upload response did not include a URL');
         const uploadType =
-          (payload.type as AttachmentKind) || detectAttachmentType(file);
+          payload.type === 'image' ||
+          payload.type === 'video' ||
+          payload.type === 'audio' ||
+          payload.type === 'file'
+            ? payload.type
+            : detectAttachmentType(file);
         setDraftAttachments(prev =>
           prev.map(att =>
             att.id === attachmentId
@@ -3018,13 +3603,13 @@ export default function ChatRoomPage() {
         );
       }
     },
-    [authFetch, canonicalRoomId],
+    [authFetch, canonicalRoomId, ensureWritableRoomId, roomReadOnly],
   );
 
   const handleFilesSelected = useCallback(
-    (fileList: FileList | null) => {
+    (fileList: FileList | File[] | null) => {
       if (!fileList || fileList.length === 0) return;
-      if (!canonicalRoomId) return;
+      if (!canonicalRoomId || roomReadOnly) return;
 
       const currentCount = draftAttachments.length;
       const remainingSlots = Math.max(
@@ -3033,8 +3618,14 @@ export default function ChatRoomPage() {
       );
       if (remainingSlots === 0) {
         notify({
-          title: 'Attachment limit reached',
-          description: `You can only attach up to ${MAX_COMPOSER_ATTACHMENTS} files at once.`,
+          title:
+            chatLocale === 'id'
+              ? 'Batas lampiran tercapai'
+              : 'Attachment limit reached',
+          description:
+            chatLocale === 'id'
+              ? `Maksimal ${MAX_COMPOSER_ATTACHMENTS} berkas dalam satu pesan.`
+              : `You can only attach up to ${MAX_COMPOSER_ATTACHMENTS} files at once.`,
           variant: 'info',
           durationMs: 4200,
         });
@@ -3048,7 +3639,7 @@ export default function ChatRoomPage() {
           `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const type = detectAttachmentType(file);
         const previewUrl =
-          type === 'image' || type === 'video'
+          type === 'image' || type === 'video' || type === 'audio'
             ? URL.createObjectURL(file)
             : undefined;
         rememberPreviewUrl(previewUrl);
@@ -3074,8 +3665,11 @@ export default function ChatRoomPage() {
     },
     [
       canonicalRoomId,
+      chatLocale,
       draftAttachments.length,
+      notify,
       rememberPreviewUrl,
+      roomReadOnly,
       uploadAttachment,
     ],
   );
@@ -3121,179 +3715,242 @@ export default function ChatRoomPage() {
     [activeDraftAttachmentIndex, draftAttachments],
   );
 
-  const sendPayload = async (
-    content: string,
-    messageType: string = 'text',
-    attachments: string[] = [],
-  ) => {
-    setSending(true);
+  const sendPayload = useCallback(
+    async (
+      content: string,
+      messageType: string = 'text',
+      attachments: string[] = [],
+      options?: {
+        clientRef?: string;
+        retryExisting?: boolean;
+        createdAt?: string;
+        reference?: MessageReference | null;
+      },
+    ) => {
+      if (roomReadOnly) return;
+      setSending(true);
 
-    const clientRef = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const tempMessage: Message = {
-      id: clientRef,
-      content,
-      sender_id: user?.id || '',
-      message_type: messageType,
-      attachments,
-      created_at: new Date().toISOString(),
-      status: 'sending',
-    };
+      const clientRef =
+        options?.clientRef?.trim() ||
+        `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const tempMessage: Message = {
+        id: clientRef,
+        content,
+        sender_id: user?.id || '',
+        message_type: messageType,
+        attachments,
+        created_at: options?.createdAt || new Date().toISOString(),
+        status: 'sending',
+        reference: options?.reference ?? null,
+      };
 
-    setMessages(prev => [...prev, tempMessage]);
-    window.requestAnimationFrame(() => {
-      scrollMessagesToBottom('smooth');
-    });
-    soundManager.play('messageSend');
-
-    const ch = channelRef.current;
-    const useSocket = !!(ch && channelReady);
-    let targetRoomId = canonicalRoomId;
-    const trackChatMessage = (roomId: string) => {
-      if (!user?.id || !peerUserId || peerUserId === user.id) return;
-      const recipientLabel =
-        dmNamesByUserId[peerUserId] ||
-        (roomName && roomName !== 'Chat' ? roomName : '') ||
-        peerUserId;
-      void trackLajukanEvent('chat.message_sent', {
-        entityType: 'chat',
-        entityId: roomId,
-        page: `/chat/${encodeURIComponent(roomId)}`,
-        properties: {
-          target_user_id: peerUserId,
-          target_username: recipientLabel.replace(/^@/, ''),
-          target_name: recipientLabel.replace(/^@/, ''),
-          target_href: `/chat/${encodeURIComponent(roomId)}`,
-          actor_user_id: user.id,
-          actor_username: user.username || '',
-          actor_name: user.name || user.fullName || user.username || '',
-          actor_avatar_url: user.avatarUrl || user.avatar_url || '',
-          source: 'chat',
-          surface: 'chat',
-          action: 'message',
-          message_type: messageType,
-        },
-      });
-    };
-
-    const ensureRoomForDraft = async (): Promise<string> => {
-      if (!isDraftRoom || !draftContact) return targetRoomId;
-      const createRes = await authFetch('/api/chat/create-room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: draftContact,
-          lead: { source: 'manual_chat', name: `@${draftContact}` },
-        }),
-        credentials: 'include',
-      });
-      const createData = await createRes.json().catch(() => ({}) as any);
-      const newRoomId = String((createData as any)?.room_id || '').trim();
-      if (!createRes.ok || !newRoomId) {
-        throw new Error((createData as any)?.error || 'Failed to create chat');
-      }
-      targetRoomId = newRoomId;
-      await refetchInbox().catch(() => {});
-      router.replace(`/chat/${encodeURIComponent(newRoomId)}`);
-      return targetRoomId;
-    };
-
-    const doPostFallback = async (): Promise<boolean> => {
-      const roomId = await ensureRoomForDraft();
-      const encodedRoomId = encodeURIComponent(roomId);
-      const res = await authFetch(`/api/chat/rooms/${encodedRoomId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, type: messageType, attachments }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        const serverMsg = (data as any).message ?? (data as any).data;
-        const resolved: Message = serverMsg
-          ? {
-              id: serverMsg.id ?? serverMsg.sent_at ?? clientRef,
-              content: serverMsg.content ?? content,
-              sender_id: serverMsg.sender_id ?? user?.id ?? '',
-              message_type: serverMsg.message_type ?? messageType,
-              attachments: Array.isArray(serverMsg.attachments)
-                ? serverMsg.attachments
-                    .map(normalizeAttachmentUrl)
-                    .filter(Boolean)
-                : attachments.map(normalizeAttachmentUrl).filter(Boolean),
-              created_at:
-                serverMsg.created_at ??
-                serverMsg.sent_at ??
-                tempMessage.created_at,
-              status: 'sent',
-            }
-          : { ...tempMessage, status: 'sent' as MessageStatus };
-        setMessages(prev => prev.map(m => (m.id === clientRef ? resolved : m)));
-        return true;
-      } else {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === clientRef
-              ? { ...m, status: 'failed' as MessageStatus }
-              : m,
-          ),
-        );
-        return false;
-      }
-    };
-
-    try {
-      if (isDraftRoom) {
-        const posted = await doPostFallback();
-        if (posted) trackChatMessage(targetRoomId);
-        return;
-      }
-      if (useSocket && ch) {
-        const result = await sendMessageViaSocket(ch, content, clientRef, {
-          message_type: messageType,
-          attachments,
+      setMessages(prev => {
+        if (!options?.retryExisting) return [...prev, tempMessage];
+        let found = false;
+        const next = prev.map(message => {
+          if (message.id !== clientRef) return message;
+          found = true;
+          return { ...message, status: 'sending' as MessageStatus };
         });
-        if (result.ok) {
+        return found ? next : [...next, tempMessage];
+      });
+      window.requestAnimationFrame(() => {
+        scrollMessagesToBottom('smooth');
+      });
+      soundManager.play('messageSend');
+
+      const ch = channelRef.current;
+      const useSocket = !!(ch && channelReady);
+      let targetRoomId = canonicalRoomId;
+      const trackChatMessage = (roomId: string) => {
+        if (!user?.id || !peerUserId || peerUserId === user.id) return;
+        const recipientLabel =
+          dmNamesByUserId[peerUserId] ||
+          (roomName && roomName !== 'Chat' ? roomName : '') ||
+          peerUserId;
+        void trackLajukanEvent('chat.message_sent', {
+          entityType: 'chat',
+          entityId: roomId,
+          page: `/chat/${encodeURIComponent(roomId)}`,
+          properties: {
+            target_user_id: peerUserId,
+            target_username: recipientLabel.replace(/^@/, ''),
+            target_name: recipientLabel.replace(/^@/, ''),
+            target_href: `/chat/${encodeURIComponent(roomId)}`,
+            actor_user_id: user.id,
+            actor_username: user.username || '',
+            actor_name: user.name || user.fullName || user.username || '',
+            actor_avatar_url: user.avatarUrl || user.avatar_url || '',
+            source: 'chat',
+            surface: 'chat',
+            action: 'message',
+            message_type: messageType,
+          },
+        });
+      };
+
+      const ensureRoomForDraft = async (): Promise<string> => {
+        if (!isDraftRoom || !draftContact) return targetRoomId;
+        targetRoomId = await ensureWritableRoomId();
+        router.replace(`/chat/${encodeURIComponent(targetRoomId)}`);
+        return targetRoomId;
+      };
+
+      const doPostFallback = async (): Promise<boolean> => {
+        const roomId = await ensureRoomForDraft();
+        const encodedRoomId = encodeURIComponent(roomId);
+        const res = await authFetch(
+          `/api/chat/rooms/${encodedRoomId}/messages`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content,
+              type: messageType,
+              attachments,
+              client_ref: clientRef,
+              reply_to_message_id: options?.reference?.message_id || undefined,
+              reply_mode: options?.reference?.mode || undefined,
+              reply_to: options?.reference || undefined,
+            }),
+          },
+        );
+        const data = asObject(await res.json().catch(() => ({})));
+        if (res.ok) {
+          const serverMessage = asObject(data.message ?? data.data);
+          const hasServerMessage = Object.keys(serverMessage).length > 0;
+          const resolved: Message = hasServerMessage
+            ? {
+                id: String(
+                  serverMessage.id ?? serverMessage.sent_at ?? clientRef,
+                ),
+                content:
+                  typeof serverMessage.content === 'string'
+                    ? serverMessage.content
+                    : content,
+                sender_id:
+                  typeof serverMessage.sender_id === 'string'
+                    ? serverMessage.sender_id
+                    : (user?.id ?? ''),
+                message_type:
+                  typeof serverMessage.message_type === 'string'
+                    ? serverMessage.message_type
+                    : messageType,
+                attachments: Array.isArray(serverMessage.attachments)
+                  ? serverMessage.attachments
+                      .map(normalizeAttachmentUrl)
+                      .filter(Boolean)
+                  : attachments.map(normalizeAttachmentUrl).filter(Boolean),
+                created_at: String(
+                  serverMessage.created_at ??
+                    serverMessage.sent_at ??
+                    tempMessage.created_at,
+                ),
+                status: 'sent',
+                reference:
+                  (serverMessage.reference as MessageReference | null | undefined) ??
+                  (serverMessage.reply_to as MessageReference | null | undefined) ??
+                  options?.reference ??
+                  null,
+              }
+            : { ...tempMessage, status: 'sent' as MessageStatus };
+          setMessages(prev =>
+            reconcileOptimisticChatMessage(prev, clientRef, resolved),
+          );
+          return true;
+        } else {
           setMessages(prev =>
             prev.map(m =>
               m.id === clientRef
-                ? {
-                    id: result.message_id,
-                    content: result.content ?? content,
-                    sender_id: user?.id ?? '',
-                    message_type: result.message_type ?? messageType,
-                    attachments: (result.attachments ?? attachments)
-                      .map(normalizeAttachmentUrl)
-                      .filter(Boolean),
-                    created_at: result.sent_at,
-                    status: 'sent',
-                  }
+                ? { ...m, status: 'failed' as MessageStatus }
                 : m,
             ),
           );
-          trackChatMessage(targetRoomId);
+          return false;
+        }
+      };
+
+      try {
+        if (isDraftRoom) {
+          const posted = await doPostFallback();
+          if (posted) trackChatMessage(targetRoomId);
+          return;
+        }
+        if (useSocket && ch) {
+          const socketPayload = {
+            message_type: messageType,
+            attachments,
+            reply_to_message_id: options?.reference?.message_id || undefined,
+            reply_mode: options?.reference?.mode || undefined,
+            reply_to: options?.reference || undefined,
+          };
+          const result = await sendMessageViaSocket(
+            ch,
+            content,
+            clientRef,
+            socketPayload as any,
+          );
+          if (result.ok) {
+            const resolved: Message = {
+              id: result.message_id,
+              content: result.content ?? content,
+              sender_id: user?.id ?? '',
+              message_type: result.message_type ?? messageType,
+              attachments: (result.attachments ?? attachments)
+                .map(normalizeAttachmentUrl)
+                .filter(Boolean),
+              created_at: result.sent_at,
+              status: 'sent',
+              reference:
+                ((result as any).reference as MessageReference | null | undefined) ??
+                ((result as any).reply_to as MessageReference | null | undefined) ??
+                options?.reference ??
+                null,
+            };
+            setMessages(prev =>
+              reconcileOptimisticChatMessage(prev, clientRef, resolved),
+            );
+            trackChatMessage(targetRoomId);
+          } else {
+            const posted = await doPostFallback();
+            if (posted) trackChatMessage(targetRoomId);
+          }
         } else {
           const posted = await doPostFallback();
           if (posted) trackChatMessage(targetRoomId);
         }
-      } else {
-        const posted = await doPostFallback();
+      } catch {
+        const posted = await doPostFallback().catch(() => {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === clientRef
+                ? { ...m, status: 'failed' as MessageStatus }
+                : m,
+            ),
+          );
+          return false;
+        });
         if (posted) trackChatMessage(targetRoomId);
+      } finally {
+        setSending(false);
       }
-    } catch {
-      const posted = await doPostFallback().catch(() => {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === clientRef
-              ? { ...m, status: 'failed' as MessageStatus }
-              : m,
-          ),
-        );
-        return false;
-      });
-      if (posted) trackChatMessage(targetRoomId);
-    } finally {
-      setSending(false);
-    }
-  };
+    },
+    [
+      authFetch,
+      canonicalRoomId,
+      channelReady,
+      dmNamesByUserId,
+      draftContact,
+      ensureWritableRoomId,
+      isDraftRoom,
+      peerUserId,
+      roomName,
+      roomReadOnly,
+      router,
+      scrollMessagesToBottom,
+      user,
+    ],
+  );
 
   const patchStructuredCardMessage = useCallback(
     (messageId: string, patch: Record<string, unknown>) => {
@@ -3446,6 +4103,43 @@ export default function ChatRoomPage() {
 
       if (!draftId || publishingDraftId === draftId) return;
 
+      const publishIssues = Array.isArray(meta?.publish_issues)
+        ? meta.publish_issues.filter(
+            (issue): issue is string =>
+              typeof issue === 'string' && issue.trim().length > 0,
+          )
+        : [];
+      if (publishIssues.length > 0 || meta?.publish_ready === false) {
+        notify({
+          title:
+            chatLocale === 'id'
+              ? 'Draft belum siap diterbitkan'
+              : 'Draft is not ready to publish',
+          description:
+            publishIssues.length > 0
+              ? formatValidationIssues(publishIssues, chatLocale)
+              : chatLocale === 'id'
+                ? 'Buka dan periksa draft terlebih dahulu.'
+                : 'Open and review the draft first.',
+          variant: 'info',
+        });
+        return;
+      }
+
+      const approved = await confirm({
+        title:
+          chatLocale === 'id'
+            ? 'Terbitkan listing ini?'
+            : 'Publish this listing?',
+        description:
+          chatLocale === 'id'
+            ? 'Listing akan langsung terlihat oleh pengguna lain. Pastikan harga, lokasi, foto, dan kontak sudah benar.'
+            : 'The listing will become visible to other users. Confirm the price, location, photos, and contact details first.',
+        confirmLabel: chatLocale === 'id' ? 'Ya, terbitkan' : 'Publish',
+        cancelLabel: chatLocale === 'id' ? 'Periksa lagi' : 'Review again',
+      });
+      if (!approved) return;
+
       setPublishingDraftId(draftId);
       try {
         const res = await authFetch(`/api/content/${draftId}`, {
@@ -3529,6 +4223,7 @@ export default function ChatRoomPage() {
     [
       authFetch,
       chatLocale,
+      confirm,
       notify,
       patchStructuredCardMessage,
       publishingDraftId,
@@ -3536,23 +4231,26 @@ export default function ChatRoomPage() {
   );
 
   const handleGenerateAiDraft = useCallback(async () => {
-    if (aiLoading) return;
+    if (aiLoading || roomReadOnly) return;
     if (sending) {
       setAiError('Tunggu pesan selesai terkirim dulu.');
       return;
     }
     setAiError(null);
     setAiLoading(true);
+    aiDraftAbortRef.current?.abort();
+    const controller = new AbortController();
+    const requestRoomId = canonicalRoomId;
+    aiDraftAbortRef.current = controller;
 
     const userDraftHint = newMessage.trim();
     const instructionParts = [
-      `Kamu adalah asisten chat pribadi milik pengguna Lajukan.`,
-      `Nama asisten: ${aiProfileName || 'AI Pribadi'}.`,
+      `Kamu adalah fitur Bantu tulis di chat Lajukan.`,
       `Tujuan: ${aiTemplate.label}.`,
       `Arahan template: ${aiTemplate.prompt}.`,
       `Nada: ${aiTone.label}. Panjang: ${aiLength.label}.`,
       aiUseContext
-        ? 'Privasi: pelajari gaya dari contoh pesan yang dikirim user sendiri saja. Jangan gunakan pesan lawan bicara sebagai bahan belajar.'
+        ? 'Privasi: gunakan hanya pesan yang dikirim user sendiri sebagai contoh gaya. Pesan lawan bicara tidak disertakan.'
         : 'Privasi: jangan gunakan riwayat chat sebagai contoh gaya.',
       aiInstruction ? `Instruksi tambahan user: ${aiInstruction}` : '',
       userDraftHint
@@ -3574,11 +4272,17 @@ export default function ChatRoomPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       const data = (await res.json().catch(() => ({}))) as {
         response?: string;
       };
       const draft = String(data.response ?? '').trim();
+      if (
+        controller.signal.aborted ||
+        canonicalRoomIdRef.current !== requestRoomId
+      )
+        return;
       if (!draft) {
         throw new Error(
           res.ok
@@ -3586,61 +4290,44 @@ export default function ChatRoomPage() {
             : 'Layanan AI sedang bermasalah.',
         );
       }
-      setAiDraft(draft);
+      setNewMessage(draft);
       setAiLastGeneratedAt(new Date().toISOString());
-
-      if (aiAutoSend) {
-        if (isUploadingAttachments) {
-          setAiError('Tunggu upload selesai sebelum auto-send.');
-          return;
-        }
-        await sendPayload(draft);
-      }
+      setShowAiQuickPanel(false);
+      window.setTimeout(() => {
+        messageInputRef.current?.focus({ preventScroll: true });
+      }, 0);
     } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === 'AbortError') ||
+        canonicalRoomIdRef.current !== requestRoomId
+      )
+        return;
       setAiError(
         error instanceof Error ? error.message : 'Gagal membuat draft AI.',
       );
     } finally {
-      setAiLoading(false);
+      if (aiDraftAbortRef.current === controller) {
+        aiDraftAbortRef.current = null;
+        setAiLoading(false);
+      }
     }
   }, [
-    aiAutoSend,
     aiContextMessages,
     aiInstruction,
     aiLength.label,
     aiLoading,
-    aiProfileName,
     aiTemplate.label,
     aiTemplate.prompt,
     aiTone.label,
     aiUseContext,
     authFetch,
+    canonicalRoomId,
     isSupportRoom,
-    isUploadingAttachments,
     newMessage,
-    sendPayload,
+    roomReadOnly,
     sending,
-    user?.id,
   ]);
-
-  const handleInsertAiDraft = useCallback(() => {
-    if (!aiDraft.trim()) return;
-    setNewMessage(aiDraft.trim());
-    setAiDraft('');
-    messageInputRef.current?.focus();
-  }, [aiDraft]);
-
-  const handleSendAiDraft = useCallback(async () => {
-    const draft = aiDraft.trim();
-    if (!draft || sending || isUploadingAttachments) return;
-    setAiDraft('');
-    await sendPayload(draft);
-  }, [aiDraft, isUploadingAttachments, sendPayload, sending]);
-
-  const handleClearAiDraft = useCallback(() => {
-    setAiDraft('');
-    setAiError(null);
-  }, []);
 
   const getMessageSenderLabel = useCallback(
     (message: Message) => {
@@ -3670,9 +4357,9 @@ export default function ChatRoomPage() {
     [focusComposerSoon],
   );
 
-  const handleForwardMessage = useCallback(
+  const handleQuoteMessage = useCallback(
     (message: Message) => {
-      setComposerAction({ mode: 'forward', message });
+      setComposerAction({ mode: 'quote', message });
       focusComposerSoon();
     },
     [focusComposerSoon],
@@ -3700,8 +4387,51 @@ export default function ChatRoomPage() {
     [chatLocale, notify],
   );
 
+  const handleRetryMessage = (message: Message) => {
+    if (sending || roomReadOnly || message.status !== 'failed') return;
+    setOpenMessageActionsId(null);
+    void sendPayload(
+      message.content,
+      message.message_type || 'text',
+      message.attachments || [],
+      {
+        clientRef: message.id,
+        retryExisting: true,
+        createdAt: message.created_at,
+      },
+    );
+  };
+
   const handleSend = useCallback(
     async (options?: { refocusComposer?: boolean }) => {
+      if (roomReadOnly) {
+        notify({
+          title:
+            chatLocale === 'id'
+              ? 'Mode baca dari cache'
+              : 'Read-only cached mode',
+          description:
+            chatLocale === 'id'
+              ? 'Sambungkan kembali internet untuk mengirim pesan.'
+              : 'Reconnect to send a message.',
+          variant: 'info',
+        });
+        return;
+      }
+      if (isPeerBlocked) {
+        notify({
+          title:
+            chatLocale === 'id'
+              ? 'Pengguna ini sedang diblokir'
+              : 'This person is blocked',
+          description:
+            chatLocale === 'id'
+              ? 'Buka blokir dari Pengaturan chat untuk mengirim pesan.'
+              : 'Unblock them in Chat settings to send a message.',
+          variant: 'info',
+        });
+        return;
+      }
       const trimmed = newMessage.trim();
       const hasAttachments = draftAttachments.length > 0;
       if (!trimmed && !hasAttachments && !composerAction) return;
@@ -3730,8 +4460,14 @@ export default function ChatRoomPage() {
         );
         if (notReady.length > 0) {
           notify({
-            title: 'Upload masih berjalan',
-            description: 'Please wait until all attachments finish uploading.',
+            title:
+              chatLocale === 'id'
+                ? 'Unggahan masih berjalan'
+                : 'Upload still in progress',
+            description:
+              chatLocale === 'id'
+                ? 'Tunggu sampai semua lampiran selesai diunggah.'
+                : 'Please wait until all attachments finish uploading.',
             variant: 'info',
           });
           return;
@@ -3750,23 +4486,23 @@ export default function ChatRoomPage() {
       const attachmentUrls = hasAttachments
         ? draftAttachments.map(att => att.serverUrl ?? '').filter(Boolean)
         : [];
+      const firstAttachmentType = draftAttachments[0]?.type;
+      const attachmentsShareType = draftAttachments.every(
+        attachment => attachment.type === firstAttachmentType,
+      );
       const messageType = hasAttachments
-        ? draftAttachments.length === 1
-          ? draftAttachments[0].type
+        ? attachmentsShareType && firstAttachmentType
+          ? firstAttachmentType
           : 'file'
         : 'text';
-      const outgoingContent = composeActionMessage(
+      // Reply/quote is metadata, never text. This prevents nested strings like
+      // "> Mengutip ...: > Membalas ..." from being persisted.
+      const reference = createMessageReference(
         composerAction,
-        trimmed,
-        composerAction
-          ? getMessageSenderLabel(composerAction.message)
-          : chatLocale === 'id'
-            ? 'Pesan'
-            : 'Message',
-        chatLocale,
+        getMessageSenderLabel,
       );
 
-      await sendPayload(outgoingContent, messageType, attachmentUrls);
+      await sendPayload(trimmed, messageType, attachmentUrls, { reference });
       setNewMessage('');
       setComposerAction(null);
       clearDraftAttachments();
@@ -3791,30 +4527,100 @@ export default function ChatRoomPage() {
       channelReady,
       clearDraftAttachments,
       scrollMessagesToBottom,
+      isPeerBlocked,
+      roomReadOnly,
     ],
   );
 
-  const handleChooseFile = () => fileInputRef.current?.click();
+  const handleChooseFile = () => {
+    if (isPeerBlocked || roomReadOnly) return;
+    setShowAttachmentActions(false);
+    fileInputRef.current?.click();
+  };
+  const handleAttachmentTrigger = () => {
+    if (isPeerBlocked || roomReadOnly) return;
+    const useCompactMenu =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 420px)').matches;
+    if (useCompactMenu) {
+      setShowEmojiPicker(false);
+      setShowStickerPanel(false);
+      setShowAttachmentActions(current => !current);
+      return;
+    }
+    handleChooseFile();
+  };
+
+  const handleClearRoomCache = useCallback(async () => {
+    if (!currentUserId || !canonicalRoomId) return;
+    const approved = await confirm({
+      title:
+        chatLocale === 'id'
+          ? 'Hapus cache chat di perangkat ini?'
+          : 'Clear this chat cache on this device?',
+      description:
+        chatLocale === 'id'
+          ? 'Hanya salinan lokal untuk membuka lebih cepat yang dihapus. Riwayat di server dan pesan yang sedang tampil tidak ikut terhapus.'
+          : 'Only the local speed-up copy is removed. Server history and messages currently on screen are kept.',
+      confirmLabel: chatLocale === 'id' ? 'Hapus cache' : 'Clear cache',
+      cancelLabel: chatLocale === 'id' ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+    await clearChatMessageCacheForRoom(currentUserId, canonicalRoomId);
+    notify({
+      title:
+        chatLocale === 'id'
+          ? 'Cache lokal chat dihapus'
+          : 'Local chat cache cleared',
+      description:
+        chatLocale === 'id'
+          ? 'Riwayat server tidak berubah.'
+          : 'Server history was not changed.',
+      variant: 'success',
+    });
+  }, [canonicalRoomId, chatLocale, confirm, currentUserId, notify]);
+
   const handleFileChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
     handleFilesSelected(ev.target.files);
     ev.target.value = '';
   };
 
+  const handleStartVoiceNote = useCallback(() => {
+    if (sending || isUploadingAttachments || isPeerBlocked || roomReadOnly)
+      return;
+    setShowEmojiPicker(false);
+    setShowStickerPanel(false);
+    void startVoiceNote();
+  }, [
+    isPeerBlocked,
+    isUploadingAttachments,
+    roomReadOnly,
+    sending,
+    startVoiceNote,
+  ]);
+
+  const handleUseVoiceNote = useCallback(() => {
+    if (!voiceNoteRecording || roomReadOnly) return;
+    handleFilesSelected([voiceNoteRecording.file]);
+    resetVoiceNote();
+  }, [handleFilesSelected, resetVoiceNote, roomReadOnly, voiceNoteRecording]);
+
   const handleStickerSelect = useCallback(
-    (url: string) => {
-      if (!url || sending) return;
+    (emoji: string) => {
+      if (!emoji || sending || isPeerBlocked || roomReadOnly) return;
       setShowStickerPanel(false);
-      void sendPayload('', 'sticker', [url]);
+      void sendPayload(emoji, 'sticker', []);
     },
-    [sending],
+    [isPeerBlocked, roomReadOnly, sendPayload, sending],
   );
 
   const handleEmojiPick = useCallback(
     (emoji: string) => {
-      if (!emoji) return;
+      if (!emoji || isPeerBlocked) return;
       handleTypingChange(`${newMessage}${emoji}`);
     },
-    [newMessage, handleTypingChange],
+    [newMessage, handleTypingChange, isPeerBlocked],
   );
 
   const applyListingActionMode = useCallback(
@@ -3906,7 +4712,7 @@ export default function ChatRoomPage() {
       applyListingActionMode(draft, mode);
       setShowListingActionModal(true);
     },
-    [applyListingActionMode],
+    [applyListingActionMode, notify],
   );
 
   const submitListingAction = useCallback(async () => {
@@ -3970,26 +4776,28 @@ export default function ChatRoomPage() {
           },
         }),
       });
-      const offerData = await offerRes.json().catch(() => ({}));
+      const offerData = asObject(await offerRes.json().catch(() => ({})));
       if (!offerRes.ok) {
         throw new Error(
-          (offerData as { error?: string }).error || 'Gagal membuat penawaran',
+          typeof offerData.error === 'string'
+            ? offerData.error
+            : 'Gagal membuat penawaran',
         );
       }
 
       const resolvedAmount =
-        typeof (offerData as any)?.amount_cents === 'number'
-          ? (offerData as any).amount_cents
+        typeof offerData.amount_cents === 'number'
+          ? offerData.amount_cents
           : amountCents;
       const resolvedCurrency =
-        typeof (offerData as any)?.currency === 'string'
-          ? (offerData as any).currency
+        typeof offerData.currency === 'string'
+          ? offerData.currency
           : listingActionDraft.currency;
       const resolvedStatus =
-        typeof (offerData as any)?.status === 'string'
-          ? (offerData as any).status
-          : typeof (offerData as any)?.transaction_status === 'string'
-            ? (offerData as any).transaction_status
+        typeof offerData.status === 'string'
+          ? offerData.status
+          : typeof offerData.transaction_status === 'string'
+            ? offerData.transaction_status
             : 'pending';
       const summary =
         listingActionMode === 'direct'
@@ -3998,10 +4806,7 @@ export default function ChatRoomPage() {
             ? `Need response: ${formatMoney(resolvedAmount, resolvedCurrency)}`
             : `Offer: ${formatMoney(resolvedAmount, resolvedCurrency)}`;
       const payload = {
-        transaction_id:
-          typeof (offerData as any)?.id === 'string'
-            ? (offerData as any).id
-            : '',
+        transaction_id: typeof offerData.id === 'string' ? offerData.id : '',
         content_id: listingActionDraft.contentId,
         content_title: listingActionDraft.title,
         content_url: listingActionDraft.contentUrl,
@@ -4011,31 +4816,31 @@ export default function ChatRoomPage() {
         market_side: toMarketSideValue(listingActionDraft.listingSide),
         created_at: createdAt,
         buyer_id:
-          typeof (offerData as any)?.buyer_id === 'string'
-            ? (offerData as any).buyer_id
+          typeof offerData.buyer_id === 'string'
+            ? offerData.buyer_id
             : user?.id,
         seller_id:
-          typeof (offerData as any)?.seller_id === 'string'
-            ? (offerData as any).seller_id
+          typeof offerData.seller_id === 'string'
+            ? offerData.seller_id
             : undefined,
         deal_kind:
-          typeof (offerData as any)?.deal_kind === 'string'
-            ? (offerData as any).deal_kind
+          typeof offerData.deal_kind === 'string'
+            ? offerData.deal_kind
             : listingActionDraft.dealKind,
         fulfillment_mode:
-          typeof (offerData as any)?.fulfillment_mode === 'string'
-            ? (offerData as any).fulfillment_mode
+          typeof offerData.fulfillment_mode === 'string'
+            ? offerData.fulfillment_mode
             : listingActionDraft.fulfillmentMode,
         snapshot_listing:
-          typeof (offerData as any)?.snapshot_listing === 'object'
-            ? (offerData as any).snapshot_listing
+          Object.keys(asObject(offerData.snapshot_listing)).length > 0
+            ? asObject(offerData.snapshot_listing)
             : undefined,
         safety_checklist: safetyChecklist,
         risk_flags: riskFlags,
         status: resolvedStatus,
         protection_status:
-          typeof (offerData as any)?.protection_status === 'string'
-            ? (offerData as any).protection_status
+          typeof offerData.protection_status === 'string'
+            ? offerData.protection_status
             : 'awaiting_funding',
         flow_mode: listingActionMode,
         ticket: {
@@ -4591,7 +5396,8 @@ export default function ChatRoomPage() {
   }, [showTransactionsDrawer, loadRoomTransactions]);
 
   useEffect(() => {
-    if (!canonicalRoomId || roomAllowed !== true || isDraftRoom) return;
+    if (!canonicalRoomId || roomAllowed !== true || roomReadOnly || isDraftRoom)
+      return;
     if (!hasTransactionMessages) return;
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       return;
@@ -4604,18 +5410,17 @@ export default function ChatRoomPage() {
       void refreshRoomTransactionsSilently();
     };
 
-    const timer = window.setInterval(refresh, 12000);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
 
     return () => {
-      window.clearInterval(timer);
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refresh);
     };
   }, [
     canonicalRoomId,
     roomAllowed,
+    roomReadOnly,
     isDraftRoom,
     hasTransactionMessages,
     refreshRoomTransactionsSilently,
@@ -4641,28 +5446,28 @@ export default function ChatRoomPage() {
         next.push({
           type: 'day',
           id: `day-${dayKey}-${msg.id}`,
-          label: formatDayLabel(msg.created_at),
+          label: formatChatDayLabel(msg.created_at, chatLocale),
         });
         prevDayKey = dayKey;
       }
       next.push({ type: 'message', message: msg });
     }
     return next;
-  }, [messages]);
+  }, [chatLocale, messages]);
 
   const statusMeta: Record<
     'connecting' | 'connected' | 'disconnected' | 'error',
     { label: string; subtext: string; dotClass: string; textClass: string }
   > = {
     connected: {
-      label: chatLocale === 'id' ? 'Online' : 'Online',
+      label: chatLocale === 'id' ? 'Tersambung' : 'Connected',
       subtext: typingUser
         ? chatLocale === 'id'
           ? `${typingUser} sedang mengetik...`
           : `${typingUser} is typing...`
         : chatLocale === 'id'
-          ? 'Chat terenkripsi'
-          : 'End-to-end encrypted',
+          ? 'Terhubung ke layanan chat Lajukan'
+          : 'Connected to Lajukan chat',
       dotClass: 'bg-[color:var(--app-accent)]',
       textClass:
         'text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]',
@@ -4680,8 +5485,8 @@ export default function ChatRoomPage() {
       label: chatLocale === 'id' ? 'Menyambung ulang...' : 'Reconnecting...',
       subtext:
         chatLocale === 'id'
-          ? 'Akan dicoba lagi otomatis'
-          : "We'll retry automatically",
+          ? 'Menunggu koneksi kembali'
+          : 'Waiting for the connection to return',
       dotClass: 'bg-[color:var(--app-surface)] animate-pulse',
       textClass:
         'text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]',
@@ -4690,19 +5495,14 @@ export default function ChatRoomPage() {
       label: chatLocale === 'id' ? 'Masalah koneksi' : 'Connection issue',
       subtext:
         chatLocale === 'id'
-          ? 'Coba lagi sebentar lagi'
-          : 'Tap to retry in a moment',
+          ? 'Periksa koneksi, lalu coba lagi'
+          : 'Check your connection, then try again',
       dotClass: 'bg-[color:var(--app-danger)] animate-pulse',
       textClass: 'text-[color:var(--app-danger)]',
     },
   };
 
   const statusInfo = statusMeta[connectionStatus];
-  const roomKind = canonicalRoomId.startsWith('support:')
-    ? 'support'
-    : canonicalRoomId.startsWith('dm:') || canonicalRoomId.startsWith('draft:')
-      ? 'direct'
-      : 'group';
   const roomSummaryTransaction = useMemo(() => {
     if (selectedTransaction) return selectedTransaction;
     const activeTxn = roomTransactions.find(txn => {
@@ -4958,12 +5758,14 @@ export default function ChatRoomPage() {
   if (!canonicalRoomId) {
     return (
       <div className="min-h-full flex flex-col items-center justify-center gap-4 bg-[color:var(--app-surface)] p-4">
-        <p className="text-[color:var(--app-text-soft)]">Invalid chat room</p>
+        <p className="text-[color:var(--app-text-soft)]">
+          {chatLocale === 'id' ? 'Ruang chat tidak valid' : 'Invalid chat room'}
+        </p>
         <Link
           href="/chat"
-          className="px-4 py-2 rounded-full bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] text-sm font-bold hover:bg-[color:var(--app-accent-strong)]"
+          className="inline-flex min-h-11 items-center rounded-full bg-[color:var(--app-accent)] px-5 py-2 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
         >
-          Back to chats
+          {chatLocale === 'id' ? 'Kembali ke chat' : 'Back to chats'}
         </Link>
       </div>
     );
@@ -4971,7 +5773,7 @@ export default function ChatRoomPage() {
 
   if (roomAllowed === null) {
     return (
-      <div className="lajukan-visual-viewport-shell flex min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]">
+      <div className="lajukan-visual-viewport-shell flex h-[var(--app-visual-viewport-height,100dvh)] max-h-[var(--app-visual-viewport-height,100dvh)] min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]">
         <header className="sticky top-0 z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
           <div className="flex min-w-0 items-center gap-3 px-2.5 py-2 sm:px-2 sm:py-2.5">
             <div className="h-10 w-10 shrink-0 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942]" />
@@ -4994,6 +5796,41 @@ export default function ChatRoomPage() {
     );
   }
 
+  if (!isDraftRoom && roomAccessState === 'error') {
+    return (
+      <div className="min-h-full flex items-center justify-center bg-[color:var(--app-surface)] p-6">
+        <div className="ui-feed-section w-full max-w-md rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-6 text-center">
+          <AlertCircle className="mx-auto h-8 w-8 text-[color:var(--app-warning)]" />
+          <h2 className="mt-3 text-base font-semibold text-[color:var(--app-text)]">
+            {chatLocale === 'id'
+              ? 'Belum bisa membuka chat'
+              : 'Unable to open chat yet'}
+          </h2>
+          <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+            {chatLocale === 'id'
+              ? 'Akses ruang belum dapat diperiksa. Periksa koneksi, lalu coba lagi.'
+              : 'Room access could not be checked. Check your connection, then try again.'}
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRoomAccessRetryKey(value => value + 1)}
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-5 py-2 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+            >
+              {chatLocale === 'id' ? 'Coba lagi' : 'Try again'}
+            </button>
+            <Link
+              href="/chat"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--app-border-strong)] px-5 py-2 text-sm font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface)]"
+            >
+              {chatLocale === 'id' ? 'Daftar chat' : 'Chat list'}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isDraftRoom && roomAllowed === false) {
     return (
       <div className="min-h-full flex items-center justify-center bg-[color:var(--app-surface)] p-6">
@@ -5003,12 +5840,13 @@ export default function ChatRoomPage() {
             {chatLocale === 'id' ? 'Chat tidak tersedia' : 'Chat not available'}
           </h2>
           <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-            Room ini tidak ditemukan / kamu tidak punya akses. Buka chat dari
-            list, bukan dari URL.
+            {chatLocale === 'id'
+              ? 'Ruang ini tidak ditemukan atau akun Anda tidak memiliki akses.'
+              : 'This room was not found or your account does not have access.'}
           </p>
           <Link
             href="/chat"
-            className="mt-5 inline-flex items-center justify-center rounded-full bg-[color:var(--app-accent)] px-5 py-2 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+            className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-5 py-2 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
           >
             {chatLocale === 'id' ? 'Kembali ke chat' : 'Back to chats'}
           </Link>
@@ -5019,17 +5857,17 @@ export default function ChatRoomPage() {
 
   return (
     <div
-      className="lajukan-visual-viewport-shell flex min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]"
+      className="lajukan-visual-viewport-shell flex h-[var(--app-visual-viewport-height,100dvh)] max-h-[var(--app-visual-viewport-height,100dvh)] min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]"
       style={{
         backgroundColor: 'transparent',
       }}
     >
       <header className="sticky top-0 z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
-        <div className="min-w-0 px-2.5 py-2 sm:px-2 sm:py-2.5">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="min-w-0 py-2 pl-[max(0.625rem,env(safe-area-inset-left))] pr-[max(0.625rem,env(safe-area-inset-right))] sm:px-4 sm:py-2.5 lg:px-4">
+          <div className="flex min-w-0 items-center gap-1.5 min-[380px]:gap-2 sm:gap-3">
             <button
               onClick={handleBack}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#54656f] shadow-sm transition hover:bg-black/5 dark:border-white/10 dark:bg-[#111b21] dark:text-[#aebac1] dark:hover:bg-white/5 lg:hidden"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#54656f] shadow-sm transition hover:bg-black/5 dark:border-white/10 dark:bg-[#111b21] dark:text-[#aebac1] dark:hover:bg-white/5 max-[359px]:h-9 max-[359px]:w-9 sm:h-11 sm:w-11 lg:hidden"
               aria-label={
                 chatLocale === 'id' ? 'Kembali ke chat' : 'Back to chats'
               }
@@ -5037,76 +5875,117 @@ export default function ChatRoomPage() {
               <ArrowLeft className="h-5 w-5" />
             </button>
 
-            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#dfe5e7] dark:bg-[#2a3942] sm:h-11 sm:w-11">
-              <Image
-                src={roomAvatarUrl}
-                alt=""
-                width={44}
-                height={44}
-                className="h-full w-full object-cover"
-                priority
-              />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[15px] font-semibold leading-5 text-[#111b21] dark:text-[#e9edef] sm:text-base">
-                {roomName}
-              </h1>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-              <button
-                onClick={() => void startOutgoingCall('video')}
-                className="hidden h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 min-[360px]:inline-flex dark:text-[#aebac1] dark:hover:bg-white/5"
-                aria-label="Start video call"
-                disabled={
-                  !channelReady ||
-                  !channelRef.current ||
-                  showVideoCall ||
-                  showVoiceCall ||
-                  !!incomingCall
-                }
-                title={
-                  !channelReady
-                    ? chatLocale === 'id'
-                      ? 'Menghubungkan...'
-                      : 'Connecting...'
-                    : chatLocale === 'id'
-                      ? 'Panggilan video'
-                      : 'Video call'
+            {roomKind === 'direct' && peerUserId ? (
+              <Link
+                href={`/profile/${encodeURIComponent(peerUserId)}`}
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl pr-1 transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00a884]/45 dark:hover:bg-white/5"
+                aria-label={
+                  chatLocale === 'id'
+                    ? `Buka profil ${roomName}`
+                    : `Open ${roomName}'s profile`
                 }
               >
-                <Video className="h-5 w-5" />
-              </button>
+                <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#dfe5e7] dark:bg-[#2a3942] min-[380px]:h-10 min-[380px]:w-10 sm:h-11 sm:w-11">
+                  <Image
+                    src={roomAvatarUrl}
+                    alt=""
+                    width={44}
+                    height={44}
+                    className="h-full w-full object-cover"
+                    priority
+                  />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-5 text-[#111b21] dark:text-[#e9edef] min-[380px]:text-[15px] sm:text-base">
+                  {roomName}
+                </span>
+              </Link>
+            ) : (
+              <div className="flex min-h-11 min-w-0 flex-1 items-center gap-2">
+                <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#dfe5e7] dark:bg-[#2a3942] min-[380px]:h-10 min-[380px]:w-10 sm:h-11 sm:w-11">
+                  <Image
+                    src={roomAvatarUrl}
+                    alt=""
+                    width={44}
+                    height={44}
+                    className="h-full w-full object-cover"
+                    priority
+                  />
+                </div>
+                <h1 className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-5 text-[#111b21] dark:text-[#e9edef] min-[380px]:text-[15px] sm:text-base">
+                  {roomName}
+                </h1>
+              </div>
+            )}
 
-              <button
-                onClick={() => void startOutgoingCall('voice')}
-                className="hidden h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 min-[360px]:inline-flex dark:text-[#aebac1] dark:hover:bg-white/5"
-                aria-label="Start voice call"
-                disabled={
-                  !channelReady ||
-                  !channelRef.current ||
-                  showVideoCall ||
-                  showVoiceCall ||
-                  !!incomingCall
-                }
-                title={
-                  !channelReady
-                    ? chatLocale === 'id'
-                      ? 'Menghubungkan...'
-                      : 'Connecting...'
-                    : chatLocale === 'id'
-                      ? 'Panggilan suara'
-                      : 'Voice call'
-                }
-              >
-                <Phone className="h-5 w-5" />
-              </button>
+            <div className="flex shrink-0 items-center gap-0 max-[359px]:-mr-1 min-[380px]:gap-0.5 sm:gap-1">
+              {roomKind === 'direct' ? (
+                <>
+                  <button
+                    onClick={() => void startOutgoingCall('video')}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#aebac1] dark:hover:bg-white/5 min-[380px]:h-10 min-[380px]:w-10 sm:h-11 sm:w-11"
+                    aria-label={
+                      chatLocale === 'id'
+                        ? 'Mulai panggilan video'
+                        : 'Start video call'
+                    }
+                    disabled={
+                      isPeerBlocked ||
+                      roomReadOnly ||
+                      !channelReady ||
+                      !channelRef.current ||
+                      showVideoCall ||
+                      showVoiceCall ||
+                      !!incomingCall
+                    }
+                    title={
+                      !channelReady
+                        ? chatLocale === 'id'
+                          ? 'Menghubungkan...'
+                          : 'Connecting...'
+                        : chatLocale === 'id'
+                          ? 'Panggilan video'
+                          : 'Video call'
+                    }
+                  >
+                    <Video className="h-5 w-5" />
+                  </button>
+
+                  <button
+                    onClick={() => void startOutgoingCall('voice')}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#aebac1] dark:hover:bg-white/5 min-[380px]:h-10 min-[380px]:w-10 sm:h-11 sm:w-11"
+                    aria-label={
+                      chatLocale === 'id'
+                        ? 'Mulai panggilan suara'
+                        : 'Start voice call'
+                    }
+                    disabled={
+                      isPeerBlocked ||
+                      roomReadOnly ||
+                      !channelReady ||
+                      !channelRef.current ||
+                      showVideoCall ||
+                      showVoiceCall ||
+                      !!incomingCall
+                    }
+                    title={
+                      !channelReady
+                        ? chatLocale === 'id'
+                          ? 'Menghubungkan...'
+                          : 'Connecting...'
+                        : chatLocale === 'id'
+                          ? 'Panggilan suara'
+                          : 'Voice call'
+                    }
+                  >
+                    <Phone className="h-5 w-5" />
+                  </button>
+                </>
+              ) : null}
 
               <button
                 type="button"
                 onClick={() => setShowChatSettings(true)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5 min-[380px]:h-10 min-[380px]:w-10 sm:h-11 sm:w-11"
                 aria-label={
                   chatLocale === 'id' ? 'Pengaturan chat' : 'Chat settings'
                 }
@@ -5119,9 +5998,14 @@ export default function ChatRoomPage() {
             </div>
           </div>
 
-          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mt-2 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {/* 1. STATUS & TYPING INDICATOR */}
-            <span className="inline-flex min-h-[26px] min-w-0 max-w-full items-center gap-1.5 rounded-md bg-zinc-100/70 px-2 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800/40 dark:text-zinc-400 sm:text-xs">
+            <span
+              className="inline-flex min-h-[26px] min-w-0 max-w-full items-center gap-1.5 rounded-md bg-zinc-100/70 px-2 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800/40 dark:text-zinc-400 sm:text-xs"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
               <span
                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusInfo.dotClass} ${
                   typingUser ? 'animate-pulse scale-110' : ''
@@ -5174,8 +6058,30 @@ export default function ChatRoomPage() {
         </div>
       </header>
 
+      {roomReadOnly ? (
+        <div
+          className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-b border-amber-300/60 bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-950 dark:border-amber-200/20 dark:bg-amber-950/70 dark:text-amber-100"
+          role="status"
+          aria-live="polite"
+        >
+          <span>
+            {chatLocale === 'id'
+              ? 'Mode offline: menampilkan snapshot perangkat. Kirim, panggilan, dan perubahan lain aktif kembali setelah akses server tervalidasi.'
+              : 'Offline mode: showing the device snapshot. Sending, calls, and other changes resume after server access is validated.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setRoomAccessRetryKey(value => value + 1)}
+            className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-amber-700/30 bg-white/70 px-3 text-xs font-bold hover:bg-white dark:bg-amber-900/60 dark:hover:bg-amber-900"
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            {chatLocale === 'id' ? 'Coba lagi' : 'Retry'}
+          </button>
+        </div>
+      ) : null}
+
       {!PROMO_ONLY_MODE && roomSummaryTransaction ? (
-        <div className="shrink-0 border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-2">
+        <div className="shrink-0 border-b border-black/5 bg-[#f7f5f3]/85 py-1.5 pl-[max(0.625rem,env(safe-area-inset-left))] pr-[max(0.625rem,env(safe-area-inset-right))] dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
           <div className="mx-auto w-full max-w-[920px]">
             <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)]  dark:border-white/8 dark:bg-[#202c33]/90">
               <button
@@ -5277,7 +6183,7 @@ export default function ChatRoomPage() {
                     ) : null}
                   </div>
 
-                  <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
                       <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
                         {chatLocale === 'id' ? 'Nominal' : 'Amount'}
@@ -5350,7 +6256,7 @@ export default function ChatRoomPage() {
       ) : null}
 
       {/* Messages */}
-      <main className="flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+      <main className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div
             className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-35"
@@ -5363,18 +6269,31 @@ export default function ChatRoomPage() {
           />
           <div
             ref={messagesViewportRef}
-            className="relative min-h-0 flex-1 min-w-0 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 py-3 pb-4 [-webkit-overflow-scrolling:touch] sm:px-5 sm:py-4"
+            className="relative min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain py-3 pb-4 pl-[max(0.625rem,env(safe-area-inset-left))] pr-[max(0.625rem,env(safe-area-inset-right))] [-webkit-overflow-scrolling:touch] sm:px-4 sm:py-4 lg:px-5"
             data-auto-scrollbar
+            role="log"
+            aria-label={
+              chatLocale === 'id'
+                ? 'Riwayat percakapan'
+                : 'Conversation history'
+            }
+            aria-busy={loading}
           >
             <div
-              className={`mx-auto flex min-h-full w-full max-w-[920px] flex-col space-y-1.5 ${
+              className={`mx-auto flex min-h-full w-full max-w-[880px] flex-col space-y-1.5 xl:max-w-[960px] ${
                 !loading && !loadError && messages.length > 0
                   ? ''
                   : 'justify-center'
               }`}
             >
               {loading ? (
-                <div className="flex justify-center py-20">
+                <div
+                  className="flex justify-center py-20"
+                  role="status"
+                  aria-label={
+                    chatLocale === 'id' ? 'Memuat pesan' : 'Loading messages'
+                  }
+                >
                   <Loader2 className="h-6 w-6 animate-spin text-[#25d366]" />
                 </div>
               ) : loadError ? (
@@ -5421,6 +6340,8 @@ export default function ChatRoomPage() {
                     }
 
                     const msg = item.message;
+                    const displayContent = getMessageDisplayContent(msg);
+                    const messageReference = getMessageDisplayReference(msg);
                     const isOwn = msg.sender_id === user?.id;
                     const status = msg.status ?? 'sent';
                     const meta = parseStructuredAttachment(
@@ -5666,8 +6587,8 @@ export default function ChatRoomPage() {
 
                     const bubbleMaxWidthClass =
                       msg.message_type === 'transaction'
-                        ? 'max-w-[94%] sm:max-w-[520px]'
-                        : 'max-w-[86%] sm:max-w-[72%]';
+                        ? 'max-w-[calc(100%-2.5rem)] sm:max-w-[560px]'
+                        : 'max-w-[82%] sm:max-w-[72%] lg:max-w-[640px]';
                     const bubbleClass = `relative ${bubbleMaxWidthClass} overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:px-3 sm:py-2.5 sm:text-sm ${
                       isOwn
                         ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
@@ -5686,78 +6607,63 @@ export default function ChatRoomPage() {
                         {status === 'sending' && (
                           <Clock
                             className="h-3 w-3 animate-pulse"
-                            aria-label="Sending"
+                            aria-label={
+                              chatLocale === 'id' ? 'Mengirim' : 'Sending'
+                            }
                           />
                         )}
                         {status === 'sent' && (
-                          <Check className="h-3 w-3" aria-label="Sent" />
-                        )}
-                        {status === 'read' && (
-                          <CheckCheck
-                            className="h-3 w-3 text-[#53bdeb]"
-                            aria-label="Read"
+                          <Check
+                            className="h-3 w-3"
+                            aria-label={
+                              chatLocale === 'id'
+                                ? 'Terkirim ke Lajukan'
+                                : 'Sent to Lajukan'
+                            }
                           />
                         )}
                         {status === 'failed' && (
                           <AlertCircle
                             className="h-3 w-3 text-[#ff6b6b]"
-                            aria-label="Failed"
+                            aria-label={
+                              chatLocale === 'id' ? 'Gagal dikirim' : 'Failed'
+                            }
                           />
                         )}
                       </>
                     ) : null;
-                    const messageActionButtonClass =
-                      'inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/92 text-[#54656f] shadow-sm transition hover:bg-[#f0f2f5] hover:text-[#008f72] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40 dark:border-white/10 dark:bg-[#202c33]/95 dark:text-[#aebac1] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366]';
                     const messageActions = (
                       <div
-                        className={`flex shrink-0 items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover/message:opacity-100 sm:group-focus-within/message:opacity-100 ${isOwn ? 'order-first' : 'order-last'}`}
+                        className={`relative flex shrink-0 items-center opacity-100 transition ${
+                          openMessageActionsId === msg.id
+                            ? 'sm:opacity-100'
+                            : 'sm:opacity-0 sm:group-hover/message:opacity-100 sm:group-focus-within/message:opacity-100'
+                        } ${isOwn ? 'order-first' : 'order-last'}`}
+                        onBlur={event => {
+                          if (
+                            !event.currentTarget.contains(
+                              event.relatedTarget as Node | null,
+                            )
+                          ) {
+                            setOpenMessageActionsId(current =>
+                              current === msg.id ? null : current,
+                            );
+                          }
+                        }}
                       >
                         <button
                           type="button"
-                          onClick={() => handleReplyToMessage(msg)}
-                          className={messageActionButtonClass}
-                          title={chatLocale === 'id' ? 'Balas' : 'Reply'}
-                          aria-label={chatLocale === 'id' ? 'Balas' : 'Reply'}
-                        >
-                          <Reply className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleForwardMessage(msg)}
-                          className={messageActionButtonClass}
-                          title={chatLocale === 'id' ? 'Teruskan' : 'Forward'}
-                          aria-label={
-                            chatLocale === 'id' ? 'Teruskan' : 'Forward'
-                          }
-                        >
-                          <Forward className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleCopyMessage(msg)}
-                          className={messageActionButtonClass}
-                          title={chatLocale === 'id' ? 'Salin' : 'Copy'}
-                          aria-label={chatLocale === 'id' ? 'Salin' : 'Copy'}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
                           onClick={() =>
-                            notify({
-                              title:
-                                chatLocale === 'id'
-                                  ? 'Aksi pesan'
-                                  : 'Message actions',
-                              description:
-                                chatLocale === 'id'
-                                  ? 'Pilih Balas, Teruskan, atau Salin di samping pesan.'
-                                  : 'Choose Reply, Forward, or Copy next to the message.',
-                              variant: 'info',
-                              durationMs: 1800,
-                            })
+                            setOpenMessageActionsId(current =>
+                              current === msg.id ? null : msg.id,
+                            )
                           }
-                          className={`${messageActionButtonClass} hidden sm:inline-flex`}
+                          onKeyDown={event => {
+                            if (event.key === 'Escape') {
+                              setOpenMessageActionsId(null);
+                            }
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/5 bg-white/92 text-[#54656f] shadow-sm transition hover:bg-[#f0f2f5] hover:text-[#008f72] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40 dark:border-white/10 dark:bg-[#202c33]/95 dark:text-[#aebac1] dark:hover:bg-[#2a3942] dark:hover:text-[#25d366] sm:h-10 sm:w-10"
                           title={
                             chatLocale === 'id'
                               ? 'Aksi pesan'
@@ -5768,18 +6674,79 @@ export default function ChatRoomPage() {
                               ? 'Aksi pesan'
                               : 'Message actions'
                           }
+                          aria-haspopup="menu"
+                          aria-expanded={openMessageActionsId === msg.id}
                         >
-                          <MoreVertical className="h-3.5 w-3.5" />
+                          <ChevronDown className="h-4 w-4" />
                         </button>
+
+                        {openMessageActionsId === msg.id ? (
+                          <div
+                            role="menu"
+                            className={`absolute bottom-full z-30 mb-1 min-w-[156px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-black/10 bg-white py-1 shadow-xl dark:border-white/10 dark:bg-[#233138] ${isOwn ? 'left-0' : 'right-0'}`}
+                          >
+                            {isOwn && status === 'failed' ? (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => handleRetryMessage(msg)}
+                                disabled={sending}
+                                className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#008f72] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#25d366] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                              >
+                                <Send className="h-4 w-4" />
+                                {chatLocale === 'id'
+                                  ? 'Kirim ulang'
+                                  : 'Send again'}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setOpenMessageActionsId(null);
+                                handleReplyToMessage(msg);
+                              }}
+                              className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#111b21] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                            >
+                              <Reply className="h-4 w-4" />
+                              {chatLocale === 'id' ? 'Balas' : 'Reply'}
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setOpenMessageActionsId(null);
+                                handleQuoteMessage(msg);
+                              }}
+                              className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#111b21] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                            >
+                              <Quote className="h-4 w-4" />
+                              {chatLocale === 'id' ? 'Kutip' : 'Quote'}
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setOpenMessageActionsId(null);
+                                void handleCopyMessage(msg);
+                              }}
+                              className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-[#111b21] transition hover:bg-[#f0f2f5] focus:bg-[#f0f2f5] focus:outline-none dark:text-[#e9edef] dark:hover:bg-[#2a3942] dark:focus:bg-[#2a3942]"
+                            >
+                              <Copy className="h-4 w-4" />
+                              {chatLocale === 'id' ? 'Salin' : 'Copy'}
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     );
 
                     return (
                       <motion.div
                         key={msg.id}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`group/message flex items-end gap-1 px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
+                        className={`group/message flex min-w-0 items-end gap-1 px-0.5 sm:px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
+                        data-message-id={msg.id}
                       >
                         {isOwn ? messageActions : null}
                         <div className={bubbleClass}>
@@ -5788,6 +6755,63 @@ export default function ChatRoomPage() {
                             className={bubbleTailClass}
                           />
                           <div className="relative z-10">
+                            {messageReference ? (
+                              <button
+                                type="button"
+                                className={`mb-1.5 block w-full overflow-hidden rounded-[10px] border-l-[3px] px-2.5 py-1.5 text-left transition ${
+                                  isOwn
+                                    ? 'border-[#128c7e] bg-black/[0.055] hover:bg-black/[0.085] dark:border-[#53bdeb] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]'
+                                    : 'border-[#25d366] bg-[#f0f2f5] hover:bg-[#e7eaed] dark:border-[#25d366] dark:bg-[#2a3942] dark:hover:bg-[#33434d]'
+                                }`}
+                                onClick={() => {
+                                  const targetId = messageReference.message_id;
+                                  if (!targetId) return;
+                                  const target = document.querySelector<HTMLElement>(
+                                    `[data-message-id="${CSS.escape(targetId)}"]`,
+                                  );
+                                  target?.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'center',
+                                  });
+                                  if (target) {
+                                    target.animate(
+                                      [
+                                        { backgroundColor: 'rgba(37,211,102,.18)' },
+                                        { backgroundColor: 'transparent' },
+                                      ],
+                                      { duration: 900, easing: 'ease-out' },
+                                    );
+                                  }
+                                }}
+                                aria-label={
+                                  chatLocale === 'id'
+                                    ? 'Buka pesan yang dirujuk'
+                                    : 'Open referenced message'
+                                }
+                              >
+                                <span className={`block text-[10px] font-bold ${isOwn ? 'text-[#128c7e] dark:text-[#7dd3fc]' : 'text-[#008f72] dark:text-[#25d366]'}`}>
+                                  {messageReference.mode === 'quote'
+                                    ? chatLocale === 'id'
+                                      ? 'Kutipan'
+                                      : 'Quoted message'
+                                    : chatLocale === 'id'
+                                      ? 'Membalas'
+                                      : 'Replying to'}
+                                  {messageReference.sender_name
+                                    ? ` · ${messageReference.sender_name}`
+                                    : ''}
+                                </span>
+                                <span className={`mt-0.5 block max-h-9 overflow-hidden text-[11px] leading-4 ${isOwn ? 'text-[#54656f] dark:text-[#c9d4d8]' : 'text-[#54656f] dark:text-[#c7d0d4]'}`}>
+                                  {messageReference.content ||
+                                    (messageReference.attachments?.length
+                                      ? chatLocale === 'id'
+                                        ? 'Lampiran'
+                                        : 'Attachment'
+                                      : 'Pesan')}
+                                </span>
+                              </button>
+                            ) : null}
+
                             {/* Structured business messages */}
                             {isStructured ? (
                               <div className="space-y-2">
@@ -5795,7 +6819,9 @@ export default function ChatRoomPage() {
                                   className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${isOwn ? 'bg-[color:color-mix(in_srgb,_var(--app-overlay)_25%,_transparent)] text-[color:var(--app-accent)]' : 'bg-[color:var(--app-surface)] text-[color:var(--app-accent)]'}`}
                                 >
                                   {msg.message_type === 'offer' &&
-                                    (chatLocale === 'id' ? 'Offer' : 'Offer')}
+                                    (chatLocale === 'id'
+                                      ? 'Penawaran'
+                                      : 'Offer')}
                                   {msg.message_type === 'application' &&
                                     (chatLocale === 'id'
                                       ? 'Lamaran'
@@ -6261,16 +7287,18 @@ export default function ChatRoomPage() {
                                               }
                                               disabled={
                                                 publishingDraftId ===
-                                                structuredDraftId
+                                                  structuredDraftId ||
+                                                structuredDraftPublishIssues.length >
+                                                  0
                                               }
-                                              className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:opacity-60"
+                                              className="inline-flex min-h-11 items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-3 py-2 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                               {publishingDraftId ===
                                               structuredDraftId ? (
                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                               ) : null}
                                               {chatLocale === 'id'
-                                                ? 'Publish sekarang'
+                                                ? 'Terbitkan'
                                                 : 'Publish now'}
                                             </button>
                                           )}
@@ -6525,9 +7553,9 @@ export default function ChatRoomPage() {
                                   </div>
                                 )}
 
-                                {msg.content && (
+                                {displayContent && (
                                   <p className="text-xs opacity-90">
-                                    {msg.content}
+                                    {displayContent}
                                   </p>
                                 )}
                               </div>
@@ -6552,74 +7580,100 @@ export default function ChatRoomPage() {
                                     />
                                   );
                                 })}
-                                {msg.content && (
-                                  <span className="block">{msg.content}</span>
+                                {displayContent && (
+                                  <span className="block">{displayContent}</span>
                                 )}
                               </div>
                             ) : msg.message_type === 'video' &&
-                              msg.attachments?.[0] ? (
+                              msg.attachments?.length ? (
                               <div className="space-y-2">
-                                <video
-                                  src={normalizeAttachmentUrl(
-                                    msg.attachments[0],
-                                  )}
-                                  controls
-                                  className="max-w-full rounded-lg"
-                                />
-                                {msg.content && (
-                                  <span className="block">{msg.content}</span>
+                                {msg.attachments.map((rawUrl, index) => {
+                                  const videoUrl =
+                                    normalizeAttachmentUrl(rawUrl);
+                                  if (!videoUrl) return null;
+                                  return (
+                                    <video
+                                      key={`${msg.id}-video-${index}`}
+                                      src={videoUrl}
+                                      controls
+                                      preload="metadata"
+                                      className="max-w-full rounded-lg"
+                                    />
+                                  );
+                                })}
+                                {displayContent && (
+                                  <span className="block">{displayContent}</span>
                                 )}
                               </div>
                             ) : msg.message_type === 'audio' &&
-                              msg.attachments?.[0] ? (
+                              msg.attachments?.length ? (
                               <div className="space-y-2">
-                                <audio
-                                  src={normalizeAttachmentUrl(
-                                    msg.attachments[0],
-                                  )}
-                                  controls
-                                  className="max-w-full"
-                                />
-                                {msg.content && (
-                                  <span className="block">{msg.content}</span>
+                                {msg.attachments.map((rawUrl, index) => {
+                                  const audioUrl =
+                                    normalizeAttachmentUrl(rawUrl);
+                                  if (!audioUrl) return null;
+                                  return (
+                                    <audio
+                                      key={`${msg.id}-audio-${index}`}
+                                      src={audioUrl}
+                                      controls
+                                      preload="metadata"
+                                      className="max-w-full"
+                                    />
+                                  );
+                                })}
+                                {displayContent && (
+                                  <span className="block">{displayContent}</span>
                                 )}
                               </div>
                             ) : msg.message_type === 'sticker' &&
-                              msg.attachments?.[0] ? (
-                              <div className="space-y-2">
-                                <img
-                                  src={normalizeAttachmentUrl(
-                                    msg.attachments[0],
-                                  )}
-                                  alt="Sticker"
-                                  className="mx-auto h-24 w-24 object-contain"
-                                  loading="lazy"
-                                />
-                                {msg.content && (
-                                  <span className="block">{msg.content}</span>
-                                )}
-                              </div>
-                            ) : msg.message_type === 'file' &&
-                              msg.attachments?.[0] ? (
-                              <a
-                                href={normalizeAttachmentUrl(
-                                  msg.attachments[0],
-                                )}
-                                target="_blank"
-                                rel="noreferrer"
-                                className={`break-words underline ${isOwn ? 'text-[color:color-mix(in_srgb,_var(--app-text-inverse)_90%,_transparent)]' : 'text-[color:var(--app-accent)]'}`}
+                              displayContent ? (
+                              <span
+                                role="img"
+                                aria-label={
+                                  chatLocale === 'id' ? 'Stiker' : 'Sticker'
+                                }
+                                className="block px-2 py-1 text-center text-7xl leading-none"
                               >
-                                {msg.content || 'Download file'}
-                              </a>
+                                {displayContent}
+                              </span>
+                            ) : msg.message_type === 'file' &&
+                              msg.attachments?.length ? (
+                              <div className="space-y-2">
+                                {msg.attachments.map((rawUrl, index) => {
+                                  const fileUrl =
+                                    normalizeAttachmentUrl(rawUrl);
+                                  if (!fileUrl) return null;
+                                  return (
+                                    <a
+                                      key={`${msg.id}-file-${index}`}
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`flex min-h-11 items-center rounded-xl border border-black/10 px-3 py-2 text-sm font-semibold underline-offset-2 hover:underline dark:border-white/10 ${isOwn ? 'text-[color:color-mix(in_srgb,_var(--app-text-inverse)_90%,_transparent)]' : 'text-[color:var(--app-accent)]'}`}
+                                    >
+                                      {chatLocale === 'id'
+                                        ? `Buka file ${index + 1}`
+                                        : `Open file ${index + 1}`}
+                                    </a>
+                                  );
+                                })}
+                                {displayContent ? (
+                                  <span className="block">{displayContent}</span>
+                                ) : null}
+                              </div>
                             ) : (
                               <span>
-                                {msg.content}
+                                {displayContent}
                                 {isTextOnlyMessage ? (
                                   <span
                                     className={`ml-2 inline-flex translate-y-[2px] items-center gap-1 whitespace-nowrap align-baseline text-[10px] leading-none ${bubbleMetaClass}`}
                                   >
                                     <span>
-                                      {formatMessageTime(msg.created_at)}
+                                      {formatChatMessageTime(
+                                        msg.created_at,
+                                        chatLocale,
+                                      )}
                                     </span>
                                     {deliveryStatusIcon ? (
                                       <span className="inline-flex items-center opacity-90">
@@ -6636,7 +7690,10 @@ export default function ChatRoomPage() {
                                 <span
                                   className={`text-[10px] ${bubbleMetaClass}`}
                                 >
-                                  {formatMessageTime(msg.created_at)}
+                                  {formatChatMessageTime(
+                                    msg.created_at,
+                                    chatLocale,
+                                  )}
                                 </span>
                                 {deliveryStatusIcon ? (
                                   <span className="ml-0.5 inline-flex items-center opacity-90">
@@ -6663,9 +7720,9 @@ export default function ChatRoomPage() {
       {/* Composer */}
       <div
         ref={composerRef}
-        className="lajukan-chat-composer shrink-0 border-t border-black/5 bg-[#f0f2f5]/95 px-2 pb-[var(--chat-composer-bottom-pad)] pt-2  dark:border-white/6 dark:bg-[#202c33]/95"
+        className="lajukan-chat-composer relative z-30 w-full min-w-0 shrink-0 max-h-[min(66dvh,calc(var(--app-visual-viewport-height,100dvh)-3.5rem))] overflow-x-hidden overflow-y-auto overscroll-contain border-t border-black/5 bg-[#f0f2f5]/95 pt-2 pb-[max(0.5rem,var(--chat-composer-bottom-pad,0px),env(safe-area-inset-bottom))] pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] [-webkit-overflow-scrolling:touch] dark:border-white/6 dark:bg-[#202c33]/95 sm:px-4"
       >
-        <div className="mx-auto w-full max-w-[920px] space-y-2">
+        <div className="mx-auto w-full max-w-[880px] min-w-0 space-y-2 xl:max-w-[960px]">
           <input
             ref={fileInputRef}
             type="file"
@@ -6675,29 +7732,60 @@ export default function ChatRoomPage() {
             accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
           />
 
+          {isPeerBlocked ? (
+            <div
+              role="status"
+              className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-[#f4b8b8] bg-[#fff4f4] px-3 py-2 text-[#a52a2a] dark:border-[#6b3030] dark:bg-[#281818] dark:text-[#ffb4ab]"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <p className="text-xs font-semibold leading-5">
+                  {chatLocale === 'id'
+                    ? 'Anda memblokir pengguna ini. Pesan dan panggilan pribadi dinonaktifkan.'
+                    : 'You blocked this person. Direct messages and calls are disabled.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowChatSettings(true)}
+                className="inline-flex min-h-11 shrink-0 items-center rounded-xl px-3 text-xs font-bold underline-offset-2 hover:underline"
+              >
+                {chatLocale === 'id' ? 'Atur' : 'Manage'}
+              </button>
+            </div>
+          ) : null}
+
           {activeDraftAttachment && (
             <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white/90 p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21]/90">
               <div className="mb-2 flex items-center justify-between gap-2 px-1">
                 <div className="min-w-0">
                   <p className="truncate text-[12px] font-bold text-[#111b21] dark:text-[#e9edef]">
-                    Preview sebelum kirim
+                    {chatLocale === 'id'
+                      ? 'Pratinjau sebelum kirim'
+                      : 'Preview before sending'}
                   </p>
                   <p className="truncate text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
                     {draftAttachments.length > 1
-                      ? `${activeDraftAttachmentIndex + 1}/${draftAttachments.length} file`
-                      : '1 file'}
+                      ? `${activeDraftAttachmentIndex + 1}/${draftAttachments.length} ${chatLocale === 'id' ? 'berkas' : 'files'}`
+                      : chatLocale === 'id'
+                        ? '1 berkas'
+                        : '1 file'}
                     {' - '}
                     {isUploadingAttachments
-                      ? 'Upload masih jalan'
-                      : 'Siap dikirim'}
+                      ? chatLocale === 'id'
+                        ? 'Masih mengunggah'
+                        : 'Still uploading'
+                      : chatLocale === 'id'
+                        ? 'Siap dikirim'
+                        : 'Ready to send'}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => clearDraftAttachments()}
-                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-black/5 bg-[#f0f2f5] px-3 text-[11px] font-bold text-[#54656f] transition hover:bg-[#e9edef] dark:border-white/8 dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-black/5 bg-[#f0f2f5] px-3 text-[11px] font-bold text-[#54656f] transition hover:bg-[#e9edef] dark:border-white/8 dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
                 >
-                  Hapus semua
+                  {chatLocale === 'id' ? 'Hapus semua' : 'Remove all'}
                 </button>
               </div>
 
@@ -6719,7 +7807,7 @@ export default function ChatRoomPage() {
                   showDraftAttachmentAtOffset(deltaX < 0 ? 1 : -1);
                 }}
               >
-                <div className="flex min-h-[230px] items-center justify-center sm:min-h-[320px]">
+                <div className="flex min-h-[clamp(120px,26dvh,210px)] items-center justify-center sm:min-h-[clamp(160px,30dvh,280px)] lg:min-h-[clamp(180px,32dvh,320px)]">
                   {activeDraftAttachment.type === 'image' &&
                   activeDraftAttachment.previewUrl ? (
                     <img
@@ -6737,8 +7825,25 @@ export default function ChatRoomPage() {
                       playsInline
                       controls
                     />
+                  ) : activeDraftAttachment.type === 'audio' &&
+                    activeDraftAttachment.previewUrl ? (
+                    <div className="flex min-h-[clamp(120px,26dvh,210px)] w-full flex-col items-center justify-center gap-3 px-4 pb-20 pt-8 text-white sm:min-h-[clamp(160px,30dvh,280px)] sm:px-6 lg:min-h-[clamp(180px,32dvh,320px)]">
+                      <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#00a884]/18 text-[#25d366]">
+                        <Mic className="h-7 w-7" />
+                      </span>
+                      <audio
+                        controls
+                        preload="metadata"
+                        src={activeDraftAttachment.previewUrl}
+                        className="relative z-10 h-11 w-full max-w-md"
+                      >
+                        {chatLocale === 'id'
+                          ? 'Browser tidak dapat memutar rekaman ini.'
+                          : 'Your browser cannot play this recording.'}
+                      </audio>
+                    </div>
                   ) : (
-                    <div className="flex min-h-[230px] w-full flex-col items-center justify-center gap-3 px-6 text-center text-white/82 sm:min-h-[320px]">
+                    <div className="flex min-h-[clamp(120px,26dvh,210px)] w-full flex-col items-center justify-center gap-3 px-4 text-center text-white/82 sm:min-h-[clamp(160px,30dvh,280px)] sm:px-6 lg:min-h-[clamp(180px,32dvh,320px)]">
                       <span className="inline-flex h-16 w-16 items-center justify-center rounded-[22px] bg-white/10 text-white">
                         <Paperclip className="h-7 w-7" />
                       </span>
@@ -6758,8 +7863,17 @@ export default function ChatRoomPage() {
                     onClick={() =>
                       removeDraftAttachment(activeDraftAttachment.id)
                     }
-                    className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white shadow-sm transition hover:bg-black/72"
-                    title="Remove attachment"
+                    className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white shadow-sm transition hover:bg-black/72"
+                    title={
+                      chatLocale === 'id'
+                        ? 'Hapus lampiran'
+                        : 'Remove attachment'
+                    }
+                    aria-label={
+                      chatLocale === 'id'
+                        ? 'Hapus lampiran'
+                        : 'Remove attachment'
+                    }
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -6769,16 +7883,24 @@ export default function ChatRoomPage() {
                       <button
                         type="button"
                         onClick={() => showDraftAttachmentAtOffset(-1)}
-                        className="absolute left-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
-                        aria-label="Previous attachment"
+                        className="absolute left-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
+                        aria-label={
+                          chatLocale === 'id'
+                            ? 'Lampiran sebelumnya'
+                            : 'Previous attachment'
+                        }
                       >
                         <ChevronLeft className="h-5 w-5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => showDraftAttachmentAtOffset(1)}
-                        className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
-                        aria-label="Next attachment"
+                        className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
+                        aria-label={
+                          chatLocale === 'id'
+                            ? 'Lampiran berikutnya'
+                            : 'Next attachment'
+                        }
                       >
                         <ChevronRight className="h-5 w-5" />
                       </button>
@@ -6800,9 +7922,11 @@ export default function ChatRoomPage() {
                       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-bold text-white">
                         <Loader2
                           className="h-3.5 w-3.5 animate-spin"
-                          aria-label="Uploading"
+                          aria-label={
+                            chatLocale === 'id' ? 'Mengunggah' : 'Uploading'
+                          }
                         />
-                        Upload
+                        {chatLocale === 'id' ? 'Unggah' : 'Upload'}
                       </span>
                     ) : activeDraftAttachment.status === 'error' ? (
                       <button
@@ -6810,13 +7934,13 @@ export default function ChatRoomPage() {
                         onClick={() =>
                           retryAttachmentUpload(activeDraftAttachment.id)
                         }
-                        className="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#128c7e]"
+                        className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#128c7e]"
                       >
-                        Retry
+                        {chatLocale === 'id' ? 'Coba lagi' : 'Retry'}
                       </button>
                     ) : (
                       <span className="inline-flex shrink-0 items-center rounded-full bg-[#25d366] px-2.5 py-1 text-[11px] font-bold text-[#0b141a]">
-                        Siap
+                        {chatLocale === 'id' ? 'Siap' : 'Ready'}
                       </span>
                     )}
                   </div>
@@ -6839,7 +7963,7 @@ export default function ChatRoomPage() {
                             ? 'border-[#25d366] ring-2 ring-[#25d366]/28'
                             : 'border-black/5 opacity-72 hover:opacity-100 dark:border-white/8'
                         }`}
-                        aria-label={`Open attachment ${index + 1}`}
+                        aria-label={`${chatLocale === 'id' ? 'Buka lampiran' : 'Open attachment'} ${index + 1}`}
                       >
                         {attachment.type === 'image' &&
                         attachment.previewUrl ? (
@@ -6856,6 +7980,10 @@ export default function ChatRoomPage() {
                             muted
                             playsInline
                           />
+                        ) : attachment.type === 'audio' ? (
+                          <span className="flex h-full w-full items-center justify-center bg-[#0b141a] text-[#25d366]">
+                            <Mic className="h-5 w-5" />
+                          </span>
                         ) : (
                           <span className="flex h-full w-full items-center justify-center bg-[#f0f2f5] text-[#667781] dark:bg-[#202c33] dark:text-[#aebac1]">
                             <Paperclip className="h-5 w-5" />
@@ -6868,7 +7996,7 @@ export default function ChatRoomPage() {
                         )}
                         {attachment.status === 'error' && (
                           <span className="absolute inset-x-1 bottom-1 rounded-full bg-white px-1 py-0.5 text-[9px] font-bold text-[#d14343]">
-                            Retry
+                            {chatLocale === 'id' ? 'Ulangi' : 'Retry'}
                           </span>
                         )}
                       </button>
@@ -6901,8 +8029,8 @@ export default function ChatRoomPage() {
                       ? `Membalas ${getMessageSenderLabel(composerAction.message)}`
                       : `Replying to ${getMessageSenderLabel(composerAction.message)}`
                     : chatLocale === 'id'
-                      ? `Meneruskan dari ${getMessageSenderLabel(composerAction.message)}`
-                      : `Forwarded from ${getMessageSenderLabel(composerAction.message)}`}
+                      ? `Mengutip ${getMessageSenderLabel(composerAction.message)}`
+                      : `Quoting ${getMessageSenderLabel(composerAction.message)}`}
                 </p>
                 <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-5 text-[#54656f] dark:text-[#aebac1]">
                   {summarizeMessageForAction(composerAction.message)}
@@ -6911,7 +8039,7 @@ export default function ChatRoomPage() {
               <button
                 type="button"
                 onClick={() => setComposerAction(null)}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5 sm:h-10 sm:w-10"
                 aria-label={
                   chatLocale === 'id' ? 'Batalkan aksi pesan' : 'Cancel action'
                 }
@@ -6921,189 +8049,658 @@ export default function ChatRoomPage() {
             </div>
           ) : null}
 
-          <div className="flex items-end gap-2">
-            <div className={CHAT_COMPOSER_SHELL_CLASS}>
-              <div className="flex shrink-0 items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEmojiPicker(prev => !prev);
-                    setShowStickerPanel(false);
-                  }}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5"
-                  title="Emoji"
-                >
-                  <Smile className="h-4 w-4" />
-                </button>
+          {showAttachmentActions ? (
+            <div
+              className="grid grid-cols-4 gap-2 rounded-[18px] border border-black/5 bg-white p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21] min-[421px]:hidden"
+              role="menu"
+              aria-label={
+                chatLocale === 'id' ? 'Pilihan lampiran' : 'Attachment options'
+              }
+            >
+              <button
+                type="button"
+                role="menuitem"
+                disabled={roomReadOnly}
+                onClick={() => {
+                  setShowAttachmentActions(false);
+                  setShowCameraModal(true);
+                }}
+                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#f0f2f5] px-2 text-[11px] font-bold text-[#54656f] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#202c33] dark:text-[#aebac1]"
+              >
+                <Camera className="h-4 w-4" />
+                {chatLocale === 'id' ? 'Kamera' : 'Camera'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={roomReadOnly}
+                onClick={handleChooseFile}
+                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#f0f2f5] px-2 text-[11px] font-bold text-[#54656f] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#202c33] dark:text-[#aebac1]"
+              >
+                <Paperclip className="h-4 w-4" />
+                {chatLocale === 'id' ? 'Berkas' : 'File'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={roomReadOnly}
+                onClick={() => {
+                  setShowAttachmentActions(false);
+                  setShowStickerPanel(true);
+                }}
+                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#f0f2f5] px-2 text-[11px] font-bold text-[#54656f] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#202c33] dark:text-[#aebac1]"
+              >
+                <Sticker className="h-4 w-4" />
+                {chatLocale === 'id' ? 'Stiker' : 'Sticker'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={roomReadOnly}
+                onClick={() => {
+                  setShowAttachmentActions(false);
+                  openAiWorkspace('reply');
+                }}
+                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-[14px] bg-[#e7f8ef] px-2 text-[11px] font-bold text-[#128c7e] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#123d32] dark:text-[#25d366]"
+              >
+                <Sparkles className="h-4 w-4" />
+                AI
+              </button>
+            </div>
+          ) : null}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowStickerPanel(prev => !prev);
-                    setShowEmojiPicker(false);
-                  }}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 max-[420px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5"
-                  title="Stickers"
-                >
-                  <Sticker className="h-4 w-4" />
-                </button>
+          {voiceNoteComposerOpen ? (
+            <div className="flex min-h-[60px] w-full items-center gap-2 rounded-[20px] border border-slate-300 bg-white px-2 py-2 shadow-sm dark:border-[#3b4a54] dark:bg-[#2a3942]">
+              <button
+                type="button"
+                onClick={cancelVoiceNote}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#d14343] transition hover:bg-[#fff0ee] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d14343]/35 dark:hover:bg-[#3d2526]"
+                aria-label={
+                  chatLocale === 'id'
+                    ? 'Batalkan pesan suara'
+                    : 'Cancel voice note'
+                }
+                title={
+                  chatLocale === 'id'
+                    ? 'Batalkan pesan suara'
+                    : 'Cancel voice note'
+                }
+              >
+                <X className="h-5 w-5" />
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEmojiPicker(false);
-                    setShowStickerPanel(false);
-                    setShowCameraModal(true);
-                  }}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 max-[420px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5"
-                  title="Camera"
-                >
-                  <Camera className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openAiWorkspace('reply')}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#128c7e] transition hover:bg-[#d9fdd3] max-[520px]:hidden dark:text-[#25d366] dark:hover:bg-[#103529]"
-                  title="AI draft"
-                  aria-label="AI draft"
-                >
-                  <Sparkles className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleChooseFile}
-                  disabled={isUploadingAttachments}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#aebac1] dark:hover:bg-white/5"
-                  title="Attach files"
-                >
-                  {isUploadingAttachments ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Paperclip className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                {/* CONTAINER INPUT & EMOJI */}
-                <div className="relative min-w-0 flex-1">
-                  <input
-                    ref={messageInputRef}
-                    type="text"
-                    value={newMessage}
-                    onChange={e => handleTypingChange(e.target.value)}
-                    onFocus={() => {
-                      setComposerFocused(true);
-                    }}
-                    onBlur={() => {
-                      setComposerFocused(false);
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleSend({ refocusComposer: true });
-                      }
-                    }}
-                    placeholder={
-                      chatLocale === 'id'
-                        ? 'Ketik pesan...'
-                        : 'Type a message...'
-                    }
-                    className="h-10 w-full rounded-xl bg-zinc-100/80 px-4 text-sm font-medium text-zinc-800 placeholder:text-zinc-400 outline-none transition-all duration-200 focus:bg-zinc-100 dark:bg-zinc-800/60 dark:text-zinc-200 dark:placeholder:text-zinc-500 dark:focus:bg-zinc-800"
-                  />
-
-                  {/* FLOATING EMOJI PICKER PREMIUM */}
-                  {showEmojiPicker && (
-                    <div
-                      ref={emojiPickerRef}
-                      className="absolute bottom-full left-1/2 z-40 mb-3 w-[min(300px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-zinc-100 bg-white/95 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.08)]  dark:border-zinc-800 dark:bg-zinc-900/95 sm:left-0 sm:w-[300px] sm:translate-x-0"
-                    >
-                      <div className="grid grid-cols-5 gap-1 sm:grid-cols-6 sm:gap-1.5">
-                        {QUICK_EMOJIS.map(emoji => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => handleEmojiPick(emoji)}
-                            className="rounded-lg p-1.5 text-lg transition-all hover:bg-zinc-100 hover:scale-110 active:scale-95 dark:hover:bg-zinc-800 sm:p-2 sm:text-xl"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
+              {voiceNoteStatus === 'ready' && voiceNoteRecording ? (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center justify-between gap-2 px-1">
+                      <span
+                        role="status"
+                        aria-live="polite"
+                        className="truncate text-[11px] font-bold text-[#008f72] dark:text-[#25d366]"
+                      >
+                        {chatLocale === 'id'
+                          ? 'Dengarkan sebelum dilampirkan'
+                          : 'Listen before attaching'}
+                      </span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-[#667781] dark:text-[#aebac1]">
+                        {formatVoiceNoteDuration(voiceNoteDurationMs)}
+                      </span>
                     </div>
-                  )}
+                    <audio
+                      controls
+                      preload="metadata"
+                      src={voiceNoteRecording.previewUrl}
+                      className="h-10 w-full min-w-0"
+                    >
+                      {chatLocale === 'id'
+                        ? 'Browser tidak dapat memutar rekaman ini.'
+                        : 'Your browser cannot play this recording.'}
+                    </audio>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUseVoiceNote}
+                    className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#00a884] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#008f72] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40"
+                    aria-label={
+                      chatLocale === 'id'
+                        ? 'Lampirkan pesan suara'
+                        : 'Attach voice note'
+                    }
+                  >
+                    <Check className="h-4 w-4" />
+                    <span className="hidden sm:inline">
+                      {chatLocale === 'id' ? 'Lampirkan' : 'Attach'}
+                    </span>
+                  </button>
+                </>
+              ) : voiceNoteStatus === 'error' ? (
+                <>
+                  <p
+                    role="alert"
+                    className="min-w-0 flex-1 text-xs font-semibold leading-5 text-[#d14343] dark:text-[#ff9b91]"
+                  >
+                    {voiceNoteErrorMessage(voiceNoteError, chatLocale)}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleStartVoiceNote}
+                    className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#00a884] px-3 text-xs font-bold text-white transition hover:bg-[#008f72] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40"
+                  >
+                    <Mic className="h-4 w-4" />
+                    <span>{chatLocale === 'id' ? 'Coba lagi' : 'Retry'}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="min-w-0 flex-1 px-1">
+                    <div className="flex items-center gap-2">
+                      {voiceNoteStatus === 'recording' ? (
+                        <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-[#d14343]" />
+                      ) : (
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#00a884]" />
+                      )}
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        aria-atomic="true"
+                        className="truncate text-xs font-bold text-[#111b21] dark:text-[#e9edef]"
+                      >
+                        {voiceNoteStatus === 'requesting-permission'
+                          ? chatLocale === 'id'
+                            ? 'Meminta izin mikrofon...'
+                            : 'Requesting microphone permission...'
+                          : voiceNoteStatus === 'processing'
+                            ? chatLocale === 'id'
+                              ? 'Menyiapkan rekaman...'
+                              : 'Preparing recording...'
+                            : voiceNoteStatus === 'paused'
+                              ? chatLocale === 'id'
+                                ? 'Rekaman dijeda'
+                                : 'Recording paused'
+                              : chatLocale === 'id'
+                                ? 'Merekam pesan suara'
+                                : 'Recording voice note'}
+                      </p>
+                    </div>
+                    {voiceNoteIsCapturing &&
+                    voiceNoteStatus !== 'requesting-permission' ? (
+                      <p className="mt-1 text-[11px] tabular-nums text-[#667781] dark:text-[#aebac1]">
+                        {formatVoiceNoteDuration(voiceNoteDurationMs)} / 5:00
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {voiceNoteStatus === 'recording' ? (
+                    <button
+                      type="button"
+                      onClick={pauseVoiceNote}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40 dark:text-[#aebac1] dark:hover:bg-white/5"
+                      aria-label={
+                        chatLocale === 'id' ? 'Jeda rekaman' : 'Pause recording'
+                      }
+                      title={
+                        chatLocale === 'id' ? 'Jeda rekaman' : 'Pause recording'
+                      }
+                    >
+                      <Pause className="h-5 w-5" />
+                    </button>
+                  ) : voiceNoteStatus === 'paused' ? (
+                    <button
+                      type="button"
+                      onClick={resumeVoiceNote}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40 dark:text-[#aebac1] dark:hover:bg-white/5"
+                      aria-label={
+                        chatLocale === 'id'
+                          ? 'Lanjutkan rekaman'
+                          : 'Resume recording'
+                      }
+                      title={
+                        chatLocale === 'id'
+                          ? 'Lanjutkan rekaman'
+                          : 'Resume recording'
+                      }
+                    >
+                      <Play className="h-5 w-5" />
+                    </button>
+                  ) : null}
+
+                  {voiceNoteStatus === 'recording' ||
+                  voiceNoteStatus === 'paused' ? (
+                    <button
+                      type="button"
+                      onClick={stopVoiceNote}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white transition hover:bg-[#008f72] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/40"
+                      aria-label={
+                        chatLocale === 'id'
+                          ? 'Selesai merekam'
+                          : 'Finish recording'
+                      }
+                      title={
+                        chatLocale === 'id'
+                          ? 'Selesai merekam'
+                          : 'Finish recording'
+                      }
+                    >
+                      <Square className="h-4 w-4 fill-current" />
+                    </button>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex min-w-0 items-end gap-1.5 sm:gap-2">
+              <div className={CHAT_COMPOSER_SHELL_CLASS}>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachmentActions(false);
+                      setShowEmojiPicker(prev => !prev);
+                      setShowStickerPanel(false);
+                    }}
+                    disabled={isPeerBlocked || roomReadOnly}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#aebac1] dark:hover:bg-white/5 min-[380px]:h-11 min-[380px]:w-11"
+                    title="Emoji"
+                    aria-label="Emoji"
+                  >
+                    <Smile className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachmentActions(false);
+                      setShowStickerPanel(prev => !prev);
+                      setShowEmojiPicker(false);
+                    }}
+                    disabled={isPeerBlocked || roomReadOnly}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 max-[420px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5 min-[480px]:h-11 min-[480px]:w-11"
+                    title={chatLocale === 'id' ? 'Stiker' : 'Stickers'}
+                    aria-label={chatLocale === 'id' ? 'Stiker' : 'Stickers'}
+                  >
+                    <Sticker className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachmentActions(false);
+                      setShowEmojiPicker(false);
+                      setShowStickerPanel(false);
+                      setShowCameraModal(true);
+                    }}
+                    disabled={isPeerBlocked || roomReadOnly}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 max-[420px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5 min-[480px]:h-11 min-[480px]:w-11"
+                    title={chatLocale === 'id' ? 'Kamera' : 'Camera'}
+                    aria-label={chatLocale === 'id' ? 'Kamera' : 'Camera'}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openAiWorkspace('reply')}
+                    disabled={isPeerBlocked || roomReadOnly}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#128c7e] transition hover:bg-[#d9fdd3] disabled:cursor-not-allowed disabled:opacity-50 max-[520px]:hidden dark:text-[#25d366] dark:hover:bg-[#103529] min-[560px]:h-11 min-[560px]:w-11"
+                    title={chatLocale === 'id' ? 'Draf AI' : 'AI draft'}
+                    aria-label={chatLocale === 'id' ? 'Draf AI' : 'AI draft'}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAttachmentTrigger}
+                    disabled={
+                      isUploadingAttachments || isPeerBlocked || roomReadOnly
+                    }
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#aebac1] dark:hover:bg-white/5"
+                    title={chatLocale === 'id' ? 'Lampiran' : 'Attachments'}
+                    aria-label={
+                      chatLocale === 'id'
+                        ? 'Buka pilihan lampiran'
+                        : 'Open attachment options'
+                    }
+                  >
+                    {isUploadingAttachments ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Paperclip className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onPointerDown={event => {
-                    if (!canSendMessage || sending || isUploadingAttachments)
-                      return;
-                    const refocusComposer =
-                      typeof document !== 'undefined' &&
-                      document.activeElement === messageInputRef.current;
-                    sendShouldRefocusComposerRef.current = refocusComposer;
-                    if (event.pointerType === 'mouse') return;
-                    event.preventDefault();
-                    sendPointerHandledRef.current = true;
-                    window.setTimeout(() => {
-                      sendPointerHandledRef.current = false;
-                      sendShouldRefocusComposerRef.current = false;
-                    }, 1200);
-                    void handleSend({ refocusComposer });
-                  }}
-                  onClick={() => {
-                    if (sendPointerHandledRef.current) {
-                      sendPointerHandledRef.current = false;
-                      sendShouldRefocusComposerRef.current = false;
-                      return;
-                    }
-                    const refocusComposer =
-                      sendShouldRefocusComposerRef.current ||
-                      (typeof document !== 'undefined' &&
-                        document.activeElement === messageInputRef.current);
-                    sendShouldRefocusComposerRef.current = false;
-                    void handleSend({
-                      refocusComposer,
-                    });
-                  }}
-                  disabled={
-                    !canSendMessage || sending || isUploadingAttachments
-                  }
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#00a884] text-white shadow-[0_8px_18px_-12px_rgba(0,128,96,0.9)] transition-all duration-200 hover:bg-[#008f72] hover:shadow-[0_10px_22px_-14px_rgba(0,128,96,0.95)] active:scale-95 disabled:cursor-not-allowed disabled:bg-[#d7dbd8] disabled:text-[#87939b] disabled:shadow-none dark:bg-[#00a884] dark:hover:bg-[#06cf9c] dark:disabled:bg-[#2a3942] dark:disabled:text-[#667781]"
-                  title="Send"
-                >
-                  {sending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 tracking-wide" />
-                  )}
-                </button>
+                <div className="flex min-w-0 flex-1 items-end gap-1.5 sm:gap-2">
+                  {/* INPUT WRAPPER */}
+                  <div className="relative min-w-0 flex-1">
+                    {/* EMOJI PICKER */}
+                    {showEmojiPicker && (
+                      <div
+                        ref={emojiPickerRef}
+                        className="
+                          absolute
+                          bottom-[calc(100%+8px)]
+                          left-0
+                          z-50
+                          w-[min(320px,calc(100vw-24px))]
+                          max-w-[calc(100vw-24px)]
+                          overflow-hidden
+                          rounded-2xl
+                          border border-zinc-200/80
+                          bg-white/98
+                          p-2
+                          shadow-[0_12px_40px_rgba(0,0,0,0.14)]
+                          backdrop-blur-xl
+                          dark:border-zinc-700/80
+                          dark:bg-zinc-900/98
+                          sm:bottom-[calc(100%+10px)]
+                          sm:left-0
+                          sm:w-[320px]
+                          sm:max-w-none
+                        "
+                      >
+                        <div className="grid grid-cols-6 gap-0.5 sm:gap-1">
+                          {QUICK_EMOJIS.map(emoji => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleEmojiPick(emoji)}
+                              className="
+                                flex
+                                h-10
+                                w-full
+                                items-center
+                                justify-center
+                                rounded-xl
+                                text-lg
+                                transition
+                                hover:bg-zinc-100
+                                hover:scale-105
+                                active:scale-95
+                                dark:hover:bg-zinc-800
+                                sm:h-11
+                                sm:text-xl
+                              "
+                              aria-label={
+                                chatLocale === 'id'
+                                  ? `Pilih emoji ${emoji}`
+                                  : `Choose emoji ${emoji}`
+                              }
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TEXTAREA */}
+                    <textarea
+                      ref={messageInputRef}
+                      rows={1}
+                      maxLength={4000}
+                      enterKeyHint="enter"
+                      value={newMessage}
+                      disabled={isPeerBlocked || roomReadOnly}
+                      onChange={e => handleTypingChange(e.target.value)}
+                      onFocus={() => {
+                        setShowAttachmentActions(false);
+                        setComposerFocused(true);
+                      }}
+                      onBlur={() => {
+                        setComposerFocused(false);
+                      }}
+                      onKeyDown={e => {
+                        const isCoarsePointer =
+                          typeof window !== 'undefined' &&
+                          window.matchMedia('(pointer: coarse)').matches;
+
+                        if (
+                          shouldSubmitChatComposer({
+                            key: e.key,
+                            shiftKey: e.shiftKey,
+                            isComposing: e.nativeEvent.isComposing,
+                            keyCode: e.nativeEvent.keyCode,
+                            isCoarsePointer,
+                          })
+                        ) {
+                          e.preventDefault();
+                          void handleSend({ refocusComposer: true });
+                        }
+                      }}
+                      placeholder={
+                        chatLocale === 'id'
+                          ? 'Ketik pesan'
+                          : 'Type a message'
+                      }
+                      aria-label={chatLocale === 'id' ? 'Pesan' : 'Message'}
+                      className="
+                        block
+                        min-h-[44px]
+                        max-h-[120px]
+                        w-full
+                        resize-none
+                        overflow-y-auto
+                        rounded-[22px]
+                        border-0
+                        bg-zinc-100
+                        px-4
+                        py-[11px]
+                        pr-4
+                        text-[16px]
+                        font-medium
+                        leading-[22px]
+                        text-zinc-800
+                        outline-none
+                        placeholder:text-zinc-400
+                        transition-colors
+                        duration-200
+
+                        focus:bg-zinc-100
+
+                        disabled:cursor-not-allowed
+                        disabled:opacity-60
+
+                        dark:bg-zinc-800
+                        dark:text-zinc-100
+                        dark:placeholder:text-zinc-500
+                        dark:focus:bg-zinc-800
+
+                        sm:min-h-[46px]
+                        sm:rounded-[23px]
+                        sm:px-4
+                        sm:py-3
+                        sm:text-[15px]
+                      "
+                    />
+                  </div>
+
+                  {/* SEND / VOICE BUTTON */}
+                  <div className="shrink-0 pb-0">
+                    {canSendMessage ? (
+                      <button
+                        type="button"
+                        onPointerDown={event => {
+                          if (
+                            !canSendMessage ||
+                            sending ||
+                            isUploadingAttachments
+                          ) {
+                            return;
+                          }
+
+                          const refocusComposer =
+                            typeof document !== 'undefined' &&
+                            document.activeElement === messageInputRef.current;
+
+                          sendShouldRefocusComposerRef.current =
+                            refocusComposer;
+
+                          /*
+                          * Prevent duplicate touch/pointer + click
+                          */
+                          if (event.pointerType !== 'mouse') {
+                            event.preventDefault();
+
+                            sendPointerHandledRef.current = true;
+
+                            window.setTimeout(() => {
+                              sendPointerHandledRef.current = false;
+                              sendShouldRefocusComposerRef.current = false;
+                            }, 1200);
+
+                            void handleSend({ refocusComposer });
+                          }
+                        }}
+                        onClick={() => {
+                          if (sendPointerHandledRef.current) {
+                            sendPointerHandledRef.current = false;
+                            sendShouldRefocusComposerRef.current = false;
+                            return;
+                          }
+
+                          const refocusComposer =
+                            sendShouldRefocusComposerRef.current ||
+                            (typeof document !== 'undefined' &&
+                              document.activeElement === messageInputRef.current);
+
+                          sendShouldRefocusComposerRef.current = false;
+
+                          void handleSend({
+                            refocusComposer,
+                          });
+                        }}
+                        disabled={
+                          !canSendMessage ||
+                          sending ||
+                          isUploadingAttachments ||
+                          isPeerBlocked ||
+                          roomReadOnly
+                        }
+                        className="
+                          inline-flex
+                          h-11
+                          w-11
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-[#00a884]
+                          text-white
+                          shadow-[0_3px_10px_rgba(0,168,132,0.22)]
+                          transition
+                          duration-150
+
+                          hover:bg-[#008f72]
+                          hover:shadow-[0_5px_14px_rgba(0,168,132,0.28)]
+
+                          active:scale-95
+
+                          disabled:cursor-not-allowed
+                          disabled:bg-[#d7dbd8]
+                          disabled:text-[#87939b]
+                          disabled:shadow-none
+
+                          dark:bg-[#00a884]
+                          dark:hover:bg-[#06cf9c]
+                          dark:disabled:bg-[#2a3942]
+                          dark:disabled:text-[#667781]
+
+                          sm:h-11
+                          sm:w-11
+                        "
+                        title={chatLocale === 'id' ? 'Kirim' : 'Send'}
+                        aria-label={
+                          chatLocale === 'id'
+                            ? 'Kirim pesan'
+                            : 'Send message'
+                        }
+                      >
+                        {sending ? (
+                          <Loader2 className="h-[18px] w-[18px] animate-spin" />
+                        ) : (
+                          <Send className="h-[18px] w-[18px]" />
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleStartVoiceNote}
+                        disabled={
+                          sending ||
+                          isUploadingAttachments ||
+                          isPeerBlocked ||
+                          roomReadOnly
+                        }
+                        className="
+                          inline-flex
+                          h-11
+                          w-11
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-[#00a884]
+                          text-white
+                          shadow-[0_3px_10px_rgba(0,168,132,0.22)]
+                          transition
+                          duration-150
+
+                          hover:bg-[#008f72]
+
+                          active:scale-95
+
+                          disabled:cursor-not-allowed
+                          disabled:bg-[#d7dbd8]
+                          disabled:text-[#87939b]
+                          disabled:shadow-none
+
+                          dark:bg-[#00a884]
+                          dark:hover:bg-[#06cf9c]
+                          dark:disabled:bg-[#2a3942]
+                          dark:disabled:text-[#667781]
+
+                          sm:h-11
+                          sm:w-11
+                        "
+                        title={
+                          chatLocale === 'id'
+                            ? 'Rekam pesan suara'
+                            : 'Record voice note'
+                        }
+                        aria-label={
+                          chatLocale === 'id'
+                            ? 'Rekam pesan suara'
+                            : 'Record voice note'
+                        }
+                      >
+                        <Mic className="h-[19px] w-[19px]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {showStickerPanel && (
             <div
               ref={stickerPanelRef}
-              className="rounded-2xl border border-black/5 bg-white p-2.5 shadow-2xl dark:border-white/10 dark:bg-[#202c33] sm:p-3"
+              className="min-w-0 overflow-hidden rounded-2xl border border-black/5 bg-white p-2.5 shadow-2xl dark:border-white/10 dark:bg-[#202c33] sm:p-3"
             >
               <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2">
                 {STICKER_PACK.map(sticker => (
                   <button
                     key={sticker.id}
                     type="button"
-                    onClick={() => handleStickerSelect(sticker.url)}
-                    className="rounded-xl p-1.5 transition-colors hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942] sm:p-2"
+                    onClick={() => handleStickerSelect(sticker.emoji)}
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1.5 transition-colors hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942] sm:p-2"
                     title={sticker.label}
+                    aria-label={sticker.label}
                   >
-                    <img
-                      src={sticker.url}
-                      alt={sticker.label}
-                      className="mx-auto h-9 w-9 sm:h-12 sm:w-12"
-                    />
+                    <span aria-hidden="true" className="text-4xl leading-none">
+                      {sticker.emoji}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -7114,11 +8711,11 @@ export default function ChatRoomPage() {
 
       {showAiQuickPanel && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] sm:items-center sm:p-3"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] pt-[calc(0.5rem+env(safe-area-inset-top))] sm:items-center sm:p-3"
           onClick={() => setShowAiQuickPanel(false)}
         >
           <div
-            className="ui-feed-section max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
+            className="ui-feed-section max-h-[min(86dvh,calc(var(--app-visual-viewport-height,100dvh)-0.75rem))] w-full min-w-0 overflow-y-auto rounded-t-[28px] border border-b-0 border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl sm:max-w-lg sm:rounded-2xl sm:border sm:p-4"
             onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -7139,7 +8736,9 @@ export default function ChatRoomPage() {
                       : chatLocale === 'id'
                         ? 'Bantu support lebih cepat'
                         : 'Faster support helper'
-                    : aiProfileName || 'AI Pribadi'}
+                    : chatLocale === 'id'
+                      ? 'Bantu tulis'
+                      : 'Writing help'}
                 </h3>
               </div>
               <button
@@ -7280,15 +8879,8 @@ export default function ChatRoomPage() {
                         ? 'Membuat draft...'
                         : 'Generating...'
                       : chatLocale === 'id'
-                        ? 'Generate balasan'
-                        : 'Generate reply'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearAiDraft}
-                    className="rounded-full border border-[color:var(--app-border-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
-                  >
-                    {chatLocale === 'id' ? 'Clear' : 'Clear'}
+                        ? 'Buat draf di kolom pesan'
+                        : 'Draft into message box'}
                   </button>
                   {aiLastGeneratedAt && (
                     <span className="text-[10px] text-[color:var(--app-text-soft)]">
@@ -7306,48 +8898,6 @@ export default function ChatRoomPage() {
                     {aiError}
                   </p>
                 ) : null}
-
-                {aiDraft && (
-                  <div className="mt-3 rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
-                    <p className="whitespace-pre-wrap text-xs text-[color:var(--app-text)]">
-                      {aiDraft}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleInsertAiDraft}
-                        className="rounded-full bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface)]"
-                      >
-                        {chatLocale === 'id'
-                          ? 'Masukkan ke input'
-                          : 'Insert to input'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleSendAiDraft()}
-                        disabled={
-                          sending || isUploadingAttachments || aiAutoSend
-                        }
-                        className="rounded-full bg-[color:var(--app-accent)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] disabled:opacity-60"
-                      >
-                        {aiAutoSend
-                          ? chatLocale === 'id'
-                            ? 'Auto-send aktif'
-                            : 'Auto-send enabled'
-                          : chatLocale === 'id'
-                            ? 'Kirim sekarang'
-                            : 'Send now'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAiDraft('')}
-                        className="rounded-full border border-[color:var(--app-border-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
-                      >
-                        {chatLocale === 'id' ? 'Buang draft' : 'Discard'}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </>
             ) : (
               <>
@@ -7586,8 +9136,8 @@ export default function ChatRoomPage() {
 
             <div className="mt-3 rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3 text-[11px] text-[color:var(--app-text-soft)]">
               {chatLocale === 'id'
-                ? 'Nada AI dan auto-send ada di Chat Settings.'
-                : 'The AI tone, extra instruction, and auto-send are still managed from Chat Settings.'}
+                ? 'Nada dan instruksi Bantu tulis ada di Pengaturan chat. Hasilnya selalu masuk ke kolom pesan untuk Anda periksa.'
+                : 'Tone and instructions for Writing help are in Chat settings. Results always go to the message box for your review.'}
               <button
                 type="button"
                 onClick={() => {
@@ -7604,230 +9154,207 @@ export default function ChatRoomPage() {
       )}
 
       {showChatSettings && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-[color:color-mix(in_srgb,_var(--app-overlay)_45%,_transparent)]"
-          onClick={() => setShowChatSettings(false)}
+        <Modal
+          open={showChatSettings}
+          title={`${chatLocale === 'id' ? 'Pengaturan chat' : 'Chat settings'} · ${roomName}`}
+          onClose={() => setShowChatSettings(false)}
+          className="h-[min(var(--app-visual-viewport-height,100dvh),760px)] w-full max-w-none sm:max-w-md"
         >
-          <div
-            className="ui-feed-section flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full max-w-md flex-col overflow-hidden border-l border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  Chat Settings
-                </p>
-                <h3 className="text-sm font-semibold text-[color:var(--app-text-soft)]">
-                  Pengaturan room
-                </h3>
-              </div>
+          <div className="space-y-3 pb-4">
+            <ChatSafetyControls
+              roomId={canonicalRoomId}
+              peerUserId={roomKind === 'direct' ? peerUserId : null}
+              locale={chatLocale}
+              onBlockedChange={setIsPeerBlocked}
+            />
+
+            <div className="rounded-[20px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+              <p className="text-xs font-bold text-[color:var(--app-text)]">
+                {chatLocale === 'id'
+                  ? 'Penyimpanan di perangkat'
+                  : 'On-device storage'}
+              </p>
+              <p className="mt-1 text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]">
+                {chatLocale === 'id'
+                  ? 'Lajukan menyimpan snapshot terbatas agar chat terbaru lebih cepat dibuka. Ini bukan penghapusan riwayat server.'
+                  : 'Lajukan keeps a bounded snapshot so recent chat opens faster. This does not delete server history.'}
+              </p>
               <button
                 type="button"
-                onClick={() => setShowChatSettings(false)}
-                className="rounded-full p-2 text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
-                title="Close"
+                onClick={() => void handleClearRoomCache()}
+                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-xs font-bold text-rose-700 transition hover:bg-rose-50 dark:border-rose-900 dark:text-rose-200 dark:hover:bg-rose-500/10"
               >
-                <X className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" />
+                {chatLocale === 'id'
+                  ? 'Hapus cache chat ini'
+                  : 'Clear this chat cache'}
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-8">
-              <div className="ui-feed-tile rounded-[24px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                      AI Pribadi
-                    </p>
-                    <h4 className="mt-1 text-base font-bold text-[color:var(--app-text)]">
-                      Balas seperti kamu
-                    </h4>
-                    <p className="mt-1 max-w-[28rem] text-xs font-medium leading-5 text-[color:var(--app-text-soft)]">
-                      AI hanya belajar dari pesan yang kamu kirim sendiri. Pesan
-                      lawan bicara tidak dipakai buat gaya balasan.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowChatSettings(false);
-                      openAiWorkspace('reply');
-                    }}
-                    className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)]"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Buka AI
-                  </button>
-                </div>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setAiUseContext(prev => !prev)}
-                    aria-pressed={aiUseContext}
-                    className={`rounded-[18px] border p-3 text-left transition ${
-                      aiUseContext
-                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                        : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                    }`}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold">
-                        Belajar gaya saya
-                      </span>
-                      {aiUseContext ? (
-                        <CheckCircle2 className="h-4 w-4" />
-                      ) : null}
-                    </span>
-                    <span className="mt-1 block text-[11px] font-semibold leading-4 opacity-80">
-                      Pakai maksimal 8 pesan terakhir dari saya saja.
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAiAutoSend(prev => !prev)}
-                    aria-pressed={aiAutoSend}
-                    className={`rounded-[18px] border p-3 text-left transition ${
-                      aiAutoSend
-                        ? 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_12%,_transparent)] text-[color:var(--app-warning)]'
-                        : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                    }`}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold">
-                        {aiAutoSend ? 'Auto kirim' : 'Review dulu'}
-                      </span>
-                      {aiAutoSend ? <CheckCircle2 className="h-4 w-4" /> : null}
-                    </span>
-                    <span className="mt-1 block text-[11px] font-semibold leading-4 opacity-80">
-                      {aiAutoSend
-                        ? 'AI langsung kirim setelah draft jadi.'
-                        : 'Lebih aman: cek draft sebelum dikirim.'}
-                    </span>
-                  </button>
-                </div>
-
-                <div className="mt-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
-                    Gaya balasan
+            <div className="ui-feed-tile rounded-[24px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                    {chatLocale === 'id' ? 'Bantu tulis' : 'Writing help'}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {AI_TONES.map(tone => (
-                      <button
-                        key={tone.id}
-                        type="button"
-                        onClick={() => setAiToneId(tone.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-bold transition ${
-                          aiToneId === tone.id
-                            ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
-                        }`}
-                      >
-                        {tone.label}
-                      </button>
-                    ))}
-                    {AI_LENGTHS.map(length => (
-                      <button
-                        key={length.id}
-                        type="button"
-                        onClick={() => setAiLengthId(length.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-bold transition ${
-                          aiLengthId === length.id
-                            ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
-                        }`}
-                      >
-                        {length.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
-                    Tujuan balasan
+                  <h4 className="mt-1 text-base font-bold text-[color:var(--app-text)]">
+                    {chatLocale === 'id'
+                      ? 'Siapkan draf untuk diperiksa'
+                      : 'Prepare a draft for review'}
+                  </h4>
+                  <p className="mt-1 max-w-[28rem] text-xs font-medium leading-5 text-[color:var(--app-text-soft)]">
+                    {chatLocale === 'id'
+                      ? 'Jika konteks diaktifkan, hanya pesan yang Anda kirim sendiri yang diteruskan. Pesan lawan bicara tidak dikirim tanpa kontrak persetujuan yang eksplisit.'
+                      : "When context is enabled, only messages you sent are forwarded. The other person's messages are not sent without an explicit consent contract."}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {aiReplyTemplates.map(template => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => setAiTemplateId(template.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-bold transition ${
-                          aiTemplateId === template.id
-                            ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
-                        }`}
-                      >
-                        {template.label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
+                <button
+                  type="button"
+                  disabled={roomReadOnly}
+                  onClick={() => {
+                    setShowChatSettings(false);
+                    openAiWorkspace('reply');
+                  }}
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Buka AI
+                </button>
+              </div>
 
-                <label className={`mt-4 ${CHAT_FIELD_LABEL_CLASS}`}>
-                  Instruksi singkat
-                  <input
-                    type="text"
-                    value={aiInstruction}
-                    onChange={event => setAiInstruction(event.target.value)}
-                    className={CHAT_CONTROL_CLASS}
-                    placeholder="Contoh: fokus ke harga dan deadline"
-                  />
-                </label>
+              <div className="mt-3 grid gap-2">
+                <button
+                  type="button"
+                  disabled={roomReadOnly}
+                  onClick={() => setAiUseContext(prev => !prev)}
+                  aria-pressed={aiUseContext}
+                  className={`rounded-[18px] border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    aiUseContext
+                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold">
+                      {chatLocale === 'id'
+                        ? 'Gunakan contoh pesan saya'
+                        : 'Use examples from my messages'}
+                    </span>
+                    {aiUseContext ? <CheckCircle2 className="h-4 w-4" /> : null}
+                  </span>
+                  <span className="mt-1 block text-[11px] font-semibold leading-4 opacity-80">
+                    {chatLocale === 'id'
+                      ? 'Untuk room ini, kirim maksimal 8 pesan terakhir milik saya sebagai contoh gaya. Izin direset saat pindah room.'
+                      : 'For this room, send up to 8 of my latest messages as style examples. Consent resets when you change rooms.'}
+                  </span>
+                </button>
+              </div>
 
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {aiPromptExamples.map(example => (
+              <div className="mt-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+                  Gaya balasan
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {AI_TONES.map(tone => (
                     <button
-                      key={example.id}
+                      key={tone.id}
                       type="button"
-                      onClick={() => setAiInstruction(example.prompt)}
-                      className="rounded-full border border-[color:var(--app-border-strong)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
+                      onClick={() => setAiToneId(tone.id)}
+                      className={`min-h-11 rounded-full px-3 text-xs font-bold transition ${
+                        aiToneId === tone.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                      }`}
                     >
-                      {example.label}
+                      {tone.label}
+                    </button>
+                  ))}
+                  {AI_LENGTHS.map(length => (
+                    <button
+                      key={length.id}
+                      type="button"
+                      onClick={() => setAiLengthId(length.id)}
+                      className={`min-h-11 rounded-full px-3 text-xs font-bold transition ${
+                        aiLengthId === length.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                      }`}
+                    >
+                      {length.label}
                     </button>
                   ))}
                 </div>
+              </div>
 
-                <div className="mt-4 rounded-[18px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
-                  <div className="flex items-start gap-2">
-                    <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-[color:var(--app-text)]">
-                        Izin konteks dibuat ketat
-                      </p>
-                      <p className="mt-1 text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]">
-                        Saat aktif, payload AI cuma berisi contoh pesan milik
-                        kamu. Jika butuh membalas detail dari lawan bicara,
-                        tulis poinnya dulu di input chat.
-                      </p>
-                    </div>
+              <div className="mt-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+                  Tujuan balasan
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {aiReplyTemplates.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setAiTemplateId(template.id)}
+                      className={`min-h-11 rounded-full px-3 text-xs font-bold transition ${
+                        aiTemplateId === template.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                      }`}
+                    >
+                      {template.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className={`mt-4 ${CHAT_FIELD_LABEL_CLASS}`}>
+                Instruksi singkat
+                <input
+                  type="text"
+                  value={aiInstruction}
+                  onChange={event => setAiInstruction(event.target.value)}
+                  className={CHAT_CONTROL_CLASS}
+                  placeholder="Contoh: fokus ke harga dan deadline"
+                />
+              </label>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {aiPromptExamples.map(example => (
+                  <button
+                    key={example.id}
+                    type="button"
+                    onClick={() => setAiInstruction(example.prompt)}
+                    className="min-h-11 rounded-full border border-[color:var(--app-border-strong)] px-3 py-2 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
+                  >
+                    {example.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-[18px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
+                <div className="flex items-start gap-2">
+                  <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[color:var(--app-text)]">
+                      Izin konteks dibuat ketat
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]">
+                      {chatLocale === 'id'
+                        ? 'Saat aktif, payload hanya berisi contoh pesan yang Anda kirim sendiri. Pesan lawan bicara tidak dikirim tanpa kontrak persetujuan eksplisit; tulis sendiri poin yang memang ingin dipakai.'
+                        : "When enabled, the payload only includes messages you sent. The other person's messages are not sent without an explicit consent contract; type any points you intentionally want to use."}
+                    </p>
                   </div>
                 </div>
-
-                <details className="mt-3 rounded-[18px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
-                  <summary className="cursor-pointer text-xs font-bold text-[color:var(--app-text)]">
-                    Pengaturan lanjutan
-                  </summary>
-                  <label className={`mt-3 ${CHAT_FIELD_LABEL_CLASS}`}>
-                    Nama AI
-                    <input
-                      type="text"
-                      value={aiProfileName}
-                      onChange={event => setAiProfileName(event.target.value)}
-                      className={CHAT_CONTROL_CLASS}
-                      placeholder="AI Pribadi"
-                    />
-                  </label>
-                </details>
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showListingActionModal && listingActionDraft && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] sm:items-center sm:p-3">
-          <div className="ui-feed-section max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] pt-[calc(0.5rem+env(safe-area-inset-top))] sm:items-center sm:p-3">
+          <div className="ui-feed-section max-h-[min(88dvh,calc(var(--app-visual-viewport-height,100dvh)-0.75rem))] w-full min-w-0 overflow-y-auto rounded-t-[28px] border border-b-0 border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl sm:max-w-md sm:rounded-2xl sm:border sm:p-4">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
@@ -8022,7 +9549,7 @@ export default function ChatRoomPage() {
                 : 'After submission, chat receives a structured ticket card with reference, status, and next steps.'}
             </p>
 
-            <div className="mt-4 flex items-center justify-end gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
               <button
                 type="button"
                 onClick={() => setShowListingActionModal(false)}
@@ -8060,11 +9587,11 @@ export default function ChatRoomPage() {
 
       {showTransactionsDrawer && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-[color:color-mix(in_srgb,_var(--app-overlay)_45%,_transparent)]"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_45%,_transparent)] lg:items-stretch lg:justify-end"
           onClick={() => setShowTransactionsDrawer(false)}
         >
           <div
-            className="ui-feed-section flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full max-w-md flex-col overflow-hidden border-l border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
+            className="ui-feed-section flex h-[min(84dvh,var(--app-visual-viewport-height,100dvh))] max-h-[var(--app-visual-viewport-height,100dvh)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] border border-b-0 border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 pb-[calc(0.875rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl sm:h-[min(78dvh,var(--app-visual-viewport-height,100dvh))] sm:max-w-xl lg:h-full lg:max-h-full lg:max-w-md lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:p-4"
             onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
@@ -8100,7 +9627,7 @@ export default function ChatRoomPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto pb-8 pr-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pr-0.5 sm:pb-8 sm:pr-1">
               {transactionsLoading ? (
                 <div className="flex items-center gap-2 py-6 text-sm text-[color:var(--app-text-soft)]">
                   <Loader2 className="h-4 w-4 animate-spin text-[color:var(--app-accent)]" />
@@ -8176,7 +9703,7 @@ export default function ChatRoomPage() {
                             <img
                               src={txnCoverImage}
                               alt={title}
-                              className="h-16 w-16 shrink-0 rounded-2xl object-cover"
+                              className="h-14 w-14 shrink-0 rounded-2xl object-cover sm:h-16 sm:w-16"
                               loading="lazy"
                             />
                           ) : (
@@ -8273,8 +9800,8 @@ export default function ChatRoomPage() {
       )}
 
       {selectedTransaction && (
-        <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] sm:items-center sm:p-3">
-          <div className="ui-feed-section max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl sm:p-5">
+        <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] pt-[calc(0.5rem+env(safe-area-inset-top))] md:items-center md:p-3">
+          <div className="ui-feed-section max-h-[min(90dvh,calc(var(--app-visual-viewport-height,100dvh)-0.5rem))] w-full min-w-0 overflow-y-auto rounded-t-[28px] border border-b-0 border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl sm:px-4 md:max-w-2xl md:rounded-2xl md:border md:p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
@@ -8612,7 +10139,9 @@ export default function ChatRoomPage() {
                         </p>
                       ) : null}
                       <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                        {item.at ? formatMessageTime(item.at) : '-'}
+                        {item.at
+                          ? formatChatMessageTime(item.at, chatLocale)
+                          : '-'}
                       </p>
                     </div>
                   </div>
@@ -8722,7 +10251,7 @@ export default function ChatRoomPage() {
               </div>
             ) : null}
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
               {selectedTxnCanCounter && (
                 <button
                   type="button"
@@ -8874,7 +10403,7 @@ export default function ChatRoomPage() {
               )}
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/transactions?focus_transaction_id=${encodeURIComponent(selectedTransaction.id)}`}
@@ -8892,7 +10421,7 @@ export default function ChatRoomPage() {
               <button
                 type="button"
                 onClick={() => setSelectedTransaction(null)}
-                className="rounded-full bg-[color:var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                className="w-full rounded-full bg-[color:var(--app-accent)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] sm:w-auto sm:py-1.5"
               >
                 Tutup
               </button>
@@ -8902,7 +10431,7 @@ export default function ChatRoomPage() {
       )}
 
       {/* Incoming Call */}
-      {incomingCall && channelRef.current && (
+      {roomKind === 'direct' && incomingCall && channelRef.current && (
         <IncomingCall
           callId={incomingCall.callId}
           callerId={incomingCall.callerId}
@@ -8941,7 +10470,8 @@ export default function ChatRoomPage() {
       )}
 
       {/* Video Call */}
-      {showVideoCall &&
+      {roomKind === 'direct' &&
+        showVideoCall &&
         user?.id &&
         canonicalRoomId &&
         activeCallId &&
@@ -8961,7 +10491,8 @@ export default function ChatRoomPage() {
         )}
 
       {/* Voice Call */}
-      {showVoiceCall &&
+      {roomKind === 'direct' &&
+        showVoiceCall &&
         user?.id &&
         canonicalRoomId &&
         activeCallId &&
@@ -8982,15 +10513,15 @@ export default function ChatRoomPage() {
         )}
 
       {/* Camera */}
-      <CameraCaptureModal
-        open={showCameraModal}
-        onClose={() => setShowCameraModal(false)}
-        onCapture={file => {
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          handleFilesSelected(dt.files);
-        }}
-      />
+      {showCameraModal ? (
+        <CameraCaptureModal
+          open
+          onClose={() => setShowCameraModal(false)}
+          onCapture={file => {
+            handleFilesSelected([file]);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

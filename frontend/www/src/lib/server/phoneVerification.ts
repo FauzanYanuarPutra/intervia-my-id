@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
-  PHONE_VERIFICATION_SETTINGS_PATH,
+  // PHONE_VERIFICATION_SETTINGS_PATH,
   readPhoneVerifiedStatus,
 } from '@/lib/identityVerification';
 
@@ -55,7 +55,7 @@ export async function requirePhoneVerifiedForListing(
             error:
               'Phone verification required before creating or publishing a listing',
             code: 'phone_verification_required',
-            next_step: PHONE_VERIFICATION_SETTINGS_PATH,
+            // next_step: PHONE_VERIFICATION_SETTINGS_PATH,
           },
           { status: 403 },
         ),

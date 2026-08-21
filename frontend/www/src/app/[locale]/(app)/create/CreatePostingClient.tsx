@@ -4544,30 +4544,7 @@ export function CreatePostingClient({
           locale === 'id'
             ? ['Omzet', 'Aset', 'Handover']
             : ['Revenue', 'Assets', 'Handover'],
-      },
-      {
-        key: 'profile',
-        href: '/profile/edit?focus=talent',
-        badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
-        title:
-          locale === 'id'
-            ? 'Tawarkan skill lewat profil'
-            : 'Offer skills via profile',
-        description:
-          locale === 'id'
-            ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
-            : 'If you want to sell personal skills, polish your user profile.',
-        example:
-          locale === 'id'
-            ? 'Contoh: profil akuntan UMKM freelance'
-            : 'Example: freelance MSME accountant profile',
-        Icon: Users,
-        theme: specialCreateThemes.profile,
-        highlights:
-          locale === 'id'
-            ? ['Headline', 'Skill', 'Rate']
-            : ['Headline', 'Skills', 'Rate'],
-      },
+      }
     ] as const);
   const typeSelectorGrid = (
     <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">

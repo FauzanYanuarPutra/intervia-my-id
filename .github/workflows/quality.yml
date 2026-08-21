@@ -1,0 +1,131 @@
+name: Quality gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend / ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [shared, www, usaha, cms, crm]
+    defaults:
+      run:
+        working-directory: frontend/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/${{ matrix.package }}/package-lock.json
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Static checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.package }}" == "shared" ]]; then
+            npm run build
+          else
+            npm run lint
+            npm run build
+          fi
+      - name: Unit tests
+        if: matrix.package == 'www'
+        run: npm run test:unit
+
+  rust:
+    name: Rust / ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [identity_service, marketplace_service, community_service]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/${{ matrix.service }}
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+
+  chat:
+    name: Chat / format and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: services/chat_service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '26.2'
+          elixir-version: '1.15.8'
+      - run: mix deps.get --only test
+        env:
+          MIX_ENV: test
+      - run: mix format --check-formatted
+      - run: mix test --no-start
+        env:
+          MIX_ENV: test
+
+  deployment-contract:
+    name: Production deployment contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOCKERHUB_NAMESPACE: lajukan-ci
+      SMTP_HOST: smtp.invalid
+      SMTP_USER: ci-config-check
+      SMTP_PASS: ci-config-check
+      SCYLLA_NODES: scylla-1.internal:9042,scylla-2.internal:9042,scylla-3.internal:9042
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate merged production Compose
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --services
+      - name: Assert only Caddy publishes host ports
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config --format json > /tmp/compose.json
+          python - <<'PY'
+          import json
+          with open('/tmp/compose.json', encoding='utf-8') as handle:
+              config = json.load(handle)
+          published = {
+              name: service.get('ports', [])
+              for name, service in config.get('services', {}).items()
+              if service.get('ports')
+          }
+          assert set(published) == {'caddy'}, published
+          assert {str(p.get('published')) for p in published['caddy']} == {'80', '443'}
+          PY
+      - name: Validate production Caddyfile
+        run: >-
+          docker run --rm
+          -e APP_DOMAIN=lajukan.test
+          -e ADMIN_EMAIL=ops@lajukan.test
+          -v "${PWD}/infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro"
+          caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+

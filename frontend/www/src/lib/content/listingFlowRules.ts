@@ -526,7 +526,7 @@ function isSimpleListing(metadata: Record<string, unknown>): boolean {
   return mode === 'simple';
 }
 
-function activeListingNeedsPrimaryImage(
+export function activeListingNeedsPrimaryImage(
   listingType: string,
   listingSide: string,
 ): boolean {

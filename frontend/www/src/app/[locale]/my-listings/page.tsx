@@ -13,20 +13,15 @@ import {
   MyListingsSkeleton,
 } from '@/components/system/feedback/RouteSkeletons';
 import {
-  BookmarkCheck,
-  Clock3,
   Eye,
   EyeOff,
-  Heart,
   ImageIcon,
-  Megaphone,
-  MessageCircle,
+  MoreHorizontal,
   PencilLine,
   Plus,
   Search,
   Trash2,
   X,
-  type LucideIcon,
 } from 'lucide-react';
 import {
   readSearchCartSession,
@@ -345,48 +340,24 @@ function statusToneClass(status: string): string {
   return 'bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-400/12 dark:text-amber-200 dark:ring-amber-400/20';
 }
 
-function listingNextStep(status: ListingStatus, locale: string): string {
-  if (status === 'active') {
-    return locale === 'id'
-      ? 'Sudah tayang. Pantau chat dan rapikan info kalau ada yang kurang.'
-      : 'This is live. Watch chats and refine details if needed.';
-  }
-  if (status === 'archived') {
-    return locale === 'id'
-      ? 'Disimpan di arsip. Kamu masih bisa edit kalau mau dipakai lagi.'
-      : 'Saved in archive. You can still edit it if needed.';
-  }
-  return locale === 'id'
-    ? 'Belum tayang. Lengkapi dulu supaya siap dilihat orang.'
-    : 'Not live yet. Complete it so people can view it.';
-}
-
 function listingStatusToggle(
   status: ListingStatus,
   locale: string,
 ): {
   label: string;
   nextStatus: 'active' | 'archived';
-  icon: LucideIcon;
-  className: string;
 } | null {
   if (status === 'active') {
     return {
-      label: locale === 'id' ? 'Sembunyikan' : 'Hide',
+      label: locale === 'id' ? 'Arsipkan' : 'Archive',
       nextStatus: 'archived',
-      icon: EyeOff,
-      className:
-        'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white',
     };
   }
 
   if (status === 'archived') {
     return {
-      label: locale === 'id' ? 'Tampilkan' : 'Unhide',
+      label: locale === 'id' ? 'Tayangkan' : 'Publish',
       nextStatus: 'active',
-      icon: Eye,
-      className:
-        'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-400/12 dark:text-emerald-200',
     };
   }
 
@@ -410,7 +381,7 @@ export default function MyListingsPage() {
       ? 'history'
       : 'mine';
 
-  const [activeStatus, setActiveStatus] = useState<ListingStatus>('draft');
+  const [activeStatus, setActiveStatus] = useState<ListingStatus>('active');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -428,8 +399,8 @@ export default function MyListingsPage() {
 
   const statusTabs = useMemo(
     () => [
-      { id: 'draft' as const, label: locale === 'id' ? 'Draft' : 'Draft' },
       { id: 'active' as const, label: locale === 'id' ? 'Tayang' : 'Live' },
+      { id: 'draft' as const, label: locale === 'id' ? 'Draft' : 'Draft' },
       {
         id: 'archived' as const,
         label: locale === 'id' ? 'Arsip' : 'Archived',
@@ -443,7 +414,7 @@ export default function MyListingsPage() {
       {
         id: 'mine',
         href: '/my-listings',
-        label: locale === 'id' ? 'Postingan saya' : 'My posts',
+        label: locale === 'id' ? 'Milik saya' : 'Mine',
       },
       {
         id: 'favorites',
@@ -453,7 +424,7 @@ export default function MyListingsPage() {
       {
         id: 'history',
         href: '/my-listings?filter=history',
-        label: locale === 'id' ? 'Dilihat' : 'Viewed',
+        label: locale === 'id' ? 'Riwayat' : 'History',
       },
     ],
     [locale],
@@ -659,8 +630,8 @@ export default function MyListingsPage() {
       );
       setActivityNotice(
         locale === 'id'
-          ? `${option.labelId} tersimpan. Listing terlihat aktif lagi.`
-          : `${option.labelEn} saved. The listing looks active again.`,
+          ? `${option.labelId} tersimpan.`
+          : `${option.labelEn} saved.`,
       );
     } catch (err) {
       setItems(current =>
@@ -690,18 +661,9 @@ export default function MyListingsPage() {
       .toLowerCase();
     if (currentStatus === nextStatus) return;
 
-    const optimisticItem: ListingItem = {
-      ...item,
-      content_status: nextStatus,
-      status: nextStatus,
-      updated_at: new Date().toISOString(),
-    };
-
     setUpdatingStatusId(item.id);
     setError('');
-    setItems(current =>
-      current.map(entry => (entry.id === item.id ? optimisticItem : entry)),
-    );
+    setActivityNotice('');
 
     try {
       const response = await authFetch(`/api/content/${encodeURIComponent(id)}`, {
@@ -726,21 +688,19 @@ export default function MyListingsPage() {
         );
       }
 
-      setItems(current =>
-        current.map(entry =>
-          entry.id === item.id
-            ? mergeUpdatedListing(
-              optimisticItem,
-              payload,
-              optimisticItem.metadata || {},
-            )
-            : entry,
-        ),
+      // The page is filtered by status, so a successfully moved listing should
+      // leave the current list instead of lingering with a mismatched badge.
+      setItems(current => current.filter(entry => entry.id !== item.id));
+      setActivityNotice(
+        nextStatus === 'active'
+          ? locale === 'id'
+            ? 'Postingan ditayangkan.'
+            : 'Listing published.'
+          : locale === 'id'
+            ? 'Postingan dipindahkan ke Arsip.'
+            : 'Listing moved to Archive.',
       );
     } catch (err) {
-      setItems(current =>
-        current.map(entry => (entry.id === item.id ? item : entry)),
-      );
       setError(
         err instanceof Error
           ? err.message
@@ -803,363 +763,442 @@ export default function MyListingsPage() {
     }
   };
 
-  const pageTitle =
-    collectionMode === 'favorites'
-      ? locale === 'id'
-        ? 'Disimpan'
-        : 'Saved posts'
-      : collectionMode === 'history'
-        ? locale === 'id'
-          ? 'Pernah dilihat'
-          : 'Viewed posts'
-        : locale === 'id'
-          ? 'Postingan Saya'
-          : 'My posts';
-  const pageDescription =
-    collectionMode === 'favorites'
-      ? locale === 'id'
-        ? 'Tempat menyimpan produk, jasa, atau usaha yang menarik.'
-        : 'Products, services, or businesses you saved.'
-      : collectionMode === 'history'
-        ? locale === 'id'
-          ? 'Nanti isi riwayat listing yang pernah kamu buka.'
-          : 'Listings you recently opened will appear here.'
-        : locale === 'id'
-          ? 'Kelola draft, postingan tayang, dan arsip tanpa ribet.'
-          : 'Manage drafts, live posts, and archives without clutter.';
-  const HeaderIcon =
-    collectionMode === 'favorites'
-      ? BookmarkCheck
-      : collectionMode === 'history'
-        ? Eye
-        : Megaphone;
-  const primaryAction =
-    collectionMode !== 'mine'
-      ? {
-        label: locale === 'id' ? 'Cari inspirasi' : 'Search ideas',
-        href: '/explore',
-        icon: Search,
-      }
-      : {
-        label: createLabel,
-        href: createHref,
-        icon: Plus,
-      };
-  const PrimaryActionIcon = primaryAction.icon;
-  const secondaryAction =
-    collectionMode !== 'mine'
-      ? {
-        label: locale === 'id' ? 'Postingan saya' : 'My posts',
-        href: '/my-listings',
-        icon: Megaphone,
-      }
-      : {
-        label: locale === 'id' ? 'Cari inspirasi' : 'Find ideas',
-        href: '/explore',
-        icon: Search,
-      };
-  const SecondaryActionIcon = secondaryAction.icon;
-  const totalShown =
-    collectionMode === 'favorites'
-      ? filteredReferences.length
-      : collectionMode === 'history'
-        ? filteredViewedReferences.length
-        : filteredItems.length;
-  const heroStatusLabel =
-    collectionMode === 'mine'
-      ? statusTabs.find(tab => tab.id === activeStatus)?.label || 'Draft'
-      : collectionMode === 'favorites'
+
+    const isMine = collectionMode === 'mine';
+    const pageTitle =
+      collectionMode === 'favorites'
         ? locale === 'id'
           ? 'Disimpan'
           : 'Saved'
-        : locale === 'id'
-          ? 'Dilihat'
-          : 'Viewed';
+        : collectionMode === 'history'
+          ? locale === 'id'
+            ? 'Riwayat'
+            : 'History'
+          : locale === 'id'
+            ? 'Kelola postingan'
+            : 'Manage listings';
 
-  return (
-    <CreateMarketplaceShell>
-      <div className="mx-auto w-full max-w-7xl px-0 py-0 sm:px-1">
-        <div className="space-y-2.5 sm:space-y-3">
-          <section className="relative overflow-hidden rounded-none border border-x-0 border-emerald-100 bg-[linear-gradient(135deg,#fffdf6_0%,#eefdf4_58%,#fff8e8_100%)] p-3 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e21_58%,#1c1917_100%)] sm:rounded-[22px] sm:border-x sm:p-4">
-            <div className="pointer-events-none absolute -right-16 -top-20 h-32 w-32 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-400/10" />
-            <div className="pointer-events-none absolute -bottom-20 left-4 h-28 w-28 rounded-full bg-orange-300/22 blur-3xl dark:bg-orange-400/10" />
+    const pageDescription =
+      collectionMode === 'favorites'
+        ? locale === 'id'
+          ? 'Yang kamu simpan untuk dibuka lagi.'
+          : 'Things you saved for later.'
+        : collectionMode === 'history'
+          ? locale === 'id'
+            ? 'Postingan yang baru kamu lihat.'
+            : 'Listings you recently viewed.'
+          : locale === 'id'
+            ? 'Edit, tayangkan, atau arsipkan dari satu tempat.'
+            : 'Edit, publish, or archive from one place.';
 
-            <div className="relative grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+    const closeDetails = (target: EventTarget & HTMLElement) => {
+      target.closest('details')?.removeAttribute('open');
+    };
+
+    return (
+      <CreateMarketplaceShell>
+        <div className="mx-auto w-full max-w-5xl px-0 pb-8 sm:px-2 lg:px-3">
+          <header className="border-b border-slate-200 bg-white px-3 pb-3 pt-2 dark:border-white/10 dark:bg-slate-950 sm:rounded-t-[20px] sm:px-4 sm:pt-4">
+            <div className="flex min-w-0 items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-white/86 text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-200 dark:ring-white/10">
-                    <HeaderIcon className="h-4 w-4" />
-                  </span>
-                  <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-100 dark:bg-white/8 dark:text-emerald-200 dark:ring-white/10">
-                    {locale === 'id' ? 'Ruang promosi' : 'Promo space'}
-                  </span>
-                </div>
-                <h1 className="mt-2 text-xl font-bold leading-tight tracking-[-0.05em] text-slate-950 dark:text-white sm:text-2xl">
+                <h1 className="truncate text-lg font-black tracking-[-0.025em] text-slate-950 dark:text-white sm:text-xl">
                   {pageTitle}
                 </h1>
-                <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300 sm:text-[13px]">
+                <p className="mt-0.5 line-clamp-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                   {pageDescription}
                 </p>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 lg:w-[300px]">
-                <Link
-                  href={primaryAction.href}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-xs font-bold text-white shadow-[0_18px_34px_-24px_rgba(4,120,87,0.72)] transition hover:bg-emerald-800"
-                >
-                  <PrimaryActionIcon className="h-4 w-4" />
-                  {primaryAction.label}
-                </Link>
-                <Link
-                  href={secondaryAction.href}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/84 px-4 text-xs font-bold text-slate-800 transition hover:bg-white dark:border-white/10 dark:bg-white/8 dark:text-white"
-                >
-                  <SecondaryActionIcon className="h-4 w-4" />
-                  {secondaryAction.label}
-                </Link>
-              </div>
+              <Link
+                href={isMine ? '/create' : '/explore'}
+                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3.5 text-xs font-bold text-white transition hover:bg-emerald-800 sm:px-4 sm:text-sm"
+              >
+                {isMine ? <Plus className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+                {isMine
+                  ? locale === 'id'
+                    ? 'Buat baru'
+                    : 'Create'
+                  : locale === 'id'
+                    ? 'Jelajahi'
+                    : 'Explore'}
+              </Link>
             </div>
 
-            <div className="relative mt-3 grid gap-1.5 sm:grid-cols-3">
-              <div className="rounded-[15px] bg-white/72 p-2.5 ring-1 ring-white/80 dark:bg-white/[0.06] dark:ring-white/10">
-                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  {locale === 'id' ? 'Mode' : 'Mode'}
-                </p>
-                <p className="mt-0.5 truncate text-sm font-bold text-slate-950 dark:text-white">
-                  {heroStatusLabel}
-                </p>
-              </div>
-              <div className="rounded-[15px] bg-white/72 p-2.5 ring-1 ring-white/80 dark:bg-white/[0.06] dark:ring-white/10">
-                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  {locale === 'id' ? 'Tampil' : 'Shown'}
-                </p>
-                <p className="mt-0.5 text-sm font-bold text-slate-950 dark:text-white">
-                  {totalShown.toLocaleString(locale)}
-                </p>
-              </div>
-              <div className="rounded-[15px] bg-white/72 p-2.5 ring-1 ring-white/80 dark:bg-white/[0.06] dark:ring-white/10">
-                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  {locale === 'id' ? 'Fokus launch' : 'Launch focus'}
-                </p>
-                <p className="mt-0.5 truncate text-sm font-bold text-slate-950 dark:text-white">
-                  {locale === 'id' ? 'Promosi + chat' : 'Promo + chat'}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[20px] border border-slate-200 bg-white p-2.5 shadow-[0_14px_34px_-32px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 sm:p-3">
-            <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(250px,340px)] lg:items-center">
-              <div className="grid grid-cols-3 gap-1 rounded-[15px] bg-slate-100 p-1 ring-1 ring-slate-200/70 dark:bg-white/[0.04] dark:ring-white/10">
-                {collectionTabs.map(tab => {
-                  const active =
-                    (tab.id === 'favorites' &&
-                      collectionMode === 'favorites') ||
-                    (tab.id === 'history' && collectionMode === 'history') ||
-                    (tab.id === 'mine' && collectionMode === 'mine');
-                  return (
-                    <Link
-                      key={tab.id}
-                      href={tab.href}
-                      aria-current={active ? 'page' : undefined}
-                      className={`inline-flex min-h-9 items-center justify-center rounded-[12px] px-2 text-center text-xs font-bold transition sm:text-[13px] ${active
-                          ? 'bg-emerald-700 text-white shadow-[0_12px_24px_-18px_rgba(4,120,87,0.45)] ring-1 ring-emerald-800/10 dark:bg-emerald-500 dark:text-slate-950'
-                          : 'text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/70 dark:hover:text-white'
-                        }`}
-                    >
-                      {tab.label}
-                    </Link>
-                  );
-                })}
-              </div>
-
-              <div className="rounded-[15px] border border-slate-200 bg-white px-3 py-1 transition focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100 dark:border-white/10 dark:bg-slate-950 dark:focus-within:ring-emerald-400/12">
-                <label className="flex min-h-9 items-center gap-2">
-                  <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={event => setQuery(event.target.value)}
-                    placeholder={
-                      isFavoritesMode
-                        ? locale === 'id'
-                          ? 'Cari yang disimpan'
-                          : 'Search saved'
-                        : isHistoryMode
-                          ? locale === 'id'
-                            ? 'Cari yang pernah dilihat'
-                            : 'Search viewed'
-                          : locale === 'id'
-                            ? 'Cari judul, jenis, atau status'
-                            : 'Search title, type, or status'
-                    }
-                    className="w-full min-w-0 bg-transparent text-[13px] font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
-                    aria-label={
-                      locale === 'id' ? 'Cari postingan' : 'Search posts'
-                    }
-                  />
-                  {query ? (
-                    <button
-                      type="button"
-                      onClick={() => setQuery('')}
-                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 dark:bg-white/8 dark:text-slate-300 dark:hover:bg-white/12"
-                      aria-label={
-                        locale === 'id' ? 'Hapus pencarian' : 'Clear search'
-                      }
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </label>
-              </div>
-            </div>
-
-            {collectionMode === 'mine' ? (
-              <div className="mt-2 grid grid-cols-3 gap-1 rounded-[15px] bg-slate-100 p-1 ring-1 ring-slate-200/70 dark:bg-white/[0.04] dark:ring-white/10 sm:max-w-lg">
-                {statusTabs.map(tab => (
-                  <button
+            <nav className="mt-3 grid grid-cols-3 gap-1 rounded-[14px] bg-slate-100 p-1 dark:bg-white/[0.05]" aria-label={locale === 'id' ? 'Bagian postingan' : 'Listing sections'}>
+              {collectionTabs.map(tab => {
+                const active = tab.id === collectionMode;
+                return (
+                  <Link
                     key={tab.id}
-                    type="button"
-                    onClick={() => setActiveStatus(tab.id)}
-                    aria-pressed={activeStatus === tab.id}
-                    className={`min-h-9 rounded-[12px] px-2 text-xs font-bold transition sm:text-[13px] ${activeStatus === tab.id
-                        ? 'bg-emerald-700 text-white shadow-[0_12px_24px_-18px_rgba(4,120,87,0.45)] ring-1 ring-emerald-800/10 dark:bg-emerald-500 dark:text-slate-950'
-                        : 'text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/70 dark:hover:text-white'
-                      }`}
+                    href={tab.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={`inline-flex min-h-9 items-center justify-center rounded-[11px] px-2 text-xs font-bold transition sm:text-[13px] ${
+                      active
+                        ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-900 dark:text-emerald-300'
+                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
                   >
                     {tab.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+              {isMine ? (
+                <div className="grid shrink-0 grid-cols-3 gap-1 rounded-[13px] bg-slate-100 p-1 dark:bg-white/[0.05] sm:w-[310px]">
+                  {statusTabs.map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveStatus(tab.id)}
+                      aria-pressed={activeStatus === tab.id}
+                      className={`min-h-9 rounded-[10px] px-2 text-xs font-bold transition ${
+                        activeStatus === tab.id
+                          ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-900 dark:text-emerald-300'
+                          : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              <label className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-[13px] border border-slate-200 bg-white px-3 transition focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100 dark:border-white/10 dark:bg-slate-950 dark:focus-within:ring-emerald-400/15">
+                <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder={
+                    locale === 'id'
+                      ? isMine
+                        ? 'Cari postingan'
+                        : collectionMode === 'favorites'
+                          ? 'Cari yang disimpan'
+                          : 'Cari riwayat'
+                      : isMine
+                        ? 'Search listings'
+                        : collectionMode === 'favorites'
+                          ? 'Search saved'
+                          : 'Search history'
+                  }
+                  className="w-full min-w-0 bg-transparent text-[13px] font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
+                  aria-label={locale === 'id' ? 'Cari' : 'Search'}
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/8 dark:hover:text-white"
+                    aria-label={locale === 'id' ? 'Hapus pencarian' : 'Clear search'}
+                  >
+                    <X className="h-4 w-4" />
                   </button>
-                ))}
-              </div>
-            ) : null}
-          </section>
+                ) : null}
+              </label>
+            </div>
+          </header>
 
           {error ? (
-            <section className="rounded-[22px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-100">
+            <div className="border-b border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-100 sm:px-4">
               {error}
-            </section>
+            </div>
           ) : null}
 
           {activityNotice ? (
-            <section className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
+            <div className="border-b border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100 sm:px-4">
               {activityNotice}
-            </section>
+            </div>
           ) : null}
 
-          <section className="rounded-[20px] border border-slate-200 bg-white p-2.5 shadow-[0_14px_34px_-32px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 sm:p-3">
-            {collectionMode === 'history' ? (
-              filteredViewedReferences.length === 0 ? (
+          <section className="bg-white dark:bg-slate-950 sm:rounded-b-[20px] sm:border-x sm:border-b sm:border-slate-200 sm:dark:border-white/10">
+            {collectionMode === 'mine' ? (
+              loading ? (
+                <div className="p-3 sm:p-4">
+                  <MyListingsListSkeleton count={4} />
+                </div>
+              ) : filteredItems.length === 0 ? (
                 <EmptyState
-                  className="px-3 py-8 sm:py-10"
+                  className="px-4 py-12"
                   title={
                     query
                       ? locale === 'id'
-                        ? 'Tidak ketemu'
+                        ? 'Tidak ditemukan'
                         : 'No match'
-                      : locale === 'id'
-                        ? 'Belum ada yang dilihat'
-                        : 'No viewed posts yet'
+                      : activeStatus === 'active'
+                        ? locale === 'id'
+                          ? 'Belum ada yang tayang'
+                          : 'Nothing live yet'
+                        : activeStatus === 'draft'
+                          ? locale === 'id'
+                            ? 'Tidak ada draft'
+                            : 'No drafts'
+                          : locale === 'id'
+                            ? 'Arsip masih kosong'
+                            : 'Archive is empty'
                   }
                   description={
                     query
                       ? locale === 'id'
                         ? 'Coba kata lain atau hapus pencarian.'
                         : 'Try another keyword or clear search.'
-                      : locale === 'id'
-                        ? 'Setelah kamu buka postingan dari Home atau Search, riwayatnya muncul di sini.'
-                        : 'After you open posts from Home or Search, they will appear here.'
+                      : activeStatus === 'active'
+                        ? locale === 'id'
+                          ? 'Postingan yang sudah diterbitkan akan muncul di sini.'
+                          : 'Published listings will appear here.'
+                        : activeStatus === 'draft'
+                          ? locale === 'id'
+                            ? 'Draft tersimpan otomatis saat kamu belum selesai membuat postingan.'
+                            : 'Drafts are saved when you have not finished a listing.'
+                          : locale === 'id'
+                            ? 'Postingan yang kamu arsipkan akan tetap tersimpan di sini.'
+                            : 'Archived listings stay available here.'
                   }
                   action={
                     query ? (
                       <button
                         type="button"
                         onClick={() => setQuery('')}
-                        className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                        className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                       >
-                        {locale === 'id' ? 'Reset cari' : 'Reset search'}
+                        {locale === 'id' ? 'Hapus pencarian' : 'Clear search'}
                       </button>
                     ) : (
                       <Link
-                        href="/explore"
-                        className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
+                        href="/create"
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"
                       >
-                        {locale === 'id' ? 'Cari postingan' : 'Search posts'}
+                        <Plus className="h-4 w-4" />
+                        {locale === 'id' ? 'Buat postingan' : 'Create listing'}
                       </Link>
                     )
                   }
                 />
               ) : (
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredViewedReferences.map(item => {
-                    const imageStyle = item.image
-                      ? {
-                        backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
-                      }
+                <div className="divide-y divide-slate-100 dark:divide-white/8">
+                  {filteredItems.map(item => {
+                    const id = parseId(item.id);
+                    const rawType = item.type || item.content_type || 'listing';
+                    const typeLabel = listingTypeLabel(rawType, locale);
+                    const rawStatus = item.content_status || item.status || activeStatus;
+                    const normalizedStatus = rawStatus.toLowerCase();
+                    const cardStatus: ListingStatus =
+                      normalizedStatus === 'active' || normalizedStatus === 'archived'
+                        ? normalizedStatus
+                        : 'draft';
+                    const itemStatus = listingStatusLabel(rawStatus, locale);
+                    const progress = readProgress(item);
+                    const imageUrl = resolveListingImage(item);
+                    const imageStyle = imageUrl
+                      ? { backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")` }
                       : undefined;
+                    const statusToggle = listingStatusToggle(cardStatus, locale);
+                    const activity = readListingActivity(item);
+                    const activityLabel = activity
+                      ? locale === 'id'
+                        ? activity.labelId
+                        : activity.labelEn
+                      : '';
+                    const activityBusy = updatingActivityId === item.id;
+                    const statusBusy = updatingStatusId === item.id;
+
+                    const primaryAction =
+                      cardStatus === 'draft'
+                        ? {
+                            label: locale === 'id' ? 'Lanjutkan' : 'Continue',
+                            href: `/create?draft=${id}`,
+                            tone: 'bg-amber-600 text-white hover:bg-amber-700',
+                          }
+                        : cardStatus === 'archived'
+                          ? null
+                          : {
+                              label: locale === 'id' ? 'Edit' : 'Edit',
+                              href: `/create?draft=${id}`,
+                              tone: 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-white',
+                            };
 
                     return (
-                      <article
-                        key={item.id}
-                        className="overflow-hidden rounded-[18px] border border-slate-200 bg-[#fffdf7] p-2 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.04]"
-                      >
-                        <div className="grid grid-cols-[76px_minmax(0,1fr)] gap-2">
-                          <div
-                            className="relative flex h-[78px] w-full items-center justify-center overflow-hidden rounded-[15px] bg-slate-100 bg-cover bg-center text-slate-400 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10"
+                      <article key={item.id} className="relative p-3 sm:p-4">
+                        <div className="flex min-w-0 gap-3">
+                          <Link
+                            href={cardStatus === 'draft' ? `/create?draft=${id}` : `/content/${id}`}
+                            className="relative h-[82px] w-[82px] shrink-0 overflow-hidden rounded-[14px] bg-slate-100 bg-cover bg-center ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10 sm:h-[92px] sm:w-[92px]"
                             style={imageStyle}
+                            aria-label={item.title || typeLabel}
                           >
-                            {!item.image ? (
-                              <Eye className="h-5 w-5 text-emerald-500" />
+                            {!imageUrl ? (
+                              <span className="absolute inset-0 grid place-items-center text-slate-400">
+                                <ImageIcon className="h-5 w-5" />
+                              </span>
                             ) : null}
-                            <span className="absolute left-1.5 top-1.5 max-w-[64px] truncate rounded-full bg-white/88 px-1.5 py-0.5 text-[9px] font-bold text-slate-700 shadow-sm dark:bg-slate-950/78 dark:text-white">
-                              {item.typeLabel}
+                            <span className={`absolute left-1.5 top-1.5 max-w-[70px] truncate rounded-full px-2 py-0.5 text-[9px] font-bold ${statusToneClass(rawStatus)}`}>
+                              {itemStatus}
                             </span>
-                          </div>
-                          <div className="min-w-0">
-                            <h2 className="line-clamp-2 text-[13.5px] font-bold leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
-                              {item.title}
-                            </h2>
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
-                                {item.priceLabel}
-                              </span>
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/8 dark:text-slate-300">
-                                {formatDate(new Date(item.viewedAt).toISOString())}
-                              </span>
+                          </Link>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <Link
+                                  href={cardStatus === 'draft' ? `/create?draft=${id}` : `/content/${id}`}
+                                  className="line-clamp-2 text-[14px] font-bold leading-snug text-slate-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300 sm:text-[15px]"
+                                >
+                                  {item.title || (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
+                                </Link>
+                                <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 sm:text-[11px]">
+                                  <span>{typeLabel}</span>
+                                  <span aria-hidden="true">•</span>
+                                  <span>{formatDate(item.updated_at || item.created_at)}</span>
+                                  {activityLabel && cardStatus === 'active' ? (
+                                    <>
+                                      <span aria-hidden="true">•</span>
+                                      <span className="text-emerald-700 dark:text-emerald-300">{activityLabel}</span>
+                                    </>
+                                  ) : null}
+                                </p>
+                              </div>
+
+                              <details className="group relative shrink-0">
+                                <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/8 dark:hover:text-white [&::-webkit-details-marker]:hidden" aria-label={locale === 'id' ? 'Aksi lainnya' : 'More actions'}>
+                                  <MoreHorizontal className="h-5 w-5" />
+                                </summary>
+                                <div className="absolute right-0 top-10 z-30 w-[240px] overflow-hidden rounded-[16px] border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-slate-900">
+                                  {cardStatus === 'active' ? (
+                                    <>
+                                      <p className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                                        {locale === 'id' ? 'Ketersediaan hari ini' : 'Availability today'}
+                                      </p>
+                                      {DAILY_ACTIVITY_OPTIONS.map(option => {
+                                        const active = activity?.kind === option.id;
+                                        return (
+                                          <button
+                                            key={option.id}
+                                            type="button"
+                                            disabled={activityBusy}
+                                            onClick={event => {
+                                              closeDetails(event.currentTarget);
+                                              void updateDailyActivity(item, option.id);
+                                            }}
+                                            className={`flex w-full items-center justify-between gap-2 rounded-[10px] px-2.5 py-2 text-left text-xs font-semibold transition disabled:opacity-50 ${
+                                              active
+                                                ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/12 dark:text-emerald-200'
+                                                : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/6'
+                                            }`}
+                                          >
+                                            <span>{locale === 'id' ? option.labelId : option.labelEn}</span>
+                                            {active ? <span className="text-[10px]">✓</span> : null}
+                                          </button>
+                                        );
+                                      })}
+                                      <div className="my-1 border-t border-slate-100 dark:border-white/8" />
+                                    </>
+                                  ) : null}
+
+                                  {cardStatus === 'active' && statusToggle ? (
+                                    <button
+                                      type="button"
+                                      disabled={statusBusy}
+                                      onClick={event => {
+                                        closeDetails(event.currentTarget);
+                                        void updateListingStatus(item, statusToggle.nextStatus);
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-white/6"
+                                    >
+                                      <EyeOff className="h-4 w-4" />
+                                      {statusToggle.label}
+                                    </button>
+                                  ) : null}
+
+                                  {cardStatus === 'draft' ? (
+                                    <button
+                                      type="button"
+                                      disabled={deletingDraftId === item.id}
+                                      onClick={event => {
+                                        closeDetails(event.currentTarget);
+                                        void deleteDraft(item);
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-400/10"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      {deletingDraftId === item.id
+                                        ? locale === 'id'
+                                          ? 'Menghapus...'
+                                          : 'Deleting...'
+                                        : locale === 'id'
+                                          ? 'Hapus draft'
+                                          : 'Delete draft'}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </details>
                             </div>
-                            {item.location ? (
-                              <p className="mt-1 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                {item.location}
+
+                            {item.summary ? (
+                              <p className="mt-1.5 line-clamp-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                {summarizeText(item.summary)}
                               </p>
                             ) : null}
+
+                            {cardStatus === 'draft' ? (
+                              <div className="mt-2 max-w-[280px]">
+                                <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/8">
+                                  <div className="h-full rounded-full bg-amber-500" style={{ width: `${progress}%` }} />
+                                </div>
+                                <p className="mt-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  {locale === 'id' ? `Kelengkapan ${progress}%` : `${progress}% complete`}
+                                </p>
+                              </div>
+                            ) : null}
+
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                              {primaryAction ? (
+                                <Link
+                                  href={primaryAction.href}
+                                  className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-bold transition ${primaryAction.tone}`}
+                                >
+                                  <PencilLine className="h-3.5 w-3.5" />
+                                  {primaryAction.label}
+                                </Link>
+                              ) : null}
+
+                              {cardStatus === 'active' ? (
+                                <Link
+                                  href={`/content/${id}`}
+                                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/8 dark:hover:text-white"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  {locale === 'id' ? 'Lihat' : 'View'}
+                                </Link>
+                              ) : null}
+
+                              {cardStatus === 'archived' && statusToggle ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => void updateListingStatus(item, statusToggle.nextStatus)}
+                                    disabled={statusBusy}
+                                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    {statusBusy
+                                      ? locale === 'id'
+                                        ? 'Menyimpan...'
+                                        : 'Saving...'
+                                      : statusToggle.label}
+                                  </button>
+                                  <Link
+                                    href={`/create?draft=${id}`}
+                                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/8 dark:hover:text-white"
+                                  >
+                                    <PencilLine className="h-3.5 w-3.5" />
+                                    {locale === 'id' ? 'Edit' : 'Edit'}
+                                  </Link>
+                                </>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-
-                        {item.summary ? (
-                          <p className="mt-2 line-clamp-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
-                            {item.summary}
-                          </p>
-                        ) : null}
-
-                        <div className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => removeViewedReference(item.id)}
-                            className="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
-                            aria-label={
-                              locale === 'id'
-                                ? 'Hapus dari riwayat'
-                                : 'Remove from history'
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          <Link
-                            href={item.href}
-                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-800"
-                          >
-                            <Eye className="h-4 w-4" />
-                            {locale === 'id' ? 'Buka lagi' : 'Open again'}
-                          </Link>
                         </div>
                       </article>
                     );
@@ -1169,406 +1208,63 @@ export default function MyListingsPage() {
             ) : collectionMode === 'favorites' ? (
               filteredReferences.length === 0 ? (
                 <EmptyState
-                  className="px-3 py-8 sm:py-10"
-                  title={
-                    query
-                      ? locale === 'id'
-                        ? 'Tidak ketemu'
-                        : 'No match'
-                      : locale === 'id'
-                        ? 'Belum ada yang disimpan'
-                        : 'No saved posts yet'
-                  }
-                  description={
-                    query
-                      ? locale === 'id'
-                        ? 'Coba kata lain atau hapus pencarian.'
-                        : 'Try another keyword or clear search.'
-                      : locale === 'id'
-                        ? 'Simpan produk, jasa, atau usaha dari Search supaya gampang dibuka lagi.'
-                        : 'Save products, services, or businesses from Search so they are easy to open again.'
-                  }
-                  action={
-                    query ? (
-                      <button
-                        type="button"
-                        onClick={() => setQuery('')}
-                        className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                      >
-                        {locale === 'id' ? 'Reset cari' : 'Reset search'}
-                      </button>
-                    ) : (
-                      <Link
-                        href="/explore"
-                        className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
-                      >
-                        {locale === 'id' ? 'Cari inspirasi' : 'Search ideas'}
-                      </Link>
-                    )
-                  }
+                  className="px-4 py-12"
+                  title={query ? (locale === 'id' ? 'Tidak ditemukan' : 'No match') : locale === 'id' ? 'Belum ada yang disimpan' : 'Nothing saved yet'}
+                  description={query ? (locale === 'id' ? 'Coba kata lain atau hapus pencarian.' : 'Try another keyword or clear search.') : locale === 'id' ? 'Simpan produk, jasa, atau usaha dari Explore supaya gampang ditemukan lagi.' : 'Save products, services, or businesses from Explore to find them again quickly.'}
+                  action={!query ? (
+                    <Link href="/explore" className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">
+                      {locale === 'id' ? 'Jelajahi' : 'Explore'}
+                    </Link>
+                  ) : undefined}
                 />
               ) : (
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                <div className="divide-y divide-slate-100 dark:divide-white/8">
                   {filteredReferences.map(item => {
-                    const imageStyle = item.image
-                      ? {
-                        backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
-                      }
-                      : undefined;
-
+                    const imageStyle = item.image ? { backgroundImage: `url("${item.image.replace(/"/g, '%22')}")` } : undefined;
                     return (
-                      <article
-                        key={item.id}
-                        className="overflow-hidden rounded-[18px] border border-slate-200 bg-[#fffdf7] p-2 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.04]"
-                      >
-                        <div className="grid grid-cols-[76px_minmax(0,1fr)] gap-2">
-                          <div
-                            className="relative flex h-[78px] w-full items-center justify-center overflow-hidden rounded-[15px] bg-slate-100 bg-cover bg-center text-slate-400 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10"
-                            style={imageStyle}
-                          >
-                            {!item.image ? (
-                              <Heart className="h-5 w-5 text-rose-400" />
-                            ) : null}
-                            <span className="absolute left-1.5 top-1.5 max-w-[64px] truncate rounded-full bg-white/88 px-1.5 py-0.5 text-[9px] font-bold text-slate-700 shadow-sm dark:bg-slate-950/78 dark:text-white">
-                              {item.typeLabel}
-                            </span>
-                          </div>
-                          <div className="min-w-0">
-                            <h2 className="line-clamp-2 text-[13.5px] font-bold leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
-                              {item.title}
-                            </h2>
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
-                                {item.priceLabel}
-                              </span>
-                              {item.quantity > 1 ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/8 dark:text-slate-300">
-                                  x{item.quantity}
-                                </span>
-                              ) : null}
-                            </div>
-                            {item.location ? (
-                              <p className="mt-1 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                {item.location}
-                              </p>
-                            ) : null}
-                          </div>
+                      <article key={item.id} className="flex min-w-0 items-center gap-3 p-3 sm:p-4">
+                        <Link href={item.href} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[13px] bg-slate-100 bg-cover bg-center ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10" style={imageStyle}>
+                          {!item.image ? <span className="absolute inset-0 grid place-items-center"><ImageIcon className="h-5 w-5 text-slate-400" /></span> : null}
+                        </Link>
+                        <div className="min-w-0 flex-1">
+                          <Link href={item.href} className="line-clamp-2 text-sm font-bold text-slate-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">{item.title}</Link>
+                          <p className="mt-1 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">{[item.typeLabel, item.priceLabel, item.location].filter(Boolean).join(' • ')}</p>
                         </div>
-
-                        {item.summary ? (
-                          <p className="mt-2 line-clamp-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
-                            {item.summary}
-                          </p>
-                        ) : null}
-
-                        <div className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => removeReference(item.id)}
-                            className="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
-                            aria-label={
-                              locale === 'id'
-                                ? 'Hapus dari simpanan'
-                                : 'Remove saved post'
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          <Link
-                            href={item.href}
-                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-800"
-                          >
-                            <Eye className="h-4 w-4" />
-                            {item.actionLabel ||
-                              (locale === 'id' ? 'Buka' : 'Open')}
-                          </Link>
-                        </div>
+                        <button type="button" onClick={() => removeReference(item.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-400/10" aria-label={locale === 'id' ? 'Hapus dari simpanan' : 'Remove saved'}>
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </article>
                     );
                   })}
                 </div>
               )
-            ) : loading ? (
-              <div className="py-1">
-                <MyListingsListSkeleton count={3} />
-              </div>
-            ) : filteredItems.length === 0 ? (
+            ) : filteredViewedReferences.length === 0 ? (
               <EmptyState
-                className="px-3 py-8 sm:py-10"
-                title={
-                  query
-                    ? locale === 'id'
-                      ? 'Tidak ketemu'
-                      : 'No match'
-                    : locale === 'id'
-                      ? 'Belum ada postingan'
-                      : 'No posts yet'
-                }
-                description={
-                  query
-                    ? locale === 'id'
-                      ? 'Coba kata lain atau pindah tab Draft, Tayang, atau Arsip.'
-                      : 'Try another keyword or switch Draft, Live, or Archived tabs.'
-                    : locale === 'id'
-                      ? 'Mulai dari satu postingan produk, jasa, atau profil usaha yang paling mudah dijelaskan.'
-                      : 'Start with one product, service, or business profile that is easy to explain.'
-                }
-                action={
-                  query ? (
-                    <button
-                      type="button"
-                      onClick={() => setQuery('')}
-                      className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                    >
-                      {locale === 'id' ? 'Reset cari' : 'Reset search'}
-                    </button>
-                  ) : (
-                    <Link
-                      href={createHref}
-                      className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
-                    >
-                      {createLabel}
-                    </Link>
-                  )
-                }
+                className="px-4 py-12"
+                title={query ? (locale === 'id' ? 'Tidak ditemukan' : 'No match') : locale === 'id' ? 'Riwayat masih kosong' : 'History is empty'}
+                description={query ? (locale === 'id' ? 'Coba kata lain atau hapus pencarian.' : 'Try another keyword or clear search.') : locale === 'id' ? 'Postingan yang kamu buka dari Explore atau Search akan muncul di sini.' : 'Listings you open from Explore or Search will appear here.'}
+                action={!query ? (
+                  <Link href="/explore" className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">
+                    {locale === 'id' ? 'Jelajahi' : 'Explore'}
+                  </Link>
+                ) : undefined}
               />
             ) : (
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {filteredItems.map(item => {
-                  const id = parseId(item.id);
-                  const rawType = item.type || item.content_type || 'listing';
-                  const typeLabel = listingTypeLabel(rawType, locale);
-                  const rawStatus =
-                    item.content_status || item.status || activeStatus;
-                  const normalizedStatus = rawStatus.toLowerCase();
-                  const cardStatus: ListingStatus =
-                    normalizedStatus === 'active' ||
-                      normalizedStatus === 'archived'
-                      ? normalizedStatus
-                      : 'draft';
-                  const itemStatus = listingStatusLabel(rawStatus, locale);
-                  const progress = readProgress(item);
-                  const imageUrl = resolveListingImage(item);
-                  const imageStyle = imageUrl
-                    ? {
-                      backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")`,
-                    }
-                    : undefined;
-                  const statusToggle = listingStatusToggle(cardStatus, locale);
-                  const actionGridClass = statusToggle
-                    ? 'grid-cols-3'
-                    : 'grid-cols-2';
-                  const activity = readListingActivity(item);
-                  const activityLabel = activity
-                    ? locale === 'id'
-                      ? activity.labelId
-                      : activity.labelEn
-                    : '';
-                  const activityNote = activity
-                    ? locale === 'id'
-                      ? activity.noteId
-                      : activity.noteEn
-                    : '';
-                  const activityBusy = updatingActivityId === item.id;
-
+              <div className="divide-y divide-slate-100 dark:divide-white/8">
+                {filteredViewedReferences.map(item => {
+                  const imageStyle = item.image ? { backgroundImage: `url("${item.image.replace(/"/g, '%22')}")` } : undefined;
                   return (
-                    <article
-                      key={item.id}
-                      className="overflow-hidden rounded-[18px] border border-slate-200 bg-[#fffdf7] p-2 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.04]"
-                    >
-                      <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-2">
-                        <div
-                          className="relative flex h-[84px] w-full items-center justify-center overflow-hidden rounded-[15px] bg-slate-100 bg-cover bg-center text-slate-400 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10"
-                          style={imageStyle}
-                          aria-label={imageUrl ? typeLabel : undefined}
-                        >
-                          {!imageUrl ? (
-                            <ImageIcon className="h-5 w-5" />
-                          ) : null}
-                          <span
-                            className={`absolute left-1.5 top-1.5 max-w-[68px] truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusToneClass(rawStatus)}`}
-                          >
-                            {itemStatus}
-                          </span>
-                        </div>
-
-                        <div className="min-w-0">
-                          <h2 className="line-clamp-2 text-[13.5px] font-bold leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
-                            {item.title ||
-                              (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
-                          </h2>
-                          <div className="mt-1.5 flex flex-wrap gap-1">
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-white/8 dark:text-slate-300">
-                              {typeLabel}
-                            </span>
-                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-white/10">
-                              {formatDate(item.updated_at || item.created_at)}
-                            </span>
-                            {activityLabel ? (
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/12 dark:text-emerald-200 dark:ring-emerald-400/20">
-                                {activityLabel}
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {summarizeText(item.summary) ? (
-                            <p className="mt-1.5 line-clamp-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
-                              {summarizeText(item.summary)}
-                            </p>
-                          ) : (
-                            <p className="mt-1.5 line-clamp-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
-                              {locale === 'id'
-                                ? 'Belum ada ringkasan. Tambahkan cerita singkat supaya orang cepat paham.'
-                                : 'No summary yet. Add a short story so people understand faster.'}
-                            </p>
-                          )}
-                        </div>
+                    <article key={item.id} className="flex min-w-0 items-center gap-3 p-3 sm:p-4">
+                      <Link href={item.href} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[13px] bg-slate-100 bg-cover bg-center ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10" style={imageStyle}>
+                        {!item.image ? <span className="absolute inset-0 grid place-items-center"><ImageIcon className="h-5 w-5 text-slate-400" /></span> : null}
+                      </Link>
+                      <div className="min-w-0 flex-1">
+                        <Link href={item.href} className="line-clamp-2 text-sm font-bold text-slate-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">{item.title}</Link>
+                        <p className="mt-1 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">{[item.typeLabel, item.priceLabel, item.location].filter(Boolean).join(' • ')}</p>
                       </div>
-
-                      <div className="mt-2 rounded-[14px] bg-slate-50 p-2 dark:bg-white/[0.04]">
-                        <div className="flex gap-2">
-                          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
-                            {cardStatus === 'draft' ? (
-                              <PencilLine className="h-3.5 w-3.5" />
-                            ) : cardStatus === 'active' ? (
-                              <MessageCircle className="h-3.5 w-3.5" />
-                            ) : (
-                              <Clock3 className="h-3.5 w-3.5" />
-                            )}
-                          </span>
-                          <p className="line-clamp-2 text-[11px] font-bold leading-4 text-slate-600 dark:text-slate-300">
-                            {listingNextStep(cardStatus, locale)}
-                          </p>
-                        </div>
-
-                        {cardStatus === 'active' ? (
-                          <div className="mt-2 border-t border-slate-200/80 pt-2 dark:border-white/10">
-                            <div className="mb-2 flex items-center justify-between gap-2">
-                              <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                                {locale === 'id'
-                                  ? 'Update cepat'
-                                  : 'Quick update'}
-                              </p>
-                              {activityNote ? (
-                                <p className="hidden min-w-0 truncate text-[10px] font-bold text-emerald-700 dark:text-emerald-200 sm:block">
-                                  {activityNote}
-                                </p>
-                              ) : null}
-                            </div>
-                            <div className="grid grid-cols-2 gap-1">
-                              {DAILY_ACTIVITY_OPTIONS.map(option => {
-                                const activeActivity =
-                                  activity?.kind === option.id;
-                                return (
-                                  <button
-                                    key={option.id}
-                                    type="button"
-                                    disabled={activityBusy}
-                                    onClick={() =>
-                                      void updateDailyActivity(item, option.id)
-                                    }
-                                    className={`min-h-8 rounded-full border px-1.5 text-[10px] font-bold transition disabled:cursor-wait disabled:opacity-60 ${activeActivity
-                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/12 dark:text-emerald-200'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-emerald-400/20 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200'
-                                      }`}
-                                  >
-                                    {activityBusy
-                                      ? locale === 'id'
-                                        ? 'Simpan...'
-                                        : 'Saving...'
-                                      : locale === 'id'
-                                        ? option.labelId
-                                        : option.labelEn}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {cardStatus === 'draft' ? (
-                          <div className="mt-2">
-                            <div className="h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-white/10">
-                              <div
-                                className="h-full rounded-full bg-amber-500"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                            <p className="mt-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                              {locale === 'id'
-                                ? `Kelengkapan ${progress}%`
-                                : `${progress}% complete`}
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className={`mt-2 grid gap-1.5 ${actionGridClass}`}>
-                        {cardStatus === 'draft' ? (
-                          <>
-                            <Link
-                              href={`/create?draft=${id}`}
-                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-bold text-white transition hover:bg-amber-700"
-                            >
-                              <PencilLine className="h-4 w-4" />
-                              {locale === 'id'
-                                ? 'Lanjut isi draft'
-                                : 'Continue draft'}
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={() => void deleteDraft(item)}
-                              disabled={deletingDraftId === item.id}
-                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-red-50 px-3 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60 dark:bg-red-400/10 dark:text-red-200 dark:hover:bg-red-400/15"
-                              aria-label={
-                                locale === 'id' ? 'Hapus draft' : 'Delete draft'
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              {deletingDraftId === item.id
-                                ? locale === 'id'
-                                  ? 'Menghapus...'
-                                  : 'Deleting...'
-                                : locale === 'id'
-                                  ? 'Hapus'
-                                  : 'Delete'}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <Link
-                              href={`/create?draft=${id}`}
-                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                            >
-                              <PencilLine className="h-4 w-4" />
-                              {locale === 'id' ? 'Edit' : 'Edit'}
-                            </Link>
-                            <Link
-                              href={`/content/${id}`}
-                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-800"
-                            >
-                              <Eye className="h-4 w-4" />
-                              {locale === 'id' ? 'Lihat' : 'View'}
-                            </Link>
-                            {statusToggle ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void updateListingStatus(
-                                    item,
-                                    statusToggle.nextStatus,
-                                  )
-                                }
-                                disabled={updatingStatusId === item.id}
-                                className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border-2 px-3 text-xs font-bold transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
-                              >
-                                <statusToggle.icon className="h-4 w-4" />
-                                {statusToggle.label}
-                              </button>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
+                      <button type="button" onClick={() => removeViewedReference(item.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/8 dark:hover:text-white" aria-label={locale === 'id' ? 'Hapus dari riwayat' : 'Remove from history'}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </article>
                   );
                 })}
@@ -1576,496 +1272,6 @@ export default function MyListingsPage() {
             )}
           </section>
         </div>
-      </div>
-    </CreateMarketplaceShell>
-  );
-
-  return (
-    <CreateMarketplaceShell>
-      <div className="mx-auto w-full max-w-5xl px-0 py-0 sm:px-1">
-        <div className="rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-2xl sm:border-x sm:p-4">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] bg-[color:color-mix(in_srgb,var(--app-accent)_12%,white)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-emerald-400/10">
-                <HeaderIcon className="h-4.5 w-4.5" />
-              </span>
-              <div className="min-w-0">
-                <h1 className="truncate text-[17px] font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {pageTitle}
-                </h1>
-                <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
-                  {pageDescription}
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:justify-end">
-              <Link
-                href={primaryAction.href}
-                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] shadow-[0_14px_24px_-20px_rgba(15,23,42,0.35)]"
-              >
-                <PrimaryActionIcon className="h-3.5 w-3.5" />
-                {primaryAction.label}
-              </Link>
-              <Link
-                href={
-                  collectionMode !== 'mine' ? '/my-listings' : '/transactions'
-                }
-                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
-              >
-                <SecondaryActionIcon className="h-3.5 w-3.5" />
-                {collectionMode !== 'mine'
-                  ? locale === 'id'
-                    ? 'Postingan'
-                    : 'Posts'
-                  : locale === 'id'
-                    ? 'Transaksi'
-                    : 'Transactions'}
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(230px,320px)] lg:items-center">
-            <div className="grid grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
-              {collectionTabs.map(tab => {
-                const active =
-                  (tab.id === 'favorites' && collectionMode === 'favorites') ||
-                  (tab.id === 'history' && collectionMode === 'history') ||
-                  (tab.id === 'mine' && collectionMode === 'mine');
-                return (
-                  <Link
-                    key={tab.id}
-                    href={tab.href}
-                    className={`inline-flex min-h-9 items-center justify-center rounded-[12px] px-2 text-xs font-bold transition sm:text-[13px] ${active
-                        ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
-                        : 'text-[color:var(--app-text-soft)] hover:bg-white/70 hover:text-[color:var(--app-text)] dark:hover:bg-slate-900'
-                      }`}
-                  >
-                    {tab.label}
-                  </Link>
-                );
-              })}
-            </div>
-
-            <div className="ui-field-shell rounded-[14px] border border-slate-300 bg-white px-2.5 py-1 shadow-none transition focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:focus-within:border-emerald-400">
-              <label className="flex min-h-[34px] items-center gap-2">
-                <Search className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={event => setQuery(event.target.value)}
-                  placeholder={
-                    isFavoritesMode
-                      ? locale === 'id'
-                        ? 'Cari favorit'
-                        : 'Search favorites'
-                      : isHistoryMode
-                        ? locale === 'id'
-                          ? 'Cari riwayat'
-                          : 'Search history'
-                        : locale === 'id'
-                          ? 'Cari postingan'
-                          : 'Search posts'
-                  }
-                  className="w-full min-w-0 bg-transparent text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400"
-                  aria-label={
-                    locale === 'id' ? 'Cari postingan' : 'Search listings'
-                  }
-                />
-                {query ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery('')}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[color:var(--app-text-soft)] transition hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800"
-                    aria-label={
-                      locale === 'id' ? 'Hapus pencarian' : 'Clear search'
-                    }
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ) : null}
-              </label>
-            </div>
-          </div>
-
-          {collectionMode === 'mine' ? (
-            <div className="mt-2 grid grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55 sm:max-w-md">
-              {statusTabs.map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveStatus(tab.id)}
-                  className={`min-h-9 rounded-[12px] px-2 text-xs font-bold transition sm:text-[13px] ${activeStatus === tab.id
-                      ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
-                      : 'text-[color:var(--app-text-soft)] hover:bg-white/70 hover:text-[color:var(--app-text)] dark:hover:bg-slate-900'
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {error && (
-            <div className="mt-4 rounded-lg border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3 py-2 text-xs text-[color:var(--app-danger)]">
-              {error}
-            </div>
-          )}
-
-          {collectionMode === 'history' ? (
-            <EmptyState
-              className="mt-3 px-3 py-6 sm:py-7"
-              title={
-                query
-                  ? locale === 'id'
-                    ? 'Tidak ketemu'
-                    : 'No match'
-                  : locale === 'id'
-                    ? 'Riwayat masih kosong'
-                    : 'No viewed history yet'
-              }
-              description={
-                query
-                  ? locale === 'id'
-                    ? 'Coba kata lain atau reset pencarian.'
-                    : 'Try another keyword or reset search.'
-                  : locale === 'id'
-                    ? 'Setelah kamu membuka listing dari Search atau Home, riwayatnya akan muncul di sini.'
-                    : 'After you open listings from Search or Home, your viewed history will show here.'
-              }
-              action={
-                query ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery('')}
-                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
-                  >
-                    {locale === 'id' ? 'Reset cari' : 'Reset search'}
-                  </button>
-                ) : (
-                  <Link
-                    href="/explore"
-                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
-                  >
-                    {locale === 'id' ? 'Cari listing' : 'Search listings'}
-                  </Link>
-                )
-              }
-            />
-          ) : collectionMode === 'favorites' ? (
-            filteredReferences.length === 0 ? (
-              <EmptyState
-                className="mt-3 px-3 py-6 sm:py-7"
-                title={
-                  query
-                    ? locale === 'id'
-                      ? 'Tidak ketemu'
-                      : 'No match'
-                    : locale === 'id'
-                      ? 'Belum ada favorit'
-                      : 'No favorites yet'
-                }
-                description={
-                  query
-                    ? locale === 'id'
-                      ? 'Coba kata lain atau reset pencarian.'
-                      : 'Try another keyword or reset search.'
-                    : locale === 'id'
-                      ? 'Buka Search, tambah item yang menarik, nanti referensinya muncul di sini.'
-                      : 'Open Search, add interesting items, and the references will show here.'
-                }
-                action={
-                  query ? (
-                    <button
-                      type="button"
-                      onClick={() => setQuery('')}
-                      className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
-                    >
-                      {locale === 'id' ? 'Reset cari' : 'Reset search'}
-                    </button>
-                  ) : (
-                    <Link
-                      href="/explore"
-                      className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
-                    >
-                      {locale === 'id' ? 'Cari listing' : 'Search listings'}
-                    </Link>
-                  )
-                }
-              />
-            ) : (
-              <div className="mt-4 space-y-3">
-                {filteredReferences.map(item => {
-                  const imageStyle = item.image
-                    ? {
-                      backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
-                    }
-                    : undefined;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.26)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/72"
-                    >
-                      <div className="flex gap-3">
-                        <div
-                          className="flex h-[86px] w-[86px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] bg-cover bg-center text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]"
-                          style={imageStyle}
-                        >
-                          {item.image ? null : <Heart className="h-6 w-6" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <h2 className="line-clamp-2 text-[15px] font-bold leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                                {item.title}
-                              </h2>
-                              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-slate-900">
-                                  {item.typeLabel}
-                                </span>
-                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--app-accent)_10%,transparent)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)]">
-                                  {item.priceLabel}
-                                </span>
-                                {item.quantity > 1 ? (
-                                  <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-slate-900">
-                                    x{item.quantity}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                            <span className="hidden shrink-0 text-[11px] font-semibold text-[color:var(--app-text-soft)] min-[420px]:inline">
-                              {item.location}
-                            </span>
-                          </div>
-
-                          {item.summary ? (
-                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                              {item.summary}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-                        <button
-                          type="button"
-                          onClick={() => removeReference(item.id)}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] border-2 border-slate-300 bg-white px-3 text-sm font-bold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] dark:border-slate-700 dark:bg-slate-950"
-                          aria-label={
-                            locale === 'id'
-                              ? 'Hapus favorit'
-                              : 'Remove favorite'
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                        <Link
-                          href={item.href}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
-                        >
-                          {item.actionLabel ||
-                            (locale === 'id' ? 'Buka' : 'Open')}
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          ) : loading ? (
-            <MyListingsListSkeleton count={3} />
-          ) : filteredItems.length === 0 ? (
-            <EmptyState
-              className="mt-3 px-3 py-6 sm:py-7"
-              title={
-                query
-                  ? locale === 'id'
-                    ? 'Tidak ketemu'
-                    : 'No match'
-                  : locale === 'id'
-                    ? 'Belum ada'
-                    : 'No listings found for this status'
-              }
-              description={
-                query
-                  ? locale === 'id'
-                    ? 'Coba kata lain atau pindah tab.'
-                    : 'Try another keyword or switch tabs.'
-                  : locale === 'id'
-                    ? 'Buat baru atau pindah tab.'
-                    : 'Start a new post or switch tabs to see the others.'
-              }
-              action={
-                query ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery('')}
-                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
-                  >
-                    {locale === 'id' ? 'Reset cari' : 'Reset search'}
-                  </button>
-                ) : (
-                  <Link
-                    href={createHref}
-                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
-                  >
-                    {createLabel}
-                  </Link>
-                )
-              }
-            />
-          ) : (
-            <div className="mt-4 space-y-3">
-              {filteredItems.map(item => {
-                const id = parseId(item.id);
-                const rawType = item.type || item.content_type || 'listing';
-                const typeLabel = listingTypeLabel(rawType, locale);
-                const rawStatus =
-                  item.content_status || item.status || activeStatus;
-                const itemStatus = listingStatusLabel(rawStatus, locale);
-                const normalizedStatus = rawStatus.toLowerCase();
-                const cardStatus: ListingStatus =
-                  normalizedStatus === 'active' ||
-                    normalizedStatus === 'archived'
-                    ? normalizedStatus
-                    : 'draft';
-                const progress = readProgress(item);
-                const imageUrl = resolveListingImage(item);
-                const imageStyle = imageUrl
-                  ? {
-                    backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")`,
-                  }
-                  : undefined;
-                const statusToggle = listingStatusToggle(cardStatus, locale);
-                const actionGridClass = statusToggle
-                  ? 'grid-cols-3'
-                  : 'grid-cols-2';
-
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.26)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/72"
-                  >
-                    <div className="flex gap-3">
-                      <div
-                        className="flex h-[86px] w-[86px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] bg-cover bg-center text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]"
-                        style={imageStyle}
-                        aria-label={imageUrl ? typeLabel : undefined}
-                      >
-                        {!imageUrl ? <ImageIcon className="h-6 w-6" /> : null}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h2 className="line-clamp-2 text-[15px] font-bold leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                              {item.title ||
-                                (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
-                            </h2>
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-slate-900">
-                                {typeLabel}
-                              </span>
-                              <span className="rounded-full bg-[color:color-mix(in_srgb,var(--app-accent)_10%,transparent)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)]">
-                                {itemStatus}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="hidden shrink-0 text-[11px] font-semibold text-[color:var(--app-text-soft)] min-[420px]:inline">
-                            {formatDate(item.updated_at || item.created_at)}
-                          </span>
-                        </div>
-
-                        {summarizeText(item.summary) ? (
-                          <p className="mt-2 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                            {summarizeText(item.summary)}
-                          </p>
-                        ) : null}
-
-                        {activeStatus === 'draft' ? (
-                          <div className="mt-3">
-                            <div className="h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-slate-900">
-                              <div
-                                className="h-full bg-[color:var(--app-warning)]"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                            <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                              {locale === 'id'
-                                ? 'Progress'
-                                : 'Current progress'}
-                              : {progress}%
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className={`mt-3 grid gap-2 ${actionGridClass}`}>
-                      {activeStatus === 'draft' ? (
-                        <>
-                          <Link
-                            href={`/create?draft=${id}`}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-warning)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)]"
-                          >
-                            {locale === 'id' ? 'Lanjut isi' : 'Continue Draft'}
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => void deleteDraft(item)}
-                            disabled={deletingDraftId === item.id}
-                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] bg-[color:var(--app-danger-soft)] px-3 text-sm font-bold text-[color:var(--app-danger)] transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-red-400/15"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            {deletingDraftId === item.id
-                              ? locale === 'id'
-                                ? 'Menghapus...'
-                                : 'Deleting...'
-                              : locale === 'id'
-                                ? 'Hapus'
-                                : 'Delete'}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <Link
-                            href={`/create?draft=${id}`}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] border-2 border-slate-300 bg-white px-3 text-sm font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-slate-700 dark:bg-slate-950"
-                          >
-                            {locale === 'id' ? 'Edit' : 'Edit'}
-                          </Link>
-                          <Link
-                            href={`/content/${id}`}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
-                          >
-                            {locale === 'id' ? 'Lihat' : 'View'}
-                          </Link>
-                          {statusToggle ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void updateListingStatus(
-                                  item,
-                                  statusToggle.nextStatus,
-                                )
-                              }
-                              disabled={updatingStatusId === item.id}
-                              className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border-2 px-3 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
-                            >
-                              <statusToggle.icon className="h-4 w-4" />
-                              {statusToggle.label}
-                            </button>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </CreateMarketplaceShell>
-  );
-}
+      </CreateMarketplaceShell>
+    );
+  }

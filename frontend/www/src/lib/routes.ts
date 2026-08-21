@@ -43,6 +43,7 @@ export enum RoutePath {
   REELS = '/reels',
   REGISTER = '/register',
   RESET_PASSWORD = '/reset-password',
+  SEARCH = '/search',
   SETTINGS = '/settings',
   SUPPORT = '/support',
   TERMS = '/terms',
@@ -54,8 +55,14 @@ export enum RoutePath {
 }
 
 export interface MetaType {
+  /** Indonesian/fallback route title. */
   title?: string;
+  /** Indonesian/fallback route description. */
   description?: string;
+  /** English route title for client-side document title fallback. */
+  titleEn?: string;
+  /** English route description for client-side metadata fallback. */
+  descriptionEn?: string;
   topbar?: {
     isVisibleOnWeb: boolean;
     isVisibleOnMobile: boolean;
@@ -96,6 +103,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.HOME,
     name: 'Home',
     meta: {
+      title: "Beranda Lajukan | Supplier, Sourcing, dan Operasional Usaha",
+      description: "Temukan supplier, jasa, kebutuhan usaha, komunitas, dan aktivitas bisnis di Lajukan.",
+      titleEn: "Lajukan Home | Suppliers, Sourcing, and Business Operations",
+      descriptionEn: "Find suppliers, services, business needs, communities, and business activity on Lajukan.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -105,9 +116,30 @@ export const routes: RouteConfig[] = [
     shared: true,
   },
   {
+    path: RoutePath.SEARCH,
+    name: 'Search',
+    meta: {
+      title: "Cari di Lajukan UMKM | Supplier, Jasa, dan Peluang Usaha",
+      description: "Cari supplier, jasa, produk, talent, tempat usaha, dan peluang berdasarkan kebutuhanmu.",
+      titleEn: "Lajukan Search | Suppliers, Services, and Business Opportunities",
+      descriptionEn: "Search suppliers, services, products, talent, business places, and opportunities based on your needs.",
+      topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      routeIntent: 'search',
+    },
+    access: PUBLIC_ACCESS,
+    shared: true,
+  },
+  {
     path: RoutePath.EXPLORE,
     name: 'Explore',
     meta: {
+      title: "Jelajahi Lajukan",
+      description: "Jelajahi supplier, bahan usaha, jasa, mesin, tempat usaha, peluang, komunitas, dan video.",
+      titleEn: "Explore Lajukan",
+      descriptionEn: "Explore suppliers, business materials, services, machines, business places, opportunities, communities, and videos.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -121,6 +153,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.EXPLORE}/:category`,
         name: 'Explore Category',
         meta: {
+          title: "Jelajahi Kategori",
+          description: "Temukan penyedia dan kebutuhan usaha berdasarkan kategori di Lajukan.",
+          titleEn: "Explore Category",
+          descriptionEn: "Find providers and business needs by category on Lajukan.",
           topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -136,6 +172,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.KATEGORI,
     name: 'Categories',
     meta: {
+      title: "Kategori Usaha",
+      description: "Lihat kategori produk, jasa, supplier, mesin, tempat, dan kebutuhan usaha.",
+      titleEn: "Business Categories",
+      descriptionEn: "Browse product, service, supplier, machine, place, and business-need categories.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -149,6 +189,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.JOBS,
     name: 'Jobs',
     meta: {
+      title: "Lowongan Kerja",
+      description: "Temukan lowongan dan peluang kerja untuk kebutuhan usaha.",
+      titleEn: "Jobs",
+      descriptionEn: "Find jobs and work opportunities for business needs.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -162,6 +206,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.JOBS}/:slug`,
         name: 'Job Detail',
         meta: {
+          title: "Detail Lowongan",
+          description: "Lihat detail lowongan, kebutuhan posisi, dan cara melamar.",
+          titleEn: "Job Details",
+          descriptionEn: "View job details, role requirements, and application information.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -176,6 +224,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.MICROGIGS,
     name: 'Microgigs',
     meta: {
+      title: "Jasa Cepat & Microgigs",
+      description: "Temukan pekerjaan dan jasa singkat untuk kebutuhan usaha.",
+      titleEn: "Microgigs",
+      descriptionEn: "Find short-form jobs and services for business needs.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -189,6 +241,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.PROPERTY,
     name: 'Property',
     meta: {
+      title: "Tempat Usaha",
+      description: "Cari ruko, kios, booth, gudang, dan lokasi untuk menjalankan usaha.",
+      titleEn: "Business Places",
+      descriptionEn: "Find shops, kiosks, booths, warehouses, and locations for your business.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -202,6 +258,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.PROPERTY}/:slug`,
         name: 'Property Detail',
         meta: {
+          title: "Detail Tempat Usaha",
+          description: "Lihat detail lokasi, fasilitas, harga, dan informasi tempat usaha.",
+          titleEn: "Business Place Details",
+          descriptionEn: "View location, facilities, pricing, and business-place details.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -217,6 +277,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.SUPPORT,
     name: 'Support',
     meta: {
+      title: "Pusat Bantuan",
+      description: "Dapatkan bantuan untuk akun, listing, media, chat, komunitas, transaksi, dan usaha.",
+      titleEn: "Help Center",
+      descriptionEn: "Get help with accounts, listings, media, chat, community, transactions, and business tools.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -229,6 +293,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.PAYMENTS,
     name: 'Payments',
     meta: {
+      title: "Pembayaran",
+      description: "Kelola metode, status, dan aktivitas pembayaran yang tersedia di Lajukan.",
+      titleEn: "Payments",
+      descriptionEn: "Manage payment methods, status, and available payment activity on Lajukan.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -241,6 +309,10 @@ export const routes: RouteConfig[] = [
     path: `${RoutePath.CONTENT}/:id`,
     name: 'Content Detail',
     meta: {
+      title: "Detail Listing",
+      description: "Lihat detail produk, jasa, kebutuhan, supplier, atau tempat usaha di Lajukan.",
+      titleEn: "Listing Details",
+      descriptionEn: "View product, service, need, supplier, or business-place details on Lajukan.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -253,6 +325,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.CONTENT}/:id/edit`,
         name: 'Edit Content',
         meta: {
+          title: "Edit Listing",
+          description: "Perbarui informasi, media, harga, lokasi, dan status listing.",
+          titleEn: "Edit Listing",
+          descriptionEn: "Update listing information, media, price, location, and status.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -268,6 +344,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.DASHBOARD,
     name: 'Dashboard',
     meta: {
+      title: "Dashboard",
+      description: "Lihat ringkasan aktivitas, chat, listing, transaksi, dan hal yang perlu ditangani.",
+      titleEn: "Dashboard",
+      descriptionEn: "View activity, chats, listings, transactions, and items that need attention.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -279,8 +359,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.CREATE,
     name: 'Create Posting',
     meta: {
-      title: 'Buat Postingan',
-      description: 'Pilih jenis postingan yang ingin dibuat.',
+      title: "Buat Postingan",
+      description: "Buat produk, jasa, kebutuhan, supplier, tempat usaha, atau promosi baru.",
+      titleEn: "Create Post",
+      descriptionEn: "Create a product, service, need, supplier, business place, or promotion.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -293,6 +375,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.CREATE}/:flow`,
         name: 'Create Flow',
         meta: {
+          title: "Buat Listing",
+          description: "Isi informasi utama untuk membuat listing yang mudah ditemukan dan dipahami.",
+          titleEn: "Create Listing",
+          descriptionEn: "Add the key information needed to create a clear, discoverable listing.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -303,6 +389,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.CREATE}/:flow/:listing`,
         name: 'Create Listing Detail',
         meta: {
+          title: "Lengkapi Listing",
+          description: "Lengkapi detail listing sebelum disimpan atau diterbitkan.",
+          titleEn: "Complete Listing",
+          descriptionEn: "Complete listing details before saving or publishing.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -315,7 +405,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.PROFILE,
     name: 'Profile',
     meta: {
-      title: 'Profil',
+      title: "Profil Saya",
+      description: "Kelola identitas, profil usaha, keahlian, media, dan kepercayaan akun.",
+      titleEn: "My Profile",
+      descriptionEn: "Manage your identity, business profile, expertise, media, and account trust.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -324,20 +417,13 @@ export const routes: RouteConfig[] = [
     access: AUTH_ACCESS,
     children: [
       {
-        path: `${RoutePath.PROFILE}/edit`,
-        name: 'Edit Profile',
-        meta: {
-          topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
-          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
-          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
-          footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
-        },
-        access: AUTH_ACCESS,
-      },
-      {
         path: `${RoutePath.PROFILE}/ai`,
         name: 'AI Profile',
         meta: {
+          title: "AI Studio Profil",
+          description: "Gunakan bantuan AI untuk membuat dan mengembangkan konten serta profil Lajukan.",
+          titleEn: "Profile AI Studio",
+          descriptionEn: "Use AI assistance to create and improve Lajukan profile and content.",
           topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -351,6 +437,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.PROFILE}/:slug`,
         name: 'Public Profile',
         meta: {
+          title: "Profil Publik",
+          description: "Lihat profil publik, penawaran, keahlian, dan aktivitas pengguna Lajukan.",
+          titleEn: "Public Profile",
+          descriptionEn: "View a Lajukan user’s public profile, offers, expertise, and activity.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
           footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
@@ -364,6 +454,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.SETTINGS,
     name: 'Settings',
     meta: {
+      title: "Pengaturan",
+      description: "Atur akun, privasi, keamanan, preferensi, dan pengaturan Lajukan.",
+      titleEn: "Settings",
+      descriptionEn: "Manage account, privacy, security, preferences, and Lajukan settings.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -375,6 +469,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.TRANSACTIONS,
     name: 'Activity',
     meta: {
+      title: "Transaksi & Aktivitas",
+      description: "Pantau transaksi, kesepakatan, dan aktivitas yang sedang berjalan.",
+      titleEn: "Transactions & Activity",
+      descriptionEn: "Track transactions, agreements, and ongoing activity.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -387,6 +485,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.TRANSACTIONS}/:id`,
         name: 'Transaction Detail',
         meta: {
+          title: "Detail Transaksi",
+          description: "Lihat status, pihak terkait, nilai, dan riwayat transaksi.",
+          titleEn: "Transaction Details",
+          descriptionEn: "View transaction status, parties, amount, and history.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -399,6 +501,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.TRANSACTIONS}/:id/review`,
         name: 'Transaction Review',
         meta: {
+          title: "Ulas Transaksi",
+          description: "Berikan ulasan berdasarkan transaksi atau interaksi yang sudah selesai.",
+          titleEn: "Review Transaction",
+          descriptionEn: "Leave a review for a completed transaction or interaction.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -413,6 +519,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.NOTIFICATIONS,
     name: 'Notifications',
     meta: {
+      title: "Notifikasi",
+      description: "Lihat pembaruan penting dari chat, listing, komunitas, transaksi, dan akun.",
+      titleEn: "Notifications",
+      descriptionEn: "See important updates from chats, listings, community, transactions, and your account.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -424,6 +534,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.MANAGE,
     name: 'Manage',
     meta: {
+      title: "Kelola Usaha",
+      description: "Kelola chat, postingan, transaksi, usaha, reels, dan komunitas dari satu tempat.",
+      titleEn: "Manage Business",
+      descriptionEn: "Manage chats, listings, transactions, business, reels, and community in one place.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -436,6 +550,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.MANAGE}/community`,
         name: 'Manage Community Posts',
         meta: {
+          title: "Kelola Komunitas",
+          description: "Cari, buka, edit, dan hapus postingan komunitas yang kamu kelola.",
+          titleEn: "Manage Community",
+          descriptionEn: "Search, open, edit, and delete community posts you manage.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -448,6 +566,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.MANAGE}/reels`,
         name: 'Manage Reels',
         meta: {
+          title: "Kelola Reels",
+          description: "Lihat, edit, dan arsipkan reels yang sudah kamu buat.",
+          titleEn: "Manage Reels",
+          descriptionEn: "View, edit, and archive reels you have created.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -462,6 +584,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.MY_LISTINGS,
     name: 'My Listings',
     meta: {
+      title: "Postingan Saya",
+      description: "Kelola listing aktif, draft, arsip, produk, jasa, dan kebutuhan milikmu.",
+      titleEn: "My Listings",
+      descriptionEn: "Manage your active, draft, archived, product, service, and need listings.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -473,6 +599,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.MY_PROJECTS,
     name: 'My Projects',
     meta: {
+      title: "Proyek Saya",
+      description: "Pantau proyek, kebutuhan, dan aktivitas kerja yang terhubung ke akunmu.",
+      titleEn: "My Projects",
+      descriptionEn: "Track projects, needs, and work activity linked to your account.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -485,6 +615,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.REELS,
     name: 'Reels',
     meta: {
+      title: "Reels Lajukan",
+      description: "Tonton video usaha, edukasi, produk, dan inspirasi dari komunitas Lajukan.",
+      titleEn: "Lajukan Reels",
+      descriptionEn: "Watch business, education, product, and inspiration videos from Lajukan.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -498,6 +632,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.REELS}/:id`,
         name: 'Reels Detail',
         meta: {
+          title: "Detail Reels",
+          description: "Tonton reels, lihat detail, interaksi, dan konten terkait.",
+          titleEn: "Reel Details",
+          descriptionEn: "Watch a reel and view its details, interactions, and related content.",
           topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -513,6 +651,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.CHAT,
     name: 'Messages',
     meta: {
+      title: "Chat",
+      description: "Buka percakapan dengan pembeli, penjual, penyedia jasa, atau tim support.",
+      titleEn: "Chat",
+      descriptionEn: "Open conversations with buyers, sellers, service providers, or support.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -525,6 +667,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.CHAT}/:id`,
         name: 'Chat Detail',
         meta: {
+          title: "Percakapan",
+          description: "Lanjutkan percakapan dan lihat konteks listing atau aktivitas terkait.",
+          titleEn: "Conversation",
+          descriptionEn: "Continue a conversation and view related listing or activity context.",
           topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -541,6 +687,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.ABOUT,
     name: 'About',
     meta: {
+      title: "Tentang Lajukan",
+      description: "Kenali Lajukan dan cara platform membantu kebutuhan serta aktivitas usaha.",
+      titleEn: "About Lajukan",
+      descriptionEn: "Learn about Lajukan and how the platform supports business needs and activity.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -553,6 +703,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.CONTACT,
     name: 'Contact',
     meta: {
+      title: "Hubungi Kami",
+      description: "Hubungi tim Lajukan untuk bantuan akun, listing, supplier, verifikasi, atau kerja sama.",
+      titleEn: "Contact Us",
+      descriptionEn: "Contact Lajukan for account, listing, supplier, verification, or partnership help.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -565,6 +719,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.COMMUNITY,
     name: 'Community',
     meta: {
+      title: "Komunitas Lajukan",
+      description: "Temukan diskusi, komunitas, pengalaman, dan jaringan untuk pelaku usaha.",
+      titleEn: "Lajukan Community",
+      descriptionEn: "Discover discussions, communities, experiences, and networks for business users.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -577,6 +735,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.COMMUNITY}/groups/:slug`,
         name: 'Community Group Detail',
         meta: {
+          title: "Grup Komunitas",
+          description: "Lihat diskusi, anggota, dan aktivitas dalam grup komunitas Lajukan.",
+          titleEn: "Community Group",
+          descriptionEn: "View discussions, members, and activity in a Lajukan community group.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -590,6 +752,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.CRM,
     name: 'CRM',
     meta: {
+      title: "CRM",
+      description: "Kelola hubungan, prospek, dan aktivitas pelanggan usaha.",
+      titleEn: "CRM",
+      descriptionEn: "Manage business relationships, leads, and customer activity.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -602,6 +768,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.BLOG,
     name: 'Blog',
     meta: {
+      title: "Blog Lajukan",
+      description: "Baca panduan, wawasan, dan informasi seputar usaha dan ekosistem Lajukan.",
+      titleEn: "Lajukan Blog",
+      descriptionEn: "Read guides, insights, and information about business and the Lajukan ecosystem.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -614,6 +784,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.BLOG}/:slug`,
         name: 'Blog Article',
         meta: {
+          title: "Artikel Lajukan",
+          description: "Baca artikel dan panduan usaha dari Lajukan.",
+          titleEn: "Lajukan Article",
+          descriptionEn: "Read business articles and guides from Lajukan.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
@@ -627,6 +801,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.EDUCATION,
     name: 'Education',
     meta: {
+      title: "Edukasi Usaha",
+      description: "Pelajari materi praktis untuk menjalankan dan mengembangkan usaha.",
+      titleEn: "Business Education",
+      descriptionEn: "Learn practical material for running and growing a business.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -640,6 +818,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.LEARN,
     name: 'Learn',
     meta: {
+      title: "Belajar",
+      description: "Akses materi belajar dan panduan yang tersimpan di akun Lajukan.",
+      titleEn: "Learn",
+      descriptionEn: "Access learning material and guides in your Lajukan account.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -652,6 +834,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.LEARN}/:slug`,
         name: 'Lesson Detail',
         meta: {
+          title: "Materi Belajar",
+          description: "Buka materi, panduan, dan detail pembelajaran.",
+          titleEn: "Lesson",
+          descriptionEn: "Open learning material, guides, and lesson details.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
@@ -664,6 +850,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.LAINNYA,
     name: 'Lainnya',
     meta: {
+      title: "Menu Lainnya",
+      description: "Temukan fitur dan akses tambahan di Lajukan.",
+      titleEn: "More",
+      descriptionEn: "Find additional features and shortcuts on Lajukan.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -677,6 +867,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.UMKM,
     name: 'UMKM Portal',
     meta: {
+      title: "Lajukan UMKM | Pasokan Lokal, Substitusi Impor, dan Ekspor",
+      description: "Cari usaha lokal, produk, jasa, kuliner, dan tempat usaha di sekitar.",
+      titleEn: "Lajukan Global | Local Supply, Import Replacement, and Export",
+      descriptionEn: "Find local businesses, products, services, food, and business places nearby.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -691,6 +885,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.COOKIE_POLICY,
     name: 'Cookie Policy',
     meta: {
+      title: "Kebijakan Cookie",
+      description: "Pelajari penggunaan cookie, preferensi, dan kontrol data di Lajukan.",
+      titleEn: "Cookie Policy",
+      descriptionEn: "Learn about cookies, preferences, and data controls on Lajukan.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -703,6 +901,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.PRIVACY,
     name: 'Privacy Policy',
     meta: {
+      title: "Kebijakan Privasi",
+      description: "Pelajari cara Lajukan mengelola data, consent, retensi, dan hak pengguna.",
+      titleEn: "Privacy Policy",
+      descriptionEn: "Learn how Lajukan handles data, consent, retention, and user rights.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -715,6 +917,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.REFUND_POLICY,
     name: 'Refund & Return Policy',
     meta: {
+      title: "Kebijakan Refund & Retur",
+      description: "Pelajari alur refund, retur, pembatalan, komplain, dan bukti transaksi.",
+      titleEn: "Refund & Return Policy",
+      descriptionEn: "Learn about refunds, returns, cancellations, complaints, and transaction evidence.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -727,6 +933,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.TERMS,
     name: 'Terms',
     meta: {
+      title: "Syarat & Ketentuan",
+      description: "Baca aturan penggunaan akun, listing, chat, transaksi, moderasi, dan layanan Lajukan.",
+      titleEn: "Terms & Conditions",
+      descriptionEn: "Read the rules for accounts, listings, chat, transactions, moderation, and Lajukan services.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -739,6 +949,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.TRUST,
     name: 'Trust',
     meta: {
+      title: "Pusat Keamanan & Trust",
+      description: "Pelajari privasi, keamanan akun, pembayaran, aksesibilitas, vendor, dan aturan Lajukan.",
+      titleEn: "Trust & Safety Center",
+      descriptionEn: "Learn about privacy, account security, payments, accessibility, vendors, and Lajukan policies.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -751,6 +965,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.TRUST}/:topic`,
         name: 'Trust Topic',
         meta: {
+          title: "Panduan Trust & Keamanan",
+          description: "Baca penjelasan lengkap topik keamanan, privasi, pembayaran, dan kepatuhan Lajukan.",
+          titleEn: "Trust & Safety Guide",
+          descriptionEn: "Read detailed guidance on Lajukan security, privacy, payments, and compliance.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
@@ -764,6 +982,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.TOKO,
     name: 'Toko',
     meta: {
+      title: "Toko Lajukan",
+      description: "Temukan dan buka halaman toko serta katalog usaha di Lajukan.",
+      titleEn: "Lajukan Stores",
+      descriptionEn: "Discover store pages and business catalogs on Lajukan.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -777,6 +999,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.TOKO}/scan`,
         name: 'Scan QR Toko',
         meta: {
+          title: "Scan QR Toko",
+          description: "Pindai QR untuk membuka toko, outlet, atau informasi usaha.",
+          titleEn: "Scan Store QR",
+          descriptionEn: "Scan a QR code to open a store, outlet, or business information.",
           topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -788,6 +1014,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.TOKO}/:slug`,
         name: 'Storefront View',
         meta: {
+          title: "Halaman Toko",
+          description: "Lihat profil, katalog, lokasi, jam operasional, dan kontak toko.",
+          titleEn: "Storefront",
+          descriptionEn: "View a store profile, catalog, location, operating hours, and contact information.",
           topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -804,6 +1034,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.USAHA,
     name: 'Portal Usaha',
     meta: {
+      title: "Portal Usaha",
+      description: "Kelola profil, katalog, operasional, order, tim, outlet, dan performa usaha.",
+      titleEn: "Business Portal",
+      descriptionEn: "Manage business profile, catalog, operations, orders, team, outlets, and performance.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -815,6 +1049,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/analytics`,
         name: 'Analytics Usaha',
         meta: {
+          title: "Analitik Usaha",
+          description: "Lihat metrik, performa, dan ringkasan aktivitas usaha.",
+          titleEn: "Business Analytics",
+          descriptionEn: "View business metrics, performance, and activity summaries.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -825,6 +1063,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/asisten`,
         name: 'Asisten AI Usaha',
         meta: {
+          title: "Asisten AI Usaha",
+          description: "Gunakan AI untuk membantu pekerjaan, konten, dan operasional usaha.",
+          titleEn: "Business AI Assistant",
+          descriptionEn: "Use AI to help with business work, content, and operations.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -835,6 +1077,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/dashboard`,
         name: 'Dashboard Usaha Core',
         meta: {
+          title: "Dashboard Usaha",
+          description: "Lihat kondisi usaha, aktivitas penting, dan hal yang perlu ditangani.",
+          titleEn: "Business Dashboard",
+          descriptionEn: "View business status, important activity, and items that need attention.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -845,6 +1091,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/katalog`,
         name: 'Katalog Produk Usaha',
         meta: {
+          title: "Katalog Usaha",
+          description: "Kelola produk, layanan, stok, dan katalog yang ditampilkan oleh usaha.",
+          titleEn: "Business Catalog",
+          descriptionEn: "Manage products, services, stock, and the catalog shown by your business.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -855,6 +1105,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/onboarding`,
         name: 'Onboarding Usaha Baru',
         meta: {
+          title: "Daftarkan Usaha",
+          description: "Tambahkan informasi dasar untuk membuat profil usaha baru di Lajukan.",
+          titleEn: "Set Up Business",
+          descriptionEn: "Add the basic information needed to create a new business profile on Lajukan.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -865,6 +1119,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/operasional`,
         name: 'Operasional Toko',
         meta: {
+          title: "Operasional Usaha",
+          description: "Kelola status operasional, jadwal, layanan, dan aktivitas outlet.",
+          titleEn: "Business Operations",
+          descriptionEn: "Manage operating status, schedules, services, and outlet activity.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -875,6 +1133,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/order`,
         name: 'Order Management',
         meta: {
+          title: "Kelola Pesanan",
+          description: "Pantau dan kelola pesanan atau permintaan yang masuk ke usaha.",
+          titleEn: "Order Management",
+          descriptionEn: "Track and manage orders or requests received by the business.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -885,6 +1147,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/profil`,
         name: 'Profil Management',
         meta: {
+          title: "Profil Usaha",
+          description: "Perbarui identitas, deskripsi, lokasi, kontak, dan informasi usaha.",
+          titleEn: "Business Profile",
+          descriptionEn: "Update business identity, description, location, contact, and information.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -895,6 +1161,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/qr`,
         name: 'QR Settings',
         meta: {
+          title: "QR Usaha",
+          description: "Atur QR untuk toko, outlet, katalog, atau akses bisnis.",
+          titleEn: "Business QR",
+          descriptionEn: "Configure QR codes for stores, outlets, catalogs, or business access.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -905,6 +1175,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/tim`,
         name: 'Team Access',
         meta: {
+          title: "Tim & Akses",
+          description: "Kelola anggota tim, peran, dan akses ke portal usaha.",
+          titleEn: "Team & Access",
+          descriptionEn: "Manage team members, roles, and access to the business portal.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -915,6 +1189,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/toko/:storeId`,
         name: 'Outlet Control',
         meta: {
+          title: "Kelola Outlet",
+          description: "Kelola informasi, katalog, operasional, dan pengaturan satu outlet.",
+          titleEn: "Manage Outlet",
+          descriptionEn: "Manage information, catalog, operations, and settings for one outlet.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -925,6 +1203,10 @@ export const routes: RouteConfig[] = [
         path: `${RoutePath.USAHA}/toko/:storeId/:workspace`,
         name: 'Workspace Outlet',
         meta: {
+          title: "Workspace Outlet",
+          description: "Buka workspace khusus untuk mengelola bagian tertentu dari outlet.",
+          titleEn: "Outlet Workspace",
+          descriptionEn: "Open a dedicated workspace to manage a specific part of an outlet.",
           navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -939,6 +1221,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.LOGIN,
     name: 'Login',
     meta: {
+      title: "Masuk",
+      description: "Masuk ke Lajukan untuk membuka profil, chat, listing, komunitas, dan alat usaha.",
+      titleEn: "Sign In",
+      descriptionEn: "Sign in to Lajukan to access your profile, chats, listings, community, and business tools.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -952,6 +1238,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.REGISTER,
     name: 'Register',
     meta: {
+      title: "Daftar",
+      description: "Buat akun Lajukan untuk mulai mencari, menawarkan, dan mengelola aktivitas usaha.",
+      titleEn: "Create Account",
+      descriptionEn: "Create a Lajukan account to search, offer, and manage business activity.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -965,6 +1255,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.ONBOARDING,
     name: 'Account Onboarding',
     meta: {
+      title: "Siapkan Akun",
+      description: "Lengkapi informasi dasar agar akun Lajukan siap digunakan.",
+      titleEn: "Set Up Account",
+      descriptionEn: "Complete the basic information needed to get your Lajukan account ready.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -976,6 +1270,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.FORGOT_PASSWORD,
     name: 'Forgot Password',
     meta: {
+      title: "Lupa Password",
+      description: "Pulihkan akses akun Lajukan dengan aman.",
+      titleEn: "Forgot Password",
+      descriptionEn: "Recover access to your Lajukan account securely.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -989,6 +1287,10 @@ export const routes: RouteConfig[] = [
     path: RoutePath.RESET_PASSWORD,
     name: 'Reset Password',
     meta: {
+      title: "Atur Ulang Password",
+      description: "Buat password baru untuk mengamankan kembali akun Lajukan.",
+      titleEn: "Reset Password",
+      descriptionEn: "Create a new password to secure your Lajukan account.",
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
@@ -999,3 +1301,32 @@ export const routes: RouteConfig[] = [
     access: [Role.GUEST],
   },
 ];
+
+export type LajukanLocale = 'id' | 'en';
+
+/**
+ * Returns route copy without forcing every existing route consumer to understand i18n.
+ * Dynamic public pages should still prefer their own `generateMetadata()` values.
+ */
+export function getLocalizedRouteMeta(
+  meta: MetaType,
+  locale: LajukanLocale,
+): { title: string; description: string } {
+  return locale === 'en'
+    ? {
+        title: meta.titleEn || meta.title || 'Lajukan',
+        description: meta.descriptionEn || meta.description || '',
+      }
+    : {
+        title: meta.title || 'Lajukan',
+        description: meta.description || '',
+      };
+}
+
+/** Browser-tab title used by the route-title client fallback. */
+export function formatRouteDocumentTitle(title: string | undefined): string {
+  const clean = String(title || '').trim();
+  if (!clean) return 'Lajukan';
+  if (/\blajukan\b/i.test(clean)) return clean;
+  return `${clean} | Lajukan`;
+}

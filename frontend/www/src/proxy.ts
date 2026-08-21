@@ -69,7 +69,7 @@ const LEGACY_EXACT_REDIRECTS: Record<string, string> = {
   '/my-applications': '/dashboard',
   '/property/create': '/create/jual/properti',
   '/jobs/create': '/create/butuh/lowongan',
-  '/profile/freelancer/create': '/profile/edit?focus=talent',
+  '/profile/freelancer/create': '/profile?edit=professional',
   '/company/create': '/usaha/onboarding',
   '/super-app': '/home',
 };

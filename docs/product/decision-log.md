@@ -224,3 +224,61 @@ Use this file for approved product/architecture decisions. Do not record unappro
 - Decision: The canonical UMKM map loads registered businesses and public references in network batches of 10, ranks by viewer proximity or visible-map center, and fetches public-reference markers separately through a thin viewport-bounded endpoint. Public requests are capped at 50 rows and a 500-row progressive window rather than exposing an unbounded collection read.
 - Evidence: Product feedback identified slow first load and requested Google Maps-like nearby loading. The implementation audit found a 120-row server seed, a 160-row client refetch, periodic full polling, and public references fetched through a generic content query that reached its 1.5-second deadline.
 - Consequence: Map movement must query indexed bounds, stale requests must be cancelled, public projections must exclude private metadata, and user coordinates placed in URLs must remain coarse. Newest-first reference browsing uses keyset cursors; query, nearby, and viewport ranking use a bounded 10-at-a-time prefix window of at most 50 reference rows. A reference is publishable on these surfaces only with an explicit safe source URL and license URL. Larger windows, spatial tiles, replicas, partitioning, or sharding require production query plans and load evidence rather than row-count claims alone.
+
+## 2026-08-11: Public People Discovery Lives Inside Explore
+
+- Decision: `/explore?tab=users` is the canonical public directory for finding Lajukan people and business actors. Explore exposes this mode directly from its hub and desktop discovery menu; legacy `type=people`, `type=orang`, and user/freelancer links canonicalize to the same tab.
+- Evidence: Product feedback found no understandable way to browse registered users. The user discovery API and shared user-result card already existed, but Explore discarded the legacy type parameter and refused an empty-query browse, making the capability effectively unreachable.
+- Consequence: Anonymous visitors may browse bounded, rate-limited projections of active public profiles and search them by public profile fields. Accounts without a meaningful profile, profiles explicitly marked private or non-discoverable, private contacts, credentials, documents, and raw metadata are excluded. This extends the single Explore surface rather than introducing a second search or people directory.
+
+## 2026-08-11: Explore Starts With Concrete Tasks
+
+- Decision: The Explore hub starts with one plain-language search and a compact menu of concrete business needs. It no longer requires visitors to choose an abstract buying/selling intent before searching. Buyer requests, people, learning, and public map data remain visible as clearly named secondary paths.
+- Evidence: Product review found that intent cards and long explanatory category cards required Indonesian MSME users to understand the platform taxonomy before taking action. Current Gojek product guidance similarly teaches users to choose a plainly named service icon and then search or choose a relevant curation inside that service.
+- Consequence: Indonesian labels favor familiar outcomes such as `Bahan & stok`, `Cari pembeli`, and `Orang & usaha`. The mobile hub uses a six-item icon grid, search examples, touch targets of at least 44px, and no horizontally scrolling primary navigation. Search results preserve the same three visible modes so switching context does not require returning to the hub.
+
+## 2026-08-11: Chat Uses Familiar Messaging Grammar Without WhatsApp Claims
+
+- Decision: Internal Chat and Profile AI use interaction patterns already familiar to Indonesian messaging users—scannable conversations, simple filters, a bottom composer, multiline messages, reply context, attachment tray, voice-note drafts, honest send state, and 44px touch targets—while retaining Lajukan identity and contracts. They must not copy WhatsApp branding or imply that Lajukan is WhatsApp.
+- Evidence: Product feedback asks for a WhatsApp-familiar experience. Repository audit found that the core two-pane/mobile layout, realtime transport, reply, media, and Profile AI conversations already exist, but several labels remain technical, voice recording is absent, small controls are difficult to tap, and Chat displayed an end-to-end-encryption claim without an E2EE protocol.
+- Consequence: Internal Chat and WhatsApp remain separate channels. UI may only show delivery, read, encryption, presence, block/report, edit, archive, mute, or forward semantics that are enforced by canonical server contracts; unavailable capabilities are not simulated with decorative buttons. Profile AI identifies itself as AI, discloses that answers can be wrong, warns against sharing secrets, requires human confirmation for consequential actions, and never claims WhatsApp Private Processing or E2EE. Voice input is transcribed by an authenticated, rate-limited server route, disclosed before use, and inserted as editable text instead of being sent directly. Technical builder/model controls are secondary to plain-language everyday tasks.
+
+## 2026-08-11: Shared Profile AI Keeps Recipient Consent And Owner Configuration Separate
+
+- Decision: Sharing a Profile AI grants access to its public interaction surface, not consent to store recipient memory and not access to owner instructions. Recipient memory is opt-in per account and assistant, public quick actions resolve hidden instructions only on the server, chat retries use durable request identity, and owners can rotate or revoke share links.
+- Evidence: The earlier runtime used the owner's agent-level memory flag for every viewer and accepted `action_instruction` from the browser. A lost chat response could also cause a retry to invoke the AI provider and store the turn twice, while a share token had no rotation lifecycle.
+- Consequence: Deploy migration `20260811160000_personal_ai_recipient_memory_and_idempotency` before the WWW changes. Shared DTOs remain allowlisted, old share URLs stop resolving after rotate/revoke, and a recipient can inspect, disable, or delete only memory keyed to their own account.
+
+## 2026-08-13: Chat And Profile AI Use Realtime-First Bounded Local Snapshots
+
+- Decision: Chat and Profile AI may hydrate from sanitized, user-scoped browser
+  snapshots, then perform one canonical revalidation and use realtime/event
+  updates. They do not poll full history during the healthy steady state.
+- Evidence: The unread counter and inbox snapshot previously disagreed after a
+  read, unstable React callback identities restarted history/socket effects, a
+  failed DM profile lookup rewrote state repeatedly, production forced Phoenix
+  Long Poll, and Profile AI could load the same thread through two paths.
+- Consequence: ScyllaDB and PostgreSQL remain the sources of truth. Browser
+  caches are bounded, expire, tolerate quota/privacy-mode failures, and are
+  cleared on authenticated account release/change. WebSocket is primary and
+  Long Poll remains a bounded fallback. Read state must update every inbox
+  projection, and unsupported delivery/read/edit/privacy semantics remain
+  unavailable until their server contracts exist.
+
+## 2026-08-13: Offline Chat Is Authorized Read-Only And Group History Starts At Membership
+
+- Decision: A currently authenticated user may open a bounded local Chat snapshot while offline only when that room is already present in the same user's cached inbox. The room stays read-only until server membership is revalidated. A group member's ordinary history starts at `joined_at`; older history is never granted implicitly.
+- Evidence: The previous global offline overlay made local snapshots unusable, while bypassing the membership gate for an arbitrary room URL would make browser cache an authorization source. The group membership projection already stored `joined_at`, but the history query previously ignored it. WhatsApp's published group-history pattern also treats recent history for a new member as an explicit, visible grant rather than automatic archive access.
+- Consequence: Offline mode is entered only for a same-user inbox room during a network exception or 5xx; 401/403/404 remain auth/access failures. It does not join sockets, acknowledge reads, send/upload, call, invoke Chat AI, or mutate transactions, and exposes bounded focus/online/manual revalidation. Cold offline authentication is not claimed. Group queries use a `minTimeuuid(joined_at)` lower bound and fail closed when access metadata is missing. Any future 25–100-message history grant needs a separate audited contract and transparent system event.
+
+## 2026-08-13: Local Messaging Data Has Explicit Context And Release Boundaries
+
+- Decision: Chat/Profile AI browser snapshots remain user-scoped acceleration data and are purged on logout/account release. Profile AI composer drafts are scoped to agent+thread, recipient-memory controls follow server authorization, and local-data deletion copy must distinguish browser cache from canonical history and AI memory.
+- Evidence: Global text/media drafts could cross into a different assistant or thread, stale memory requests could overwrite the new context, and Profile AI cache cleanup previously depended on the Studio component being mounted. Narrow Chat also hid Camera and Sticker without an alternate trigger.
+- Consequence: Chat AI context consent resets per room/session, free-form AI instructions are not persisted, and stale room-A inference cannot populate room B. Create/send/attachment mutations use synchronous single-flight guards; stale upload/transcription/memory results cannot cross context; logout closes the client socket and best-effort purges both IndexedDB stores; Chat and Profile AI expose truthful local-cache controls; 320–360 px keeps feature parity through a compact attachment tray. No temporary/no-history AI mode is advertised until its server, provider, media, cache, memory, and analytics retention contract exists.
+
+## 2026-08-13: Profile AI Never Deletes Canonical History As A Write Side Effect
+
+- Decision: Reaching the current Profile AI thread or per-thread message limit rejects the new write atomically with a typed quota response. It never removes older canonical threads or messages automatically. Deletion is a separate, confirmed user action exposed in the thread UI.
+- Evidence: The previous store removed eight oldest threads when creating the eighty-first thread and trimmed old messages after send/forward. That behavior made a successful new write silently destroy unrelated history and gave users no durable deletion choice.
+- Consequence: PostgreSQL writes use transaction-scoped advisory locks around count-and-insert, idempotent chat replay remains valid, and HTTP routes return `409 personal_ai_quota_exceeded` with resource and limit. Pagination and configurable retention remain follow-up work; until then, limits are explicit capacity controls rather than retention policy.
