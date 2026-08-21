@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import createNextIntlPlugin from 'next-intl/plugin';
 
 import {
@@ -6,6 +7,7 @@ import {
   buildSecurityHeaders,
 } from '../../packages/config/nextSecurityHeaders.mjs';
 
+const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env.NODE_ENV === 'production';
 const WWW_ORIGIN =
   (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
@@ -25,10 +27,7 @@ const SECURITY_HEADERS = buildSecurityHeaders({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  outputFileTracingRoot: path.resolve(
-    configDir,
-    '../..',
-  ),
+  outputFileTracingRoot: path.resolve(CONFIG_DIR, '../..'),
   poweredByHeader: false,
   compress: true,
   typescript: {
