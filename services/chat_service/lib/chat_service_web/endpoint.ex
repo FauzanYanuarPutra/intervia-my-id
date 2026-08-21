@@ -38,10 +38,10 @@ defmodule ChatServiceWeb.Endpoint do
                      do: @production_origins,
                      else: @production_origins ++ @development_origins
   @socket_allowed_origins if Mix.env() == :prod,
-                          do: @production_socket_origins,
-                          else: @production_socket_origins ++ @development_socket_origins
+                            do: @production_socket_origins,
+                            else: @production_socket_origins ++ @development_socket_origins
 
-  socket "/socket", ChatServiceWeb.UserSocket,
+  socket("/socket", ChatServiceWeb.UserSocket,
     websocket: [
       check_origin: @socket_allowed_origins,
       connect_info: [:peer_data, :x_headers],
@@ -53,27 +53,33 @@ defmodule ChatServiceWeb.Endpoint do
     longpoll: [
       check_origin: @socket_allowed_origins
     ]
+  )
 
-  plug ChatServiceWeb.Plugs.SecurityHeaders
+  plug(ChatServiceWeb.Plugs.SecurityHeaders)
   # Liveness intentionally avoids dependencies. Readiness is routed separately
   # and verifies that Scylla can serve queries before traffic is admitted.
-  plug :health_check
+  plug(:health_check)
 
   defp health_check(%{path_info: ["api", "health"]} = conn, _opts) do
-    conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"status":"ok"})) |> halt()
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, ~s({"status":"ok"}))
+    |> halt()
   end
+
   defp health_check(conn, _opts), do: conn
 
-  plug Plug.RequestId
-  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+  plug(Plug.RequestId)
+  plug(Plug.Telemetry, event_prefix: [:phoenix, :endpoint])
 
-  plug CORSPlug, origin: @allowed_origins
+  plug(CORSPlug, origin: @allowed_origins)
 
-  plug Plug.Parsers,
+  plug(Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
     length: 2_000_000,
     json_decoder: Phoenix.json_library()
+  )
 
-  plug ChatServiceWeb.Router
+  plug(ChatServiceWeb.Router)
 end
