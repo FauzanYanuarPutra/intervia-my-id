@@ -60,7 +60,7 @@ set +a
 
 case "$APP" in
   www)
-    APP_DIR="frontend/www"
+    APP_DIR="frontend/apps/www"
     PORT="3000"
     export NEXT_PUBLIC_MARKETPLACE_URL="${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}"
     export INTERNAL_MARKETPLACE_URL="${INTERNAL_MARKETPLACE_URL:-http://localhost:8081}"
@@ -68,17 +68,17 @@ case "$APP" in
     export INTERNAL_CHAT_URL="${INTERNAL_CHAT_URL:-http://localhost:4000}"
     ;;
   cms)
-    APP_DIR="frontend/cms"
+    APP_DIR="frontend/apps/cms"
     PORT="3001"
     ;;
   usaha)
-    APP_DIR="frontend/usaha"
+    APP_DIR="frontend/apps/usaha"
     PORT="3003"
     export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}"
     export NEXT_PUBLIC_WWW_URL="${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}"
     ;;
   crm)
-    APP_DIR="frontend/crm"
+    APP_DIR="frontend/apps/crm"
     PORT="3002"
     export NEXT_PUBLIC_MARKETPLACE_URL="${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}"
     export INTERNAL_CHAT_URL="${INTERNAL_CHAT_URL:-http://localhost:4000}"

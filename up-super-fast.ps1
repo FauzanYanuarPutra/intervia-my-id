@@ -659,32 +659,32 @@ function Invoke-FastWorkspaceCleanup {
         ".codex-chrome-home-scroll",
         ".codex-chrome-home-scroll-2",
         ".codex-tmp",
-        "frontend/www/.next",
-        "frontend/www/.turbo",
-        "frontend/www/out",
-        "frontend/www/coverage",
-        "frontend/www/playwright-report",
-        "frontend/www/test-results",
-        "frontend/www/.parcel-cache",
-        "frontend/www/.vite",
-        "frontend/cms/.next",
-        "frontend/cms/.turbo",
-        "frontend/cms/out",
-        "frontend/cms/coverage",
-        "frontend/cms/playwright-report",
-        "frontend/cms/test-results",
-        "frontend/crm/.next",
-        "frontend/crm/.turbo",
-        "frontend/crm/out",
-        "frontend/crm/coverage",
-        "frontend/crm/playwright-report",
-        "frontend/crm/test-results",
-        "frontend/usaha/.next",
-        "frontend/usaha/.turbo",
-        "frontend/usaha/out",
-        "frontend/usaha/coverage",
-        "frontend/usaha/playwright-report",
-        "frontend/usaha/test-results"
+        "frontend/apps/www/.next",
+        "frontend/apps/www/.turbo",
+        "frontend/apps/www/out",
+        "frontend/apps/www/coverage",
+        "frontend/apps/www/playwright-report",
+        "frontend/apps/www/test-results",
+        "frontend/apps/www/.parcel-cache",
+        "frontend/apps/www/.vite",
+        "frontend/apps/cms/.next",
+        "frontend/apps/cms/.turbo",
+        "frontend/apps/cms/out",
+        "frontend/apps/cms/coverage",
+        "frontend/apps/cms/playwright-report",
+        "frontend/apps/cms/test-results",
+        "frontend/apps/crm/.next",
+        "frontend/apps/crm/.turbo",
+        "frontend/apps/crm/out",
+        "frontend/apps/crm/coverage",
+        "frontend/apps/crm/playwright-report",
+        "frontend/apps/crm/test-results",
+        "frontend/apps/usaha/.next",
+        "frontend/apps/usaha/.turbo",
+        "frontend/apps/usaha/out",
+        "frontend/apps/usaha/coverage",
+        "frontend/apps/usaha/playwright-report",
+        "frontend/apps/usaha/test-results"
     )
 
     foreach ($target in $directoryTargets) {
@@ -700,10 +700,10 @@ function Invoke-FastWorkspaceCleanup {
 
     $patternTargets = @(
         @{ Base = "."; Patterns = @(".codex-*.log", "tmp-*.png", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
-        @{ Base = "frontend/www"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
-        @{ Base = "frontend/cms"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
-        @{ Base = "frontend/crm"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
-        @{ Base = "frontend/usaha"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") }
+        @{ Base = "frontend/apps/www"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/apps/cms"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/apps/crm"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/apps/usaha"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") }
     )
 
     foreach ($target in $patternTargets) {
@@ -1740,10 +1740,10 @@ $serviceInputs = @{
     chat_service        = @("services/chat_service")
     ocr_service         = @("services/ocr_service")
     liveness_service    = @("services/liveness_service")
-    www                 = @("frontend/www", "frontend/shared", "frontend/.dockerignore")
-    usaha               = @("frontend/usaha", "frontend/shared", "frontend/.dockerignore")
-    cms                 = @("frontend/cms", "frontend/shared", "frontend/.dockerignore")
-    crm                 = @("frontend/crm", "frontend/shared", "frontend/.dockerignore")
+    www                 = @("frontend/apps/www", "frontend/apps/shared", "frontend/apps/.dockerignore")
+    usaha               = @("frontend/apps/usaha", "frontend/apps/shared", "frontend/apps/.dockerignore")
+    cms                 = @("frontend/apps/cms", "frontend/apps/shared", "frontend/apps/.dockerignore")
+    crm                 = @("frontend/apps/crm", "frontend/apps/shared", "frontend/apps/.dockerignore")
 }
 
 $composeProjectName = if ($env:COMPOSE_PROJECT_NAME) {
