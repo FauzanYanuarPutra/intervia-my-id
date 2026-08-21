@@ -94,7 +94,11 @@ services:
     ports:
       - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
 
+  # Backoffice remains available, but it is not part of the lightweight core
+  # development stack. This preserves the pre-refactor startup contract and
+  # avoids building three extra Next.js applications when working on WWW/API.
   cms:
+    profiles: [backoffice]
     environment:
       ENV: development
       APP_ENV: development
@@ -104,6 +108,7 @@ services:
       - "127.0.0.1:${PORT_CMS:-3001}:3001"
 
   crm:
+    profiles: [backoffice]
     environment:
       ENV: development
       APP_ENV: development
@@ -113,6 +118,7 @@ services:
       - "127.0.0.1:${PORT_CRM:-3002}:3002"
 
   usaha:
+    profiles: [backoffice]
     environment:
       ENV: development
       APP_ENV: development
@@ -124,7 +130,10 @@ services:
   caddy:
     profiles: [edge]
 
+  # Local email/OTP flows expect SMTP_HOST=mailhog. Keep MailHog in the default
+  # development stack; production/staging still inherit the base profile gate.
   mailhog:
+    profiles: !reset []
     ports:
       - "127.0.0.1:${PORT_MAILHOG_SMTP:-1025}:1025"
       - "127.0.0.1:${PORT_MAILHOG_UI:-8025}:8025"
