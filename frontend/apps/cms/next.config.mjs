@@ -2,7 +2,7 @@ import path from 'node:path';
 import {
   buildInternalWebCsp,
   buildSecurityHeaders,
-} from '../shared/config/nextSecurityHeaders.mjs';
+} from '../../packages/config/nextSecurityHeaders.mjs';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SECURITY_HEADERS = buildSecurityHeaders({

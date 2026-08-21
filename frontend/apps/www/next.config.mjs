@@ -4,7 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 import {
   buildPublicWebCsp,
   buildSecurityHeaders,
-} from '../shared/config/nextSecurityHeaders.mjs';
+} from '../../packages/config/nextSecurityHeaders.mjs';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const WWW_ORIGIN =
@@ -25,7 +25,10 @@ const SECURITY_HEADERS = buildSecurityHeaders({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  outputFileTracingRoot: path.resolve(process.cwd(), '..'),
+  outputFileTracingRoot: path.resolve(
+    configDir,
+    '../..',
+  ),
   poweredByHeader: false,
   compress: true,
   typescript: {

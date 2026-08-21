@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildInternalWebCsp,
   buildSecurityHeaders,
-} from '../shared/config/nextSecurityHeaders.mjs';
+} from '../../packages/config/nextSecurityHeaders.mjs';
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';

@@ -3,7 +3,7 @@ import type { Config } from 'tailwindcss';
 const config: Config = {
   content: [
     './src/**/*.{ts,tsx}',
-    '../shared/**/*.{ts,tsx}',
+    '../../packages/**/*.{ts,tsx}',
     './node_modules/lajukan-ui/**/*.{ts,tsx,js,jsx}',
   ],
   theme: {

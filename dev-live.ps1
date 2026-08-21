@@ -111,10 +111,10 @@ Invoke-ComposeQuiet -Args @("rm", "-sf", $App)
 Import-EnvFile -Path $EnvFile
 
 $appPath = switch ($App) {
-    "www" { Join-Path $PSScriptRoot "frontend\\www" }
-    "usaha" { Join-Path $PSScriptRoot "frontend\\usaha" }
-    "cms" { Join-Path $PSScriptRoot "frontend\\cms" }
-    "crm" { Join-Path $PSScriptRoot "frontend\\crm" }
+    "www" { Join-Path $PSScriptRoot "frontend\apps\www" }
+    "usaha" { Join-Path $PSScriptRoot "frontend\apps\usaha" }
+    "cms" { Join-Path $PSScriptRoot "frontend\apps\cms" }
+    "crm" { Join-Path $PSScriptRoot "frontend\apps\crm" }
 }
 
 $port = switch ($App) {

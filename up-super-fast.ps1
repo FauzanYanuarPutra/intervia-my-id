@@ -39,10 +39,18 @@ $ProdComposeBaseFile = "docker-compose.yml"
 $ProdComposeOverrideFile = "docker-compose.prod.yml"
 
 $script:ComposeFileArgs = if ($Mode -eq "prod") {
-    @("-f", $ProdComposeBaseFile, "-f", $ProdComposeOverrideFile)
+    @(
+        "-f",
+        $ProdComposeBaseFile,
+        "-f",
+        $ProdComposeOverrideFile
+    )
 }
 else {
-    @("-f", $DevComposeFile)
+    @(
+        "-f",
+        $DevComposeFile
+    )
 }
 
 if ($Mode -eq "dev" -and -not (Test-Path -LiteralPath $DevComposeFile)) {

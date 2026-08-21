@@ -48,7 +48,7 @@ for (const filePath of sourceFiles(sourceRoot)) {
 
 const { buildContentSecurityPolicy } = await import(
   pathToFileURL(
-    path.resolve(projectRoot, '../shared/config/nextSecurityHeaders.mjs'),
+    path.resolve(projectRoot, '../../packages/config/nextSecurityHeaders.mjs'),
   ).href
 );
 const sharedSecurityConfig = buildContentSecurityPolicy();

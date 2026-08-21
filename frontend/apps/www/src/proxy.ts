@@ -12,7 +12,7 @@ import { findRouteConfig } from './lib/routesHelpers';
 import {
   buildPublicWebCsp,
   buildSecurityHeaders,
-} from '../../shared/config/nextSecurityHeaders.mjs';
+} from '../../../packages/config/nextSecurityHeaders.mjs';
 
 /* ---------------- CONFIG ---------------- */
 const LOCALES = ['en', 'id'] as const;
