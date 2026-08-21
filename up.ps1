@@ -43,12 +43,22 @@ try {
         }
     }
 
-    if (-not (Test-Path $EnvFile)) {
-        $Example = "$EnvFile.example"
-        if (Test-Path $Example) {
-            throw "File $EnvFile belum ada. Copy $Example menjadi $EnvFile lalu isi nilainya."
+    # Backward compatibility for existing local installations. Before the
+    # repository-foundation refactor the canonical launcher accepted `.env`
+    # when `.env.development` was absent. Keeping this fallback prevents a
+    # harmless launcher refactor from breaking an otherwise valid local stack.
+    if (-not (Test-Path -LiteralPath $EnvFile)) {
+        if ($Environment -eq "development" -and (Test-Path -LiteralPath ".env")) {
+            Write-Warning ".env.development tidak ditemukan; menggunakan .env untuk kompatibilitas development lama."
+            $EnvFile = ".env"
         }
-        throw "File environment $EnvFile tidak ditemukan."
+        else {
+            $Example = "$EnvFile.example"
+            if (Test-Path -LiteralPath $Example) {
+                throw "File $EnvFile belum ada. Copy $Example menjadi $EnvFile lalu isi nilainya."
+            }
+            throw "File environment $EnvFile tidak ditemukan."
+        }
     }
 
     $ComposeArgs = @(
@@ -65,6 +75,14 @@ try {
                 $ComposeArgs += @("--profile", $Trimmed)
             }
         }
+    }
+
+    # Validate the merged Compose model before changing container state. This
+    # catches missing variables, invalid overrides and broken service contracts
+    # early instead of partially starting the stack.
+    & docker @ComposeArgs config --quiet
+    if ($LASTEXITCODE -ne 0) {
+        throw "Konfigurasi Docker Compose tidak valid. Perbaiki error di atas sebelum stack dijalankan."
     }
 
     if ($Fresh) {
