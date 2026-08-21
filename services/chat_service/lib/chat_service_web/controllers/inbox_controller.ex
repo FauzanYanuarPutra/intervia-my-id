@@ -114,8 +114,11 @@ defmodule ChatServiceWeb.InboxController do
   # state until the first canonical message projection arrives.
   defp prefer_inbox_row(candidate, current) do
     case {meaningful_message?(candidate), meaningful_message?(current)} do
-      {true, false} -> candidate
-      {false, true} -> current
+      {true, false} ->
+        candidate
+
+      {false, true} ->
+        current
 
       _ ->
         if row_timestamp(candidate) > row_timestamp(current), do: candidate, else: current
