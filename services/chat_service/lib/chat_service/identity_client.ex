@@ -79,7 +79,7 @@ defmodule ChatService.IdentityClient do
            :get,
            {String.to_charlist(url), []},
            [timeout: @request_timeout, connect_timeout: @request_timeout],
-           [body_format: :binary]
+           body_format: :binary
          ) do
       {:ok, {{_, status, _}, _headers, body}} ->
         {:ok, status, body}
