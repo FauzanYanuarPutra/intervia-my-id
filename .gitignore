@@ -4,6 +4,7 @@
 .DS_Store
 Thumbs.db
 Desktop.ini
+
 *.swp
 *.swo
 *.tmp
@@ -14,27 +15,79 @@ Desktop.ini
 .idea/
 *.iml
 
+
 # ------------------------------------------------------------
 # Environment / Secrets
 # ------------------------------------------------------------
 .env
 .env.*
+
 !.env.example
 !.env.staging.example
 !.env.production.example
+
+.npmrc
+
+
+# ------------------------------------------------------------
+# Local Backups / Database Dumps
+# ------------------------------------------------------------
+/.backups/
+
+*.dump
+*.dump.gz
+*.backup
+*.backup.gz
+*.sql.gz
+*.sql.bak
+
+# Do NOT ignore *.sql globally.
+# SQL migrations, schemas, and deterministic seeds may belong in Git.
+
+
+# ------------------------------------------------------------
+# Runtime / Temporary State
+# ------------------------------------------------------------
+/.runtime/
+**/.runtime/
+
+**/tmp/
+**/temp/
+
+.tmp/
+.cache/
+
+*.log
+
+
+# ------------------------------------------------------------
+# Generated Screenshots / Temporary Media
+# ------------------------------------------------------------
+*.screenshot.png
+*.screenshot.jpg
+*.screenshot.jpeg
+*.screenshot.webp
+
+/tmp-*.png
+/tmp-*.jpg
+/tmp-*.jpeg
+/tmp-*.webp
+
+frontend/www/.codex-*.png
+frontend/www/tmp-storefront.png
+
 
 # ------------------------------------------------------------
 # Node / Frontend
 # ------------------------------------------------------------
 **/node_modules/
+
 **/.next/
 **/dist/
 **/build/
 **/out/
 **/.turbo/
 **/.cache/
-.cache/
-.tmp/
 **/.parcel-cache/
 **/.vite/
 
@@ -47,38 +100,48 @@ pnpm-debug.log*
 .eslintcache
 .stylelintcache
 
+
 # ------------------------------------------------------------
 # Python
 # ------------------------------------------------------------
 **/__pycache__/
+
 *.py[cod]
 *.pyo
+
 .venv/
 venv/
 env/
 ENV/
+
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
 
 # ------------------------------------------------------------
 # Rust
 # ------------------------------------------------------------
 **/target/
 
+
 # ------------------------------------------------------------
 # Elixir
 # ------------------------------------------------------------
 **/_build/
 **/deps/
+
 erl_crash.dump
 *.ez
 
+
 # ------------------------------------------------------------
-# Docker / Local Data / Build Artifacts
+# Docker / Local Infrastructure Data
 # ------------------------------------------------------------
 .dockerbuildkit/
+
 docker-data/
+
 qdrant_storage/
 postgres_data/
 redis_data/
@@ -89,18 +152,64 @@ ollama_data/
 caddy_data/
 caddy_config/
 rabbitmq_data/
-.runtime/
+
 data/generated/
+
+.docker-build-state
 .docker-build-state.*
-frontend/www/.codex-*.png
-frontend/www/tmp-storefront.png
-AppDataLocalDockerwsldataext4.vhdx
+**/.docker-build-state
+**/.docker-build-state.*
+
 
 # ------------------------------------------------------------
-# Misc
+# Local Database / Infrastructure Volumes
 # ------------------------------------------------------------
-*.log
-.npmrc
+**/postgres_data/
+**/redis_data/
+**/rabbitmq_data/
+**/scylla_data/
+**/minio_data/
+**/meili_data/
+**/qdrant_storage/
+**/ollama_data/
+**/caddy_data/
+**/caddy_config/
+
+
+# ------------------------------------------------------------
+# Large Local VM / Docker / WSL Files
+# ------------------------------------------------------------
+*.vhd
+*.vhdx
+
+AppDataLocalDockerwsldataext4.vhdx
+
 ubuntu.tar
-ubuntu.tar
-ubuntu.tar
+*.tar.tmp
+
+
+# ------------------------------------------------------------
+# IDE / Tool Generated Files
+# ------------------------------------------------------------
+.coverage
+coverage/
+htmlcov/
+
+.nyc_output/
+
+playwright-report/
+test-results/
+
+**/playwright-report/
+**/test-results/
+
+
+# ------------------------------------------------------------
+# Misc Generated Files
+# ------------------------------------------------------------
+*.pid
+*.pid.lock
+
+*.cache
+*.temp
+*.old
