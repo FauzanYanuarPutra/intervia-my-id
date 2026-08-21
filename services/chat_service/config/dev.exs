@@ -20,7 +20,6 @@ config :chat_service, ChatServiceWeb.Endpoint,
   secret_key_base: "dev_secret_key_base_minimal_64_chars_long_for_dev_only_12345",
   render_errors: [view: ChatServiceWeb.ErrorJSON, accepts: ~w(json)]
 
-
 # Log level detail untuk debugging
 config :logger, :console, format: "[$level] $message\n", level: :debug
 
