@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-axum = { version = "0.7", features = ["multipart", "json"] }
+axum = { version = "0.8", features = ["multipart", "json"] }
 bytes = "1"
 
 reqwest = {
