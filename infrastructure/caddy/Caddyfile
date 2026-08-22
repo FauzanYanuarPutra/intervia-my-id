@@ -12,6 +12,15 @@ http://{$APP_DOMAIN} {
     redir https://www.{$APP_DOMAIN}{uri} permanent
 }
 
+# Cloudflare terminates browser TLS before forwarding through the private
+# Tunnel to Caddy over HTTP. Frontend applications must therefore receive the
+# external scheme explicitly; otherwise Next.js sees X-Forwarded-Proto=http
+# and redirects https://www.* back to itself forever.
+(public_frontend_proxy) {
+    header_up X-Forwarded-Proto https
+    header_up X-Forwarded-Host {host}
+}
+
 # Public WWW.
 http://www.{$APP_DOMAIN} {
     @chat_socket path /socket /socket/*
@@ -20,7 +29,9 @@ http://www.{$APP_DOMAIN} {
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
     reverse_proxy @notifications_socket marketplace_service:8081
 
-    reverse_proxy www:3000
+    reverse_proxy www:3000 {
+        import public_frontend_proxy
+    }
 
     header {
         Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://www.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
@@ -38,7 +49,9 @@ http://usaha.{$APP_DOMAIN} {
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
     reverse_proxy @notifications_socket marketplace_service:8081
 
-    reverse_proxy usaha:3003
+    reverse_proxy usaha:3003 {
+        import public_frontend_proxy
+    }
 
     header {
         Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://usaha.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
@@ -51,12 +64,16 @@ http://usaha.{$APP_DOMAIN} {
 # Backoffice apps. Cloudflare Access should protect these hostnames in real
 # deployments; Caddy only performs the internal reverse proxy.
 http://cms.{$APP_DOMAIN} {
-    reverse_proxy cms:3001
+    reverse_proxy cms:3001 {
+        import public_frontend_proxy
+    }
     encode gzip zstd
 }
 
 http://crm.{$APP_DOMAIN} {
-    reverse_proxy crm:3002
+    reverse_proxy crm:3002 {
+        import public_frontend_proxy
+    }
     encode gzip zstd
 }
 
