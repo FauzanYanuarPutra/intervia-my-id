@@ -3,7 +3,9 @@ import {
   buildInternalWebCsp,
   buildSecurityHeaders,
 } from '../../packages/config/nextSecurityHeaders.mjs';
+import { fileURLToPath } from 'node:url';
 
+const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SECURITY_HEADERS = buildSecurityHeaders({
   csp: buildInternalWebCsp({

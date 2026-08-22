@@ -8846,6 +8846,17 @@ fn resolve_lajukan_request_owner_filter(
     actor_user_id.map(Some).ok_or(StatusCode::UNAUTHORIZED)
 }
 
+fn authorize_umkm_owner(
+    actor_user_id: Option<Uuid>,
+    owner_user_id: Uuid,
+) -> Result<Uuid, StatusCode> {
+    let actor_user_id = actor_user_id.ok_or(StatusCode::UNAUTHORIZED)?;
+    if actor_user_id != owner_user_id {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(actor_user_id)
+}
+
 async fn fetch_lajukan_request_counts(
     db: &PgPool,
     owner_id: Option<Uuid>,
@@ -9367,8 +9378,20 @@ async fn get_umkm_store(
 
 async fn create_umkm_store(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(payload): Json<CreateUmkmStoreRequest>,
 ) -> impl IntoResponse {
+    let actor_user_id = match authorize_umkm_owner(
+        user_id_from_auth(&headers, &state.jwt_secret),
+        payload.owner_user_id,
+    ) {
+        Ok(user_id) => user_id,
+        Err(StatusCode::UNAUTHORIZED) => {
+            return err(StatusCode::UNAUTHORIZED, "authentication required").into_response()
+        }
+        Err(_) => return err(StatusCode::FORBIDDEN, "store owner mismatch").into_response(),
+    };
+
     let name = match clean_text(Some(payload.name)) {
         Some(value) if value.len() >= 3 && value.len() <= 120 => value,
         _ => return err(StatusCode::BAD_REQUEST, "invalid store name").into_response(),
@@ -9407,7 +9430,7 @@ async fn create_umkm_store(
           is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
         "#,
     )
-    .bind(payload.owner_user_id)
+    .bind(actor_user_id)
     .bind(name)
     .bind(slug)
     .bind(description)
@@ -9439,6 +9462,7 @@ async fn create_umkm_store(
 async fn update_umkm_store(
     State(state): State<Arc<AppState>>,
     Path(store_ref): Path<String>,
+    headers: HeaderMap,
     Json(payload): Json<UpdateUmkmStoreRequest>,
 ) -> impl IntoResponse {
     let existing = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
@@ -9453,6 +9477,17 @@ async fn update_umkm_store(
             .into_response();
         }
     };
+
+    match authorize_umkm_owner(
+        user_id_from_auth(&headers, &state.jwt_secret),
+        existing.owner_user_id,
+    ) {
+        Ok(_) => {}
+        Err(StatusCode::UNAUTHORIZED) => {
+            return err(StatusCode::UNAUTHORIZED, "authentication required").into_response()
+        }
+        Err(_) => return err(StatusCode::FORBIDDEN, "store access denied").into_response(),
+    }
 
     let name = payload
         .name
@@ -9631,6 +9666,7 @@ async fn list_umkm_products(
 async fn create_umkm_product(
     State(state): State<Arc<AppState>>,
     Path(store_ref): Path<String>,
+    headers: HeaderMap,
     Json(payload): Json<CreateUmkmProductRequest>,
 ) -> impl IntoResponse {
     let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
@@ -9645,6 +9681,17 @@ async fn create_umkm_product(
             .into_response();
         }
     };
+
+    match authorize_umkm_owner(
+        user_id_from_auth(&headers, &state.jwt_secret),
+        store.owner_user_id,
+    ) {
+        Ok(_) => {}
+        Err(StatusCode::UNAUTHORIZED) => {
+            return err(StatusCode::UNAUTHORIZED, "authentication required").into_response()
+        }
+        Err(_) => return err(StatusCode::FORBIDDEN, "store access denied").into_response(),
+    }
 
     let name = match clean_text(Some(payload.name)) {
         Some(value) if value.len() >= 2 && value.len() <= 160 => value,
@@ -24458,6 +24505,34 @@ mod tests {
             .expect("authenticated owner filter");
 
         assert_eq!(owner_filter, Some(actor_user_id));
+    }
+
+    #[test]
+    fn umkm_owner_authorization_requires_authentication() {
+        let owner_user_id = Uuid::new_v4();
+
+        assert_eq!(
+            authorize_umkm_owner(None, owner_user_id),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+    }
+
+    #[test]
+    fn umkm_owner_authorization_rejects_a_different_actor() {
+        assert_eq!(
+            authorize_umkm_owner(Some(Uuid::new_v4()), Uuid::new_v4()),
+            Err(StatusCode::FORBIDDEN)
+        );
+    }
+
+    #[test]
+    fn umkm_owner_authorization_accepts_the_store_owner() {
+        let owner_user_id = Uuid::new_v4();
+
+        assert_eq!(
+            authorize_umkm_owner(Some(owner_user_id), owner_user_id),
+            Ok(owner_user_id)
+        );
     }
 
     #[test]

@@ -4,8 +4,8 @@ FROM node:20-bullseye-slim AS cms_deps
 
 ARG NPM_REGISTRY
 ARG NEXT_PUBLIC_APP_ENV=development
-ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
-ARG NEXT_PUBLIC_CMS_URL=http://localhost:3000
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3001
+ARG NEXT_PUBLIC_CMS_URL=http://localhost:3001
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080
 ARG NEXT_PUBLIC_MARKETPLACE_URL=http://localhost:8081
 ARG NEXT_PUBLIC_COMMUNITY_URL=http://localhost:8082
@@ -133,7 +133,7 @@ FROM cms_builder AS cms
 WORKDIR /app/apps/cms
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3001
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -142,6 +142,6 @@ RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-mani
     && test -d .next/standalone/apps/cms/.next/static \
     && test -d .next/standalone/apps/cms/public
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["node", ".next/standalone/apps/cms/server.js"]

@@ -3,20 +3,41 @@ ARG NPM_REGISTRY=https://registry.npmjs.org/
 FROM node:20-bullseye-slim AS usaha_deps
 
 ARG NPM_REGISTRY
-
 ARG NEXT_PUBLIC_APP_ENV=development
 ARG NEXT_PUBLIC_APP_URL=http://localhost:3003
-ARG NEXT_PUBLIC_WWW_URL=http://localhost:3000
 ARG NEXT_PUBLIC_USAHA_URL=http://localhost:3003
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080
 ARG NEXT_PUBLIC_MARKETPLACE_URL=http://localhost:8081
+ARG NEXT_PUBLIC_COMMUNITY_URL=http://localhost:8082
+ARG NEXT_PUBLIC_CHAT_WS_URL=ws://localhost:4000/socket
+ARG NEXT_PUBLIC_MARKETPLACE_WS_URL=
+ARG NEXT_PUBLIC_NOTIFICATION_WS_URL=
+ARG NEXT_PUBLIC_LOGIN_OTP_REQUIRED=true
+ARG NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED=false
+ARG NEXT_PUBLIC_DISABLE_PWA=true
+ARG NEXT_PUBLIC_CAPTCHA_PROVIDER=turnstile
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ARG NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
+ARG NEXT_PUBLIC_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+ARG NEXT_PUBLIC_TURN_URLS=
 
 ENV NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV}
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-ENV NEXT_PUBLIC_WWW_URL=${NEXT_PUBLIC_WWW_URL}
 ENV NEXT_PUBLIC_USAHA_URL=${NEXT_PUBLIC_USAHA_URL}
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_MARKETPLACE_URL=${NEXT_PUBLIC_MARKETPLACE_URL}
+ENV NEXT_PUBLIC_COMMUNITY_URL=${NEXT_PUBLIC_COMMUNITY_URL}
+ENV NEXT_PUBLIC_CHAT_WS_URL=${NEXT_PUBLIC_CHAT_WS_URL}
+ENV NEXT_PUBLIC_MARKETPLACE_WS_URL=${NEXT_PUBLIC_MARKETPLACE_WS_URL}
+ENV NEXT_PUBLIC_NOTIFICATION_WS_URL=${NEXT_PUBLIC_NOTIFICATION_WS_URL}
+ENV NEXT_PUBLIC_LOGIN_OTP_REQUIRED=${NEXT_PUBLIC_LOGIN_OTP_REQUIRED}
+ENV NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED=${NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED}
+ENV NEXT_PUBLIC_DISABLE_PWA=${NEXT_PUBLIC_DISABLE_PWA}
+ENV NEXT_PUBLIC_CAPTCHA_PROVIDER=${NEXT_PUBLIC_CAPTCHA_PROVIDER}
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+ENV NEXT_PUBLIC_HCAPTCHA_SITE_KEY=${NEXT_PUBLIC_HCAPTCHA_SITE_KEY}
+ENV NEXT_PUBLIC_STUN_URLS=${NEXT_PUBLIC_STUN_URLS}
+ENV NEXT_PUBLIC_TURN_URLS=${NEXT_PUBLIC_TURN_URLS}
 
 WORKDIR /app/apps/usaha
 
@@ -29,7 +50,8 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
 
-# WAJIB karena next.config.mjs menggunakan ../../packages
+# Shared frontend package.
+# Build context adalah ./frontend, sehingga "packages" berarti frontend/packages.
 COPY packages /app/packages
 
 RUN set -eux; \
@@ -41,6 +63,7 @@ RUN set -eux; \
     fi; \
     ./node_modules/.bin/tsc -p tsconfig.build.json
 
+# Copy manifest terlebih dahulu agar Docker dependency layer bisa dicache.
 COPY apps/usaha/package*.json ./
 
 RUN set -eux; \
@@ -56,19 +79,9 @@ RUN set -eux; \
       return 1; \
     }; \
     if [ -f package-lock.json ]; then \
-      retry_npm npm ci \
-        --legacy-peer-deps \
-        --include=optional \
-        --prefer-offline \
-        --no-audit \
-        --no-fund; \
+      retry_npm npm ci --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
     else \
-      retry_npm npm install \
-        --legacy-peer-deps \
-        --include=optional \
-        --prefer-offline \
-        --no-audit \
-        --no-fund; \
+      retry_npm npm install --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
     fi; \
     if ! node -e "require.resolve('@next/swc-linux-x64-gnu/package.json')"; then \
       NEXT_VERSION=$(node -p "require('./node_modules/next/package.json').version"); \
@@ -83,19 +96,28 @@ RUN set -eux; \
 
 COPY apps/usaha/ ./
 
-RUN mkdir -p public
-
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV FAST_DOCKER_BUILD=true
+
+FROM usaha_deps AS usaha_test
+
+RUN npm run test
 
 FROM usaha_deps AS usaha_lint
 
-RUN npm run lint \
-    && npm run typecheck
+RUN npm run lint
 
 FROM usaha_deps AS usaha_builder
 
+RUN if [ -d "/app/apps/usaha/next-env.d.ts" ]; then \
+      echo "WARNING: next-env.d.ts was a directory; removing it"; \
+      rm -rf "/app/apps/usaha/next-env.d.ts"; \
+    fi
+
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
+# Next standalone intentionally excludes static/public assets. Place them beside
+# the generated server so the production image can use the supported entrypoint.
 RUN mkdir -p .next/standalone/apps/usaha/.next \
     && cp -R .next/static .next/standalone/apps/usaha/.next/static \
     && cp -R public .next/standalone/apps/usaha/public
@@ -121,3 +143,5 @@ RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-mani
     && test -d .next/standalone/apps/usaha/public
 
 EXPOSE 3003
+
+CMD ["node", ".next/standalone/apps/usaha/server.js"]

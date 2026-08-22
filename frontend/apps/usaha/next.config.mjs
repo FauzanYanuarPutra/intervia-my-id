@@ -5,8 +5,9 @@ import {
   buildSecurityHeaders,
 } from '../../packages/config/nextSecurityHeaders.mjs';
 
-const configDir = path.dirname(fileURLToPath(import.meta.url));
+const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';
+
 const configuredUsahaOrigin = (
   process.env.NEXT_PUBLIC_USAHA_URL || ''
 ).replace(/\/$/, '');
@@ -48,7 +49,7 @@ const nextConfig = {
     },
   },
   turbopack: {
-    root: path.resolve(configDir),
+    root: path.resolve(CONFIG_DIR),
   },
   async headers() {
     return [
