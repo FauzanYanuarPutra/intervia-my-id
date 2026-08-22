@@ -31,6 +31,8 @@ def main() -> int:
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', 'activeOrders', 'locations')
+    for compose in ['docker-compose.dev.yml', 'docker-compose.staging.yml', 'docker-compose.prod.yml']:
+        require(compose, 'USAHA_GOOGLE_REDIRECT_URI', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'INTERNAL_API_URL')
     if ERRORS:
         print('Usaha Business OS contract FAILED:', file=sys.stderr)
         for item in ERRORS: print(f' - {item}', file=sys.stderr)

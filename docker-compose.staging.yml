@@ -116,6 +116,12 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.staging.lajukan.com}
       NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://staging.lajukan.com}
       NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.staging.lajukan.com}
+      INTERNAL_API_URL: http://identity_service:8080
+      INTERNAL_IDENTITY_URL: http://identity_service:8080
+      INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      USAHA_GOOGLE_REDIRECT_URI: ${USAHA_GOOGLE_REDIRECT_URI:-https://usaha.staging.lajukan.com/api/auth/google/callback}
 
   caddy:
     environment:
