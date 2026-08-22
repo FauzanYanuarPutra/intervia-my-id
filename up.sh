@@ -163,6 +163,17 @@ else
   exit 1
 fi
 
+# Development KYC is self-provisioning. The downloader is pinned by commit and
+# SHA-256. Staging/production remain explicit and never download model assets.
+KYC_REQUESTED=0
+for profile in "${ACTIVE_PROFILES[@]}"; do
+  [[ "$profile" == "kyc" ]] && KYC_REQUESTED=1
+done
+if [[ "$ENVIRONMENT" == "development" && "$KYC_REQUESTED" == "1" && "$DOWN" == "0" ]]; then
+  echo "Verifying local KYC liveness models..."
+  "$PYTHON_BIN" scripts/config/provision_kyc_models.py --env-file "$ENV_FILE"
+fi
+
 COMPOSE_MODEL="$("${COMPOSE[@]}" config --format json)"
 VALIDATOR_ARGS=(
   scripts/config/runtime_contract.py

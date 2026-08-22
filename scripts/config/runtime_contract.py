@@ -30,6 +30,82 @@ def non_empty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _find_bind_mount(service: dict[str, Any], target: str) -> dict[str, Any] | None:
+    volumes = service.get("volumes")
+    if not isinstance(volumes, list):
+        return None
+
+    normalized_target = target.rstrip("/") or "/"
+    for volume in volumes:
+        if not isinstance(volume, dict):
+            continue
+        volume_target = str(volume.get("target", "")).rstrip("/") or "/"
+        if volume_target == normalized_target and volume.get("type") == "bind":
+            return volume
+    return None
+
+
+def _host_path_for_container_path(
+    bind_mount: dict[str, Any],
+    container_path: str,
+) -> Path | None:
+    source = bind_mount.get("source")
+    target = bind_mount.get("target")
+    if not non_empty(source) or not non_empty(target) or not non_empty(container_path):
+        return None
+
+    target_path = Path(str(target))
+    requested = Path(str(container_path))
+    try:
+        relative = requested.relative_to(target_path)
+    except ValueError:
+        return None
+
+    return Path(str(source)) / relative
+
+
+def _validate_kyc_runtime(
+    services: dict[str, Any],
+    errors: list[str],
+) -> None:
+    liveness = services.get("liveness_service")
+    if not isinstance(liveness, dict):
+        errors.append("KYC profile requires the liveness_service Compose service.")
+        return
+
+    environment = liveness.get("environment")
+    if not isinstance(environment, dict):
+        environment = {}
+
+    model_dir = environment.get("LIVENESS_MODEL_DIR", "/models/anti_spoof_models")
+    if not non_empty(model_dir):
+        errors.append("KYC liveness service requires LIVENESS_MODEL_DIR.")
+        return
+
+    bind_mount = _find_bind_mount(liveness, "/models")
+    if bind_mount is None:
+        errors.append("KYC liveness service must bind-mount its host model directory at /models.")
+        return
+
+    if bind_mount.get("read_only") is not True:
+        errors.append("KYC liveness model bind mount must be read-only.")
+
+    host_model_dir = _host_path_for_container_path(bind_mount, str(model_dir))
+    if host_model_dir is None:
+        errors.append(
+            "KYC LIVENESS_MODEL_DIR must resolve inside the /models bind mount."
+        )
+        return
+
+    model_files = sorted(host_model_dir.glob("*.onnx")) if host_model_dir.is_dir() else []
+    if not model_files:
+        errors.append(
+            "KYC profile requires at least one anti-spoof .onnx model under "
+            f"{host_model_dir}. Set LIVENESS_MODELS_PATH to a provisioned model "
+            "directory before startup."
+        )
+
+
 def validate_contract(
     model: dict[str, Any],
     env_values: dict[str, str],
@@ -98,6 +174,10 @@ def validate_contract(
         if profile.strip()
     }
     active_profiles = requested_profiles | env_profiles
+
+    if "kyc" in active_profiles:
+        _validate_kyc_runtime(services, errors)
+
     if "tunnel" in active_profiles:
         if not non_empty(env_values.get("CLOUDFLARE_TUNNEL_TOKEN")):
             errors.append("Tunnel profile requires CLOUDFLARE_TUNNEL_TOKEN.")

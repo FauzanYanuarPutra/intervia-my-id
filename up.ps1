@@ -92,6 +92,18 @@ try {
         throw "Python 3 tidak ditemukan. Runtime contract validator memerlukan Python 3."
     }
 
+    # Development KYC is self-provisioning: the anti-spoof ONNX files are
+    # pinned by commit and SHA-256 in the provisioner. Staging/production remain
+    # explicit and fail closed so deployment never downloads security models.
+    $KycRequested = $RequestedProfiles -contains "kyc"
+    if ($Environment -eq "development" -and $KycRequested -and -not $Down) {
+        Write-Host "Verifying local KYC liveness models..." -ForegroundColor Cyan
+        & $PythonCommand.Source "scripts/config/provision_kyc_models.py" "--env-file" $EnvFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "Gagal menyiapkan model KYC liveness. Tidak ada container yang diubah."
+        }
+    }
+
     $ComposeModel = & docker @ComposeArgs config --format json
     if ($LASTEXITCODE -ne 0) {
         throw "Gagal membuat model Docker Compose untuk validasi runtime."
