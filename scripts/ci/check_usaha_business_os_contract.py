@@ -22,6 +22,9 @@ def main() -> int:
     require('frontend/apps/usaha/src/lib/auth-session.ts', 'access_token', 'refresh_token', 'auth_present')
     require('frontend/apps/usaha/src/lib/business-server.ts', '/organizations', '/v1/umkm/stores')
     forbid('frontend/apps/usaha/src/app/api/businesses/route.ts', 'portal-store', 'portal-session', 'createOrUpdateAccount')
+    for legacy_auth in ['frontend/apps/usaha/src/app/api/auth/login/route.ts', 'frontend/apps/usaha/src/app/api/auth/register/route.ts']:
+        require(legacy_auth, 'LEGACY_USAHA_AUTH_RETIRED')
+        forbid(legacy_auth, 'portal-store', 'portal-session', 'writePortalSession')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/locations/page.tsx', 'Lokasi', 'BusinessLocation')
     require('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Lajukan Usaha', 'Lokasi & Cabang')
     forbid('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Usaha Portal')
