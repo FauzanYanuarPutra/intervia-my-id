@@ -1,9 +1,11 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   buildInternalWebCsp,
   buildSecurityHeaders,
 } from '../../packages/config/nextSecurityHeaders.mjs';
 
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SECURITY_HEADERS = buildSecurityHeaders({
   csp: buildInternalWebCsp({ production: IS_PROD }),
@@ -14,6 +16,8 @@ const SECURITY_HEADERS = buildSecurityHeaders({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
+  outputFileTracingRoot: path.resolve(configDir, '../..'),
   poweredByHeader: false,
   compress: true,
   typescript: {
