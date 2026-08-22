@@ -10,6 +10,4 @@ config :logger, level: :warning
 
 # Pakai ETS (In-memory) untuk rate limiter saat test
 config :hammer,
-  backend:
-    {Hammer.Backend.ETS,
-     [expiry_ms: 60_000, cleanup_interval_ms: 60_000]}
+  backend: {Hammer.Backend.ETS, [expiry_ms: 60_000, cleanup_interval_ms: 60_000]}

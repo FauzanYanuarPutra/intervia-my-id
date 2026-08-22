@@ -25,7 +25,7 @@ defmodule ChatService.Auth do
       is_binary(claim_iss) and claim_iss != issuer ->
         {:error, :invalid_issuer}
 
-      claims["exp"] < (now - @max_clock_skew) ->
+      claims["exp"] < now - @max_clock_skew ->
         {:error, :token_expired}
 
       not is_nil(claim_aud) and not audience_allowed?(claim_aud, audiences) ->
@@ -44,4 +44,3 @@ defmodule ChatService.Auth do
 
   defp audience_allowed?(_, _), do: false
 end
-

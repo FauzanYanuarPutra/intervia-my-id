@@ -9,10 +9,11 @@ defmodule ChatService.Guardian do
 
   # WAJIB ADA: Mengambil data user dari 'sub' di JWT
   def resource_from_claims(claims) do
-    {:ok, %{
-      id: claims["sub"],
-      username: claims["username"],
-      roles: claims["roles"]
-    }}
+    {:ok,
+     %{
+       id: claims["sub"],
+       username: claims["username"],
+       roles: claims["roles"]
+     }}
   end
 end

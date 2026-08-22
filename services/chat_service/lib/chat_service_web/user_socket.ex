@@ -5,12 +5,13 @@ defmodule ChatServiceWeb.UserSocket do
   require Logger
 
   # Channel definitions
-  channel "room:*", ChatServiceWeb.RoomChannel
-  channel "user:*", ChatServiceWeb.UserChannel
-  channel "spatial:*", ChatServiceWeb.SpatialChannel
+  channel("room:*", ChatServiceWeb.RoomChannel)
+  channel("user:*", ChatServiceWeb.UserChannel)
+  channel("spatial:*", ChatServiceWeb.SpatialChannel)
 
   # Configuration Constants
-  @max_clock_skew 300 # 5 menit toleransi
+  # 5 menit toleransi
+  @max_clock_skew 300
   @audit_log_prefix "[Socket Auth]"
 
   # =========================================================
@@ -21,7 +22,6 @@ defmodule ChatServiceWeb.UserSocket do
     # Pipeline koneksi dengan logging di setiap kegagalan
     with {:ok, claims} <- verify_and_validate_jwt(token),
          {:ok, user_ctx} <- build_enriched_context(claims) do
-
       # Pre-cast UUID string untuk FE agar tidak ada overhead di channel nantinya
       user_id_string = Ecto.UUID.cast!(user_ctx.user_id_bin)
 
@@ -71,6 +71,7 @@ defmodule ChatServiceWeb.UserSocket do
       {:ok, claims} ->
         # 2. Deep Validation (Iss, Exp, Aud)
         validate_strict_claims(claims)
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -93,7 +94,7 @@ defmodule ChatServiceWeb.UserSocket do
       not is_integer(claim_exp) ->
         {:error, :invalid_exp}
 
-      claim_exp < (now - @max_clock_skew) ->
+      claim_exp < now - @max_clock_skew ->
         {:error, :token_expired}
 
       # Validate audience only when present
@@ -154,6 +155,7 @@ defmodule ChatServiceWeb.UserSocket do
                permissions: claims["perms"] || []
              }}
         end
+
       :error ->
         {:error, :malformed_uuid}
     end
@@ -179,6 +181,7 @@ defmodule ChatServiceWeb.UserSocket do
 
   defp sync_user_projection(%{user_id_bin: user_id, username: name, avatar: img}) do
     now = DateTime.utc_now()
+
     Repo.execute(
       """
       INSERT INTO users (user_id, display_name, avatar_url, last_active, updated_at)
