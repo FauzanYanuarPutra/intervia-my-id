@@ -125,6 +125,12 @@ services:
       APP_ENV: development
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: development
+      INTERNAL_API_URL: http://identity_service:8080
+      INTERNAL_IDENTITY_URL: http://identity_service:8080
+      INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      USAHA_GOOGLE_REDIRECT_URI: ${USAHA_GOOGLE_REDIRECT_URI:-http://localhost:3003/api/auth/google/callback}
     ports:
       - "127.0.0.1:${PORT_USAHA:-3003}:3003"
 
