@@ -6,13 +6,13 @@ import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
 export default async function BusinessLocationsPage({ params }: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await params;
-  const { account, businesses, activeBusiness, isAuthenticated } = await resolvePortalBusinessPageState(businessId);
-  if (!isAuthenticated) redirect(`/login?callbackUrl=${encodeURIComponent(`/businesses/${businessId}/locations`)}`);
-  if (!activeBusiness) notFound();
+  const state = await resolvePortalBusinessPageState(businessId);
+  if (!state.isAuthenticated) redirect(`/login?callbackUrl=${encodeURIComponent(`/businesses/${businessId}/locations`)}`);
+  if (!state.activeBusiness) notFound();
   return (
-    <PortalShell activeBusiness={activeBusiness} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="locations">
+    <PortalShell activeBusiness={state.activeBusiness} availableBusinesses={state.businesses} viewerName={state.account.name} currentSection="locations">
       <SectionCard eyebrow="Lokasi & Cabang" title="Atur lokasi usaha" description="Alamat, pin peta, kontak, dan cabang dikelola dari workspace Usaha—peta publik tetap tampil untuk pelanggan di WWW.">
-        <BusinessLocationsManager businessId={activeBusiness.id} businessName={activeBusiness.name} initialLocations={activeBusiness.locations} />
+        <BusinessLocationsManager businessId={state.activeBusiness.id} businessName={state.activeBusiness.name} initialLocations={state.activeBusiness.locations ?? []} />
       </SectionCard>
     </PortalShell>
   );

@@ -30,17 +30,19 @@ export function buildSectionHref(businessId: string, section: PortalSection) {
 }
 
 export function getStatusCopy(business: BusinessRecord) {
+  const locations = business.locations ?? [];
   if (!business.infoComplete) return { label: 'Setup awal', description: 'Info dasar usaha masih perlu dirapikan.' };
-  if (business.locations.length === 0) return { label: 'Lengkapi lokasi', description: 'Tambahkan lokasi utama agar pelanggan mudah menemukan usaha.' };
+  if (locations.length === 0) return { label: 'Lengkapi lokasi', description: 'Tambahkan lokasi utama agar pelanggan mudah menemukan usaha.' };
   if (!business.buyerPageReady) return { label: 'Siapkan etalase', description: 'Lengkapi katalog agar halaman pembeli siap dibuka.' };
   if (!business.isOpen) return { label: 'Siap buka', description: 'Tampilan publik rapi, tinggal aktifkan status buka.' };
   return { label: 'Sedang jalan', description: 'Operasional sudah aktif dan bisa dipantau tim.' };
 }
 
 export function getSetupSteps(business: BusinessRecord): ProgressStep[] {
+  const locations = business.locations ?? [];
   return [
     { id: 'info', label: 'Lengkapi profil usaha', hint: 'Nama, kategori dan kontak harus jelas.', done: business.infoComplete },
-    { id: 'locations', label: 'Pastikan lokasi utama', hint: 'Alamat dan pin peta membantu pelanggan menemukan cabang.', done: business.locations.some(item => item.isPrimary) },
+    { id: 'locations', label: 'Pastikan lokasi utama', hint: 'Alamat dan pin peta membantu pelanggan menemukan cabang.', done: locations.some(item => item.isPrimary) },
     { id: 'products', label: 'Isi katalog', hint: 'Tambahkan produk atau jasa yang paling sering dicari.', done: business.productsCount > 0 },
     { id: 'operations', label: 'Atur operasional', hint: 'Atur jam buka sesuai kondisi lapangan.', done: business.schedule.trim().length >= 5 && business.schedule !== 'Belum diatur' },
     { id: 'buyer-page', label: 'Siapkan halaman pembeli', hint: 'Preview harus jelas sebelum link dibagikan.', done: business.buyerPageReady },

@@ -32,6 +32,7 @@ const sectionLinks: Array<{ id: PortalSection; label: string }> = [
 export function PortalShell({ activeBusiness, availableBusinesses, viewerName, currentSection, children }: PortalShellProps) {
   const status = activeBusiness ? getStatusCopy(activeBusiness) : null;
   const setupSteps = activeBusiness ? getSetupSteps(activeBusiness) : [];
+  const activeLocations = activeBusiness?.locations ?? [];
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(29,106,67,0.12),transparent_34%),linear-gradient(180deg,#f8f2e5_0%,#f4ede1_45%,#efe7d8_100%)] text-portal-ink">
@@ -70,7 +71,7 @@ export function PortalShell({ activeBusiness, availableBusinesses, viewerName, c
           <aside className="space-y-4">
             {activeBusiness ? (
               <>
-                <div className="portal-panel p-4"><p className="portal-kicker">Usaha aktif</p><div className="mt-3 flex items-start gap-3"><span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-portal-sand text-portal-forest"><CircleDot className="h-4 w-4" /></span><div><p className="font-bold">{activeBusiness.name}</p><p className="mt-1 text-xs leading-5 text-portal-soft">{activeBusiness.city} · {activeBusiness.category} · {activeBusiness.locations.length} lokasi</p></div></div></div>
+                <div className="portal-panel p-4"><p className="portal-kicker">Usaha aktif</p><div className="mt-3 flex items-start gap-3"><span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-portal-sand text-portal-forest"><CircleDot className="h-4 w-4" /></span><div><p className="font-bold">{activeBusiness.name}</p><p className="mt-1 text-xs leading-5 text-portal-soft">{activeBusiness.city} · {activeBusiness.category} · {activeLocations.length} lokasi</p></div></div></div>
                 <ProgressTracker steps={setupSteps} />
                 <RoleAccessCard role={activeBusiness.currentRole} />
                 <TeamSnapshot business={activeBusiness} canViewTeam={activeBusiness.permissions.includes('viewTeam')} canManageTeam={activeBusiness.permissions.includes('inviteMembers') || activeBusiness.permissions.includes('manageRoles')} />

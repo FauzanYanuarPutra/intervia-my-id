@@ -27,10 +27,12 @@ export type PortalSection =
   | 'buyerPage'
   | 'security';
 
+export type BusinessLocationType = 'physical' | 'service_area' | 'online';
+
 export type BusinessLocation = {
   id: string;
   name: string;
-  locationType: 'physical' | 'service_area' | 'online';
+  locationType: BusinessLocationType | string;
   address: string;
   city: string;
   province: string;
@@ -74,7 +76,8 @@ export type BusinessRecord = {
   id: string;
   slug: string;
   name: string;
-  organizationId: string | null;
+  /** Additive during migration so old local fixtures remain type-compatible. */
+  organizationId?: string | null;
   currentRole: PortalRole;
   city: string;
   address: string;
@@ -101,7 +104,8 @@ export type BusinessRecord = {
   products: ProductRecord[];
   orders: OrderRecord[];
   reservations: ReservationRecord[];
-  locations: BusinessLocation[];
+  /** Real backend records always provide this; optional only for legacy fixtures. */
+  locations?: BusinessLocation[];
   permissions: PermissionId[];
   publicUrl: string;
   securityEvents: SecurityEvent[];
