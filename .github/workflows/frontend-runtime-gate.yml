@@ -4,20 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
-    paths:
-      - "frontend/**"
-      - "docker-compose.yml"
-      - "docker-compose.dev.yml"
-      - "scripts/ci/**"
-      - ".github/workflows/frontend-runtime-gate.yml"
   push:
     branches: [main]
-    paths:
-      - "frontend/**"
-      - "docker-compose.yml"
-      - "docker-compose.dev.yml"
-      - "scripts/ci/**"
-      - ".github/workflows/frontend-runtime-gate.yml"
 
 permissions:
   contents: read
