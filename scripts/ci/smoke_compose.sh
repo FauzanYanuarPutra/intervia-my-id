@@ -9,7 +9,7 @@ COMPOSE=(
 )
 
 cleanup() {
-  local status=$?
+  local status=${1:-$?}
   if (( status != 0 )); then
     echo "::group::Docker Compose status"
     "${COMPOSE[@]}" ps -a || true
@@ -19,9 +19,8 @@ cleanup() {
     echo "::endgroup::"
   fi
   "${COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
-  exit "$status"
+  return "$status"
 }
-trap cleanup EXIT
 
 wait_http() {
   local name=$1
@@ -42,16 +41,40 @@ wait_http() {
   return 1
 }
 
-"${COMPOSE[@]}" config --quiet
-"${COMPOSE[@]}" build
-"${COMPOSE[@]}" up --detach --wait --wait-timeout 420
+phase=${1:-all}
 
-# Compose healthchecks cover the stateful/core backend services. These probes
-# additionally prove that the host-published application endpoints are usable.
-wait_http "identity" "http://127.0.0.1:${PORT_IDENTITY:-8080}/health"
-wait_http "marketplace" "http://127.0.0.1:${PORT_MARKETPLACE:-8081}/health"
-wait_http "community" "http://127.0.0.1:${PORT_COMMUNITY:-8082}/health"
-wait_http "chat" "http://127.0.0.1:${PORT_CHAT:-4000}/api/health"
-wait_http "www" "http://127.0.0.1:${PORT_FRONTEND:-3000}/"
-
-"${COMPOSE[@]}" ps -a
+case "$phase" in
+  validate)
+    "${COMPOSE[@]}" config --quiet
+    ;;
+  build)
+    "${COMPOSE[@]}" build
+    ;;
+  start)
+    "${COMPOSE[@]}" up --detach --wait --wait-timeout 420
+    ;;
+  probe)
+    # Compose healthchecks cover the stateful/core backend services. These probes
+    # additionally prove that the host-published application endpoints are usable.
+    wait_http "identity" "http://127.0.0.1:${PORT_IDENTITY:-8080}/health"
+    wait_http "marketplace" "http://127.0.0.1:${PORT_MARKETPLACE:-8081}/health"
+    wait_http "community" "http://127.0.0.1:${PORT_COMMUNITY:-8082}/health"
+    wait_http "chat" "http://127.0.0.1:${PORT_CHAT:-4000}/api/health"
+    wait_http "www" "http://127.0.0.1:${PORT_FRONTEND:-3000}/"
+    "${COMPOSE[@]}" ps -a
+    ;;
+  cleanup)
+    cleanup "${SMOKE_STATUS:-0}"
+    ;;
+  all)
+    trap 'cleanup $?' EXIT
+    "$0" validate
+    "$0" build
+    "$0" start
+    "$0" probe
+    ;;
+  *)
+    echo "usage: $0 {validate|build|start|probe|cleanup|all}" >&2
+    exit 64
+    ;;
+esac
