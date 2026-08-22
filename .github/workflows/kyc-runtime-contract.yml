@@ -24,8 +24,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Run KYC runtime contract regression tests
-        run: python scripts/config/test_runtime_contract.py
+      - name: Run KYC runtime regression tests
+        run: python -m unittest discover -s scripts/config -p 'test_*.py'
       - name: Validate KYC Compose model
         env:
           LIVENESS_MODELS_PATH: /tmp/lajukan-ci/liveness
