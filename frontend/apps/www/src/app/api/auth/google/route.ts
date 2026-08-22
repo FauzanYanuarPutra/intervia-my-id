@@ -15,7 +15,7 @@ const GOOGLE_OAUTH_STATE_COOKIE = 'google_oauth_state';
 function getPublicBaseUrl(req: NextRequest): string {
   return resolvePublicOrigin({
     configuredOrigin:
-      process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
+      process.env.NEXT_PUBLIC_WWW_URL || process.env.NEXT_PUBLIC_APP_URL,
     requestOrigin: req.nextUrl.origin,
     production: isExternalHttpsRequired(),
   });
@@ -23,7 +23,7 @@ function getPublicBaseUrl(req: NextRequest): string {
 
 function getGoogleRedirectUri(req: NextRequest): string {
   return (
-    process.env.GOOGLE_REDIRECT_URI ||
+    process.env.WWW_GOOGLE_REDIRECT_URI ||
     `${getPublicBaseUrl(req)}/api/auth/google/callback`
   );
 }
@@ -35,7 +35,10 @@ function getPreferredLocale(req: NextRequest, callbackUrl: string): 'id' | 'en' 
 }
 
 /**
- * Redirect to Google OAuth consent page
+ * Redirect to Google OAuth consent page.
+ *
+ * WWW and Usaha intentionally share the same Google OAuth client identity,
+ * while each app owns an explicit app-specific callback URI.
  */
 export async function GET(req: NextRequest) {
   const security = await enforceAuthRouteSecurity(req, {
