@@ -1,0 +1,82 @@
+name: Frontend Runtime
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/apps/www/**"
+      - "frontend/apps/usaha/**"
+      - "frontend/apps/cms/**"
+      - "frontend/apps/crm/**"
+      - "frontend/packages/**"
+      - "docker-compose.yml"
+      - "docker-compose.dev.yml"
+      - "infrastructure/caddy/**"
+      - "scripts/ci/smoke_compose.sh"
+      - ".github/workflows/frontend-runtime.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/apps/www/**"
+      - "frontend/apps/usaha/**"
+      - "frontend/apps/cms/**"
+      - "frontend/apps/crm/**"
+      - "frontend/packages/**"
+      - "docker-compose.yml"
+      - "docker-compose.dev.yml"
+      - "infrastructure/caddy/**"
+      - "scripts/ci/smoke_compose.sh"
+      - ".github/workflows/frontend-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-surface-smoke:
+    name: WWW + Usaha + CMS + CRM + Caddy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate full frontend Compose model
+        run: |
+          docker compose \
+            --profile backoffice \
+            --profile edge \
+            --env-file .env.development.example \
+            -f docker-compose.yml \
+            -f docker-compose.dev.yml \
+            config --quiet
+
+      - name: Build, start and probe full frontend runtime
+        run: bash scripts/ci/smoke_compose.sh full
+
+      - name: Capture failure diagnostics
+        if: failure()
+        run: |
+          docker compose \
+            --profile backoffice \
+            --profile edge \
+            --env-file .env.development.example \
+            -f docker-compose.yml \
+            -f docker-compose.dev.yml \
+            ps -a || true
+          docker compose \
+            --profile backoffice \
+            --profile edge \
+            --env-file .env.development.example \
+            -f docker-compose.yml \
+            -f docker-compose.dev.yml \
+            logs --no-color --tail=250 www usaha cms crm caddy || true
+
+      - name: Tear down full frontend runtime
+        if: always()
+        env:
+          SMOKE_SCOPE: full
+        run: bash scripts/ci/smoke_compose.sh cleanup
