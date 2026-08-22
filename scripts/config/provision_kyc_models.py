@@ -21,6 +21,7 @@ PINNED_MODEL_BASE_URL = (
     "QingHeYang/Silent-Face-Anti-Spoofing-onnx/"
     f"{PINNED_MODEL_COMMIT}/onnx"
 )
+MODEL_FILE_MODE = 0o644
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,14 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def ensure_container_readable(path: Path) -> None:
+    """Make a verified model readable by the non-root runtime container user."""
+    try:
+        os.chmod(path, MODEL_FILE_MODE)
+    except OSError as exc:
+        raise RuntimeError(f"Unable to set readable permissions on {path}: {exc}") from exc
+
+
 def download_bytes(url: str) -> bytes:
     request = urllib.request.Request(
         url,
@@ -80,6 +89,7 @@ def provision_models(
     for artifact in artifacts:
         target = model_dir / artifact.filename
         if target.is_file() and sha256_file(target) == artifact.sha256:
+            ensure_container_readable(target)
             installed.append(target)
             continue
 
@@ -96,15 +106,18 @@ def provision_models(
             suffix=".tmp",
             dir=model_dir,
         )
+        temp_path = Path(temp_name)
         try:
             with os.fdopen(fd, "wb") as destination:
                 destination.write(payload)
                 destination.flush()
                 os.fsync(destination.fileno())
-            Path(temp_name).replace(target)
+            ensure_container_readable(temp_path)
+            temp_path.replace(target)
+            ensure_container_readable(target)
         except Exception:
             try:
-                Path(temp_name).unlink(missing_ok=True)
+                temp_path.unlink(missing_ok=True)
             finally:
                 raise
 
