@@ -65,7 +65,7 @@ services:
   chat_service:
     environment:
       ENV: development
-      PHX_HOST: localhost
+      PHX_HOST: ${PHX_HOST:-localhost}
     ports:
       - "127.0.0.1:${PORT_CHAT:-4000}:4000"
 

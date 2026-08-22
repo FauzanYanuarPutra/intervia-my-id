@@ -106,6 +106,41 @@ def _validate_kyc_runtime(
         )
 
 
+def _validate_tunnel_runtime(
+    services: dict[str, Any],
+    env_values: dict[str, str],
+    errors: list[str],
+) -> None:
+    if not non_empty(env_values.get("CLOUDFLARE_TUNNEL_TOKEN")):
+        errors.append("Tunnel profile requires CLOUDFLARE_TUNNEL_TOKEN.")
+
+    cloudflared = services.get("cloudflared")
+    dependency = (
+        cloudflared.get("depends_on", {}).get("caddy")
+        if isinstance(cloudflared, dict)
+        else None
+    )
+    if dependency is None:
+        errors.append("Tunnel profile must layer cloudflared in front of Caddy.")
+
+    app_domain = env_values.get("APP_DOMAIN", "").strip().lower().rstrip(".")
+    if app_domain in {"", "localhost", "127.0.0.1", "::1"}:
+        errors.append(
+            "Tunnel profile requires APP_DOMAIN to be a public hostname, not localhost."
+        )
+
+    public_app_url = env_values.get("NEXT_PUBLIC_APP_URL", "").strip()
+    parsed_public_app_url = urlparse(public_app_url) if public_app_url else None
+    if (
+        parsed_public_app_url is None
+        or parsed_public_app_url.scheme != "https"
+        or not parsed_public_app_url.hostname
+    ):
+        errors.append(
+            "Tunnel profile requires NEXT_PUBLIC_APP_URL to use a valid HTTPS origin."
+        )
+
+
 def validate_contract(
     model: dict[str, Any],
     env_values: dict[str, str],
@@ -179,12 +214,7 @@ def validate_contract(
         _validate_kyc_runtime(services, errors)
 
     if "tunnel" in active_profiles:
-        if not non_empty(env_values.get("CLOUDFLARE_TUNNEL_TOKEN")):
-            errors.append("Tunnel profile requires CLOUDFLARE_TUNNEL_TOKEN.")
-        cloudflared = services.get("cloudflared")
-        dependency = cloudflared.get("depends_on", {}).get("caddy") if isinstance(cloudflared, dict) else None
-        if dependency is None:
-            errors.append("Tunnel profile must layer cloudflared in front of Caddy.")
+        _validate_tunnel_runtime(services, env_values, errors)
 
     return errors
 

@@ -36,6 +36,12 @@ def base_model(liveness_source: Path) -> dict:
                     }
                 ],
             },
+            "caddy": {},
+            "cloudflared": {
+                "depends_on": {
+                    "caddy": {"condition": "service_started"},
+                },
+            },
         }
     }
 
@@ -79,6 +85,64 @@ class KycRuntimeContractTests(unittest.TestCase):
                 any("anti-spoof" in error.lower() for error in errors),
                 errors,
             )
+
+
+class TunnelRuntimeContractTests(unittest.TestCase):
+    def test_tunnel_rejects_localhost_app_domain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = validate_contract(
+                base_model(Path(tmp)),
+                {
+                    "CLOUDFLARE_TUNNEL_TOKEN": "rotated-token",
+                    "APP_DOMAIN": "localhost",
+                    "NEXT_PUBLIC_APP_URL": "https://www.lajukan.com",
+                },
+                "development",
+                {"tunnel"},
+            )
+
+        self.assertTrue(
+            any("APP_DOMAIN" in error and "localhost" in error for error in errors),
+            errors,
+        )
+
+    def test_tunnel_rejects_non_https_public_app_url(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = validate_contract(
+                base_model(Path(tmp)),
+                {
+                    "CLOUDFLARE_TUNNEL_TOKEN": "rotated-token",
+                    "APP_DOMAIN": "lajukan.com",
+                    "NEXT_PUBLIC_APP_URL": "http://www.lajukan.com",
+                },
+                "development",
+                {"tunnel"},
+            )
+
+        self.assertTrue(
+            any("NEXT_PUBLIC_APP_URL" in error and "HTTPS" in error for error in errors),
+            errors,
+        )
+
+    def test_tunnel_accepts_public_domain_and_https_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = validate_contract(
+                base_model(Path(tmp)),
+                {
+                    "CLOUDFLARE_TUNNEL_TOKEN": "rotated-token",
+                    "APP_DOMAIN": "lajukan.com",
+                    "NEXT_PUBLIC_APP_URL": "https://www.lajukan.com",
+                },
+                "development",
+                {"tunnel"},
+            )
+
+        tunnel_errors = [
+            error
+            for error in errors
+            if "Tunnel" in error or "APP_DOMAIN" in error or "NEXT_PUBLIC_APP_URL" in error
+        ]
+        self.assertEqual(tunnel_errors, [], tunnel_errors)
 
 
 if __name__ == "__main__":

@@ -61,22 +61,42 @@ try {
         }
     }
 
+    $PythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $PythonCommand) {
+        throw "Python 3 tidak ditemukan. Runtime contract validator memerlukan Python 3."
+    }
+
+    # Resolve both COMPOSE_PROFILES from the env file and explicit -Profile
+    # arguments through one shared contract. Development automatically enables
+    # the tunnel when a token is configured, preventing a healthy local stack
+    # from silently publishing a dead Cloudflare Tunnel (Error 1033).
+    $ProfileResolverArgs = @(
+        "scripts/config/launcher_profiles.py",
+        "--env-file", $EnvFile,
+        "--environment", $Environment
+    )
+    foreach ($Item in $Profile) {
+        $ProfileResolverArgs += @("--profile", $Item)
+    }
+    $ResolvedProfileOutput = & $PythonCommand.Source @ProfileResolverArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Gagal menentukan Docker Compose profiles."
+    }
+    $RequestedProfiles = @(
+        $ResolvedProfileOutput |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+    )
+
     $ComposeArgs = @(
         "compose",
         "--env-file", $EnvFile,
         "-f", "docker-compose.yml",
         "-f", $Overlay
     )
-    $RequestedProfiles = @()
 
-    foreach ($Item in $Profile) {
-        foreach ($Name in ($Item -split ',')) {
-            $Trimmed = $Name.Trim()
-            if ($Trimmed) {
-                $ComposeArgs += @("--profile", $Trimmed)
-                $RequestedProfiles += $Trimmed
-            }
-        }
+    foreach ($RequestedProfile in $RequestedProfiles) {
+        $ComposeArgs += @("--profile", $RequestedProfile)
     }
 
     # Validate the merged Compose model before changing container state. This
@@ -85,11 +105,6 @@ try {
     & docker @ComposeArgs config --quiet
     if ($LASTEXITCODE -ne 0) {
         throw "Konfigurasi Docker Compose tidak valid. Perbaiki error di atas sebelum stack dijalankan."
-    }
-
-    $PythonCommand = Get-Command python -ErrorAction SilentlyContinue
-    if (-not $PythonCommand) {
-        throw "Python 3 tidak ditemukan. Runtime contract validator memerlukan Python 3."
     }
 
     # Development KYC is self-provisioning: the anti-spoof ONNX files are

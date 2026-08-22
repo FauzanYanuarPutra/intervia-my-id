@@ -1,5 +1,4 @@
-# Akses lokal langsung tanpa hostname www. Gunakan alamat IP agar blok ini
-# tidak bentrok ketika APP_DOMAIN=localhost.
+# Direct local access without a www hostname.
 http://127.0.0.1 {
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
@@ -7,19 +6,22 @@ http://127.0.0.1 {
     encode gzip zstd
 }
 
-# Redirect domain utama ke www
+# Apex traffic arrives from Cloudflare over the private Docker HTTP hop, but
+# browser redirects must stay on external HTTPS.
 http://{$APP_DOMAIN} {
-    redir http://www.{$APP_DOMAIN}{uri} permanent
+    redir https://www.{$APP_DOMAIN}{uri} permanent
 }
 
-# Blok Utama: WWW
+# Public WWW.
 http://www.{$APP_DOMAIN} {
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
+
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
     reverse_proxy @notifications_socket marketplace_service:8081
+
     reverse_proxy www:3000
-    
+
     header {
         Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://www.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
         X-Content-Type-Options "nosniff"
@@ -28,11 +30,14 @@ http://www.{$APP_DOMAIN} {
     encode gzip zstd
 }
 
+# Usaha workspace.
 http://usaha.{$APP_DOMAIN} {
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
+
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
     reverse_proxy @notifications_socket marketplace_service:8081
+
     reverse_proxy usaha:3003
 
     header {
@@ -43,19 +48,60 @@ http://usaha.{$APP_DOMAIN} {
     encode gzip zstd
 }
 
-# Service lain gunakan http:// agar tidak loop
+# Backoffice apps. Cloudflare Access should protect these hostnames in real
+# deployments; Caddy only performs the internal reverse proxy.
+http://cms.{$APP_DOMAIN} {
+    reverse_proxy cms:3001
+    encode gzip zstd
+}
+
+http://crm.{$APP_DOMAIN} {
+    reverse_proxy crm:3002
+    encode gzip zstd
+}
+
+# Canonical public API gateway. Preserve backend-native paths so existing BFF
+# and direct API clients do not need response-shape or prefix rewrites.
+http://api.{$APP_DOMAIN} {
+    @identity path /auth /auth/* /users /users/*
+    handle @identity {
+        reverse_proxy identity_service:8080
+    }
+
+    @community path /v1/community /v1/community/* /v1/reels /v1/reels/* /v1/forum /v1/forum/*
+    handle @community {
+        reverse_proxy community_service:8082
+    }
+
+    handle {
+        reverse_proxy marketplace_service:8081
+    }
+
+    encode gzip zstd
+}
+
+# Backward-compatible identity hostname while clients migrate to api.*.
 http://auth.{$APP_DOMAIN} {
     reverse_proxy identity_service:8080
 }
 
+# Dedicated Phoenix HTTP/WebSocket origin.
 http://chat.{$APP_DOMAIN} {
     reverse_proxy chat_service:4000
+}
+
+# Canonical public media origin plus the legacy cdn.* alias.
+http://media.{$APP_DOMAIN} {
+    reverse_proxy minio:9002
 }
 
 http://cdn.{$APP_DOMAIN} {
     reverse_proxy minio:9002
 }
 
+# MinIO console is intentionally not part of the recommended public Tunnel
+# routes. If remote administration is required, protect it with Cloudflare
+# Access before publishing console.*.
 http://console.{$APP_DOMAIN} {
     reverse_proxy minio:9001
 }

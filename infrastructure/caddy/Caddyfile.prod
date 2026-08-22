@@ -38,7 +38,21 @@ usaha.{$APP_DOMAIN} {
 
 api.{$APP_DOMAIN} {
     import security_headers
-    reverse_proxy marketplace_service:8081
+
+    @identity path /auth /auth/* /users /users/*
+    handle @identity {
+        reverse_proxy identity_service:8080
+    }
+
+    @community path /v1/community /v1/community/* /v1/reels /v1/reels/* /v1/forum /v1/forum/*
+    handle @community {
+        reverse_proxy community_service:8082
+    }
+
+    handle {
+        reverse_proxy marketplace_service:8081
+    }
+
     encode zstd gzip
 }
 
@@ -69,6 +83,13 @@ crm.{$APP_DOMAIN} {
     encode zstd gzip
 }
 
+media.{$APP_DOMAIN} {
+    import security_headers
+    reverse_proxy minio:9002
+    encode zstd gzip
+}
+
+# Legacy alias retained while callers migrate to media.*.
 cdn.{$APP_DOMAIN} {
     import security_headers
     reverse_proxy minio:9002

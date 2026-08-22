@@ -1,0 +1,100 @@
+name: Edge Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/caddy/**"
+      - "scripts/config/**"
+      - "up.ps1"
+      - "up.sh"
+      - "docker-compose*.yml"
+      - ".env.*.example"
+      - ".github/workflows/edge-contract.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "infrastructure/caddy/**"
+      - "scripts/config/**"
+      - "up.ps1"
+      - "up.sh"
+      - "docker-compose*.yml"
+      - ".env.*.example"
+      - ".github/workflows/edge-contract.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  edge-contract:
+    name: Tunnel / Caddy / Compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate launcher and Python syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n up.sh
+          python -m compileall -q scripts/config
+          pwsh -NoProfile -NonInteractive -Command '[void][scriptblock]::Create((Get-Content -Raw ./up.ps1))'
+
+      - name: Run configuration contract tests
+        run: python -m unittest discover -s scripts/config -p 'test_*.py' -v
+
+      - name: Validate development Caddyfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e APP_DOMAIN=lajukan.com \
+            -e ADMIN_EMAIL=ops@lajukan.com \
+            -v "$PWD/infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      - name: Validate production Caddyfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e APP_DOMAIN=lajukan.com \
+            -e ADMIN_EMAIL=ops@lajukan.com \
+            -v "$PWD/infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      - name: Validate development tunnel Compose contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .env.development.example /tmp/lajukan-edge.env
+          cat >> /tmp/lajukan-edge.env <<'EOF'
+          APP_DOMAIN=lajukan.com
+          FRONTEND_URL=https://www.lajukan.com
+          NEXT_PUBLIC_APP_URL=https://www.lajukan.com
+          NEXT_PUBLIC_WWW_URL=https://www.lajukan.com
+          CLOUDFLARE_TUNNEL_TOKEN=ci-placeholder-token
+          EOF
+
+          docker compose \
+            --profile tunnel \
+            --env-file /tmp/lajukan-edge.env \
+            -f docker-compose.yml \
+            -f docker-compose.dev.yml \
+            config --format json > /tmp/compose.json
+
+          python scripts/config/runtime_contract.py \
+            --model /tmp/compose.json \
+            --env-file /tmp/lajukan-edge.env \
+            --environment development \
+            --profile tunnel
