@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -103,6 +104,29 @@ class CaddyEdgeContractTests(unittest.TestCase):
     def test_development_apex_redirect_is_external_https(self) -> None:
         caddy = self._read_caddy("Caddyfile")
         self.assertIn("redir https://www.{$APP_DOMAIN}{uri} permanent", caddy)
+
+    def test_tunnel_frontends_forward_external_https_scheme(self) -> None:
+        """The private Tunnel hop must not overwrite the browser HTTPS scheme."""
+        caddy = self._read_caddy("Caddyfile")
+
+        snippet = re.search(
+            r"\(public_frontend_proxy\)\s*\{(?P<body>.*?)\n\}",
+            caddy,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(snippet)
+        body = snippet.group("body") if snippet else ""
+        self.assertIn("header_up X-Forwarded-Proto https", body)
+        self.assertIn("header_up X-Forwarded-Host {host}", body)
+
+        for upstream in ("www:3000", "usaha:3003", "cms:3001", "crm:3002"):
+            with self.subTest(upstream=upstream):
+                pattern = re.compile(
+                    rf"reverse_proxy\s+{re.escape(upstream)}\s*\{{[^}}]*"
+                    r"import\s+public_frontend_proxy",
+                    re.DOTALL,
+                )
+                self.assertRegex(caddy, pattern)
 
 
 if __name__ == "__main__":
