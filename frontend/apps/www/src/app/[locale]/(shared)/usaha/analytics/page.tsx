@@ -1,10 +1,3 @@
-import { UsahaOwnerRouteView } from '../_components/UsahaOwnerRouteView';
-
-type PageProps = {
-  params: Promise<{ locale: string }>;
-};
-
-export default async function UsahaAnalyticsPage({ params }: PageProps) {
-  const { locale } = await params;
-  return <UsahaOwnerRouteView locale={locale} />;
-}
+import { redirect } from 'next/navigation';
+import { getUsahaWorkspaceUrl } from '@/lib/usahaWorkspace';
+export default function LegacyUsahaAnalyticsPage() { redirect(getUsahaWorkspaceUrl('/')); }

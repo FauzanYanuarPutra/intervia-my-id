@@ -1,37 +1,19 @@
 import { NextResponse } from 'next/server';
-import { getPortalAccount } from '@/lib/portal-server';
-import { updateBusinessOperations } from '@/lib/portal-store';
+import { updateBusiness } from '@/lib/business-server';
 
-export async function PATCH(
-  request: Request,
-  context: { params: Promise<{ businessId: string }> },
-) {
-  const account = await getPortalAccount({ clearInvalidSession: true });
+export async function PATCH(request: Request, context: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await context.params;
-
-  if (!account) {
-    return NextResponse.json(
-      { error: 'Sesi habis atau akun tidak ditemukan. Login lagi dulu.' },
-      { status: 401 },
-    );
-  }
-
-  const body = (await request.json()) as {
-    schedule?: string;
-    isOpen?: boolean;
-  };
-
   try {
-    const business = updateBusinessOperations(account.id, businessId, {
-      schedule: body.schedule?.trim() ?? '',
-      isOpen: Boolean(body.isOpen),
-    });
-
+    const body = (await request.json()) as Record<string, unknown>;
+    const schedule = typeof body.schedule === 'string' ? body.schedule.trim() : undefined;
+    const metadataPatch: Record<string, unknown> = {};
+    if (typeof body.isOpen === 'boolean') metadataPatch.isOpen = body.isOpen;
+    if (Array.isArray(body.reservations)) metadataPatch.reservations = body.reservations;
+    const business = await updateBusiness(businessId, { schedule, metadataPatch });
     return NextResponse.json({ ok: true, business });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Gagal simpan operasional.' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal memperbarui operasional.' }, { status: 400 });
   }
 }
+
+export const POST = PATCH;

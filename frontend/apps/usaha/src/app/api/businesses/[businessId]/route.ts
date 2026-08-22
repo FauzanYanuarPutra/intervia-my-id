@@ -1,64 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getPortalAccount } from '@/lib/portal-server';
-import { updateBusinessInfo } from '@/lib/portal-store';
+import { updateBusiness } from '@/lib/business-server';
 
 function readNumber(value: unknown): number | null {
-  const parsed =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number(value)
-        : Number.NaN;
-
-  return Number.isFinite(parsed) ? Number(parsed.toFixed(6)) : null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? Number(parsed) : null;
 }
 
-export async function PATCH(
-  request: Request,
-  context: { params: Promise<{ businessId: string }> },
-) {
-  const account = await getPortalAccount({ clearInvalidSession: true });
+export async function PATCH(request: Request, context: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await context.params;
-
-  if (!account) {
-    return NextResponse.json(
-      { error: 'Sesi habis atau akun tidak ditemukan. Login lagi dulu.' },
-      { status: 401 },
-    );
-  }
-
-  const body = (await request.json()) as {
-    name?: string;
-    category?: string;
-    city?: string;
-    address?: string;
-    locationQuery?: string;
-    phone?: string;
-    description?: string;
-    schedule?: string;
-    latitude?: number | string | null;
-    longitude?: number | string | null;
-  };
-
   try {
-    const business = updateBusinessInfo(account.id, businessId, {
-      name: body.name?.trim() ?? '',
-      category: body.category?.trim() ?? '',
-      city: body.city?.trim() ?? '',
-      address: body.address?.trim() ?? '',
-      locationQuery: body.locationQuery?.trim() ?? '',
-      phone: body.phone?.trim() ?? '',
-      description: body.description?.trim() ?? '',
-      schedule: body.schedule?.trim() ?? '',
-      latitude: readNumber(body.latitude),
-      longitude: readNumber(body.longitude),
+    const body = (await request.json()) as Record<string, unknown>;
+    const business = await updateBusiness(businessId, {
+      name: typeof body.name === 'string' ? body.name.trim() : undefined,
+      category: typeof body.category === 'string' ? body.category.trim() : undefined,
+      city: typeof body.city === 'string' ? body.city.trim() : undefined,
+      address: typeof body.address === 'string' ? body.address.trim() : undefined,
+      locationQuery: typeof body.locationQuery === 'string' ? body.locationQuery.trim() : undefined,
+      phone: typeof body.phone === 'string' ? body.phone.trim() : undefined,
+      description: typeof body.description === 'string' ? body.description.trim() : undefined,
+      schedule: typeof body.schedule === 'string' ? body.schedule.trim() : undefined,
+      latitude: body.latitude === undefined ? undefined : readNumber(body.latitude),
+      longitude: body.longitude === undefined ? undefined : readNumber(body.longitude),
     });
-
     return NextResponse.json({ ok: true, business });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Gagal simpan perubahan.' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal simpan perubahan.' }, { status: 400 });
   }
 }
