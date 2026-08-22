@@ -30,6 +30,15 @@ def non_empty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _origin(value: object) -> tuple[str, str, int | None] | None:
+    if not non_empty(value):
+        return None
+    parsed = urlparse(str(value))
+    if not parsed.scheme or not parsed.hostname:
+        return None
+    return (parsed.scheme.lower(), parsed.hostname.lower(), parsed.port)
+
+
 def _find_bind_mount(service: dict[str, Any], target: str) -> dict[str, Any] | None:
     volumes = service.get("volumes")
     if not isinstance(volumes, list):
@@ -62,6 +71,145 @@ def _host_path_for_container_path(
         return None
 
     return Path(str(source)) / relative
+
+
+def _validate_google_redirect(
+    *,
+    app_name: str,
+    redirect_uri: object,
+    public_url: object,
+    environment: str,
+    errors: list[str],
+) -> None:
+    redirect = urlparse(str(redirect_uri)) if non_empty(redirect_uri) else None
+    if redirect is None or not redirect.hostname:
+        errors.append(f"{app_name} Google OAuth redirect must use a valid origin.")
+        return
+
+    if redirect.path != "/api/auth/google/callback":
+        errors.append(
+            f"{app_name} Google OAuth redirect must target /api/auth/google/callback."
+        )
+
+    if environment in {"production", "staging"} and redirect.scheme != "https":
+        errors.append(f"{app_name} Google OAuth redirect must use HTTPS outside development.")
+
+    expected_origin = _origin(public_url)
+    redirect_origin = _origin(redirect_uri)
+    if expected_origin is None:
+        errors.append(f"{app_name} public URL must use a valid origin for Google OAuth.")
+    elif redirect_origin != expected_origin:
+        errors.append(
+            f"{app_name} Google OAuth redirect origin must match the app public origin."
+        )
+
+
+def _validate_google_oauth_runtime(
+    services: dict[str, Any],
+    environment: str,
+    errors: list[str],
+) -> None:
+    www = services.get("www")
+    usaha = services.get("usaha")
+    identity = services.get("identity_service")
+
+    if not isinstance(www, dict):
+        return
+
+    www_environment = www.get("environment")
+    if not isinstance(www_environment, dict):
+        www_environment = {}
+
+    usaha_environment = usaha.get("environment") if isinstance(usaha, dict) else {}
+    if not isinstance(usaha_environment, dict):
+        usaha_environment = {}
+
+    identity_environment = identity.get("environment") if isinstance(identity, dict) else {}
+    if not isinstance(identity_environment, dict):
+        identity_environment = {}
+
+    www_client_id = www_environment.get("GOOGLE_CLIENT_ID")
+    www_client_secret = www_environment.get("GOOGLE_CLIENT_SECRET")
+    www_redirect_uri = www_environment.get("GOOGLE_REDIRECT_URI")
+    usaha_client_id = usaha_environment.get("GOOGLE_CLIENT_ID")
+    usaha_client_secret = usaha_environment.get("GOOGLE_CLIENT_SECRET")
+    usaha_redirect_uri = usaha_environment.get("USAHA_GOOGLE_REDIRECT_URI")
+    identity_client_id = identity_environment.get("GOOGLE_CLIENT_ID")
+
+    any_google_value = any(
+        non_empty(value)
+        for value in (
+            www_client_id,
+            www_client_secret,
+            www_redirect_uri,
+            usaha_client_id,
+            usaha_client_secret,
+            usaha_redirect_uri,
+            identity_client_id,
+        )
+    )
+    if not any_google_value:
+        return
+
+    www_complete = all(
+        non_empty(value)
+        for value in (www_client_id, www_client_secret, www_redirect_uri)
+    )
+    if not www_complete:
+        errors.append(
+            "WWW Google OAuth configuration is partial; configure client ID, client secret, and redirect URI together."
+        )
+
+    usaha_complete = all(
+        non_empty(value)
+        for value in (usaha_client_id, usaha_client_secret, usaha_redirect_uri)
+    )
+    if not usaha_complete:
+        errors.append(
+            "Usaha Google OAuth configuration is partial; configure client ID, client secret, and redirect URI together."
+        )
+
+    if not non_empty(identity_client_id):
+        errors.append("Identity Google OAuth client ID must be configured when web OAuth is enabled.")
+
+    complete_client_ids = [
+        str(value)
+        for value in (www_client_id, usaha_client_id, identity_client_id)
+        if non_empty(value)
+    ]
+    if complete_client_ids and len(set(complete_client_ids)) != 1:
+        errors.append("WWW, Usaha, and Identity must use the same Google OAuth client ID.")
+
+    if (
+        non_empty(www_client_secret)
+        and non_empty(usaha_client_secret)
+        and str(www_client_secret) != str(usaha_client_secret)
+    ):
+        errors.append("WWW and Usaha must use the same Google OAuth client secret.")
+
+    if www_complete:
+        _validate_google_redirect(
+            app_name="WWW",
+            redirect_uri=www_redirect_uri,
+            public_url=(
+                www_environment.get("NEXT_PUBLIC_WWW_URL")
+                or www_environment.get("NEXT_PUBLIC_APP_URL")
+            ),
+            environment=environment,
+            errors=errors,
+        )
+
+    if usaha_complete:
+        _validate_google_redirect(
+            app_name="Usaha",
+            redirect_uri=usaha_redirect_uri,
+            public_url=(
+                usaha_environment.get("NEXT_PUBLIC_USAHA_URL")
+                or usaha_environment.get("NEXT_PUBLIC_APP_URL")
+            ),
+            environment=environment,
+            errors=errors,
+        )
 
 
 def _validate_kyc_runtime(
@@ -181,27 +329,7 @@ def validate_contract(
     if identity_host != "identity_service":
         errors.append("WWW Identity must use the identity_service service.")
 
-    google_client_id = www_environment.get("GOOGLE_CLIENT_ID")
-    google_client_secret = www_environment.get("GOOGLE_CLIENT_SECRET")
-    google_redirect_uri = www_environment.get("GOOGLE_REDIRECT_URI")
-    google_credentials_present = non_empty(google_client_id) or non_empty(google_client_secret)
-    google_credentials_complete = non_empty(google_client_id) and non_empty(google_client_secret)
-    if google_credentials_present and (
-        not google_credentials_complete or not non_empty(google_redirect_uri)
-    ):
-        errors.append("Google OAuth configuration is partial; configure client ID, client secret, and redirect URI together.")
-
-    if google_credentials_complete and non_empty(google_redirect_uri):
-        redirect = urlparse(str(google_redirect_uri))
-        if environment in {"production", "staging"} and redirect.scheme != "https":
-            errors.append("Google OAuth redirect must use HTTPS outside development.")
-        if not redirect.hostname or redirect.path != "/api/auth/google/callback":
-            errors.append("Google OAuth redirect must target /api/auth/google/callback on a valid origin.")
-
-        identity = services.get("identity_service")
-        identity_environment = identity.get("environment", {}) if isinstance(identity, dict) else {}
-        if identity_environment.get("GOOGLE_CLIENT_ID") != google_client_id:
-            errors.append("WWW and Identity must use the same Google OAuth client ID.")
+    _validate_google_oauth_runtime(services, environment, errors)
 
     env_profiles = {
         profile.strip()
