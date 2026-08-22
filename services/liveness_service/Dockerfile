@@ -4,6 +4,11 @@ WORKDIR /app
 
 ARG PIP_INDEX_URL=https://pypi.org/simple
 
+# The pinned Silent-Face ONNX models consume float32 BGR tensors in the
+# original 0..255 range. Keep this explicit so a fresh container cannot fall
+# back to the generic normalized-input default in liveness_model.py.
+ENV LIVENESS_INPUT_SCALE=1.0
+
 # 1. Install dependensi sistem
 RUN apt-get update -o Acquire::Retries=10 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::ForceIPv4=true && apt-get install -y --no-install-recommends \
     libgl1 \
