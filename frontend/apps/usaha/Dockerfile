@@ -3,6 +3,21 @@ ARG NPM_REGISTRY=https://registry.npmjs.org/
 FROM node:20-bullseye-slim AS usaha_deps
 
 ARG NPM_REGISTRY
+ARG NEXT_PUBLIC_APP_ENV=development
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3003
+ARG NEXT_PUBLIC_WWW_URL=http://localhost:3000
+ARG NEXT_PUBLIC_USAHA_URL=http://localhost:3003
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG NEXT_PUBLIC_MARKETPLACE_URL=http://localhost:8081
+ARG NEXT_PUBLIC_COMMUNITY_URL=http://localhost:8082
+
+ENV NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_WWW_URL=${NEXT_PUBLIC_WWW_URL}
+ENV NEXT_PUBLIC_USAHA_URL=${NEXT_PUBLIC_USAHA_URL}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_MARKETPLACE_URL=${NEXT_PUBLIC_MARKETPLACE_URL}
+ENV NEXT_PUBLIC_COMMUNITY_URL=${NEXT_PUBLIC_COMMUNITY_URL}
 
 WORKDIR /app/apps/usaha
 
@@ -14,6 +29,17 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set fetch-timeout 600000 \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
+
+COPY packages /app/packages
+
+RUN set -eux; \
+    cd /app/packages; \
+    if [ -f package-lock.json ]; then \
+      npm ci --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+    else \
+      npm install --legacy-peer-deps --include=dev --prefer-offline --no-audit --no-fund; \
+    fi; \
+    ./node_modules/.bin/tsc -p tsconfig.build.json
 
 COPY apps/usaha/package*.json ./
 
@@ -51,27 +77,37 @@ RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+FROM usaha_deps AS usaha_lint
+
+RUN npm run lint && npm run typecheck
+
 FROM usaha_deps AS usaha_builder
 
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
+RUN mkdir -p .next/standalone/apps/usaha/.next \
+    && cp -R .next/static .next/standalone/apps/usaha/.next/static \
+    && cp -R public .next/standalone/apps/usaha/public
+
 RUN npm prune --omit=dev --legacy-peer-deps
 RUN rm -rf .next/cache /root/.npm /tmp/*
 
 FROM usaha_deps AS usaha_dev
 
-FROM node:20-bullseye-slim AS usaha
+FROM usaha_builder AS usaha
 
 WORKDIR /app/apps/usaha
 
 ENV NODE_ENV=production
 ENV PORT=3003
+ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=usaha_builder /app/apps/usaha/.next ./.next
-COPY --from=usaha_builder /app/apps/usaha/public ./public
-COPY --from=usaha_builder /app/apps/usaha/package*.json ./
-COPY --from=usaha_builder /app/apps/usaha/node_modules ./node_modules
+RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-manifest.json', 'utf8'))" \
+    && test -f .next/standalone/apps/usaha/server.js \
+    && test -d .next/standalone/apps/usaha/.next/static \
+    && test -d .next/standalone/apps/usaha/public
 
 EXPOSE 3003
 
-CMD ["npm", "start", "--", "-H", "0.0.0.0", "-p", "3003"]
+CMD ["node", ".next/standalone/apps/usaha/server.js"]
