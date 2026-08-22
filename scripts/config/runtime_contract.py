@@ -140,31 +140,33 @@ def _validate_google_oauth_runtime(
     legacy_redirect = www_environment.get("GOOGLE_REDIRECT_URI") or env_values.get(
         "GOOGLE_REDIRECT_URI"
     )
-    if non_empty(legacy_redirect) and not non_empty(www_redirect_uri):
+    if non_empty(legacy_redirect):
         errors.append(
             "GOOGLE_REDIRECT_URI is legacy; rename it to WWW_GOOGLE_REDIRECT_URI."
         )
 
-    for legacy_name in ("NEXTAUTH_URL", "AUTH_URL", "NEXTAUTH_URL_USAHA", "AUTH_URL_USAHA"):
+    for legacy_name in (
+        "NEXTAUTH_URL",
+        "AUTH_URL",
+        "NEXTAUTH_URL_USAHA",
+        "AUTH_URL_USAHA",
+    ):
         if non_empty(env_values.get(legacy_name)):
             errors.append(
                 f"{legacy_name} is not part of Lajukan's custom Google OAuth contract; remove it."
             )
 
-    any_google_value = any(
+    oauth_enabled = any(
         non_empty(value)
         for value in (
             www_client_id,
             www_client_secret,
-            www_redirect_uri,
-            legacy_redirect,
             usaha_client_id,
             usaha_client_secret,
-            usaha_redirect_uri,
             identity_client_id,
         )
     )
-    if not any_google_value:
+    if not oauth_enabled:
         return
 
     www_complete = all(
