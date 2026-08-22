@@ -14,12 +14,21 @@ def base_model(liveness_source: Path) -> dict:
                 "environment": {
                     "REDIS_URL": "redis://:dev@redis_cache:6379",
                     "INTERNAL_API_URL": "http://identity_service:8080",
+                    "NEXT_PUBLIC_WWW_URL": "http://localhost:3000",
                     "GOOGLE_CLIENT_ID": "",
                     "GOOGLE_CLIENT_SECRET": "",
                     "GOOGLE_REDIRECT_URI": "",
                 },
                 "depends_on": {
                     "redis_cache": {"condition": "service_healthy"},
+                },
+            },
+            "usaha": {
+                "environment": {
+                    "NEXT_PUBLIC_USAHA_URL": "http://localhost:3003",
+                    "GOOGLE_CLIENT_ID": "",
+                    "GOOGLE_CLIENT_SECRET": "",
+                    "USAHA_GOOGLE_REDIRECT_URI": "",
                 },
             },
             "identity_service": {"environment": {"GOOGLE_CLIENT_ID": ""}},
@@ -44,6 +53,105 @@ def base_model(liveness_source: Path) -> dict:
             },
         }
     }
+
+
+def configure_google_oauth(model: dict) -> None:
+    client_id = "shared-client.apps.googleusercontent.com"
+    client_secret = "shared-secret"
+    model["services"]["www"]["environment"].update(
+        {
+            "GOOGLE_CLIENT_ID": client_id,
+            "GOOGLE_CLIENT_SECRET": client_secret,
+            "GOOGLE_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
+        }
+    )
+    model["services"]["usaha"]["environment"].update(
+        {
+            "GOOGLE_CLIENT_ID": client_id,
+            "GOOGLE_CLIENT_SECRET": client_secret,
+            "USAHA_GOOGLE_REDIRECT_URI": "http://localhost:3003/api/auth/google/callback",
+        }
+    )
+    model["services"]["identity_service"]["environment"]["GOOGLE_CLIENT_ID"] = client_id
+
+
+class GoogleOauthRuntimeContractTests(unittest.TestCase):
+    def test_google_oauth_requires_usaha_configuration_when_shared_client_is_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            configure_google_oauth(model)
+            model["services"]["usaha"]["environment"]["GOOGLE_CLIENT_SECRET"] = ""
+
+            errors = validate_contract(model, {}, "development", set())
+
+        self.assertTrue(
+            any("Usaha Google OAuth configuration is partial" in error for error in errors),
+            errors,
+        )
+
+    def test_google_oauth_requires_same_client_id_across_www_usaha_and_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            configure_google_oauth(model)
+            model["services"]["usaha"]["environment"]["GOOGLE_CLIENT_ID"] = (
+                "different-client.apps.googleusercontent.com"
+            )
+
+            errors = validate_contract(model, {}, "development", set())
+
+        self.assertTrue(
+            any("same Google OAuth client ID" in error for error in errors),
+            errors,
+        )
+
+    def test_google_oauth_requires_distinct_www_and_usaha_redirect_origins(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            configure_google_oauth(model)
+            model["services"]["usaha"]["environment"]["USAHA_GOOGLE_REDIRECT_URI"] = (
+                "http://localhost:3000/api/auth/google/callback"
+            )
+
+            errors = validate_contract(model, {}, "development", set())
+
+        self.assertTrue(
+            any("Usaha Google OAuth redirect origin" in error for error in errors),
+            errors,
+        )
+
+    def test_google_oauth_requires_https_for_both_callbacks_outside_development(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            configure_google_oauth(model)
+            model["services"]["www"]["environment"].update(
+                {
+                    "NEXT_PUBLIC_WWW_URL": "https://www.lajukan.com",
+                    "GOOGLE_REDIRECT_URI": "https://www.lajukan.com/api/auth/google/callback",
+                }
+            )
+            model["services"]["usaha"]["environment"].update(
+                {
+                    "NEXT_PUBLIC_USAHA_URL": "https://usaha.lajukan.com",
+                    "USAHA_GOOGLE_REDIRECT_URI": "http://usaha.lajukan.com/api/auth/google/callback",
+                }
+            )
+
+            errors = validate_contract(model, {}, "production", set())
+
+        self.assertTrue(
+            any("Usaha Google OAuth redirect must use HTTPS" in error for error in errors),
+            errors,
+        )
+
+    def test_google_oauth_accepts_one_shared_client_with_two_callbacks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            configure_google_oauth(model)
+
+            errors = validate_contract(model, {}, "development", set())
+
+        google_errors = [error for error in errors if "Google OAuth" in error]
+        self.assertEqual(google_errors, [], google_errors)
 
 
 class KycRuntimeContractTests(unittest.TestCase):
