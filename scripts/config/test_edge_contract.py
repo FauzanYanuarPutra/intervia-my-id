@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -103,6 +104,23 @@ class CaddyEdgeContractTests(unittest.TestCase):
     def test_development_apex_redirect_is_external_https(self) -> None:
         caddy = self._read_caddy("Caddyfile")
         self.assertIn("redir https://www.{$APP_DOMAIN}{uri} permanent", caddy)
+
+    def test_tunnel_frontends_forward_external_https_scheme(self) -> None:
+        """The Tunnel-to-Caddy hop is HTTP, but the browser-facing hop is HTTPS.
+
+        Next's production middleware redirects public hosts when it receives
+        X-Forwarded-Proto=http. If Caddy forwards its private HTTP hop as the
+        browser scheme, https://www.lajukan.com redirects to itself forever.
+        """
+        caddy = self._read_caddy("Caddyfile")
+        for upstream in ("www:3000", "usaha:3003", "cms:3001", "crm:3002"):
+            with self.subTest(upstream=upstream):
+                pattern = re.compile(
+                    rf"reverse_proxy\s+{re.escape(upstream)}\s*\{{[^}}]*"
+                    r"header_up\s+X-Forwarded-Proto\s+https",
+                    re.DOTALL,
+                )
+                self.assertRegex(caddy, pattern)
 
 
 if __name__ == "__main__":
