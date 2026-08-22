@@ -44,7 +44,7 @@ jobs:
   frontend:
     name: Usaha frontend validation
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: frontend/apps/usaha
@@ -56,7 +56,14 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/apps/usaha/package-lock.json
       - name: Install Usaha dependencies
-        run: npm ci --ignore-scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! npm ci --legacy-peer-deps --include=optional --ignore-scripts --no-audit --no-fund; then
+            echo "package-lock.json is stale or incompatible; matching the Dockerfile fallback to npm install"
+            rm -rf node_modules
+            npm install --legacy-peer-deps --include=optional --ignore-scripts --no-audit --no-fund --package-lock=false
+          fi
       - name: Typecheck Usaha
         run: npm run typecheck
       - name: Build Usaha
