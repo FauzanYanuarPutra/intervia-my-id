@@ -134,26 +134,6 @@ if [[ ! -f "$ENV_FILE" ]]; then
   fi
 fi
 
-COMPOSE=(
-  docker compose
-  --env-file "$ENV_FILE"
-  -f docker-compose.yml
-  -f "$OVERLAY"
-)
-
-for profile in "${PROFILES[@]}"; do
-  IFS=',' read -r -a split_profiles <<< "$profile"
-  for item in "${split_profiles[@]}"; do
-    if [[ -n "$item" ]]; then
-      COMPOSE+=(--profile "$item")
-      ACTIVE_PROFILES+=("$item")
-    fi
-  done
-done
-
-# Fail before changing container state if the merged Compose model is invalid.
-"${COMPOSE[@]}" config --quiet
-
 if command -v python3 >/dev/null 2>&1; then
   PYTHON_BIN=python3
 elif command -v python >/dev/null 2>&1; then
@@ -162,6 +142,34 @@ else
   echo "Python 3 is required by the runtime contract validator." >&2
   exit 1
 fi
+
+# Resolve both COMPOSE_PROFILES from the env file and explicit --profile
+# arguments through one shared contract. Development automatically enables the
+# tunnel when a token is configured, preventing a healthy local stack from
+# silently publishing a dead Cloudflare Tunnel (Error 1033).
+PROFILE_RESOLVER_ARGS=(
+  scripts/config/launcher_profiles.py
+  --env-file "$ENV_FILE"
+  --environment "$ENVIRONMENT"
+)
+for profile in "${PROFILES[@]}"; do
+  PROFILE_RESOLVER_ARGS+=(--profile "$profile")
+done
+mapfile -t ACTIVE_PROFILES < <("$PYTHON_BIN" "${PROFILE_RESOLVER_ARGS[@]}")
+
+COMPOSE=(
+  docker compose
+  --env-file "$ENV_FILE"
+  -f docker-compose.yml
+  -f "$OVERLAY"
+)
+
+for profile in "${ACTIVE_PROFILES[@]}"; do
+  [[ -n "$profile" ]] && COMPOSE+=(--profile "$profile")
+done
+
+# Fail before changing container state if the merged Compose model is invalid.
+"${COMPOSE[@]}" config --quiet
 
 # Development KYC is self-provisioning. The downloader is pinned by commit and
 # SHA-256. Staging/production remain explicit and never download model assets.
