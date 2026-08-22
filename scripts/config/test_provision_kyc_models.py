@@ -8,6 +8,9 @@ from pathlib import Path
 from provision_kyc_models import ModelArtifact, provision_models
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 class KycModelProvisioningTests(unittest.TestCase):
     def test_provisions_model_into_anti_spoof_directory(self) -> None:
         payload = b"verified-onnx-payload"
@@ -75,6 +78,22 @@ class KycModelProvisioningTests(unittest.TestCase):
             )
 
             self.assertEqual(installed, [target])
+
+    def test_development_launchers_auto_provision_when_kyc_is_requested(self) -> None:
+        powershell = (REPO_ROOT / "up.ps1").read_text(encoding="utf-8")
+        bash = (REPO_ROOT / "up.sh").read_text(encoding="utf-8")
+
+        self.assertIn("provision_kyc_models.py", powershell)
+        self.assertIn('"kyc"', powershell)
+        self.assertIn("provision_kyc_models.py", bash)
+        self.assertIn('"kyc"', bash)
+
+    def test_liveness_image_uses_preprocessing_scale_required_by_pinned_models(self) -> None:
+        dockerfile = (
+            REPO_ROOT / "services" / "liveness_service" / "Dockerfile"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("ENV LIVENESS_INPUT_SCALE=1.0", dockerfile)
 
 
 if __name__ == "__main__":
