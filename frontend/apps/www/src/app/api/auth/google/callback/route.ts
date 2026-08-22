@@ -62,7 +62,7 @@ interface BackendOAuthResponse {
 function getPublicBaseUrl(req: NextRequest): string {
   return resolvePublicOrigin({
     configuredOrigin:
-      process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
+      process.env.NEXT_PUBLIC_WWW_URL || process.env.NEXT_PUBLIC_APP_URL,
     requestOrigin: req.nextUrl.origin,
     production: isExternalHttpsRequired(),
   });
@@ -70,7 +70,7 @@ function getPublicBaseUrl(req: NextRequest): string {
 
 function getGoogleRedirectUri(req: NextRequest): string {
   return (
-    process.env.GOOGLE_REDIRECT_URI ||
+    process.env.WWW_GOOGLE_REDIRECT_URI ||
     `${getPublicBaseUrl(req)}/api/auth/google/callback`
   );
 }
@@ -108,7 +108,10 @@ function oauthFailureResponse(
 }
 
 /**
- * Handle Google OAuth callback
+ * Handle Google OAuth callback.
+ *
+ * WWW and Usaha share the Google client identity, but each app owns an
+ * explicit callback URI so configuration cannot silently drift between hosts.
  */
 export async function GET(req: NextRequest) {
   const secure = shouldUseSecureCookies(req);
@@ -136,7 +139,6 @@ export async function GET(req: NextRequest) {
 
     const { code, state, error } = parsedQuery.data;
 
-    // Parse callback URL from state and validate the nonce stored at start.
     let callbackUrl = '/home';
     let stateNonce = '';
     if (state) {
@@ -196,7 +198,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -221,7 +222,6 @@ export async function GET(req: NextRequest) {
 
     const tokens: GoogleTokenResponse = await tokenResponse.json();
 
-    // Get user info from Google
     const userInfoResponse = await fetch(
       'https://www.googleapis.com/oauth2/v3/userinfo',
       {
@@ -241,7 +241,6 @@ export async function GET(req: NextRequest) {
 
     const googleUser: GoogleUserInfo = await userInfoResponse.json();
 
-    // Send to our backend to create/link user
     const backendResponse = await fetch(`${API_URL}/auth/oauth/google`, {
       method: 'POST',
       headers: {
@@ -285,7 +284,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Mirror backend session_id to local session registry when provided.
     const session = await createSession(userId, {
       userAgent: req.headers.get('user-agent') || 'Unknown',
       ipAddress:
@@ -296,14 +294,12 @@ export async function GET(req: NextRequest) {
     });
     const sessionId = backendSessionId || session.id;
 
-    // Log audit event
     await logAuditEvent(userId, 'user.login.success', {
       ipAddress: req.headers.get('x-forwarded-for') || undefined,
       userAgent: req.headers.get('user-agent') || undefined,
       eventData: { method: 'google_oauth', email: googleUser.email },
     });
 
-    // Create response with cookies
     const response = NextResponse.redirect(
       new URL(localizeCallbackPath(callbackUrl, preferredLocale), baseUrl),
     );
@@ -312,7 +308,7 @@ export async function GET(req: NextRequest) {
       httpOnly: true,
       secure,
       sameSite: 'lax',
-      maxAge: 60 * 60, // 1 hour
+      maxAge: 60 * 60,
     });
 
     if (authData.refresh_token) {
@@ -320,7 +316,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true,
         secure,
         sameSite: 'lax',
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+        maxAge: 30 * 24 * 60 * 60,
       });
     }
 
@@ -328,7 +324,7 @@ export async function GET(req: NextRequest) {
       httpOnly: true,
       secure,
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 30 * 24 * 60 * 60,
     });
 
     response.cookies.set('auth_present', '1', {
