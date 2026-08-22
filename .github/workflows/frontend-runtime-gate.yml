@@ -1,0 +1,78 @@
+name: Frontend Runtime Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "docker-compose.yml"
+      - "docker-compose.dev.yml"
+      - "scripts/ci/**"
+      - ".github/workflows/frontend-runtime-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "docker-compose.yml"
+      - "docker-compose.dev.yml"
+      - "scripts/ci/**"
+      - ".github/workflows/frontend-runtime-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Frontend runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate frontend runtime invariants
+        run: python3 scripts/ci/check_frontend_runtime_contract.py
+
+  docker-build:
+    name: Docker build / ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: contract
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [www, usaha, cms, crm]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - name: Build ${{ matrix.app }} runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/apps/${{ matrix.app }}/Dockerfile
+          target: ${{ matrix.app }}
+          push: false
+          provenance: false
+          cache-from: type=gha,scope=frontend-runtime-${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=frontend-runtime-${{ matrix.app }}
+
+  frontend-runtime-gate:
+    name: Frontend runtime gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [contract, docker-build]
+    steps:
+      - name: Require all frontend runtime checks
+        env:
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          DOCKER_RESULT: ${{ needs.docker-build.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "contract=$CONTRACT_RESULT"
+          echo "docker-build=$DOCKER_RESULT"
+          [[ "$CONTRACT_RESULT" == "success" ]]
+          [[ "$DOCKER_RESULT" == "success" ]]
