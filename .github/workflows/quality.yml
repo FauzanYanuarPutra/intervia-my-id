@@ -26,11 +26,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-
       - name: Reject tracked ignored/runtime artifacts
         shell: bash
         run: |
@@ -45,16 +43,11 @@ jobs:
               exit 1
             fi
           fi
-
       - name: Reject root database dumps
         shell: bash
         run: |
           set -euo pipefail
-          forbidden=(
-            community.sql community_utf8.sql
-            identity.sql identity_utf8.sql
-            marketplace.sql marketplace_utf8.sql
-          )
+          forbidden=(community.sql community_utf8.sql identity.sql identity_utf8.sql marketplace.sql marketplace_utf8.sql)
           failed=0
           for path in "${forbidden[@]}"; do
             if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
@@ -71,7 +64,6 @@ jobs:
     needs: repository-hygiene
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -81,13 +73,10 @@ jobs:
             frontend/apps/*/package-lock.json
             frontend/packages/package-lock.json
             frontend/packages/*/package-lock.json
-
       - name: Install, lint, test and build
         shell: bash
         run: |
           set -euo pipefail
-
-          # Final root-workspace layout.
           if [[ -f frontend/package.json && -f frontend/package-lock.json ]]; then
             cd frontend
             npm ci --legacy-peer-deps --no-audit --no-fund
@@ -96,28 +85,13 @@ jobs:
             npm run build --workspaces --if-present
             exit 0
           fi
-
-          # Migration-safe current layout.
           if [[ -f frontend/packages/package.json ]]; then
-            (
-              cd frontend/packages
-              npm ci --legacy-peer-deps --no-audit --no-fund
-              npm run build --if-present
-              npm run test --if-present
-            )
+            (cd frontend/packages && npm ci --legacy-peer-deps --no-audit --no-fund && npm run build --if-present && npm run test --if-present)
           fi
-
           for app in www usaha cms crm; do
             dir="frontend/apps/$app"
             [[ -f "$dir/package.json" ]] || continue
-            (
-              cd "$dir"
-              npm ci --legacy-peer-deps --no-audit --no-fund
-              npm run lint --if-present
-              npm run test:unit --if-present
-              npm run test --if-present
-              npm run build --if-present
-            )
+            (cd "$dir" && npm ci --legacy-peer-deps --no-audit --no-fund && npm run lint --if-present && npm run test:unit --if-present && npm run test --if-present && npm run build --if-present)
           done
 
   rust:
@@ -128,30 +102,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - identity_service
-          - marketplace_service
-          - community_service
-          - ai_service
+        service: [identity_service, marketplace_service, community_service, ai_service]
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Install pinned Rust toolchain
         run: rustup show
-
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: services/${{ matrix.service }}
-
       - name: Format
         run: cargo fmt --check
-
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
-
       - name: Tests
         run: cargo test --locked
 
@@ -165,20 +130,16 @@ jobs:
         working-directory: services/chat_service
     steps:
       - uses: actions/checkout@v4
-
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "26.2"
           elixir-version: "1.15.8"
-
       - name: Install dependencies
         env:
           MIX_ENV: test
         run: mix deps.get --only test
-
       - name: Format
         run: mix format --check-formatted
-
       - name: Tests
         env:
           MIX_ENV: test
@@ -198,34 +159,24 @@ jobs:
         working-directory: services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: services/${{ matrix.service }}/requirements.txt
-
       - name: Install dependencies
         shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          if [[ -f requirements-dev.txt ]]; then
-            pip install -r requirements-dev.txt
-          fi
+          if [[ -f requirements-dev.txt ]]; then pip install -r requirements-dev.txt; fi
           pip install pytest
-
       - name: Compile
         run: python -m compileall -q .
-
       - name: Tests when present
         shell: bash
         run: |
-          if [[ -d tests ]]; then
-            pytest -q
-          else
-            echo "No tests directory yet; compile check completed."
-          fi
+          if [[ -d tests ]]; then pytest -q; else echo "No tests directory yet; compile check completed."; fi
 
   flutter:
     name: Flutter mobile
@@ -234,12 +185,10 @@ jobs:
     needs: repository-hygiene
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
       - name: Detect Flutter project
         id: mobile
         shell: bash
@@ -251,7 +200,6 @@ jobs:
           else
             echo "dir=" >> "$GITHUB_OUTPUT"
           fi
-
       - name: Analyze and test
         if: steps.mobile.outputs.dir != ''
         working-directory: ${{ steps.mobile.outputs.dir }}
@@ -267,37 +215,18 @@ jobs:
     needs: repository-hygiene
     steps:
       - uses: actions/checkout@v4
-
       - name: Validate development configuration
-        run: >-
-          docker compose
-          --env-file .env.development.example
-          -f docker-compose.yml
-          -f docker-compose.dev.yml
-          config --quiet
-
+        run: docker compose --env-file .env.development.example -f docker-compose.yml -f docker-compose.dev.yml config --quiet
       - name: Validate staging configuration
         env:
           IMAGE_TAG: sha-ci
           DOCKERHUB_NAMESPACE: lajukan-ci
-        run: >-
-          docker compose
-          --env-file .env.staging.example
-          -f docker-compose.yml
-          -f docker-compose.staging.yml
-          config --quiet
-
+        run: docker compose --env-file .env.staging.example -f docker-compose.yml -f docker-compose.staging.yml config --quiet
       - name: Validate production configuration
         env:
           IMAGE_TAG: sha-ci
           DOCKERHUB_NAMESPACE: lajukan-ci
-        run: >-
-          docker compose
-          --env-file .env.production.example
-          -f docker-compose.yml
-          -f docker-compose.prod.yml
-          config --quiet
-
+        run: docker compose --env-file .env.production.example -f docker-compose.yml -f docker-compose.prod.yml config --quiet
       - name: Assert production host ports are edge-only
         env:
           IMAGE_TAG: sha-ci
@@ -305,22 +234,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker compose \
-            --env-file .env.production.example \
-            -f docker-compose.yml \
-            -f docker-compose.prod.yml \
-            config --format json > /tmp/compose.json
-
+          docker compose --env-file .env.production.example -f docker-compose.yml -f docker-compose.prod.yml config --format json > /tmp/compose.json
           python - <<'PY'
           import json
           with open('/tmp/compose.json', encoding='utf-8') as handle:
               cfg = json.load(handle)
-          published = {
-              name: service.get('ports', [])
-              for name, service in cfg.get('services', {}).items()
-              if service.get('ports')
-          }
+          published = {name: service.get('ports', []) for name, service in cfg.get('services', {}).items() if service.get('ports')}
           assert set(published) == {'caddy'}, published
           ports = {str(item.get('published')) for item in published['caddy']}
           assert ports == {'80', '443'}, ports
           PY
+
+  runtime-smoke:
+    name: Development runtime smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: repository-hygiene
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, start and probe the development stack
+        shell: bash
+        run: bash scripts/ci/smoke_compose.sh
