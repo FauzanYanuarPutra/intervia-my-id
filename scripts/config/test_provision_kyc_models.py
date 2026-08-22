@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -35,6 +36,7 @@ class KycModelProvisioningTests(unittest.TestCase):
                 [Path(tmp) / "anti_spoof_models" / "test.onnx"],
             )
             self.assertEqual(installed[0].read_bytes(), payload)
+            self.assertEqual(installed[0].stat().st_mode & 0o777, 0o644)
 
     def test_rejects_download_when_sha256_does_not_match(self) -> None:
         artifact = ModelArtifact(
@@ -55,7 +57,7 @@ class KycModelProvisioningTests(unittest.TestCase):
                 (Path(tmp) / "anti_spoof_models" / "bad.onnx").exists()
             )
 
-    def test_verified_existing_model_is_reused_without_network(self) -> None:
+    def test_verified_existing_model_is_reused_without_network_and_permission_is_repaired(self) -> None:
         payload = b"already-present"
         artifact = ModelArtifact(
             filename="cached.onnx",
@@ -67,6 +69,7 @@ class KycModelProvisioningTests(unittest.TestCase):
             target = Path(tmp) / "anti_spoof_models" / artifact.filename
             target.parent.mkdir(parents=True)
             target.write_bytes(payload)
+            os.chmod(target, 0o600)
 
             def fail_downloader(_: str) -> bytes:
                 raise AssertionError("network should not be used for verified cached model")
@@ -78,6 +81,7 @@ class KycModelProvisioningTests(unittest.TestCase):
             )
 
             self.assertEqual(installed, [target])
+            self.assertEqual(target.stat().st_mode & 0o777, 0o644)
 
     def test_development_launchers_auto_provision_when_kyc_is_requested(self) -> None:
         powershell = (REPO_ROOT / "up.ps1").read_text(encoding="utf-8")
