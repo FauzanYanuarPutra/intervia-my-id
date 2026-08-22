@@ -91,7 +91,7 @@ services:
       APP_ENV: development
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: development
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
+      WWW_GOOGLE_REDIRECT_URI: ${WWW_GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
     ports:
       - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
 
