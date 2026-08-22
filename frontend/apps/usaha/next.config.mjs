@@ -29,8 +29,12 @@ const securityHeaders = buildSecurityHeaders({
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  outputFileTracingRoot: path.resolve(configDir, '../..'),
   poweredByHeader: false,
   compress: true,
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   experimental: {
     externalDir: true,
     sri: { algorithm: 'sha256' },
