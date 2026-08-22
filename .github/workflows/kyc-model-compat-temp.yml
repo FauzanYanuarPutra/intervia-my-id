@@ -1,0 +1,49 @@
+name: KYC Model Compatibility Temp
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-models:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Download pinned ONNX models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/liveness-models
+          base=https://raw.githubusercontent.com/QingHeYang/Silent-Face-Anti-Spoofing-onnx/584d4421d7ac42c59e640796f46e886b0095367a/onnx
+          curl -fL --retry 3 "$base/2.7_80x80_MiniFASNetV2.onnx" -o /tmp/liveness-models/2.7_80x80_MiniFASNetV2.onnx
+          curl -fL --retry 3 "$base/4_0_0_80x80_MiniFASNetV1SE.onnx" -o /tmp/liveness-models/4_0_0_80x80_MiniFASNetV1SE.onnx
+          sha256sum /tmp/liveness-models/*.onnx
+      - name: Verify ONNX runtime contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -q numpy onnxruntime
+          python - <<'PY'
+          from pathlib import Path
+          import numpy as np
+          import onnxruntime as ort
+
+          for path in sorted(Path('/tmp/liveness-models').glob('*.onnx')):
+              session = ort.InferenceSession(str(path), providers=['CPUExecutionProvider'])
+              node = session.get_inputs()[0]
+              shape = [1 if not isinstance(v, int) or v <= 0 else v for v in node.shape]
+              if len(shape) != 4:
+                  raise SystemExit(f'{path.name}: unexpected input shape {node.shape}')
+              output = session.run(None, {node.name: np.zeros(shape, dtype=np.float32)})[0]
+              values = np.asarray(output).reshape(-1)
+              if values.size != 3:
+                  raise SystemExit(f'{path.name}: expected 3 output classes, got {values.size}')
+              print(f'{path.name}: input={node.shape} output_shape={np.asarray(output).shape} values={values.tolist()}')
+          PY
