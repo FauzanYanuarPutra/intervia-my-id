@@ -66,10 +66,11 @@ class LauncherProfileTests(unittest.TestCase):
 
 
 class CaddyEdgeContractTests(unittest.TestCase):
-    def test_public_routes_reach_expected_internal_services(self) -> None:
-        caddy = (ROOT / "infrastructure/caddy/Caddyfile").read_text(
-            encoding="utf-8"
-        )
+    def _read_caddy(self, name: str) -> str:
+        return (ROOT / "infrastructure/caddy" / name).read_text(encoding="utf-8")
+
+    def test_development_public_routes_reach_expected_internal_services(self) -> None:
+        caddy = self._read_caddy("Caddyfile")
         expected = {
             "cms.{$APP_DOMAIN}": "cms:3001",
             "crm.{$APP_DOMAIN}": "crm:3002",
@@ -81,21 +82,26 @@ class CaddyEdgeContractTests(unittest.TestCase):
                 self.assertIn(f"http://{host}", caddy)
                 self.assertIn(f"reverse_proxy {upstream}", caddy)
 
-    def test_api_gateway_has_all_backend_upstreams(self) -> None:
-        caddy = (ROOT / "infrastructure/caddy/Caddyfile").read_text(
-            encoding="utf-8"
-        )
+    def test_api_gateway_has_all_backend_upstreams_in_both_caddyfiles(self) -> None:
+        for name in ("Caddyfile", "Caddyfile.prod"):
+            with self.subTest(caddyfile=name):
+                caddy = self._read_caddy(name)
+                self.assertIn("api.{$APP_DOMAIN}", caddy)
+                self.assertIn("reverse_proxy identity_service:8080", caddy)
+                self.assertIn("reverse_proxy marketplace_service:8081", caddy)
+                self.assertIn("reverse_proxy community_service:8082", caddy)
+                self.assertIn("/auth/*", caddy)
+                self.assertIn("/v1/community/*", caddy)
 
-        self.assertIn("http://api.{$APP_DOMAIN}", caddy)
-        self.assertIn("reverse_proxy identity_service:8080", caddy)
-        self.assertIn("reverse_proxy marketplace_service:8081", caddy)
-        self.assertIn("reverse_proxy community_service:8082", caddy)
+    def test_media_origin_exists_in_both_caddyfiles(self) -> None:
+        for name in ("Caddyfile", "Caddyfile.prod"):
+            with self.subTest(caddyfile=name):
+                caddy = self._read_caddy(name)
+                self.assertIn("media.{$APP_DOMAIN}", caddy)
+                self.assertIn("reverse_proxy minio:9002", caddy)
 
-    def test_apex_redirect_is_external_https(self) -> None:
-        caddy = (ROOT / "infrastructure/caddy/Caddyfile").read_text(
-            encoding="utf-8"
-        )
-
+    def test_development_apex_redirect_is_external_https(self) -> None:
+        caddy = self._read_caddy("Caddyfile")
         self.assertIn("redir https://www.{$APP_DOMAIN}{uri} permanent", caddy)
 
 
