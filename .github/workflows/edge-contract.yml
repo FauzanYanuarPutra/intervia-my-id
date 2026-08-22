@@ -40,6 +40,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Validate launcher and Python syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n up.sh
+          python -m compileall -q scripts/config
+          pwsh -NoProfile -NonInteractive -Command '[void][scriptblock]::Create((Get-Content -Raw ./up.ps1))'
+
       - name: Run configuration contract tests
         run: python -m unittest discover -s scripts/config -p 'test_*.py' -v
 
