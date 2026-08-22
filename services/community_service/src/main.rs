@@ -1014,6 +1014,38 @@ struct ReelsFeedResponse {
     stores: i64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DatabasePoolPurpose {
+    Migration,
+    Application,
+}
+
+fn database_session_setup(purpose: DatabasePoolPurpose) -> Option<&'static str> {
+    match purpose {
+        DatabasePoolPurpose::Migration => None,
+        DatabasePoolPurpose::Application => Some("SET search_path TO forum, reel, public, events"),
+    }
+}
+
+async fn connect_database_pool(
+    database_url: &str,
+    purpose: DatabasePoolPurpose,
+) -> anyhow::Result<PgPool> {
+    let options = PgPoolOptions::new().max_connections(20).min_connections(2);
+    let options = if let Some(statement) = database_session_setup(purpose) {
+        options.after_connect(move |conn, _meta| {
+            Box::pin(async move {
+                sqlx::query(statement).execute(conn).await?;
+                Ok(())
+            })
+        })
+    } else {
+        options
+    };
+
+    Ok(options.connect(database_url).await?)
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
@@ -1028,20 +1060,6 @@ async fn main() -> anyhow::Result<()> {
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let port = env::var("APP_PORT").unwrap_or_else(|_| "8082".to_string());
     let addr = format!("0.0.0.0:{port}");
-
-    let db = PgPoolOptions::new()
-        .max_connections(20)
-        .min_connections(2)
-        .after_connect(|conn, _meta| {
-            Box::pin(async move {
-                sqlx::query("SET search_path TO forum, reel, public, events")
-                    .execute(conn)
-                    .await?;
-                Ok(())
-            })
-        })
-        .connect(&database_url)
-        .await?;
 
     let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
     let strict_secrets =
@@ -1059,10 +1077,11 @@ async fn main() -> anyhow::Result<()> {
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
     let mut migrator = sqlx::migrate!("./migrations");
+    let migration_db = connect_database_pool(&database_url, DatabasePoolPurpose::Migration).await?;
     if !strict_migrations {
         migrator.set_ignore_missing(true);
     }
-    if let Err(error) = migrator.run(&db).await {
+    if let Err(error) = migrator.run(&migration_db).await {
         let message = error.to_string();
         let checksum_mismatch = message.contains("was previously applied but has been modified");
         let missing_migration =
@@ -1078,6 +1097,9 @@ async fn main() -> anyhow::Result<()> {
             return Err(error.into());
         }
     }
+    migration_db.close().await;
+
+    let db = connect_database_pool(&database_url, DatabasePoolPurpose::Application).await?;
 
     verify_schema_contract(&db).await?;
     sync_forum_users_from_identity(&db).await;
@@ -9502,12 +9524,21 @@ fn internal_error(error: sqlx::Error) -> ApiError {
 #[cfg(test)]
 mod security_tests {
     use super::{
-        apply_reel_privacy_metadata, clean_store_reference, has_valid_media_signature,
-        normalize_reel_action, normalize_trust_report_reason, parse_media_range,
-        resolve_reel_privacy, safe_public_display_name, sanitize_reel_metadata,
-        sanitize_report_details, MAX_MEDIA_RANGE_BYTES,
+        apply_reel_privacy_metadata, clean_store_reference, database_session_setup,
+        has_valid_media_signature, normalize_reel_action, normalize_trust_report_reason,
+        parse_media_range, resolve_reel_privacy, safe_public_display_name, sanitize_reel_metadata,
+        sanitize_report_details, DatabasePoolPurpose, MAX_MEDIA_RANGE_BYTES,
     };
     use serde_json::json;
+
+    #[test]
+    fn migration_pool_keeps_the_canonical_public_migration_tracker() {
+        assert_eq!(database_session_setup(DatabasePoolPurpose::Migration), None);
+        assert_eq!(
+            database_session_setup(DatabasePoolPurpose::Application),
+            Some("SET search_path TO forum, reel, public, events")
+        );
+    }
 
     #[test]
     fn media_signatures_reject_active_content_disguised_as_an_image() {
