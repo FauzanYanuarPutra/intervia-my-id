@@ -236,7 +236,6 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      RUN_MIGRATIONS: ${RUN_MIGRATIONS_IDENTITY:-true}
     depends_on:
       identity_db: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
@@ -296,7 +295,6 @@ services:
       WALLET_MIDTRANS_FINISH_REDIRECT_URL: ${WALLET_MIDTRANS_FINISH_REDIRECT_URL:-}
       WALLET_MIDTRANS_UNFINISH_REDIRECT_URL: ${WALLET_MIDTRANS_UNFINISH_REDIRECT_URL:-}
       WALLET_MIDTRANS_ERROR_REDIRECT_URL: ${WALLET_MIDTRANS_ERROR_REDIRECT_URL:-}
-      RUN_MIGRATIONS: ${RUN_MIGRATIONS_MARKETPLACE:-true}
     depends_on:
       marketplace_db: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
@@ -336,7 +334,6 @@ services:
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum
       COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
       INTERNAL_API_URL: http://identity_service:8080
-      RUN_MIGRATIONS: ${RUN_MIGRATIONS_COMMUNITY:-true}
     volumes:
       - community_uploads:/app/uploads/forum
     depends_on:
@@ -395,11 +392,10 @@ services:
     networks: [app, data]
 
   # ---------------------------------------------------------------------------
-  # OPTIONAL AI / KYC
+  # AI ORCHESTRATION / OPTIONAL MODEL AND KYC RUNTIMES
   # ---------------------------------------------------------------------------
   ai_service:
     <<: *service-defaults
-    profiles: [ai]
     build:
       context: ./services/ai_service
       dockerfile: Dockerfile
@@ -408,15 +404,14 @@ services:
       APP_ENV: ${APP_ENV:-development}
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
       RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-}
-      VLLM_CHAT_URL: ${VLLM_CHAT_URL:-}
-      VLLM_MODELS_URL: ${VLLM_MODELS_URL:-}
+      VLLM_URL: ${VLLM_URL:-http://ollama:11434/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-}
       VLLM_MODEL: ${VLLM_MODEL:-}
       VLLM_STRUCTURED_MODEL: ${VLLM_STRUCTURED_MODEL:-}
       VLLM_VISION_MODEL: ${VLLM_VISION_MODEL:-}
       VLLM_KYC_MODEL: ${VLLM_KYC_MODEL:-}
-      OCR_URL: ${OCR_URL:-http://ocr_service:8000}
-      LIVENESS_URL: ${LIVENESS_URL:-http://liveness_service:8000}
+      OCR_URL: ${OCR_URL:-http://ocr_service:8000/predict}
+      LIVENESS_URL: ${LIVENESS_URL:-http://liveness_service:8000/check}
       FACE_MATCH_URL: ${FACE_MATCH_URL:-}
       RAG_URL: ${RAG_URL:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
@@ -435,6 +430,12 @@ services:
       context: ./services/ocr_service
       dockerfile: Dockerfile
     expose: ["8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     networks: [app]
 
   liveness_service:
@@ -443,12 +444,26 @@ services:
     build:
       context: ./services/liveness_service
       dockerfile: Dockerfile
+    environment:
+      LIVENESS_FACE_DETECTOR_MODEL: /models/face_detection_yunet_2026may.onnx
+      LIVENESS_MODEL_DIR: /models/anti_spoof_models
+    volumes:
+      - type: bind
+        source: ${LIVENESS_MODELS_PATH:-./.runtime/models/liveness}
+        target: /models
+        read_only: true
     expose: ["8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks: [app]
 
   ollama:
     <<: *service-defaults
-    profiles: [ai]
+    profiles: [local-ai]
     image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
     volumes:
       - ollama_data:/root/.ollama
@@ -478,6 +493,8 @@ services:
       INTERNAL_COMMUNITY_URL: http://community_service:8082
       COMMUNITY_SERVICE_URL: http://community_service:8082
       INTERNAL_CHAT_URL: http://chat_service:4000
+      INTERNAL_AI_URL: http://ai_service:8080
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
       EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -489,6 +506,7 @@ services:
       marketplace_service: { condition: service_healthy }
       community_service: { condition: service_healthy }
       chat_service: { condition: service_healthy }
+      ai_service: { condition: service_healthy }
     networks: [app]
 
   cms:

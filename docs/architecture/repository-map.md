@@ -1,38 +1,47 @@
 # Repository Map
 
-Status: repo audit 2026-07-11.
+Status: verified against repository HEAD on 2026-08-22.
 
 ## Root
 
-- `docker-compose.yml`, `docker-compose.dev.yml`, `docker-compose.prod.yml`, `docker-compose.staging.yml`: service orchestration.
-- `up-super-fast.ps1`, `up-super-fast.sh`: local startup helpers.
-- `README.md`: local workflow and product summary.
-- `docs/`: architecture, product, research, and engineering docs.
-- `ai/`, `ai_data/`, `.runtime/`: local AI/runtime data areas. Do not treat runtime data as source code.
+- `docker-compose.yml` owns the shared service contract.
+- `docker-compose.dev.yml`, `docker-compose.staging.yml`, and `docker-compose.prod.yml` are environment overlays.
+- `up.ps1` and `up.sh` are the supported local startup helpers.
+- `scripts/ci/` owns repository and runtime contract checks.
+- `infrastructure/` owns edge and observability configuration, not business schema.
+- `docs/` contains durable architecture, engineering, product, and operating guidance.
+
+Local `.runtime/`, `.cache/`, `.backups/`, and generated `audit_output/` content is not source and must not be tracked.
 
 ## Frontend
 
-- `frontend/www`: main Next.js app and BFF API routes.
-- `frontend/usaha`: business owner portal.
-- `frontend/cms`: CMS/admin content management.
-- `frontend/crm`: CRM/ops surfaces.
-- `frontend/mobile`: mobile wrapper/project.
-- `frontend/shared`: shared frontend package.
+- `frontend/apps/www`: public Next.js application and same-origin BFF routes.
+- `frontend/apps/usaha`: business owner application.
+- `frontend/apps/cms`: internal content operations application.
+- `frontend/apps/crm`: internal CRM application.
+- `frontend/packages`: shared frontend packages used by two or more applications.
 
-## Services
+Routing and layout stay in each app's Next.js route tree. Reusable business UI belongs in feature modules; a package is justified only by shared semantics across apps.
 
-- `services/identity_service`: auth, sessions, roles, user profiles.
-- `services/marketplace_service`: marketplace/content/commerce operations.
-- `services/community_service`: community, forum, groups, reels.
-- `services/chat_service`: chat API and ScyllaDB schema.
-- `services/ai_service`: verification AI helper service.
+## Services and data ownership
 
-## Database Assets
+- `services/identity_service`: identity, authentication, authorization, sessions, and profiles; owns `identity_db`.
+- `services/marketplace_service`: discovery, content, commerce, payments, wallet, orders, and marketplace projections; owns `marketplace_db` and the Meilisearch projection.
+- `services/community_service`: forum, groups, social graph, and reels; owns `community_db`.
+- `services/chat_service`: chat and realtime presence; owns its Scylla keyspace.
+- `services/ai_service`: internal AI orchestration gateway; it does not own product source-of-truth data.
+- `services/ocr_service`: optional OCR inference runtime.
+- `services/liveness_service`: optional passive presentation-attack detection runtime.
 
-- `services/*/migrations`: service-owned SQL migrations.
-- `services/chat_service/priv/scylladb`: ScyllaDB chat schema and setup.
-- Root SQL dumps such as `marketplace.sql`, `identity.sql`, `community.sql`: reference/dump files, not migration policy.
+Cross-service data moves through documented APIs or RabbitMQ events plus local projections. A service must not query another service's database.
 
-## Evidence
+## Database assets
 
-Observed by `Get-ChildItem`, `rg --files`, package scripts, compose service config, and route/migration scans.
+- `services/*/migrations`: service-owned, versioned PostgreSQL migrations.
+- `services/chat_service/priv/scylladb`: versioned Scylla schema and migration scripts.
+- PostgreSQL remains the transactional source of truth; Meilisearch is rebuildable.
+- Runtime application code must not create or alter business tables.
+
+## Verification
+
+Use `rg --files`, Compose config validation, each application manifest, service entrypoints, and migration directories when refreshing this map. Folder names alone are not evidence of current behavior.

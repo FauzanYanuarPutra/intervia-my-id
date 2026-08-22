@@ -41,6 +41,10 @@ struct IdentityOutboxEventRow {
     payload: Value,
 }
 
+// Kept temporarily for migration characterization tests only. Runtime schema
+// ownership belongs exclusively to versioned files in `migrations/`.
+#[cfg(test)]
+#[allow(dead_code)]
 async fn ensure_identity_runtime_schema(db: &sqlx::PgPool) -> Result<()> {
     sqlx::query("CREATE EXTENSION IF NOT EXISTS citext")
         .execute(db)
@@ -156,6 +160,24 @@ async fn ensure_identity_runtime_schema(db: &sqlx::PgPool) -> Result<()> {
     )
     .execute(db)
     .await?;
+    Ok(())
+}
+
+async fn verify_identity_schema(db: &sqlx::PgPool) -> Result<()> {
+    let ready: bool = sqlx::query_scalar(
+        r#"
+        SELECT to_regclass('core.users') IS NOT NULL
+           AND to_regclass('core.user_profiles') IS NOT NULL
+           AND to_regclass('core.user_identities') IS NOT NULL
+           AND to_regclass('events.event_outbox') IS NOT NULL
+        "#,
+    )
+    .fetch_one(db)
+    .await?;
+
+    if !ready {
+        anyhow::bail!("identity schema contract is incomplete after migrations");
+    }
     Ok(())
 }
 
@@ -383,7 +405,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    ensure_identity_runtime_schema(&db_pool).await?;
+    verify_identity_schema(&db_pool).await?;
 
     println!("Initializing Redis...");
     let redis_pool = db::init_redis(&cfg).await;

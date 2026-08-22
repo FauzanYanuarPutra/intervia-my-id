@@ -11,6 +11,8 @@
 **/test-results
 **/.eslintcache
 **/*.tsbuildinfo
+**/public/sw.js
+**/public/workbox-*.js
 www-apk
 **/.git
 **/.DS_Store

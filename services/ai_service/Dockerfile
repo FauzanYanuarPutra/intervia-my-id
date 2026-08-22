@@ -8,7 +8,7 @@
 # ---------------------------------------------------------
 # Stage 1: Builder
 # ---------------------------------------------------------
-FROM rust:1-bookworm AS builder
+FROM rust:1.97.1-bookworm AS builder
 
 ENV CARGO_NET_RETRY=10 \
     CARGO_HTTP_TIMEOUT=600 \
@@ -28,13 +28,13 @@ WORKDIR /app
 # Dependency caching
 # ---------------------------------------------------------
 
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 
 # Dummy source agar dependency bisa dicache Docker.
 RUN mkdir -p src \
     && printf 'fn main() {}\n' > src/main.rs
 
-RUN cargo build --release || true
+RUN cargo build --release --locked || true
 
 # ---------------------------------------------------------
 # Actual application
@@ -49,7 +49,7 @@ COPY src ./src
 # COPY prompts ./prompts
 
 RUN touch src/main.rs \
-    && cargo build --release \
+    && cargo build --release --locked \
     && strip target/release/ai_service
 
 # ---------------------------------------------------------

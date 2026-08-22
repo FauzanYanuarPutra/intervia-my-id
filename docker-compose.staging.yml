@@ -49,6 +49,11 @@ services:
     environment:
       ENV: staging
       APP_ENV: staging
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required in staging}
+      VLLM_URL: ${VLLM_URL:?VLLM_URL is required in staging}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
+      start_period: 30s
 
   ocr_service:
     build: !reset null
@@ -69,8 +74,10 @@ services:
       APP_ENV: staging
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: staging
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://staging.lajukan.com}
-      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://staging.lajukan.com}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://www.staging.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.staging.lajukan.com}
+      INTERNAL_AI_URL: http://ai_service:8080
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required in staging}
 
   cms:
     build: !reset null

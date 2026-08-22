@@ -21,7 +21,7 @@ use tokio::sync::Semaphore;
 use tower_http::cors::CorsLayer;
 
 const SERVICE_NAME: &str = "lajukan-ai-orchestrator";
-const SERVICE_VERSION: &str = "2.0.2";
+const SERVICE_VERSION: &str = "2.0.3";
 
 #[derive(Clone)]
 struct AppState {
@@ -230,9 +230,7 @@ impl AiTask {
             }
             "support" | "support_triage" | "triage" => Self::SupportTriage,
             "moderate" | "moderation" | "content_moderation" => Self::Moderation,
-            "match" | "marketplace_match" | "supplier_match" | "rfq" => {
-                Self::MarketplaceMatch
-            }
+            "match" | "marketplace_match" | "supplier_match" | "rfq" => Self::MarketplaceMatch,
             "deal" | "deal_assist" | "negotiation" | "negotiate" => Self::DealAssist,
             "analytics" | "analytics_insight" | "metric_insight" | "diagnostic" => {
                 Self::AnalyticsInsight
@@ -330,10 +328,7 @@ async fn main() {
 
     let port = env_u16("PORT", 8080);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    println!(
-        "{} {} listening on {}",
-        SERVICE_NAME, SERVICE_VERSION, addr
-    );
+    println!("{} {} listening on {}", SERVICE_NAME, SERVICE_VERSION, addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
@@ -345,30 +340,41 @@ async fn main() {
 
 impl Config {
     fn from_env() -> Self {
-        let raw_vllm = env::var("VLLM_URL")
-            .ok()
-            .filter(|v| !v.trim().is_empty())
-            .or_else(|| env::var("MODEL_URL").ok())
-            .unwrap_or_else(|| "http://vllm_engine:8000/v1".to_string());
+        let environment = non_empty_env("APP_ENV")
+            .or_else(|| non_empty_env("ENV"))
+            .unwrap_or_else(|| "development".to_string());
+        let strict_environment = matches!(
+            environment.trim().to_ascii_lowercase().as_str(),
+            "production" | "staging"
+        );
+
+        let configured_vllm = non_empty_env("VLLM_URL").or_else(|| non_empty_env("MODEL_URL"));
+        if strict_environment && configured_vllm.is_none() {
+            panic!("VLLM_URL must be configured in production and staging");
+        }
+        let raw_vllm = configured_vllm.unwrap_or_else(|| "http://ollama:11434/v1".to_string());
 
         let (vllm_chat_url, vllm_models_url) = normalize_vllm_urls(&raw_vllm);
 
-        let vllm_model = env::var("VLLM_MODEL")
-            .or_else(|_| env::var("AI_MODEL"))
-            .unwrap_or_else(|_| "/models/my-fine-tuned-llama".to_string());
+        let vllm_model = non_empty_env("VLLM_MODEL")
+            .or_else(|| non_empty_env("AI_MODEL"))
+            .unwrap_or_else(|| "qwen3:4b".to_string());
+        let ai_service_token = non_empty_env("AI_SERVICE_TOKEN").unwrap_or_default();
+        if strict_environment && ai_service_token.is_empty() {
+            panic!("AI_SERVICE_TOKEN must be configured in production and staging");
+        }
 
         Self {
-            ai_service_token: env::var("AI_SERVICE_TOKEN").unwrap_or_default(),
+            ai_service_token,
 
             vllm_chat_url,
             vllm_models_url,
             vllm_api_key: env::var("VLLM_API_KEY").unwrap_or_default(),
-            vllm_structured_model: env::var("VLLM_STRUCTURED_MODEL")
-                .unwrap_or_else(|_| vllm_model.clone()),
-            vllm_vision_model: env::var("VLLM_VISION_MODEL")
-                .unwrap_or_else(|_| vllm_model.clone()),
-            vllm_kyc_model: env::var("VLLM_KYC_MODEL")
-                .unwrap_or_else(|_| vllm_model.clone()),
+            vllm_structured_model: non_empty_env("VLLM_STRUCTURED_MODEL")
+                .unwrap_or_else(|| vllm_model.clone()),
+            vllm_vision_model: non_empty_env("VLLM_VISION_MODEL")
+                .unwrap_or_else(|| vllm_model.clone()),
+            vllm_kyc_model: non_empty_env("VLLM_KYC_MODEL").unwrap_or_else(|| vllm_model.clone()),
             vllm_model,
             vllm_structured_outputs: env_bool("VLLM_STRUCTURED_OUTPUTS", true),
             vllm_reasoning_effort: env::var("VLLM_REASONING_EFFORT")
@@ -377,16 +383,10 @@ impl Config {
                 .to_ascii_lowercase(),
 
             ocr_url: service_url("OCR_URL", "http://ocr_service:8000/predict"),
-            liveness_url: service_url(
-                "LIVENESS_URL",
-                "http://liveness_service:8000/check",
-            ),
+            liveness_url: service_url("LIVENESS_URL", "http://liveness_service:8000/check"),
             face_match_url: env::var("FACE_MATCH_URL").unwrap_or_default(),
             face_match_threshold: env_f64("FACE_MATCH_THRESHOLD", 0.72, 0.0, 1.0),
-            require_face_match_for_identity: env_bool(
-                "REQUIRE_FACE_MATCH_FOR_IDENTITY",
-                true,
-            ),
+            require_face_match_for_identity: env_bool("REQUIRE_FACE_MATCH_FOR_IDENTITY", true),
             kyc_include_raw_capture: env_bool("KYC_INCLUDE_RAW_CAPTURE", false),
             kyc_max_image_bytes: env_usize(
                 "KYC_MAX_IMAGE_BYTES",
@@ -400,16 +400,11 @@ impl Config {
             rag_limit: env_usize("RAG_LIMIT", 6, 1, 12),
 
             request_timeout_ms: env_u64("AI_REQUEST_TIMEOUT_MS", 65_000, 3_000, 180_000),
-            dependency_timeout_ms: env_u64(
-                "AI_DEPENDENCY_TIMEOUT_MS",
-                25_000,
-                2_000,
-                90_000,
-            ),
+            dependency_timeout_ms: env_u64("AI_DEPENDENCY_TIMEOUT_MS", 25_000, 2_000, 90_000),
             max_body_bytes: env_usize(
                 "AI_MAX_BODY_BYTES",
                 14 * 1024 * 1024,
-                1 * 1024 * 1024,
+                1024 * 1024,
                 30 * 1024 * 1024,
             ),
             max_context_chars: env_usize("AI_MAX_CONTEXT_CHARS", 22_000, 2_000, 80_000),
@@ -584,11 +579,10 @@ async fn run_ai_endpoint(
     forced_task: Option<AiTask>,
 ) -> Response {
     if let Err(response) = authorize(&headers, &state.config) {
-        return response;
+        return *response;
     }
 
-    let request_id = request_id_from_headers(&headers)
-        .unwrap_or_else(|| next_request_id(&state));
+    let request_id = request_id_from_headers(&headers).unwrap_or_else(|| next_request_id(&state));
 
     let permit = match tokio::time::timeout(
         Duration::from_secs(2),
@@ -645,8 +639,14 @@ async fn run_ai_endpoint(
     let mut sources = request.sources.clone();
 
     if request.use_rag.unwrap_or(false) && !state.config.rag_url.is_empty() {
-        match retrieve_rag_sources(&state, task, locale, &user_message, request.context.as_ref())
-            .await
+        match retrieve_rag_sources(
+            &state,
+            task,
+            locale,
+            &user_message,
+            request.context.as_ref(),
+        )
+        .await
         {
             Ok(mut retrieved) => {
                 dedupe_sources(&mut sources, &mut retrieved);
@@ -686,10 +686,7 @@ async fn run_ai_endpoint(
         .unwrap_or_else(|| default_tokens_for_task(task))
         .clamp(128, state.config.max_output_tokens);
 
-    let has_vision_media = request
-        .media
-        .iter()
-        .any(|media| !media.data_url.is_empty());
+    let has_vision_media = request.media.iter().any(|media| !media.data_url.is_empty());
 
     let model = if has_vision_media {
         &state.config.vllm_vision_model
@@ -710,7 +707,6 @@ async fn run_ai_endpoint(
         &request_id,
         model,
         &model_messages,
-        &request.media,
         temperature,
         max_tokens,
         schema.as_ref(),
@@ -748,34 +744,28 @@ async fn run_ai_endpoint(
         None
     };
 
-    let (
-        response_text,
-        data,
-        needs_clarification,
-        questions,
-        confidence,
-        mut output_warnings,
-    ) = if let Some(parsed) = parsed {
-        parse_response_envelope(parsed, &raw_content)
-    } else if structured {
-        (
-            raw_content.clone(),
-            json!({}),
-            false,
-            Vec::<String>::new(),
-            0.45,
-            vec!["structured_output_parse_failed".to_string()],
-        )
-    } else {
-        (
-            raw_content.clone(),
-            json!({}),
-            false,
-            Vec::<String>::new(),
-            0.75,
-            Vec::<String>::new(),
-        )
-    };
+    let (response_text, data, needs_clarification, questions, confidence, mut output_warnings) =
+        if let Some(parsed) = parsed {
+            parse_response_envelope(parsed, &raw_content)
+        } else if structured {
+            (
+                raw_content.clone(),
+                json!({}),
+                false,
+                Vec::<String>::new(),
+                0.45,
+                vec!["structured_output_parse_failed".to_string()],
+            )
+        } else {
+            (
+                raw_content.clone(),
+                json!({}),
+                false,
+                Vec::<String>::new(),
+                0.75,
+                Vec::<String>::new(),
+            )
+        };
 
     warnings.append(&mut output_warnings);
 
@@ -835,9 +825,8 @@ fn sanitize_ai_request(request: &mut AiRequest, config: &Config) {
         .collect::<Vec<_>>();
 
     if request.messages.len() > config.max_messages {
-        request.messages = request.messages
-            [request.messages.len() - config.max_messages..]
-            .to_vec();
+        request.messages =
+            request.messages[request.messages.len() - config.max_messages..].to_vec();
     }
 
     if let Some(agent) = request.agent.as_mut() {
@@ -1011,11 +1000,8 @@ fn build_model_messages(
         .iter()
         .any(|media| !media.data_url.is_empty() || !media.text.is_empty());
 
-    let last_request_message_is_user = request
-        .messages
-        .last()
-        .map(|message| message.role.as_str())
-        == Some("user");
+    let last_request_message_is_user =
+        request.messages.last().map(|message| message.role.as_str()) == Some("user");
 
     let history = request
         .messages
@@ -1051,9 +1037,7 @@ fn build_model_messages(
     let resolved_message = resolve_user_message(request);
 
     if !has_media_context {
-        if request.messages.is_empty()
-            || !last_request_message_is_user
-            || request.message.is_some()
+        if request.messages.is_empty() || !last_request_message_is_user || request.message.is_some()
         {
             messages.push(json!({
                 "role": "user",
@@ -1246,7 +1230,6 @@ async fn call_vllm(
     request_id: &str,
     model: &str,
     messages: &[Value],
-    _media: &[MediaInput],
     temperature: f64,
     max_tokens: u32,
     schema: Option<&Value>,
@@ -1303,10 +1286,7 @@ async fn call_vllm(
         match request.send().await {
             Ok(response) => {
                 let status = response.status();
-                let text = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| "{}".to_string());
+                let text = response.text().await.unwrap_or_else(|_| "{}".to_string());
 
                 if status.is_success() {
                     let parsed: Value = serde_json::from_str(&text)
@@ -1344,9 +1324,7 @@ async fn call_vllm(
                             .unwrap_or(false);
 
                         if has_reasoning {
-                            return Err(
-                                "vllm_returned_reasoning_without_final_content".to_string(),
-                            );
+                            return Err("vllm_returned_reasoning_without_final_content".to_string());
                         }
 
                         return Err("vllm_returned_empty_content".to_string());
@@ -1371,21 +1349,18 @@ async fn call_vllm(
                 if status_code == 400
                     && payload.get("reasoning_effort").is_some()
                     && !removed_reasoning_effort
-                    && (
-                        lower_error.contains("reasoning")
-                            || lower_error.contains("unknown")
-                            || lower_error.contains("unsupported")
-                            || lower_error.contains("extra")
-                            || lower_error.contains("unexpected")
-                    )
+                    && (lower_error.contains("reasoning")
+                        || lower_error.contains("unknown")
+                        || lower_error.contains("unsupported")
+                        || lower_error.contains("extra")
+                        || lower_error.contains("unexpected"))
                 {
                     payload
                         .as_object_mut()
                         .map(|map| map.remove("reasoning_effort"));
                     removed_reasoning_effort = true;
-                    warnings.push(
-                        "provider_rejected_reasoning_effort_retry_without_it".to_string(),
-                    );
+                    warnings
+                        .push("provider_rejected_reasoning_effort_retry_without_it".to_string());
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     continue;
                 }
@@ -1399,9 +1374,7 @@ async fn call_vllm(
                 {
                     payload["response_format"] = json!({"type": "json_object"});
                     downgraded_json_schema = true;
-                    warnings.push(
-                        "vllm_json_schema_unsupported_retry_json_object".to_string(),
-                    );
+                    warnings.push("vllm_json_schema_unsupported_retry_json_object".to_string());
                     tokio::time::sleep(Duration::from_millis(120)).await;
                     continue;
                 }
@@ -1887,9 +1860,7 @@ async fn retrieve_rag_sources(
             "limit": state.config.rag_limit,
             "filters": context.cloned().unwrap_or_else(|| json!({}))
         }))
-        .timeout(Duration::from_millis(
-            state.config.dependency_timeout_ms,
-        ));
+        .timeout(Duration::from_millis(state.config.dependency_timeout_ms));
 
     if !state.config.rag_service_token.is_empty() {
         request = request.bearer_auth(&state.config.rag_service_token);
@@ -1920,7 +1891,11 @@ async fn retrieve_rag_sources(
 
     let mut output = Vec::<GroundingSource>::new();
 
-    for (index, item) in candidates.into_iter().take(state.config.rag_limit).enumerate() {
+    for (index, item) in candidates
+        .into_iter()
+        .take(state.config.rag_limit)
+        .enumerate()
+    {
         let content = first_value_string(
             &item,
             &["content", "text", "snippet", "description", "body"],
@@ -1962,7 +1937,7 @@ impl NonEmptyFallback for String {
     }
 }
 
-fn dedupe_sources(existing: &mut Vec<GroundingSource>, incoming: &mut Vec<GroundingSource>) {
+fn dedupe_sources(existing: &mut [GroundingSource], incoming: &mut Vec<GroundingSource>) {
     incoming.retain(|candidate| {
         !existing.iter().any(|current| {
             (!candidate.id.is_empty() && current.id == candidate.id)
@@ -2045,11 +2020,10 @@ async fn handle_verification(
     mut multipart: Multipart,
 ) -> Response {
     if let Err(response) = authorize(&headers, &state.config) {
-        return response;
+        return *response;
     }
 
-    let request_id = request_id_from_headers(&headers)
-        .unwrap_or_else(|| next_request_id(&state));
+    let request_id = request_id_from_headers(&headers).unwrap_or_else(|| next_request_id(&state));
     let started = Instant::now();
 
     let mut ktp_bytes: Option<Bytes> = None;
@@ -2164,10 +2138,7 @@ async fn handle_verification(
         Ok(value) => value,
         Err(error) => {
             degraded = true;
-            warnings.push(format!(
-                "liveness_unavailable: {}",
-                safe_error(&error, 180)
-            ));
+            warnings.push(format!("liveness_unavailable: {}", safe_error(&error, 180)));
             json!({"is_real": false, "error_code": "LIVENESS_UNAVAILABLE"})
         }
     };
@@ -2189,8 +2160,7 @@ async fn handle_verification(
         }
     };
 
-    let raw_text =
-        read_non_empty_string(raw_ocr.get("raw_text_for_vllm")).unwrap_or_default();
+    let raw_text = read_non_empty_string(raw_ocr.get("raw_text_for_vllm")).unwrap_or_default();
 
     let cleaned_document = if raw_text.is_empty() {
         json!({})
@@ -2210,15 +2180,8 @@ async fn handle_verification(
 
     let document = merge_document_data(cleaned_document, &raw_ocr, &state.config);
     let ocr_confidence = average_ocr_confidence(&raw_ocr);
-    let checks = build_checks(
-        &document,
-        &raw_ocr,
-        &liveness,
-        &face_match,
-        ocr_confidence,
-    );
-    let verification =
-        build_verification_summary(&checks, &liveness, &face_match, &state.config);
+    let checks = build_checks(&document, &raw_ocr, &liveness, &face_match, ocr_confidence);
+    let verification = build_verification_summary(&checks, &liveness, &face_match, &state.config);
 
     let is_verified = read_bool(verification.get("identity_verified"));
 
@@ -2231,8 +2194,9 @@ async fn handle_verification(
         "manual_review" => {
             "Bukti identitas belum cukup untuk auto-approve; perlu review manual.".to_string()
         }
-        _ => "Capture belum cukup kuat; minta user ambil ulang dengan foto lebih jelas."
-            .to_string(),
+        _ => {
+            "Capture belum cukup kuat; minta user ambil ulang dengan foto lebih jelas.".to_string()
+        }
     };
 
     let payload = VerificationResponse {
@@ -2320,7 +2284,6 @@ OCR:
         request_id,
         &state.config.vllm_kyc_model,
         &messages,
-        &[],
         0.0,
         700,
         Some(&schema),
@@ -2354,9 +2317,7 @@ async fn call_image_service(
         .http
         .post(url)
         .multipart(form)
-        .timeout(Duration::from_millis(
-            state.config.dependency_timeout_ms,
-        ))
+        .timeout(Duration::from_millis(state.config.dependency_timeout_ms))
         .send()
         .await
         .map_err(|error| format!("network: {}", error))?;
@@ -2409,9 +2370,7 @@ async fn call_face_match_service(
         .http
         .post(&state.config.face_match_url)
         .multipart(form)
-        .timeout(Duration::from_millis(
-            state.config.dependency_timeout_ms,
-        ))
+        .timeout(Duration::from_millis(state.config.dependency_timeout_ms))
         .send()
         .await
         .map_err(|error| format!("network: {}", error))?;
@@ -2534,17 +2493,17 @@ fn validate_kyc_image(data: &Bytes, label: &str, max_bytes: usize) -> Result<(),
         && bytes.get(8..12) == Some(b"WEBP".as_slice());
 
     if !is_jpeg && !is_png && !is_webp {
-        return Err(format!(
-            "{} must be a JPEG, PNG, or WebP image",
-            label
-        ));
+        return Err(format!("{} must be a JPEG, PNG, or WebP image", label));
     }
 
     Ok(())
 }
 
 fn normalize_nik(value: &str) -> Option<String> {
-    let digits = value.chars().filter(|ch| ch.is_ascii_digit()).collect::<String>();
+    let digits = value
+        .chars()
+        .filter(|ch| ch.is_ascii_digit())
+        .collect::<String>();
     if digits.len() == 16 {
         Some(digits)
     } else {
@@ -2553,10 +2512,7 @@ fn normalize_nik(value: &str) -> Option<String> {
 }
 
 fn average_ocr_confidence(raw_ocr: &Value) -> f64 {
-    let Some(segments) = raw_ocr
-        .get("all_segments")
-        .and_then(Value::as_array)
-    else {
+    let Some(segments) = raw_ocr.get("all_segments").and_then(Value::as_array) else {
         return 0.0;
     };
 
@@ -2694,8 +2650,7 @@ fn build_verification_summary(
         !face_match_available || face_match_passed
     };
 
-    let identity_verified =
-        document_verified && liveness_passed && identity_match_satisfied;
+    let identity_verified = document_verified && liveness_passed && identity_match_satisfied;
 
     let capture_quality = if ocr_confidence >= 0.82
         && liveness_score >= 0.97
@@ -2832,8 +2787,8 @@ fn calculate_identity_trust_score(
     document_verified: bool,
     liveness_passed: bool,
 ) -> i64 {
-    let mut weighted = ocr_confidence.clamp(0.0, 1.0) * 0.35
-        + liveness_score.clamp(0.0, 1.0) * 0.30;
+    let mut weighted =
+        ocr_confidence.clamp(0.0, 1.0) * 0.35 + liveness_score.clamp(0.0, 1.0) * 0.30;
 
     if face_match_available {
         weighted += face_match_score.clamp(0.0, 1.0) * 0.25;
@@ -2856,7 +2811,7 @@ fn calculate_identity_trust_score(
 /* Utilities                                                                  */
 /* -------------------------------------------------------------------------- */
 
-fn authorize(headers: &HeaderMap, config: &Config) -> Result<(), Response> {
+fn authorize(headers: &HeaderMap, config: &Config) -> Result<(), Box<Response>> {
     if config.ai_service_token.trim().is_empty() {
         return Ok(());
     }
@@ -2870,13 +2825,13 @@ fn authorize(headers: &HeaderMap, config: &Config) -> Result<(), Response> {
     if constant_time_eq(actual.as_bytes(), expected.as_bytes()) {
         Ok(())
     } else {
-        Err(json_response(
+        Err(Box::new(json_response(
             StatusCode::UNAUTHORIZED,
             json!({
                 "status": "error",
                 "error": "UNAUTHORIZED"
             }),
-        ))
+        )))
     }
 }
 
@@ -2906,7 +2861,14 @@ fn parse_cors_origins() -> Vec<HeaderValue> {
 }
 
 fn service_url(key: &str, fallback: &str) -> String {
-    env::var(key).unwrap_or_else(|_| fallback.to_string())
+    non_empty_env(key).unwrap_or_else(|| fallback.to_string())
+}
+
+fn non_empty_env(key: &str) -> Option<String> {
+    env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn normalize_vllm_urls(raw: &str) -> (String, String) {
@@ -2997,9 +2959,7 @@ fn clean_text(value: &str, max_chars: usize) -> String {
 }
 
 fn safe_error(value: &str, max_chars: usize) -> String {
-    clean_text(value, max_chars)
-        .replace('\n', " ")
-        .replace('\r', " ")
+    clean_text(value, max_chars).replace(['\n', '\r'], " ")
 }
 
 fn bounded_json(value: &Value, max_chars: usize) -> String {
@@ -3095,17 +3055,11 @@ fn json_response(status: StatusCode, value: Value) -> Response {
     (status, Json(value)).into_response()
 }
 
-fn json_response_with_request_id(
-    status: StatusCode,
-    request_id: &str,
-    value: Value,
-) -> Response {
+fn json_response_with_request_id(status: StatusCode, request_id: &str, value: Value) -> Response {
     let mut response = json_response(status, value);
 
     if let Ok(header_value) = HeaderValue::from_str(request_id) {
-        response
-            .headers_mut()
-            .insert("x-request-id", header_value);
+        response.headers_mut().insert("x-request-id", header_value);
     }
 
     response
@@ -3164,4 +3118,25 @@ fn env_f64(key: &str, fallback: f64, min: f64, max: f64) -> f64 {
         .and_then(|value| value.trim().parse::<f64>().ok())
         .unwrap_or(fallback)
         .clamp(min, max)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_vllm_urls;
+
+    #[test]
+    fn normalizes_openai_compatible_base_url() {
+        let (chat, models) = normalize_vllm_urls("https://provider.example/v1/");
+
+        assert_eq!(chat, "https://provider.example/v1/chat/completions");
+        assert_eq!(models, "https://provider.example/v1/models");
+    }
+
+    #[test]
+    fn preserves_explicit_chat_completions_url() {
+        let (chat, models) = normalize_vllm_urls("https://provider.example/v1/chat/completions");
+
+        assert_eq!(chat, "https://provider.example/v1/chat/completions");
+        assert_eq!(models, "https://provider.example/v1/models");
+    }
 }

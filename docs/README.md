@@ -1,6 +1,6 @@
 # Lajukan Documentation Index
 
-Status: repo audit 2026-07-11.
+Status: architecture index refreshed 2026-08-22.
 
 This documentation system describes what exists in the repository now. It is not a wishlist and not a market research replacement.
 
@@ -31,6 +31,7 @@ This documentation system describes what exists in the repository now. It is not
 - `architecture/business-profile-and-map.md`
 - `architecture/transaction-status.md`
 - `architecture/deployment-architecture.md`
+- `architecture/modernization-2026-08.md`
 - `architecture/crm-architecture.md`
 - `architecture/ai-creation-hub.md`
 - `architecture/decisions/ADR-0001-crm-owner-internal-boundary.md`

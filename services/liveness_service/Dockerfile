@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
@@ -16,13 +16,17 @@ COPY requirements.txt .
 
 # 3. Install dependencies
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir fastapi uvicorn python-multipart numpy \
     && pip install --no-cache-dir --default-timeout=1000 \
     --index-url ${PIP_INDEX_URL} \
     -r requirements.txt
 
 # 4. Copy source code
 COPY . .
+
+RUN useradd --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 

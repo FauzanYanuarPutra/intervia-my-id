@@ -64,6 +64,14 @@ COPY apps/www/ ./
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV FAST_DOCKER_BUILD=true
 
+FROM www_deps AS www_test
+
+RUN npm run test
+
+FROM www_deps AS www_lint
+
+RUN npm run lint
+
 FROM www_deps AS www_builder
 
 RUN if [ -d "/app/apps/www/next-env.d.ts" ]; then \

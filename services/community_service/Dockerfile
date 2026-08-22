@@ -1,5 +1,5 @@
 # --- Stage 1: Builder ---
-FROM rustlang/rust:nightly-bookworm AS builder
+FROM rust:1.97.1-bookworm AS builder
 
 ENV CARGO_NET_RETRY=20 \
     CARGO_HTTP_TIMEOUT=600 \
@@ -32,7 +32,7 @@ RUN for i in 1 2 3 4 5; do \
     (echo "cargo fetch failed, retry $i/5" && sleep 8); \
     done
 
-RUN cargo build --release || true
+RUN cargo build --release --locked || true
 
 COPY . .
 
@@ -42,12 +42,7 @@ RUN if [ ! -d migrations ]; then \
 
 RUN find src -type f -name '*.rs' -exec touch {} +
 
-RUN cargo build --release
-
-ARG INSTALL_SQLX=true
-RUN if [ "${INSTALL_SQLX}" = "true" ]; then \
-    cargo install sqlx-cli --no-default-features --features postgres; \
-    fi
+RUN cargo build --release --locked
 
 # --- Runtime ---
 FROM debian:bookworm-slim AS runtime
@@ -60,21 +55,12 @@ RUN apt-get update \
     apt-get install -y --no-install-recommends \
     libssl3 \
     ca-certificates \
-    curl \
-    postgresql-client \
-    redis-tools \
-    bash && \
+    curl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY --from=builder /app/target/release/community_service /usr/local/bin/app_service
-
-COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
-
-RUN mkdir -p migrations
-
-COPY --from=builder /app/migrations/ ./migrations/
 
 EXPOSE 8082
 

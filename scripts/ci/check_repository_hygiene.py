@@ -13,7 +13,23 @@ BANNED_DIRECTORY_NAMES = {
     ".next",
     "target",
     "__pycache__",
+    "audit_output",
 }
+
+REQUIRED_REPOSITORY_PATHS = (
+    "frontend/apps/www",
+    "frontend/apps/usaha",
+    "frontend/apps/cms",
+    "frontend/apps/crm",
+    "frontend/packages",
+    "services/identity_service",
+    "services/marketplace_service",
+    "services/community_service",
+    "services/chat_service",
+    "services/ai_service",
+    "services/ocr_service",
+    "services/liveness_service",
+)
 
 BANNED_EXACT_FILES = {
     ".docker-build-state",
@@ -100,6 +116,11 @@ def main() -> int:
 
     violations: list[str] = []
     review_only: list[str] = []
+
+    for required_path in REQUIRED_REPOSITORY_PATHS:
+        prefix = f"{required_path}/"
+        if not any(path == required_path or path.startswith(prefix) for path in tracked_files):
+            violations.append(f"missing required repository path: {required_path}")
 
     for path in tracked_files:
         if contains_banned_directory(path):

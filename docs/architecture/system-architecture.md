@@ -1,44 +1,56 @@
 # System Architecture
 
-Status: repo audit 2026-07-11.
+Status: verified against repository HEAD on 2026-08-22.
 
-## Runtime Shape
-
-Lajukan is a multi-frontend, multi-service app:
+## Runtime shape
 
 ```text
-Browser
-  -> frontend/www Next.js app and API/BFF routes
-  -> identity_service for auth/profile
-  -> marketplace_service for listing/content/commerce/ops
-  -> community_service for forum/groups/reels
-  -> chat_service for room/message APIs
-  -> PostgreSQL service databases, ScyllaDB chat store, Redis, RabbitMQ, Meilisearch
-  -> optional local Ollama for AI routes
+Browser / mobile client
+          |
+          v
+      Caddy edge
+          |
+          v
+Next.js app + same-origin BFF
+   |       |        |        |         |
+   v       v        v        v         v
+Identity Marketplace Community Chat  AI orchestrator
+   |       |        |        |         |
+Postgres Postgres  Postgres  Scylla    +-- OpenAI-compatible model provider
+           |                           +-- optional RAG adapter
+           +-- Meilisearch projection  +-- optional OCR/liveness/face match
+
+All services may use Redis and RabbitMQ only for their documented cache,
+coordination, outbox/inbox, and event-consumer responsibilities.
 ```
 
-`frontend/usaha`, `frontend/cms`, and `frontend/crm` are separate frontend apps that talk to the same service layer.
+The BFF authenticates the browser, limits and sanitizes requests, and maps public contracts to internal service contracts. It must not select AI vendors or query service databases. `ai_service` is the only model-provider gateway.
 
-## Core Product Flow Evidence
+## Ownership rules
 
-- Search/listing: `frontend/www/src/app/[locale]/(shared)/search`, `/api/content`, marketplace `/v1/content`.
-- Create: `frontend/www/src/app/[locale]/(app)/create`, `/api/content/create`.
-- UMKM map/store: `frontend/www/src/app/[locale]/(shared)/umkm`, `/api/super-app/umkm/stores`, marketplace `/v1/umkm/stores`.
-- Community/reels: `frontend/www/src/app/[locale]/(shared)/community`, `/reels`, community `/v1/forum/*`, `/v1/reels/*`.
-- Chat: `frontend/www/src/app/[locale]/(app)/chat`, `/api/chat/*`, chat service `/api/v1/*`.
-- Transactions/wallet: `frontend/www/src/app/[locale]/(app)/transactions`, `/payments`, marketplace `/v1/transactions`, `/v1/wallet/*`.
+- Identity owns identity truth.
+- Marketplace owns listings, orders, payment, wallet, and transaction truth.
+- Community owns community truth.
+- Chat owns chat history.
+- AI output is advisory until a domain service or authorized user validates and persists it.
+- Search indexes and read models are projections and must be replayable/rebuildable.
 
-## Known Boundaries
+## Reliability patterns
 
-- Source of identity truth is `identity_service`.
-- Source of marketplace/catalog/order/wallet truth is `marketplace_service`.
-- Source of forum/reels/group truth is `community_service`.
-- Source of chat history truth is `chat_service`/ScyllaDB.
-- `frontend/www/src/app/api` often acts as a BFF layer; do not assume data is stored there.
+- Database mutation plus event publication uses transactional outbox semantics.
+- Consumers use inbox/event IDs and idempotent side effects.
+- Financial operations use explicit database transactions, provider idempotency keys, unique provider IDs, and validated state transitions.
+- Production and staging fail fast on missing secrets and provider configuration.
+- `/health` means the process is alive; `/ready` means required dependencies are usable.
 
-## Needs Verification
+## Security boundaries
 
-- End-to-end production readiness of payments/escrow/refunds.
-- Full WebSocket/presence behavior for chat beyond API and Scylla schema.
-- Exact Meilisearch indexing jobs and sync guarantees.
-- Whether public pages are fully server-rendered for SEO/profile detail surfaces.
+- Authentication does not replace object-level authorization.
+- Every route receiving an object ID must authorize that actor against that object before reading or mutating it.
+- Internal service tokens are server-only and never use `NEXT_PUBLIC_*`.
+- Raw identity documents, NIK, credentials, cookies, authorization headers, OTPs, and model input containing sensitive documents must not be logged.
+- KYC remains fail-closed when a real reviewed model or dependency is unavailable.
+
+## Current modularity debt
+
+The architecture boundary is sound, but several files are too large: Marketplace and Community service entrypoints plus several WWW client components. Refactor one domain at a time into route, service, repository, and domain modules, preserving route and payload contracts after each extraction.

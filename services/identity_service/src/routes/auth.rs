@@ -370,114 +370,17 @@ fn mask_identifier_for_log(raw: &str) -> String {
     format!("{}***", visible)
 }
 
-async fn ensure_google_oauth_schema(state: &Arc<AppState>) -> Result<(), sqlx::Error> {
-    sqlx::query("CREATE EXTENSION IF NOT EXISTS citext")
-        .execute(&state.db)
-        .await?;
-    sqlx::query("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-        .execute(&state.db)
-        .await?;
-    sqlx::query("CREATE SCHEMA IF NOT EXISTS core")
-        .execute(&state.db)
-        .await?;
-    sqlx::query("CREATE SCHEMA IF NOT EXISTS events")
-        .execute(&state.db)
-        .await?;
-    sqlx::query(
+async fn verify_google_oauth_schema(state: &Arc<AppState>) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
         r#"
-        CREATE OR REPLACE FUNCTION public.update_timestamp()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            NEW.updated_at = NOW();
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql
+        SELECT
+            to_regclass('core.users') IS NOT NULL
+            AND to_regclass('core.user_profiles') IS NOT NULL
+            AND to_regclass('core.user_identities') IS NOT NULL
         "#,
     )
-    .execute(&state.db)
-    .await?;
-    sqlx::query(
-        r#"
-        DO $$
-        BEGIN
-            IF to_regclass('core.users') IS NOT NULL THEN
-                ALTER TABLE core.users ALTER COLUMN password_hash DROP NOT NULL;
-            END IF;
-            IF to_regclass('core.user_profiles') IS NOT NULL THEN
-                ALTER TABLE core.user_profiles
-                    ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
-            END IF;
-        END $$;
-        "#,
-    )
-    .execute(&state.db)
-    .await?;
-    sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS core.user_identities (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL REFERENCES core.users(id) ON DELETE CASCADE,
-            provider TEXT NOT NULL,
-            provider_user_id TEXT NOT NULL,
-            email CITEXT,
-            email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-            raw_profile JSONB NOT NULL DEFAULT '{}'::jsonb,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            last_login_at TIMESTAMPTZ,
-            CONSTRAINT user_identities_provider_check CHECK (provider <> ''),
-            CONSTRAINT user_identities_provider_user_id_check CHECK (provider_user_id <> '')
-        )
-        "#,
-    )
-    .execute(&state.db)
-    .await?;
-    sqlx::query(
-        r#"
-        ALTER TABLE core.user_identities
-            ADD COLUMN IF NOT EXISTS email CITEXT,
-            ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-            ADD COLUMN IF NOT EXISTS raw_profile JSONB NOT NULL DEFAULT '{}'::jsonb,
-            ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
-            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        "#,
-    )
-    .execute(&state.db)
-    .await?;
-    sqlx::query(
-        r#"
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identities_provider_subject
-            ON core.user_identities(provider, provider_user_id)
-        "#,
-    )
-    .execute(&state.db)
-    .await?;
-    sqlx::query(
-        r#"
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identities_provider_user
-            ON core.user_identities(provider, user_id)
-        "#,
-    )
-    .execute(&state.db)
-    .await?;
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_user_identities_user_id ON core.user_identities(user_id)",
-    )
-    .execute(&state.db)
-    .await?;
-    sqlx::query("DROP TRIGGER IF EXISTS user_identities_update_timestamp ON core.user_identities")
-        .execute(&state.db)
-        .await?;
-    sqlx::query(
-        r#"
-        CREATE TRIGGER user_identities_update_timestamp
-        BEFORE UPDATE ON core.user_identities
-        FOR EACH ROW EXECUTE FUNCTION public.update_timestamp()
-        "#,
-    )
-    .execute(&state.db)
-    .await?;
-    Ok(())
+    .fetch_one(&state.db)
+    .await
 }
 
 fn google_username_base(email: &str, name: Option<&str>) -> String {
@@ -2005,13 +1908,24 @@ pub async fn oauth_google(
             .into_response();
     }
 
-    if let Err(error) = ensure_google_oauth_schema(&state).await {
-        tracing::error!("oauth google ensure schema failed: {:?}", error);
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error":"database schema error"})),
-        )
-            .into_response();
+    match verify_google_oauth_schema(&state).await {
+        Ok(true) => {}
+        Ok(false) => {
+            tracing::error!("oauth google schema is incomplete; migrations must run before traffic");
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error":"database schema unavailable"})),
+            )
+                .into_response();
+        }
+        Err(error) => {
+            tracing::error!("oauth google schema verification failed: {:?}", error);
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error":"database schema unavailable"})),
+            )
+                .into_response();
+        }
     }
 
     let existing_identity_user_id = match sqlx::query_scalar::<_, Uuid>(

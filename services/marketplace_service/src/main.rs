@@ -153,6 +153,10 @@ fn parse_cors_origins() -> Vec<HeaderValue> {
         .collect()
 }
 
+// Retained only for migration characterization tests while startup DDL is
+// removed. Versioned migrations are the runtime source of schema truth.
+#[cfg(test)]
+#[allow(dead_code)]
 async fn ensure_base_schema(db: &PgPool) -> anyhow::Result<()> {
     sqlx::query("CREATE EXTENSION IF NOT EXISTS citext")
         .execute(db)
@@ -169,6 +173,8 @@ async fn ensure_base_schema(db: &PgPool) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+#[allow(dead_code)]
 async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
     ensure_base_schema(db).await?;
     sqlx::query(
@@ -361,6 +367,24 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
     )
     .execute(db)
     .await?;
+    Ok(())
+}
+
+async fn verify_schema_contract(db: &PgPool) -> anyhow::Result<()> {
+    let ready: bool = sqlx::query_scalar(
+        r#"
+        SELECT to_regclass('public.content_items') IS NOT NULL
+           AND to_regclass('public.users_read_model') IS NOT NULL
+           AND to_regclass('events.event_outbox') IS NOT NULL
+           AND to_regclass('events.event_inbox') IS NOT NULL
+        "#,
+    )
+    .fetch_one(db)
+    .await?;
+
+    if !ready {
+        anyhow::bail!("marketplace schema contract is incomplete after migrations");
+    }
     Ok(())
 }
 
@@ -2257,7 +2281,6 @@ async fn main() -> anyhow::Result<()> {
     {
         anyhow::bail!("JWT_SECRET must be at least 32 characters and not a placeholder");
     }
-    ensure_base_schema(&db).await?;
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
     let mut migrator = sqlx::migrate!("./migrations");
@@ -2281,7 +2304,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    ensure_runtime_schema(&db).await?;
+    verify_schema_contract(&db).await?;
 
     let http_client = Client::builder()
         .connect_timeout(std::time::Duration::from_secs(10))

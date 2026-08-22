@@ -60,6 +60,7 @@ case "$phase" in
     wait_http "marketplace" "http://127.0.0.1:${PORT_MARKETPLACE:-8081}/health"
     wait_http "community" "http://127.0.0.1:${PORT_COMMUNITY:-8082}/health"
     wait_http "chat" "http://127.0.0.1:${PORT_CHAT:-4000}/api/health"
+    wait_http "ai orchestrator" "http://127.0.0.1:${PORT_AI_SERVICE:-8084}/health"
     wait_http "www" "http://127.0.0.1:${PORT_FRONTEND:-3000}/"
     "${COMPOSE[@]}" ps -a
     ;;

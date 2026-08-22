@@ -57,7 +57,7 @@ export function isDirectReelVideoUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return false;
   const path = trimmed.split(/[?#]/)[0]?.toLowerCase() || '';
-  if (!/\.(mov|mp4|m4v|ogv|webm)$/.test(path)) return false;
+  if (!/\.(mp4|m4v|ogv|webm)$/.test(path)) return false;
 
   if (trimmed.startsWith('/')) return true;
 

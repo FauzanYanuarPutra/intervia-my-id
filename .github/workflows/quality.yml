@@ -160,6 +160,8 @@ jobs:
           pip install pytest
       - name: Compile
         run: python -m compileall -q .
+      - name: Import runtime entrypoint
+        run: python -c "import main"
       - name: Tests when present
         shell: bash
         run: |
@@ -213,7 +215,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker compose --env-file .env.production.example -f docker-compose.yml -f docker-compose.prod.yml config --format json > /tmp/compose.json
+          docker compose --profile kyc --profile local-ai --env-file .env.production.example -f docker-compose.yml -f docker-compose.prod.yml config --format json > /tmp/compose.json
           python - <<'PY'
           import json
           with open('/tmp/compose.json', encoding='utf-8') as handle:
@@ -222,6 +224,33 @@ jobs:
           assert set(published) == {'caddy'}, published
           ports = {str(item.get('published')) for item in published['caddy']}
           assert ports == {'80', '443'}, ports
+          PY
+      - name: Assert AI and KYC runtime contracts
+        env:
+          IMAGE_TAG: sha-ci
+          DOCKERHUB_NAMESPACE: lajukan-ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --profile kyc --profile local-ai --env-file .env.production.example -f docker-compose.yml -f docker-compose.prod.yml config --format json > /tmp/compose.json
+          python - <<'PY'
+          import json
+          with open('/tmp/compose.json', encoding='utf-8') as handle:
+              services = json.load(handle)['services']
+          ai_env = services['ai_service']['environment']
+          www_env = services['www']['environment']
+          assert ai_env['VLLM_URL'].rstrip('/').endswith('/v1')
+          assert ai_env['OCR_URL'].endswith('/predict')
+          assert ai_env['LIVENESS_URL'].endswith('/check')
+          assert www_env['INTERNAL_AI_URL'] == 'http://ai_service:8080'
+          assert www_env['AI_SERVICE_TOKEN'] == ai_env['AI_SERVICE_TOKEN']
+          assert 'profiles' not in services['ai_service']
+          assert services['ollama']['profiles'] == ['local-ai']
+          assert services['ocr_service']['healthcheck']['test'][-1].endswith('/ready')
+          assert services['liveness_service']['healthcheck']['test'][-1].endswith('/ready')
+          liveness_mount = next(item for item in services['liveness_service']['volumes'] if item['target'] == '/models')
+          assert liveness_mount['type'] == 'bind'
+          assert liveness_mount['read_only'] is True
           PY
 
   runtime-smoke:

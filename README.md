@@ -210,6 +210,7 @@ Start here:
 - `docs/architecture/event-map.md`
 - `docs/architecture/database-map.md`
 - `docs/architecture/deployment-architecture.md`
+- `docs/architecture/modernization-2026-08.md`
 
 ## License / ownership
 
