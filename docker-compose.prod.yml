@@ -113,7 +113,7 @@ services:
     command:
       - |
         set -e
-        sed 's/\r$//' /scylladb/run_chat_migrations.sh > /tmp/run_chat_migrations.sh
+        sed 's/\r$//' /scylladb/run_migrations.sh > /tmp/run_chat_migrations.sh
         exec /bin/sh /tmp/run_chat_migrations.sh
     networks: [app, data]
 
