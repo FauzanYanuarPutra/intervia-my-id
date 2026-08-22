@@ -19,7 +19,7 @@ http://www.{$APP_DOMAIN} {
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
     reverse_proxy @notifications_socket marketplace_service:8081
     reverse_proxy www:3000
-    
+
     header {
         Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://www.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
         X-Content-Type-Options "nosniff"
@@ -39,6 +39,30 @@ http://usaha.{$APP_DOMAIN} {
         Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://usaha.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
+    }
+    encode gzip zstd
+}
+
+http://cms.{$APP_DOMAIN} {
+    reverse_proxy cms:3001
+
+    header {
+        Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN};"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-Robots-Tag "noindex, nofollow, noarchive"
+    }
+    encode gzip zstd
+}
+
+http://crm.{$APP_DOMAIN} {
+    reverse_proxy crm:3002
+
+    header {
+        Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} ws: wss:;"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-Robots-Tag "noindex, nofollow, noarchive"
     }
     encode gzip zstd
 }
