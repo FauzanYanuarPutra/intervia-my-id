@@ -4,6 +4,20 @@ FROM node:20-bullseye-slim AS crm_deps
 
 ARG NPM_REGISTRY
 
+ARG NEXT_PUBLIC_APP_ENV=development
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3003
+ARG NEXT_PUBLIC_WWW_URL=http://localhost:3000
+ARG NEXT_PUBLIC_CRM_URL=http://localhost:3003
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG NEXT_PUBLIC_MARKETPLACE_URL=http://localhost:8081
+
+ENV NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_WWW_URL=${NEXT_PUBLIC_WWW_URL}
+ENV NEXT_PUBLIC_CRM_URL=${NEXT_PUBLIC_CRM_URL}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_MARKETPLACE_URL=${NEXT_PUBLIC_MARKETPLACE_URL}
+
 WORKDIR /app/apps/crm
 
 RUN npm config set registry "${NPM_REGISTRY}" \
@@ -15,6 +29,7 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
 
+# WAJIB karena next.config.mjs menggunakan ../../packages
 COPY packages /app/packages
 
 RUN set -eux; \
@@ -41,9 +56,19 @@ RUN set -eux; \
       return 1; \
     }; \
     if [ -f package-lock.json ]; then \
-      retry_npm npm ci --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
+      retry_npm npm ci \
+        --legacy-peer-deps \
+        --include=optional \
+        --prefer-offline \
+        --no-audit \
+        --no-fund; \
     else \
-      retry_npm npm install --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
+      retry_npm npm install \
+        --legacy-peer-deps \
+        --include=optional \
+        --prefer-offline \
+        --no-audit \
+        --no-fund; \
     fi; \
     if ! node -e "require.resolve('@next/swc-linux-x64-gnu/package.json')"; then \
       NEXT_VERSION=$(node -p "require('./node_modules/next/package.json').version"); \
@@ -62,29 +87,37 @@ RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+FROM crm_deps AS crm_lint
+
+RUN npm run lint \
+    && npm run typecheck
+
 FROM crm_deps AS crm_builder
 
-RUN NODE_OPTIONS="--max-old-space-size=2048" npm run build
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
+RUN mkdir -p .next/standalone/apps/crm/.next \
+    && cp -R .next/static .next/standalone/apps/crm/.next/static \
+    && cp -R public .next/standalone/apps/crm/public
+
 RUN npm prune --omit=dev --legacy-peer-deps
+
 RUN rm -rf .next/cache /root/.npm /tmp/*
 
 FROM crm_deps AS crm_dev
 
-FROM node:20-bullseye-slim AS crm
+FROM crm_builder AS crm
 
 WORKDIR /app/apps/crm
 
 ENV NODE_ENV=production
-ENV PORT=3002
+ENV PORT=3003
+ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=crm_builder /app/apps/crm/.next ./.next
-COPY --from=crm_builder /app/apps/crm/public ./public
-COPY --from=crm_builder /app/apps/crm/package*.json ./
-COPY --from=crm_builder /app/apps/crm/node_modules ./node_modules
+RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-manifest.json', 'utf8'))" \
+    && test -f .next/standalone/apps/crm/server.js \
+    && test -d .next/standalone/apps/crm/.next/static \
+    && test -d .next/standalone/apps/crm/public
 
-COPY --from=crm_builder /app/packages /app/packages
-
-EXPOSE 3002
-
-CMD ["npm", "start"]
+EXPOSE 3003

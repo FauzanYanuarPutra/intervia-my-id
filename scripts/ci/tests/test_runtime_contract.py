@@ -53,6 +53,23 @@ class ComposeRuntimeContractTests(unittest.TestCase):
             www["depends_on"]["redis_cache"],
         )
 
+    def test_www_uses_identity_service_for_server_side_identity_calls(self) -> None:
+        environment = self.model["services"]["www"]["environment"]
+
+        self.assertEqual(
+            "http://identity_service:8080",
+            environment["INTERNAL_API_URL"],
+        )
+        self.assertEqual(
+            "http://localhost:8080",
+            environment["NEXT_PUBLIC_API_URL"],
+        )
+
+    def test_www_rate_limit_policy_cannot_be_configured_fail_open(self) -> None:
+        environment = self.model["services"]["www"]["environment"]
+
+        self.assertNotIn("RATE_LIMIT_FAIL_OPEN", environment)
+
     def test_www_and_redis_share_only_a_dedicated_cache_network(self) -> None:
         services = self.model["services"]
         www_networks = set(services["www"]["networks"])
@@ -218,6 +235,7 @@ class RuntimeValidatorCliTests(unittest.TestCase):
                 "www": {
                     "environment": {
                         "REDIS_URL": "redis://:redacted@redis_cache:6379",
+                        "INTERNAL_API_URL": "http://identity_service:8080",
                         "GOOGLE_CLIENT_ID": "",
                         "GOOGLE_CLIENT_SECRET": "",
                         "GOOGLE_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
@@ -259,6 +277,26 @@ class RuntimeValidatorCliTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("WWW Redis must use the redis_cache service", result.stderr)
         self.assertNotIn("redis://localhost:6379", result.stderr)
+
+    def test_www_localhost_identity_url_is_rejected(self) -> None:
+        model = self.valid_model()
+        www = model["services"]["www"]  # type: ignore[index]
+        www["environment"]["INTERNAL_API_URL"] = "http://localhost:8080"  # type: ignore[index]
+
+        result = self.run_validator(model, "")
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("WWW Identity must use the identity_service service", result.stderr)
+
+    def test_fail_open_rate_limit_override_is_rejected(self) -> None:
+        model = self.valid_model()
+        www = model["services"]["www"]  # type: ignore[index]
+        www["environment"]["RATE_LIMIT_FAIL_OPEN"] = "true"  # type: ignore[index]
+
+        result = self.run_validator(model, "")
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("Rate limiting must fail closed", result.stderr)
 
     def test_tunnel_profile_requires_non_empty_token(self) -> None:
         model = self.valid_model()

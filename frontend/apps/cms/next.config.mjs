@@ -13,16 +13,25 @@ const SECURITY_HEADERS = buildSecurityHeaders({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  output: 'standalone',
+
+  outputFileTracingRoot: path.resolve(
+    CONFIG_DIR,
+    '../..',
+  ),
+
   poweredByHeader: false,
   compress: true,
+
   typescript: {
     ignoreBuildErrors: false,
   },
-  transpilePackages: ['lajukan-ui'],
+
   experimental: {
     externalDir: true,
-    sri: { algorithm: 'sha256' },
+    sri: {
+      algorithm: 'sha256',
+    },
   },
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }];

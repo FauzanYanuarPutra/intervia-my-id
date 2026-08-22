@@ -513,6 +513,7 @@ services:
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
       INTERNAL_IDENTITY_URL: http://identity_service:8080
+      INTERNAL_API_URL: http://identity_service:8080
       INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
       MARKETPLACE_URL: http://marketplace_service:8081
       INTERNAL_COMMUNITY_URL: http://community_service:8082
@@ -532,7 +533,6 @@ services:
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9002}
       REDIS_URL: redis://:${REDIS_PASS}@redis_cache:6379
       REDIS_CONNECTION_NAME: ${REDIS_CONNECTION_NAME:-lajukan-www}
-      RATE_LIMIT_FAIL_OPEN: ${RATE_LIMIT_FAIL_OPEN:-false}
       JWT_SECRET: ${JWT_SECRET}
       ALLOW_BEARER_AUTH: ${ALLOW_BEARER_AUTH:-true}
       ENABLE_OTP_AUTH: ${ENABLE_OTP_AUTH:-true}

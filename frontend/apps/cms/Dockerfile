@@ -3,6 +3,41 @@ ARG NPM_REGISTRY=https://registry.npmjs.org/
 FROM node:20-bullseye-slim AS cms_deps
 
 ARG NPM_REGISTRY
+ARG NEXT_PUBLIC_APP_ENV=development
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
+ARG NEXT_PUBLIC_CMS_URL=http://localhost:3000
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG NEXT_PUBLIC_MARKETPLACE_URL=http://localhost:8081
+ARG NEXT_PUBLIC_COMMUNITY_URL=http://localhost:8082
+ARG NEXT_PUBLIC_CHAT_WS_URL=ws://localhost:4000/socket
+ARG NEXT_PUBLIC_MARKETPLACE_WS_URL=
+ARG NEXT_PUBLIC_NOTIFICATION_WS_URL=
+ARG NEXT_PUBLIC_LOGIN_OTP_REQUIRED=true
+ARG NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED=false
+ARG NEXT_PUBLIC_DISABLE_PWA=true
+ARG NEXT_PUBLIC_CAPTCHA_PROVIDER=turnstile
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ARG NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
+ARG NEXT_PUBLIC_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+ARG NEXT_PUBLIC_TURN_URLS=
+
+ENV NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_CMS_URL=${NEXT_PUBLIC_CMS_URL}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_MARKETPLACE_URL=${NEXT_PUBLIC_MARKETPLACE_URL}
+ENV NEXT_PUBLIC_COMMUNITY_URL=${NEXT_PUBLIC_COMMUNITY_URL}
+ENV NEXT_PUBLIC_CHAT_WS_URL=${NEXT_PUBLIC_CHAT_WS_URL}
+ENV NEXT_PUBLIC_MARKETPLACE_WS_URL=${NEXT_PUBLIC_MARKETPLACE_WS_URL}
+ENV NEXT_PUBLIC_NOTIFICATION_WS_URL=${NEXT_PUBLIC_NOTIFICATION_WS_URL}
+ENV NEXT_PUBLIC_LOGIN_OTP_REQUIRED=${NEXT_PUBLIC_LOGIN_OTP_REQUIRED}
+ENV NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED=${NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED}
+ENV NEXT_PUBLIC_DISABLE_PWA=${NEXT_PUBLIC_DISABLE_PWA}
+ENV NEXT_PUBLIC_CAPTCHA_PROVIDER=${NEXT_PUBLIC_CAPTCHA_PROVIDER}
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+ENV NEXT_PUBLIC_HCAPTCHA_SITE_KEY=${NEXT_PUBLIC_HCAPTCHA_SITE_KEY}
+ENV NEXT_PUBLIC_STUN_URLS=${NEXT_PUBLIC_STUN_URLS}
+ENV NEXT_PUBLIC_TURN_URLS=${NEXT_PUBLIC_TURN_URLS}
 
 WORKDIR /app/apps/cms
 
@@ -15,6 +50,8 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
 
+# Shared frontend package.
+# Build context adalah ./frontend, sehingga "packages" berarti frontend/packages.
 COPY packages /app/packages
 
 RUN set -eux; \
@@ -26,6 +63,7 @@ RUN set -eux; \
     fi; \
     ./node_modules/.bin/tsc -p tsconfig.build.json
 
+# Copy manifest terlebih dahulu agar Docker dependency layer bisa dicache.
 COPY apps/cms/package*.json ./
 
 RUN set -eux; \
@@ -58,34 +96,52 @@ RUN set -eux; \
 
 COPY apps/cms/ ./
 
-RUN mkdir -p public
-
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV FAST_DOCKER_BUILD=true
+
+FROM cms_deps AS cms_test
+
+RUN npm run test
+
+FROM cms_deps AS cms_lint
+
+RUN npm run lint
 
 FROM cms_deps AS cms_builder
 
-RUN NODE_OPTIONS="--max-old-space-size=2048" npm run build
+RUN if [ -d "/app/apps/cms/next-env.d.ts" ]; then \
+      echo "WARNING: next-env.d.ts was a directory; removing it"; \
+      rm -rf "/app/apps/cms/next-env.d.ts"; \
+    fi
+
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
+# Next standalone intentionally excludes static/public assets. Place them beside
+# the generated server so the production image can use the supported entrypoint.
+RUN mkdir -p .next/standalone/apps/cms/.next \
+    && cp -R .next/static .next/standalone/apps/cms/.next/static \
+    && cp -R public .next/standalone/apps/cms/public
+
 RUN npm prune --omit=dev --legacy-peer-deps
+
 RUN rm -rf .next/cache /root/.npm /tmp/*
 
 FROM cms_deps AS cms_dev
 
-FROM node:20-bullseye-slim AS cms
+FROM cms_builder AS cms
 
 WORKDIR /app/apps/cms
 
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=cms_builder /app/apps/cms/.next ./.next
-COPY --from=cms_builder /app/apps/cms/public ./public
-COPY --from=cms_builder /app/apps/cms/package*.json ./
-COPY --from=cms_builder /app/apps/cms/node_modules ./node_modules
+RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-manifest.json', 'utf8'))" \
+    && test -f .next/standalone/apps/cms/server.js \
+    && test -d .next/standalone/apps/cms/.next/static \
+    && test -d .next/standalone/apps/cms/public
 
-# Dibutuhkan apabila npm menyimpan local file dependency sebagai symlink.
-COPY --from=cms_builder /app/packages /app/packages
+EXPOSE 3000
 
-EXPOSE 3001
-
-CMD ["npm", "start"]
+CMD ["node", ".next/standalone/apps/cms/server.js"]

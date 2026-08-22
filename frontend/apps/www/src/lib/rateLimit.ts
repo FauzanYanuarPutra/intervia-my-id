@@ -2,8 +2,6 @@ import { getRedis } from '@/lib/redis';
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
-const RATE_LIMIT_FAIL_OPEN = process.env.RATE_LIMIT_FAIL_OPEN === 'true';
-
 type RateLimitResult = {
   allowed: boolean;
   limit: number;
@@ -66,18 +64,7 @@ async function evaluateRateLimit(
       degraded: false,
     };
   } catch (error) {
-    if (RATE_LIMIT_FAIL_OPEN) {
-      console.error('[RateLimit] Redis unavailable. fail-open=true:', error);
-      return {
-        allowed: true,
-        limit: maxRequests,
-        remaining: maxRequests,
-        resetInSec: windowSec,
-        degraded: true,
-      };
-    }
-
-    console.error('[RateLimit] Redis unavailable. fail-open=false:', error);
+    console.error('[RateLimit] Redis unavailable; request denied:', error);
     return {
       allowed: false,
       limit: maxRequests,

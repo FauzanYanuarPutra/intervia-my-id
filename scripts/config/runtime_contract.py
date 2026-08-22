@@ -49,6 +49,13 @@ def validate_contract(
     if not isinstance(www_environment, dict):
         www_environment = {}
 
+    fail_open_values = {
+        str(www_environment.get("RATE_LIMIT_FAIL_OPEN", "")).strip().lower(),
+        env_values.get("RATE_LIMIT_FAIL_OPEN", "").strip().lower(),
+    }
+    if "true" in fail_open_values:
+        errors.append("Rate limiting must fail closed; RATE_LIMIT_FAIL_OPEN=true is forbidden.")
+
     redis_url = www_environment.get("REDIS_URL")
     redis_host = urlparse(redis_url).hostname if non_empty(redis_url) else None
     if redis_host != "redis_cache":
@@ -57,6 +64,11 @@ def validate_contract(
     redis_dependency = www.get("depends_on", {}).get("redis_cache", {})
     if not isinstance(redis_dependency, dict) or redis_dependency.get("condition") != "service_healthy":
         errors.append("WWW must wait for redis_cache to become healthy.")
+
+    identity_url = www_environment.get("INTERNAL_API_URL")
+    identity_host = urlparse(identity_url).hostname if non_empty(identity_url) else None
+    if identity_host != "identity_service":
+        errors.append("WWW Identity must use the identity_service service.")
 
     google_client_id = www_environment.get("GOOGLE_CLIENT_ID")
     google_client_secret = www_environment.get("GOOGLE_CLIENT_SECRET")
