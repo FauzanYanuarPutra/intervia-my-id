@@ -1,0 +1,86 @@
+name: Usaha Business OS Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/apps/usaha/**"
+      - "frontend/apps/www/**"
+      - "services/identity_service/**"
+      - "services/marketplace_service/**"
+      - "scripts/ci/check_usaha_business_os_contract.py"
+      - ".github/workflows/usaha-business-os-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/apps/usaha/**"
+      - "frontend/apps/www/**"
+      - "services/identity_service/**"
+      - "services/marketplace_service/**"
+      - "scripts/ci/check_usaha_business_os_contract.py"
+      - ".github/workflows/usaha-business-os-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: usaha-business-os-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Usaha business OS contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate application boundary
+        run: python scripts/ci/check_usaha_business_os_contract.py
+
+  frontend:
+    name: Usaha frontend validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend workspace
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+      - name: Typecheck Usaha
+        working-directory: frontend
+        run: npm run typecheck --workspace=usaha
+      - name: Build Usaha
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_WWW_URL: http://localhost:3000
+          NEXT_PUBLIC_USAHA_URL: http://localhost:3003
+          NEXT_PUBLIC_API_URL: http://localhost:8080
+          NEXT_PUBLIC_MARKETPLACE_URL: http://localhost:8081
+        run: npm run build --workspace=usaha
+
+  gate:
+    name: Usaha business OS gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [contract, frontend]
+    steps:
+      - name: Require contract and frontend validation
+        env:
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "contract=$CONTRACT_RESULT"
+          echo "frontend=$FRONTEND_RESULT"
+          [[ "$CONTRACT_RESULT" == "success" ]]
+          [[ "$FRONTEND_RESULT" == "success" ]]
