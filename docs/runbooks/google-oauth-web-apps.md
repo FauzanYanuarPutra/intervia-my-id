@@ -4,19 +4,24 @@ Lajukan uses one Google OAuth **Web application** client for public web apps tha
 
 ## Architecture
 
-The Google credential is shared, while each web app owns its own callback URI:
+The Google credential is shared, while each web app owns an explicit callback URI:
 
 ```text
 Google OAuth Web Client
   |
-  +-- www.lajukan.com   -> /api/auth/google/callback
+  +-- www.lajukan.com
+  |     `-- WWW_GOOGLE_REDIRECT_URI
   |
-  +-- usaha.lajukan.com -> /api/auth/google/callback
+  +-- usaha.lajukan.com
+  |     `-- USAHA_GOOGLE_REDIRECT_URI
   |
-  `-- identity_service  -> validates the same Google client ID
+  `-- identity_service
+        `-- validates the same GOOGLE_CLIENT_ID
 ```
 
 Do not create separate Google client IDs for WWW and Usaha unless there is an explicit isolation requirement. A single client prevents credential drift and keeps both apps attached to the same Lajukan account identity.
+
+Lajukan currently uses its own OAuth routes and identity service integration. It does **not** use NextAuth/Auth.js for these Google login flows.
 
 ## Google Cloud configuration
 
@@ -52,40 +57,76 @@ http://localhost:3003/api/auth/google/callback
 
 Staging uses the corresponding `www.staging.lajukan.com` and `usaha.staging.lajukan.com` origins and callback URIs.
 
-## Runtime environment
+## Canonical runtime environment
 
 Use the same client credential for WWW and Usaha. Keep real values outside Git.
+
+Production/tunnel example:
 
 ```env
 GOOGLE_CLIENT_ID=<rotated-client-id>.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=<rotated-client-secret>
-GOOGLE_REDIRECT_URI=https://www.lajukan.com/api/auth/google/callback
+WWW_GOOGLE_REDIRECT_URI=https://www.lajukan.com/api/auth/google/callback
 USAHA_GOOGLE_REDIRECT_URI=https://usaha.lajukan.com/api/auth/google/callback
 ```
 
-Development:
+Local development:
 
 ```env
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+WWW_GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 USAHA_GOOGLE_REDIRECT_URI=http://localhost:3003/api/auth/google/callback
 ```
 
-The Compose model passes the shared client ID to `identity_service` and passes the client ID/secret to both web applications. WWW reads `GOOGLE_REDIRECT_URI`; Usaha reads `USAHA_GOOGLE_REDIRECT_URI`.
+The Compose model passes the shared client ID to `identity_service` and the shared client ID/secret to the web apps. WWW reads `WWW_GOOGLE_REDIRECT_URI`; Usaha reads `USAHA_GOOGLE_REDIRECT_URI`.
+
+## Removed / legacy variables
+
+Do not add app-specific NextAuth variables merely for symmetry. They are not consumed by the current Lajukan Google OAuth flow.
+
+Remove these from Lajukan runtime env files:
+
+```text
+GOOGLE_REDIRECT_URI
+NEXTAUTH_URL
+AUTH_URL
+NEXTAUTH_URL_USAHA
+AUTH_URL_USAHA
+```
+
+`GOOGLE_REDIRECT_URI` was the old ambiguous WWW callback name and has been replaced by `WWW_GOOGLE_REDIRECT_URI`.
 
 ## Runtime contract
 
-Startup validation rejects Google OAuth configuration when any of these invariants are broken:
+OAuth is considered enabled when Google OAuth credentials are configured. Callback defaults may exist while OAuth is disabled.
 
-- WWW has only part of its client ID, client secret, or callback URI.
-- Usaha has only part of its client ID, client secret, or callback URI.
-- Identity does not receive the Google client ID while web OAuth is enabled.
+When OAuth is enabled, startup validation rejects configuration when any of these invariants are broken:
+
+- WWW has only part of its client ID, client secret, or `WWW_GOOGLE_REDIRECT_URI`.
+- Usaha has only part of its client ID, client secret, or `USAHA_GOOGLE_REDIRECT_URI`.
+- Identity does not receive the Google client ID.
 - WWW, Usaha, and Identity use different Google client IDs.
 - WWW and Usaha use different Google client secrets.
 - a callback does not end at `/api/auth/google/callback`.
 - a callback origin differs from that app's configured public origin.
 - staging or production uses a non-HTTPS callback.
+- a removed/legacy OAuth URL variable is still configured.
 
 This catches configuration drift before a browser reaches Google and receives errors such as `401 invalid_client` or `redirect_uri_mismatch`.
+
+## Development through Cloudflare Tunnel
+
+When development is exposed through the tunnel, browser-facing origins and callbacks must all use the public hosts:
+
+```env
+APP_DOMAIN=lajukan.com
+NEXT_PUBLIC_APP_URL=https://www.lajukan.com
+NEXT_PUBLIC_WWW_URL=https://www.lajukan.com
+NEXT_PUBLIC_USAHA_URL=https://usaha.lajukan.com
+WWW_GOOGLE_REDIRECT_URI=https://www.lajukan.com/api/auth/google/callback
+USAHA_GOOGLE_REDIRECT_URI=https://usaha.lajukan.com/api/auth/google/callback
+```
+
+Do not mix `NEXT_PUBLIC_USAHA_URL=http://localhost:3003` with an `https://usaha.lajukan.com/...` OAuth callback in the same runtime mode.
 
 ## Applying rotated credentials in development
 

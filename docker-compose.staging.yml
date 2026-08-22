@@ -76,6 +76,7 @@ services:
       NEXT_PUBLIC_APP_ENV: staging
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://www.staging.lajukan.com}
       NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.staging.lajukan.com}
+      WWW_GOOGLE_REDIRECT_URI: ${WWW_GOOGLE_REDIRECT_URI:-https://www.staging.lajukan.com/api/auth/google/callback}
       INTERNAL_AI_URL: http://ai_service:8080
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required in staging}
 

@@ -17,7 +17,7 @@ def base_model(liveness_source: Path) -> dict:
                     "NEXT_PUBLIC_WWW_URL": "http://localhost:3000",
                     "GOOGLE_CLIENT_ID": "",
                     "GOOGLE_CLIENT_SECRET": "",
-                    "GOOGLE_REDIRECT_URI": "",
+                    "WWW_GOOGLE_REDIRECT_URI": "",
                 },
                 "depends_on": {
                     "redis_cache": {"condition": "service_healthy"},
@@ -62,7 +62,7 @@ def configure_google_oauth(model: dict) -> None:
         {
             "GOOGLE_CLIENT_ID": client_id,
             "GOOGLE_CLIENT_SECRET": client_secret,
-            "GOOGLE_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
+            "WWW_GOOGLE_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
         }
     )
     model["services"]["usaha"]["environment"].update(
@@ -76,6 +76,21 @@ def configure_google_oauth(model: dict) -> None:
 
 
 class GoogleOauthRuntimeContractTests(unittest.TestCase):
+    def test_google_oauth_allows_callback_defaults_when_credentials_are_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            model["services"]["www"]["environment"]["WWW_GOOGLE_REDIRECT_URI"] = (
+                "http://localhost:3000/api/auth/google/callback"
+            )
+            model["services"]["usaha"]["environment"]["USAHA_GOOGLE_REDIRECT_URI"] = (
+                "http://localhost:3003/api/auth/google/callback"
+            )
+
+            errors = validate_contract(model, {}, "development", set())
+
+        google_errors = [error for error in errors if "Google OAuth" in error]
+        self.assertEqual(google_errors, [], google_errors)
+
     def test_google_oauth_requires_usaha_configuration_when_shared_client_is_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = base_model(Path(tmp))
@@ -104,6 +119,35 @@ class GoogleOauthRuntimeContractTests(unittest.TestCase):
             errors,
         )
 
+    def test_google_oauth_requires_explicit_www_redirect_environment_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            configure_google_oauth(model)
+            www_environment = model["services"]["www"]["environment"]
+            www_environment["GOOGLE_REDIRECT_URI"] = www_environment.pop(
+                "WWW_GOOGLE_REDIRECT_URI"
+            )
+
+            errors = validate_contract(model, {}, "development", set())
+
+        self.assertTrue(
+            any("WWW_GOOGLE_REDIRECT_URI" in error for error in errors),
+            errors,
+        )
+
+    def test_google_oauth_rejects_nextauth_legacy_url(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+
+            errors = validate_contract(
+                model,
+                {"NEXTAUTH_URL": "http://localhost:3000"},
+                "development",
+                set(),
+            )
+
+        self.assertTrue(any("NEXTAUTH_URL" in error for error in errors), errors)
+
     def test_google_oauth_requires_distinct_www_and_usaha_redirect_origins(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = base_model(Path(tmp))
@@ -126,7 +170,7 @@ class GoogleOauthRuntimeContractTests(unittest.TestCase):
             model["services"]["www"]["environment"].update(
                 {
                     "NEXT_PUBLIC_WWW_URL": "https://www.lajukan.com",
-                    "GOOGLE_REDIRECT_URI": "https://www.lajukan.com/api/auth/google/callback",
+                    "WWW_GOOGLE_REDIRECT_URI": "https://www.lajukan.com/api/auth/google/callback",
                 }
             )
             model["services"]["usaha"]["environment"].update(
