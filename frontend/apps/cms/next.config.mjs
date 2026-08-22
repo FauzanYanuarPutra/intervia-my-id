@@ -1,57 +1,124 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import createNextIntlPlugin from 'next-intl/plugin';
+
 import {
-  buildInternalWebCsp,
+  buildPublicWebCsp,
   buildSecurityHeaders,
 } from '../../packages/config/nextSecurityHeaders.mjs';
-import { fileURLToPath } from 'node:url';
 
 const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
-const IS_PROD = process.env.NODE_ENV === 'production';
+const DEPLOYMENT_ENV = (
+  process.env.APP_ENV ||
+  process.env.ENV ||
+  process.env.NEXT_PUBLIC_APP_ENV ||
+  process.env.NODE_ENV ||
+  'development'
+).toLowerCase();
+const REQUIRES_EXTERNAL_HTTPS = ['staging', 'production'].includes(
+  DEPLOYMENT_ENV,
+);
+const CMS_ORIGIN =
+  (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
+  'https://cms.lajukan.com';
+const CHAT_SERVICE_ORIGIN =
+  process.env.INTERNAL_CHAT_SERVICE_URL ||
+  process.env.INTERNAL_CHAT_URL ||
+  'http://chat_service:4000';
 const SECURITY_HEADERS = buildSecurityHeaders({
-  csp: buildInternalWebCsp({ production: IS_PROD }),
-  production: IS_PROD,
-  robotsTag: 'noindex, nofollow, noarchive',
+  csp: buildPublicWebCsp({ production: REQUIRES_EXTERNAL_HTTPS }),
+  production: REQUIRES_EXTERNAL_HTTPS,
+  permissionsPolicy:
+    'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()',
+  crossOriginOpenerPolicy: 'same-origin-allow-popups',
 });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-
-  outputFileTracingRoot: path.resolve(
-    CONFIG_DIR,
-    '../..',
-  ),
-
+  outputFileTracingRoot: path.resolve(CONFIG_DIR, '../..'),
   poweredByHeader: false,
   compress: true,
-
   typescript: {
     ignoreBuildErrors: false,
   },
-
   experimental: {
+    optimizeCss: false,
     externalDir: true,
-    sri: {
-      algorithm: 'sha256',
-    },
+    optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts'],
+    proxyClientMaxBodySize: '128mb',
+    sri: { algorithm: 'sha256' },
   },
   async headers() {
-    return [{ source: '/:path*', headers: SECURITY_HEADERS }];
-  },
-  webpack: config => {
-    config.resolve.alias = {
-      ...(config.resolve.alias || {}),
-      'lajukan-ui$': path.resolve(
-        process.cwd(),
-        'node_modules/lajukan-ui/index.ts',
-      ),
-    };
-    config.resolve.modules = [
-      path.resolve(process.cwd(), 'node_modules'),
-      ...(config.resolve.modules || []),
+    return [
+      { source: '/:path*', headers: SECURITY_HEADERS },
+      {
+        source: '/fonts/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ];
-    return config;
+  },
+  async redirects() {
+    if (!REQUIRES_EXTERNAL_HTTPS) return [];
+    return [
+      {
+        source: '/:path*',
+        has: [
+          { type: 'header', key: 'x-forwarded-proto', value: 'http' },
+        ],
+        destination: `${CMS_ORIGIN}/:path*`,
+        permanent: true,
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/socket/:path*',
+        destination: `${CHAT_SERVICE_ORIGIN}/socket/:path*`,
+      },
+    ];
+  },
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'commons.wikimedia.org' },
+      { protocol: 'https', hostname: 'upload.wikimedia.org' },
+      { protocol: 'https', hostname: 'images.pexels.com' },
+      { protocol: 'https', hostname: 'picsum.photos' },
+      { protocol: 'https', hostname: 'i.pravatar.cc' },
+      { protocol: 'https', hostname: 'i.vimeocdn.com' },
+    ],
   },
 };
 
-export default nextConfig;
+const config = createNextIntlPlugin()(nextConfig);
+const originalWebpack = config.webpack;
+
+config.webpack = (webpackConfig, options) => {
+  const result = originalWebpack
+    ? originalWebpack(webpackConfig, options)
+    : webpackConfig;
+
+  result.resolve = result.resolve || {};
+  result.resolve.alias = {
+    ...(result.resolve.alias || {}),
+    '@': path.resolve(process.cwd(), 'src'),
+  };
+  result.resolve.symlinks = false;
+  result.resolve.modules = [
+    path.resolve(process.cwd(), 'node_modules'),
+    ...(result.resolve.modules || []),
+  ];
+  return result;
+};
+
+export default config;
