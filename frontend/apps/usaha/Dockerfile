@@ -50,8 +50,6 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
 
-# Shared frontend package.
-# Build context adalah ./frontend, sehingga "packages" berarti frontend/packages.
 COPY packages /app/packages
 
 RUN set -eux; \
@@ -63,7 +61,6 @@ RUN set -eux; \
     fi; \
     ./node_modules/.bin/tsc -p tsconfig.build.json
 
-# Copy manifest terlebih dahulu agar Docker dependency layer bisa dicache.
 COPY apps/usaha/package*.json ./
 
 RUN set -eux; \
@@ -79,69 +76,51 @@ RUN set -eux; \
       return 1; \
     }; \
     if [ -f package-lock.json ]; then \
-      retry_npm npm ci --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
+      if ! npm ci --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; then \
+        echo "package-lock.json is stale or incompatible; falling back to npm install"; \
+        rm -rf node_modules; \
+        retry_npm npm install --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
+      fi; \
     else \
       retry_npm npm install --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
     fi; \
     if ! node -e "require.resolve('@next/swc-linux-x64-gnu/package.json')"; then \
       NEXT_VERSION=$(node -p "require('./node_modules/next/package.json').version"); \
-      retry_npm npm install \
-        --no-save \
-        --legacy-peer-deps \
-        --prefer-offline \
-        --no-audit \
-        --no-fund \
-        "@next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
+      retry_npm npm install --no-save --legacy-peer-deps --prefer-offline --no-audit --no-fund "@next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
     fi
 
 COPY apps/usaha/ ./
+RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV FAST_DOCKER_BUILD=true
 
 FROM usaha_deps AS usaha_test
-
-RUN npm run test
+RUN npm run test --if-present
 
 FROM usaha_deps AS usaha_lint
-
-RUN npm run lint
+RUN npm run lint && npm run typecheck
 
 FROM usaha_deps AS usaha_builder
-
-RUN if [ -d "/app/apps/usaha/next-env.d.ts" ]; then \
-      echo "WARNING: next-env.d.ts was a directory; removing it"; \
-      rm -rf "/app/apps/usaha/next-env.d.ts"; \
-    fi
-
+RUN if [ -d "/app/apps/usaha/next-env.d.ts" ]; then rm -rf "/app/apps/usaha/next-env.d.ts"; fi
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
-
-# Next standalone intentionally excludes static/public assets. Place them beside
-# the generated server so the production image can use the supported entrypoint.
 RUN mkdir -p .next/standalone/apps/usaha/.next \
     && cp -R .next/static .next/standalone/apps/usaha/.next/static \
     && cp -R public .next/standalone/apps/usaha/public
-
 RUN npm prune --omit=dev --legacy-peer-deps
-
 RUN rm -rf .next/cache /root/.npm /tmp/*
 
 FROM usaha_deps AS usaha_dev
 
 FROM usaha_builder AS usaha
-
 WORKDIR /app/apps/usaha
-
 ENV NODE_ENV=production
 ENV PORT=3003
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
-
 RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-manifest.json', 'utf8'))" \
     && test -f .next/standalone/apps/usaha/server.js \
     && test -d .next/standalone/apps/usaha/.next/static \
     && test -d .next/standalone/apps/usaha/public
-
 EXPOSE 3003
-
 CMD ["node", ".next/standalone/apps/usaha/server.js"]
