@@ -24,6 +24,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use identity_service::config::{AppState, Config};
 use identity_service::db;
+use identity_service::organizations::routes::{
+    create_organization, get_organization, list_organization_members, list_organizations,
+};
 use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
     get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_users, login,
@@ -502,6 +505,15 @@ async fn main() -> Result<()> {
         )
         .route("/users", get(list_users))
         .route("/users/{id}", get(get_user_detail))
+        .route(
+            "/organizations",
+            get(list_organizations).post(create_organization),
+        )
+        .route("/organizations/{id}", get(get_organization))
+        .route(
+            "/organizations/{id}/members",
+            get(list_organization_members),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .layer(CompressionLayer::new())
