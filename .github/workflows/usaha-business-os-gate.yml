@@ -45,27 +45,27 @@ jobs:
     name: Usaha frontend validation
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend/apps/usaha
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install frontend workspace
-        working-directory: frontend
+          cache-dependency-path: frontend/apps/usaha/package-lock.json
+      - name: Install Usaha dependencies
         run: npm ci --ignore-scripts
       - name: Typecheck Usaha
-        working-directory: frontend
-        run: npm run typecheck --workspace=usaha
+        run: npm run typecheck
       - name: Build Usaha
-        working-directory: frontend
         env:
           NEXT_PUBLIC_WWW_URL: http://localhost:3000
           NEXT_PUBLIC_USAHA_URL: http://localhost:3003
           NEXT_PUBLIC_API_URL: http://localhost:8080
           NEXT_PUBLIC_MARKETPLACE_URL: http://localhost:8081
-        run: npm run build --workspace=usaha
+        run: npm run build
 
   gate:
     name: Usaha business OS gate
