@@ -113,7 +113,7 @@ services:
     command:
       - |
         set -e
-        sed 's/\r$//' /scylladb/run_migrations.sh > /tmp/run_chat_migrations.sh
+        sed 's/\r$//' /scylladb/run_chat_migrations.sh > /tmp/run_chat_migrations.sh
         exec /bin/sh /tmp/run_chat_migrations.sh
     networks: [app, data]
 
@@ -128,6 +128,7 @@ services:
       NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://www.lajukan.com}
       NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
+      WWW_GOOGLE_REDIRECT_URI: ${WWW_GOOGLE_REDIRECT_URI:-https://www.lajukan.com/api/auth/google/callback}
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
       INTERNAL_AI_URL: http://ai_service:8080
