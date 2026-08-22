@@ -86,6 +86,25 @@ services:
       - "127.0.0.1:${PORT_OLLAMA:-11434}:11434"
 
   www:
+    build:
+      args:
+        NEXT_PUBLIC_APP_ENV: development
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
+        NEXT_PUBLIC_COMMUNITY_URL: ${NEXT_PUBLIC_COMMUNITY_URL:-http://localhost:8082}
+        NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-ws://localhost:4000/socket}
+        NEXT_PUBLIC_MARKETPLACE_WS_URL: ${NEXT_PUBLIC_MARKETPLACE_WS_URL:-}
+        NEXT_PUBLIC_NOTIFICATION_WS_URL: ${NEXT_PUBLIC_NOTIFICATION_WS_URL:-}
+        NEXT_PUBLIC_LOGIN_OTP_REQUIRED: ${NEXT_PUBLIC_LOGIN_OTP_REQUIRED:-true}
+        NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED: ${NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED:-false}
+        NEXT_PUBLIC_DISABLE_PWA: ${NEXT_PUBLIC_DISABLE_PWA:-true}
+        NEXT_PUBLIC_CAPTCHA_PROVIDER: ${NEXT_PUBLIC_CAPTCHA_PROVIDER:-turnstile}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        NEXT_PUBLIC_HCAPTCHA_SITE_KEY: ${NEXT_PUBLIC_HCAPTCHA_SITE_KEY:-}
+        NEXT_PUBLIC_STUN_URLS: ${NEXT_PUBLIC_STUN_URLS:-stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302}
+        NEXT_PUBLIC_TURN_URLS: ${NEXT_PUBLIC_TURN_URLS:-}
     environment:
       ENV: development
       APP_ENV: development
@@ -94,12 +113,25 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
     ports:
       - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  # Backoffice remains available, but it is not part of the lightweight core
-  # development stack. This preserves the pre-refactor startup contract and
-  # avoids building three extra Next.js applications when working on WWW/API.
+  # Internal backoffice remains opt-in for lightweight development.
   cms:
     profiles: [backoffice]
+    build:
+      args:
+        NEXT_PUBLIC_APP_ENV: development
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_CMS_URL:-http://localhost:3001}
+        NEXT_PUBLIC_CMS_URL: ${NEXT_PUBLIC_CMS_URL:-http://localhost:3001}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
+        NEXT_PUBLIC_COMMUNITY_URL: ${NEXT_PUBLIC_COMMUNITY_URL:-http://localhost:8082}
+        NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-ws://localhost:4000/socket}
     environment:
       ENV: development
       APP_ENV: development
@@ -107,9 +139,24 @@ services:
       NEXT_PUBLIC_APP_ENV: development
     ports:
       - "127.0.0.1:${PORT_CMS:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   crm:
     profiles: [backoffice]
+    build:
+      args:
+        NEXT_PUBLIC_APP_ENV: development
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_CRM_URL:-http://localhost:3002}
+        NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-http://localhost:3002}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
+        NEXT_PUBLIC_COMMUNITY_URL: ${NEXT_PUBLIC_COMMUNITY_URL:-http://localhost:8082}
+        NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-ws://localhost:4000/socket}
     environment:
       ENV: development
       APP_ENV: development
@@ -117,9 +164,25 @@ services:
       NEXT_PUBLIC_APP_ENV: development
     ports:
       - "127.0.0.1:${PORT_CRM:-3002}:3002"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
+  # Usaha is customer-facing Business OS and belongs to the default product stack.
   usaha:
-    profiles: [backoffice]
+    profiles: !reset []
+    build:
+      args:
+        NEXT_PUBLIC_APP_ENV: development
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
+        NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
+        NEXT_PUBLIC_COMMUNITY_URL: ${NEXT_PUBLIC_COMMUNITY_URL:-http://localhost:8082}
+        NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-ws://localhost:4000/socket}
     environment:
       ENV: development
       APP_ENV: development
@@ -127,11 +190,18 @@ services:
       NEXT_PUBLIC_APP_ENV: development
     ports:
       - "127.0.0.1:${PORT_USAHA:-3003}:3003"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   caddy:
     profiles: [edge, tunnel]
     depends_on: !override
-      www: { condition: service_started }
+      www: { condition: service_healthy }
+      usaha: { condition: service_healthy }
     ports: !override
       - "127.0.0.1:${PORT_CADDY_HTTP:-80}:80"
       - "127.0.0.1:${PORT_CADDY_HTTPS:-443}:443"

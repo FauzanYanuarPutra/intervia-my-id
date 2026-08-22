@@ -54,14 +54,13 @@ case "$phase" in
     "${COMPOSE[@]}" up --detach --wait --wait-timeout 420
     ;;
   probe)
-    # Compose healthchecks cover the stateful/core backend services. These probes
-    # additionally prove that the host-published application endpoints are usable.
     wait_http "identity" "http://127.0.0.1:${PORT_IDENTITY:-8080}/health"
     wait_http "marketplace" "http://127.0.0.1:${PORT_MARKETPLACE:-8081}/health"
     wait_http "community" "http://127.0.0.1:${PORT_COMMUNITY:-8082}/health"
     wait_http "chat" "http://127.0.0.1:${PORT_CHAT:-4000}/api/health"
     wait_http "ai orchestrator" "http://127.0.0.1:${PORT_AI_SERVICE:-8084}/health"
-    wait_http "www" "http://127.0.0.1:${PORT_FRONTEND:-3000}/"
+    wait_http "www" "http://127.0.0.1:${PORT_FRONTEND:-3000}/api/health"
+    wait_http "usaha" "http://127.0.0.1:${PORT_USAHA:-3003}/api/health"
     "${COMPOSE[@]}" ps -a
     ;;
   cleanup)

@@ -6,7 +6,17 @@ import {
 } from '../../packages/config/nextSecurityHeaders.mjs';
 
 const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
-const isProd = process.env.NODE_ENV === 'production';
+const FRONTEND_ROOT = path.resolve(CONFIG_DIR, '../..');
+const DEPLOYMENT_ENV = (
+  process.env.APP_ENV ||
+  process.env.ENV ||
+  process.env.NEXT_PUBLIC_APP_ENV ||
+  process.env.NODE_ENV ||
+  'development'
+).toLowerCase();
+const REQUIRES_EXTERNAL_HTTPS = ['staging', 'production'].includes(
+  DEPLOYMENT_ENV,
+);
 
 const configuredUsahaOrigin = (
   process.env.NEXT_PUBLIC_USAHA_URL || ''
@@ -17,10 +27,10 @@ const usahaOrigin = configuredUsahaOrigin.startsWith('https://')
 
 const securityHeaders = buildSecurityHeaders({
   csp: buildInternalWebCsp({
-    production: isProd,
+    production: REQUIRES_EXTERNAL_HTTPS,
     connectSources: ['https:', 'wss:', 'ws:'],
   }),
-  production: isProd,
+  production: REQUIRES_EXTERNAL_HTTPS,
   permissionsPolicy:
     'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()',
   robotsTag: 'noindex, nofollow, noarchive',
@@ -29,19 +39,12 @@ const securityHeaders = buildSecurityHeaders({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-
-  outputFileTracingRoot: path.resolve(
-    CONFIG_DIR,
-    '../..',
-  ),
-
+  outputFileTracingRoot: FRONTEND_ROOT,
   poweredByHeader: false,
   compress: true,
-
   typescript: {
     ignoreBuildErrors: false,
   },
-
   experimental: {
     externalDir: true,
     sri: {
@@ -49,7 +52,7 @@ const nextConfig = {
     },
   },
   turbopack: {
-    root: path.resolve(CONFIG_DIR),
+    root: FRONTEND_ROOT,
   },
   async headers() {
     return [
@@ -60,7 +63,7 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    if (!isProd) return [];
+    if (!REQUIRES_EXTERNAL_HTTPS) return [];
 
     return [
       {

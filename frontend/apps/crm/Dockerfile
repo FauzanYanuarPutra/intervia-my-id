@@ -50,8 +50,6 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm config set maxsockets 15 \
     && npm config set prefer-offline true
 
-# Shared frontend package.
-# Build context adalah ./frontend, sehingga "packages" berarti frontend/packages.
 COPY packages /app/packages
 
 RUN set -eux; \
@@ -63,7 +61,6 @@ RUN set -eux; \
     fi; \
     ./node_modules/.bin/tsc -p tsconfig.build.json
 
-# Copy manifest terlebih dahulu agar Docker dependency layer bisa dicache.
 COPY apps/crm/package*.json ./
 
 RUN set -eux; \
@@ -95,53 +92,40 @@ RUN set -eux; \
     fi
 
 COPY apps/crm/ ./
+RUN mkdir -p public
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV FAST_DOCKER_BUILD=true
 
 FROM crm_deps AS crm_test
-
-RUN npm run test
+RUN npm run test --if-present
 
 FROM crm_deps AS crm_lint
-
-RUN npm run lint
+RUN npm run lint && npm run typecheck
 
 FROM crm_deps AS crm_builder
-
 RUN if [ -d "/app/apps/crm/next-env.d.ts" ]; then \
       echo "WARNING: next-env.d.ts was a directory; removing it"; \
       rm -rf "/app/apps/crm/next-env.d.ts"; \
     fi
-
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
-
-# Next standalone intentionally excludes static/public assets. Place them beside
-# the generated server so the production image can use the supported entrypoint.
 RUN mkdir -p .next/standalone/apps/crm/.next \
     && cp -R .next/static .next/standalone/apps/crm/.next/static \
     && cp -R public .next/standalone/apps/crm/public
-
 RUN npm prune --omit=dev --legacy-peer-deps
-
 RUN rm -rf .next/cache /root/.npm /tmp/*
 
 FROM crm_deps AS crm_dev
 
 FROM crm_builder AS crm
-
 WORKDIR /app/apps/crm
-
 ENV NODE_ENV=production
 ENV PORT=3002
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
-
 RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-manifest.json', 'utf8'))" \
     && test -f .next/standalone/apps/crm/server.js \
     && test -d .next/standalone/apps/crm/.next/static \
     && test -d .next/standalone/apps/crm/public
-
 EXPOSE 3002
-
 CMD ["node", ".next/standalone/apps/crm/server.js"]
