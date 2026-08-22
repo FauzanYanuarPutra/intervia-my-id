@@ -1,0 +1,47 @@
+name: KYC Runtime Contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kyc-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: KYC runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Run KYC runtime contract regression tests
+        run: python scripts/config/test_runtime_contract.py
+      - name: Validate KYC Compose model
+        env:
+          LIVENESS_MODELS_PATH: /tmp/lajukan-ci/liveness
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/lajukan-ci/liveness/anti_spoof_models
+          printf 'ci-placeholder' > /tmp/lajukan-ci/liveness/anti_spoof_models/model.onnx
+          docker compose \
+            --profile kyc \
+            --env-file .env.development.example \
+            -f docker-compose.yml \
+            -f docker-compose.dev.yml \
+            config --format json > /tmp/compose.json
+          python scripts/config/runtime_contract.py \
+            --model /tmp/compose.json \
+            --env-file .env.development.example \
+            --environment development \
+            --profile kyc
