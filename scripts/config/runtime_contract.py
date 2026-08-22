@@ -106,6 +106,7 @@ def _validate_google_redirect(
 
 def _validate_google_oauth_runtime(
     services: dict[str, Any],
+    env_values: dict[str, str],
     environment: str,
     errors: list[str],
 ) -> None:
@@ -130,11 +131,25 @@ def _validate_google_oauth_runtime(
 
     www_client_id = www_environment.get("GOOGLE_CLIENT_ID")
     www_client_secret = www_environment.get("GOOGLE_CLIENT_SECRET")
-    www_redirect_uri = www_environment.get("GOOGLE_REDIRECT_URI")
+    www_redirect_uri = www_environment.get("WWW_GOOGLE_REDIRECT_URI")
     usaha_client_id = usaha_environment.get("GOOGLE_CLIENT_ID")
     usaha_client_secret = usaha_environment.get("GOOGLE_CLIENT_SECRET")
     usaha_redirect_uri = usaha_environment.get("USAHA_GOOGLE_REDIRECT_URI")
     identity_client_id = identity_environment.get("GOOGLE_CLIENT_ID")
+
+    legacy_redirect = www_environment.get("GOOGLE_REDIRECT_URI") or env_values.get(
+        "GOOGLE_REDIRECT_URI"
+    )
+    if non_empty(legacy_redirect) and not non_empty(www_redirect_uri):
+        errors.append(
+            "GOOGLE_REDIRECT_URI is legacy; rename it to WWW_GOOGLE_REDIRECT_URI."
+        )
+
+    for legacy_name in ("NEXTAUTH_URL", "AUTH_URL", "NEXTAUTH_URL_USAHA", "AUTH_URL_USAHA"):
+        if non_empty(env_values.get(legacy_name)):
+            errors.append(
+                f"{legacy_name} is not part of Lajukan's custom Google OAuth contract; remove it."
+            )
 
     any_google_value = any(
         non_empty(value)
@@ -142,6 +157,7 @@ def _validate_google_oauth_runtime(
             www_client_id,
             www_client_secret,
             www_redirect_uri,
+            legacy_redirect,
             usaha_client_id,
             usaha_client_secret,
             usaha_redirect_uri,
@@ -157,7 +173,7 @@ def _validate_google_oauth_runtime(
     )
     if not www_complete:
         errors.append(
-            "WWW Google OAuth configuration is partial; configure client ID, client secret, and redirect URI together."
+            "WWW Google OAuth configuration is partial; configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and WWW_GOOGLE_REDIRECT_URI together."
         )
 
     usaha_complete = all(
@@ -166,7 +182,7 @@ def _validate_google_oauth_runtime(
     )
     if not usaha_complete:
         errors.append(
-            "Usaha Google OAuth configuration is partial; configure client ID, client secret, and redirect URI together."
+            "Usaha Google OAuth configuration is partial; configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and USAHA_GOOGLE_REDIRECT_URI together."
         )
 
     if not non_empty(identity_client_id):
@@ -329,7 +345,7 @@ def validate_contract(
     if identity_host != "identity_service":
         errors.append("WWW Identity must use the identity_service service.")
 
-    _validate_google_oauth_runtime(services, environment, errors)
+    _validate_google_oauth_runtime(services, env_values, environment, errors)
 
     env_profiles = {
         profile.strip()
