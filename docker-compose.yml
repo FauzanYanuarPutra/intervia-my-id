@@ -93,7 +93,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    networks: [data]
+    networks: [data, cache]
 
   rabbitmq:
     <<: *data-defaults
@@ -146,7 +146,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-    networks: [data]
+    networks: [data, media]
 
   # Development/staging Scylla. Production overrides Chat to use SCYLLA_NODES.
   scylla_db:
@@ -230,8 +230,6 @@ services:
       LOCKOUT_DURATION_MIN: ${LOCKOUT_DURATION_MIN:-15}
       FAILED_LOGIN_DELAY_MS: ${FAILED_LOGIN_DELAY_MS:-1000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
@@ -407,6 +405,7 @@ services:
       VLLM_URL: ${VLLM_URL:-http://ollama:11434/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-}
       VLLM_MODEL: ${VLLM_MODEL:-}
+      AI_MODEL: ${AI_MODEL:-}
       VLLM_STRUCTURED_MODEL: ${VLLM_STRUCTURED_MODEL:-}
       VLLM_VISION_MODEL: ${VLLM_VISION_MODEL:-}
       VLLM_KYC_MODEL: ${VLLM_KYC_MODEL:-}
@@ -478,6 +477,24 @@ services:
     build:
       context: ./frontend
       dockerfile: apps/www/Dockerfile
+      args:
+        NEXT_PUBLIC_APP_ENV: ${ENV:-development}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
+        NEXT_PUBLIC_COMMUNITY_URL: ${NEXT_PUBLIC_COMMUNITY_URL:-http://localhost:8082}
+        NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-ws://localhost:4000/socket}
+        NEXT_PUBLIC_MARKETPLACE_WS_URL: ${NEXT_PUBLIC_MARKETPLACE_WS_URL:-}
+        NEXT_PUBLIC_NOTIFICATION_WS_URL: ${NEXT_PUBLIC_NOTIFICATION_WS_URL:-}
+        NEXT_PUBLIC_LOGIN_OTP_REQUIRED: ${NEXT_PUBLIC_LOGIN_OTP_REQUIRED:-true}
+        NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED: ${NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED:-false}
+        NEXT_PUBLIC_DISABLE_PWA: ${NEXT_PUBLIC_DISABLE_PWA:-true}
+        NEXT_PUBLIC_CAPTCHA_PROVIDER: ${NEXT_PUBLIC_CAPTCHA_PROVIDER:-turnstile}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        NEXT_PUBLIC_HCAPTCHA_SITE_KEY: ${NEXT_PUBLIC_HCAPTCHA_SITE_KEY:-}
+        NEXT_PUBLIC_STUN_URLS: ${NEXT_PUBLIC_STUN_URLS:-stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302}
+        NEXT_PUBLIC_TURN_URLS: ${NEXT_PUBLIC_TURN_URLS:-}
     environment:
       ENV: ${ENV:-development}
       APP_ENV: ${APP_ENV:-development}
@@ -485,6 +502,14 @@ services:
       NEXT_PUBLIC_APP_ENV: ${ENV:-development}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
+      NEXT_PUBLIC_COMMUNITY_URL: ${NEXT_PUBLIC_COMMUNITY_URL:-http://localhost:8082}
+      NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-ws://localhost:4000/socket}
+      NEXT_PUBLIC_MARKETPLACE_WS_URL: ${NEXT_PUBLIC_MARKETPLACE_WS_URL:-}
+      NEXT_PUBLIC_NOTIFICATION_WS_URL: ${NEXT_PUBLIC_NOTIFICATION_WS_URL:-}
+      NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED: ${NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED:-false}
+      NEXT_PUBLIC_DISABLE_PWA: ${NEXT_PUBLIC_DISABLE_PWA:-true}
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
       INTERNAL_IDENTITY_URL: http://identity_service:8080
@@ -495,11 +520,71 @@ services:
       INTERNAL_CHAT_URL: http://chat_service:4000
       INTERNAL_AI_URL: http://ai_service:8080
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
+      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-false}
+      AI_LEARNING_LOG_DIR: ${AI_LEARNING_LOG_DIR:-/app/apps/www/.runtime/ai-learning}
+      AI_LEARNING_MEMORY_FILE: ${AI_LEARNING_MEMORY_FILE:-/app/apps/www/.runtime/ai-learning/create-from-image-memory.json}
+      PERSONAL_AI_STORE_DIR: ${PERSONAL_AI_STORE_DIR:-/app/apps/www/.runtime/personal-ai}
+      IMAGE_AI_ASSIST_ENABLED: ${IMAGE_AI_ASSIST_ENABLED:-false}
+      MINIO_ENDPOINT: http://minio:9002
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASS}
+      MINIO_BUCKET: ${MINIO_BUCKET:-laju-chat}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9002}
+      REDIS_URL: redis://:${REDIS_PASS}@redis_cache:6379
+      REDIS_CONNECTION_NAME: ${REDIS_CONNECTION_NAME:-lajukan-www}
+      RATE_LIMIT_FAIL_OPEN: ${RATE_LIMIT_FAIL_OPEN:-false}
+      JWT_SECRET: ${JWT_SECRET}
+      ALLOW_BEARER_AUTH: ${ALLOW_BEARER_AUTH:-true}
+      ENABLE_OTP_AUTH: ${ENABLE_OTP_AUTH:-true}
+      ENABLE_PHONE_AUTH: ${ENABLE_PHONE_AUTH:-false}
+      LOGIN_OTP_REQUIRED: ${LOGIN_OTP_REQUIRED:-true}
+      LOGIN_PHONE_OTP_REQUIRED: ${LOGIN_PHONE_OTP_REQUIRED:-true}
+      REGISTER_OTP_REQUIRED: ${REGISTER_OTP_REQUIRED:-true}
+      REGISTER_PHONE_OTP_REQUIRED: ${REGISTER_PHONE_OTP_REQUIRED:-false}
+      AUTH_PASSWORD_MIN_LENGTH: ${AUTH_PASSWORD_MIN_LENGTH:-15}
+      REGISTER_RATE_LIMIT_PER_HOUR: ${REGISTER_RATE_LIMIT_PER_HOUR:-12}
+      REGISTER_USERNAME_RATE_LIMIT_PER_HOUR: ${REGISTER_USERNAME_RATE_LIMIT_PER_HOUR:-3}
+      LOGIN_RATE_LIMIT_PER_15_MIN: ${LOGIN_RATE_LIMIT_PER_15_MIN:-15}
+      LOGIN_USERNAME_RATE_LIMIT_PER_15_MIN: ${LOGIN_USERNAME_RATE_LIMIT_PER_15_MIN:-5}
+      OTP_LIMIT_PER_TARGET_PER_HOUR: ${OTP_LIMIT_PER_TARGET_PER_HOUR:-5}
+      OTP_LIMIT_PER_IP_PER_HOUR: ${OTP_LIMIT_PER_IP_PER_HOUR:-30}
+      CAPTCHA_PROVIDER: ${CAPTCHA_PROVIDER:-turnstile}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      HCAPTCHA_SECRET_KEY: ${HCAPTCHA_SECRET_KEY:-}
+      NEXT_PUBLIC_LOGIN_OTP_REQUIRED: ${NEXT_PUBLIC_LOGIN_OTP_REQUIRED:-true}
+      NEXT_PUBLIC_STUN_URLS: ${NEXT_PUBLIC_STUN_URLS:-stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302}
+      NEXT_PUBLIC_TURN_URLS: ${NEXT_PUBLIC_TURN_URLS:-}
+      TURN_URL: ${TURN_URL:-}
+      TURN_URLS: ${TURN_URLS:-}
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:-}
+      TURN_CREDENTIAL_TTL_SECONDS: ${TURN_CREDENTIAL_TTL_SECONDS:-3600}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      CREATOR_INITIAL_COINS: ${CREATOR_INITIAL_COINS:-1000}
+      CREATOR_DAILY_COINS: ${CREATOR_DAILY_COINS:-50}
+      CREATOR_ACTION_COST_COINS: ${CREATOR_ACTION_COST_COINS:-10}
+      CREATOR_DAILY_ACTION_LIMIT: ${CREATOR_DAILY_ACTION_LIMIT:-10}
+      WHATSAPP_META_ACCESS_TOKEN: ${WHATSAPP_META_ACCESS_TOKEN:-}
+      WHATSAPP_META_PHONE_NUMBER_ID: ${WHATSAPP_META_PHONE_NUMBER_ID:-}
+      WHATSAPP_META_API_VERSION: ${WHATSAPP_META_API_VERSION:-v22.0}
+      WHATSAPP_META_DEFAULT_COUNTRY_CODE: ${WHATSAPP_META_DEFAULT_COUNTRY_CODE:-62}
+      WHATSAPP_META_OTP_MODE: ${WHATSAPP_META_OTP_MODE:-text}
+      WHATSAPP_META_OTP_TEMPLATE_NAME: ${WHATSAPP_META_OTP_TEMPLATE_NAME:-lajukan_auth_otp}
+      WHATSAPP_META_OTP_TEMPLATE_LANGUAGE: ${WHATSAPP_META_OTP_TEMPLATE_LANGUAGE:-id}
+      WHATSAPP_META_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_META_WEBHOOK_VERIFY_TOKEN:-}
+      WHATSAPP_META_APP_SECRET: ${WHATSAPP_META_APP_SECRET:-}
+      WHATSAPP_META_WEBHOOK_REQUIRE_SIGNATURE: ${WHATSAPP_META_WEBHOOK_REQUIRE_SIGNATURE:-true}
       EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      FROM_NAME: ${FROM_NAME:-Lajukan}
+    volumes:
+      - www_runtime:/app/apps/www/.runtime
     expose: ["3000"]
     depends_on:
       identity_service: { condition: service_healthy }
@@ -507,7 +592,9 @@ services:
       community_service: { condition: service_healthy }
       chat_service: { condition: service_healthy }
       ai_service: { condition: service_healthy }
-    networks: [app]
+      redis_cache: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    networks: [app, cache, media]
 
   cms:
     <<: *service-defaults
@@ -599,6 +686,26 @@ services:
     networks: [edge, app]
     logging: *default-logging
 
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2026.7.3}
+    profiles: [tunnel]
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --loglevel
+      - info
+      - --metrics
+      - 0.0.0.0:2000
+      - run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    expose: ["2000"]
+    depends_on:
+      caddy: { condition: service_started }
+    networks: [edge]
+    logging: *default-logging
+
   mailhog:
     profiles: [devtools]
     image: mailhog/mailhog:v1.0.1
@@ -612,6 +719,12 @@ networks:
     driver: bridge
   app:
     driver: bridge
+  cache:
+    driver: bridge
+    internal: true
+  media:
+    driver: bridge
+    internal: true
   data:
     driver: bridge
     internal: true
@@ -629,3 +742,4 @@ volumes:
   ollama_data:
   caddy_data:
   caddy_config:
+  www_runtime:

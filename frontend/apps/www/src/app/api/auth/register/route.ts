@@ -5,6 +5,7 @@ import {
   shouldUseSecureCookies,
 } from '@/lib/server/forwardCookies';
 import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
+import { isRegisterOtpRequired } from '@/lib/auth/runtimeConfig';
 import { verifyCaptchaToken } from '@/lib/captcha';
 import {
   passwordContainsIdentityHint,
@@ -27,7 +28,7 @@ const REGISTER_USERNAME_RATE_LIMIT_PER_HOUR = Number.parseInt(
   process.env.REGISTER_USERNAME_RATE_LIMIT_PER_HOUR || '3',
   10,
 );
-const REGISTER_OTP_REQUIRED = process.env.ENABLE_OTP_AUTH !== 'false';
+const REGISTER_OTP_REQUIRED = isRegisterOtpRequired();
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (value == null) return undefined;

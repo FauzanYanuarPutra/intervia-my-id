@@ -81,6 +81,18 @@ Examples:
 ./up.sh --profile ai --profile kyc --profile devtools
 ```
 
+The launchers validate runtime configuration before mutating containers and
+wait for selected services to become running/healthy. Optional edge modes are:
+
+```powershell
+.\up.ps1 -Profile edge    # local HTTP through Caddy
+.\up.ps1 -Profile tunnel  # Caddy + Cloudflare Tunnel; requires a rotated token
+```
+
+Google OAuth is enabled only when client ID, client secret, and redirect URI are
+configured together. Register the exact callback URI shown in the relevant env
+example. Never reuse credentials copied from chat, logs, or backup env files.
+
 To rebuild images:
 
 ```powershell
@@ -210,7 +222,9 @@ Start here:
 - `docs/architecture/event-map.md`
 - `docs/architecture/database-map.md`
 - `docs/architecture/deployment-architecture.md`
+- `docs/architecture/runtime-configuration-integration.md`
 - `docs/architecture/modernization-2026-08.md`
+- `docs/operations/backup-and-disaster-recovery.md`
 
 ## License / ownership
 

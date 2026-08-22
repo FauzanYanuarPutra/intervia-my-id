@@ -10,6 +10,7 @@ PULL=0
 DOWN=0
 FRESH=0
 PROFILES=()
+ACTIVE_PROFILES=()
 SERVICES=()
 
 usage() {
@@ -143,12 +144,36 @@ COMPOSE=(
 for profile in "${PROFILES[@]}"; do
   IFS=',' read -r -a split_profiles <<< "$profile"
   for item in "${split_profiles[@]}"; do
-    [[ -n "$item" ]] && COMPOSE+=(--profile "$item")
+    if [[ -n "$item" ]]; then
+      COMPOSE+=(--profile "$item")
+      ACTIVE_PROFILES+=("$item")
+    fi
   done
 done
 
 # Fail before changing container state if the merged Compose model is invalid.
 "${COMPOSE[@]}" config --quiet
+
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN=python
+else
+  echo "Python 3 is required by the runtime contract validator." >&2
+  exit 1
+fi
+
+COMPOSE_MODEL="$("${COMPOSE[@]}" config --format json)"
+VALIDATOR_ARGS=(
+  scripts/config/runtime_contract.py
+  --model -
+  --env-file "$ENV_FILE"
+  --environment "$ENVIRONMENT"
+)
+for profile in "${ACTIVE_PROFILES[@]}"; do
+  VALIDATOR_ARGS+=(--profile "$profile")
+done
+printf '%s' "$COMPOSE_MODEL" | "$PYTHON_BIN" "${VALIDATOR_ARGS[@]}"
 
 if ((FRESH)); then
   echo "Recreating containers for $ENVIRONMENT (volumes are preserved)..."
@@ -172,9 +197,41 @@ if ((BUILD)); then
 fi
 
 if ((${#SERVICES[@]})); then
-  "${COMPOSE[@]}" up -d --remove-orphans "${SERVICES[@]}"
+  "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180 "${SERVICES[@]}"
 else
-  "${COMPOSE[@]}" up -d --remove-orphans
+  "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180
+fi
+
+TUNNEL_REQUESTED=0
+for profile in "${ACTIVE_PROFILES[@]}"; do
+  [[ "$profile" == "tunnel" ]] && TUNNEL_REQUESTED=1
+done
+
+TUNNEL_SELECTED=0
+if ((${#SERVICES[@]} == 0)); then
+  TUNNEL_SELECTED=1
+else
+  for service in "${SERVICES[@]}"; do
+    [[ "$service" == "cloudflared" ]] && TUNNEL_SELECTED=1
+  done
+fi
+
+if ((TUNNEL_REQUESTED && TUNNEL_SELECTED)); then
+  echo "Waiting for Cloudflare Tunnel edge registration..."
+  TUNNEL_READY=0
+  for _ in {1..30}; do
+    if "${COMPOSE[@]}" logs --no-color --since 2m cloudflared 2>&1 | grep -q "Registered tunnel connection"; then
+      TUNNEL_READY=1
+      break
+    fi
+    sleep 2
+  done
+  if ((!TUNNEL_READY)); then
+    "${COMPOSE[@]}" ps cloudflared
+    echo "Cloudflare Tunnel did not register an edge connection within 60 seconds. Check the rotated token, tunnel DNS, and cloudflared logs." >&2
+    exit 1
+  fi
+  echo "Cloudflare Tunnel registered with the edge."
 fi
 
 "${COMPOSE[@]}" ps

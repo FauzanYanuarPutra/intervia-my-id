@@ -22,7 +22,8 @@ http://www.{$APP_DOMAIN} {
     
     header {
         Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://www.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
     }
     encode gzip zstd
 }
@@ -36,7 +37,8 @@ http://usaha.{$APP_DOMAIN} {
 
     header {
         Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://usaha.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
     }
     encode gzip zstd
 }

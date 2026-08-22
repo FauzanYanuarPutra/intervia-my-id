@@ -3,6 +3,41 @@ ARG NPM_REGISTRY=https://registry.npmjs.org/
 FROM node:20-bullseye-slim AS www_deps
 
 ARG NPM_REGISTRY
+ARG NEXT_PUBLIC_APP_ENV=development
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
+ARG NEXT_PUBLIC_WWW_URL=http://localhost:3000
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG NEXT_PUBLIC_MARKETPLACE_URL=http://localhost:8081
+ARG NEXT_PUBLIC_COMMUNITY_URL=http://localhost:8082
+ARG NEXT_PUBLIC_CHAT_WS_URL=ws://localhost:4000/socket
+ARG NEXT_PUBLIC_MARKETPLACE_WS_URL=
+ARG NEXT_PUBLIC_NOTIFICATION_WS_URL=
+ARG NEXT_PUBLIC_LOGIN_OTP_REQUIRED=true
+ARG NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED=false
+ARG NEXT_PUBLIC_DISABLE_PWA=true
+ARG NEXT_PUBLIC_CAPTCHA_PROVIDER=turnstile
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ARG NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
+ARG NEXT_PUBLIC_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+ARG NEXT_PUBLIC_TURN_URLS=
+
+ENV NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_WWW_URL=${NEXT_PUBLIC_WWW_URL}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_MARKETPLACE_URL=${NEXT_PUBLIC_MARKETPLACE_URL}
+ENV NEXT_PUBLIC_COMMUNITY_URL=${NEXT_PUBLIC_COMMUNITY_URL}
+ENV NEXT_PUBLIC_CHAT_WS_URL=${NEXT_PUBLIC_CHAT_WS_URL}
+ENV NEXT_PUBLIC_MARKETPLACE_WS_URL=${NEXT_PUBLIC_MARKETPLACE_WS_URL}
+ENV NEXT_PUBLIC_NOTIFICATION_WS_URL=${NEXT_PUBLIC_NOTIFICATION_WS_URL}
+ENV NEXT_PUBLIC_LOGIN_OTP_REQUIRED=${NEXT_PUBLIC_LOGIN_OTP_REQUIRED}
+ENV NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED=${NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED}
+ENV NEXT_PUBLIC_DISABLE_PWA=${NEXT_PUBLIC_DISABLE_PWA}
+ENV NEXT_PUBLIC_CAPTCHA_PROVIDER=${NEXT_PUBLIC_CAPTCHA_PROVIDER}
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+ENV NEXT_PUBLIC_HCAPTCHA_SITE_KEY=${NEXT_PUBLIC_HCAPTCHA_SITE_KEY}
+ENV NEXT_PUBLIC_STUN_URLS=${NEXT_PUBLIC_STUN_URLS}
+ENV NEXT_PUBLIC_TURN_URLS=${NEXT_PUBLIC_TURN_URLS}
 
 WORKDIR /app/apps/www
 
@@ -81,6 +116,12 @@ RUN if [ -d "/app/apps/www/next-env.d.ts" ]; then \
 
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
+# Next standalone intentionally excludes static/public assets. Place them beside
+# the generated server so the production image can use the supported entrypoint.
+RUN mkdir -p .next/standalone/apps/www/.next \
+    && cp -R .next/static .next/standalone/apps/www/.next/static \
+    && cp -R public .next/standalone/apps/www/public
+
 RUN npm prune --omit=dev --legacy-peer-deps
 
 RUN rm -rf .next/cache /root/.npm /tmp/*
@@ -93,10 +134,14 @@ WORKDIR /app/apps/www
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-manifest.json', 'utf8')); require.resolve('next/dist/bin/next')"
+RUN node -e "JSON.parse(require('fs').readFileSync('.next/server/middleware-manifest.json', 'utf8'))" \
+    && test -f .next/standalone/apps/www/server.js \
+    && test -d .next/standalone/apps/www/.next/static \
+    && test -d .next/standalone/apps/www/public
 
 EXPOSE 3000
 
-CMD ["npm", "start", "--", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["node", ".next/standalone/apps/www/server.js"]

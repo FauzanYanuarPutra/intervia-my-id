@@ -15,6 +15,7 @@ import {
   sanitizeInternalCallbackPath,
 } from '@/lib/auth/oauthRedirects';
 import { safeErrorCode } from '@/lib/server/safeLog';
+import { isExternalHttpsRequired } from '@/lib/auth/runtimeConfig';
 import { z } from 'zod';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -63,7 +64,7 @@ function getPublicBaseUrl(req: NextRequest): string {
     configuredOrigin:
       process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
     requestOrigin: req.nextUrl.origin,
-    production: process.env.NODE_ENV === 'production',
+    production: isExternalHttpsRequired(),
   });
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRedis, getOTPAttempts, incrementOTPAttempts, storeOTP } from '@/lib/redis';
 import { sendOTPEmail, sendPasswordResetEmail } from '@/lib/email';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
+import { isExternalHttpsRequired } from '@/lib/auth/runtimeConfig';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { resolvePublicOrigin } from '@/lib/auth/oauthRedirects';
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
         configuredOrigin:
           process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
         requestOrigin: req.nextUrl.origin,
-        production: process.env.NODE_ENV === 'production',
+        production: isExternalHttpsRequired(),
       });
       const locale = req.cookies.get('NEXT_LOCALE')?.value || 'id';
       const resetLink = `${baseUrl}/${locale}/reset-password?token=${resetToken}`;

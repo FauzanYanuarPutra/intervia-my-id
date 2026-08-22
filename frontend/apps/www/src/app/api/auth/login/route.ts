@@ -5,6 +5,7 @@ import {
   shouldUseSecureCookies,
 } from '@/lib/server/forwardCookies';
 import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
+import { isLoginOtpRequired } from '@/lib/auth/runtimeConfig';
 import { verifyCaptchaToken } from '@/lib/captcha';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import {
@@ -23,7 +24,7 @@ const LOGIN_USERNAME_RATE_LIMIT_PER_15_MIN = Number.parseInt(
   process.env.LOGIN_USERNAME_RATE_LIMIT_PER_15_MIN || '5',
   10,
 );
-const LOGIN_OTP_REQUIRED = process.env.ENABLE_OTP_AUTH !== 'false';
+const LOGIN_OTP_REQUIRED = isLoginOtpRequired();
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (value == null) return undefined;

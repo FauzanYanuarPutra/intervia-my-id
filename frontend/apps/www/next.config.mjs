@@ -8,7 +8,16 @@ import {
 } from '../../packages/config/nextSecurityHeaders.mjs';
 
 const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
-const IS_PROD = process.env.NODE_ENV === 'production';
+const DEPLOYMENT_ENV = (
+  process.env.APP_ENV ||
+  process.env.ENV ||
+  process.env.NEXT_PUBLIC_APP_ENV ||
+  process.env.NODE_ENV ||
+  'development'
+).toLowerCase();
+const REQUIRES_EXTERNAL_HTTPS = ['staging', 'production'].includes(
+  DEPLOYMENT_ENV,
+);
 const WWW_ORIGIN =
   (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
   'https://www.lajukan.com';
@@ -17,8 +26,8 @@ const CHAT_SERVICE_ORIGIN =
   process.env.INTERNAL_CHAT_URL ||
   'http://chat_service:4000';
 const SECURITY_HEADERS = buildSecurityHeaders({
-  csp: buildPublicWebCsp({ production: IS_PROD }),
-  production: IS_PROD,
+  csp: buildPublicWebCsp({ production: REQUIRES_EXTERNAL_HTTPS }),
+  production: REQUIRES_EXTERNAL_HTTPS,
   permissionsPolicy:
     'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()',
   crossOriginOpenerPolicy: 'same-origin-allow-popups',
@@ -55,7 +64,7 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    if (!IS_PROD) return [];
+    if (!REQUIRES_EXTERNAL_HTTPS) return [];
     return [
       {
         source: '/:path*',

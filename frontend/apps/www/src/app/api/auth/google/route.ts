@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { shouldUseSecureCookies } from '@/lib/server/forwardCookies';
+import { isExternalHttpsRequired } from '@/lib/auth/runtimeConfig';
 import {
   preferredLocaleForCallback,
   resolvePublicOrigin,
@@ -16,7 +17,7 @@ function getPublicBaseUrl(req: NextRequest): string {
     configuredOrigin:
       process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL,
     requestOrigin: req.nextUrl.origin,
-    production: process.env.NODE_ENV === 'production',
+    production: isExternalHttpsRequired(),
   });
 }
 

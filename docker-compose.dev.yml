@@ -91,6 +91,7 @@ services:
       APP_ENV: development
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: development
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
     ports:
       - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
 
@@ -128,7 +129,16 @@ services:
       - "127.0.0.1:${PORT_USAHA:-3003}:3003"
 
   caddy:
-    profiles: [edge]
+    profiles: [edge, tunnel]
+    depends_on: !override
+      www: { condition: service_started }
+    ports: !override
+      - "127.0.0.1:${PORT_CADDY_HTTP:-80}:80"
+      - "127.0.0.1:${PORT_CADDY_HTTPS:-443}:443"
+
+  cloudflared:
+    ports:
+      - "127.0.0.1:${PORT_CLOUDFLARED_METRICS:-2000}:2000"
 
   # Local email/OTP flows expect SMTP_HOST=mailhog. Keep MailHog in the default
   # development stack; production/staging still inherit the base profile gate.
