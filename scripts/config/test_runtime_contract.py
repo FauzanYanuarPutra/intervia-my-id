@@ -17,7 +17,7 @@ def base_model(liveness_source: Path) -> dict:
                     "NEXT_PUBLIC_WWW_URL": "http://localhost:3000",
                     "GOOGLE_CLIENT_ID": "",
                     "GOOGLE_CLIENT_SECRET": "",
-                    "GOOGLE_REDIRECT_URI": "",
+                    "WWW_GOOGLE_REDIRECT_URI": "",
                 },
                 "depends_on": {
                     "redis_cache": {"condition": "service_healthy"},
@@ -62,7 +62,7 @@ def configure_google_oauth(model: dict) -> None:
         {
             "GOOGLE_CLIENT_ID": client_id,
             "GOOGLE_CLIENT_SECRET": client_secret,
-            "GOOGLE_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
+            "WWW_GOOGLE_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
         }
     )
     model["services"]["usaha"]["environment"].update(
@@ -104,6 +104,22 @@ class GoogleOauthRuntimeContractTests(unittest.TestCase):
             errors,
         )
 
+    def test_google_oauth_requires_explicit_www_redirect_environment_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            configure_google_oauth(model)
+            www_environment = model["services"]["www"]["environment"]
+            www_environment["GOOGLE_REDIRECT_URI"] = www_environment.pop(
+                "WWW_GOOGLE_REDIRECT_URI"
+            )
+
+            errors = validate_contract(model, {}, "development", set())
+
+        self.assertTrue(
+            any("WWW_GOOGLE_REDIRECT_URI" in error for error in errors),
+            errors,
+        )
+
     def test_google_oauth_requires_distinct_www_and_usaha_redirect_origins(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = base_model(Path(tmp))
@@ -126,7 +142,7 @@ class GoogleOauthRuntimeContractTests(unittest.TestCase):
             model["services"]["www"]["environment"].update(
                 {
                     "NEXT_PUBLIC_WWW_URL": "https://www.lajukan.com",
-                    "GOOGLE_REDIRECT_URI": "https://www.lajukan.com/api/auth/google/callback",
+                    "WWW_GOOGLE_REDIRECT_URI": "https://www.lajukan.com/api/auth/google/callback",
                 }
             )
             model["services"]["usaha"]["environment"].update(
