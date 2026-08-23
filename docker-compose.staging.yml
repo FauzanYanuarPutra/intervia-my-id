@@ -132,3 +132,4 @@ services:
       - ./infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks: !override [edge, app, media]
