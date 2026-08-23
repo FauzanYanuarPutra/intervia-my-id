@@ -18,6 +18,24 @@ const IS_DEV = process.env.NODE_ENV === 'development';
 const LOCALE_COOKIE = 'NEXT_LOCALE';
 const CHAT_INBOX_CACHE_PREFIX = 'lajukan:chat-inbox:v1:';
 const CHAT_AI_SETTINGS_PREFIX = 'chat_ai_settings:';
+const AUTH_SESSION_REQUEST_TIMEOUT_MS = 8_000;
+
+async function fetchAuthBootstrap(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(
+    () => controller.abort(),
+    AUTH_SESSION_REQUEST_TIMEOUT_MS,
+  );
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
 
 async function clearLocalMessagingData(userId: string): Promise<void> {
   const normalizedUserId = userId.trim();
@@ -249,7 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     refreshPromise.current = (async () => {
       try {
-        const res = await fetch('/api/auth/refresh', {
+        const res = await fetchAuthBootstrap('/api/auth/refresh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -272,8 +290,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         return data.access_token || null;
-      } catch {
-        if (IS_DEV) hardResetAuth();
+      } catch (error) {
+        if (
+          IS_DEV &&
+          !(error instanceof DOMException && error.name === 'AbortError')
+        ) {
+          hardResetAuth();
+        }
         return null;
       } finally {
         refreshPromise.current = null;
@@ -285,12 +308,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* ================= FETCH USER (ME) ================= */
   const fetchMe = useCallback(
-    async (token: string | null) => {
+    async (token: string | null): Promise<boolean> => {
       try {
         const headers: HeadersInit = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetch('/api/auth/me', {
+        const res = await fetchAuthBootstrap('/api/auth/me', {
           headers,
           credentials: 'include',
         });
@@ -300,20 +323,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const normalizedUser = normalizeUserPayload(data);
           saveAccountSnapshot(normalizedUser);
           setUser(normalizedUser);
-        } else {
-          if (data.shouldClearLocalAuth) hardResetAuth();
-          if (res.status === 401 || res.status === 403) {
-            handleInvalidToken();
-            return;
-          }
+          return true;
         }
+
+        if (data.shouldClearLocalAuth || res.status === 401 || res.status === 403) {
+          hardResetAuth();
+        }
+        return false;
       } catch (err) {
-        console.error('FetchMe Error:', err);
-      } finally {
-        setLoading(false);
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          console.error('FetchMe Error:', err);
+        }
+        return false;
       }
     },
-    [hardResetAuth, handleInvalidToken],
+    [hardResetAuth],
   );
 
   /* ================= AUTH FETCH (Wrapper) ================= */
@@ -358,29 +382,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [accessToken, fetchMe]);
 
   const bootstrapSession = useCallback(
-    async (options?: { redirectOnFailure?: boolean }) => {
-      const localToken = IS_DEV ? localStorage.getItem('access_token') : null;
+    async function bootstrapSession(options?: { redirectOnFailure?: boolean }) {
+      try {
+        const localToken = IS_DEV ? localStorage.getItem('access_token') : null;
 
-      if (IS_DEV && localToken) {
-        setAccessToken(localToken);
-        await fetchMe(localToken);
-        return;
-      }
+        if (IS_DEV && localToken) {
+          setAccessToken(localToken);
+          const loaded = await fetchMe(localToken);
+          if (!loaded && options?.redirectOnFailure) handleInvalidToken();
+          return;
+        }
 
-      if (!shouldBootstrapSession(pathname)) {
+        if (!shouldBootstrapSession(pathname)) return;
+
+        const token = await refresh();
+        if (token) {
+          const loaded = await fetchMe(token);
+          if (!loaded && options?.redirectOnFailure) handleInvalidToken();
+          return;
+        }
+
+        if (options?.redirectOnFailure && isProtectedRoutePath(pathname)) {
+          handleInvalidToken();
+        }
+      } finally {
         setLoading(false);
-        return;
-      }
-
-      const token = await refresh();
-      if (token) {
-        await fetchMe(token);
-        return;
-      }
-
-      setLoading(false);
-      if (options?.redirectOnFailure && isProtectedRoutePath(pathname)) {
-        handleInvalidToken();
       }
     },
     [fetchMe, handleInvalidToken, pathname, refresh],
@@ -398,8 +424,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setLoading(true);
-    void bootstrapSession({ redirectOnFailure: true });
+    const onProtectedRoute = isProtectedRoutePath(pathname);
+    setLoading(onProtectedRoute);
+    void bootstrapSession({ redirectOnFailure: onProtectedRoute });
   }, [bootstrapSession, pathname, user]);
 
   useEffect(() => {
@@ -410,12 +437,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const onProtectedRoute = isProtectedRoutePath(pathname);
 
       if (user && !hasMarker) {
-        handleInvalidToken();
+        hardResetAuth();
+        if (onProtectedRoute) redirectToLogin();
         return;
       }
 
       if (!user && !loading && (hasMarker || onProtectedRoute)) {
-        setLoading(true);
+        setLoading(onProtectedRoute);
         void bootstrapSession({ redirectOnFailure: onProtectedRoute });
       }
     };
@@ -433,7 +461,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('pageshow', syncAuthState);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [bootstrapSession, handleInvalidToken, loading, pathname, user]);
+  }, [
+    bootstrapSession,
+    hardResetAuth,
+    loading,
+    pathname,
+    redirectToLogin,
+    user,
+  ]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
