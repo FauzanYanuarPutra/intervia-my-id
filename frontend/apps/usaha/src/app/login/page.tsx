@@ -19,11 +19,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <div className="relative">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-[15px] bg-white text-portal-forest"><Store className="h-5 w-5" /></span>
-              <div><p className="text-[11px] font-semibold text-white/55">Lajukan</p><p className="text-base font-bold">Usaha</p></div>
+              <div><p className="text-[11px] font-semibold text-white/60">Lajukan</p><p className="text-base font-bold">Usaha</p></div>
             </div>
 
             <h1 className="mt-10 max-w-2xl text-3xl font-bold tracking-[-0.055em] sm:text-5xl">Kelola usaha tanpa kehilangan fokus.</h1>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-white/65 sm:text-base">Profil, lokasi, katalog, pesanan, operasional, dan tim berada dalam satu workspace yang terhubung dengan akun Lajukan.</p>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-white/70 sm:text-base">Profil, lokasi, katalog, pesanan, operasional, dan tim berada dalam satu workspace yang terhubung dengan akun Lajukan.</p>
 
             <div className="mt-9 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               {[
@@ -33,10 +33,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               ].map(([Icon, label, detail]) => {
                 const IconComponent = Icon as typeof MapPinned;
                 return (
-                  <article key={String(label)} className="rounded-[18px] border border-white/10 bg-white/7 p-4">
+                  <article key={String(label)} className="rounded-[18px] border border-white/10 bg-white/[0.07] p-4">
                     <IconComponent className="h-5 w-5 text-emerald-200" />
                     <p className="mt-4 text-sm font-bold">{String(label)}</p>
-                    <p className="mt-1 text-xs leading-5 text-white/55">{String(detail)}</p>
+                    <p className="mt-1 text-xs leading-5 text-white/60">{String(detail)}</p>
                   </article>
                 );
               })}
