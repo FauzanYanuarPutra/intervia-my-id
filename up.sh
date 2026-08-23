@@ -119,8 +119,6 @@ docker compose version >/dev/null 2>&1 || {
   exit 1
 }
 
-# Keep compatibility with existing local installations that still use `.env`.
-# Staging and production remain fail-closed and require their explicit files.
 if [[ ! -f "$ENV_FILE" ]]; then
   if [[ "$ENVIRONMENT" == "development" && -f ".env" ]]; then
     echo "warning: .env.development not found; using .env for legacy development compatibility." >&2
@@ -143,10 +141,6 @@ else
   exit 1
 fi
 
-# Resolve both COMPOSE_PROFILES from the env file and explicit --profile
-# arguments through one shared contract. Development automatically enables the
-# tunnel when a token is configured, preventing a healthy local stack from
-# silently publishing a dead Cloudflare Tunnel (Error 1033).
 PROFILE_RESOLVER_ARGS=(
   scripts/config/launcher_profiles.py
   --env-file "$ENV_FILE"
@@ -168,11 +162,8 @@ for profile in "${ACTIVE_PROFILES[@]}"; do
   [[ -n "$profile" ]] && COMPOSE+=(--profile "$profile")
 done
 
-# Fail before changing container state if the merged Compose model is invalid.
 "${COMPOSE[@]}" config --quiet
 
-# Development KYC is self-provisioning. The downloader is pinned by commit and
-# SHA-256. Staging/production remain explicit and never download model assets.
 KYC_REQUESTED=0
 for profile in "${ACTIVE_PROFILES[@]}"; do
   [[ "$profile" == "kyc" ]] && KYC_REQUESTED=1
@@ -236,21 +227,32 @@ else
 fi
 
 if ((TUNNEL_REQUESTED && TUNNEL_SELECTED)); then
-  echo "Waiting for Cloudflare Tunnel edge registration..."
+  echo "Checking Cloudflare Tunnel edge readiness..."
   TUNNEL_READY=0
   for _ in {1..30}; do
-    if "${COMPOSE[@]}" logs --no-color --since 2m cloudflared 2>&1 | grep -q "Registered tunnel connection"; then
+    if "$PYTHON_BIN" scripts/config/tunnel_readiness.py --env-file "$ENV_FILE"; then
       TUNNEL_READY=1
       break
     fi
+
+    # Metrics are host-published in development. For environments that keep
+    # the metrics endpoint private, retain an all-history registration fallback.
+    if "${COMPOSE[@]}" logs --no-color cloudflared 2>&1 | grep -q "Registered tunnel connection"; then
+      echo "Cloudflare Tunnel registration found in connector history (metrics endpoint not reachable from host)."
+      TUNNEL_READY=1
+      break
+    fi
+
     sleep 2
   done
+
   if ((!TUNNEL_READY)); then
     "${COMPOSE[@]}" ps cloudflared
-    echo "Cloudflare Tunnel did not register an edge connection within 60 seconds. Check the rotated token, tunnel DNS, and cloudflared logs." >&2
+    "${COMPOSE[@]}" logs --no-color --tail 80 cloudflared >&2 || true
+    echo "Cloudflare Tunnel has no active edge connection after 60 seconds. Check the token, outbound network, and tunnel configuration." >&2
     exit 1
   fi
-  echo "Cloudflare Tunnel registered with the edge."
+  echo "Cloudflare Tunnel is connected to the edge."
 fi
 
 "${COMPOSE[@]}" ps
