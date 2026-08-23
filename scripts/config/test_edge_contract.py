@@ -151,6 +151,26 @@ class CaddyEdgeContractTests(unittest.TestCase):
                 )
                 self.assertRegex(caddy, pattern)
 
+    def test_launchers_validate_and_reload_running_caddy(self) -> None:
+        """Bind-mounted Caddyfile changes must be activated on every edge startup."""
+        for launcher in ("up.ps1", "up.sh"):
+            with self.subTest(launcher=launcher):
+                source = (ROOT / launcher).read_text(encoding="utf-8")
+                self.assertIn("caddy validate --config /etc/caddy/Caddyfile", source)
+                self.assertIn("caddy reload --config /etc/caddy/Caddyfile", source)
+
+
+class OAuthNavigationContractTests(unittest.TestCase):
+    def test_usaha_google_oauth_uses_full_document_navigation(self) -> None:
+        """External OAuth redirects must not be followed by Next router fetches."""
+        source = (
+            ROOT / "frontend/apps/usaha/src/app/login/page.tsx"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("from 'next/link'", source)
+        self.assertRegex(source, r"<a\s+[^>]*href=\{googleHref\}")
+        self.assertNotRegex(source, r"<Link\s+[^>]*href=\{googleHref\}")
+
 
 if __name__ == "__main__":
     unittest.main()
