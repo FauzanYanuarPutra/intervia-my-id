@@ -204,6 +204,29 @@ class OAuthNavigationContractTests(unittest.TestCase):
         self.assertRegex(source, r"<a\s+[^>]*href=\{googleHref\}")
         self.assertNotRegex(source, r"<Link\s+[^>]*href=\{googleHref\}")
 
+    def test_tunnel_oauth_does_not_inject_localhost_redirect_uris(self) -> None:
+        """Tunnel development must derive callbacks from the app public origin."""
+        compose = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "WWW_GOOGLE_REDIRECT_URI: ${WWW_GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}",
+            compose,
+        )
+        self.assertNotIn(
+            "USAHA_GOOGLE_REDIRECT_URI: ${USAHA_GOOGLE_REDIRECT_URI:-http://localhost:3003/api/auth/google/callback}",
+            compose,
+        )
+
+    def test_www_oauth_supports_canonical_and_legacy_redirect_env_names(self) -> None:
+        """WWW keeps legacy GOOGLE_REDIRECT_URI compatibility during migration."""
+        for path in (
+            "frontend/apps/www/src/app/api/auth/google/route.ts",
+            "frontend/apps/www/src/app/api/auth/google/callback/route.ts",
+        ):
+            with self.subTest(path=path):
+                source = (ROOT / path).read_text(encoding="utf-8")
+                self.assertIn("process.env.WWW_GOOGLE_REDIRECT_URI", source)
+                self.assertIn("process.env.GOOGLE_REDIRECT_URI", source)
+
 
 if __name__ == "__main__":
     unittest.main()
