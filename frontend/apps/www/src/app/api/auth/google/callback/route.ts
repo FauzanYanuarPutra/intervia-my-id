@@ -71,6 +71,7 @@ function getPublicBaseUrl(req: NextRequest): string {
 function getGoogleRedirectUri(req: NextRequest): string {
   return (
     process.env.WWW_GOOGLE_REDIRECT_URI ||
+    process.env.GOOGLE_REDIRECT_URI ||
     `${getPublicBaseUrl(req)}/api/auth/google/callback`
   );
 }
