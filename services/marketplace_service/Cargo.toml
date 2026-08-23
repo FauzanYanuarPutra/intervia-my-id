@@ -18,7 +18,7 @@ sqlx = { version = "0.8.6", features = [
     "rust_decimal",
     "migrate"
 ] }
-meilisearch-sdk = "0.25"
+meilisearch-sdk = "0.33"
 serde = { version = "1", features = ["derive", "alloc"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
