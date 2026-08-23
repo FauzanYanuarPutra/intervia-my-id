@@ -141,16 +141,25 @@ class CaddyEdgeContractTests(unittest.TestCase):
                 self.assertIn("buildPublicWebCsp", next_config)
                 self.assertIn("buildSecurityHeaders", next_config)
 
-    def test_caddy_shares_media_network_with_minio(self) -> None:
-        """Caddy must be able to resolve minio:9002 for media.lajukan.com."""
-        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        caddy = re.search(
-            r"(?ms)^  caddy:\n(?P<body>.*?)(?=^  [a-zA-Z0-9_]+:\n|^networks:\n)",
-            compose,
-        )
-        self.assertIsNotNone(caddy)
-        body = caddy.group("body") if caddy else ""
-        self.assertRegex(body, r"networks:\s*\[[^\]]*\bmedia\b[^\]]*\]")
+    def test_caddy_shares_media_network_with_minio_in_all_deployments(self) -> None:
+        """Caddy must resolve minio:9002 in development, staging, and production."""
+        for name in (
+            "docker-compose.dev.yml",
+            "docker-compose.staging.yml",
+            "docker-compose.prod.yml",
+        ):
+            with self.subTest(compose=name):
+                compose = (ROOT / name).read_text(encoding="utf-8")
+                caddy = re.search(
+                    r"(?ms)^  caddy:\n(?P<body>.*?)(?=^  [a-zA-Z0-9_]+:\n|\Z)",
+                    compose,
+                )
+                self.assertIsNotNone(caddy)
+                body = caddy.group("body") if caddy else ""
+                self.assertRegex(
+                    body,
+                    r"networks:\s*!override\s*\[[^\]]*\bmedia\b[^\]]*\]",
+                )
 
     def test_tunnel_frontends_forward_external_https_scheme(self) -> None:
         """The private Tunnel hop must not overwrite the browser HTTPS scheme."""
