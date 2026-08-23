@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from launcher_profiles import resolve_profiles
+from tunnel_readiness import active_ha_connections, metrics_report_healthy
 
 
 HERE = Path(__file__).resolve().parent
@@ -64,6 +65,28 @@ class LauncherProfileTests(unittest.TestCase):
             "launcher_profiles.py",
             (ROOT / "up.sh").read_text(encoding="utf-8"),
         )
+
+
+class TunnelReadinessTests(unittest.TestCase):
+    def test_metrics_parser_reports_active_ha_connections(self) -> None:
+        metrics = """
+# HELP cloudflared_tunnel_ha_connections Number of active ha connections
+# TYPE cloudflared_tunnel_ha_connections gauge
+cloudflared_tunnel_ha_connections 4
+"""
+        self.assertEqual(active_ha_connections(metrics), 4.0)
+        self.assertTrue(metrics_report_healthy(metrics))
+
+    def test_metrics_parser_rejects_zero_or_missing_connections(self) -> None:
+        self.assertFalse(metrics_report_healthy("cloudflared_tunnel_ha_connections 0\n"))
+        self.assertFalse(metrics_report_healthy("build_info{version=\"2026.7.3\"} 1\n"))
+
+    def test_launchers_use_current_tunnel_state_not_recent_log_window(self) -> None:
+        for launcher in ("up.ps1", "up.sh"):
+            with self.subTest(launcher=launcher):
+                source = (ROOT / launcher).read_text(encoding="utf-8")
+                self.assertIn("tunnel_readiness.py", source)
+                self.assertNotIn("--since 2m", source)
 
 
 class CaddyEdgeContractTests(unittest.TestCase):
