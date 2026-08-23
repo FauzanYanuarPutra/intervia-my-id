@@ -91,7 +91,10 @@ services:
       APP_ENV: development
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: development
-      WWW_GOOGLE_REDIRECT_URI: ${WWW_GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
+      # Leave callback empty by default so public tunnel requests derive the
+      # callback from their trusted www.lajukan.com origin. Explicit local
+      # development may still set this variable to a localhost callback.
+      WWW_GOOGLE_REDIRECT_URI: ${WWW_GOOGLE_REDIRECT_URI:-}
     ports:
       - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
 
@@ -130,7 +133,9 @@ services:
       INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      USAHA_GOOGLE_REDIRECT_URI: ${USAHA_GOOGLE_REDIRECT_URI:-http://localhost:3003/api/auth/google/callback}
+      # Same contract as WWW: public tunnel traffic derives the callback from
+      # usaha.lajukan.com unless an explicit matching callback is supplied.
+      USAHA_GOOGLE_REDIRECT_URI: ${USAHA_GOOGLE_REDIRECT_URI:-}
     ports:
       - "127.0.0.1:${PORT_USAHA:-3003}:3003"
 
