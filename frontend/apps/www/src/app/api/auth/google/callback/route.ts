@@ -10,6 +10,7 @@ import { DEFAULT_PROFILE_AVATAR } from '@/lib/profile/avatar';
 import {
   localizeCallbackPath,
   preferredLocaleForCallback,
+  resolveGoogleCallbackUri,
   resolvePublicOrigin,
   safeEqualState,
   sanitizeInternalCallbackPath,
@@ -69,11 +70,13 @@ function getPublicBaseUrl(req: NextRequest): string {
 }
 
 function getGoogleRedirectUri(req: NextRequest): string {
-  return (
-    process.env.WWW_GOOGLE_REDIRECT_URI ||
-    process.env.GOOGLE_REDIRECT_URI ||
-    `${getPublicBaseUrl(req)}/api/auth/google/callback`
-  );
+  return resolveGoogleCallbackUri({
+    publicOrigin: getPublicBaseUrl(req),
+    configuredRedirectUris: [
+      process.env.WWW_GOOGLE_REDIRECT_URI,
+      process.env.GOOGLE_REDIRECT_URI,
+    ],
+  });
 }
 
 function clearGoogleOAuthState(response: NextResponse, secure: boolean) {
