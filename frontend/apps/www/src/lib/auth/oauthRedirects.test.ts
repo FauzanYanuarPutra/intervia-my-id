@@ -38,6 +38,24 @@ describe('OAuth redirect safety', () => {
     ).toBe('http://localhost:3100');
   });
 
+  it('prefers the trusted public tunnel origin over a stale localhost configuration', () => {
+    expect(
+      resolvePublicOrigin({
+        production: false,
+        configuredOrigin: 'http://localhost:3000',
+        requestOrigin: 'https://www.lajukan.com',
+      }),
+    ).toBe('https://www.lajukan.com');
+
+    expect(
+      resolvePublicOrigin({
+        production: false,
+        configuredOrigin: 'http://localhost:3000',
+        requestOrigin: 'https://evil.example',
+      }),
+    ).toBe('http://localhost:3000');
+  });
+
   it('compares OAuth state without partial matches', () => {
     expect(safeEqualState('same-state', 'same-state')).toBe(true);
     expect(safeEqualState('same-state', 'other-state')).toBe(false);
