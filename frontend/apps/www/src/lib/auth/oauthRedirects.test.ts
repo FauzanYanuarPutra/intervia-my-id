@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   localizeCallbackPath,
+  resolveGoogleCallbackUri,
   resolvePublicOrigin,
   safeEqualState,
   sanitizeInternalCallbackPath,
@@ -54,6 +55,25 @@ describe('OAuth redirect safety', () => {
         requestOrigin: 'https://evil.example',
       }),
     ).toBe('http://localhost:3000');
+  });
+
+  it('keeps the Google callback on the resolved WWW origin', () => {
+    expect(
+      resolveGoogleCallbackUri({
+        publicOrigin: 'https://www.lajukan.com',
+        configuredRedirectUris: [
+          'http://localhost:3000/api/auth/google/callback',
+          'https://www.lajukan.com/api/auth/google/callback',
+        ],
+      }),
+    ).toBe('https://www.lajukan.com/api/auth/google/callback');
+
+    expect(
+      resolveGoogleCallbackUri({
+        publicOrigin: 'https://www.lajukan.com',
+        configuredRedirectUris: ['https://evil.example/callback'],
+      }),
+    ).toBe('https://www.lajukan.com/api/auth/google/callback');
   });
 
   it('compares OAuth state without partial matches', () => {
