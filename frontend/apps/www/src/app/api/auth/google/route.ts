@@ -13,11 +13,20 @@ import {
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_OAUTH_STATE_COOKIE = 'google_oauth_state';
 
+function requestOrigin(req: NextRequest): string {
+  const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  if (forwardedHost && forwardedProto) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+  return req.nextUrl.origin;
+}
+
 function getPublicBaseUrl(req: NextRequest): string {
   return resolvePublicOrigin({
     configuredOrigin:
       process.env.NEXT_PUBLIC_WWW_URL || process.env.NEXT_PUBLIC_APP_URL,
-    requestOrigin: req.nextUrl.origin,
+    requestOrigin: requestOrigin(req),
     production: isExternalHttpsRequired(),
   });
 }

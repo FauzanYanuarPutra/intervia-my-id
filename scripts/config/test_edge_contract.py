@@ -227,6 +227,19 @@ class OAuthNavigationContractTests(unittest.TestCase):
                 self.assertIn("process.env.WWW_GOOGLE_REDIRECT_URI", source)
                 self.assertIn("process.env.GOOGLE_REDIRECT_URI", source)
 
+    def test_oauth_routes_consume_forwarded_public_origin(self) -> None:
+        """OAuth behind Caddy/Tunnel must use the browser host, not container localhost."""
+        for path in (
+            "frontend/apps/www/src/app/api/auth/google/route.ts",
+            "frontend/apps/www/src/app/api/auth/google/callback/route.ts",
+            "frontend/apps/usaha/src/app/api/auth/google/route.ts",
+            "frontend/apps/usaha/src/app/api/auth/google/callback/route.ts",
+        ):
+            with self.subTest(path=path):
+                source = (ROOT / path).read_text(encoding="utf-8")
+                self.assertIn("x-forwarded-host", source)
+                self.assertIn("x-forwarded-proto", source)
+
 
 if __name__ == "__main__":
     unittest.main()
