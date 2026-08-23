@@ -212,6 +212,43 @@ else
   "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180
 fi
 
+# Caddyfile is bind-mounted. Compose does not reload a long-running Caddy
+# process when only that file changes, so activate the current configuration on
+# every edge/tunnel startup after validating it inside the running container.
+EDGE_REQUESTED=0
+for profile in "${ACTIVE_PROFILES[@]}"; do
+  if [[ "$profile" == "edge" || "$profile" == "tunnel" ]]; then
+    EDGE_REQUESTED=1
+  fi
+done
+
+CADDY_SELECTED=0
+if ((${#SERVICES[@]} == 0)); then
+  CADDY_SELECTED=1
+else
+  for service in "${SERVICES[@]}"; do
+    [[ "$service" == "caddy" ]] && CADDY_SELECTED=1
+  done
+fi
+
+if ((EDGE_REQUESTED && CADDY_SELECTED)); then
+  echo "Validating and reloading Caddy edge configuration..."
+
+  if ! "${COMPOSE[@]}" exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
+    "${COMPOSE[@]}" logs --no-color --tail 80 caddy >&2 || true
+    echo "Caddy configuration is invalid. Edge configuration was not reloaded." >&2
+    exit 1
+  fi
+
+  if ! "${COMPOSE[@]}" exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+    "${COMPOSE[@]}" logs --no-color --tail 80 caddy >&2 || true
+    echo "Caddy failed to activate the latest edge configuration." >&2
+    exit 1
+  fi
+
+  echo "Caddy edge configuration is active."
+fi
+
 TUNNEL_REQUESTED=0
 for profile in "${ACTIVE_PROFILES[@]}"; do
   [[ "$profile" == "tunnel" ]] && TUNNEL_REQUESTED=1
