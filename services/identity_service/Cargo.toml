@@ -84,4 +84,4 @@ time = "0.3"
 
 # Argon2 compatible
 rand = "0.8.5"
-rand_core = "0.6.4"
+rand_core = "0.10.1"
