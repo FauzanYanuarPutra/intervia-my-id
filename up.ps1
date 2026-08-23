@@ -43,10 +43,6 @@ try {
         }
     }
 
-    # Backward compatibility for existing local installations. Before the
-    # repository-foundation refactor the canonical launcher accepted `.env`
-    # when `.env.development` was absent. Keeping this fallback prevents a
-    # harmless launcher refactor from breaking an otherwise valid local stack.
     if (-not (Test-Path -LiteralPath $EnvFile)) {
         if ($Environment -eq "development" -and (Test-Path -LiteralPath ".env")) {
             Write-Warning ".env.development tidak ditemukan; menggunakan .env untuk kompatibilitas development lama."
@@ -66,10 +62,6 @@ try {
         throw "Python 3 tidak ditemukan. Runtime contract validator memerlukan Python 3."
     }
 
-    # Resolve both COMPOSE_PROFILES from the env file and explicit -Profile
-    # arguments through one shared contract. Development automatically enables
-    # the tunnel when a token is configured, preventing a healthy local stack
-    # from silently publishing a dead Cloudflare Tunnel (Error 1033).
     $ProfileResolverArgs = @(
         "scripts/config/launcher_profiles.py",
         "--env-file", $EnvFile,
@@ -99,17 +91,11 @@ try {
         $ComposeArgs += @("--profile", $RequestedProfile)
     }
 
-    # Validate the merged Compose model before changing container state. This
-    # catches missing variables, invalid overrides and broken service contracts
-    # early instead of partially starting the stack.
     & docker @ComposeArgs config --quiet
     if ($LASTEXITCODE -ne 0) {
         throw "Konfigurasi Docker Compose tidak valid. Perbaiki error di atas sebelum stack dijalankan."
     }
 
-    # Development KYC is self-provisioning: the anti-spoof ONNX files are
-    # pinned by commit and SHA-256 in the provisioner. Staging/production remain
-    # explicit and fail closed so deployment never downloads security models.
     $KycRequested = $RequestedProfiles -contains "kyc"
     if ($Environment -eq "development" -and $KycRequested -and -not $Down) {
         Write-Host "Verifying local KYC liveness models..." -ForegroundColor Cyan
@@ -173,22 +159,35 @@ try {
     $TunnelRequested = $RequestedProfiles -contains "tunnel"
     $TunnelSelected = $Services.Count -eq 0 -or $Services -contains "cloudflared"
     if ($TunnelRequested -and $TunnelSelected) {
-        Write-Host "Waiting for Cloudflare Tunnel edge registration..." -ForegroundColor Cyan
+        Write-Host "Checking Cloudflare Tunnel edge readiness..." -ForegroundColor Cyan
         $TunnelReady = $false
         $Deadline = (Get-Date).AddSeconds(60)
+
         while ((Get-Date) -lt $Deadline) {
-            $TunnelLogs = & docker @ComposeArgs logs --no-color --since 2m cloudflared 2>&1
-            if ($TunnelLogs -match "Registered tunnel connection") {
+            & $PythonCommand.Source "scripts/config/tunnel_readiness.py" "--env-file" $EnvFile
+            if ($LASTEXITCODE -eq 0) {
                 $TunnelReady = $true
                 break
             }
+
+            # Staging/production may keep the metrics port private. In that
+            # case, an existing registration log is a compatibility fallback.
+            $TunnelLogs = & docker @ComposeArgs logs --no-color cloudflared 2>&1
+            if ($TunnelLogs -match "Registered tunnel connection") {
+                $TunnelReady = $true
+                Write-Host "Cloudflare Tunnel registration found in connector history (metrics endpoint not reachable from host)." -ForegroundColor Yellow
+                break
+            }
+
             Start-Sleep -Seconds 2
         }
+
         if (-not $TunnelReady) {
             & docker @ComposeArgs ps cloudflared
-            throw "Cloudflare Tunnel belum mendaftarkan koneksi edge dalam 60 detik. Periksa token baru, DNS tunnel, dan log cloudflared."
+            & docker @ComposeArgs logs --no-color --tail 80 cloudflared
+            throw "Cloudflare Tunnel tidak memiliki koneksi edge aktif dalam 60 detik. Periksa token, jaringan outbound, dan konfigurasi tunnel."
         }
-        Write-Host "Cloudflare Tunnel registered with the edge." -ForegroundColor Green
+        Write-Host "Cloudflare Tunnel is connected to the edge." -ForegroundColor Green
     }
 
     & docker @ComposeArgs ps
