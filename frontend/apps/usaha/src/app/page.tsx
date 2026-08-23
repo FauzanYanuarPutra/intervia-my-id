@@ -59,7 +59,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         action={<Link href={`/businesses/${business.id}/products`} className="portal-button-primary"><Boxes className="h-4 w-4" /> Tambah produk</Link>}
       />
 
-      <DataPanel title="Perlu perhatian" description="Prioritas yang paling mungkin menghambat penjualan atau operasional hari ini.">
+      <DataPanel title="Yang perlu ditangani sekarang" description="Prioritas yang paling mungkin menghambat penjualan atau operasional hari ini.">
         {attention.length ? (
           <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4">
             {attention.map(item => <ActionCard key={item.title} href={item.href} title={item.title} description={item.detail} icon={item.icon} tone={item.tone} />)}
