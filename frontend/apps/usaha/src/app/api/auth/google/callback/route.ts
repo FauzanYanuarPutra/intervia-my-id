@@ -4,6 +4,10 @@ import {
   shouldUseSecureAuthCookies,
   writeAuthCookies,
 } from '@/lib/auth-session';
+import {
+  resolveUsahaGoogleCallbackUri,
+  resolveUsahaPublicOrigin,
+} from '@/lib/oauth-origin';
 
 const IDENTITY_URL =
   process.env.INTERNAL_API_URL ||
@@ -12,11 +16,18 @@ const IDENTITY_URL =
 const GOOGLE_OAUTH_STATE_COOKIE = 'google_oauth_state';
 
 function publicOrigin(req: NextRequest): string {
-  return (process.env.NEXT_PUBLIC_USAHA_URL || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin).replace(/\/$/, '');
+  return resolveUsahaPublicOrigin({
+    configuredOrigin:
+      process.env.NEXT_PUBLIC_USAHA_URL || process.env.NEXT_PUBLIC_APP_URL,
+    requestOrigin: req.nextUrl.origin,
+  });
 }
 
 function redirectUri(req: NextRequest): string {
-  return process.env.USAHA_GOOGLE_REDIRECT_URI || `${publicOrigin(req)}/api/auth/google/callback`;
+  return resolveUsahaGoogleCallbackUri({
+    publicOrigin: publicOrigin(req),
+    configuredRedirectUri: process.env.USAHA_GOOGLE_REDIRECT_URI,
+  });
 }
 
 function safeCallback(value: unknown): string {
@@ -33,7 +44,9 @@ function stateMatches(a: string, b: string): boolean {
 }
 
 function failure(req: NextRequest, code: string) {
-  const response = NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(code)}`, publicOrigin(req)));
+  const response = NextResponse.redirect(
+    new URL(`/login?error=${encodeURIComponent(code)}`, publicOrigin(req)),
+  );
   response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', {
     httpOnly: true,
     secure: shouldUseSecureAuthCookies(req.url),
@@ -57,7 +70,9 @@ export async function GET(req: NextRequest) {
       return failure(req, 'oauth_state_invalid');
     }
     const cookieNonce = req.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value || '';
-    if (!stateMatches(state.nonce || '', cookieNonce)) return failure(req, 'oauth_state_invalid');
+    if (!stateMatches(state.nonce || '', cookieNonce)) {
+      return failure(req, 'oauth_state_invalid');
+    }
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -81,9 +96,12 @@ export async function GET(req: NextRequest) {
       id_token: string;
     };
 
-    const infoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
-    });
+    const infoResponse = await fetch(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      },
+    );
     if (!infoResponse.ok) return failure(req, 'google_profile_failed');
     const googleUser = (await infoResponse.json()) as {
       sub: string;
@@ -115,7 +133,9 @@ export async function GET(req: NextRequest) {
     };
     if (!auth.access_token) return failure(req, 'identity_oauth_invalid');
 
-    const response = NextResponse.redirect(new URL(safeCallback(state.callbackUrl), publicOrigin(req)));
+    const response = NextResponse.redirect(
+      new URL(safeCallback(state.callbackUrl), publicOrigin(req)),
+    );
     writeAuthCookies(
       response,
       {

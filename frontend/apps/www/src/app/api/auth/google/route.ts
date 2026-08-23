@@ -5,6 +5,7 @@ import { shouldUseSecureCookies } from '@/lib/server/forwardCookies';
 import { isExternalHttpsRequired } from '@/lib/auth/runtimeConfig';
 import {
   preferredLocaleForCallback,
+  resolveGoogleCallbackUri,
   resolvePublicOrigin,
   sanitizeInternalCallbackPath,
 } from '@/lib/auth/oauthRedirects';
@@ -22,10 +23,13 @@ function getPublicBaseUrl(req: NextRequest): string {
 }
 
 function getGoogleRedirectUri(req: NextRequest): string {
-  return (
-    process.env.WWW_GOOGLE_REDIRECT_URI ||
-    `${getPublicBaseUrl(req)}/api/auth/google/callback`
-  );
+  return resolveGoogleCallbackUri({
+    publicOrigin: getPublicBaseUrl(req),
+    configuredRedirectUris: [
+      process.env.WWW_GOOGLE_REDIRECT_URI,
+      process.env.GOOGLE_REDIRECT_URI,
+    ],
+  });
 }
 
 function getPreferredLocale(req: NextRequest, callbackUrl: string): 'id' | 'en' {

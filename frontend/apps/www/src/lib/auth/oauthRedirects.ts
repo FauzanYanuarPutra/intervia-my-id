@@ -8,6 +8,11 @@ type PublicOriginOptions = {
   production: boolean;
 };
 
+type GoogleCallbackOptions = {
+  publicOrigin: string;
+  configuredRedirectUris?: Array<string | undefined>;
+};
+
 function normalizedOrigin(value: string | undefined): string | null {
   if (!value?.trim()) return null;
   try {
@@ -31,21 +36,71 @@ function isLocalDevelopmentOrigin(origin: string): boolean {
   }
 }
 
+function isTrustedPublicWwwOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === 'https:' &&
+      /^www(?:\.[a-z0-9-]+)*\.lajukan\.com$/i.test(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function resolvePublicOrigin({
   configuredOrigin,
   requestOrigin,
   production,
 }: PublicOriginOptions): string {
   const configured = normalizedOrigin(configuredOrigin);
-  if (configured && (!production || configured.startsWith('https://'))) {
-    return configured;
+  const request = normalizedOrigin(requestOrigin);
+
+  // A public request arriving through the trusted Lajukan edge must never be
+  // sent back to a stale localhost value left in a development environment.
+  if (
+    request &&
+    isTrustedPublicWwwOrigin(request) &&
+    (!configured || isLocalDevelopmentOrigin(configured))
+  ) {
+    return request;
   }
 
-  const request = normalizedOrigin(requestOrigin);
+  if (configured) {
+    if (isTrustedPublicWwwOrigin(configured)) return configured;
+    if (!production && isLocalDevelopmentOrigin(configured)) return configured;
+  }
+
   if (!production && request && isLocalDevelopmentOrigin(request)) {
     return request;
   }
+
+  if (request && isTrustedPublicWwwOrigin(request)) return request;
   return CANONICAL_PUBLIC_ORIGIN;
+}
+
+export function resolveGoogleCallbackUri({
+  publicOrigin,
+  configuredRedirectUris = [],
+}: GoogleCallbackOptions): string {
+  const fallback = `${publicOrigin}/api/auth/google/callback`;
+
+  for (const candidate of configuredRedirectUris) {
+    if (!candidate?.trim()) continue;
+    try {
+      const callback = new URL(candidate.trim());
+      if (
+        callback.origin === publicOrigin &&
+        callback.pathname === '/api/auth/google/callback' &&
+        !callback.search &&
+        !callback.hash
+      ) {
+        return callback.toString();
+      }
+    } catch {}
+  }
+
+  return fallback;
 }
 
 export function sanitizeInternalCallbackPath(
