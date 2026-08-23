@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Building2, CircleDot, MapPinned, ShieldCheck, Store, UserRound } from 'lucide-react';
+import { Building2, Store, UserRound } from 'lucide-react';
+import { BusinessSwitcher } from '@/components/portal/BusinessSwitcher';
 import { LogoutButton } from '@/components/portal/LogoutButton';
-import { PortfolioPanel } from '@/components/portal/PortfolioPanel';
-import { ProgressTracker } from '@/components/portal/ProgressTracker';
-import { RoleAccessCard } from '@/components/portal/RoleAccessCard';
-import { TeamSnapshot } from '@/components/portal/TeamSnapshot';
-import { buildSectionHref, getSetupSteps, getStatusCopy } from '@/lib/portal-logic';
+import { MobileNav } from '@/components/portal/MobileNav';
+import { SidebarNav } from '@/components/portal/SidebarNav';
+import { StatusBadge } from '@/components/portal/StatusBadge';
+import { getStatusCopy } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
 
 type PortalShellProps = {
@@ -17,71 +17,91 @@ type PortalShellProps = {
   children: ReactNode;
 };
 
-const sectionLinks: Array<{ id: PortalSection; label: string }> = [
-  { id: 'home', label: 'Beranda' },
-  { id: 'info', label: 'Profil usaha' },
-  { id: 'locations', label: 'Lokasi & Cabang' },
-  { id: 'products', label: 'Katalog' },
-  { id: 'orders', label: 'Pesanan' },
-  { id: 'operations', label: 'Operasional' },
-  { id: 'team', label: 'Tim' },
-  { id: 'buyerPage', label: 'Halaman pembeli' },
-  { id: 'security', label: 'Keamanan' },
-];
+const sectionTitle: Record<PortalSection, string> = {
+  home: 'Beranda',
+  info: 'Profil usaha',
+  locations: 'Lokasi & Cabang',
+  products: 'Produk',
+  orders: 'Pesanan',
+  operations: 'Operasional',
+  team: 'Tim',
+  buyerPage: 'Halaman pembeli',
+  security: 'Keamanan',
+};
 
-export function PortalShell({ activeBusiness, availableBusinesses, viewerName, currentSection, children }: PortalShellProps) {
+export function PortalShell({
+  activeBusiness,
+  availableBusinesses,
+  viewerName,
+  currentSection,
+  children,
+}: PortalShellProps) {
   const status = activeBusiness ? getStatusCopy(activeBusiness) : null;
-  const setupSteps = activeBusiness ? getSetupSteps(activeBusiness) : [];
-  const activeLocations = activeBusiness?.locations ?? [];
+  const businesses = activeBusiness && !availableBusinesses.some(item => item.id === activeBusiness.id)
+    ? [activeBusiness, ...availableBusinesses]
+    : availableBusinesses;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(29,106,67,0.12),transparent_34%),linear-gradient(180deg,#f8f2e5_0%,#f4ede1_45%,#efe7d8_100%)] text-portal-ink">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-3 py-3 sm:px-5 lg:px-7 lg:py-5">
-        <header className="portal-panel px-4 py-4 sm:px-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-portal-forest px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white"><Store className="h-3.5 w-3.5" /> Lajukan Usaha</div>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <h1 className="text-[1.7rem] font-bold tracking-[-0.055em] sm:text-[2.2rem]">{activeBusiness ? activeBusiness.name : 'Workspace bisnis'}</h1>
-                {status ? <span className="rounded-full border border-portal-line bg-white px-3 py-1 text-xs font-bold text-portal-forest">{status.label}</span> : null}
-              </div>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-portal-soft">{activeBusiness ? status?.description : 'Satu akun Lajukan untuk mengelola organisasi, lokasi, katalog, operasional, dan tim.'}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex min-h-10 items-center gap-2 rounded-full border border-portal-line bg-white px-3 text-sm font-semibold"><UserRound className="h-4 w-4 text-portal-forest" /> {viewerName ?? 'Akun Lajukan'}</div>
-              <Link href="/businesses/new" className="portal-button-secondary min-h-10 px-4"><Building2 className="h-4 w-4" /> Tambah usaha</Link>
-              {viewerName ? <LogoutButton compact /> : null}
+    <main className="min-h-screen bg-[#f6f7f4] text-portal-ink">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[272px] flex-col bg-portal-forestDark px-4 py-4 text-white lg:flex">
+        <Link href="/" className="flex min-h-12 items-center gap-3 rounded-[16px] px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-portal-forest shadow-sm"><Store className="h-5 w-5" /></span>
+          <span>
+            <span className="block text-[11px] font-semibold text-white/55">Lajukan</span>
+            <span className="block text-base font-bold tracking-[-0.025em]">Usaha</span>
+          </span>
+        </Link>
+
+        <div className="mt-4">
+          <BusinessSwitcher activeBusiness={activeBusiness} businesses={businesses} currentSection={currentSection} />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <SidebarNav business={activeBusiness} currentSection={currentSection} />
+        </div>
+
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <div className="flex items-center gap-3 rounded-[14px] px-2 py-2">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-white/10 text-white"><UserRound className="h-4 w-4" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-white/55">Akun</p>
+              <p className="truncate text-sm font-bold text-white">{viewerName ?? 'Lajukan'}</p>
             </div>
           </div>
+          {viewerName ? <div className="mt-1 px-2"><LogoutButton compact /></div> : null}
+        </div>
+      </aside>
 
-          {activeBusiness ? (
-            <div className="mt-4 border-t border-portal-line/70 pt-4">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {sectionLinks.map(link => {
-                  const active = currentSection === link.id;
-                  return <Link key={link.id} href={buildSectionHref(activeBusiness.id, link.id)} className={active ? 'inline-flex min-h-10 shrink-0 items-center rounded-full bg-portal-forest px-4 text-sm font-semibold text-white' : 'inline-flex min-h-10 shrink-0 items-center rounded-full border border-portal-line bg-white/90 px-4 text-sm font-semibold text-portal-ink'}>{link.id === 'locations' ? <MapPinned className="mr-2 h-4 w-4" /> : null}{link.label}</Link>;
-                })}
+      <div className="min-h-screen lg:pl-[272px]">
+        <header className="sticky top-0 z-30 border-b border-portal-line bg-[#f6f7f4]/92 backdrop-blur-xl">
+          <div className="mx-auto flex min-h-[68px] w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-portal-forest text-white"><Store className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-portal-soft">{activeBusiness ? activeBusiness.name : 'Lajukan Usaha'}</p>
+                <p className="truncate text-sm font-bold text-portal-ink">{sectionTitle[currentSection]}</p>
               </div>
             </div>
-          ) : null}
+
+            <div className="hidden min-w-0 lg:block">
+              <p className="text-[11px] font-semibold text-portal-soft">{activeBusiness ? activeBusiness.name : 'Workspace bisnis'}</p>
+              <p className="mt-0.5 text-sm font-bold text-portal-ink">{sectionTitle[currentSection]}</p>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              {status ? <StatusBadge tone={activeBusiness?.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge> : null}
+              <Link href="/businesses/new" className="portal-button-secondary hidden sm:inline-flex"><Building2 className="h-4 w-4" /> Tambah usaha</Link>
+              <div className="lg:hidden">{viewerName ? <LogoutButton compact /> : null}</div>
+            </div>
+          </div>
         </header>
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="min-w-0 space-y-4">{children}</div>
-          <aside className="space-y-4">
-            {activeBusiness ? (
-              <>
-                <div className="portal-panel p-4"><p className="portal-kicker">Usaha aktif</p><div className="mt-3 flex items-start gap-3"><span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-portal-sand text-portal-forest"><CircleDot className="h-4 w-4" /></span><div><p className="font-bold">{activeBusiness.name}</p><p className="mt-1 text-xs leading-5 text-portal-soft">{activeBusiness.city} · {activeBusiness.category} · {activeLocations.length} lokasi</p></div></div></div>
-                <ProgressTracker steps={setupSteps} />
-                <RoleAccessCard role={activeBusiness.currentRole} />
-                <TeamSnapshot business={activeBusiness} canViewTeam={activeBusiness.permissions.includes('viewTeam')} canManageTeam={activeBusiness.permissions.includes('inviteMembers') || activeBusiness.permissions.includes('manageRoles')} />
-              </>
-            ) : null}
-            <div className="portal-panel p-4"><p className="portal-kicker">Portofolio usaha</p><div className="mt-4"><PortfolioPanel businesses={availableBusinesses} activeBusinessId={activeBusiness?.id ?? null} currentSection={activeBusiness ? currentSection : 'home'} /></div></div>
-            <Link href={activeBusiness ? `/security?business=${activeBusiness.id}` : '/security'} className="portal-panel flex items-center gap-3 p-4 text-sm font-bold"><ShieldCheck className="h-4 w-4 text-portal-forest" /> Keamanan workspace</Link>
-          </aside>
+        <div className="mx-auto w-full max-w-[1600px] px-3 pb-24 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8">
+          <div className="min-w-0 space-y-4 sm:space-y-5">{children}</div>
         </div>
       </div>
+
+      <MobileNav business={activeBusiness} currentSection={currentSection} />
     </main>
   );
 }
