@@ -1,105 +1,67 @@
 import { notFound } from 'next/navigation';
-import { hasPermission } from '@/lib/portal-logic';
-import { resolvePortalBusinessPageState } from '@/lib/portal-server';
+import { ClipboardCheck, Clock3, PackageCheck, ShoppingBag } from 'lucide-react';
+import { DataPanel } from '@/components/portal/DataPanel';
+import { EmptyState } from '@/components/portal/EmptyState';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { SectionCard } from '@/components/portal/SectionCard';
+import { StatCard } from '@/components/portal/StatCard';
+import { StatusBadge } from '@/components/portal/StatusBadge';
+import { hasPermission } from '@/lib/portal-logic';
+import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
-type PageProps = {
-  params: Promise<{ businessId: string }>;
-};
+type PageProps = { params: Promise<{ businessId: string }> };
+
+function orderTone(status: string): 'info' | 'warning' | 'success' | 'neutral' {
+  if (status === 'baru') return 'info';
+  if (status === 'diproses' || status === 'siap kirim') return 'warning';
+  if (status === 'selesai') return 'success';
+  return 'neutral';
+}
 
 export default async function BusinessOrdersPage({ params }: PageProps) {
   const { businessId } = await params;
-  const { account, businesses, activeBusiness } =
-    await resolvePortalBusinessPageState(businessId);
+  const { account, businesses, activeBusiness } = await resolvePortalBusinessPageState(businessId);
   const business = activeBusiness;
-
-  if (!business) {
-    notFound();
-  }
+  if (!business) notFound();
 
   const canManage = hasPermission(business, 'manageOrders');
   const newOrders = business.orders.filter(order => order.status === 'baru').length;
-  const processingOrders = business.orders.filter(
-    order => order.status === 'diproses',
-  ).length;
+  const processingOrders = business.orders.filter(order => order.status === 'diproses' || order.status === 'siap kirim').length;
+  const completedOrders = business.orders.filter(order => order.status === 'selesai').length;
 
   return (
-    <PortalShell
-      activeBusiness={business}
-      availableBusinesses={businesses}
-      viewerName={account?.name ?? null}
-      currentSection="orders"
-    >
-      <SectionCard
-        eyebrow="Pesanan"
-        title="Antrean order dibuat singkat dan jelas"
-        description="Antrean utama."
-      >
-        <div className="grid gap-5">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
-                Baru masuk
-              </p>
-              <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
-                {newOrders}
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
-                Sedang diproses
-              </p>
-              <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
-                {processingOrders}
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
-                Mode akses
-              </p>
-              <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
-                {canManage ? 'Bisa proses' : 'Pantau saja'}
-              </p>
-            </div>
-          </div>
+    <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="orders">
+      <SectionCard eyebrow="Penjualan" title="Pesanan" description="Pantau antrean berdasarkan status dan prioritaskan order yang perlu diproses lebih dulu.">
+        <div className="space-y-4">
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Baru masuk" value={newOrders} icon={ShoppingBag} note="Belum mulai diproses" />
+            <StatCard label="Sedang berjalan" value={processingOrders} icon={Clock3} note="Diproses atau siap kirim" />
+            <StatCard label="Selesai" value={completedOrders} icon={PackageCheck} note="Tercatat pada data workspace" />
+            <StatCard label="Akses" value={canManage ? 'Kelola' : 'Pantau'} icon={ClipboardCheck} note={canManage ? 'Dapat memproses pesanan' : 'Mode lihat saja'} />
+          </section>
 
-          {business.orders.length > 0 ? (
-            <div className="grid gap-3 xl:grid-cols-2">
-              {business.orders.map(order => (
-                <article
-                  key={order.id}
-                  className="rounded-[24px] border border-portal-line/70 bg-white p-5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
-                        {order.id}
-                      </p>
-                      <h3 className="mt-1 text-lg font-bold tracking-[-0.04em] text-portal-ink">
-                        {order.buyer}
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-portal-soft">
-                        {order.itemSummary}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-portal-ink">{order.amountLabel}</p>
-                      <p className="mt-1 text-sm text-portal-soft">{order.channel}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 inline-flex rounded-full border border-portal-line bg-portal-sand/45 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-portal-ink">
-                    {order.status}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-[28px] border border-dashed border-portal-line bg-portal-sand/40 p-6 text-sm leading-7 text-portal-soft">
-              Belum ada order aktif. Begitu order pertama masuk, halaman ini harus jadi tempat
-              pertama yang dibuka kasir atau manager.
-            </div>
-          )}
+          <DataPanel title="Antrean pesanan" description={`${business.orders.length} pesanan tercatat untuk usaha ini.`}>
+            {business.orders.length ? (
+              <div>
+                <div className="hidden grid-cols-[120px_minmax(180px,1fr)_minmax(220px,1.4fr)_130px_110px] gap-4 border-b border-portal-line bg-[#fafbf9] px-5 py-3 text-[11px] font-bold text-portal-soft lg:grid">
+                  <span>ID</span><span>Pembeli</span><span>Pesanan</span><span>Total</span><span>Status</span>
+                </div>
+                <div className="divide-y divide-portal-line">
+                  {business.orders.map(order => (
+                    <article key={order.id} className="grid gap-3 px-4 py-4 transition hover:bg-[#fafbf9] sm:px-5 lg:grid-cols-[120px_minmax(180px,1fr)_minmax(220px,1.4fr)_130px_110px] lg:items-center lg:gap-4">
+                      <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">ID pesanan</p><p className="mt-1 text-xs font-bold text-portal-ink lg:mt-0">{order.id}</p></div>
+                      <div className="min-w-0"><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Pembeli</p><p className="mt-1 truncate text-sm font-bold text-portal-ink lg:mt-0">{order.buyer}</p><p className="mt-1 text-xs text-portal-soft">{order.channel}</p></div>
+                      <div className="min-w-0"><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Pesanan</p><p className="mt-1 text-sm leading-5 text-portal-ink lg:mt-0">{order.itemSummary}</p></div>
+                      <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Total</p><p className="mt-1 text-sm font-bold text-portal-ink lg:mt-0">{order.amountLabel}</p></div>
+                      <div><StatusBadge tone={orderTone(order.status)}>{order.status}</StatusBadge></div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <EmptyState title="Belum ada pesanan" description="Begitu pesanan pertama masuk, antreannya akan tampil di sini untuk dipantau owner, manager, atau kasir sesuai akses." icon={ShoppingBag} />
+            )}
+          </DataPanel>
         </div>
       </SectionCard>
     </PortalShell>
