@@ -8,6 +8,11 @@ type PublicOriginOptions = {
   production: boolean;
 };
 
+type GoogleCallbackOptions = {
+  publicOrigin: string;
+  configuredRedirectUris?: Array<string | undefined>;
+};
+
 function normalizedOrigin(value: string | undefined): string | null {
   if (!value?.trim()) return null;
   try {
@@ -72,6 +77,30 @@ export function resolvePublicOrigin({
 
   if (request && isTrustedPublicWwwOrigin(request)) return request;
   return CANONICAL_PUBLIC_ORIGIN;
+}
+
+export function resolveGoogleCallbackUri({
+  publicOrigin,
+  configuredRedirectUris = [],
+}: GoogleCallbackOptions): string {
+  const fallback = `${publicOrigin}/api/auth/google/callback`;
+
+  for (const candidate of configuredRedirectUris) {
+    if (!candidate?.trim()) continue;
+    try {
+      const callback = new URL(candidate.trim());
+      if (
+        callback.origin === publicOrigin &&
+        callback.pathname === '/api/auth/google/callback' &&
+        !callback.search &&
+        !callback.hash
+      ) {
+        return callback.toString();
+      }
+    } catch {}
+  }
+
+  return fallback;
 }
 
 export function sanitizeInternalCallbackPath(
