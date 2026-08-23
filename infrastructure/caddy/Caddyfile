@@ -33,8 +33,10 @@ http://www.{$APP_DOMAIN} {
         import public_frontend_proxy
     }
 
+    # Frontend CSP is emitted by Next.js. Do not add a second CSP here:
+    # browsers intersect multiple CSP headers, which can block Next bootstrap
+    # scripts even when the application policy explicitly allows them.
     header {
-        Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://www.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
     }
@@ -53,8 +55,8 @@ http://usaha.{$APP_DOMAIN} {
         import public_frontend_proxy
     }
 
+    # Usaha owns its CSP through Next.js for the same reason as WWW above.
     header {
-        Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://usaha.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
     }
