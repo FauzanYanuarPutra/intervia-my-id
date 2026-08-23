@@ -128,6 +128,30 @@ class CaddyEdgeContractTests(unittest.TestCase):
         caddy = self._read_caddy("Caddyfile")
         self.assertIn("redir https://www.{$APP_DOMAIN}{uri} permanent", caddy)
 
+    def test_development_frontend_csp_is_owned_by_next(self) -> None:
+        """Caddy must not add a second CSP that intersects with Next.js CSP."""
+        caddy = self._read_caddy("Caddyfile")
+        self.assertNotIn("Content-Security-Policy", caddy)
+
+        for app in ("www", "usaha", "cms", "crm"):
+            with self.subTest(app=app):
+                next_config = (
+                    ROOT / f"frontend/apps/{app}/next.config.mjs"
+                ).read_text(encoding="utf-8")
+                self.assertIn("buildPublicWebCsp", next_config)
+                self.assertIn("buildSecurityHeaders", next_config)
+
+    def test_caddy_shares_media_network_with_minio(self) -> None:
+        """Caddy must be able to resolve minio:9002 for media.lajukan.com."""
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        caddy = re.search(
+            r"(?ms)^  caddy:\n(?P<body>.*?)(?=^  [a-zA-Z0-9_]+:\n|^networks:\n)",
+            compose,
+        )
+        self.assertIsNotNone(caddy)
+        body = caddy.group("body") if caddy else ""
+        self.assertRegex(body, r"networks:\s*\[[^\]]*\bmedia\b[^\]]*\]")
+
     def test_tunnel_frontends_forward_external_https_scheme(self) -> None:
         """The private Tunnel hop must not overwrite the browser HTTPS scheme."""
         caddy = self._read_caddy("Caddyfile")
