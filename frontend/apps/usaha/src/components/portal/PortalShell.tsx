@@ -47,7 +47,7 @@ export function PortalShell({
         <Link href="/" className="flex min-h-12 items-center gap-3 rounded-[16px] px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-portal-forest shadow-sm"><Store className="h-5 w-5" /></span>
           <span>
-            <span className="block text-[11px] font-semibold text-white/55">Lajukan</span>
+            <span className="block text-[11px] font-semibold text-white/60">Lajukan</span>
             <span className="block text-base font-bold tracking-[-0.025em]">Usaha</span>
           </span>
         </Link>
@@ -64,7 +64,7 @@ export function PortalShell({
           <div className="flex items-center gap-3 rounded-[14px] px-2 py-2">
             <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-white/10 text-white"><UserRound className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white/55">Akun</p>
+              <p className="truncate text-xs font-semibold text-white/60">Akun</p>
               <p className="truncate text-sm font-bold text-white">{viewerName ?? 'Lajukan'}</p>
             </div>
           </div>
@@ -73,7 +73,7 @@ export function PortalShell({
       </aside>
 
       <div className="min-h-screen lg:pl-[272px]">
-        <header className="sticky top-0 z-30 border-b border-portal-line bg-[#f6f7f4]/92 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-portal-line bg-[#f6f7f4]/95 backdrop-blur-xl">
           <div className="mx-auto flex min-h-[68px] w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3 lg:hidden">
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-portal-forest text-white"><Store className="h-5 w-5" /></span>
