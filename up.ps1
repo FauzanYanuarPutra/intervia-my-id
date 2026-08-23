@@ -156,6 +156,32 @@ try {
     & docker @ComposeArgs @UpArgs
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    # Caddyfile is bind-mounted. `docker compose up` does not reload an already
+    # running Caddy process when only the mounted file content changes. Always
+    # validate and activate the current edge config after startup so forwarded
+    # scheme/host fixes cannot remain stale and cause HTTPS redirect loops.
+    $EdgeRequested =
+        ($RequestedProfiles -contains "edge") -or
+        ($RequestedProfiles -contains "tunnel")
+    $CaddySelected = $Services.Count -eq 0 -or $Services -contains "caddy"
+    if ($EdgeRequested -and $CaddySelected) {
+        Write-Host "Validating and reloading Caddy edge configuration..." -ForegroundColor Cyan
+
+        & docker @ComposeArgs exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+        if ($LASTEXITCODE -ne 0) {
+            & docker @ComposeArgs logs --no-color --tail 80 caddy
+            throw "Konfigurasi Caddy tidak valid. Edge configuration tidak direload."
+        }
+
+        & docker @ComposeArgs exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+        if ($LASTEXITCODE -ne 0) {
+            & docker @ComposeArgs logs --no-color --tail 80 caddy
+            throw "Caddy gagal memuat konfigurasi edge terbaru."
+        }
+
+        Write-Host "Caddy edge configuration is active." -ForegroundColor Green
+    }
+
     $TunnelRequested = $RequestedProfiles -contains "tunnel"
     $TunnelSelected = $Services.Count -eq 0 -or $Services -contains "cloudflared"
     if ($TunnelRequested -and $TunnelSelected) {

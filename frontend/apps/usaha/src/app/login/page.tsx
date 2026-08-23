@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Building2, CheckCircle2, MapPinned, ShieldCheck } from 'lucide-react';
 import { getAuthenticatedActor } from '@/lib/business-server';
@@ -10,10 +9,12 @@ export default async function LoginPage({
 }) {
   const account = await getAuthenticatedActor();
   if (account) redirect('/');
+
   const params = await searchParams;
-  const callbackUrl = typeof params.callbackUrl === 'string' && params.callbackUrl.startsWith('/')
-    ? params.callbackUrl
-    : '/';
+  const callbackUrl =
+    typeof params.callbackUrl === 'string' && params.callbackUrl.startsWith('/')
+      ? params.callbackUrl
+      : '/';
   const error = typeof params.error === 'string' ? params.error : '';
   const googleHref = `/api/auth/google?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
@@ -38,7 +39,10 @@ export default async function LoginPage({
             ].map(([Icon, label]) => {
               const IconComponent = Icon as typeof MapPinned;
               return (
-                <div key={String(label)} className="rounded-[20px] border border-portal-line/70 bg-portal-sand/30 p-4">
+                <div
+                  key={String(label)}
+                  className="rounded-[20px] border border-portal-line/70 bg-portal-sand/30 p-4"
+                >
                   <IconComponent className="h-5 w-5 text-portal-forest" />
                   <p className="mt-3 text-sm font-bold">{String(label)}</p>
                 </div>
@@ -49,18 +53,34 @@ export default async function LoginPage({
         <aside className="flex items-center bg-portal-sand/35 p-6 sm:p-9 lg:p-12">
           <div className="w-full rounded-[26px] border border-portal-line/70 bg-white p-5 sm:p-6">
             <p className="portal-kicker">Masuk ke workspace</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em]">Lanjutkan dengan akun Lajukan</h2>
-            <p className="mt-2 text-sm leading-6 text-portal-soft">Google akan menghubungkan akun yang sama dengan WWW melalui Identity Service.</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em]">
+              Lanjutkan dengan akun Lajukan
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-portal-soft">
+              Google akan menghubungkan akun yang sama dengan WWW melalui Identity Service.
+            </p>
             {error ? (
-              <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">Login Google belum berhasil ({error}). Coba lagi.</p>
+              <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                Login Google belum berhasil ({error}). Coba lagi.
+              </p>
             ) : null}
-            <Link
+
+            {/*
+              OAuth start endpoints must use a full-document navigation. Next's
+              client router/prefetch can follow the 302 as a fetch and turn the
+              cross-origin Google redirect into a CORS preflight (OPTIONS), which
+              accounts.google.com correctly rejects with 405.
+            */}
+            <a
               href={googleHref}
               className="mt-6 flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-portal-line bg-white px-4 text-sm font-bold shadow-sm transition hover:bg-portal-sand/40"
             >
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-portal-line font-black text-[#4285F4]">G</span>
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-portal-line font-black text-[#4285F4]">
+                G
+              </span>
               Lanjutkan dengan Google
-            </Link>
+            </a>
+
             <p className="mt-5 text-center text-xs leading-5 text-portal-soft">
               Belum punya akun? Login Google akan membuat atau menghubungkan akun Lajukan secara aman.
             </p>
