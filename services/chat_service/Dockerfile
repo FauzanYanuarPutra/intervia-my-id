@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: BUILDER (Lingkungan Kompilasi)
 # ==========================================
-FROM elixir:1.15-slim AS builder
+FROM hexpm/elixir:1.17.3-erlang-26.2.5.21-debian-bookworm-20260824-slim AS builder
 
 # Set environment untuk produksi
 ENV MIX_ENV=prod \
@@ -78,7 +78,7 @@ RUN mix release chat_service --overwrite
 # ==========================================
 # STAGE 1.5: DEV (Hot Reload)
 # ==========================================
-FROM elixir:1.15-slim AS chat_service_dev
+FROM hexpm/elixir:1.17.3-erlang-26.2.5.21-debian-bookworm-20260824-slim AS chat_service_dev
 
 ENV MIX_ENV=dev \
     LANG=C.UTF-8 \

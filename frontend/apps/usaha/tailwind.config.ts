@@ -6,18 +6,20 @@ const config: Config = {
     extend: {
       colors: {
         portal: {
-          paper: '#fffaf0',
-          sand: '#efe0c2',
-          ink: '#1f2937',
-          soft: '#6b7280',
-          line: '#d6c7af',
-          forest: '#1d6a43',
+          paper: '#ffffff',
+          sand: '#eee7d7',
+          mist: '#edf4ef',
+          ink: '#17211c',
+          soft: '#66736c',
+          line: '#dce4de',
+          forest: '#17613d',
+          forestDark: '#104c30',
           amber: '#c88d2f',
           ember: '#b45309',
         },
       },
       boxShadow: {
-        card: '0 24px 60px -36px rgba(31, 41, 55, 0.28)',
+        card: '0 16px 40px -30px rgba(15, 23, 42, 0.28)',
       },
     },
   },

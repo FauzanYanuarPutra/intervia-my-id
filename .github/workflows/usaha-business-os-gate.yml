@@ -10,6 +10,7 @@ on:
       - "services/identity_service/**"
       - "services/marketplace_service/**"
       - "scripts/ci/check_usaha_business_os_contract.py"
+      - "scripts/config/test_usaha_ui_contract.py"
       - ".github/workflows/usaha-business-os-gate.yml"
   push:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "services/identity_service/**"
       - "services/marketplace_service/**"
       - "scripts/ci/check_usaha_business_os_contract.py"
+      - "scripts/config/test_usaha_ui_contract.py"
       - ".github/workflows/usaha-business-os-gate.yml"
 
 permissions:
@@ -34,12 +36,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Validate application boundary
         run: python scripts/ci/check_usaha_business_os_contract.py
+      - name: Validate Business OS UI architecture
+        run: python scripts/config/test_usaha_ui_contract.py
 
   frontend:
     name: Usaha frontend validation
@@ -49,8 +53,8 @@ jobs:
       run:
         working-directory: frontend/apps/usaha
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
