@@ -18,9 +18,10 @@ config :chat_service, ChatServiceWeb.Endpoint,
 # Digunakan untuk sinkronisasi pesan antar node Elixir
 config :chat_service, ChatService.PubSub,
   adapter: Phoenix.PubSub.Redis,
-  # Menggunakan host "redis" (asumsi nama service di docker-compose adalah redis)
-  host: System.get_env("REDIS_HOST") || "redis",
-  port: String.to_integer(System.get_env("REDIS_PORT") || "6379"),
+  redis_opts: [
+    host: System.get_env("REDIS_HOST") || "redis",
+    port: String.to_integer(System.get_env("REDIS_PORT") || "6379")
+  ],
   node_name: System.get_env("NODE_NAME") || "chat_service_node"
 
 # --- KONFIGURASI SCYLLADB ---
