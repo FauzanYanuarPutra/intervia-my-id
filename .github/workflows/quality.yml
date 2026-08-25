@@ -53,7 +53,7 @@ jobs:
     needs: repository-hygiene
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
@@ -121,7 +121,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "26.2"
-          elixir-version: "1.15.8"
+          elixir-version: "1.17.3"
       - name: Install dependencies
         env:
           MIX_ENV: test
