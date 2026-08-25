@@ -2,190 +2,315 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make WWW and Usaha resolve the same durable merchant workspace, then introduce the normalized canonical Business identity contract without duplicating legacy Stores.
+**Goal:** Make WWW and Usaha provision and resolve one durable Business aggregate, preserve existing Store IDs, and make the Marketplace public Store API private-by-default.
 
-**Architecture:** Deliver Phase 0 in independently reviewable slices. Phase 0A first closes the production-facing mismatch by making WWW create an Identity Organization and an authenticated durable Marketplace Store, removing phantom in-memory success, and making Usaha read the normalized `organization_id` compatibility column. Phase 0B adds normalized `businesses`, `business_store_links`, private Business APIs, idempotent provisioning/reconciliation, and public Store redaction behind a focused Marketplace Business module.
+**Architecture:** Identity remains authoritative for Organizations and memberships. A focused Marketplace `businesses` module owns canonical Businesses, explicit Store links, locations, provisioning idempotency, reconciliation, and private Business reads. WWW and Usaha are server-side adapters over those APIs; they do not coordinate separate Identity and Marketplace writes.
 
-**Tech Stack:** Next.js 16 / TypeScript / Vitest, Rust / Axum / SQLx / PostgreSQL, GitHub Actions, existing Identity and Marketplace services.
+**Tech Stack:** Rust 2021, Axum 0.8, SQLx/PostgreSQL, Next.js 16, TypeScript 5.9, Vitest, Python contract tests, Docker Compose.
 
-**Spec:** `docs/superpowers/specs/2026-08-25-canonical-business-identity-phase-0-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-25-canonical-business-identity-design.md`
+
+## Current State at 2026-08-26
+
+- [x] PR #105 added a fail-closed WWW Phase 0A bridge that forwards the actor token while creating an Organization and Store.
+- [x] Usaha prefers the normalized `store.organization_id` field when it is present.
+- [ ] Marketplace still omits `organization_id` from Store SQL and exposes `owner_user_id` plus raw metadata on public endpoints.
+- [ ] Identity has no idempotent Organization ensure operation and still globally constrains Organization display names.
+- [ ] Canonical `businesses`, `business_store_links`, Business APIs, and reconciliation do not exist.
+- [ ] Usaha still scans/filter public Stores and coordinates two remote writes itself.
 
 ## Global Constraints
 
-- Do not modify the already-applied `20260823001000_usaha_business_os.up.sql` migration.
-- Never push implementation directly to `main`; use `fix/canonical-business-phase0-20260825` and a PR.
-- WWW and Usaha must not create separate Store records for one business creation request.
-- Browser-supplied `owner_user_id` is never authentication evidence.
-- Durable owner provisioning must forward the verified actor token and fail closed when Marketplace is unavailable.
-- Runtime/in-memory Store fallback remains available only to explicitly non-persistent test/demo callers; persistent provisioning cannot use it.
-- Cross-service Organization references are UUID values, never database foreign keys into Identity.
-- No inventory, recipe/BOM, finance, accounting, or analytics implementation belongs in this Phase 0 PR.
-- Existing public storefront URLs stay compatible.
-- Completion claims require fresh CI/runtime evidence.
+- Do not modify applied migration `20260823001000_usaha_business_os.up.sql` or any earlier migration.
+- Work on `fix/canonical-business-phase0-20260825`; do not push implementation directly to `main`.
+- Derive the actor from a verified token. Never authorize with a browser-supplied owner, Organization, Store, or Business ID.
+- Identity and Marketplace databases remain isolated. Cross-service membership validation uses Identity HTTP APIs.
+- All provisioning retries use a stable UUID `Idempotency-Key`; same key plus different normalized input returns `409 idempotency_conflict`.
+- Organization creation/membership/audit/outbox/idempotency share one Identity transaction.
+- Business/Store/link/location/outbox/idempotency share one Marketplace transaction.
+- Persistent paths fail closed; no in-memory Store success is allowed after an upstream failure.
+- Preserve Store IDs and public storefront URLs during reconciliation.
+- Do not add inventory, recipes/BOM, finance, accounting, analytics, Kafka, Kubernetes, or another deployable service in Phase 0.
+- Completion claims require fresh tests, image builds, migrations, runtime probes, and the exact requested `up.ps1` command.
 
 ---
 
-### Task 1: Phase 0A regression tests for durable WWW provisioning
+### Task 1: Lock the regression contracts before implementation
 
 **Files:**
+
+- Create: `scripts/ci/tests/test_canonical_business_contract.py`
 - Create: `frontend/apps/www/src/lib/super-app/umkm-commerce.persistence.test.ts`
-- Create: `frontend/apps/www/src/lib/super-app/business-workspace.test.ts`
-- Create: `frontend/apps/www/src/lib/super-app/business-workspace.ts`
-- Modify: `frontend/apps/www/src/lib/super-app/umkm-commerce.types.ts`
-- Modify: `frontend/apps/www/src/lib/super-app/umkm-commerce.service.ts`
+- Create: `frontend/apps/usaha/src/lib/business-server.test.ts`
+- Create: `frontend/apps/usaha/vitest.config.ts`
+- Modify: `frontend/apps/usaha/package.json`
 
-**Interfaces:**
-- Produces `ensureWorkspaceOrganization({ token, name, fetchImpl? }): Promise<string>`.
-- Extends `CreateUmkmStoreInput` with `authToken?: string` and `persistentOnly?: boolean`.
-- Persistent create forwards `Authorization: Bearer <token>` and throws if backend persistence is unavailable.
+**Behavior under test:**
 
-- [ ] Write tests proving Organization resolution rules: zero Organizations creates one, one reuses it, multiple returns `organization_selection_required`.
-- [ ] Write test proving Marketplace create receives the Authorization header.
-- [ ] Write test proving `persistentOnly=true` rejects fetch failure and does not fall back to runtime Store creation.
-- [ ] Run targeted tests and confirm RED before implementation.
-- [ ] Implement the minimum code to pass.
-- [ ] Run targeted tests and typecheck/lint for touched WWW code.
+```text
+public Store JSON must not contain owner_user_id, organization_id,
+business_id, or raw metadata
 
-### Task 2: Route WWW owner creation through the shared workspace contract
+persistent WWW/Usaha provisioning must send Authorization and
+Idempotency-Key and must not return an in-memory success
 
-**Files:**
-- Modify: `frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts`
+Usaha must consume /v1/businesses/mine rather than a 500-row public scan
+```
 
-**Interfaces:**
-- Consumes `ensureWorkspaceOrganization` and authenticated `auth.ctx.token`.
-- Calls `createUmkmStore` with `persistentOnly: true`, `authToken`, and `metadata.organization_id`.
+- [ ] Add the narrow Python architecture/migration assertions and frontend behavioral tests.
+- [ ] Run them against current source and record the expected RED failures.
+- [ ] Keep existing Phase 0A tests green so the new work does not regress token forwarding.
 
-- [ ] Add route-level regression assertion/contract proving token and Organization are passed to durable Store creation.
-- [ ] Verify RED.
-- [ ] Implement Organization ensure before Store creation.
-- [ ] Ensure QR/table creation only runs after Store durability is confirmed.
-- [ ] Verify targeted tests/typecheck.
+**RED commands:**
 
-### Task 3: Make Usaha read the durable Organization link
+```powershell
+python -m unittest scripts.ci.tests.test_canonical_business_contract -v
+docker run --rm -v "${PWD}:/src:ro" node:22-bookworm-slim sh -lc "cp -a /src /work && cd /work/frontend/apps/www && npm ci --ignore-scripts && npx vitest run src/lib/super-app/business-workspace.test.ts src/lib/super-app/umkm-commerce.persistence.test.ts"
+docker run --rm -v "${PWD}:/src:ro" node:22-bookworm-slim sh -lc "cp -a /src /work && cd /work/frontend/apps/usaha && npm ci --ignore-scripts && npm test -- --run"
+```
+
+### Task 2: Add idempotent Organization ensure in Identity
 
 **Files:**
-- Modify: `frontend/apps/usaha/src/lib/business-server.ts`
-- Create or modify the narrowest Usaha contract test supported by the app.
 
-**Interfaces:**
-- `mapStore` prefers top-level `store.organization_id` and retains metadata fallback only for legacy rows.
-- Owner listing uses an authenticated owner-scoped Marketplace request where possible instead of relying only on the public 500-row scan.
+- Create: `services/identity_service/migrations/20260826090000_organization_provisioning_idempotency.up.sql`
+- Modify: `services/identity_service/Cargo.toml`
+- Modify: `services/identity_service/Cargo.lock`
+- Modify: `services/identity_service/src/organizations/domain.rs`
+- Modify: `services/identity_service/src/organizations/repository.rs`
+- Modify: `services/identity_service/src/organizations/service.rs`
+- Modify: `services/identity_service/src/organizations/routes.rs`
+- Modify: `services/identity_service/src/main.rs`
 
-- [ ] Add a regression fixture where top-level `organization_id` exists but metadata link does not.
-- [ ] Verify RED.
-- [ ] Implement normalized-column preference and owner-scoped lookup.
-- [ ] Keep compatibility fallback for legacy metadata-only Stores.
-- [ ] Verify Usaha lint/build/test gate.
+**Schema/API contract:**
 
-### Task 4: Add normalized canonical Business schema
+```sql
+PRIMARY KEY (actor_user_id, idempotency_key)
+request_hash CHAR(64) NOT NULL
+organization_id UUID NOT NULL REFERENCES core.organizations(id)
+```
+
+```http
+POST /organizations/ensure
+Authorization: Bearer <actor>
+Idempotency-Key: <uuid>
+{"name":"Cuk"}
+```
+
+- [ ] Add domain tests for normalized request hashing and deterministic collision-safe slugs.
+- [ ] Add service/repository tests for replay and same-key/different-body conflict; verify RED.
+- [ ] Add a forward migration that drops only `organizations_name_key`, preserves unique slug, and creates the idempotency table.
+- [ ] Implement one transactional `ensure_for_actor` path using transaction-scoped advisory locks for idempotency and slug selection.
+- [ ] Return `201` on first creation, `200` with `replayed=true` on replay, and stable `409 idempotency_conflict` on body mismatch.
+- [ ] Mount `/organizations/ensure` before the `{id}` route and preserve existing `/organizations` behavior.
+- [ ] Build and test the Identity builder image with `--locked`.
+
+**GREEN commands:**
+
+```powershell
+docker build --target builder -t lajukan-identity-phase0-test services/identity_service
+docker run --rm lajukan-identity-phase0-test cargo fmt --check
+docker run --rm lajukan-identity-phase0-test cargo clippy --locked --all-targets -- -D warnings
+docker run --rm lajukan-identity-phase0-test cargo test --locked
+```
+
+### Task 3: Add the canonical Marketplace schema and pure domain invariants
 
 **Files:**
-- Create: `services/marketplace_service/migrations/20260825001000_canonical_business_identity.up.sql`
-- Create: `services/marketplace_service/migrations/20260825001000_canonical_business_identity.down.sql` only if repository migration conventions allow reversible down files; otherwise document forward-only rollback.
 
-**Interfaces:**
-- Creates `businesses` and `business_store_links`.
-- Adds nullable `business_locations.business_id`.
-- Adds uniqueness constraints for idempotency and Store ownership.
-
-- [ ] Add migration contract test/inspection first.
-- [ ] Verify test fails because schema is missing.
-- [ ] Add additive migration without editing prior checksums.
-- [ ] Verify migration applies on disposable PostgreSQL in CI.
-
-### Task 5: Implement focused Marketplace Business module
-
-**Files:**
+- Create: `services/marketplace_service/migrations/20260826091000_canonical_business_identity.up.sql`
 - Create: `services/marketplace_service/src/businesses/mod.rs`
 - Create: `services/marketplace_service/src/businesses/domain.rs`
+- Modify: `services/marketplace_service/src/main.rs`
+
+**Schema invariants:**
+
+```text
+businesses: immutable id, organization_id, creator audit ID,
+idempotency key, request hash, capability/status/version
+
+business_store_links: unique store_id and at most one primary Store per Business
+
+business_locations: nullable business_id for additive compatibility;
+new canonical writes always populate it
+```
+
+- [ ] Extend the migration contract test first and verify RED.
+- [ ] Add `businesses` and `business_store_links` plus constraints/indexes.
+- [ ] Add nullable `business_locations.business_id` with a same-database foreign key and active access index.
+- [ ] Add domain tests for request validation, canonical hashing, mode validation, stable errors, and public DTO forbidden keys.
+- [ ] Register only `mod businesses;` in `main.rs`; keep business logic out of the bootstrap file.
+
+### Task 4: Implement the Business repository transaction
+
+**Files:**
+
 - Create: `services/marketplace_service/src/businesses/repository.rs`
+- Modify: `services/marketplace_service/src/businesses/mod.rs`
+
+**Repository contract:**
+
+```rust
+provision(actor_id, idempotency_key, request_hash, organization_id, command)
+    -> ProvisionOutcome { aggregate, replayed }
+
+list_for_organizations(organization_ids) -> Vec<BusinessAggregate>
+get_for_organization(business_id, organization_id) -> Option<BusinessAggregate>
+reconcile_existing_store(actor_id, store_id, organization_id, idempotency_key)
+    -> ReconcileOutcome
+```
+
+- [ ] Add DB-backed tests for replay, conflict, unique Store link, and atomic rollback.
+- [ ] In one transaction insert Business, Store, primary link, primary Location, compatibility `umkm_stores.organization_id`, and versioned outbox events.
+- [ ] Acquire an advisory lock for `(actor,idempotency_key)` before replay lookup.
+- [ ] Read aggregate rows through explicit tenant predicates; never use caller-supplied owner IDs for scope.
+- [ ] Keep legacy Store metadata reads only in reconciliation compatibility code.
+
+### Task 5: Implement Identity adapter, Business service, and private routes
+
+**Files:**
+
+- Create: `services/marketplace_service/src/businesses/identity_client.rs`
 - Create: `services/marketplace_service/src/businesses/service.rs`
 - Create: `services/marketplace_service/src/businesses/routes.rs`
-- Create: `services/marketplace_service/src/businesses/identity_client.rs`
-- Modify: `services/marketplace_service/src/main.rs` only for module registration, dependencies, and route mounting.
+- Modify: `services/marketplace_service/src/businesses/mod.rs`
+- Modify: `services/marketplace_service/src/main.rs`
+- Modify: `docker-compose.yml`
 
-**Interfaces:**
-- `GET /v1/businesses/mine`
-- `GET /v1/businesses/{business_id}`
-- `POST /v1/businesses/provision`
-- `POST /v1/businesses/reconcile`
+**Routes:**
 
-- [ ] Write domain/repository tests for idempotency conflict, explicit Store link uniqueness, actor scoping, and reconciliation replay.
-- [ ] Verify RED.
-- [ ] Implement repository/domain/service minimally.
-- [ ] Implement Identity adapter using documented Identity HTTP API; never query Identity DB.
-- [ ] Mount routes without moving unrelated Marketplace code.
-- [ ] Run `cargo fmt --check`, clippy, and tests in CI.
+```text
+GET  /v1/businesses/mine
+GET  /v1/businesses/{business_id}
+POST /v1/businesses/provision
+```
 
-### Task 6: Add idempotent Organization ensure in Identity
+- [ ] Add route/service tests for missing token, invalid key, zero/one/multiple Organizations, cross-tenant denial, replay, and Identity unavailability.
+- [ ] Forward the raw Bearer token only to the configured internal Identity base URL; never log it.
+- [ ] Implement `existing`, `create`, and `auto` Organization resolution exactly as specified.
+- [ ] Map upstream failures to stable bounded errors without forwarding raw Identity bodies.
+- [ ] Add `IDENTITY_SERVICE_URL=http://identity_service:8080` to Marketplace runtime configuration.
+- [ ] Mount the focused router from `main.rs` and keep existing public URLs unchanged.
 
-**Files:**
-- Modify focused files under `services/identity_service/src/organizations/`.
-- Create a new Identity migration for Organization idempotency records and display-name uniqueness change if required by current schema inventory.
-
-**Interfaces:**
-- `POST /organizations/ensure`
-- Accepts `Idempotency-Key` UUID.
-- Same actor/key/body returns same Organization; different body returns stable conflict.
-
-- [ ] Add service/repository/route tests first.
-- [ ] Verify RED.
-- [ ] Implement transactionally with owner membership and outbox/audit behavior according to current Identity conventions.
-- [ ] Verify Identity fmt/clippy/tests.
-
-### Task 7: Switch WWW and Usaha private reads to canonical Business APIs
+### Task 6: Implement explicit legacy reconciliation
 
 **Files:**
+
+- Modify: `services/marketplace_service/src/businesses/domain.rs`
+- Modify: `services/marketplace_service/src/businesses/repository.rs`
+- Modify: `services/marketplace_service/src/businesses/service.rs`
+- Modify: `services/marketplace_service/src/businesses/routes.rs`
+
+**Route:**
+
+```http
+POST /v1/businesses/reconcile
+Authorization: Bearer <actor>
+Idempotency-Key: <uuid>
+{"store_id":null}
+```
+
+- [ ] Add tests for single legacy Store, second-run no-op, invalid Organization hint, multiple candidate Stores, multiple Organizations, and explicit Store selection.
+- [ ] Reuse the existing Store ID and existing primary Location when possible.
+- [ ] Validate every Organization hint through Identity before linking.
+- [ ] Return `reconciliation_selection_required` without partial mutation when grouping is ambiguous.
+- [ ] Emit `marketplace.business.reconciled` in the same local transaction.
+
+### Task 7: Switch WWW and Usaha to the canonical command/read APIs
+
+**Files:**
+
+- Modify: `frontend/apps/www/src/lib/super-app/business-workspace.ts`
+- Modify: `frontend/apps/www/src/lib/super-app/business-workspace.test.ts`
 - Modify: `frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts`
-- Modify: `frontend/apps/www/src/lib/super-app/umkm-commerce.service.ts`
 - Modify: `frontend/apps/usaha/src/lib/business-server.ts`
+- Modify: `frontend/apps/usaha/src/lib/business-server.test.ts`
+- Modify: `frontend/apps/usaha/src/app/api/businesses/route.ts`
 
-**Interfaces:**
-- WWW owner-private enumeration and Usaha listing consume `/v1/businesses/mine`.
-- Existing frontend view models remain adapter-compatible.
+- [ ] Change both creation paths to `POST /v1/businesses/provision` with one stable client idempotency key across retries.
+- [ ] Change Usaha listing/detail adapters to `/v1/businesses/mine` and the canonical detail route.
+- [ ] Preserve current WWW response shape, Usaha URLs, and `BusinessRecord` view model through adapters.
+- [ ] Expose an explicit authenticated reconciliation action for a legacy unlinked Store; never mutate from GET.
+- [ ] Delete the persistent two-write Organization-then-Store coordination path after tests prove all callers moved.
+- [ ] Prove neither surface returns success on Marketplace/Identity failure.
 
-- [ ] Add cross-surface contract tests first.
-- [ ] Verify RED.
-- [ ] Switch reads/writes while preserving public URL contracts.
-- [ ] Verify no client-supplied owner ID controls authorization.
-
-### Task 8: Public Store response redaction
-
-**Files:**
-- Modify the narrow Marketplace Store DTO/query implementation.
-- Modify WWW public adapter only where necessary.
-
-**Interfaces:**
-- Public Store DTO excludes owner, Organization, Business, and raw metadata/private operational data.
-
-- [ ] Add API response test proving forbidden keys are absent.
-- [ ] Verify RED.
-- [ ] Introduce allowlisted public DTO.
-- [ ] Migrate remaining private consumers to Business APIs before removing fields.
-- [ ] Verify storefront/discovery compatibility.
-
-### Task 9: Legacy reconciliation and cross-service verification
+### Task 8: Make Marketplace public Store responses allowlist-only
 
 **Files:**
-- Create: `scripts/config/test_canonical_business_contract.py` or the repository-appropriate composed-stack test location.
-- Modify: `.github/workflows/usaha-business-os-gate.yml` or add a narrowly-scoped canonical Business workflow.
 
-**Interfaces:**
-- Proves WWW -> Usaha, Usaha -> WWW, replay, denial, ambiguity, and partial-failure recovery.
+- Modify: `services/marketplace_service/src/main.rs` only for the narrow existing Store handlers/types.
+- Modify: `frontend/apps/www/src/lib/super-app/umkm-public-store.ts` only if its defensive adapter needs compatibility changes.
 
-- [ ] Add deterministic fixtures and failure injection.
-- [ ] Reconcile an unlinked legacy Store without changing its Store ID in non-production fixture data.
-- [ ] Run twice and assert second run is no-op.
-- [ ] Verify public redaction and cross-tenant denial.
+- [ ] Add Rust response/projection tests proving `owner_user_id`, `organization_id`, `business_id`, and raw `metadata` are absent.
+- [ ] Introduce a dedicated serializable public Store DTO and an explicit public metadata allowlist.
+- [ ] Remove unauthenticated `owner_user_id` filtering from the public list contract.
+- [ ] Enforce active, transactional, non-reference, and public visibility on list and single-Store queries.
+- [ ] Confirm storefront, discovery, products, gallery, and ordering still receive the fields they deliberately need.
 
-### Task 10: Final branch verification and PR
+### Task 9: Upgrade behavioral CI and composed-stack verification
 
 **Files:**
-- No production changes unless verification exposes a defect.
 
-- [ ] Compare branch against `58e13899e6683ca4c909d6c7221157ccf829e2d1` and inspect every changed file.
-- [ ] Confirm old migration checksum is untouched.
-- [ ] Confirm no secrets, dumps, generated audit output, or unrelated refactors were added.
-- [ ] Run/inspect all GitHub Actions checks available for the PR.
-- [ ] Separate pre-existing baseline failures from regressions introduced by this branch.
-- [ ] Open PR to `main`; do not merge while required new Phase 0 checks are failing.
+- Modify: `scripts/ci/tests/test_canonical_business_contract.py`
+- Create: `scripts/config/test_canonical_business_runtime.py`
+- Modify: `.github/workflows/usaha-business-os-gate.yml`
+- Modify: `scripts/ci/check_usaha_business_os_contract.py`
+
+- [ ] Make Usaha CI run its Vitest suite, typecheck, lint, and production build.
+- [ ] Add a real-service runtime flow for WWW -> Usaha, Usaha -> WWW, replay, conflict, reconciliation, access denial, and public redaction.
+- [ ] Use unique fixture IDs and deterministic cleanup limited to those fixtures; never delete broad runtime data.
+- [ ] Keep `test_edge_contract.py` scoped to edge behavior.
+
+### Task 10: Harden the requested multi-profile launcher
+
+**Files:**
+
+- Create: `scripts/config/provision_ollama_models.py`
+- Create: `scripts/config/test_provision_ollama_models.py`
+- Create: `frontend/apps/www/src/app/api/health/route.ts`
+- Create: `frontend/apps/cms/src/app/api/health/route.ts`
+- Create: `frontend/apps/crm/src/app/api/health/route.ts`
+- Modify: `scripts/config/test_provision_kyc_models.py`
+- Modify: `docker-compose.yml`
+- Modify: `docker-compose.dev.yml`
+- Modify: `up.ps1`
+
+- [ ] Add RED tests for idempotent configured Ollama model provisioning, frontend health contracts, build args, and POSIX-only KYC permission assertions.
+- [ ] Provision `OLLAMA_MODEL` idempotently before local-AI consumers are considered ready; fail with a bounded actionable error when the pull fails.
+- [ ] Pin the documented/example Ollama image to an immutable version or digest while retaining an explicit environment override.
+- [ ] Add container health checks for WWW, Usaha, CMS, CRM, and Ollama; retain the explicit Caddy reload and Tunnel connection checks.
+- [ ] Pass each frontend Dockerfile's public build arguments explicitly in Compose.
+- [ ] Make Windows KYC tests validate portability semantics without pretending NTFS exposes POSIX `0644` mode bits.
+- [ ] Verify the full resolved profile model and runtime contract before running the launcher.
+
+### Task 11: Apply migrations and reconcile the existing development Store safely
+
+**Files:**
+
+- No tracked data files.
+
+- [ ] Inventory exact Organization, membership, Store, Business, link, and Location counts before mutation.
+- [ ] Capture Store IDs and identify the single unlinked `Cuk` Store.
+- [ ] Invoke authenticated reconciliation once, verify Store ID conservation, then invoke again and verify no-op.
+- [ ] Verify one Organization membership, one Business, one primary Store link, one primary Location, and no duplicate Store.
+- [ ] Record only aggregate evidence in the handoff; do not log tokens or sensitive row contents.
+
+### Task 12: Full verification, requested launcher, and final review
+
+**Files:**
+
+- No production changes unless a verification failure exposes a scoped defect.
+
+- [ ] Run Identity and Marketplace fmt, clippy, tests, and locked release builds.
+- [ ] Run WWW and Usaha tests, typecheck, lint, and builds with lockfile dependencies.
+- [ ] Run repository hygiene, runtime contract, edge contract, KYC provisioning tests, canonical Business contract, and Compose config.
+- [ ] Run exactly:
+
+```powershell
+.\up.ps1 -Profile backoffice,edge,local-ai,kyc,devtools,tunnel -Build
+```
+
+- [ ] Confirm all selected containers are healthy, Caddy reload succeeds, and Cloudflare Tunnel has an active edge connection.
+- [ ] Probe `https://usaha.lajukan.com`, WWW, authenticated Business APIs, public redaction, and cross-surface identity reuse.
+- [ ] Review `git diff $(git merge-base main HEAD) HEAD`, migration checksums, secrets/runtime artifacts, and stale references.
+- [ ] Request an independent code review, fix every valid finding, rerun affected/full gates, and only then prepare the PR handoff.
