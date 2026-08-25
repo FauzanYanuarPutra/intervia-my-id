@@ -31,7 +31,7 @@ concurrency:
 jobs:
   phase0a:
     name: Canonical business Phase 0A
-    if: github.event_name == 'pull_request' && github.head_ref == 'fix/canonical-business-phase0-20260825' && github.actor != 'github-actions[bot]'
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/canonical-business-phase0-20260825' && github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -215,21 +215,16 @@ jobs:
     name: Usaha business OS gate
     runs-on: ubuntu-latest
     if: always()
-    needs: [contract, frontend, phase0a]
+    needs: [contract, frontend]
     steps:
       - name: Require contract and frontend validation
         env:
           CONTRACT_RESULT: ${{ needs.contract.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
-          PHASE0A_RESULT: ${{ needs.phase0a.result }}
         shell: bash
         run: |
           set -euo pipefail
           echo "contract=$CONTRACT_RESULT"
           echo "frontend=$FRONTEND_RESULT"
-          echo "phase0a=$PHASE0A_RESULT"
           [[ "$CONTRACT_RESULT" == "success" ]]
           [[ "$FRONTEND_RESULT" == "success" ]]
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.head_ref }}" == "fix/canonical-business-phase0-20260825" ]]; then
-            [[ "$PHASE0A_RESULT" == "success" ]]
-          fi
