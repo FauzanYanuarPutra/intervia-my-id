@@ -1,0 +1,177 @@
+name: Canonical Business Phase 0 Remote Gate
+
+on:
+  push:
+    branches:
+      - fix/canonical-business-phase0-20260825
+
+permissions:
+  contents: write
+
+concurrency:
+  group: canonical-business-phase0-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  patch-test-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply deterministic Phase 0A integration patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          route = Path('frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts')
+          text = route.read_text()
+
+          old_import = "  createUmkmStore,\n"
+          if old_import not in text:
+              raise SystemExit('expected createUmkmStore import not found')
+          text = text.replace(old_import, '', 1)
+
+          anchor = "import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-metadata';\n"
+          addition = anchor + "import {\n  createDurableMarketplaceStore,\n  ensureWorkspaceOrganization,\n} from '@/lib/super-app/business-workspace';\n"
+          if "from '@/lib/super-app/business-workspace'" not in text:
+              if anchor not in text:
+                  raise SystemExit('workspace import anchor not found')
+              text = text.replace(anchor, addition, 1)
+
+          old = """    const store = await createUmkmStore({
+      ownerUserId: auth.ctx.userId,
+      name: payload.name,
+      slug: payload.slug,
+      description: payload.description,
+      city: payload.city,
+      address: payload.address,
+      lat: payload.lat,
+      lng: payload.lng,
+      phone: payload.phone,
+      onlineOrderEnabled: payload.online_order_enabled,
+      offlineOrderEnabled: payload.offline_order_enabled,
+      metadata: {
+        ...(payload.business_category
+          ? {
+              umkm_category: payload.business_category,
+              business_type: payload.business_category,
+              segment: getUmkmBusinessCategoryLabel(
+                payload.business_category,
+                true,
+              ),
+            }
+          : {}),
+        recommended_qr: (payload.table_count || 0) > 0 ? 'offline' : 'online',
+        ...(sanitizeOwnerWritableUmkmMetadata(payload.metadata) || {}),
+      },
+    });
+"""
+          new = """    const organizationId = await ensureWorkspaceOrganization({
+      token: auth.ctx.token,
+      name: payload.name,
+    });
+
+    const store = await createDurableMarketplaceStore({
+      token: auth.ctx.token,
+      ownerUserId: auth.ctx.userId,
+      organizationId,
+      name: payload.name,
+      slug: payload.slug,
+      description: payload.description,
+      city: payload.city,
+      address: payload.address,
+      lat: payload.lat,
+      lng: payload.lng,
+      phone: payload.phone,
+      onlineOrderEnabled: payload.online_order_enabled,
+      offlineOrderEnabled: payload.offline_order_enabled,
+      metadata: {
+        ...(payload.business_category
+          ? {
+              umkm_category: payload.business_category,
+              business_type: payload.business_category,
+              segment: getUmkmBusinessCategoryLabel(
+                payload.business_category,
+                true,
+              ),
+            }
+          : {}),
+        recommended_qr: (payload.table_count || 0) > 0 ? 'offline' : 'online',
+        ...(sanitizeOwnerWritableUmkmMetadata(payload.metadata) || {}),
+      },
+    });
+"""
+          if old not in text:
+              raise SystemExit('expected WWW Store creation block not found')
+          text = text.replace(old, new, 1)
+          route.write_text(text)
+
+          usaha = Path('frontend/apps/usaha/src/lib/business-server.ts')
+          text = usaha.read_text()
+          old = "  const organizationId = stringValue(metadata.organization_id ?? metadata.organizationId);\n"
+          new = "  const organizationId =\n    stringValue(store.organization_id) ||\n    stringValue(metadata.organization_id ?? metadata.organizationId);\n"
+          if old not in text:
+              raise SystemExit('expected Usaha organization mapping not found')
+          text = text.replace(old, new, 1)
+          usaha.write_text(text)
+          PY
+
+      - name: Assert integration invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          route = Path('frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts').read_text()
+          usaha = Path('frontend/apps/usaha/src/lib/business-server.ts').read_text()
+          required = [
+              'ensureWorkspaceOrganization({',
+              'token: auth.ctx.token',
+              'createDurableMarketplaceStore({',
+              'organizationId,',
+          ]
+          for marker in required:
+              assert marker in route, marker
+          assert 'const store = await createUmkmStore({' not in route
+          assert 'stringValue(store.organization_id)' in usaha
+          PY
+          git diff --check
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/apps/www/package-lock.json
+
+      - name: Install WWW dependencies
+        working-directory: frontend/apps/www
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Run Phase 0A regression tests
+        working-directory: frontend/apps/www
+        run: npm test -- src/lib/super-app/business-workspace.test.ts
+
+      - name: Typecheck WWW
+        working-directory: frontend/apps/www
+        run: npx tsc --noEmit --pretty false
+
+      - name: Commit verified source integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts \
+            frontend/apps/usaha/src/lib/business-server.ts
+          if git diff --cached --quiet; then
+            echo 'No source integration changes to commit.'
+            exit 0
+          fi
+          git commit -m 'fix(business): unify WWW and Usaha workspace creation'
+          git push origin HEAD:fix/canonical-business-phase0-20260825
