@@ -1,0 +1,156 @@
+name: Phase 0A Source Patch
+
+on:
+  push:
+    branches:
+      - fix/canonical-business-phase0-20260825
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch WWW and Usaha source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          route = Path('frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts')
+          source = route.read_text()
+
+          if "from '@/lib/super-app/business-workspace'" not in source:
+              source = source.replace(
+                  "import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-metadata';\n",
+                  "import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-metadata';\nimport {\n  createDurableMarketplaceStore,\n  ensureWorkspaceOrganization,\n} from '@/lib/super-app/business-workspace';\n",
+                  1,
+              )
+
+          old_import = "  createUmkmStore,\n"
+          if old_import in source:
+              source = source.replace(old_import, '', 1)
+
+          old_block = """    const store = await createUmkmStore({
+      ownerUserId: auth.ctx.userId,
+      name: payload.name,
+      slug: payload.slug,
+      description: payload.description,
+      city: payload.city,
+      address: payload.address,
+      lat: payload.lat,
+      lng: payload.lng,
+      phone: payload.phone,
+      onlineOrderEnabled: payload.online_order_enabled,
+      offlineOrderEnabled: payload.offline_order_enabled,
+      metadata: {
+        ...(payload.business_category
+          ? {
+              umkm_category: payload.business_category,
+              business_type: payload.business_category,
+              segment: getUmkmBusinessCategoryLabel(
+                payload.business_category,
+                true,
+              ),
+            }
+          : {}),
+        recommended_qr: (payload.table_count || 0) > 0 ? 'offline' : 'online',
+        ...(sanitizeOwnerWritableUmkmMetadata(payload.metadata) || {}),
+      },
+    });
+"""
+          new_block = """    const organizationId = await ensureWorkspaceOrganization({
+      token: auth.ctx.token,
+      name: payload.name,
+    });
+
+    const store = await createDurableMarketplaceStore({
+      token: auth.ctx.token,
+      ownerUserId: auth.ctx.userId,
+      organizationId,
+      name: payload.name,
+      slug: payload.slug,
+      description: payload.description,
+      city: payload.city,
+      address: payload.address,
+      lat: payload.lat,
+      lng: payload.lng,
+      phone: payload.phone,
+      onlineOrderEnabled: payload.online_order_enabled,
+      offlineOrderEnabled: payload.offline_order_enabled,
+      metadata: {
+        ...(payload.business_category
+          ? {
+              umkm_category: payload.business_category,
+              business_type: payload.business_category,
+              segment: getUmkmBusinessCategoryLabel(
+                payload.business_category,
+                true,
+              ),
+            }
+          : {}),
+        recommended_qr: (payload.table_count || 0) > 0 ? 'offline' : 'online',
+        ...(sanitizeOwnerWritableUmkmMetadata(payload.metadata) || {}),
+      },
+    });
+"""
+          if old_block in source:
+              source = source.replace(old_block, new_block, 1)
+          elif 'const organizationId = await ensureWorkspaceOrganization({' not in source:
+              raise SystemExit('WWW create block changed unexpectedly')
+          route.write_text(source)
+
+          usaha = Path('frontend/apps/usaha/src/lib/business-server.ts')
+          source = usaha.read_text()
+          old_line = "  const organizationId = stringValue(metadata.organization_id ?? metadata.organizationId);\n"
+          new_line = "  const organizationId =\n    stringValue(store.organization_id) ||\n    stringValue(metadata.organization_id ?? metadata.organizationId);\n"
+          if old_line in source:
+              source = source.replace(old_line, new_line, 1)
+          elif 'stringValue(store.organization_id)' not in source:
+              raise SystemExit('Usaha organization mapping changed unexpectedly')
+          usaha.write_text(source)
+          PY
+
+          grep -q "ensureWorkspaceOrganization" frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts
+          grep -q "createDurableMarketplaceStore" frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts
+          grep -q "stringValue(store.organization_id)" frontend/apps/usaha/src/lib/business-server.ts
+          git diff --check
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/apps/www/package-lock.json
+
+      - name: Install WWW dependencies
+        working-directory: frontend/apps/www
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Test durable workspace contract
+        working-directory: frontend/apps/www
+        run: npm test -- src/lib/super-app/business-workspace.test.ts
+
+      - name: Typecheck WWW
+        working-directory: frontend/apps/www
+        run: npx tsc --noEmit --pretty false
+
+      - name: Commit source patch if changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/apps/www/src/app/api/super-app/umkm/stores/route.ts frontend/apps/usaha/src/lib/business-server.ts
+          if git diff --cached --quiet; then
+            echo 'Source already patched.'
+            exit 0
+          fi
+          git commit -m 'fix(business): unify WWW and Usaha workspace creation'
+          git push origin HEAD:fix/canonical-business-phase0-20260825
