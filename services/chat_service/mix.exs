@@ -59,7 +59,7 @@ defmodule ChatService.MixProject do
       {:redix, "~> 1.5"},
       {:decimal, "~> 2.3"},
       {:telemetry, "~> 1.3"},
-      {:telemetry_metrics, "~> 0.6"},
+      {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
       {:elixir_uuid, "~> 1.2"},
       {:phoenix_pubsub_redis, "~> 3.0"},
