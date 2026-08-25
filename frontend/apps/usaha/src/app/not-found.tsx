@@ -1,24 +1,18 @@
 import Link from 'next/link';
+import { ArrowLeft, SearchX, Store } from 'lucide-react';
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#f5efe3,#efe7d8)] px-4">
-      <section className="w-full max-w-2xl rounded-[36px] border border-portal-line/80 bg-portal-paper p-10 text-center shadow-card">
-        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-portal-forest">
-          Halaman tidak ditemukan
-        </p>
-        <h1 className="mt-2 text-[2rem] font-bold tracking-[-0.06em] text-portal-ink">
-          Route bisnis ini belum ada
-        </h1>
-        <p className="mt-4 text-base leading-8 text-portal-soft">
-          Balik ke beranda usaha lalu pilih usaha yang sedang ingin dikelola.
-        </p>
-        <Link
-          href="/"
-          className="mt-6 inline-flex min-h-12 items-center rounded-full bg-portal-forest px-5 text-sm font-semibold text-white"
-        >
-          Kembali ke beranda usaha
-        </Link>
+    <main className="grid min-h-screen place-items-center bg-[#f6f7f4] px-4 py-10 text-portal-ink">
+      <section className="w-full max-w-xl rounded-[24px] border border-portal-line bg-white p-7 text-center shadow-card sm:p-10">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-portal-mist text-portal-forest"><SearchX className="h-6 w-6" /></div>
+        <p className="portal-kicker mt-6">404 · Halaman tidak ditemukan</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-[-0.05em]">Halaman ini tidak tersedia.</h1>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-portal-soft">Route bisnis mungkin berubah atau usaha yang dipilih sudah tidak dapat diakses oleh akun ini.</p>
+        <div className="mt-7 flex flex-wrap justify-center gap-2">
+          <Link href="/" className="portal-button-primary"><Store className="h-4 w-4" /> Beranda usaha</Link>
+          <Link href="/businesses/new" className="portal-button-secondary"><ArrowLeft className="h-4 w-4" /> Buat usaha baru</Link>
+        </div>
       </section>
     </main>
   );
