@@ -18,7 +18,7 @@ jobs:
     name: Repository hygiene
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v7
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: repository-hygiene
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -96,7 +96,7 @@ jobs:
       run:
         working-directory: services/${{ matrix.service }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install pinned Rust toolchain
         run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -117,7 +117,7 @@ jobs:
       run:
         working-directory: services/chat_service
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "26.2"
@@ -145,7 +145,7 @@ jobs:
       run:
         working-directory: services/${{ matrix.service }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -172,7 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: repository-hygiene
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -195,7 +195,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: repository-hygiene
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate development configuration
         run: docker compose --env-file .env.development.example -f docker-compose.yml -f docker-compose.dev.yml config --quiet
       - name: Validate staging configuration
@@ -259,7 +259,7 @@ jobs:
     timeout-minutes: 25
     needs: repository-hygiene
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate development runtime configuration
         run: bash scripts/ci/smoke_compose.sh validate
       - name: Build development runtime images
