@@ -7,7 +7,6 @@ import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { haversineKm, isCoordinateValid } from '@/lib/super-app/location-guard';
 import { getUmkmBusinessCategoryLabel } from '@/lib/super-app/umkm-taxonomy';
 import {
-  createUmkmStore,
   ensureUmkmQrToken,
   getStoreRecommendedQr,
   listUmkmTables,
@@ -22,6 +21,10 @@ import {
 } from '@/lib/super-app/umkm-public-store';
 import { isPublicUmkmStoreVisible } from '@/lib/super-app/umkm-public-discovery';
 import { sanitizeOwnerWritableUmkmMetadata } from '@/lib/super-app/umkm-owner-metadata';
+import {
+  createDurableMarketplaceStore,
+  ensureWorkspaceOrganization,
+} from '@/lib/super-app/business-workspace';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -811,8 +814,15 @@ export async function POST(req: NextRequest) {
     if (!parsed.ok) return parsed.response;
     const payload = parsed.data;
 
-    const store = await createUmkmStore({
+    const organizationId = await ensureWorkspaceOrganization({
+      token: auth.ctx.token,
+      name: payload.name,
+    });
+
+    const store = await createDurableMarketplaceStore({
+      token: auth.ctx.token,
       ownerUserId: auth.ctx.userId,
+      organizationId,
       name: payload.name,
       slug: payload.slug,
       description: payload.description,

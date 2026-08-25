@@ -248,7 +248,9 @@ function mapStore(
   organizations: WorkspaceOrganization[],
 ): BusinessRecord {
   const metadata = metadataOf(store);
-  const organizationId = stringValue(metadata.organization_id ?? metadata.organizationId);
+  const organizationId =
+    stringValue(store.organization_id) ||
+    stringValue(metadata.organization_id ?? metadata.organizationId);
   const organization = organizations.find(item => item.id === organizationId);
   const ownerUserId = stringValue(store.owner_user_id);
   const role = normalizeRole(
@@ -313,10 +315,20 @@ function mapStore(
   };
 }
 
-async function listMarketplaceStores(): Promise<JsonRecord[]> {
-  const payload = await requestJson(`${MARKETPLACE_URL}/v1/umkm/stores?limit=500`, {
-    headers: { Accept: 'application/json' },
-  });
+async function listMarketplaceStores(options: {
+  ownerUserId?: string;
+  token?: string;
+} = {}): Promise<JsonRecord[]> {
+  const params = new URLSearchParams({ limit: '500' });
+  if (options.ownerUserId) params.set('owner_user_id', options.ownerUserId);
+  const payload = await requestJson(
+    `${MARKETPLACE_URL}/v1/umkm/stores?${params.toString()}`,
+    {
+      headers: options.token
+        ? authHeaders(options.token)
+        : { Accept: 'application/json' },
+    },
+  );
   return listPayload(payload);
 }
 
@@ -324,12 +336,26 @@ export async function listBusinessesForCurrentActor(): Promise<BusinessRecord[]>
   const { token, account } = await requireAuthenticatedActor();
   const organizations = await listWorkspaceOrganizations(token);
   const organizationIds = new Set(organizations.map(item => item.id));
-  const stores = await listMarketplaceStores();
+  const [ownedStores, organizationCandidates] = await Promise.all([
+    listMarketplaceStores({ ownerUserId: account.id, token }),
+    organizations.length > 0
+      ? listMarketplaceStores({ token })
+      : Promise.resolve([] as JsonRecord[]),
+  ]);
+  const stores = Array.from(
+    new Map(
+      [...ownedStores, ...organizationCandidates]
+        .filter(store => stringValue(store.id))
+        .map(store => [stringValue(store.id), store]),
+    ).values(),
+  );
   return stores
     .filter(store => {
       if (stringValue(store.owner_user_id) === account.id) return true;
       const metadata = metadataOf(store);
-      const organizationId = stringValue(metadata.organization_id ?? metadata.organizationId);
+      const organizationId =
+        stringValue(store.organization_id) ||
+        stringValue(metadata.organization_id ?? metadata.organizationId);
       return organizationId ? organizationIds.has(organizationId) : false;
     })
     .map(store => mapStore(store, account, organizations));
@@ -439,7 +465,7 @@ export async function updateBusiness(
   const { token } = await requireAuthenticatedActor();
   const current = await getBusinessForCurrentActor(businessId);
   if (!current) throw new Error('Usaha tidak ditemukan atau akses ditolak.');
-  const stores = await listMarketplaceStores();
+  const stores = await listMarketplaceStores({ token });
   const rawStore = stores.find(item => stringValue(item.id) === current.id);
   if (!rawStore) throw new Error('Data usaha tidak ditemukan.');
   const metadata = {
