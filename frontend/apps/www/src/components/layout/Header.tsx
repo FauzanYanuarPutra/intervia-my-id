@@ -1671,7 +1671,7 @@ export function Header() {
             href="/home"
             onClick={closeAll}
             aria-label="Lajukan"
-            className="shrink-0"
+            className="shrink-0 flex justify-center items-center"
           >
             <span className="inline-flex max-w-[40px] 2xl:max-w-[128px]">
               <LajuloLogo
