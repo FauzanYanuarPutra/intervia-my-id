@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     const address = readText(body.address);
     const phone = readText(body.phone);
     const locationQuery = readText(body.locationQuery);
+    const idempotencyKey =
+      readText(body.idempotencyKey) ||
+      readText(request.headers.get('Idempotency-Key')) ||
+      crypto.randomUUID();
     const latitude = readNumber(body.latitude);
     const longitude = readNumber(body.longitude);
 
@@ -54,6 +58,7 @@ export async function POST(request: Request) {
       locationQuery,
       latitude,
       longitude,
+      idempotencyKey,
     });
     return NextResponse.json({
       ok: true,

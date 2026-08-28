@@ -14,7 +14,8 @@ type GetPortalAccountOptions = {
   clearInvalidSession?: boolean;
 };
 
-export async function getPortalAccount(_options: GetPortalAccountOptions = {}) {
+export async function getPortalAccount(options: GetPortalAccountOptions = {}) {
+  void options.clearInvalidSession;
   return getAuthenticatedActor();
 }
 

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Boxes, LayoutDashboard, Menu, ShoppingBag, X, MapPinned, ClipboardList, Building2, Store, UsersRound, ShieldCheck } from 'lucide-react';
-import { buildSectionHref } from '@/lib/portal-logic';
+import { buildSectionHref, visiblePortalSections } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
 
 type MobileNavProps = {
@@ -10,12 +10,13 @@ type MobileNavProps = {
 
 export function MobileNav({ business, currentSection }: MobileNavProps) {
   if (!business) return null;
+  const visible = new Set(visiblePortalSections(business.permissions));
 
   const primary = [
     { id: 'home' as const, label: 'Beranda', icon: LayoutDashboard },
     { id: 'orders' as const, label: 'Pesanan', icon: ShoppingBag },
     { id: 'products' as const, label: 'Produk', icon: Boxes },
-  ];
+  ].filter(item => visible.has(item.id));
 
   const more = [
     { id: 'locations' as const, label: 'Lokasi & Cabang', icon: MapPinned },
@@ -24,7 +25,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
     { id: 'buyerPage' as const, label: 'Halaman pembeli', icon: Store },
     { id: 'team' as const, label: 'Tim', icon: UsersRound },
     { id: 'security' as const, label: 'Keamanan', icon: ShieldCheck },
-  ];
+  ].filter(item => visible.has(item.id));
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-portal-line bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_-20px_rgba(15,23,42,.3)] backdrop-blur lg:hidden" aria-label="Navigasi usaha mobile">

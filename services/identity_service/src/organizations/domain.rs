@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -10,10 +11,22 @@ pub struct CreateOrganizationRequest {
     pub slug: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct EnsureOrganizationRequest {
+    pub name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedOrganizationInput {
     pub name: String,
     pub slug: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidatedEnsureOrganizationInput {
+    pub name: String,
+    pub slug: String,
+    pub request_hash: String,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -64,6 +77,31 @@ pub fn validate_create_organization(
     Ok(ValidatedOrganizationInput { name, slug })
 }
 
+pub fn validate_ensure_organization(
+    name: &str,
+) -> Result<ValidatedEnsureOrganizationInput, OrganizationValidationError> {
+    let validated = validate_create_organization(name, None)?;
+    let canonical_payload = serde_json::json!({ "name": validated.name }).to_string();
+    let request_hash = format!("{:x}", Sha256::digest(canonical_payload.as_bytes()));
+
+    Ok(ValidatedEnsureOrganizationInput {
+        name: validated.name,
+        slug: validated.slug,
+        request_hash,
+    })
+}
+
+pub fn organization_slug_candidate(base_slug: &str, collision_index: u32) -> String {
+    if collision_index == 0 {
+        return base_slug.chars().take(64).collect();
+    }
+
+    let suffix = format!("-{collision_index}");
+    let base_limit = 64usize.saturating_sub(suffix.len());
+    let base = base_slug.chars().take(base_limit).collect::<String>();
+    format!("{}{}", base.trim_matches('-'), suffix)
+}
+
 fn slugify(value: &str) -> String {
     let mut slug = String::with_capacity(value.len().min(64));
     let mut previous_was_dash = false;
@@ -110,5 +148,33 @@ mod tests {
     fn organization_slug_requires_a_meaningful_identifier() {
         assert!(validate_create_organization("Usaha", Some("---")).is_err());
         assert!(validate_create_organization("Usaha", Some("ab")).is_err());
+    }
+
+    #[test]
+    fn ensure_request_hash_is_stable_for_equivalent_names() {
+        let first = validate_ensure_organization("  Kedai   Kopi Nusantara  ")
+            .expect("valid ensure request");
+        let second =
+            validate_ensure_organization("Kedai Kopi Nusantara").expect("valid ensure request");
+
+        assert_eq!(first.request_hash, second.request_hash);
+        assert_eq!(
+            first.request_hash,
+            "c6cd0fd3aba6155c4403e5ce47c619b0dd5537f5698c7dd86add6619523915cb",
+        );
+    }
+
+    #[test]
+    fn ensure_slug_candidates_are_deterministic_and_bounded() {
+        let input = validate_ensure_organization(&format!("Kedai {}", "Panjang ".repeat(13)))
+            .expect("valid ensure request");
+
+        assert!(input.slug.len() <= 64);
+        assert_eq!(organization_slug_candidate(&input.slug, 0), input.slug);
+        assert_eq!(
+            organization_slug_candidate("kedai-kopi-nusantara", 7),
+            "kedai-kopi-nusantara-7",
+        );
+        assert!(organization_slug_candidate(&input.slug, 999_999).len() <= 64);
     }
 }

@@ -39,6 +39,7 @@ use uuid::Uuid;
 
 mod identity_projection;
 mod order_engine;
+mod businesses;
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
 };
@@ -49,6 +50,7 @@ struct AppState {
     db: PgPool,
     jwt_secret: String,
     http_client: Client,
+    identity_service_url: String,
     notification_tx: broadcast::Sender<RealtimeNotificationEnvelope>,
 }
 
@@ -1449,8 +1451,6 @@ struct ListUmkmStoresQuery {
     slug: Option<String>,
     id: Option<Uuid>,
     limit: Option<i64>,
-    active_only: Option<bool>,
-    owner_user_id: Option<Uuid>,
     min_lat: Option<f64>,
     max_lat: Option<f64>,
     min_lng: Option<f64>,
@@ -1535,6 +1535,48 @@ struct UmkmStoreRow {
     metadata: Value,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct PublicUmkmStoreRow {
+    id: Uuid,
+    name: String,
+    slug: String,
+    description: Option<String>,
+    city: String,
+    address: String,
+    lat: f64,
+    lng: f64,
+    phone: Option<String>,
+    is_active: bool,
+    online_order_enabled: bool,
+    offline_order_enabled: bool,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl PublicUmkmStoreRow {
+    fn into_public(self) -> businesses::domain::PublicStore {
+        let phone = businesses::domain::project_public_phone(self.phone, &self.metadata);
+        businesses::domain::PublicStore {
+            id: self.id,
+            name: self.name,
+            slug: self.slug,
+            description: self.description,
+            city: self.city,
+            address: self.address,
+            lat: self.lat,
+            lng: self.lng,
+            phone,
+            is_active: self.is_active,
+            online_order_enabled: self.online_order_enabled,
+            offline_order_enabled: self.offline_order_enabled,
+            metadata: businesses::domain::project_public_store_details(&self.metadata),
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, FromRow, Clone)]
@@ -2316,6 +2358,8 @@ async fn main() -> anyhow::Result<()> {
         db,
         jwt_secret,
         http_client,
+        identity_service_url: env::var("IDENTITY_SERVICE_URL")
+            .unwrap_or_else(|_| "http://identity_service:8080".to_owned()),
         notification_tx,
     });
 
@@ -2393,6 +2437,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let app = Router::new()
+        .merge(businesses::router())
         .route("/health", get(health))
         .route("/", get(root))
         .route("/v1/map/references", get(list_map_references))
@@ -8921,6 +8966,41 @@ async fn find_umkm_store_row(
     .await
 }
 
+async fn find_public_umkm_store_row(
+    db: &PgPool,
+    store_ref: &str,
+) -> Result<Option<PublicUmkmStoreRow>, sqlx::Error> {
+    let normalized = store_ref.trim().to_lowercase();
+    let parsed_id = Uuid::parse_str(store_ref.trim()).ok();
+
+    sqlx::query_as::<_, PublicUmkmStoreRow>(
+        r#"
+        SELECT
+          s.id, s.name, s.slug, s.description, s.city, s.address, s.lat, s.lng, s.phone,
+          s.is_active, s.online_order_enabled, s.offline_order_enabled, s.metadata,
+          s.created_at, s.updated_at
+        FROM umkm_stores s
+        WHERE (($1::uuid IS NOT NULL AND s.id = $1) OR lower(s.slug) = $2)
+          AND s.is_active = TRUE
+          AND lower(COALESCE(s.metadata->>'is_transactional', 'true')) <> 'false'
+          AND lower(COALESCE(s.metadata->>'market_side', '')) <> 'reference'
+          AND lower(COALESCE(s.metadata->>'record_kind', '')) NOT LIKE '%reference%'
+          AND lower(COALESCE(s.metadata->>'outlet_active', 'true')) <> 'false'
+          AND EXISTS (
+            SELECT 1 FROM business_locations location
+            WHERE location.store_id = s.id
+              AND location.public_visibility = TRUE
+              AND location.status = 'active'
+          )
+        LIMIT 1
+        "#,
+    )
+    .bind(parsed_id)
+    .bind(normalized)
+    .fetch_optional(db)
+    .await
+}
+
 async fn get_lajukan_summary(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let listing_counts = sqlx::query_as::<_, LajukanSummaryAggRow>(
         r#"
@@ -9197,13 +9277,11 @@ async fn list_umkm_stores(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ListUmkmStoresQuery>,
 ) -> impl IntoResponse {
-    let limit = query.limit.unwrap_or(80).clamp(1, 500);
-    let active_only = query.active_only.unwrap_or(true);
+    let limit = query.limit.unwrap_or(80).clamp(1, 200);
     let text_query = clean_text(query.q);
     let city = clean_text(query.city);
     let slug = clean_text(query.slug).map(|value| value.to_lowercase());
     let id = query.id;
-    let owner_user_id = query.owner_user_id;
     let bounds = match (query.min_lat, query.max_lat, query.min_lng, query.max_lng) {
         (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng))
             if (-90.0..=90.0).contains(&min_lat)
@@ -9235,46 +9313,33 @@ async fn list_umkm_stores(
         .unwrap_or((None, None));
 
     let use_nearest_index = viewer.is_some();
-    let visibility_filter = if active_only {
-        r#"
-          AND is_active = TRUE
-          AND lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
-          AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
-          AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
-          AND (
-            COALESCE(metadata->>'source', '') = 'usaha_portal'
-            OR lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
-          )
-        "#
-    } else {
-        r#"
-          AND (
-            NOT $6::bool OR (
-              is_active = TRUE
-              AND lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
-              AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
-              AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
-              AND (
-                COALESCE(metadata->>'source', '') = 'usaha_portal'
-                OR lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
-              )
-            )
-          )
-        "#
-    };
+    let visibility_filter = r#"
+      AND is_active = TRUE
+      AND lower(COALESCE(metadata->>'is_transactional', 'true')) <> 'false'
+      AND lower(COALESCE(metadata->>'market_side', '')) <> 'reference'
+      AND lower(COALESCE(metadata->>'record_kind', '')) NOT LIKE '%reference%'
+      AND lower(COALESCE(metadata->>'outlet_active', 'true')) <> 'false'
+      AND EXISTS (
+        SELECT 1
+        FROM business_locations location
+        WHERE location.store_id = umkm_stores.id
+          AND location.public_visibility = TRUE
+          AND location.status = 'active'
+      )
+    "#;
     let ranking_order = if use_nearest_index {
         // Keep KNN distance as the complete ORDER BY expression. Adding
         // updated_at/id tie-breakers makes PostgreSQL scan and sort every
         // point in the viewport instead of stopping at LIMIT through GiST.
-        "point(lng, lat) <-> point($13, $12) ASC"
+        "point(lng, lat) <-> point($11, $10) ASC"
     } else if text_query.is_some() {
         r#"
           (
-            (CASE WHEN name ILIKE ($4 || '%') THEN 64 ELSE 0 END) +
-            (CASE WHEN name ILIKE ('%' || $4 || '%') THEN 36 ELSE 0 END) +
-            (CASE WHEN city ILIKE ('%' || $4 || '%') THEN 18 ELSE 0 END) +
-            (CASE WHEN COALESCE(metadata->>'segment', '') ILIKE ('%' || $4 || '%') THEN 16 ELSE 0 END) +
-            (CASE WHEN COALESCE(metadata->>'search_text', '') ILIKE ('%' || $4 || '%') THEN 10 ELSE 0 END)
+            (CASE WHEN name ILIKE ($3 || '%') THEN 64 ELSE 0 END) +
+            (CASE WHEN name ILIKE ('%' || $3 || '%') THEN 36 ELSE 0 END) +
+            (CASE WHEN city ILIKE ('%' || $3 || '%') THEN 18 ELSE 0 END) +
+            (CASE WHEN COALESCE(metadata->>'segment', '') ILIKE ('%' || $3 || '%') THEN 16 ELSE 0 END) +
+            (CASE WHEN COALESCE(metadata->>'search_text', '') ILIKE ('%' || $3 || '%') THEN 10 ELSE 0 END)
           ) DESC,
           updated_at DESC,
           id ASC
@@ -9285,45 +9350,41 @@ async fn list_umkm_stores(
     let store_sql = format!(
         r#"
         SELECT
-          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          id, name, slug, description, city, address, lat, lng, phone,
           is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
         FROM umkm_stores
         WHERE ($1::uuid IS NULL OR id = $1)
-          AND ($2::uuid IS NULL OR owner_user_id = $2)
-          AND ($3::text IS NULL OR lower(slug) = $3)
+          AND ($2::text IS NULL OR lower(slug) = $2)
           AND (
-            $4::text IS NULL OR
-            name ILIKE ('%' || $4 || '%') OR
-            COALESCE(description, '') ILIKE ('%' || $4 || '%') OR
-            city ILIKE ('%' || $4 || '%') OR
-            address ILIKE ('%' || $4 || '%') OR
-            COALESCE(metadata->>'search_text', '') ILIKE ('%' || $4 || '%') OR
-            COALESCE(metadata->>'segment', '') ILIKE ('%' || $4 || '%') OR
-            COALESCE(metadata->>'keywords', '') ILIKE ('%' || $4 || '%')
+            $3::text IS NULL OR
+            name ILIKE ('%' || $3 || '%') OR
+            COALESCE(description, '') ILIKE ('%' || $3 || '%') OR
+            city ILIKE ('%' || $3 || '%') OR
+            address ILIKE ('%' || $3 || '%') OR
+            COALESCE(metadata->>'search_text', '') ILIKE ('%' || $3 || '%') OR
+            COALESCE(metadata->>'segment', '') ILIKE ('%' || $3 || '%') OR
+            COALESCE(metadata->>'keywords', '') ILIKE ('%' || $3 || '%')
           )
-          AND ($5::text IS NULL OR city ILIKE ('%' || $5 || '%'))
+          AND ($4::text IS NULL OR city ILIKE ('%' || $4 || '%'))
           {visibility_filter}
-          AND ($8::float8 IS NULL OR lat >= $8)
-          AND ($9::float8 IS NULL OR lat <= $9)
-          AND ($10::float8 IS NULL OR lng >= $10)
-          AND ($11::float8 IS NULL OR lng <= $11)
-          AND ($6::bool = $6::bool)
+          AND ($6::float8 IS NULL OR lat >= $6)
+          AND ($7::float8 IS NULL OR lat <= $7)
+          AND ($8::float8 IS NULL OR lng >= $8)
+          AND ($9::float8 IS NULL OR lng <= $9)
           AND (
-            ($12::float8 IS NULL AND $13::float8 IS NULL)
-            OR ($12::float8 IS NOT NULL AND $13::float8 IS NOT NULL)
+            ($10::float8 IS NULL AND $11::float8 IS NULL)
+            OR ($10::float8 IS NOT NULL AND $11::float8 IS NOT NULL)
           )
         ORDER BY
           {ranking_order}
-        LIMIT $7
+        LIMIT $5
         "#,
     );
-    let rows = sqlx::query_as::<_, UmkmStoreRow>(&store_sql)
+    let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(&store_sql)
         .bind(id)
-        .bind(owner_user_id)
         .bind(slug)
         .bind(text_query)
         .bind(city)
-        .bind(active_only)
         .bind(limit)
         .bind(min_lat)
         .bind(max_lat)
@@ -9335,7 +9396,12 @@ async fn list_umkm_stores(
         .await;
 
     match rows {
-        Ok(items) => (
+        Ok(rows) => {
+            let items = rows
+                .into_iter()
+                .map(PublicUmkmStoreRow::into_public)
+                .collect::<Vec<_>>();
+            (
             StatusCode::OK,
             Json(json!({
                 "data": {
@@ -9343,8 +9409,9 @@ async fn list_umkm_stores(
                     "count": items.len()
                 }
             })),
-        )
-            .into_response(),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("list_umkm_stores error: {:?}", error);
             err(
@@ -9360,9 +9427,13 @@ async fn get_umkm_store(
     State(state): State<Arc<AppState>>,
     Path(store_ref): Path<String>,
 ) -> impl IntoResponse {
-    match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+    match find_public_umkm_store_row(&state.db, store_ref.as_str()).await {
         Ok(Some(store)) => {
-            (StatusCode::OK, Json(json!({ "data": { "store": store } }))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({ "data": { "store": store.into_public() } })),
+            )
+                .into_response()
         }
         Ok(None) => err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
         Err(error) => {

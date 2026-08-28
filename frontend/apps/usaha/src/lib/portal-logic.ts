@@ -10,6 +10,36 @@ export function hasPermission(business: BusinessRecord, permission: PermissionId
   return business.permissions.includes(permission);
 }
 
+const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
+  info: 'viewInfo',
+  locations: 'viewInfo',
+  products: 'viewProducts',
+  orders: 'viewOrders',
+  operations: 'viewOperations',
+  team: 'viewTeam',
+  buyerPage: 'viewBuyerPage',
+  security: 'manageSecurity',
+};
+
+const sectionOrder: PortalSection[] = [
+  'home',
+  'info',
+  'locations',
+  'products',
+  'orders',
+  'operations',
+  'team',
+  'buyerPage',
+  'security',
+];
+
+export function visiblePortalSections(permissions: PermissionId[]): PortalSection[] {
+  return sectionOrder.filter(section => {
+    const permission = sectionPermission[section];
+    return !permission || permissions.includes(permission);
+  });
+}
+
 export function getRoleSummary(role: PortalRole): RoleSummary {
   return roleSummaryMap[role];
 }

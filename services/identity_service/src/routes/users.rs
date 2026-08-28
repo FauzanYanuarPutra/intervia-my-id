@@ -27,9 +27,7 @@ use uuid::Uuid;
 use sqlx::Row;
 
 use crate::config::AppState;
-use crate::routes::proofs::{
-    consume_identity_verification_proof, consume_phone_otp_proof,
-};
+use crate::routes::proofs::{consume_identity_verification_proof, consume_phone_otp_proof};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
 const MAX_METADATA_BYTES: usize = 48 * 1024;
@@ -1186,13 +1184,11 @@ pub async fn delete_me_account(
         }
     }
 
-    if sqlx::query(
-        "UPDATE core.sessions SET revoked = TRUE WHERE user_id = $1 AND revoked = FALSE",
-    )
-    .bind(user_id)
-    .execute(&mut *tx)
-    .await
-    .is_err()
+    if sqlx::query("UPDATE core.sessions SET revoked = TRUE WHERE user_id = $1 AND revoked = FALSE")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
     {
         let _ = tx.rollback().await;
         return (
@@ -1493,14 +1489,8 @@ mod tests {
         .expect("sanitized metadata");
 
         assert_eq!(sanitized["headline"].as_str(), Some("Pengrajin"));
-        assert_eq!(
-            sanitized["profile"]["bio"].as_str(),
-            Some("Profil publik")
-        );
-        assert_eq!(
-            sanitized["extended"]["skills"][0].as_str(),
-            Some("Anyaman")
-        );
+        assert_eq!(sanitized["profile"]["bio"].as_str(), Some("Profil publik"));
+        assert_eq!(sanitized["extended"]["skills"][0].as_str(), Some("Anyaman"));
         assert!(sanitized.get("verification").is_none());
         assert!(sanitized["profile"].get("phone_verified").is_none());
         assert!(sanitized["profile"].get("trust_score").is_none());

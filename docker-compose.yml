@@ -267,6 +267,7 @@ services:
       RABBITMQ_USER: ${RABBIT_USER}
       RABBITMQ_PASSWORD: ${RABBIT_PASS}
       JWT_SECRET: ${JWT_SECRET}
+      IDENTITY_SERVICE_URL: http://identity_service:8080
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       OUTBOX_EXCHANGE: ${OUTBOX_EXCHANGE:-marketplace.outbox}
       OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-50}
@@ -298,6 +299,7 @@ services:
       redis_cache: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
       meilisearch: { condition: service_healthy }
+      identity_service: { condition: service_healthy }
     expose: ["8081"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8081/health"]
@@ -463,10 +465,16 @@ services:
   ollama:
     <<: *service-defaults
     profiles: [local-ai]
-    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    image: ${OLLAMA_IMAGE:-ollama/ollama@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131}
     volumes:
       - ollama_data:/root/.ollama
     expose: ["11434"]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
     networks: [app]
 
   # ---------------------------------------------------------------------------
@@ -586,6 +594,12 @@ services:
     volumes:
       - www_runtime:/app/apps/www/.runtime
     expose: ["3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 45s
     depends_on:
       identity_service: { condition: service_healthy }
       marketplace_service: { condition: service_healthy }
@@ -609,6 +623,12 @@ services:
       NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8081}
     expose: ["3001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 45s
     depends_on:
       identity_service: { condition: service_healthy }
     networks: [app]
@@ -630,6 +650,12 @@ services:
       NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
       NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
     expose: ["3002"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3002/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 45s
     depends_on:
       identity_service: { condition: service_healthy }
     networks: [app]
@@ -656,6 +682,12 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
     expose: ["3003"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3003/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 45s
     depends_on:
       identity_service: { condition: service_healthy }
       marketplace_service: { condition: service_healthy }

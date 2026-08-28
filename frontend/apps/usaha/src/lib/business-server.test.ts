@@ -66,13 +66,13 @@ describe('canonical Usaha Business adapter', () => {
       if (target.endsWith('/auth/me')) {
         return Promise.resolve(jsonResponse({ data: { user: { id: ACTOR_ID, name: 'Cuk' } } }));
       }
-      if (target.endsWith('/organizations')) {
-        return Promise.resolve(
-          jsonResponse({ data: { organization: { id: '11111111-1111-4111-8111-111111111111' } } }),
-        );
-      }
-      if (target.endsWith('/v1/umkm/stores') && init?.method === 'POST') {
-        return Promise.resolve(jsonResponse({ data: { store: { id: '22222222-2222-4222-8222-222222222222' } } }));
+      if (target.endsWith('/v1/businesses/provision') && init?.method === 'POST') {
+        return Promise.resolve(jsonResponse({ data: { business: {
+          business: {
+            id: '22222222-2222-4222-8222-222222222222',
+            organization_id: '11111111-1111-4111-8111-111111111111',
+          },
+        } } }));
       }
       return Promise.resolve(jsonResponse({ data: {} }));
     });

@@ -246,6 +246,7 @@ function mapStore(
   store: JsonRecord,
   actor: PortalAccount,
   organizations: WorkspaceOrganization[],
+  canonicalBusinessId?: string,
 ): BusinessRecord {
   const metadata = metadataOf(store);
   const organizationId =
@@ -271,7 +272,7 @@ function mapStore(
   const locations = parseLocations(store);
 
   return {
-    id: stringValue(store.id),
+    id: canonicalBusinessId || stringValue(store.id),
     slug: stringValue(store.slug),
     name,
     currentRole: role,
@@ -315,57 +316,70 @@ function mapStore(
   };
 }
 
-async function listMarketplaceStores(options: {
-  ownerUserId?: string;
-  token?: string;
-} = {}): Promise<JsonRecord[]> {
-  const params = new URLSearchParams({ limit: '500' });
-  if (options.ownerUserId) params.set('owner_user_id', options.ownerUserId);
-  const payload = await requestJson(
-    `${MARKETPLACE_URL}/v1/umkm/stores?${params.toString()}`,
+function mapCanonicalBusiness(
+  value: JsonRecord,
+  actor: PortalAccount,
+  organizations: WorkspaceOrganization[],
+): BusinessRecord | null {
+  const business = record(value.business);
+  const store = record(value.primary_store);
+  const location = record(value.primary_location);
+  const businessId = stringValue(business?.id);
+  if (!business || !store || !businessId) return null;
+
+  const privateMetadata = record(store.metadata) ?? {};
+  return mapStore(
     {
-      headers: options.token
-        ? authHeaders(options.token)
-        : { Accept: 'application/json' },
+      ...store,
+      organization_id: business.organization_id,
+      metadata: location
+        ? { ...privateMetadata, locations: [location] }
+        : privateMetadata,
     },
+    actor,
+    organizations,
+    businessId,
   );
-  return listPayload(payload);
+}
+
+async function getCanonicalAggregate(
+  token: string,
+  businessId: string,
+): Promise<JsonRecord | null> {
+  try {
+    const payload = await requestJson(
+      `${MARKETPLACE_URL}/v1/businesses/${encodeURIComponent(businessId)}`,
+      { headers: authHeaders(token) },
+    );
+    const root = nestedRecord(payload);
+    return record(root.business) ?? root;
+  } catch {
+    return null;
+  }
 }
 
 export async function listBusinessesForCurrentActor(): Promise<BusinessRecord[]> {
   const { token, account } = await requireAuthenticatedActor();
-  const organizations = await listWorkspaceOrganizations(token);
-  const organizationIds = new Set(organizations.map(item => item.id));
-  const [ownedStores, organizationCandidates] = await Promise.all([
-    listMarketplaceStores({ ownerUserId: account.id, token }),
-    organizations.length > 0
-      ? listMarketplaceStores({ token })
-      : Promise.resolve([] as JsonRecord[]),
+  const [organizations, payload] = await Promise.all([
+    listWorkspaceOrganizations(token),
+    requestJson(`${MARKETPLACE_URL}/v1/businesses/mine`, {
+      headers: authHeaders(token),
+    }),
   ]);
-  const stores = Array.from(
-    new Map(
-      [...ownedStores, ...organizationCandidates]
-        .filter(store => stringValue(store.id))
-        .map(store => [stringValue(store.id), store]),
-    ).values(),
-  );
-  return stores
-    .filter(store => {
-      if (stringValue(store.owner_user_id) === account.id) return true;
-      const metadata = metadataOf(store);
-      const organizationId =
-        stringValue(store.organization_id) ||
-        stringValue(metadata.organization_id ?? metadata.organizationId);
-      return organizationId ? organizationIds.has(organizationId) : false;
-    })
-    .map(store => mapStore(store, account, organizations));
+  return listPayload(payload)
+    .map(item => mapCanonicalBusiness(item, account, organizations))
+    .filter((item): item is BusinessRecord => Boolean(item));
 }
 
 export async function getBusinessForCurrentActor(
   businessId: string,
 ): Promise<BusinessRecord | null> {
+  const { token, account } = await requireAuthenticatedActor();
+  const organizations = await listWorkspaceOrganizations(token);
+  const aggregate = await getCanonicalAggregate(token, businessId);
+  if (aggregate) return mapCanonicalBusiness(aggregate, account, organizations);
   const businesses = await listBusinessesForCurrentActor();
-  return businesses.find(item => item.id === businessId || item.slug === businessId) ?? null;
+  return businesses.find(item => item.slug === businessId) ?? null;
 }
 
 export async function createBusiness(input: {
@@ -377,73 +391,81 @@ export async function createBusiness(input: {
   locationQuery: string;
   latitude: number;
   longitude: number;
+  idempotencyKey?: string;
 }) {
-  const { token, account } = await requireAuthenticatedActor();
-  const organizationPayload = await requestJson(`${IDENTITY_URL}/organizations`, {
+  const { token } = await requireAuthenticatedActor();
+  const normalizedCategory = input.category.toLowerCase();
+  const capabilityKey = /makanan|minuman|kuliner|kopi|cafe|resto/.test(normalizedCategory)
+    ? 'food_beverage'
+    : /retail|ritel|toko/.test(normalizedCategory)
+      ? 'retail'
+      : /jasa|service|laundry/.test(normalizedCategory)
+        ? 'services'
+        : 'general';
+  const payload = await requestJson(`${MARKETPLACE_URL}/v1/businesses/provision`, {
     method: 'POST',
     headers: {
       ...authHeaders(token),
       'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ name: input.name }),
-  });
-  const organizationRoot = nestedRecord(organizationPayload);
-  const organization = record(organizationRoot.organization) ?? organizationRoot;
-  const organizationId = stringValue(organization.id);
-  if (!organizationId) throw new Error('Organization tidak berhasil dibuat.');
-
-  const primaryLocation: BusinessLocation = {
-    id: `pending-primary-${Date.now()}`,
-    name: 'Lokasi utama',
-    locationType: 'physical',
-    address: input.address,
-    city: input.city,
-    province: '',
-    district: '',
-    postalCode: '',
-    latitude: input.latitude,
-    longitude: input.longitude,
-    phone: input.phone,
-    whatsapp: input.phone,
-    timezone: 'Asia/Jakarta',
-    businessHours: {},
-    status: 'active',
-    isPrimary: true,
-    publicVisibility: true,
-  };
-
-  const payload = await requestJson(`${MARKETPLACE_URL}/v1/umkm/stores`, {
-    method: 'POST',
-    headers: {
-      ...authHeaders(token),
-      'Content-Type': 'application/json',
+      'Idempotency-Key': input.idempotencyKey || crypto.randomUUID(),
     },
     body: JSON.stringify({
-      owner_user_id: account.id,
-      name: input.name,
-      description: '',
-      city: input.city,
-      address: input.address,
-      lat: input.latitude,
-      lng: input.longitude,
-      phone: input.phone,
-      is_active: true,
-      online_order_enabled: true,
-      offline_order_enabled: true,
-      metadata: {
-        organization_id: organizationId,
-        category: input.category,
-        locationQuery: input.locationQuery,
-        schedule: 'Belum diatur',
-        locations: [primaryLocation],
+      organization: {
+        mode: 'auto',
+        organization_id: null,
+        new_organization_name: input.name,
+      },
+      business: { name: input.name, capability_key: capabilityKey },
+      primary_location: {
+        name: 'Lokasi utama',
+        address: input.address,
+        city: input.city,
+        lat: input.latitude,
+        lng: input.longitude,
+        phone: input.phone,
+        public_visibility: true,
+      },
+      storefront: {
+        description: '',
+        online_order_enabled: true,
+        offline_order_enabled: true,
+        public_metadata: {
+          category: input.category,
+          locationQuery: input.locationQuery,
+          schedule: 'Belum diatur',
+        },
       },
     }),
   });
   const root = nestedRecord(payload);
-  const store = record(root.store) ?? root;
-  const businessId = stringValue(store.id);
+  const aggregate = record(root.business) ?? root;
+  const business = record(aggregate.business);
+  const businessId = stringValue(business?.id);
+  const organizationId = stringValue(business?.organization_id);
   if (!businessId) throw new Error('Usaha tidak berhasil dibuat di Marketplace.');
   return { businessId, organizationId, name: input.name };
+}
+
+export async function reconcileBusiness(input: {
+  storeId?: string | null;
+  idempotencyKey: string;
+}) {
+  const { token } = await requireAuthenticatedActor();
+  const payload = await requestJson(`${MARKETPLACE_URL}/v1/businesses/reconcile`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(token),
+      'Content-Type': 'application/json',
+      'Idempotency-Key': input.idempotencyKey,
+    },
+    body: JSON.stringify({ store_id: input.storeId || null }),
+  });
+  const root = nestedRecord(payload);
+  const aggregate = record(root.business) ?? root;
+  const business = record(aggregate.business);
+  const businessId = stringValue(business?.id);
+  if (!businessId) throw new Error('Usaha lama belum berhasil dipulihkan.');
+  return { businessId, replayed: boolValue(root.replayed) };
 }
 
 export async function updateBusiness(
@@ -465,8 +487,8 @@ export async function updateBusiness(
   const { token } = await requireAuthenticatedActor();
   const current = await getBusinessForCurrentActor(businessId);
   if (!current) throw new Error('Usaha tidak ditemukan atau akses ditolak.');
-  const stores = await listMarketplaceStores({ token });
-  const rawStore = stores.find(item => stringValue(item.id) === current.id);
+  const aggregate = await getCanonicalAggregate(token, current.id);
+  const rawStore = record(aggregate?.primary_store);
   if (!rawStore) throw new Error('Data usaha tidak ditemukan.');
   const metadata = {
     ...metadataOf(rawStore),
@@ -476,7 +498,8 @@ export async function updateBusiness(
     ...(input.locationQuery !== undefined ? { locationQuery: input.locationQuery } : {}),
   };
 
-  await requestJson(`${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(current.id)}`, {
+  const storeId = stringValue(rawStore.id);
+  await requestJson(`${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(storeId)}`, {
     method: 'PUT',
     headers: {
       ...authHeaders(token),

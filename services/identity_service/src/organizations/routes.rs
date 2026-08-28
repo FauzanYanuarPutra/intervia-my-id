@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::config::AppState;
 
 use super::{
-    domain::CreateOrganizationRequest,
+    domain::{CreateOrganizationRequest, EnsureOrganizationRequest},
     repository::OrganizationRepository,
     service::{OrganizationService, OrganizationServiceError},
 };
@@ -32,7 +32,7 @@ pub async fn list_organizations(
 ) -> impl IntoResponse {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor_user_id) => actor_user_id,
-        Err(response) => return response,
+        Err(error) => return actor_auth_error_response(error),
     };
     let service = OrganizationService::new(OrganizationRepository::new(&state.db));
 
@@ -53,7 +53,7 @@ pub async fn create_organization(
 ) -> impl IntoResponse {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor_user_id) => actor_user_id,
-        Err(response) => return response,
+        Err(error) => return actor_auth_error_response(error),
     };
     let service = OrganizationService::new(OrganizationRepository::new(&state.db));
 
@@ -70,6 +70,48 @@ pub async fn create_organization(
     }
 }
 
+pub async fn ensure_organization(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<EnsureOrganizationRequest>,
+) -> impl IntoResponse {
+    let actor_user_id = match authenticate_actor(&state, &headers) {
+        Ok(actor_user_id) => actor_user_id,
+        Err(error) => return actor_auth_error_response(error),
+    };
+    let raw_idempotency_key = headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok());
+    let idempotency_key = match parse_idempotency_key(raw_idempotency_key) {
+        Ok(key) => key,
+        Err(error) => {
+            return (StatusCode::BAD_REQUEST, Json(json!({ "error": error }))).into_response()
+        }
+    };
+    let service = OrganizationService::new(OrganizationRepository::new(&state.db));
+
+    match service
+        .ensure(actor_user_id, idempotency_key, &payload.name)
+        .await
+    {
+        Ok(outcome) => (
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
+            Json(json!({
+                "data": {
+                    "organization": outcome.organization,
+                    "replayed": outcome.replayed,
+                }
+            })),
+        )
+            .into_response(),
+        Err(error) => service_error_response(error),
+    }
+}
+
 pub async fn get_organization(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -77,7 +119,7 @@ pub async fn get_organization(
 ) -> impl IntoResponse {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor_user_id) => actor_user_id,
-        Err(response) => return response,
+        Err(error) => return actor_auth_error_response(error),
     };
     let service = OrganizationService::new(OrganizationRepository::new(&state.db));
 
@@ -98,7 +140,7 @@ pub async fn list_organization_members(
 ) -> impl IntoResponse {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor_user_id) => actor_user_id,
-        Err(response) => return response,
+        Err(error) => return actor_auth_error_response(error),
     };
     let service = OrganizationService::new(OrganizationRepository::new(&state.db));
 
@@ -112,31 +154,30 @@ pub async fn list_organization_members(
     }
 }
 
-fn authenticate_actor(
-    state: &AppState,
-    headers: &HeaderMap,
-) -> Result<Uuid, axum::response::Response> {
+fn authenticate_actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, ActorAuthError> {
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": "missing token" })),
-            )
-                .into_response()
-        })?;
+        .ok_or(ActorAuthError::MissingToken)?;
 
-    decode_actor(&state.config.jwt_secret, token).ok_or_else(|| {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "error": "invalid token" })),
-        )
-            .into_response()
-    })
+    decode_actor(&state.config.jwt_secret, token).ok_or(ActorAuthError::InvalidToken)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorAuthError {
+    MissingToken,
+    InvalidToken,
+}
+
+fn actor_auth_error_response(error: ActorAuthError) -> axum::response::Response {
+    let message = match error {
+        ActorAuthError::MissingToken => "missing token",
+        ActorAuthError::InvalidToken => "invalid token",
+    };
+    (StatusCode::UNAUTHORIZED, Json(json!({ "error": message }))).into_response()
 }
 
 fn decode_actor(secret: &str, token: &str) -> Option<Uuid> {
@@ -153,6 +194,14 @@ fn decode_actor(secret: &str, token: &str) -> Option<Uuid> {
     Uuid::parse_str(&claims.sub).ok()
 }
 
+fn parse_idempotency_key(value: Option<&str>) -> Result<Uuid, &'static str> {
+    let value = value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or("missing_idempotency_key")?;
+    Uuid::parse_str(value).map_err(|_| "invalid_idempotency_key")
+}
+
 fn service_error_response(error: OrganizationServiceError) -> axum::response::Response {
     match error {
         OrganizationServiceError::Validation(error) => (
@@ -163,6 +212,11 @@ fn service_error_response(error: OrganizationServiceError) -> axum::response::Re
         OrganizationServiceError::Conflict => (
             StatusCode::CONFLICT,
             Json(json!({ "error": "organization name or slug already exists" })),
+        )
+            .into_response(),
+        OrganizationServiceError::IdempotencyConflict => (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "idempotency_conflict" })),
         )
             .into_response(),
         OrganizationServiceError::NotFound => (
@@ -224,5 +278,21 @@ mod tests {
             None
         );
         assert_eq!(decode_actor(secret, &token(secret, "not-a-uuid")), None);
+    }
+
+    #[test]
+    fn provisioning_requires_a_uuid_idempotency_key() {
+        let expected =
+            Uuid::parse_str("33333333-3333-4333-8333-333333333333").expect("valid fixture");
+
+        assert_eq!(
+            parse_idempotency_key(Some("33333333-3333-4333-8333-333333333333")),
+            Ok(expected),
+        );
+        assert_eq!(parse_idempotency_key(None), Err("missing_idempotency_key"));
+        assert_eq!(
+            parse_idempotency_key(Some("not-a-uuid")),
+            Err("invalid_idempotency_key"),
+        );
     }
 }

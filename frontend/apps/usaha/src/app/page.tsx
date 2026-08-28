@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AlertTriangle, ArrowRight, Boxes, Building2, MapPinned, PackageCheck, Store, UsersRound } from 'lucide-react';
 import { ActionCard } from '@/components/portal/ActionCard';
+import { ReconcileBusinessButton } from '@/components/forms/ReconcileBusinessButton';
 import { DataPanel } from '@/components/portal/DataPanel';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { PageHeader } from '@/components/portal/PageHeader';
@@ -31,6 +32,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <p className="mt-4 max-w-2xl text-sm leading-7 text-portal-soft sm:text-[15px]">Akun Lajukanmu sudah aktif. Buat organisasi bisnis, isi identitas dasar, tentukan lokasi utama, lalu kelola katalog dan operasional dari satu tempat.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/businesses/new" className="portal-button-primary"><Store className="h-4 w-4" /> Buat usaha <ArrowRight className="h-4 w-4" /></Link>
+              <ReconcileBusinessButton />
             </div>
           </div>
         </section>

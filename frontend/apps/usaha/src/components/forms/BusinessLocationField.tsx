@@ -59,26 +59,26 @@ export function BusinessLocationField({
     }
 
     onPointChange(inferredPoint);
-    setError('');
-    setFeedback('Koordinat berhasil diambil dari link maps atau format lat,lng.');
+    const timer = window.setTimeout(() => {
+      setError('');
+      setFeedback('Koordinat berhasil diambil dari link maps atau format lat,lng.');
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [locationQuery, onPointChange, point]);
 
   useEffect(() => {
     const query = locationQuery.trim();
-    if (query.length < 3) {
-      setSuggestions([]);
-      setIsSuggesting(false);
-      return;
-    }
-
-    if (parseLatLngFromMapsInput(query) || /^https?:\/\//i.test(query)) {
-      setSuggestions([]);
-      setIsSuggesting(false);
-      return;
-    }
-
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
+      if (
+        query.length < 3 ||
+        parseLatLngFromMapsInput(query) ||
+        /^https?:\/\//i.test(query)
+      ) {
+        setSuggestions([]);
+        setIsSuggesting(false);
+        return;
+      }
       setIsSuggesting(true);
       void searchLocationSuggestions(query, {
         signal: controller.signal,

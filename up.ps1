@@ -156,6 +156,16 @@ try {
     & docker @ComposeArgs @UpArgs
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    $LocalAiRequested = $RequestedProfiles -contains "local-ai"
+    $OllamaSelected = $Services.Count -eq 0 -or $Services -contains "ollama"
+    if ($Environment -eq "development" -and $LocalAiRequested -and $OllamaSelected) {
+        Write-Host "Verifying configured Ollama model..." -ForegroundColor Cyan
+        & $PythonCommand.Source "scripts/config/provision_ollama_models.py" "--env-file" $EnvFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "Model Ollama gagal disiapkan. Periksa koneksi registry model dan kapasitas disk."
+        }
+    }
+
     # Caddyfile is bind-mounted. `docker compose up` does not reload an already
     # running Caddy process when only the mounted file content changes. Always
     # validate and activate the current edge config after startup so forwarded

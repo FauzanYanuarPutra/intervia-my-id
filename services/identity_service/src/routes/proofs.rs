@@ -38,11 +38,7 @@ fn normalize_proof_token(raw: &str) -> Option<&str> {
     Some(token)
 }
 
-fn valid_phone_otp_payload(
-    raw: &str,
-    expected_phone: &str,
-    allowed_purposes: &[&str],
-) -> bool {
+fn valid_phone_otp_payload(raw: &str, expected_phone: &str, allowed_purposes: &[&str]) -> bool {
     let Ok(payload) = serde_json::from_str::<OtpVerificationPayload>(raw) else {
         return false;
     };

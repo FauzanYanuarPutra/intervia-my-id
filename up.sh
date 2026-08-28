@@ -212,6 +212,23 @@ else
   "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 180
 fi
 
+LOCAL_AI_REQUESTED=0
+for profile in "${ACTIVE_PROFILES[@]}"; do
+  [[ "$profile" == "local-ai" ]] && LOCAL_AI_REQUESTED=1
+done
+OLLAMA_SELECTED=0
+if ((${#SERVICES[@]} == 0)); then
+  OLLAMA_SELECTED=1
+else
+  for service in "${SERVICES[@]}"; do
+    [[ "$service" == "ollama" ]] && OLLAMA_SELECTED=1
+  done
+fi
+if [[ "$ENVIRONMENT" == "development" && "$LOCAL_AI_REQUESTED" == "1" && "$OLLAMA_SELECTED" == "1" ]]; then
+  echo "Verifying configured Ollama model..."
+  "$PYTHON_BIN" scripts/config/provision_ollama_models.py --env-file "$ENV_FILE"
+fi
+
 # Caddyfile is bind-mounted. Compose does not reload a long-running Caddy
 # process when only that file changes, so activate the current configuration on
 # every edge/tunnel startup after validating it inside the running container.

@@ -25,7 +25,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use identity_service::config::{AppState, Config};
 use identity_service::db;
 use identity_service::organizations::routes::{
-    create_organization, get_organization, list_organization_members, list_organizations,
+    create_organization, ensure_organization, get_organization, list_organization_members,
+    list_organizations,
 };
 use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
@@ -509,6 +510,7 @@ async fn main() -> Result<()> {
             "/organizations",
             get(list_organizations).post(create_organization),
         )
+        .route("/organizations/ensure", post(ensure_organization))
         .route("/organizations/{id}", get(get_organization))
         .route(
             "/organizations/{id}/members",

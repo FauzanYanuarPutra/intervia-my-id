@@ -44,6 +44,8 @@ RUN find src -type f -name '*.rs' -exec touch {} +
 
 RUN cargo build --release --locked
 
+RUN rustup component add rustfmt clippy
+
 # --- Runtime ---
 FROM debian:bookworm-slim AS runtime
 

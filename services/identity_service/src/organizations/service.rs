@@ -3,10 +3,12 @@ use uuid::Uuid;
 
 use super::{
     domain::{
-        validate_create_organization, OrganizationMemberView, OrganizationValidationError,
-        OrganizationView,
+        validate_create_organization, validate_ensure_organization, OrganizationMemberView,
+        OrganizationValidationError, OrganizationView,
     },
-    repository::OrganizationRepository,
+    repository::{
+        EnsureOrganizationOutcome, EnsureOrganizationRepositoryError, OrganizationRepository,
+    },
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -15,6 +17,8 @@ pub enum OrganizationServiceError {
     Validation(#[from] OrganizationValidationError),
     #[error("organization name or slug already exists")]
     Conflict,
+    #[error("idempotency key was already used for a different request")]
+    IdempotencyConflict,
     #[error("organization not found")]
     NotFound,
     #[error("organization storage unavailable")]
@@ -75,6 +79,24 @@ impl<'a> OrganizationService<'a> {
             .create_for_actor(actor_user_id, &input)
             .await
             .map_err(map_create_error)
+    }
+
+    pub async fn ensure(
+        &self,
+        actor_user_id: Uuid,
+        idempotency_key: Uuid,
+        name: &str,
+    ) -> Result<EnsureOrganizationOutcome, OrganizationServiceError> {
+        let input = validate_ensure_organization(name)?;
+        self.repository
+            .ensure_for_actor(actor_user_id, idempotency_key, &input)
+            .await
+            .map_err(|error| match error {
+                EnsureOrganizationRepositoryError::IdempotencyConflict => {
+                    OrganizationServiceError::IdempotencyConflict
+                }
+                EnsureOrganizationRepositoryError::Storage(_) => OrganizationServiceError::Storage,
+            })
     }
 }
 

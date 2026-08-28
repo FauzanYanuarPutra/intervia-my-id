@@ -92,7 +92,8 @@ describe('createDurableMarketplaceStore', () => {
       jsonResponse(
         {
           data: {
-            store: {
+            business: {
+              primary_store: {
               id: STORE_ID,
               owner_user_id: '44444444-4444-4444-8444-444444444444',
               name: 'Cuk',
@@ -109,6 +110,7 @@ describe('createDurableMarketplaceStore', () => {
               metadata: { organization_id: ORGANIZATION_ID },
               created_at: '2026-08-25T00:00:00.000Z',
               updated_at: '2026-08-25T00:00:00.000Z',
+              },
             },
           },
         },
@@ -120,6 +122,7 @@ describe('createDurableMarketplaceStore', () => {
       token: 'actor-token',
       ownerUserId: '44444444-4444-4444-8444-444444444444',
       organizationId: ORGANIZATION_ID,
+      idempotencyKey: '33333333-3333-4333-8333-333333333333',
       name: 'Cuk',
       city: 'Jakarta',
       address: 'Jl. Contoh',
@@ -133,13 +136,15 @@ describe('createDurableMarketplaceStore', () => {
     const init = fetchImpl.mock.calls[0]?.[1];
     expect(init).toMatchObject({
       method: 'POST',
-      headers: expect.objectContaining({ Authorization: 'Bearer actor-token' }),
+      headers: expect.objectContaining({
+        Authorization: 'Bearer actor-token',
+        'Idempotency-Key': '33333333-3333-4333-8333-333333333333',
+      }),
     });
     expect(JSON.parse(String(init?.body))).toMatchObject({
-      owner_user_id: '44444444-4444-4444-8444-444444444444',
-      metadata: {
-        organization_id: ORGANIZATION_ID,
-        category: 'Minuman',
+      organization: { mode: 'existing', organization_id: ORGANIZATION_ID },
+      storefront: {
+        public_metadata: { category: 'Minuman' },
       },
     });
   });

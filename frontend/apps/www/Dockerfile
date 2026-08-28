@@ -83,15 +83,35 @@ RUN set -eux; \
     else \
       retry_npm npm install --legacy-peer-deps --include=optional --prefer-offline --no-audit --no-fund; \
     fi; \
+    OPTIONAL_NATIVE_PACKAGES=""; \
     if ! node -e "require.resolve('@next/swc-linux-x64-gnu/package.json')"; then \
       NEXT_VERSION=$(node -p "require('./node_modules/next/package.json').version"); \
+      OPTIONAL_NATIVE_PACKAGES="${OPTIONAL_NATIVE_PACKAGES} @next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
+    fi; \
+    if ! node -e "require.resolve('@rollup/rollup-linux-x64-gnu/package.json')"; then \
+      ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version"); \
+      OPTIONAL_NATIVE_PACKAGES="${OPTIONAL_NATIVE_PACKAGES} @rollup/rollup-linux-x64-gnu@${ROLLUP_VERSION}"; \
+    fi; \
+    if ! node -e "require.resolve('@esbuild/linux-x64/package.json')"; then \
+      ESBUILD_VERSION=$(node -p "require('./node_modules/esbuild/package.json').version"); \
+      OPTIONAL_NATIVE_PACKAGES="${OPTIONAL_NATIVE_PACKAGES} @esbuild/linux-x64@${ESBUILD_VERSION}"; \
+    fi; \
+    if ! node -e "require.resolve('@parcel/watcher-linux-x64-glibc/package.json')"; then \
+      PARCEL_WATCHER_VERSION=$(node -p "require('./node_modules/@parcel/watcher/package.json').version"); \
+      OPTIONAL_NATIVE_PACKAGES="${OPTIONAL_NATIVE_PACKAGES} @parcel/watcher-linux-x64-glibc@${PARCEL_WATCHER_VERSION}"; \
+    fi; \
+    if ! node -e "require.resolve('@swc/core-linux-x64-gnu/package.json')"; then \
+      SWC_CORE_VERSION=$(node -p "require('./node_modules/next-intl/node_modules/@swc/core/package.json').version"); \
+      OPTIONAL_NATIVE_PACKAGES="${OPTIONAL_NATIVE_PACKAGES} @swc/core-linux-x64-gnu@${SWC_CORE_VERSION}"; \
+    fi; \
+    if [ -n "${OPTIONAL_NATIVE_PACKAGES}" ]; then \
       retry_npm npm install \
         --no-save \
         --legacy-peer-deps \
         --prefer-offline \
         --no-audit \
         --no-fund \
-        "@next/swc-linux-x64-gnu@${NEXT_VERSION}"; \
+        ${OPTIONAL_NATIVE_PACKAGES}; \
     fi
 
 COPY apps/www/ ./

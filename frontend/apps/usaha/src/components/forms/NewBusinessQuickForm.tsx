@@ -30,7 +30,8 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
     if (!point) return setError('Pilih titik lokasi utama di peta.');
     setPending(true);
     try {
-      const response = await fetch('/api/businesses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), category, city: city.trim(), address: address.trim(), phone: phone.trim(), locationQuery: locationQuery.trim(), latitude: point.lat, longitude: point.lng }) });
+      const idempotencyKey = crypto.randomUUID();
+      const response = await fetch('/api/businesses', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ name: name.trim(), category, city: city.trim(), address: address.trim(), phone: phone.trim(), locationQuery: locationQuery.trim(), latitude: point.lat, longitude: point.lng, idempotencyKey }) });
       const result = (await response.json()) as { error?: string; redirectTo?: string };
       if (!response.ok || !result.redirectTo) throw new Error(result.error || 'Usaha belum berhasil dibuat.');
       startTransition(() => { router.push(result.redirectTo!); router.refresh(); });

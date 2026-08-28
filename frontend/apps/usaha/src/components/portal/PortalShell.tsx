@@ -42,13 +42,13 @@ export function PortalShell({
     : availableBusinesses;
 
   return (
-    <main className="min-h-screen bg-[#f6f7f4] text-portal-ink">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[272px] flex-col bg-portal-forestDark px-4 py-4 text-white lg:flex">
-        <Link href="/" className="flex min-h-12 items-center gap-3 rounded-[16px] px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-portal-forest shadow-sm"><Store className="h-5 w-5" /></span>
+    <main className="min-h-screen bg-[#f7f8f6] text-portal-ink">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[240px] flex-col border-r border-portal-line bg-white px-3 py-3 lg:flex">
+        <Link href="/" className="flex min-h-11 items-center gap-2.5 rounded-xl px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-portal-forest text-white"><Store className="h-4 w-4" /></span>
           <span>
-            <span className="block text-[11px] font-semibold text-white/60">Lajukan</span>
-            <span className="block text-base font-bold tracking-[-0.025em]">Usaha</span>
+            <span className="block text-[10px] font-semibold text-portal-soft">Lajukan</span>
+            <span className="block text-sm font-bold tracking-[-0.02em] text-portal-ink">Usaha</span>
           </span>
         </Link>
 
@@ -60,21 +60,21 @@ export function PortalShell({
           <SidebarNav business={activeBusiness} currentSection={currentSection} />
         </div>
 
-        <div className="mt-4 border-t border-white/10 pt-4">
-          <div className="flex items-center gap-3 rounded-[14px] px-2 py-2">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-white/10 text-white"><UserRound className="h-4 w-4" /></span>
+        <div className="mt-3 border-t border-portal-line pt-3">
+          <div className="flex items-center gap-3 rounded-xl px-2 py-2">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-portal-mist text-portal-forest"><UserRound className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white/60">Akun</p>
-              <p className="truncate text-sm font-bold text-white">{viewerName ?? 'Lajukan'}</p>
+              <p className="truncate text-[10px] font-semibold text-portal-soft">Akun</p>
+              <p className="truncate text-sm font-bold text-portal-ink">{viewerName ?? 'Lajukan'}</p>
             </div>
           </div>
           {viewerName ? <div className="mt-1 px-2"><LogoutButton compact /></div> : null}
         </div>
       </aside>
 
-      <div className="min-h-screen lg:pl-[272px]">
-        <header className="sticky top-0 z-30 border-b border-portal-line bg-[#f6f7f4]/95 backdrop-blur-xl">
-          <div className="mx-auto flex min-h-[68px] w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen lg:pl-[240px]">
+        <header className="sticky top-0 z-30 border-b border-portal-line bg-white/95 backdrop-blur-xl">
+          <div className="mx-auto flex min-h-14 w-full max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-5 lg:px-6">
             <div className="flex min-w-0 items-center gap-3 lg:hidden">
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-portal-forest text-white"><Store className="h-5 w-5" /></span>
               <div className="min-w-0">
@@ -96,7 +96,7 @@ export function PortalShell({
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1600px] px-3 pb-24 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8">
+        <div className="mx-auto w-full max-w-[1440px] px-3 pb-24 pt-4 sm:px-5 lg:px-6 lg:pb-8">
           <div className="min-w-0 space-y-4 sm:space-y-5">{children}</div>
         </div>
       </div>

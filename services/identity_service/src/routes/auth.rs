@@ -250,9 +250,9 @@ async fn record_audit_log(
     source_user_id: Option<Uuid>,
     target_user_id: Option<Uuid>,
     metadata: Option<Value>,
-    ip_address: Option<String>,
-    user_agent: Option<String>,
+    request_context: (Option<String>, Option<String>),
 ) {
+    let (ip_address, user_agent) = request_context;
     let s = state.clone();
     tokio::spawn(async move {
         let _ = sqlx::query(
@@ -424,10 +424,7 @@ async fn generate_google_username(
             return candidate;
         }
     }
-    format!(
-        "user{}",
-        Uuid::new_v4().simple().to_string()[..10].to_string()
-    )
+    format!("user{}", &Uuid::new_v4().simple().to_string()[..10])
 }
 
 fn verify_reset_proof(secret: &str, proof: &str, email: &str) -> bool {
@@ -880,8 +877,7 @@ pub async fn register(
             None,
             None,
             Some(json!({"username_attempt": username_attempt, "reason": reason})),
-            ip_address.clone(),
-            user_agent.clone(),
+            (ip_address.clone(), user_agent.clone()),
         )
         .await;
 
@@ -901,8 +897,7 @@ pub async fn register(
                 None,
                 None,
                 Some(json!({"phone_attempt": masked_phone.clone(), "reason": "invalid phone"})),
-                ip_address.clone(),
-                user_agent.clone(),
+                (ip_address.clone(), user_agent.clone()),
             )
             .await;
 
@@ -945,8 +940,7 @@ pub async fn register(
                 None,
                 None,
                 Some(json!({"username_attempt": username_attempt, "reason": "duplicate username"})),
-                ip_address.clone(),
-                user_agent.clone(),
+                (ip_address.clone(), user_agent.clone()),
             )
             .await;
             return (
@@ -987,8 +981,7 @@ pub async fn register(
                     None,
                     None,
                     Some(json!({"phone_attempt": masked_phone.clone()})),
-                    ip_address.clone(),
-                    user_agent.clone(),
+                    (ip_address.clone(), user_agent.clone()),
                 )
                 .await;
                 return (
@@ -1204,8 +1197,7 @@ pub async fn register(
             "method": "username_password",
             "verified": false
         })),
-        ip_address,
-        user_agent,
+        (ip_address, user_agent),
     )
     .await;
 
@@ -1314,8 +1306,7 @@ pub async fn login(
                 None,
                 None,
                 Some(json!({"identifier_attempt": identifier_attempt.clone(), "reason": "not found"})),
-                ip_address.clone(),
-                user_agent.clone(),
+            (ip_address.clone(), user_agent.clone()),
             )
             .await;
 
@@ -1396,8 +1387,7 @@ pub async fn login(
             Some(user_data.id),
             Some(user_data.id),
             Some(json!({"identifier_attempt": identifier_attempt.clone(), "reason": "wrong password"})),
-            ip_address.clone(),
-            user_agent.clone(),
+            (ip_address.clone(), user_agent.clone()),
         )
         .await;
 
@@ -1486,8 +1476,7 @@ pub async fn login(
         Some(user_data.id),
         Some(user_data.id),
         Some(json!({"identifier_attempt": identifier_attempt})),
-        ip_address,
-        user_agent,
+        (ip_address, user_agent),
     )
     .await;
 
@@ -1590,8 +1579,7 @@ pub async fn login_phone(
             None,
             None,
             Some(json!({"phone_attempt": masked_phone, "reason": "invalid phone proof"})),
-            ip_address,
-            user_agent,
+            (ip_address, user_agent),
         )
         .await;
         return (
@@ -1640,8 +1628,7 @@ pub async fn login_phone(
             None,
             None,
             Some(json!({"phone_attempt": masked_phone, "reason": "not found"})),
-            ip_address.clone(),
-            user_agent.clone(),
+            (ip_address.clone(), user_agent.clone()),
         )
         .await;
 
@@ -1660,8 +1647,7 @@ pub async fn login_phone(
             None,
             None,
             Some(json!({"phone_attempt": masked_phone, "reason": "duplicate phone"})),
-            ip_address.clone(),
-            user_agent.clone(),
+            (ip_address.clone(), user_agent.clone()),
         )
         .await;
 
@@ -1811,8 +1797,7 @@ pub async fn login_phone(
         Some(user_data.id),
         Some(user_data.id),
         Some(json!({"phone_attempt": masked_phone, "method": "phone_otp"})),
-        ip_address,
-        user_agent,
+        (ip_address, user_agent),
     )
     .await;
 
@@ -1911,7 +1896,9 @@ pub async fn oauth_google(
     match verify_google_oauth_schema(&state).await {
         Ok(true) => {}
         Ok(false) => {
-            tracing::error!("oauth google schema is incomplete; migrations must run before traffic");
+            tracing::error!(
+                "oauth google schema is incomplete; migrations must run before traffic"
+            );
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(json!({"error":"database schema unavailable"})),
@@ -2215,8 +2202,7 @@ pub async fn oauth_google(
             "provider_user_id": provider_user_id,
             "email": email
         })),
-        ip_address,
-        user_agent,
+        (ip_address, user_agent),
     )
     .await;
 
@@ -2263,8 +2249,7 @@ pub async fn refresh_token(
             None,
             None,
             Some(json!({"session": payload.session_id})),
-            ip_address.clone(),
-            user_agent.clone(),
+            (ip_address.clone(), user_agent.clone()),
         )
         .await;
 
@@ -2326,8 +2311,7 @@ pub async fn refresh_token(
                                     "old_session": payload.session_id,
                                     "new_session": new_session_id
                                 })),
-                                ip_address,
-                                user_agent,
+                                (ip_address, user_agent),
                             )
                             .await;
 
@@ -2377,25 +2361,25 @@ pub async fn refresh_token(
                                 .add(cookie_refresh_token)
                                 .add(cookie_session);
 
-                            return (StatusCode::OK, jar, Json(resp)).into_response();
+                            (StatusCode::OK, jar, Json(resp)).into_response()
                         }
                         Err(e) => {
                             tracing::error!("create access token error: {:?}", e);
-                            return (
+                            (
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 Json(json!({"error":"token creation failed"})),
                             )
-                                .into_response();
+                                .into_response()
                         }
                     }
                 }
                 Err(e) => {
                     tracing::error!("rotate refresh token error: {:?}", e);
-                    return (
+                    (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(json!({"error":"internal server error"})),
                     )
-                        .into_response();
+                        .into_response()
                 }
             }
         }
@@ -2408,24 +2392,23 @@ pub async fn refresh_token(
                 None,
                 None,
                 Some(json!({"session": payload.session_id})),
-                ip_address,
-                user_agent,
+                (ip_address, user_agent),
             )
             .await;
 
-            return (
+            (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({"error":"invalid refresh token"})),
             )
-                .into_response();
+                .into_response()
         }
         Err(e) => {
             tracing::error!("session lookup error: {:?}", e);
-            return (
+            (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error":"internal server error"})),
             )
-                .into_response();
+                .into_response()
         }
     }
 }
@@ -2454,8 +2437,7 @@ pub async fn logout(
                 None,
                 None,
                 Some(json!({ "session": sid })),
-                ip_address,
-                user_agent,
+                (ip_address, user_agent),
             )
             .await;
         }

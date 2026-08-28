@@ -18,25 +18,70 @@ use crate::routes::verification::{derive_verification_state, public_verification
 const DEFAULT_PROFILE_AVATAR: &str = "/default-avatar.svg";
 
 const PUBLIC_PROFILE_KEYS: &[&str] = &[
-    "headline", "bio", "roles", "portfolio_url", "website", "linkedin_url", "github_url",
-    "links", "avatar_url", "cover_image",
+    "headline",
+    "bio",
+    "roles",
+    "portfolio_url",
+    "website",
+    "linkedin_url",
+    "github_url",
+    "links",
+    "avatar_url",
+    "cover_image",
 ];
 const PUBLIC_FREELANCER_KEYS: &[&str] = &[
-    "professional_title", "tagline", "bio", "summary", "skills", "skill_set", "languages",
-    "hourly_rate", "experience_years", "portfolio_urls", "certifications", "certificates",
-    "experiences", "experience", "work_history", "work_experience", "education", "links",
+    "professional_title",
+    "tagline",
+    "bio",
+    "summary",
+    "skills",
+    "skill_set",
+    "languages",
+    "hourly_rate",
+    "experience_years",
+    "portfolio_urls",
+    "certifications",
+    "certificates",
+    "experiences",
+    "experience",
+    "work_history",
+    "work_experience",
+    "education",
+    "links",
 ];
 const PUBLIC_PROVIDER_KEYS: &[&str] = &[
-    "headline", "tagline", "bio", "summary", "skills", "expertise", "languages",
-    "service_coverage", "work_mode", "response_time", "price_min", "price_max", "experience",
-    "education", "certifications", "links",
+    "headline",
+    "tagline",
+    "bio",
+    "summary",
+    "skills",
+    "expertise",
+    "languages",
+    "service_coverage",
+    "work_mode",
+    "response_time",
+    "price_min",
+    "price_max",
+    "experience",
+    "education",
+    "certifications",
+    "links",
 ];
 const PUBLIC_BUYER_KEYS: &[&str] = &[
-    "intent", "budget_min", "budget_max", "preferred_sector", "preferred_sub_sector",
+    "intent",
+    "budget_min",
+    "budget_max",
+    "preferred_sector",
+    "preferred_sub_sector",
     "preferred_location",
 ];
 const PUBLIC_MEDIA_KEYS: &[&str] = &[
-    "avatar_url", "photo_url", "cover_image", "cover_url", "gallery_images", "gallery_videos",
+    "avatar_url",
+    "photo_url",
+    "cover_image",
+    "cover_url",
+    "gallery_images",
+    "gallery_videos",
 ];
 
 fn normalize_metadata_key(raw: &str) -> String {
@@ -128,8 +173,7 @@ fn project_display_value(value: &Value, depth: usize) -> Option<Value> {
                 .filter(|(key, _)| !is_sensitive_public_key(key))
                 .take(32)
                 .filter_map(|(key, value)| {
-                    project_display_value(value, depth + 1)
-                        .map(|value| (key.clone(), value))
+                    project_display_value(value, depth + 1).map(|value| (key.clone(), value))
                 })
                 .collect::<serde_json::Map<String, Value>>();
             Some(Value::Object(projected))
@@ -311,10 +355,7 @@ fn project_public_metadata(metadata: Option<&Value>) -> Value {
         ("buyer_profile", PUBLIC_BUYER_KEYS),
         ("media", PUBLIC_MEDIA_KEYS),
     ] {
-        let value = sources
-            .iter()
-            .flatten()
-            .find_map(|source| source.get(key));
+        let value = sources.iter().flatten().find_map(|source| source.get(key));
         if let Some(value) = project_section(value, allowed_keys) {
             projected.insert(key.to_string(), value);
         }
@@ -925,8 +966,7 @@ pub async fn get_public_user_profile(
     };
     let public_freelancer_profile =
         project_section(freelancer_profile.as_ref(), PUBLIC_FREELANCER_KEYS);
-    let public_provider_profile =
-        project_section(provider_profile.as_ref(), PUBLIC_PROVIDER_KEYS);
+    let public_provider_profile = project_section(provider_profile.as_ref(), PUBLIC_PROVIDER_KEYS);
     let public_buyer_profile = project_section(buyer_profile.as_ref(), PUBLIC_BUYER_KEYS);
 
     let user = PublicUserProfileResponse {

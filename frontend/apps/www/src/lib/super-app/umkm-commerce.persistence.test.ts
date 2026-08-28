@@ -23,9 +23,11 @@ describe('persistent WWW store provisioning', () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(
       jsonResponse({
         data: {
-          store: {
-            id: STORE_ID,
-            name: 'Warung Cuk',
+          business: {
+            primary_store: {
+              id: STORE_ID,
+              name: 'Warung Cuk',
+            },
           },
         },
       }),

@@ -12,6 +12,12 @@ from provision_kyc_models import ModelArtifact, provision_models
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def assert_container_readable(case: unittest.TestCase, path: Path) -> None:
+    case.assertTrue(os.access(path, os.R_OK))
+    if os.name != "nt":
+        case.assertEqual(path.stat().st_mode & 0o777, 0o644)
+
+
 class KycModelProvisioningTests(unittest.TestCase):
     def test_provisions_model_into_anti_spoof_directory(self) -> None:
         payload = b"verified-onnx-payload"
@@ -36,7 +42,7 @@ class KycModelProvisioningTests(unittest.TestCase):
                 [Path(tmp) / "anti_spoof_models" / "test.onnx"],
             )
             self.assertEqual(installed[0].read_bytes(), payload)
-            self.assertEqual(installed[0].stat().st_mode & 0o777, 0o644)
+            assert_container_readable(self, installed[0])
 
     def test_rejects_download_when_sha256_does_not_match(self) -> None:
         artifact = ModelArtifact(
@@ -81,7 +87,7 @@ class KycModelProvisioningTests(unittest.TestCase):
             )
 
             self.assertEqual(installed, [target])
-            self.assertEqual(target.stat().st_mode & 0o777, 0o644)
+            assert_container_readable(self, target)
 
     def test_development_launchers_auto_provision_when_kyc_is_requested(self) -> None:
         powershell = (REPO_ROOT / "up.ps1").read_text(encoding="utf-8")

@@ -215,10 +215,8 @@ async function fetchMarketplaceWriteJson<T>(
 
     return payload.data;
   } catch (error) {
-    if (error instanceof Error && error.message !== 'fetch failed') {
-      throw error;
-    }
-    return undefined;
+    if (error instanceof Error && error.message !== 'fetch failed') throw error;
+    throw new Error('marketplace_persistence_unavailable');
   }
 }
 

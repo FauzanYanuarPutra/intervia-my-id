@@ -112,7 +112,8 @@ export async function ensureWorkspaceOrganization(input: {
 export async function createDurableMarketplaceStore(input: {
   token: string;
   ownerUserId: string;
-  organizationId: string;
+  organizationId?: string;
+  idempotencyKey?: string;
   name: string;
   slug?: string;
   description?: string | null;
@@ -130,29 +131,36 @@ export async function createDurableMarketplaceStore(input: {
 
   let response: Response;
   try {
-    response = await fetchImpl(`${MARKETPLACE_URL}/v1/umkm/stores`, {
+    response = await fetchImpl(`${MARKETPLACE_URL}/v1/businesses/provision`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${input.token}`,
+        'Idempotency-Key': input.idempotencyKey || crypto.randomUUID(),
       },
       body: JSON.stringify({
-        owner_user_id: input.ownerUserId,
-        name: input.name,
-        slug: input.slug,
-        description: input.description,
-        city: input.city,
-        address: input.address,
-        lat: input.lat,
-        lng: input.lng,
-        phone: input.phone,
-        is_active: true,
-        online_order_enabled: input.onlineOrderEnabled !== false,
-        offline_order_enabled: input.offlineOrderEnabled !== false,
-        metadata: {
-          ...(input.metadata ?? {}),
-          organization_id: input.organizationId,
+        organization: input.organizationId
+          ? { mode: 'existing', organization_id: input.organizationId, new_organization_name: null }
+          : { mode: 'auto', organization_id: null, new_organization_name: input.name },
+        business: {
+          name: input.name,
+          capability_key: 'general',
+        },
+        primary_location: {
+          name: 'Lokasi utama',
+          address: input.address,
+          city: input.city,
+          lat: input.lat,
+          lng: input.lng,
+          phone: input.phone,
+          public_visibility: true,
+        },
+        storefront: {
+          description: input.description,
+          online_order_enabled: input.onlineOrderEnabled !== false,
+          offline_order_enabled: input.offlineOrderEnabled !== false,
+          public_metadata: input.metadata ?? {},
         },
       }),
       cache: 'no-store',
@@ -169,7 +177,8 @@ export async function createDurableMarketplaceStore(input: {
   }
 
   const data = asRecord(payload.data);
-  const store = asRecord(data.store ?? payload.store);
+  const aggregate = asRecord(data.business ?? payload.business);
+  const store = asRecord(aggregate.primary_store);
   if (!text(store.id)) throw new Error('marketplace_invalid_store_response');
   return store as unknown as UmkmStore;
 }

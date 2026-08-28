@@ -74,11 +74,13 @@ pub fn derive_verification_state(
 
     let document_verified = read_nested_bool(metadata, &["verification", "document_verified"]);
     let liveness_verified = read_nested_bool(metadata, &["verification", "liveness_verified"]);
-    let stored_identity_verified = read_nested_bool(metadata, &["verification", "identity_verified"]);
+    let stored_identity_verified =
+        read_nested_bool(metadata, &["verification", "identity_verified"]);
 
-    let kyc_status = normalize_kyc_status(
-        read_nested_string(metadata, &["verification", "kyc_status"]),
-    )
+    let kyc_status = normalize_kyc_status(read_nested_string(
+        metadata,
+        &["verification", "kyc_status"],
+    ))
     .unwrap_or_else(|| {
         if document_verified && liveness_verified && effective_phone_verified {
             "enhanced".to_string()
