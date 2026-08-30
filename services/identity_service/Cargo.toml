@@ -31,7 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 
 lapin = "3.7.1"
 
-argon2 = "0.5"
+argon2 = "0.6"
 bcrypt = "0.15"
 
 jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }
