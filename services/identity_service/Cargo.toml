@@ -69,7 +69,7 @@ regex = "1.10"
 
 async-trait = "0.1"
 
-totp-rs = "5.4"
+totp-rs = "6.0"
 qrcode = "0.14.1"
 
 headers = "0.4"
