@@ -2325,8 +2325,7 @@ pub async fn refresh_token(
                             });
 
                             // Build cookie refresh token
-                            let cookie_access_token =
-                                Cookie::build(("access_token", access_token.clone()))
+                            let cookie_access_token = Cookie::build(("access_token", access_token.clone()))
                                     // .domain("localhost")
                                     .path("/")
                                     .http_only(true)
@@ -2335,8 +2334,7 @@ pub async fn refresh_token(
                                     .max_age(CookieDuration::days(30))
                                     .build();
 
-                            let cookie_refresh_token =
-                                Cookie::build(("refresh_token", new_opaque.clone()))
+                            let cookie_refresh_token = Cookie::build(("refresh_token", new_opaque.clone()))
                                     // .domain("localhost")
                                     .path("/")
                                     .http_only(true)
@@ -2346,8 +2344,7 @@ pub async fn refresh_token(
                                     .build();
 
                             // Build session cookie
-                            let cookie_session =
-                                Cookie::build(("session_id", new_session_id.to_string()))
+                            let cookie_session = Cookie::build(("session_id", new_session_id.to_string()))
                                     // .domain("localhost")
                                     .path("/")
                                     .http_only(true)
