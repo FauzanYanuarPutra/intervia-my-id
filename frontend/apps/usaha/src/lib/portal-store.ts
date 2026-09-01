@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { businesses as seedBusinesses, permissionMap } from '@/lib/portal-data';
+import { permissionMap } from '@/lib/portal-access';
+import { businesses as seedBusinesses } from '@/lib/portal-data';
 import {
   buildBusinessGoogleMapsUrl,
   buildBusinessLocationQuery,

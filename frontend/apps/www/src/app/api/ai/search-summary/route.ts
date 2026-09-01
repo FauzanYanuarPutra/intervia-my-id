@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LAJUKAN_AI_SEARCH_PROMPT } from '@/lib/aiSystemPrompt';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
@@ -11,7 +10,21 @@ const MARKETPLACE_URL = process.env.INTERNAL_MARKETPLACE_URL || process.env.NEXT
 
 type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
 
-async function fetchSearchResults(query: string, type?: string, hasImages?: boolean, sectors?: string[], limit: number = 20): Promise<any[]> {
+type SearchResult = {
+  title?: string;
+  type?: string;
+  summary?: string;
+  price_cents?: number;
+  metadata?: { sector?: string; location?: string };
+  tags?: string[];
+  [key: string]: unknown;
+};
+
+function isSearchResult(value: unknown): value is SearchResult {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function fetchSearchResults(query: string, type?: string, hasImages?: boolean, sectors?: string[], limit: number = 20): Promise<SearchResult[]> {
   try {
     const params = new URLSearchParams();
     if (query.trim()) params.set('q', query.trim());
@@ -29,9 +42,9 @@ async function fetchSearchResults(query: string, type?: string, hasImages?: bool
 
     if (!res.ok) return [];
     const payload = await res.json().catch(() => ({}));
-    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload)) return payload.filter(isSearchResult);
     if (payload && Array.isArray((payload as { items?: unknown[] }).items)) {
-      return (payload as { items: any[] }).items;
+      return (payload as { items: unknown[] }).items.filter(isSearchResult);
     }
     return [];
   } catch (error) {
@@ -40,7 +53,7 @@ async function fetchSearchResults(query: string, type?: string, hasImages?: bool
   }
 }
 
-async function callOllamaForSummary(query: string, results: any[], type?: string): Promise<string> {
+async function callOllamaForSummary(query: string, results: SearchResult[], type?: string): Promise<string> {
   const systemPrompt = `Kamu adalah AI assistant untuk Lajukan — platform untuk mencari pekerjaan, jasa, produk, dan properti.
 
 Tugas kamu:
@@ -64,7 +77,7 @@ Format Ringkasan:
 Jawab dalam bahasa yang sama dengan query user.`;
 
   // Build context from results
-  const resultsContext = results.slice(0, 10).map((item: any, idx: number) => {
+  const resultsContext = results.slice(0, 10).map((item, idx) => {
     const title = item.title || '';
     const itemType = item.type || '';
     const summary = item.summary || '';
@@ -112,7 +125,7 @@ Beri ringkasan yang informatif tentang hasil pencarian ini.`;
   return '';
 }
 
-async function callAIForSummary(query: string, results: any[], type?: string): Promise<string> {
+async function callAIForSummary(query: string, results: SearchResult[], type?: string): Promise<string> {
   // Try Ollama first if enabled
   if (USE_OLLAMA) {
     const summary = await callOllamaForSummary(query, results, type);
@@ -135,7 +148,7 @@ Format Ringkasan:
 - Berikan insight singkat tentang hasil pencarian
 - Akhiri dengan saran jika perlu`;
 
-  const resultsContext = results.slice(0, 10).map((item: any, idx: number) => {
+  const resultsContext = results.slice(0, 10).map((item, idx) => {
     const title = item.title || '';
     const itemType = item.type || '';
     const summary = item.summary || '';
@@ -216,7 +229,11 @@ export async function POST(req: NextRequest) {
     const query = typeof body.query === 'string' ? body.query.trim() : '';
     const type = typeof body.type === 'string' ? body.type : undefined;
     const hasImages = body.has_images === true;
-    const sectors = Array.isArray(body.sectors) ? body.sectors : [];
+    const sectors = Array.isArray(body.sectors)
+      ? body.sectors.filter(
+          (sector: unknown): sector is string => typeof sector === 'string',
+        )
+      : [];
 
     if (!query) {
       return NextResponse.json({ summary: null }, { status: 200 });

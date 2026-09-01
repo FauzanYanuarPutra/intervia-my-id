@@ -4,6 +4,7 @@ import {
   listBusinessesForCurrentActor,
   requireAuthenticatedActor,
 } from '@/lib/business-server';
+import { normalizeBusinessApiError } from '@/lib/business-api-error';
 
 function readText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -20,8 +21,11 @@ export async function GET() {
     const items = await listBusinessesForCurrentActor();
     return NextResponse.json({ items, count: items.length });
   } catch (error) {
-    const status = error instanceof Error && error.message === 'AUTH_REQUIRED' ? 401 : 503;
-    return NextResponse.json({ error: status === 401 ? 'Login dulu.' : 'Data usaha belum bisa dimuat.' }, { status });
+    const normalized = normalizeBusinessApiError(error, 'Data usaha belum bisa dimuat.');
+    return NextResponse.json(
+      { error: normalized.message, code: normalized.code },
+      { status: normalized.status },
+    );
   }
 }
 
@@ -67,7 +71,10 @@ export async function POST(request: Request) {
       redirectTo: `/?business=${encodeURIComponent(created.businessId)}&created=1`,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Usaha belum berhasil dibuat.';
-    return NextResponse.json({ error: message === 'AUTH_REQUIRED' ? 'Login dulu.' : message }, { status: message === 'AUTH_REQUIRED' ? 401 : 400 });
+    const normalized = normalizeBusinessApiError(error, 'Usaha belum berhasil dibuat.');
+    return NextResponse.json(
+      { error: normalized.message, code: normalized.code },
+      { status: normalized.status },
+    );
   }
 }

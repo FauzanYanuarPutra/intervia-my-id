@@ -934,7 +934,7 @@ export function Header() {
     useCallback(() => {
       setProfileOpen(false);
       setMobileOpen(false);
-    }, []);
+    }, [setMobileOpen, setProfileOpen]);
 
   const setGlobalSearch =
     useCallback(
@@ -1061,72 +1061,6 @@ export function Header() {
   useBodyScrollLock(
     mobileOpen,
   );
-
-  /* ---------------------------------------------------------------------- */
-  /* Menu item renderer                                                      */
-  /* ---------------------------------------------------------------------- */
-
-  const renderMenuRow = (
-    item: DrawerItem,
-    options?: {
-      compact?: boolean;
-    },
-  ) => {
-    const active = (
-      item.matchers &&
-      item.matchers.length > 0
-        ? item.matchers
-        : [hrefPath(item.href)]
-    ).some(
-      matcher =>
-        matchesRoute(
-          cleanPath,
-          matcher,
-        ),
-    );
-
-    return (
-      <Link
-        key={`${item.href}-${item.label}`}
-        href={item.href}
-        onClick={closeAll}
-        aria-current={
-          active
-            ? 'page'
-            : undefined
-        }
-        className={cn(
-          'group flex min-w-0 items-center gap-2.5 rounded-[14px] p-2 transition',
-          active
-            ? 'bg-[color:var(--app-accent-soft)]'
-            : 'hover:bg-[color:var(--app-surface-muted)]',
-          options?.compact &&
-            'min-h-[54px]',
-        )}
-      >
-        <DrawerVisual visual={item.visual} active={active} />
-
-        <span className="min-w-0 flex-1">
-          <span
-            className={cn(
-              'block truncate text-[12px] font-black',
-              active
-                ? 'text-[color:var(--app-accent)]'
-                : 'text-[color:var(--app-text)]',
-            )}
-          >
-            {item.label}
-          </span>
-
-          {item.caption ? (
-            <span className="mt-0.5 block line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-              {item.caption}
-            </span>
-          ) : null}
-        </span>
-      </Link>
-    );
-  };
 
   /* ---------------------------------------------------------------------- */
   /* Mobile create card                                                      */

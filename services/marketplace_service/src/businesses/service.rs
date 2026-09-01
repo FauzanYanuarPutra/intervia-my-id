@@ -1,6 +1,7 @@
 use super::{
     domain::{
-        validate_provision_request, BusinessAggregate, OrganizationMode, ProvisionBusinessRequest,
+        validate_business_profile_update, validate_provision_request, BusinessAggregate,
+        BusinessProfileUpdateRequest, OrganizationMode, ProvisionBusinessRequest,
         ReconcileBusinessRequest, ValidationError,
     },
     identity_client::{IdentityClient, IdentityClientError, OrganizationSummary},
@@ -15,6 +16,7 @@ pub(crate) enum BusinessServiceError {
     IdentityUnavailable,
     AccessDenied,
     IdempotencyConflict,
+    VersionConflict,
     OrganizationSelectionRequired,
     ReconciliationSelectionRequired,
     NotFound,
@@ -73,6 +75,40 @@ impl BusinessService {
             {
                 return Ok(aggregate);
             }
+        }
+        Err(BusinessServiceError::NotFound)
+    }
+
+    pub(crate) async fn update_profile(
+        &self,
+        actor_id: Uuid,
+        authorization: &str,
+        business_id: Uuid,
+        request: BusinessProfileUpdateRequest,
+    ) -> Result<BusinessAggregate, BusinessServiceError> {
+        let command =
+            validate_business_profile_update(request).map_err(BusinessServiceError::Validation)?;
+        let organizations = self
+            .identity
+            .list_organizations(authorization)
+            .await
+            .map_err(map_identity_error)?;
+        for organization in &organizations {
+            let existing = self
+                .repository
+                .get_for_organization(business_id, organization.id)
+                .await
+                .map_err(map_repository_error)?;
+            if existing.is_none() {
+                continue;
+            }
+            let managing = management_organization(&organizations, organization.id)
+                .ok_or(BusinessServiceError::AccessDenied)?;
+            return self
+                .repository
+                .update_profile(actor_id, business_id, managing.id, &command)
+                .await
+                .map_err(map_repository_error);
         }
         Err(BusinessServiceError::NotFound)
     }
@@ -239,6 +275,7 @@ fn map_identity_error(error: IdentityClientError) -> BusinessServiceError {
 fn map_repository_error(error: RepositoryError) -> BusinessServiceError {
     match error {
         RepositoryError::IdempotencyConflict => BusinessServiceError::IdempotencyConflict,
+        RepositoryError::VersionConflict => BusinessServiceError::VersionConflict,
         RepositoryError::Database | RepositoryError::IncompleteAggregate => {
             BusinessServiceError::Storage
         }
@@ -257,6 +294,15 @@ fn identity_child_key(parent: Uuid) -> Uuid {
     Uuid::from_bytes(uuid_bytes)
 }
 
+fn management_organization(
+    organizations: &[OrganizationSummary],
+    organization_id: Uuid,
+) -> Option<&OrganizationSummary> {
+    organizations.iter().find(|organization| {
+        organization.id == organization_id && organization.can_manage_businesses()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,5 +313,25 @@ mod tests {
 
         assert_eq!(identity_child_key(parent), identity_child_key(parent));
         assert_ne!(identity_child_key(parent), parent);
+    }
+
+    #[test]
+    fn business_mutation_requires_an_admin_role_for_the_owning_organization() {
+        let organization_id = Uuid::new_v4();
+        let organizations = vec![OrganizationSummary {
+            id: organization_id,
+            current_user_role: "org_member".to_owned(),
+        }];
+
+        assert!(management_organization(&organizations, organization_id).is_none());
+
+        let organizations = vec![OrganizationSummary {
+            id: organization_id,
+            current_user_role: "org_admin".to_owned(),
+        }];
+        assert_eq!(
+            management_organization(&organizations, organization_id).map(|item| item.id),
+            Some(organization_id)
+        );
     }
 }

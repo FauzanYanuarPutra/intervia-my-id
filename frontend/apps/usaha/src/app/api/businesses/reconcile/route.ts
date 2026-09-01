@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { reconcileBusiness } from '@/lib/business-server';
+import { normalizeBusinessApiError } from '@/lib/business-api-error';
 
 export async function POST(request: Request) {
   try {
@@ -17,8 +18,10 @@ export async function POST(request: Request) {
       redirectTo: `/?business=${encodeURIComponent(result.businessId)}&reconciled=1`,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Usaha lama belum bisa dipulihkan.';
-    const status = message === 'AUTH_REQUIRED' ? 401 : message.includes('selection') ? 409 : 400;
-    return NextResponse.json({ error: message === 'AUTH_REQUIRED' ? 'Login dulu.' : message }, { status });
+    const normalized = normalizeBusinessApiError(error, 'Usaha lama belum bisa dipulihkan.');
+    return NextResponse.json(
+      { error: normalized.message, code: normalized.code },
+      { status: normalized.status },
+    );
   }
 }

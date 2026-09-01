@@ -42,7 +42,8 @@ export function PortalShell({
     : availableBusinesses;
 
   return (
-    <main className="min-h-screen bg-[#f7f8f6] text-portal-ink">
+    <div className="min-h-screen bg-[#f7f8f6] text-portal-ink">
+      <a href="#portal-content" className="portal-skip-link">Langsung ke konten</a>
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[240px] flex-col border-r border-portal-line bg-white px-3 py-3 lg:flex">
         <Link href="/" className="flex min-h-11 items-center gap-2.5 rounded-xl px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-portal-forest text-white"><Store className="h-4 w-4" /></span>
@@ -96,12 +97,12 @@ export function PortalShell({
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1440px] px-3 pb-24 pt-4 sm:px-5 lg:px-6 lg:pb-8">
+        <main id="portal-content" tabIndex={-1} className="mx-auto w-full max-w-[1440px] px-3 pb-24 pt-4 outline-none sm:px-5 lg:px-6 lg:pb-8">
           <div className="min-w-0 space-y-4 sm:space-y-5">{children}</div>
-        </div>
+        </main>
       </div>
 
       <MobileNav business={activeBusiness} currentSection={currentSection} />
-    </main>
+    </div>
   );
 }

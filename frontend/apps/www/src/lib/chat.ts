@@ -1,9 +1,23 @@
 import type { Channel } from 'phoenix';
-import { connectSocket, getSocketWhenOpen } from './socket';
+import { getSocketWhenOpen } from './socket';
+
+export type ChatMessageReference = {
+  message_id: string;
+  mode: 'reply' | 'quote';
+  sender_id?: string;
+  sender_name?: string;
+  content: string;
+  message_type?: string;
+  attachments?: string[];
+  created_at?: string;
+};
 
 type MessageExtras = {
   message_type?: string;
   attachments?: string[];
+  reply_to_message_id?: string;
+  reply_mode?: 'reply' | 'quote';
+  reply_to?: ChatMessageReference;
 };
 
 export type SocketSendResult = {
@@ -13,6 +27,8 @@ export type SocketSendResult = {
   content?: string;
   message_type?: string;
   attachments?: string[];
+  reference?: ChatMessageReference | null;
+  reply_to?: ChatMessageReference | null;
 };
 
 export async function joinRoom(roomId: string, token: string): Promise<Channel> {
@@ -150,6 +166,8 @@ export async function sendMessageViaSocket(
           content?: string;
           message_type?: string;
           attachments?: string[];
+          reference?: ChatMessageReference | null;
+          reply_to?: ChatMessageReference | null;
         }) => {
           resolve({
             ok: true,
@@ -158,6 +176,8 @@ export async function sendMessageViaSocket(
             content: resp.content ?? resp.body ?? content,
             message_type: resp.message_type ?? extras.message_type ?? 'text',
             attachments: Array.isArray(resp.attachments) ? resp.attachments : (extras.attachments ?? []),
+            reference: resp.reference ?? resp.reply_to ?? extras.reply_to ?? null,
+            reply_to: resp.reply_to ?? extras.reply_to ?? null,
           });
         })
         .receive('error', (resp: unknown) => {

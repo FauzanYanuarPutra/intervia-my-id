@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { FaceLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { useAuth } from '@/context/AuthContext';
 
 export default function FaceCapture() {
@@ -14,6 +14,39 @@ export default function FaceCapture() {
   const [isCaptured, setIsCaptured] = useState(false);
   const [status, setStatus] = useState("Menyiapkan AI...");
   const { authFetch } = useAuth();
+
+  const captureAndVerify = useCallback(async () => {
+    setIsCaptured(true);
+    setStatus("Mengirim ke Server...");
+
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+
+    if (canvas && video) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(video, 0, 0);
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const formData = new FormData();
+        formData.append('face_image', blob);
+
+        try {
+          const res = await authFetch('/api/auth/face-recognition', {
+            method: 'POST',
+            body: formData,
+          });
+          const data = await res.json();
+          if (res.ok) setStatus(`Halo, ${data.user.username}!`);
+          else setStatus("Wajah tidak dikenali");
+        } catch {
+          setStatus("Gagal terhubung ke server");
+        }
+      }, 'image/jpeg', 0.95);
+    }
+  }, [authFetch]);
 
   useEffect(() => {
     async function setup() {
@@ -42,7 +75,7 @@ export default function FaceCapture() {
             predict();
           };
         }
-      } catch (err) {
+      } catch {
         setStatus("Kamera/AI Error");
       }
     }
@@ -74,44 +107,12 @@ export default function FaceCapture() {
 
   // Efek ketika progress 100%
   useEffect(() => {
-    if (progress >= 100 && !isCaptured) {
-      captureAndVerify();
-    }
-  }, [progress]);
-
-  const captureAndVerify = async () => {
-    setIsCaptured(true);
-    setStatus("Mengirim ke Server...");
-
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-
-    if (canvas && video) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(video, 0, 0);
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        const formData = new FormData();
-        formData.append('face_image', blob);
-
-        try {
-          // Endpoint ini bisa digunakan untuk LOGIN atau REGISTER
-          const res = await authFetch('/api/auth/face-recognition', {
-            method: 'POST',
-            body: formData,
-          });
-          const data = await res.json();
-          if (res.ok) setStatus(`Halo, ${data.user.username}!`);
-          else setStatus("Wajah tidak dikenali");
-        } catch (e) {
-          setStatus("Gagal terhubung ke server");
-        }
-      }, 'image/jpeg', 0.95);
-    }
-  };
+    if (progress < 100 || isCaptured) return;
+    const timeoutId = window.setTimeout(() => {
+      void captureAndVerify();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [captureAndVerify, isCaptured, progress]);
 
   return (
     <div className="flex flex-col items-center gap-4 bg-[color:var(--app-surface-strong)] p-8 rounded-3xl shadow-2xl border border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)]">

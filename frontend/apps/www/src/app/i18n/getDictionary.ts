@@ -6,7 +6,7 @@ function isLocale(value: string): value is Locale {
   return i18n.locales.includes(value as Locale);
 }
 
-export const getDictionary = async (): Promise<Record<string, any>> => {
+export const getDictionary = async (): Promise<Record<string, unknown>> => {
   const cookieStore = await cookies();
   const localeCookie =
     cookieStore.get('NEXT_LOCALE') ??

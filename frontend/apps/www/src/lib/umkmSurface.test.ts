@@ -4,6 +4,8 @@ import {
   buildUmkmDiscoveryPath,
   buildUmkmProfilePath,
   buildUmkmStorefrontPath,
+  buildUsahaPath,
+  buildUsahaPathFromWorkspace,
   isUmkmMapPublicReference,
 } from './umkmSurface';
 
@@ -45,5 +47,25 @@ describe('UMKM public route helpers', () => {
         metadata: { is_public_reference: true },
       }),
     ).toBe('/toko/osm-node-1');
+  });
+
+  it('opens owner actions directly in the dedicated Usaha workspace', () => {
+    expect(buildUsahaPath('catalog', { storeId: 'store / 1' })).toBe(
+      'http://localhost:3003/businesses/store%20%2F%201/products',
+    );
+    expect(buildUsahaPath('home', { storeId: 'business-1' })).toBe(
+      'http://localhost:3003/?business=business-1',
+    );
+  });
+
+  it('preserves workspace intent and anchors when leaving WWW', () => {
+    expect(
+      buildUsahaPathFromWorkspace('operations', {
+        storeId: 'business-1',
+        hash: 'stok-menipis',
+      }),
+    ).toBe(
+      'http://localhost:3003/businesses/business-1/operations#stok-menipis',
+    );
   });
 });

@@ -67,6 +67,30 @@ pub(crate) struct ReconcileBusinessRequest {
     pub(crate) store_id: Option<Uuid>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct BusinessProfileUpdateRequest {
+    pub(crate) expected_version: i64,
+    pub(crate) name: String,
+    pub(crate) capability_key: String,
+    pub(crate) category: String,
+    pub(crate) description: Option<String>,
+    pub(crate) schedule: String,
+    pub(crate) location_query: String,
+    pub(crate) primary_location: PrimaryLocationInput,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ValidatedBusinessProfileUpdate {
+    pub(crate) expected_version: i64,
+    pub(crate) name: String,
+    pub(crate) capability_key: String,
+    pub(crate) category: String,
+    pub(crate) description: Option<String>,
+    pub(crate) schedule: String,
+    pub(crate) location_query: String,
+    pub(crate) primary_location: PrimaryLocationInput,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ValidatedProvisionCommand {
     pub(crate) organization: OrganizationSelection,
@@ -146,6 +170,10 @@ pub(crate) enum ValidationError {
     InvalidPhone,
     InvalidDescription,
     InvalidPublicMetadata,
+    InvalidExpectedVersion,
+    InvalidCategory,
+    InvalidSchedule,
+    InvalidLocationQuery,
 }
 
 impl ValidationError {
@@ -164,8 +192,65 @@ impl ValidationError {
             Self::InvalidPhone => "invalid_phone",
             Self::InvalidDescription => "invalid_storefront_description",
             Self::InvalidPublicMetadata => "invalid_public_metadata",
+            Self::InvalidExpectedVersion => "invalid_expected_version",
+            Self::InvalidCategory => "invalid_business_category",
+            Self::InvalidSchedule => "invalid_business_schedule",
+            Self::InvalidLocationQuery => "invalid_location_query",
         }
     }
+}
+
+pub(crate) fn validate_business_profile_update(
+    request: BusinessProfileUpdateRequest,
+) -> Result<ValidatedBusinessProfileUpdate, ValidationError> {
+    if request.expected_version < 1 {
+        return Err(ValidationError::InvalidExpectedVersion);
+    }
+    let name = normalize_required(request.name, MAX_NAME_LEN)
+        .ok_or(ValidationError::InvalidBusinessName)?;
+    let capability_key = request.capability_key.trim().to_ascii_lowercase();
+    if !matches!(
+        capability_key.as_str(),
+        "general" | "food_beverage" | "retail" | "services"
+    ) {
+        return Err(ValidationError::InvalidCapability);
+    }
+    let category = normalize_required(request.category, MAX_NAME_LEN)
+        .ok_or(ValidationError::InvalidCategory)?;
+    let description = normalize_optional_or_empty(request.description, MAX_DESCRIPTION_LEN)
+        .ok_or(ValidationError::InvalidDescription)?;
+    let schedule = normalize_required(request.schedule, MAX_ADDRESS_LEN)
+        .ok_or(ValidationError::InvalidSchedule)?;
+    let location_query = normalize_required(request.location_query, MAX_ADDRESS_LEN)
+        .ok_or(ValidationError::InvalidLocationQuery)?;
+    let location_name = normalize_required(request.primary_location.name, MAX_NAME_LEN)
+        .ok_or(ValidationError::InvalidLocationName)?;
+    let address = normalize_required(request.primary_location.address, MAX_ADDRESS_LEN)
+        .ok_or(ValidationError::InvalidLocationAddress)?;
+    let city = normalize_required(request.primary_location.city, MAX_NAME_LEN)
+        .ok_or(ValidationError::InvalidLocationCity)?;
+    validate_coordinates(request.primary_location.lat, request.primary_location.lng)?;
+    let phone = normalize_optional_or_empty(request.primary_location.phone, MAX_PHONE_LEN)
+        .ok_or(ValidationError::InvalidPhone)?;
+
+    Ok(ValidatedBusinessProfileUpdate {
+        expected_version: request.expected_version,
+        name,
+        capability_key,
+        category,
+        description,
+        schedule,
+        location_query,
+        primary_location: PrimaryLocationInput {
+            name: location_name,
+            address,
+            city,
+            lat: request.primary_location.lat,
+            lng: request.primary_location.lng,
+            phone,
+            public_visibility: request.primary_location.public_visibility,
+        },
+    })
 }
 
 pub(crate) fn validate_provision_request(
@@ -221,8 +306,9 @@ pub(crate) fn validate_provision_request(
 
     let phone = normalize_optional(request.primary_location.phone, MAX_PHONE_LEN)
         .ok_or(ValidationError::InvalidPhone)?;
-    let description = normalize_optional(request.storefront.description, MAX_DESCRIPTION_LEN)
-        .ok_or(ValidationError::InvalidDescription)?;
+    let description =
+        normalize_optional_or_empty(request.storefront.description, MAX_DESCRIPTION_LEN)
+            .ok_or(ValidationError::InvalidDescription)?;
     if !request.storefront.public_metadata.is_object()
         || serde_json::to_vec(&request.storefront.public_metadata)
             .map_or(true, |metadata| metadata.len() > MAX_PUBLIC_METADATA_BYTES)
@@ -288,6 +374,14 @@ fn normalize_required(value: String, max_len: usize) -> Option<String> {
 
 fn normalize_optional(value: Option<String>, max_len: usize) -> Option<Option<String>> {
     match value {
+        Some(value) => normalize_required(value, max_len).map(Some),
+        None => Some(None),
+    }
+}
+
+fn normalize_optional_or_empty(value: Option<String>, max_len: usize) -> Option<Option<String>> {
+    match value {
+        Some(value) if value.trim().is_empty() => Some(None),
         Some(value) => normalize_required(value, max_len).map(Some),
         None => Some(None),
     }
@@ -535,6 +629,78 @@ mod tests {
         assert_eq!(
             validate_provision_request(request).unwrap_err().code(),
             "invalid_public_metadata"
+        );
+    }
+
+    #[test]
+    fn validation_treats_a_blank_optional_storefront_description_as_absent() {
+        let mut request = valid_request();
+        request.storefront.description = Some("   ".to_owned());
+
+        let command = validate_provision_request(request)
+            .expect("a blank optional description must not block business creation");
+
+        assert_eq!(command.storefront.description, None);
+    }
+
+    #[test]
+    fn profile_update_normalizes_the_canonical_business_snapshot() {
+        let request = BusinessProfileUpdateRequest {
+            expected_version: 7,
+            name: "  Kedai   Cuk  ".to_owned(),
+            capability_key: "FOOD_BEVERAGE".to_owned(),
+            category: "  Kuliner  ".to_owned(),
+            description: Some("  Minuman   segar  ".to_owned()),
+            schedule: "  Senin - Minggu, 08.00 - 22.00  ".to_owned(),
+            location_query: "  Jl. Contoh, Jakarta  ".to_owned(),
+            primary_location: PrimaryLocationInput {
+                name: "  Gerai   utama  ".to_owned(),
+                address: "  Jl.   Contoh 1  ".to_owned(),
+                city: "  Jakarta  ".to_owned(),
+                lat: Some(-6.2),
+                lng: Some(106.8),
+                phone: Some(" +628123456789 ".to_owned()),
+                public_visibility: true,
+            },
+        };
+
+        let command = validate_business_profile_update(request).expect("valid profile update");
+
+        assert_eq!(command.expected_version, 7);
+        assert_eq!(command.name, "Kedai Cuk");
+        assert_eq!(command.capability_key, "food_beverage");
+        assert_eq!(command.category, "Kuliner");
+        assert_eq!(command.description.as_deref(), Some("Minuman segar"));
+        assert_eq!(command.primary_location.name, "Gerai utama");
+        assert_eq!(command.primary_location.address, "Jl. Contoh 1");
+    }
+
+    #[test]
+    fn profile_update_rejects_a_non_positive_expected_version() {
+        let request = BusinessProfileUpdateRequest {
+            expected_version: 0,
+            name: "Kedai Cuk".to_owned(),
+            capability_key: "food_beverage".to_owned(),
+            category: "Kuliner".to_owned(),
+            description: None,
+            schedule: "Setiap hari".to_owned(),
+            location_query: "Jakarta".to_owned(),
+            primary_location: PrimaryLocationInput {
+                name: "Gerai utama".to_owned(),
+                address: "Jl. Contoh 1".to_owned(),
+                city: "Jakarta".to_owned(),
+                lat: None,
+                lng: None,
+                phone: None,
+                public_visibility: true,
+            },
+        };
+
+        assert_eq!(
+            validate_business_profile_update(request)
+                .unwrap_err()
+                .code(),
+            "invalid_expected_version"
         );
     }
 

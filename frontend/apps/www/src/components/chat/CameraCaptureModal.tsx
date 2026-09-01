@@ -56,10 +56,14 @@ export function CameraCaptureModal({ open, onClose, onCapture }: Props) {
   }, [open, stopStream]);
 
   useEffect(() => {
+    let timeoutId: number | undefined;
     if (open) {
-      startCamera();
+      timeoutId = window.setTimeout(() => {
+        void startCamera();
+      }, 0);
     }
     return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
       stopStream();
       if (!open) setStatus('idle');
     };
@@ -68,7 +72,6 @@ export function CameraCaptureModal({ open, onClose, onCapture }: Props) {
   // Pasang stream ke video setelah element ter-render (saat status ready)
   useEffect(() => {
     if (status === 'ready' && streamRef.current && videoRef.current) {
-      setVideoReady(false);
       const video = videoRef.current;
       video.srcObject = streamRef.current;
       const onCanPlay = () => {

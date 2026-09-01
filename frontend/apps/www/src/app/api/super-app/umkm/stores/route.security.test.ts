@@ -2,14 +2,14 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  createUmkmStoreMock,
+  createDurableMarketplaceStoreMock,
   enforceAuthRouteSecurityMock,
   enforceRateLimitMock,
   ensureUmkmQrTokenMock,
   parseJsonBodyWithSchemaMock,
   requireAuthMock,
 } = vi.hoisted(() => ({
-  createUmkmStoreMock: vi.fn(),
+  createDurableMarketplaceStoreMock: vi.fn(),
   enforceAuthRouteSecurityMock: vi.fn(),
   enforceRateLimitMock: vi.fn(),
   ensureUmkmQrTokenMock: vi.fn(),
@@ -34,13 +34,16 @@ vi.mock('@/lib/serverRequest', () => ({
 }));
 
 vi.mock('@/lib/super-app/umkm-commerce', () => ({
-  createUmkmStore: createUmkmStoreMock,
   ensureUmkmQrToken: ensureUmkmQrTokenMock,
   getStoreRecommendedQr: vi.fn(),
   listUmkmStores: vi.fn(),
   listUmkmStoresForActor: vi.fn(),
   listUmkmTables: vi.fn(),
   upsertUmkmTables: vi.fn(),
+}));
+
+vi.mock('@/lib/super-app/business-workspace', () => ({
+  createDurableMarketplaceStore: createDurableMarketplaceStoreMock,
 }));
 
 import { POST } from './route';
@@ -50,7 +53,7 @@ describe('POST /api/super-app/umkm/stores metadata security', () => {
     vi.clearAllMocks();
     requireAuthMock.mockResolvedValue({
       ok: true,
-      ctx: { userId: 'owner-1', email: 'owner@example.com' },
+      ctx: { userId: 'owner-1', email: 'owner@example.com', token: 'test-token' },
     });
     enforceAuthRouteSecurityMock.mockResolvedValue({
       ok: true,
@@ -58,7 +61,7 @@ describe('POST /api/super-app/umkm/stores metadata security', () => {
     });
     enforceRateLimitMock.mockResolvedValue({ ok: true });
     ensureUmkmQrTokenMock.mockResolvedValue({ id: 'qr-online' });
-    createUmkmStoreMock.mockImplementation(
+    createDurableMarketplaceStoreMock.mockImplementation(
       async (input: Record<string, unknown>) => ({
         id: 'store-1',
         owner_user_id: input.ownerUserId,
@@ -110,7 +113,7 @@ describe('POST /api/super-app/umkm/stores metadata security', () => {
     );
 
     expect(response.status).toBe(201);
-    const createInput = createUmkmStoreMock.mock.calls[0]?.[0];
+    const createInput = createDurableMarketplaceStoreMock.mock.calls[0]?.[0];
     expect(createInput.metadata).toMatchObject({
       recommended_qr: 'online',
       public_contact_enabled: true,

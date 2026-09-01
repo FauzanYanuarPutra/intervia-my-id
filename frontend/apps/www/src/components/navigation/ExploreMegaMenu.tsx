@@ -199,10 +199,6 @@ export function ExploreMegaMenu({
   }, [closeMenu, open]);
 
   useEffect(() => {
-    closeMenu();
-  }, [pathname, closeMenu]);
-
-  useEffect(() => {
     return () => cancelClose();
   }, [cancelClose]);
 

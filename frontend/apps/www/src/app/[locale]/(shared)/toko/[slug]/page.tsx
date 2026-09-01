@@ -31,7 +31,7 @@ import { isPublicUmkmStoreVisible } from '@/lib/super-app/umkm-public-discovery'
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import {
   isStorefrontProductInStock,
-  selectPublishedStorefrontProducts,
+  loadStorefrontCatalog,
 } from '@/lib/super-app/umkm-storefront-products';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 
@@ -317,18 +317,16 @@ function PrimaryAction({
   );
 }
 
-async function getStoreProducts(store: UmkmStore): Promise<UmkmProduct[]> {
-  try {
-    const products = await listUmkmProducts({
-      storeId: store.id,
-      includeUnavailable: false,
-      limit: 8,
-    });
-
-    return selectPublishedStorefrontProducts(products);
-  } catch {
-    return [];
-  }
+async function getStoreProducts(store: UmkmStore) {
+  return loadStorefrontCatalog(
+    () =>
+      listUmkmProducts({
+        storeId: store.id,
+        includeUnavailable: false,
+        limit: 8,
+      }),
+    8,
+  );
 }
 
 export async function generateMetadata({
@@ -392,7 +390,8 @@ export default async function TokoPage({ params }: PageProps) {
   const publicUrl = `${baseUrl}/${locale}/toko/${store.slug}`;
   const metadata =
     store.metadata && typeof store.metadata === 'object' ? store.metadata : {};
-  const products = await getStoreProducts(storedStore);
+  const catalog = await getStoreProducts(storedStore);
+  const products = catalog.products;
   const availableProductCount = products.filter(
     isStorefrontProductInStock,
   ).length;
@@ -731,7 +730,30 @@ export default async function TokoPage({ params }: PageProps) {
                 </span>
               </div>
 
-              {products.length > 0 ? (
+              {catalog.status === 'unavailable' ? (
+                <div
+                  className="mt-5 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-8 text-center dark:border-amber-900/70 dark:bg-amber-950/30"
+                  role="status"
+                >
+                  <ShoppingBag className="mx-auto h-7 w-7 text-amber-600 dark:text-amber-300" />
+                  <p className="mt-3 font-bold text-amber-950 dark:text-amber-100">
+                    {isId
+                      ? 'Katalog belum bisa dimuat'
+                      : 'The catalog could not be loaded'}
+                  </p>
+                  <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-amber-800 dark:text-amber-200/80">
+                    {isId
+                      ? 'Informasi usaha tetap bisa dilihat. Coba muat ulang katalog dalam beberapa saat.'
+                      : 'The business profile is still available. Try loading the catalog again shortly.'}
+                  </p>
+                  <Link
+                    href={`/${locale}/toko/${encodeURIComponent(store.slug)}`}
+                    className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/50"
+                  >
+                    {isId ? 'Coba lagi' : 'Try again'}
+                  </Link>
+                </div>
+              ) : products.length > 0 ? (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {products.map(product => (
                     <ProductCard

@@ -60,8 +60,11 @@ export function UISettingsProvider({ children }: { children: React.ReactNode }) 
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setSettings(loadSettings());
-    setMounted(true);
+    const timeoutId = window.setTimeout(() => {
+      setSettings(loadSettings());
+      setMounted(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   const updateSettings = useCallback((partial: Partial<UISettings>) => {

@@ -61,8 +61,14 @@ export default function LocaleError({
     console.groupEnd();
     
     // Kirim ke error tracking service jika ada (misalnya Sentry)
-    if (typeof window !== 'undefined' && (window as any).Sentry) {
-      (window as any).Sentry.captureException(error);
+    const sentry =
+      typeof window !== 'undefined'
+        ? (window as Window & {
+            Sentry?: { captureException: (cause: unknown) => void };
+          }).Sentry
+        : undefined;
+    if (sentry) {
+      sentry.captureException(error);
     }
   }, [error, pathname, locale]);
 

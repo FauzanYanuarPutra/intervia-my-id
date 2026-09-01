@@ -3,7 +3,6 @@ import 'server-only';
 import { readSingleParam } from '@/lib/portal-logic';
 import {
   getAuthenticatedActor,
-  getBusinessForCurrentActor,
   listBusinessesForCurrentActor,
 } from '@/lib/business-server';
 import type { BusinessRecord } from '@/lib/portal-types';
@@ -22,11 +21,7 @@ export async function getPortalAccount(options: GetPortalAccountOptions = {}) {
 export async function getPortalBusinesses() {
   const account = await getPortalAccount();
   if (!account) return [];
-  try {
-    return await listBusinessesForCurrentActor();
-  } catch {
-    return [];
-  }
+  return listBusinessesForCurrentActor();
 }
 
 export async function resolvePortalHomeState(searchParams: SearchParamsLike) {
@@ -58,9 +53,9 @@ export async function resolvePortalBusinessPageState(businessId: string) {
       isAuthenticated: false as const,
     };
   }
-  const [businesses, activeBusiness] = await Promise.all([
-    listBusinessesForCurrentActor(),
-    getBusinessForCurrentActor(businessId),
-  ]);
+  const businesses = await listBusinessesForCurrentActor();
+  const activeBusiness = businesses.find(
+    item => item.id === businessId || item.slug === businessId,
+  ) ?? null;
   return { account, businesses, activeBusiness, isAuthenticated: true as const };
 }

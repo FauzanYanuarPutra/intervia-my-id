@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateBusiness } from '@/lib/business-server';
+import { normalizeBusinessApiError } from '@/lib/business-api-error';
 
 export async function PATCH(request: Request, context: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await context.params;
@@ -12,7 +13,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ busin
     const business = await updateBusiness(businessId, { schedule, metadataPatch });
     return NextResponse.json({ ok: true, business });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal memperbarui operasional.' }, { status: 400 });
+    const normalized = normalizeBusinessApiError(error, 'Gagal memperbarui operasional.');
+    return NextResponse.json(
+      { error: normalized.message, code: normalized.code },
+      { status: normalized.status },
+    );
   }
 }
 

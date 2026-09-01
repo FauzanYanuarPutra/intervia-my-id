@@ -112,24 +112,27 @@ async function resolvePeerUserIdByUsername(
 }
 
 function buildLeadPayload(
-  input: any,
+  input: unknown,
   roomId: string,
   peerUserId?: string,
   username?: string,
-): Record<string, any> {
-  const lead: Record<string, any> = {};
-  if (input && typeof input === 'object') {
-    if (typeof input.name === 'string') lead.name = input.name;
-    if (typeof input.sector === 'string') lead.sector = input.sector;
-    if (typeof input.source === 'string') lead.source = input.source;
-    if (typeof input.stage === 'string') lead.stage = input.stage;
-    if (typeof input.currency === 'string') lead.currency = input.currency;
-    if (typeof input.chat_room_id === 'string') lead.chat_room_id = input.chat_room_id;
-    if (input.value_cents != null) lead.value_cents = input.value_cents;
-    if (typeof input.content_id === 'string' && isUuidLike(input.content_id)) {
-      lead.content_id = input.content_id;
+): Record<string, unknown> {
+  const lead: Record<string, unknown> = {};
+  if (input && typeof input === 'object' && !Array.isArray(input)) {
+    const source = input as Record<string, unknown>;
+    if (typeof source.name === 'string') lead.name = source.name;
+    if (typeof source.sector === 'string') lead.sector = source.sector;
+    if (typeof source.source === 'string') lead.source = source.source;
+    if (typeof source.stage === 'string') lead.stage = source.stage;
+    if (typeof source.currency === 'string') lead.currency = source.currency;
+    if (typeof source.chat_room_id === 'string') lead.chat_room_id = source.chat_room_id;
+    if (source.value_cents != null) lead.value_cents = source.value_cents;
+    if (typeof source.content_id === 'string' && isUuidLike(source.content_id)) {
+      lead.content_id = source.content_id;
     }
-    if (input.metadata && typeof input.metadata === 'object') lead.metadata = input.metadata;
+    if (source.metadata && typeof source.metadata === 'object') {
+      lead.metadata = source.metadata;
+    }
   }
 
   if (!lead.source) lead.source = 'chat';

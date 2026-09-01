@@ -17,7 +17,7 @@ async function handleExportData(req: NextRequest) {
     const { userId, token } = auth.ctx;
 
     // Collect all user data
-    const exportData: Record<string, any> = {
+    const exportData: Record<string, unknown> = {
       exportedAt: new Date().toISOString(),
       exportVersion: '1.0',
     };
@@ -43,8 +43,8 @@ async function handleExportData(req: NextRequest) {
           updatedAt: profile.updated_at,
         };
       }
-    } catch (e) {
-      console.error('Failed to fetch profile for export:', e);
+    } catch (error) {
+      console.error('Failed to fetch profile for export:', error);
     }
 
     // 2. Get sessions
@@ -87,7 +87,7 @@ async function handleExportData(req: NextRequest) {
       } else {
         exportData.content = [];
       }
-    } catch (e) {
+    } catch {
       exportData.content = [];
     }
 

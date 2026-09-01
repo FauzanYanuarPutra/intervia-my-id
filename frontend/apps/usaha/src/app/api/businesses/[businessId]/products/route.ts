@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getBusinessForCurrentActor, updateBusiness } from '@/lib/business-server';
 import type { ProductRecord, ProductStockHealth } from '@/lib/portal-types';
+import { normalizeBusinessApiError } from '@/lib/business-api-error';
 
 function num(value: unknown): number | null {
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -47,6 +48,10 @@ export async function POST(request: Request, context: { params: Promise<{ busine
     const updated = await updateBusiness(business.id, { metadataPatch: { products } });
     return NextResponse.json({ ok: true, business: updated });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal tambah produk.' }, { status: 400 });
+    const normalized = normalizeBusinessApiError(error, 'Gagal tambah produk.');
+    return NextResponse.json(
+      { error: normalized.message, code: normalized.code },
+      { status: normalized.status },
+    );
   }
 }

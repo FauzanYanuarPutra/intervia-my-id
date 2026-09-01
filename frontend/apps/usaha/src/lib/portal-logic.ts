@@ -1,4 +1,4 @@
-import { roleSummaryMap } from '@/lib/portal-data';
+import { roleSummaryMap } from '@/lib/portal-access';
 import type { BusinessRecord, PermissionId, PortalRole, PortalSection, ProgressStep, RoleSummary } from '@/lib/portal-types';
 
 export function readSingleParam(searchParams: Record<string, string | string[] | undefined>, key: string) {

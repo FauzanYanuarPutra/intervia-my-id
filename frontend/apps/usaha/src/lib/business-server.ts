@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
-import { permissionMap } from '@/lib/portal-data';
+import { permissionMap } from '@/lib/portal-access';
 import {
   buildBusinessGoogleMapsUrl,
   buildPublicStorefrontUrl,
@@ -89,6 +89,18 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
+export class UpstreamHttpError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string) {
+    super(code || `Upstream request failed (${status})`);
+    this.name = 'UpstreamHttpError';
+    this.status = status;
+    this.code = code || 'upstream_request_failed';
+  }
+}
+
 async function requestJson(url: string, init: RequestInit = {}): Promise<unknown> {
   const response = await fetch(url, { ...init, cache: 'no-store' });
   const text = await response.text();
@@ -100,10 +112,9 @@ async function requestJson(url: string, init: RequestInit = {}): Promise<unknown
   }
   if (!response.ok) {
     const body = record(payload);
-    throw new Error(
-      stringValue(body?.error) ||
-        stringValue(body?.message) ||
-        `Upstream request failed (${response.status})`,
+    throw new UpstreamHttpError(
+      response.status,
+      stringValue(body?.error) || stringValue(body?.message),
     );
   }
   return payload;
@@ -136,8 +147,14 @@ export async function getAuthenticatedActor(): Promise<PortalAccount | null> {
       headers: authHeaders(token),
     });
     return parseActor(payload);
-  } catch {
-    return null;
+  } catch (error) {
+    if (
+      error instanceof UpstreamHttpError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -173,7 +190,7 @@ export async function listWorkspaceOrganizations(
 
 function normalizeRole(value: string, isOwner: boolean): PortalRole {
   if (isOwner || value === 'owner') return 'owner';
-  if (['admin', 'manager'].includes(value)) return 'manager';
+  if (['admin', 'manager', 'org_admin'].includes(value)) return 'manager';
   if (['cashier', 'staff', 'operator'].includes(value)) return 'cashier';
   return 'viewer';
 }
@@ -247,6 +264,8 @@ function mapStore(
   actor: PortalAccount,
   organizations: WorkspaceOrganization[],
   canonicalBusinessId?: string,
+  canonicalVersion = 1,
+  capabilityKey = 'general',
 ): BusinessRecord {
   const metadata = metadataOf(store);
   const organizationId =
@@ -273,6 +292,8 @@ function mapStore(
 
   return {
     id: canonicalBusinessId || stringValue(store.id),
+    version: canonicalVersion,
+    capabilityKey,
     slug: stringValue(store.slug),
     name,
     currentRole: role,
@@ -328,17 +349,20 @@ function mapCanonicalBusiness(
   if (!business || !store || !businessId) return null;
 
   const privateMetadata = record(store.metadata) ?? {};
+  const publicMetadata = record(privateMetadata.public) ?? {};
   return mapStore(
     {
       ...store,
       organization_id: business.organization_id,
       metadata: location
-        ? { ...privateMetadata, locations: [location] }
-        : privateMetadata,
+        ? { ...privateMetadata, ...publicMetadata, locations: [location] }
+        : { ...privateMetadata, ...publicMetadata },
     },
     actor,
     organizations,
     businessId,
+    Number(business.version) || 1,
+    stringValue(business.capability_key) || 'general',
   );
 }
 
@@ -353,8 +377,9 @@ async function getCanonicalAggregate(
     );
     const root = nestedRecord(payload);
     return record(root.business) ?? root;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof UpstreamHttpError && error.status === 404) return null;
+    throw error;
   }
 }
 
@@ -426,7 +451,7 @@ export async function createBusiness(input: {
         public_visibility: true,
       },
       storefront: {
-        description: '',
+        description: null,
         online_order_enabled: true,
         offline_order_enabled: true,
         public_metadata: {
@@ -484,42 +509,118 @@ export async function updateBusiness(
     metadataPatch?: JsonRecord;
   },
 ): Promise<BusinessRecord> {
-  const { token } = await requireAuthenticatedActor();
-  const current = await getBusinessForCurrentActor(businessId);
-  if (!current) throw new Error('Usaha tidak ditemukan atau akses ditolak.');
-  const aggregate = await getCanonicalAggregate(token, current.id);
-  const rawStore = record(aggregate?.primary_store);
-  if (!rawStore) throw new Error('Data usaha tidak ditemukan.');
-  const metadata = {
-    ...metadataOf(rawStore),
-    ...(input.metadataPatch ?? {}),
-    ...(input.category !== undefined ? { category: input.category } : {}),
-    ...(input.schedule !== undefined ? { schedule: input.schedule } : {}),
-    ...(input.locationQuery !== undefined ? { locationQuery: input.locationQuery } : {}),
-  };
-
-  const storeId = stringValue(rawStore.id);
-  await requestJson(`${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(storeId)}`, {
-    method: 'PUT',
-    headers: {
-      ...authHeaders(token),
-      'Content-Type': 'application/json',
+  const { token, account } = await requireAuthenticatedActor();
+  const organizations = await listWorkspaceOrganizations(token);
+  const aggregate = await getCanonicalAggregate(token, businessId);
+  const current = aggregate
+    ? mapCanonicalBusiness(aggregate, account, organizations)
+    : null;
+  if (!current) throw new UpstreamHttpError(404, 'business_not_found');
+  if (input.metadataPatch) {
+    const rawStore = record(aggregate?.primary_store);
+    if (!rawStore) {
+      throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
+    }
+    const rawMetadata = metadataOf(rawStore);
+    const publicMetadata = {
+      ...(record(rawMetadata.public) ?? {}),
+      ...(input.category !== undefined ? { category: input.category } : {}),
+      ...(input.schedule !== undefined ? { schedule: input.schedule } : {}),
+      ...(input.locationQuery !== undefined
+        ? { locationQuery: input.locationQuery }
+        : {}),
+    };
+    await requestJson(
+      `${MARKETPLACE_URL}/v1/umkm/stores/${encodeURIComponent(stringValue(rawStore.id))}`,
+      {
+        method: 'PUT',
+        headers: {
+          ...authHeaders(token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.city !== undefined ? { city: input.city } : {}),
+          ...(input.address !== undefined ? { address: input.address } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.description !== undefined
+            ? { description: input.description }
+            : {}),
+          ...(input.latitude !== undefined && input.latitude !== null
+            ? { lat: input.latitude }
+            : {}),
+          ...(input.longitude !== undefined && input.longitude !== null
+            ? { lng: input.longitude }
+            : {}),
+          metadata: {
+            ...rawMetadata,
+            ...input.metadataPatch,
+            public: publicMetadata,
+          },
+        }),
+      },
+    );
+    const refreshedAggregate = await getCanonicalAggregate(token, current.id);
+    const refreshed = refreshedAggregate
+      ? mapCanonicalBusiness(refreshedAggregate, account, organizations)
+      : null;
+    if (!refreshed) {
+      throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
+    }
+    return refreshed;
+  }
+  const primaryLocation = current.locations?.find(item => item.isPrimary)
+    ?? current.locations?.[0];
+  const category = input.category ?? current.category;
+  const capabilityKey = input.category === undefined
+    ? current.capabilityKey ?? 'general'
+    : capabilityKeyForCategory(category);
+  const payload = await requestJson(
+    `${MARKETPLACE_URL}/v1/businesses/${encodeURIComponent(current.id)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        expected_version: current.version ?? 1,
+        name: input.name ?? current.name,
+        capability_key: capabilityKey,
+        category,
+        description: input.description ?? current.description,
+        schedule: input.schedule ?? current.schedule,
+        location_query: input.locationQuery ?? current.locationQuery,
+        primary_location: {
+          name: primaryLocation?.name || 'Lokasi utama',
+          address: input.address ?? current.address,
+          city: input.city ?? current.city,
+          lat: input.latitude === undefined ? current.latitude : input.latitude,
+          lng: input.longitude === undefined ? current.longitude : input.longitude,
+          phone: input.phone ?? current.phone,
+          public_visibility: primaryLocation?.publicVisibility ?? true,
+        },
+      }),
     },
-    body: JSON.stringify({
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.city !== undefined ? { city: input.city } : {}),
-      ...(input.address !== undefined ? { address: input.address } : {}),
-      ...(input.phone !== undefined ? { phone: input.phone } : {}),
-      ...(input.description !== undefined ? { description: input.description } : {}),
-      ...(input.latitude !== undefined && input.latitude !== null ? { lat: input.latitude } : {}),
-      ...(input.longitude !== undefined && input.longitude !== null ? { lng: input.longitude } : {}),
-      metadata,
-    }),
-  });
-
-  const updated = await getBusinessForCurrentActor(current.id);
-  if (!updated) throw new Error('Usaha sudah disimpan tetapi gagal dimuat ulang.');
+  );
+  const root = nestedRecord(payload);
+  const updatedAggregate = record(root.business) ?? root;
+  const updated = mapCanonicalBusiness(updatedAggregate, account, organizations);
+  if (!updated) {
+    throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
+  }
   return updated;
+}
+
+function capabilityKeyForCategory(category: string) {
+  const normalizedCategory = category.toLowerCase();
+  return /makanan|minuman|kuliner|kopi|cafe|resto/.test(normalizedCategory)
+    ? 'food_beverage'
+    : /retail|ritel|toko/.test(normalizedCategory)
+      ? 'retail'
+      : /jasa|service|laundry/.test(normalizedCategory)
+        ? 'services'
+        : 'general';
 }
 
 export async function replaceBusinessLocations(
@@ -527,17 +628,14 @@ export async function replaceBusinessLocations(
   locations: BusinessLocation[],
 ) {
   const primary = locations.find(item => item.isPrimary) ?? locations[0];
+  if (!primary) throw new UpstreamHttpError(400, 'primary_location_required');
   return updateBusiness(businessId, {
-    ...(primary
-      ? {
-          city: primary.city,
-          address: primary.address,
-          phone: primary.phone,
-          latitude: primary.latitude,
-          longitude: primary.longitude,
-          locationQuery: [primary.name, primary.address, primary.city].filter(Boolean).join(', '),
-        }
-      : {}),
+    city: primary.city,
+    address: primary.address,
+    phone: primary.phone,
+    latitude: primary.latitude,
+    longitude: primary.longitude,
+    locationQuery: [primary.name, primary.address, primary.city].filter(Boolean).join(', '),
     metadataPatch: { locations },
   });
 }

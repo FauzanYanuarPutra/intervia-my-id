@@ -85,20 +85,6 @@ function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
-function buildScopedUsahaPath(
-  genericPath: string,
-  scopedSegment: string | null,
-  options?: BuildPathOptions,
-): string {
-  const storeId = options?.storeId?.trim();
-  if (!storeId || !scopedSegment) {
-    return appendHash(genericPath, options?.hash);
-  }
-
-  const scopedPath = `${UMKM_OWNER_STORE_PATH}/${encodeURIComponent(storeId)}/${scopedSegment}`;
-  return appendHash(scopedPath, options?.hash);
-}
-
 function readSingleSurfaceParam(
   rawValue: string | string[] | undefined,
 ): string | undefined {
@@ -129,23 +115,6 @@ export function readSurfaceStoreId(
   searchParams: SurfaceSearchParams,
 ): string | undefined {
   return readSurfaceSearchParam(searchParams, 'store');
-}
-
-function appendStoreId(
-  pathname: string,
-  options: BuildPathOptions | undefined,
-): string {
-  const storeId = options?.storeId?.trim();
-  const params = new URLSearchParams();
-  if (storeId) {
-    params.set('store', storeId);
-  }
-  const queryString = params.toString();
-  const hash = options?.hash?.trim();
-  return appendHash(
-    queryString ? `${pathname}?${queryString}` : pathname,
-    hash,
-  );
 }
 
 export function getUmkmSurfaceCopy(locale: string) {
@@ -317,49 +286,6 @@ function buildUsahaPortalPath(
   }
 }
 
-function buildUsahaInternalPath(
-  route: UsahaRouteId,
-  options?: BuildPathOptions,
-): string {
-  switch (route) {
-    case 'dashboard':
-      return buildScopedUsahaPath(
-        UMKM_OWNER_DASHBOARD_PATH,
-        'dashboard',
-        options,
-      );
-    case 'assistant':
-      return appendStoreId(UMKM_OWNER_ASSISTANT_PATH, options);
-    case 'onboarding':
-      return appendStoreId(UMKM_OWNER_ONBOARDING_PATH, options);
-    case 'profile':
-      return buildScopedUsahaPath(UMKM_OWNER_PROFILE_PATH, 'profil', options);
-    case 'catalog':
-      return buildScopedUsahaPath(UMKM_OWNER_CATALOG_PATH, 'katalog', options);
-    case 'order':
-      return buildScopedUsahaPath(UMKM_OWNER_ORDER_PATH, 'order', options);
-    case 'qr':
-      return buildScopedUsahaPath(UMKM_OWNER_QR_PATH, 'qr', options);
-    case 'team':
-      return buildScopedUsahaPath(UMKM_OWNER_TEAM_PATH, 'tim', options);
-    case 'operations':
-      return buildScopedUsahaPath(
-        UMKM_OWNER_OPERATIONS_PATH,
-        'operasional',
-        options,
-      );
-    case 'analytics':
-      return buildScopedUsahaPath(
-        UMKM_OWNER_ANALYTICS_PATH,
-        'analytics',
-        options,
-      );
-    case 'home':
-    default:
-      return appendStoreId(UMKM_OWNER_PATH, options);
-  }
-}
-
 export function buildUsahaPortalHref(
   route: UsahaRouteId = 'home',
   options?: BuildPathOptions,
@@ -374,7 +300,7 @@ export function buildUsahaPath(
   route: UsahaRouteId = 'home',
   options?: BuildPathOptions,
 ): string {
-  return buildUsahaInternalPath(route, options);
+  return buildUsahaPortalHref(route, options);
 }
 
 export function buildUsahaPathFromWorkspace(

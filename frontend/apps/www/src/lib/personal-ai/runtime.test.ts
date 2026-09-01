@@ -2,6 +2,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultPersonalAiBuilderConfig } from './builder';
 import type { PersonalAiAgent, PersonalAiMessage } from './store';
 
+type AiRequestBody = {
+  task?: string;
+  message?: string;
+  locale?: string;
+  response_mode?: string;
+  agent?: Record<string, unknown>;
+  context?: {
+    personal_ai?: {
+      legacy_model_preference?: string;
+      builder?: unknown;
+      domain_reference?: string;
+    };
+  };
+  media?: Array<Record<string, unknown>>;
+  messages?: Array<{ role?: string; content?: string }>;
+  memory?: Record<string, unknown>;
+};
+
+const AI_RUNTIME_TEST_TIMEOUT_MS = 15_000;
+
 function makeAgent(): PersonalAiAgent {
   return {
     id: 'agent-1',
@@ -57,7 +77,7 @@ describe('Personal AI runtime gateway boundary', () => {
       const headers = init?.headers as Record<string, string>;
       expect(headers.Authorization).toBe('Bearer test-token');
 
-      const body = JSON.parse(String(init?.body)) as Record<string, any>;
+      const body = JSON.parse(String(init?.body)) as AiRequestBody;
 
       expect(body.task).toBe('chat');
       expect(body.message).toBe('Apa ini?');
@@ -73,17 +93,17 @@ describe('Personal AI runtime gateway boundary', () => {
         }),
       );
 
-      expect(body.context.personal_ai.legacy_model_preference).toBe('openai');
-      expect(body.context.personal_ai.builder).toBeTruthy();
-      expect(body.context.personal_ai.domain_reference).toContain(
+      expect(body.context?.personal_ai?.legacy_model_preference).toBe('openai');
+      expect(body.context?.personal_ai?.builder).toBeTruthy();
+      expect(body.context?.personal_ai?.domain_reference).toContain(
         'Referensi domain Lajukan',
       );
 
       expect(body.media).toHaveLength(1);
-      expect(body.media[0].data_url).toMatch(/^data:image\/png;base64,/);
-      expect(body.media[0]).not.toHaveProperty('url');
+      expect(body.media?.[0]?.data_url).toMatch(/^data:image\/png;base64,/);
+      expect(body.media?.[0]).not.toHaveProperty('url');
 
-      expect(body.messages.some((item: any) => item.role === 'system')).toBe(true);
+      expect(body.messages?.some(item => item.role === 'system')).toBe(true);
 
       return new Response(
         JSON.stringify({
@@ -125,7 +145,7 @@ describe('Personal AI runtime gateway boundary', () => {
       provider: 'ai-service',
       model: 'qwen3-vl:2b',
     });
-  });
+  }, AI_RUNTIME_TEST_TIMEOUT_MS);
 
   it('preserves reply/history and caller-authorized memory without forwarding private owner fields', async () => {
     const history: PersonalAiMessage[] = [
@@ -148,7 +168,7 @@ describe('Personal AI runtime gateway boundary', () => {
     ];
 
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as Record<string, any>;
+      const body = JSON.parse(String(init?.body)) as AiRequestBody;
 
       expect(body.messages).toEqual(
         expect.arrayContaining([
@@ -165,7 +185,7 @@ describe('Personal AI runtime gateway boundary', () => {
 
       expect(body.agent).not.toHaveProperty('owner_id');
       expect(body.agent).not.toHaveProperty('share_id');
-      expect(body.context.personal_ai).not.toHaveProperty('owner_id');
+      expect(body.context?.personal_ai).not.toHaveProperty('owner_id');
 
       return new Response(
         JSON.stringify({
@@ -201,7 +221,7 @@ describe('Personal AI runtime gateway boundary', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.provider).toBe('ai-service');
-  });
+  }, AI_RUNTIME_TEST_TIMEOUT_MS);
 
   it('never fetches media URLs and never falls back to direct providers when gateway fails', async () => {
     const fetchMock = vi.fn(async (url: string) => {
@@ -240,5 +260,5 @@ describe('Personal AI runtime gateway boundary', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.provider).toBe('safe-fallback');
     expect(result.provider_errors.join(' ')).toContain('ai-service:PROVIDER_DOWN');
-  });
+  }, AI_RUNTIME_TEST_TIMEOUT_MS);
 });

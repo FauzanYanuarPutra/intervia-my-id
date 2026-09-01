@@ -3888,7 +3888,7 @@ export default function ChatRoomPage() {
             ch,
             content,
             clientRef,
-            socketPayload as any,
+            socketPayload,
           );
           if (result.ok) {
             const resolved: Message = {
@@ -3902,8 +3902,8 @@ export default function ChatRoomPage() {
               created_at: result.sent_at,
               status: 'sent',
               reference:
-                ((result as any).reference as MessageReference | null | undefined) ??
-                ((result as any).reply_to as MessageReference | null | undefined) ??
+                result.reference ??
+                result.reply_to ??
                 options?.reference ??
                 null,
             };

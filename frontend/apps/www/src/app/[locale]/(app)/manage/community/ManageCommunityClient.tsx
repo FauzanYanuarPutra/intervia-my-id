@@ -112,6 +112,54 @@ type SummaryItem = {
   icon: LucideIcon;
 };
 
+type ManageCopy = Record<
+  | 'archive'
+  | 'archived'
+  | 'back'
+  | 'cancel'
+  | 'comments'
+  | 'community'
+  | 'createPost'
+  | 'createReel'
+  | 'delete'
+  | 'deleted'
+  | 'edit'
+  | 'editPost'
+  | 'editReel'
+  | 'emptyCommunity'
+  | 'emptyReels'
+  | 'failed'
+  | 'inactive'
+  | 'likes'
+  | 'listings'
+  | 'live'
+  | 'loadFailed'
+  | 'noSearch'
+  | 'open'
+  | 'otherTools'
+  | 'partialLoadFailed'
+  | 'postContent'
+  | 'posts'
+  | 'postTitle'
+  | 'reelCaption'
+  | 'reels'
+  | 'reelTag'
+  | 'reelTitle'
+  | 'refresh'
+  | 'replies'
+  | 'result'
+  | 'review'
+  | 'save'
+  | 'saved'
+  | 'searchPlaceholder'
+  | 'signIn'
+  | 'signInCta'
+  | 'subtitle'
+  | 'title'
+  | 'views',
+  string
+>;
+
 function formatDate(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
@@ -882,7 +930,7 @@ function CommunityRow({
   thread: ForumThread;
   locale: string;
   busy: boolean;
-  copy: any;
+  copy: ManageCopy;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -1016,7 +1064,7 @@ function ReelCard({
   reel: ReelItem;
   isId: boolean;
   busy: boolean;
-  copy: any;
+  copy: ManageCopy;
   onEdit: () => void;
   onArchive: () => void;
 }) {
@@ -1139,7 +1187,7 @@ function EditorModal({
 }: {
   editor: EditorState;
   busyId: string | null;
-  copy: any;
+  copy: ManageCopy;
   onClose: () => void;
   onChange: (value: EditorState) => void;
   onSaveThread: (event: FormEvent<HTMLFormElement>) => void;
@@ -1318,7 +1366,7 @@ function LabeledField({
   );
 }
 
-function statusPresentation(status: string, copy: any) {
+function statusPresentation(status: string, copy: ManageCopy) {
   const normalized = status.trim().toLowerCase();
   if (normalized === 'pending' || normalized === 'review') {
     return {

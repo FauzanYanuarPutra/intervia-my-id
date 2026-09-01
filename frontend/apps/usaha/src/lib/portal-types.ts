@@ -74,6 +74,8 @@ export type ProgressStep = { id: string; label: string; hint: string; done: bool
 
 export type BusinessRecord = {
   id: string;
+  version?: number;
+  capabilityKey?: string;
   slug: string;
   name: string;
   /** Additive during migration so old local fixtures remain type-compatible. */

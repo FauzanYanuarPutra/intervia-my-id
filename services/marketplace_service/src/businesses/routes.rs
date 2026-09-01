@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{user_id_from_auth, AppState};
 
 use super::{
-    domain::{ProvisionBusinessRequest, ReconcileBusinessRequest},
+    domain::{BusinessProfileUpdateRequest, ProvisionBusinessRequest, ReconcileBusinessRequest},
     identity_client::IdentityClient,
     repository::BusinessRepository,
     service::{BusinessService, BusinessServiceError},
@@ -24,7 +24,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/businesses/mine", get(list_mine))
         .route("/v1/businesses/provision", post(provision))
         .route("/v1/businesses/reconcile", post(reconcile))
-        .route("/v1/businesses/{business_id}", get(get_business))
+        .route(
+            "/v1/businesses/{business_id}",
+            get(get_business).patch(update_business),
+        )
 }
 
 async fn list_mine(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -53,6 +56,29 @@ async fn get_business(
         Err(error) => return actor_auth_error_response(error),
     };
     match service(&state).get(&authorization, business_id).await {
+        Ok(aggregate) => (
+            StatusCode::OK,
+            Json(json!({ "data": { "business": aggregate } })),
+        )
+            .into_response(),
+        Err(error) => error_response(error),
+    }
+}
+
+async fn update_business(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(business_id): Path<Uuid>,
+    Json(payload): Json<BusinessProfileUpdateRequest>,
+) -> Response {
+    let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
+        Ok(actor) => actor,
+        Err(error) => return actor_auth_error_response(error),
+    };
+    match service(&state)
+        .update_profile(actor_id, &authorization, business_id, payload)
+        .await
+    {
         Ok(aggregate) => (
             StatusCode::OK,
             Json(json!({ "data": { "business": aggregate } })),
@@ -188,6 +214,9 @@ fn error_response(error: BusinessServiceError) -> Response {
         BusinessServiceError::IdempotencyConflict => {
             api_error(StatusCode::CONFLICT, "idempotency_conflict")
         }
+        BusinessServiceError::VersionConflict => {
+            api_error(StatusCode::CONFLICT, "business_version_conflict")
+        }
         BusinessServiceError::OrganizationSelectionRequired => {
             api_error(StatusCode::CONFLICT, "organization_selection_required")
         }
@@ -219,5 +248,12 @@ mod tests {
             Err("invalid_idempotency_key")
         );
         assert!(parse_idempotency_key(Some("3d69acb2-aed8-4c48-b62d-30034e0440eb")).is_ok());
+    }
+
+    #[test]
+    fn optimistic_concurrency_conflicts_use_http_conflict() {
+        let response = error_response(BusinessServiceError::VersionConflict);
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 }

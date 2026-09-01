@@ -5,6 +5,13 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct OrganizationSummary {
     pub(crate) id: Uuid,
+    pub(crate) current_user_role: String,
+}
+
+impl OrganizationSummary {
+    pub(crate) fn can_manage_businesses(&self) -> bool {
+        self.current_user_role == "org_admin"
+    }
 }
 
 #[derive(Debug)]
@@ -120,7 +127,7 @@ mod tests {
 
     #[test]
     fn organization_list_parses_the_identity_envelope() {
-        let body = r#"{"data":{"count":1,"items":[{"id":"76b836f4-3032-433f-8ac7-04a88f1a8511","name":"Cuk","slug":"cuk","current_user_role":"organization_admin"}]}}"#;
+        let body = r#"{"data":{"count":1,"items":[{"id":"76b836f4-3032-433f-8ac7-04a88f1a8511","name":"Cuk","slug":"cuk","owner_user_id":"44444444-4444-4444-8444-444444444444","current_user_role":"org_admin"}]}}"#;
         let organizations = parse_organization_list(body).expect("identity response");
 
         assert_eq!(organizations.len(), 1);
@@ -128,5 +135,17 @@ mod tests {
             organizations[0].id,
             Uuid::parse_str("76b836f4-3032-433f-8ac7-04a88f1a8511").unwrap()
         );
+        assert_eq!(organizations[0].current_user_role, "org_admin");
+        assert!(organizations[0].can_manage_businesses());
+    }
+
+    #[test]
+    fn ordinary_organization_members_cannot_mutate_businesses() {
+        let member = OrganizationSummary {
+            id: Uuid::new_v4(),
+            current_user_role: "org_member".to_owned(),
+        };
+
+        assert!(!member.can_manage_businesses());
     }
 }

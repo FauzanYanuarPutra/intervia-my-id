@@ -34,7 +34,7 @@ export interface AuditLogEntry {
   userId: string;
   actorId?: string; // For impersonation
   eventType: AuditEventType;
-  eventData?: Record<string, any>;
+  eventData?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
   createdAt: string;
@@ -52,7 +52,7 @@ export async function logAuditEvent(
   eventType: AuditEventType,
   options?: {
     actorId?: string;
-    eventData?: Record<string, any>;
+    eventData?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
   }

@@ -17,8 +17,16 @@ type LinkLike = {
   hintEn: string;
 };
 
-function expectValidInternalLink(item: LinkLike) {
-  expect(item.href).toMatch(/^\/[a-z0-9/?=&%.-]+$/i);
+function expectValidActionLink(item: LinkLike) {
+  if (item.href.startsWith('/')) {
+    expect(item.href).toMatch(/^\/[a-z0-9/?=&%.-]+$/i);
+  } else {
+    const url = new URL(item.href);
+    expect(['http:', 'https:']).toContain(url.protocol);
+    expect(url.hostname).toBeTruthy();
+    expect(url.username).toBe('');
+    expect(url.password).toBe('');
+  }
   expect(item.href).not.toContain(' ');
   expect(item.href).not.toContain('undefined');
   expect(item.href).not.toContain('null');
@@ -40,7 +48,7 @@ describe('home launcher data', () => {
 
     for (const group of groups) {
       for (const item of group) {
-        expectValidInternalLink(item);
+        expectValidActionLink(item);
       }
     }
   });

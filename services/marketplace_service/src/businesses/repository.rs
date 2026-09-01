@@ -1,6 +1,6 @@
 use super::domain::{
     store_slug, BusinessAggregate, BusinessLocation, BusinessRecord, BusinessStore,
-    ValidatedProvisionCommand,
+    ValidatedBusinessProfileUpdate, ValidatedProvisionCommand,
 };
 use chrono::{DateTime, Utc};
 use serde_json::json;
@@ -12,6 +12,7 @@ use uuid::Uuid;
 pub(crate) enum RepositoryError {
     Database,
     IdempotencyConflict,
+    VersionConflict,
     IncompleteAggregate,
 }
 
@@ -242,6 +243,140 @@ impl BusinessRepository {
             Err(RepositoryError::IncompleteAggregate) => Ok(None),
             Err(error) => Err(error),
         }
+    }
+
+    pub(crate) async fn update_profile(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        command: &ValidatedBusinessProfileUpdate,
+    ) -> Result<BusinessAggregate, RepositoryError> {
+        let mut transaction = self.db.begin().await?;
+        let updated = sqlx::query(
+            r#"
+            UPDATE businesses
+            SET name = $1,
+                capability_key = $2,
+                version = version + 1,
+                updated_at = NOW()
+            WHERE id = $3
+              AND organization_id = $4
+              AND status <> 'archived'
+              AND version = $5
+            "#,
+        )
+        .bind(&command.name)
+        .bind(&command.capability_key)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(command.expected_version)
+        .execute(&mut *transaction)
+        .await?
+        .rows_affected();
+        if updated == 0 {
+            return Err(RepositoryError::VersionConflict);
+        }
+
+        let store_updated = sqlx::query(
+            r#"
+            UPDATE umkm_stores store
+            SET name = $1,
+                description = $2,
+                city = $3,
+                address = $4,
+                lat = $5,
+                lng = $6,
+                phone = $7,
+                metadata = COALESCE(store.metadata, '{}'::jsonb)
+                  || jsonb_build_object(
+                    'public',
+                    COALESCE(store.metadata->'public', '{}'::jsonb)
+                      || jsonb_build_object(
+                        'category', $8::text,
+                        'schedule', $9::text,
+                        'locationQuery', $10::text
+                      )
+                  ),
+                updated_at = NOW()
+            FROM business_store_links link
+            WHERE link.store_id = store.id
+              AND link.business_id = $11
+              AND link.link_type = 'primary'
+            "#,
+        )
+        .bind(&command.name)
+        .bind(&command.description)
+        .bind(&command.primary_location.city)
+        .bind(&command.primary_location.address)
+        .bind(command.primary_location.lat.unwrap_or(0.0))
+        .bind(command.primary_location.lng.unwrap_or(0.0))
+        .bind(&command.primary_location.phone)
+        .bind(&command.category)
+        .bind(&command.schedule)
+        .bind(&command.location_query)
+        .bind(business_id)
+        .execute(&mut *transaction)
+        .await?
+        .rows_affected();
+        if store_updated != 1 {
+            return Err(RepositoryError::IncompleteAggregate);
+        }
+
+        let location_updated = sqlx::query(
+            r#"
+            UPDATE business_locations
+            SET name = $1,
+                address = $2,
+                city = $3,
+                lat = $4,
+                lng = $5,
+                phone = $6,
+                whatsapp = $6,
+                public_visibility = $7,
+                updated_at = NOW()
+            WHERE business_id = $8 AND is_primary
+            "#,
+        )
+        .bind(&command.primary_location.name)
+        .bind(&command.primary_location.address)
+        .bind(&command.primary_location.city)
+        .bind(command.primary_location.lat)
+        .bind(command.primary_location.lng)
+        .bind(&command.primary_location.phone)
+        .bind(command.primary_location.public_visibility)
+        .bind(business_id)
+        .execute(&mut *transaction)
+        .await?
+        .rows_affected();
+        if location_updated != 1 {
+            return Err(RepositoryError::IncompleteAggregate);
+        }
+
+        let new_version = command.expected_version + 1;
+        sqlx::query(
+            r#"
+            INSERT INTO events.event_outbox (
+              aggregate_type, aggregate_id, event_type, payload, routing_key
+            ) VALUES ('business', $1, 'marketplace.business.profile_updated', $2,
+                      'marketplace.business.profile_updated')
+            "#,
+        )
+        .bind(business_id.to_string())
+        .bind(json!({
+            "event_version": 1,
+            "business_id": business_id,
+            "organization_id": organization_id,
+            "actor_user_id": actor_id,
+            "version": new_version
+        }))
+        .execute(&mut *transaction)
+        .await?;
+
+        let aggregate =
+            load_aggregate_in_transaction(&mut transaction, business_id, organization_id).await?;
+        transaction.commit().await?;
+        Ok(aggregate)
     }
 
     pub(crate) async fn list_unlinked_for_actor(

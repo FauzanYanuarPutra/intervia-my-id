@@ -2,7 +2,10 @@
 
 import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { useChatInbox } from '@/context/ChatInboxContext';
+import {
+  useChatInbox,
+  type InboxRoom,
+} from '@/context/ChatInboxContext';
 import { MessageCircle, ChevronRight, Loader2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 
@@ -17,14 +20,14 @@ function normalizeRoomId(raw: unknown): string {
   }
 }
 
-function getLatestRoom(rooms: unknown[]) {
-  const rows = [...rooms] as any[];
+function getLatestRoom(rooms: InboxRoom[]): InboxRoom | undefined {
+  const rows = [...rooms];
   rows.sort((a, b) => {
     const aTime = new Date(a?.last_message_at ?? 0).getTime();
     const bTime = new Date(b?.last_message_at ?? 0).getTime();
     return bTime - aTime;
   });
-  return rows[0] as any | undefined;
+  return rows[0];
 }
 
 export default function ChatIndexPage() {

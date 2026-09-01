@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
+import { LajukanImage } from '@/components/common/LajukanImage';
 import {
   ArrowRight,
   Clapperboard,
@@ -32,6 +33,12 @@ type ReelItem = {
     phone?: string | null;
     storefrontPath: string;
   };
+};
+
+type FeedState = {
+  requestSearch: string;
+  status: 'loading' | 'ready';
+  items: ReelItem[];
 };
 
 function getReelFilterCss(filterPreset?: ReelItem['filterPreset']) {
@@ -64,14 +71,43 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [query, setQuery] = useState(searchParams.get('q') || '');
-  const [city, setCity] = useState(searchParams.get('city') || '');
-  const [items, setItems] = useState<ReelItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const search = searchParams.toString();
   const requestSearch = search ? `${search}&limit=18` : 'limit=18';
   const storeHint = searchParams.get('store') || '';
+  const urlQuery = searchParams.get('q') || '';
+  const urlCity = searchParams.get('city') || '';
+  const [filterDraft, setFilterDraft] = useState({
+    source: search,
+    query: urlQuery,
+    city: urlCity,
+  });
+  const query = filterDraft.source === search ? filterDraft.query : urlQuery;
+  const city = filterDraft.source === search ? filterDraft.city : urlCity;
+  const setQuery = (value: string) => {
+    setFilterDraft(current => ({
+      source: search,
+      query: value,
+      city: current.source === search ? current.city : urlCity,
+    }));
+  };
+  const setCity = (value: string) => {
+    setFilterDraft(current => ({
+      source: search,
+      query: current.source === search ? current.query : urlQuery,
+      city: value,
+    }));
+  };
+  const [feedState, setFeedState] = useState<FeedState>({
+    requestSearch,
+    status: 'loading',
+    items: [],
+  });
+  const activeFeed =
+    feedState.requestSearch === requestSearch
+      ? feedState
+      : { requestSearch, status: 'loading' as const, items: [] };
+  const items = activeFeed.items;
+  const loading = activeFeed.status === 'loading';
 
   const quickLinks = [
     {
@@ -93,24 +129,23 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   ];
 
   useEffect(() => {
-    setQuery(searchParams.get('q') || '');
-    setCity(searchParams.get('city') || '');
-  }, [searchParams]);
-
-  useEffect(() => {
     let alive = true;
-    setLoading(true);
 
     fetch(`/api/reels/feed?${requestSearch}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(payload => {
-        if (alive) setItems(payload.data || []);
+        if (alive) {
+          setFeedState({
+            requestSearch,
+            status: 'ready',
+            items: Array.isArray(payload.data) ? payload.data : [],
+          });
+        }
       })
       .catch(() => {
-        if (alive) setItems([]);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
+        if (alive) {
+          setFeedState({ requestSearch, status: 'ready', items: [] });
+        }
       });
 
     return () => {
@@ -282,12 +317,13 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
                           preload="metadata"
                         />
                       ) : (
-                        <img
+                        <LajukanImage
                           src={item.mediaUrl}
                           alt={item.title}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                          className="object-cover transition duration-300 group-hover:scale-[1.01]"
                           style={filter === 'none' ? undefined : { filter }}
-                          loading="lazy"
                         />
                       )}
 

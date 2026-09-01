@@ -32,9 +32,9 @@ function normalizeRoles(rolesRaw: unknown): string[] {
 function getUserIdFromPayload(payload: JWTPayload): string | undefined {
   const candidates: unknown[] = [
     payload.sub,
-    (payload as any).user_id,
-    (payload as any).userId,
-    (payload as any).id,
+    payload.user_id,
+    payload.userId,
+    payload.id,
   ];
 
   for (const c of candidates) {
@@ -47,9 +47,9 @@ function getUserIdFromPayload(payload: JWTPayload): string | undefined {
 
 function getEmailFromPayload(payload: JWTPayload): string | undefined {
   const candidates: unknown[] = [
-    (payload as any).email,
-    (payload as any).user_email,
-    (payload as any).preferred_username,
+    payload.email,
+    payload.user_email,
+    payload.preferred_username,
   ];
 
   for (const candidate of candidates) {
@@ -101,7 +101,7 @@ export async function requireAuth(req: NextRequest): Promise<AuthGuardResult> {
       };
     }
 
-    const roles = normalizeRoles((payload as any).roles);
+    const roles = normalizeRoles(payload.roles);
     const email = getEmailFromPayload(payload);
 
     return {
@@ -114,7 +114,7 @@ export async function requireAuth(req: NextRequest): Promise<AuthGuardResult> {
         payload,
       },
     };
-  } catch (e) {
+  } catch {
     return {
       ok: false,
       res: NextResponse.json(

@@ -71,7 +71,10 @@ export default function CreateDraftsClient() {
 
   useEffect(() => {
     if (authLoading || !draftOwnerId) return;
-    setLocalDraft(readTemporaryCreateDraft(draftOwnerId));
+    const timeoutId = window.setTimeout(() => {
+      setLocalDraft(readTemporaryCreateDraft(draftOwnerId));
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [authLoading, draftOwnerId]);
 
   useEffect(() => {

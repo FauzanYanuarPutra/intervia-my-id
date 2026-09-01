@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateBusiness } from '@/lib/business-server';
+import { normalizeBusinessApiError } from '@/lib/business-api-error';
 
 function readNumber(value: unknown): number | null {
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -24,6 +25,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ busin
     });
     return NextResponse.json({ ok: true, business });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal simpan perubahan.' }, { status: 400 });
+    const normalized = normalizeBusinessApiError(error, 'Gagal simpan perubahan.');
+    return NextResponse.json(
+      { error: normalized.message, code: normalized.code },
+      { status: normalized.status },
+    );
   }
 }

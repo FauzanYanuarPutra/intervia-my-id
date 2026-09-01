@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBusinessForCurrentActor, replaceBusinessLocations } from '@/lib/business-server';
 import type { BusinessLocation } from '@/lib/portal-types';
+import { normalizeBusinessApiError } from '@/lib/business-api-error';
 
 export async function GET(_request: Request, context: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await context.params;
@@ -19,6 +20,10 @@ export async function PUT(request: Request, context: { params: Promise<{ busines
     const business = await replaceBusinessLocations(businessId, locations);
     return NextResponse.json({ ok: true, items: business.locations ?? [] });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Lokasi belum berhasil disimpan.' }, { status: 400 });
+    const normalized = normalizeBusinessApiError(error, 'Lokasi belum berhasil disimpan.');
+    return NextResponse.json(
+      { error: normalized.message, code: normalized.code },
+      { status: normalized.status },
+    );
   }
 }

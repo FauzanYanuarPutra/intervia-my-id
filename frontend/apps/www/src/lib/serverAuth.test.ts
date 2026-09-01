@@ -1,23 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { SignJWT } from 'jose';
+import { NextRequest } from 'next/server';
 import { requireAuth } from './serverAuth';
 
 function makeReq(opts: { bearer?: string; cookie?: string } = {}) {
   const headers = new Headers();
   if (opts.bearer) headers.set('authorization', `Bearer ${opts.bearer}`);
 
-  const cookieMap = new Map<string, string>();
-  if (opts.cookie) cookieMap.set('access_token', opts.cookie);
-
-  return {
-    headers,
-    cookies: {
-      get: (name: string) => {
-        const v = cookieMap.get(name);
-        return v ? ({ value: v } as any) : undefined;
-      },
-    },
-  } as any;
+  if (opts.cookie) headers.set('cookie', `access_token=${opts.cookie}`);
+  return new NextRequest('http://localhost/api/test', { headers });
 }
 
 const ENV_SNAPSHOT = { ...process.env };

@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDurableMarketplaceStore } from './business-workspace';
-import { createUmkmStore } from './umkm-commerce';
+import {
+  createUmkmStore,
+  getUmkmStoreBySlug,
+  listUmkmProducts,
+  listUmkmStores,
+} from './umkm-commerce';
 
 const IDEMPOTENCY_KEY = '33333333-3333-4333-8333-333333333333';
 const ORGANIZATION_ID = '11111111-1111-4111-8111-111111111111';
@@ -71,5 +76,61 @@ describe('persistent WWW store provisioning', () => {
         lng: 106.8,
       }),
     ).rejects.toThrow('marketplace_persistence_unavailable');
+  });
+
+  it('surfaces Marketplace read outages instead of rendering an empty public catalog', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(
+        jsonResponse({ error: 'marketplace_unavailable' }, 503),
+      ),
+    );
+
+    await expect(listUmkmStores({ backendOnly: true })).rejects.toThrow(
+      'marketplace_unavailable',
+    );
+  });
+
+  it('rejects malformed Marketplace catalog responses instead of using runtime data', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ data: {} })),
+    );
+
+    await expect(listUmkmStores({ backendOnly: true })).rejects.toThrow(
+      'marketplace_invalid_response',
+    );
+  });
+
+  it('rejects a malformed Marketplace store detail instead of consulting another source', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ data: {} })),
+    );
+
+    await expect(getUmkmStoreBySlug('warung-cuk')).rejects.toThrow(
+      'marketplace_invalid_response',
+    );
+  });
+
+  it('rejects a malformed Marketplace product list instead of using runtime products', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ data: {} })),
+    );
+
+    await expect(
+      listUmkmProducts({ storeId: STORE_ID, includeUnavailable: false }),
+    ).rejects.toThrow('marketplace_invalid_response');
+  });
+
+  it('treats a Marketplace detail 404 as authoritative', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse({ error: 'store_not_found' }, 404));
+    vi.stubGlobal('fetch', fetchImpl);
+
+    await expect(getUmkmStoreBySlug('tidak-ada')).resolves.toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,7 +7,7 @@ declare module 'next-pwa' {
     skipWaiting?: boolean;
     disable?: boolean;
     sw?: string;
-    fallbacks?: Record<string, any>;
+    fallbacks?: Record<string, unknown>;
     scope?: string;
     // bisa tambah opsi lain jika perlu
   }

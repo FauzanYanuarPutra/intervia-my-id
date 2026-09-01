@@ -38,6 +38,21 @@
   ::selection {
     background: rgba(23, 97, 61, 0.16);
   }
+
+  :focus-visible {
+    scroll-margin-block: 5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
@@ -87,5 +102,9 @@
 
   .portal-button-ghost {
     @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[12px] px-3 py-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20;
+  }
+
+  .portal-skip-link {
+    @apply fixed left-4 top-3 z-[100] -translate-y-20 rounded-xl bg-portal-forest px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-portal-forest;
   }
 }

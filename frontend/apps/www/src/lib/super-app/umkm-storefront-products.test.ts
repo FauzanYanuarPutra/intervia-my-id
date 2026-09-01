@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { UmkmProduct } from './umkm-commerce';
 import {
   isStorefrontProductInStock,
+  loadStorefrontCatalog,
   selectPublishedStorefrontProducts,
 } from './umkm-storefront-products';
 
@@ -51,5 +52,20 @@ describe('public UMKM storefront products', () => {
     expect(
       isStorefrontProductInStock(buildProduct('available', { stock_qty: 3 })),
     ).toBe(true);
+  });
+
+  it('distinguishes an unavailable catalog from a genuinely empty catalog', async () => {
+    const result = await loadStorefrontCatalog(async () => {
+      throw new Error('marketplace_read_unavailable');
+    });
+
+    expect(result).toEqual({ status: 'unavailable', products: [] });
+  });
+
+  it('marks a successful empty response as ready', async () => {
+    await expect(loadStorefrontCatalog(async () => [])).resolves.toEqual({
+      status: 'ready',
+      products: [],
+    });
   });
 });

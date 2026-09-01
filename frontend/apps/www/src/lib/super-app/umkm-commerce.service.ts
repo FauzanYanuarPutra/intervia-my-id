@@ -2,10 +2,7 @@ import crypto from 'node:crypto';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 import {
   getUsahaPortalUmkmStoreById,
-  getUsahaPortalUmkmStoreBySlug,
   isUsahaPortalStore,
-  listUsahaPortalProductsByStoreId,
-  listUsahaPortalUmkmStores,
 } from '@/lib/server/usahaPortalSync';
 import {
   DEFAULT_ONLINE_SERVICE_FEE_CENTS,
@@ -24,7 +21,6 @@ import {
   findStoreMemberRecordById,
   findStoreMemberRecordByActor,
   findStoreRecordById,
-  findStoreRecordBySlug,
   findTableRecordById,
   findTableRecordByStoreAndCode,
   hasOpenOrderForTable,
@@ -171,23 +167,40 @@ function cacheRuntimeProduct(product: UmkmProduct): void {
   insertProductRecord(cloneProduct(product));
 }
 
-async function fetchMarketplaceReadJson<T>(path: string): Promise<T | undefined> {
+type MarketplaceReadResult<T> =
+  | { kind: 'found'; payload: T }
+  | { kind: 'not_found' };
+
+async function fetchMarketplaceReadJson<T>(
+  path: string,
+): Promise<MarketplaceReadResult<T>> {
+  let response: Response;
   try {
-    const response = await fetch(`${MARKETPLACE_URL}${path}`, {
+    response = await fetch(`${MARKETPLACE_URL}${path}`, {
       cache: 'no-store',
       headers: {
         Accept: 'application/json',
       },
     });
-
-    if (!response.ok) {
-      return undefined;
-    }
-
-    return (await response.json().catch(() => undefined)) as T | undefined;
   } catch {
-    return undefined;
+    throw new Error('marketplace_read_unavailable');
   }
+
+  if (!response.ok) {
+    if (response.status === 404) return { kind: 'not_found' };
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(payload.error || 'marketplace_read_unavailable');
+  }
+
+  const payload = (await response.json().catch(() => undefined)) as
+    | T
+    | undefined;
+  if (payload === undefined) {
+    throw new Error('marketplace_invalid_response');
+  }
+  return { kind: 'found', payload };
 }
 
 async function fetchMarketplaceWriteJson<T>(
@@ -222,7 +235,7 @@ async function fetchMarketplaceWriteJson<T>(
 
 async function fetchMarketplaceStoreList(
   options?: ListUmkmStoresOptions,
-): Promise<UmkmStore[] | undefined> {
+): Promise<UmkmStore[]> {
   const params = new URLSearchParams();
   if (options?.query?.trim()) params.set('q', options.query.trim());
   if (options?.city?.trim()) params.set('city', options.city.trim());
@@ -242,12 +255,15 @@ async function fetchMarketplaceStoreList(
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
-  const payload = await fetchMarketplaceReadJson<MarketplaceStoreListResponse>(
+  const result = await fetchMarketplaceReadJson<MarketplaceStoreListResponse>(
     `/v1/umkm/stores${suffix}`,
   );
-  const items = payload?.data?.items;
+  if (result.kind === 'not_found') {
+    throw new Error('marketplace_read_unavailable');
+  }
+  const items = result.payload?.data?.items;
   if (!Array.isArray(items)) {
-    return undefined;
+    throw new Error('marketplace_invalid_response');
   }
 
   return items.map(cloneStore);
@@ -255,13 +271,15 @@ async function fetchMarketplaceStoreList(
 
 async function fetchMarketplaceStoreByRef(
   storeRef: string,
-): Promise<UmkmStore | undefined> {
-  const payload = await fetchMarketplaceReadJson<MarketplaceStoreResponse>(
+): Promise<UmkmStore | null> {
+  const result = await fetchMarketplaceReadJson<MarketplaceStoreResponse>(
     `/v1/umkm/stores/${encodeURIComponent(storeRef)}`,
   );
-  const store = payload?.data?.store;
+  if (result.kind === 'not_found') return null;
+
+  const store = result.payload?.data?.store;
   if (!store) {
-    return undefined;
+    throw new Error('marketplace_invalid_response');
   }
 
   cacheRuntimeStore(store);
@@ -270,19 +288,21 @@ async function fetchMarketplaceStoreByRef(
 
 async function fetchMarketplaceProducts(
   options: ListUmkmProductsOptions,
-): Promise<UmkmProduct[] | undefined> {
+): Promise<UmkmProduct[]> {
   const params = new URLSearchParams();
   if (options.channel) params.set('channel', options.channel);
   if (options.includeUnavailable) params.set('include_unavailable', 'true');
   if (options.limit) params.set('limit', String(options.limit));
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
-  const payload = await fetchMarketplaceReadJson<MarketplaceProductListResponse>(
+  const result = await fetchMarketplaceReadJson<MarketplaceProductListResponse>(
     `/v1/umkm/stores/${encodeURIComponent(options.storeId)}/products${suffix}`,
   );
-  const items = payload?.data?.items;
+  if (result.kind === 'not_found') return [];
+
+  const items = result.payload?.data?.items;
   if (!Array.isArray(items)) {
-    return undefined;
+    throw new Error('marketplace_invalid_response');
   }
 
   items.forEach(cacheRuntimeProduct);
@@ -436,36 +456,7 @@ export function __resetUmkmCommerceRuntime(): void {
 }
 
 export async function listUmkmStores(options?: ListUmkmStoresOptions): Promise<UmkmStore[]> {
-  const backendStores = await fetchMarketplaceStoreList(options);
-  if (backendStores) {
-    return backendStores;
-  }
-  if (options?.backendOnly) {
-    return [];
-  }
-
-  const runtimeStores = listStoreRecords(options).map(cloneStore);
-  const portalStores = await listUsahaPortalUmkmStores({
-    query: options?.query,
-    city: options?.city,
-    slug: options?.slug,
-    limit: options?.limit,
-  });
-
-  const merged = [...runtimeStores];
-  for (const portalStore of portalStores) {
-    if (
-      merged.some(
-        runtimeStore =>
-          runtimeStore.id === portalStore.id || runtimeStore.slug === portalStore.slug,
-      )
-    ) {
-      continue;
-    }
-    merged.push(portalStore);
-  }
-
-  return merged;
+  return fetchMarketplaceStoreList(options);
 }
 
 export async function listUmkmStoresForActor(input: {
@@ -525,21 +516,11 @@ export async function listUmkmStoresForActor(input: {
 }
 
 export async function getUmkmStoreById(storeId: string): Promise<UmkmStore | null> {
-  const backendStore = await fetchMarketplaceStoreByRef(storeId);
-  if (backendStore) return backendStore;
-
-  const store = findStoreRecordById(storeId);
-  if (store) return cloneStore(store);
-  return getUsahaPortalUmkmStoreById(storeId);
+  return fetchMarketplaceStoreByRef(storeId);
 }
 
 export async function getUmkmStoreBySlug(slug: string): Promise<UmkmStore | null> {
-  const backendStore = await fetchMarketplaceStoreByRef(slug);
-  if (backendStore) return backendStore;
-
-  const store = findStoreRecordBySlug(slug);
-  if (store) return cloneStore(store);
-  return getUsahaPortalUmkmStoreBySlug(slug);
+  return fetchMarketplaceStoreByRef(slug);
 }
 
 export async function createUmkmStore(input: CreateUmkmStoreInput): Promise<UmkmStore> {
@@ -636,22 +617,7 @@ export async function createUmkmStore(input: CreateUmkmStoreInput): Promise<Umkm
 }
 
 export async function listUmkmProducts(options: ListUmkmProductsOptions): Promise<UmkmProduct[]> {
-  const backendItems = await fetchMarketplaceProducts(options);
-  if (backendItems) {
-    return backendItems;
-  }
-
-  const items = listProductRecords(options).map(cloneProduct);
-  if (items.length > 0) {
-    return items;
-  }
-
-  const portalStore = await getUsahaPortalUmkmStoreById(options.storeId);
-  if (!isUsahaPortalStore(portalStore)) {
-    return items;
-  }
-
-  return listUsahaPortalProductsByStoreId(options.storeId);
+  return fetchMarketplaceProducts(options);
 }
 
 export async function listUmkmStoreMembers(

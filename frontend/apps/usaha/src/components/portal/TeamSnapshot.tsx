@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { BellDot, ShieldCheck, Users } from 'lucide-react';
-import { roleSummaryMap } from '@/lib/portal-data';
+import { roleSummaryMap } from '@/lib/portal-access';
 import type { BusinessRecord } from '@/lib/portal-types';
 
 type TeamSnapshotProps = {
