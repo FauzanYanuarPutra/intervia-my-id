@@ -1,17 +1,45 @@
-use serde::Deserialize;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-#[derive(Debug, Clone, Deserialize)]
+const MAX_PRODUCT_NAME_LEN: usize = 160;
+const MAX_CATEGORY_LEN: usize = 120;
+const MAX_PRICE_LABEL_LEN: usize = 80;
+const MAX_STOCK_UNIT_LEN: usize = 40;
+const MAX_OWNER_LABEL_LEN: usize = 160;
+const MAX_CONSIGNMENT_TERMS_LEN: usize = 1_000;
+const MAX_NOTES_LEN: usize = 2_000;
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ProductSourceType {
     Owned,
     Consignment,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+impl ProductSourceType {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Owned => "owned",
+            Self::Consignment => "consignment",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ProductStockMode {
     Manual,
     Estimated,
+}
+
+impl ProductStockMode {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Estimated => "estimated",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -29,14 +57,144 @@ pub(crate) struct CreateBusinessProductRequest {
     pub(crate) notes: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ValidatedCreateBusinessProduct {
+    pub(crate) name: String,
+    pub(crate) category: String,
+    pub(crate) price_label: String,
+    pub(crate) source_type: ProductSourceType,
+    pub(crate) owner_label: Option<String>,
+    pub(crate) stock_count: Option<f64>,
+    pub(crate) stock_unit: String,
+    pub(crate) min_stock_alert: Option<f64>,
+    pub(crate) stock_mode: ProductStockMode,
+    pub(crate) consignment_terms: Option<String>,
+    pub(crate) notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct BusinessProduct {
+    pub(crate) id: Uuid,
+    pub(crate) name: String,
+    pub(crate) category: String,
+    pub(crate) price_label: String,
+    pub(crate) status: String,
+    pub(crate) source_type: String,
+    pub(crate) owner_label: Option<String>,
+    pub(crate) stock_count: Option<f64>,
+    pub(crate) stock_unit: String,
+    pub(crate) min_stock_alert: Option<f64>,
+    pub(crate) stock_mode: String,
+    pub(crate) stock_health: String,
+    pub(crate) stock_updated_at: DateTime<Utc>,
+    pub(crate) consignment_terms: Option<String>,
+    pub(crate) notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProductValidationError {
+    InvalidName,
+    InvalidCategory,
+    InvalidPriceLabel,
+    InvalidOwnerLabel,
+    InvalidStockCount,
+    InvalidStockUnit,
+    InvalidMinimumStock,
+    InvalidConsignmentTerms,
+    InvalidNotes,
+}
+
+impl ProductValidationError {
+    pub(crate) const fn code(self) -> &'static str {
+        match self {
+            Self::InvalidName => "invalid_product_name",
+            Self::InvalidCategory => "invalid_product_category",
+            Self::InvalidPriceLabel => "invalid_product_price_label",
+            Self::InvalidOwnerLabel => "invalid_product_owner_label",
+            Self::InvalidStockCount => "invalid_product_stock_count",
+            Self::InvalidStockUnit => "invalid_product_stock_unit",
+            Self::InvalidMinimumStock => "invalid_product_min_stock_alert",
+            Self::InvalidConsignmentTerms => "invalid_product_consignment_terms",
+            Self::InvalidNotes => "invalid_product_notes",
+        }
+    }
+}
+
+pub(crate) fn validate_create_request(
+    request: CreateBusinessProductRequest,
+) -> Result<ValidatedCreateBusinessProduct, ProductValidationError> {
+    let name = normalize_required(request.name, 2, MAX_PRODUCT_NAME_LEN)
+        .ok_or(ProductValidationError::InvalidName)?;
+    let category = normalize_required(request.category, 1, MAX_CATEGORY_LEN)
+        .ok_or(ProductValidationError::InvalidCategory)?;
+    let price_label = normalize_required(request.price_label, 1, MAX_PRICE_LABEL_LEN)
+        .ok_or(ProductValidationError::InvalidPriceLabel)?;
+    let owner_label = normalize_optional(request.owner_label, MAX_OWNER_LABEL_LEN)
+        .ok_or(ProductValidationError::InvalidOwnerLabel)?;
+    validate_non_negative_finite(request.stock_count)
+        .ok_or(ProductValidationError::InvalidStockCount)?;
+    let stock_unit = normalize_required(request.stock_unit, 1, MAX_STOCK_UNIT_LEN)
+        .ok_or(ProductValidationError::InvalidStockUnit)?;
+    validate_non_negative_finite(request.min_stock_alert)
+        .ok_or(ProductValidationError::InvalidMinimumStock)?;
+    let consignment_terms = normalize_optional(request.consignment_terms, MAX_CONSIGNMENT_TERMS_LEN)
+        .ok_or(ProductValidationError::InvalidConsignmentTerms)?;
+    let notes = normalize_optional(request.notes, MAX_NOTES_LEN)
+        .ok_or(ProductValidationError::InvalidNotes)?;
+
+    Ok(ValidatedCreateBusinessProduct {
+        name,
+        category,
+        price_label,
+        source_type: request.source_type,
+        owner_label,
+        stock_count: request.stock_count,
+        stock_unit,
+        min_stock_alert: request.min_stock_alert,
+        stock_mode: request.stock_mode,
+        consignment_terms,
+        notes,
+    })
+}
+
+pub(crate) fn stock_health(stock: Option<f64>, minimum: Option<f64>) -> &'static str {
+    match stock {
+        None => "perlu-cocokkan",
+        Some(value) if value <= 0.0 => "habis",
+        Some(value) if minimum.is_some_and(|minimum| value < minimum) => "tipis",
+        Some(_) => "aman",
+    }
+}
+
+fn normalize_required(value: String, min_len: usize, max_len: usize) -> Option<String> {
+    let normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    let len = normalized.chars().count();
+    (len >= min_len && len <= max_len).then_some(normalized)
+}
+
+fn normalize_optional(value: Option<String>, max_len: usize) -> Option<Option<String>> {
+    match value {
+        None => Some(None),
+        Some(value) if value.trim().is_empty() => Some(None),
+        Some(value) => normalize_required(value, 1, max_len).map(Some),
+    }
+}
+
+fn validate_non_negative_finite(value: Option<f64>) -> Option<()> {
+    match value {
+        None => Some(()),
+        Some(value) if value.is_finite() && value >= 0.0 => Some(()),
+        Some(_) => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn product_name_requires_two_trimmed_characters() {
-        assert!(validate_create_request(CreateBusinessProductRequest {
-            name: " a ".to_owned(),
+    fn valid_request() -> CreateBusinessProductRequest {
+        CreateBusinessProductRequest {
+            name: "Jus mangga".to_owned(),
             category: "Minuman".to_owned(),
             price_label: "Rp10.000".to_owned(),
             source_type: ProductSourceType::Owned,
@@ -47,28 +205,50 @@ mod tests {
             stock_mode: ProductStockMode::Manual,
             consignment_terms: None,
             notes: None,
-        })
-        .is_err());
+        }
+    }
+
+    #[test]
+    fn product_name_requires_two_trimmed_characters() {
+        let mut request = valid_request();
+        request.name = " a ".to_owned();
+
+        assert_eq!(
+            validate_create_request(request).unwrap_err(),
+            ProductValidationError::InvalidName
+        );
     }
 
     #[test]
     fn stock_values_must_be_finite_and_non_negative() {
         for stock_count in [Some(-1.0), Some(f64::NAN), Some(f64::INFINITY)] {
-            assert!(validate_create_request(CreateBusinessProductRequest {
-                name: "Jus mangga".to_owned(),
-                category: "Minuman".to_owned(),
-                price_label: "Rp10.000".to_owned(),
-                source_type: ProductSourceType::Owned,
-                owner_label: None,
-                stock_count,
-                stock_unit: "cup".to_owned(),
-                min_stock_alert: Some(2.0),
-                stock_mode: ProductStockMode::Manual,
-                consignment_terms: None,
-                notes: None,
-            })
-            .is_err());
+            let mut request = valid_request();
+            request.stock_count = stock_count;
+            assert_eq!(
+                validate_create_request(request).unwrap_err(),
+                ProductValidationError::InvalidStockCount
+            );
         }
+
+        for minimum in [Some(-1.0), Some(f64::NAN), Some(f64::INFINITY)] {
+            let mut request = valid_request();
+            request.min_stock_alert = minimum;
+            assert_eq!(
+                validate_create_request(request).unwrap_err(),
+                ProductValidationError::InvalidMinimumStock
+            );
+        }
+    }
+
+    #[test]
+    fn product_request_is_normalized() {
+        let mut request = valid_request();
+        request.name = "  Jus   mangga  ".to_owned();
+        request.owner_label = Some("  Mitra   A  ".to_owned());
+        let validated = validate_create_request(request).unwrap();
+
+        assert_eq!(validated.name, "Jus mangga");
+        assert_eq!(validated.owner_label.as_deref(), Some("Mitra A"));
     }
 
     #[test]
