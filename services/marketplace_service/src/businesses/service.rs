@@ -5,6 +5,10 @@ use super::{
         ReconcileBusinessRequest, ValidationError,
     },
     identity_client::{IdentityClient, IdentityClientError, OrganizationSummary},
+    products::{
+        validate_create_request, BusinessProduct, CreateBusinessProductRequest, ProductRepository,
+        ProductRepositoryError, ProductValidationError,
+    },
     repository::{BusinessRepository, ProvisionOutcome, RepositoryError},
 };
 use sha2::{Digest, Sha256};
@@ -13,6 +17,7 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub(crate) enum BusinessServiceError {
     Validation(ValidationError),
+    ProductValidation(ProductValidationError),
     IdentityUnavailable,
     AccessDenied,
     IdempotencyConflict,
@@ -26,13 +31,19 @@ pub(crate) enum BusinessServiceError {
 #[derive(Clone)]
 pub(crate) struct BusinessService {
     repository: BusinessRepository,
+    product_repository: ProductRepository,
     identity: IdentityClient,
 }
 
 impl BusinessService {
-    pub(crate) fn new(repository: BusinessRepository, identity: IdentityClient) -> Self {
+    pub(crate) fn new(
+        repository: BusinessRepository,
+        product_repository: ProductRepository,
+        identity: IdentityClient,
+    ) -> Self {
         Self {
             repository,
+            product_repository,
             identity,
         }
     }
@@ -110,6 +121,42 @@ impl BusinessService {
                 .await
                 .map_err(map_repository_error);
         }
+        Err(BusinessServiceError::NotFound)
+    }
+
+    pub(crate) async fn create_product(
+        &self,
+        actor_id: Uuid,
+        authorization: &str,
+        business_id: Uuid,
+        request: CreateBusinessProductRequest,
+    ) -> Result<BusinessProduct, BusinessServiceError> {
+        let command =
+            validate_create_request(request).map_err(BusinessServiceError::ProductValidation)?;
+        let organizations = self
+            .identity
+            .list_organizations(authorization)
+            .await
+            .map_err(map_identity_error)?;
+
+        for organization in &organizations {
+            let existing = self
+                .repository
+                .get_for_organization(business_id, organization.id)
+                .await
+                .map_err(map_repository_error)?;
+            if existing.is_none() {
+                continue;
+            }
+            let managing = management_organization(&organizations, organization.id)
+                .ok_or(BusinessServiceError::AccessDenied)?;
+            return self
+                .product_repository
+                .create(actor_id, business_id, managing.id, &command)
+                .await
+                .map_err(map_product_repository_error);
+        }
+
         Err(BusinessServiceError::NotFound)
     }
 
@@ -279,6 +326,13 @@ fn map_repository_error(error: RepositoryError) -> BusinessServiceError {
         RepositoryError::Database | RepositoryError::IncompleteAggregate => {
             BusinessServiceError::Storage
         }
+    }
+}
+
+fn map_product_repository_error(error: ProductRepositoryError) -> BusinessServiceError {
+    match error {
+        ProductRepositoryError::BusinessNotFound => BusinessServiceError::NotFound,
+        ProductRepositoryError::Database => BusinessServiceError::Storage,
     }
 }
 

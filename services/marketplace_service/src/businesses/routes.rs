@@ -15,6 +15,7 @@ use crate::{user_id_from_auth, AppState};
 use super::{
     domain::{BusinessProfileUpdateRequest, ProvisionBusinessRequest, ReconcileBusinessRequest},
     identity_client::IdentityClient,
+    products::{CreateBusinessProductRequest, ProductRepository},
     repository::BusinessRepository,
     service::{BusinessService, BusinessServiceError},
 };
@@ -27,6 +28,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route(
             "/v1/businesses/{business_id}",
             get(get_business).patch(update_business),
+        )
+        .route(
+            "/v1/businesses/{business_id}/products",
+            post(create_product),
         )
 }
 
@@ -82,6 +87,29 @@ async fn update_business(
         Ok(aggregate) => (
             StatusCode::OK,
             Json(json!({ "data": { "business": aggregate } })),
+        )
+            .into_response(),
+        Err(error) => error_response(error),
+    }
+}
+
+async fn create_product(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(business_id): Path<Uuid>,
+    Json(payload): Json<CreateBusinessProductRequest>,
+) -> Response {
+    let (actor_id, authorization) = match actor_and_authorization(&state, &headers) {
+        Ok(actor) => actor,
+        Err(error) => return actor_auth_error_response(error),
+    };
+    match service(&state)
+        .create_product(actor_id, &authorization, business_id, payload)
+        .await
+    {
+        Ok(product) => (
+            StatusCode::CREATED,
+            Json(json!({ "data": { "product": product } })),
         )
             .into_response(),
         Err(error) => error_response(error),
@@ -165,6 +193,7 @@ async fn reconcile(
 fn service(state: &AppState) -> BusinessService {
     BusinessService::new(
         BusinessRepository::new(state.db.clone()),
+        ProductRepository::new(state.db.clone()),
         IdentityClient::new(
             state.http_client.clone(),
             state.identity_service_url.clone(),
@@ -207,6 +236,9 @@ fn parse_idempotency_key(value: Option<&str>) -> Result<Uuid, &'static str> {
 fn error_response(error: BusinessServiceError) -> Response {
     match error {
         BusinessServiceError::Validation(error) => api_error(StatusCode::BAD_REQUEST, error.code()),
+        BusinessServiceError::ProductValidation(error) => {
+            api_error(StatusCode::BAD_REQUEST, error.code())
+        }
         BusinessServiceError::AccessDenied => {
             api_error(StatusCode::FORBIDDEN, "business_access_denied")
         }
@@ -255,5 +287,14 @@ mod tests {
         let response = error_response(BusinessServiceError::VersionConflict);
 
         assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn product_validation_errors_use_stable_bad_request_responses() {
+        let response = error_response(BusinessServiceError::ProductValidation(
+            super::super::products::ProductValidationError::InvalidName,
+        ));
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }
