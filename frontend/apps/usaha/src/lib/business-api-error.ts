@@ -11,6 +11,15 @@ const messages: Record<string, string> = {
   business_version_conflict: 'Data usaha sudah berubah. Muat ulang lalu simpan kembali.',
   identity_unavailable: 'Layanan akun sedang tidak tersedia. Coba lagi sebentar.',
   provisioning_retryable: 'Layanan usaha sedang sibuk. Coba lagi sebentar.',
+  invalid_product_name: 'Nama produk minimal dua karakter.',
+  invalid_product_category: 'Pilih kategori produk yang valid.',
+  invalid_product_price_label: 'Isi harga produk.',
+  invalid_product_owner_label: 'Nama penitip atau supplier terlalu panjang.',
+  invalid_product_stock_count: 'Jumlah stok harus berupa angka nol atau lebih.',
+  invalid_product_stock_unit: 'Isi satuan stok, misalnya pcs atau botol.',
+  invalid_product_min_stock_alert: 'Batas stok tipis harus berupa angka nol atau lebih.',
+  invalid_product_consignment_terms: 'Skema titip jual terlalu panjang.',
+  invalid_product_notes: 'Catatan produk terlalu panjang.',
 };
 
 function errorRecord(error: unknown): Record<string, unknown> | null {

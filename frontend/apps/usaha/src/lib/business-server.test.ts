@@ -8,6 +8,7 @@ vi.mock('@/lib/auth-session', () => ({ readAccessToken }));
 
 import {
   createBusiness,
+  createBusinessProduct,
   getAuthenticatedActor,
   getBusinessForCurrentActor,
   listBusinessesForCurrentActor,
@@ -37,7 +38,12 @@ function jsonForCurrentSource(url: string): Response {
   return jsonResponse({ data: { items: [] } });
 }
 
-function canonicalBusiness(version: number, name = 'Warung Cuk') {
+function canonicalBusiness(
+  version: number,
+  name = 'Warung Cuk',
+  products: Record<string, unknown>[] = [],
+  legacyProducts?: Record<string, unknown>[],
+) {
   return {
     data: {
       business: {
@@ -66,6 +72,7 @@ function canonicalBusiness(version: number, name = 'Warung Cuk') {
               schedule: 'Setiap hari',
               locationQuery: 'Jl. Contoh, Jakarta',
             },
+            ...(legacyProducts ? { products: legacyProducts } : {}),
           },
         },
         primary_location: {
@@ -81,6 +88,7 @@ function canonicalBusiness(version: number, name = 'Warung Cuk') {
           is_primary: true,
           public_visibility: true,
         },
+        products,
       },
     },
   };
@@ -247,6 +255,119 @@ describe('canonical Usaha Business adapter', () => {
       expect.stringContaining('/v1/umkm/stores/'),
       expect.anything(),
     );
+  });
+
+  it('maps canonical products instead of legacy storefront metadata', async () => {
+    const payload = canonicalBusiness(
+      3,
+      'Warung Cuk',
+      [{
+        id: '66666666-6666-4666-8666-666666666666',
+        name: 'Jus mangga',
+        category: 'Minuman',
+        price_label: 'Rp10.000',
+        status: 'active',
+        source_type: 'owned',
+        stock_count: 4,
+        stock_unit: 'botol',
+        min_stock_alert: 2,
+        stock_mode: 'manual',
+        stock_health: 'aman',
+        stock_updated_at: '2026-09-03T00:00:00Z',
+      }],
+      [{ id: 'legacy-product', name: 'Produk lama' }],
+    );
+    const fetchMock = vi.fn<typeof fetch>((url) => {
+      const target = String(url);
+      if (target.endsWith('/auth/me')) return Promise.resolve(jsonForCurrentSource(target));
+      if (target.endsWith('/organizations')) return Promise.resolve(jsonForCurrentSource(target));
+      if (target.endsWith(`/v1/businesses/${BUSINESS_ID}`)) {
+        return Promise.resolve(jsonResponse(payload));
+      }
+      return Promise.resolve(jsonResponse({ data: {} }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const business = await getBusinessForCurrentActor(BUSINESS_ID);
+
+    expect(business?.products).toEqual([
+      expect.objectContaining({
+        id: '66666666-6666-4666-8666-666666666666',
+        name: 'Jus mangga',
+        priceLabel: 'Rp10.000',
+        stockLabel: '4 botol',
+        status: 'live',
+      }),
+    ]);
+    expect(business?.products.some(product => product.id === 'legacy-product')).toBe(false);
+  });
+
+  it('creates products through the canonical endpoint without rewriting store metadata', async () => {
+    const createdProduct = {
+      id: '66666666-6666-4666-8666-666666666666',
+      name: 'Jus mangga',
+      category: 'Minuman',
+      price_label: 'Rp10.000',
+      status: 'active',
+      source_type: 'owned',
+      owner_label: null,
+      stock_count: 4,
+      stock_unit: 'botol',
+      min_stock_alert: 2,
+      stock_mode: 'manual',
+      stock_health: 'aman',
+      stock_updated_at: '2026-09-03T00:00:00Z',
+      consignment_terms: null,
+      notes: null,
+    };
+    const fetchMock = vi.fn<typeof fetch>((url, init) => {
+      const target = String(url);
+      if (target.endsWith('/auth/me')) return Promise.resolve(jsonForCurrentSource(target));
+      if (target.endsWith('/organizations')) return Promise.resolve(jsonForCurrentSource(target));
+      if (target.endsWith(`/v1/businesses/${BUSINESS_ID}/products`) && init?.method === 'POST') {
+        return Promise.resolve(jsonResponse({ data: { product: createdProduct } }, 201));
+      }
+      if (target.endsWith(`/v1/businesses/${BUSINESS_ID}`)) {
+        return Promise.resolve(jsonResponse(canonicalBusiness(3, 'Warung Cuk', [createdProduct])));
+      }
+      return Promise.resolve(jsonResponse({ data: {} }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const updated = await createBusinessProduct(BUSINESS_ID, {
+      name: 'Jus mangga',
+      category: 'Minuman',
+      priceLabel: 'Rp10.000',
+      sourceType: 'owned',
+      ownerLabel: '',
+      stockCount: 4,
+      stockUnit: 'botol',
+      minStockAlert: 2,
+      stockMode: 'manual',
+      consignmentTerms: '',
+      notes: '',
+    });
+
+    expect(updated.products).toHaveLength(1);
+    const createCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith(`/v1/businesses/${BUSINESS_ID}/products`),
+    );
+    expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({
+      name: 'Jus mangga',
+      category: 'Minuman',
+      price_label: 'Rp10.000',
+      source_type: 'owned',
+      owner_label: null,
+      stock_count: 4,
+      stock_unit: 'botol',
+      min_stock_alert: 2,
+      stock_mode: 'manual',
+      consignment_terms: null,
+      notes: null,
+    });
+    expect(fetchMock.mock.calls.some(([url, init]) =>
+      String(url).includes('/v1/umkm/stores/') && init?.method === 'PUT',
+    )).toBe(false);
   });
 
   it('preserves existing persistent workspace metadata mutations during the migration', async () => {

@@ -33,4 +33,16 @@ describe('business API error normalization', () => {
       message: 'Sesi Anda berakhir. Masuk lagi untuk melanjutkan.',
     });
   });
+
+  it('turns product validation codes into field-specific guidance', () => {
+    expect(normalizeBusinessApiError({
+      name: 'UpstreamHttpError',
+      status: 400,
+      code: 'invalid_product_stock_count',
+    }, 'Gagal tambah produk.')).toEqual({
+      status: 400,
+      code: 'invalid_product_stock_count',
+      message: 'Jumlah stok harus berupa angka nol atau lebih.',
+    });
+  });
 });

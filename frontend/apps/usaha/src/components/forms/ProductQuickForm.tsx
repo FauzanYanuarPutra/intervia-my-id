@@ -29,7 +29,6 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
     useState<(typeof sourceTypeOptions)[number]['value']>('owned');
   const [priceLabel, setPriceLabel] = useState('');
   const [ownerLabel, setOwnerLabel] = useState('');
-  const [stockLabel, setStockLabel] = useState('Siap');
   const [stockCount, setStockCount] = useState('');
   const [minStockAlert, setMinStockAlert] = useState('');
   const [stockUnit, setStockUnit] = useState('pcs');
@@ -53,11 +52,6 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       return;
     }
 
-    if (stockLabel.trim().length < 2) {
-      setError('Status stok belum valid.');
-      return;
-    }
-
     setError('');
     setSuccess('');
     setIsPending(true);
@@ -72,7 +66,6 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
           name: name.trim(),
           category,
           priceLabel: priceLabel.trim(),
-          stockLabel: stockLabel.trim(),
           sourceType,
           ownerLabel: ownerLabel.trim(),
           stockCount: stockCount.trim() ? Number(stockCount) : null,
@@ -94,7 +87,6 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       setName('');
       setPriceLabel('');
       setOwnerLabel('');
-      setStockLabel('Siap');
       setStockCount('');
       setMinStockAlert('');
       setStockUnit('pcs');
@@ -117,6 +109,9 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       <label className="grid gap-2 text-sm font-semibold text-portal-ink">
         Nama produk
         <input
+          required
+          minLength={2}
+          maxLength={160}
           value={name}
           onChange={event => setName(event.target.value)}
           placeholder="Contoh: Es Kopi Susu"
@@ -158,6 +153,8 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         <label className="grid gap-2 text-sm font-semibold text-portal-ink">
           Harga
           <input
+            required
+            maxLength={80}
             value={priceLabel}
             onChange={event => setPriceLabel(event.target.value)}
             placeholder="Rp18.000"
@@ -166,21 +163,13 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         </label>
       </div>
 
-      <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-        Stok
-        <input
-          value={stockLabel}
-          onChange={event => setStockLabel(event.target.value)}
-          placeholder="Siap / Sisa 12 / Pre-order"
-          className="portal-input"
-        />
-      </label>
-
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-semibold text-portal-ink">
           Jumlah stok
           <input
-            inputMode="numeric"
+            type="number"
+            min="0"
+            step="any"
             value={stockCount}
             onChange={event => setStockCount(event.target.value)}
             placeholder="12"
@@ -191,7 +180,9 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         <label className="grid gap-2 text-sm font-semibold text-portal-ink">
           Batas stok tipis
           <input
-            inputMode="numeric"
+            type="number"
+            min="0"
+            step="any"
             value={minStockAlert}
             onChange={event => setMinStockAlert(event.target.value)}
             placeholder="5"
@@ -204,6 +195,8 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         <label className="grid gap-2 text-sm font-semibold text-portal-ink">
           Satuan stok
           <input
+            required
+            maxLength={40}
             value={stockUnit}
             onChange={event => setStockUnit(event.target.value)}
             placeholder="pcs / bungkus / botol"

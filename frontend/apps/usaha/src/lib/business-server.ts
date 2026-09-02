@@ -11,6 +11,9 @@ import type {
   BusinessRecord,
   PortalRole,
   ProductRecord,
+  ProductSourceType,
+  ProductStockHealth,
+  ProductStockMode,
   ReservationRecord,
   TeamMember,
 } from '@/lib/portal-types';
@@ -51,6 +54,7 @@ function stringValue(value: unknown): string {
 }
 
 function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? Number(parsed) : null;
 }
@@ -259,6 +263,68 @@ function parseLocations(store: JsonRecord): BusinessLocation[] {
   ];
 }
 
+function productStockHealth(
+  value: unknown,
+  stockCount: number | null,
+  minStockAlert: number | null,
+): ProductStockHealth {
+  if (['aman', 'tipis', 'habis', 'perlu-cocokkan'].includes(stringValue(value))) {
+    return stringValue(value) as ProductStockHealth;
+  }
+  if (stockCount === null) return 'perlu-cocokkan';
+  if (stockCount <= 0) return 'habis';
+  if (minStockAlert !== null && stockCount <= minStockAlert) return 'tipis';
+  return 'aman';
+}
+
+function mapCanonicalProduct(value: unknown): ProductRecord | null {
+  const item = record(value);
+  if (!item) return null;
+  const id = stringValue(item.id);
+  const name = stringValue(item.name);
+  if (!id || !name) return null;
+
+  const stockCount = nullableNumber(item.stock_count ?? item.stockCount);
+  const minStockAlert = nullableNumber(
+    item.min_stock_alert ?? item.minStockAlert,
+  );
+  const stockUnit = stringValue(item.stock_unit ?? item.stockUnit) || 'pcs';
+  const sourceType: ProductSourceType =
+    stringValue(item.source_type ?? item.sourceType) === 'consignment'
+      ? 'consignment'
+      : 'owned';
+  const stockMode: ProductStockMode =
+    stringValue(item.stock_mode ?? item.stockMode) === 'estimated'
+      ? 'estimated'
+      : 'manual';
+
+  return {
+    id,
+    name,
+    category: stringValue(item.category) || 'Umum',
+    priceLabel: stringValue(item.price_label ?? item.priceLabel),
+    stockLabel:
+      stockCount === null ? 'Perlu dicocokkan' : `${stockCount} ${stockUnit}`,
+    status: stringValue(item.status) === 'active' ? 'live' : 'draft',
+    sourceType,
+    ownerLabel: stringValue(item.owner_label ?? item.ownerLabel),
+    stockCount,
+    stockUnit,
+    minStockAlert,
+    stockMode,
+    stockHealth: productStockHealth(
+      item.stock_health ?? item.stockHealth,
+      stockCount,
+      minStockAlert,
+    ),
+    stockUpdatedAt: stringValue(item.stock_updated_at ?? item.stockUpdatedAt),
+    consignmentTerms: stringValue(
+      item.consignment_terms ?? item.consignmentTerms,
+    ),
+    notes: stringValue(item.notes),
+  };
+}
+
 function mapStore(
   store: JsonRecord,
   actor: PortalAccount,
@@ -266,6 +332,7 @@ function mapStore(
   canonicalBusinessId?: string,
   canonicalVersion = 1,
   capabilityKey = 'general',
+  canonicalProducts?: ProductRecord[],
 ): BusinessRecord {
   const metadata = metadataOf(store);
   const organizationId =
@@ -285,7 +352,7 @@ function mapStore(
   const locationQuery =
     stringValue(metadata.locationQuery ?? metadata.location_query) ||
     [name, address, city].filter(Boolean).join(', ');
-  const products = arrayValue<ProductRecord>(metadata.products);
+  const products = canonicalProducts ?? arrayValue<ProductRecord>(metadata.products);
   const reservations = arrayValue<ReservationRecord>(metadata.reservations);
   const teamMembers = arrayValue<TeamMember>(metadata.teamMembers ?? metadata.team_members);
   const locations = parseLocations(store);
@@ -350,6 +417,11 @@ function mapCanonicalBusiness(
 
   const privateMetadata = record(store.metadata) ?? {};
   const publicMetadata = record(privateMetadata.public) ?? {};
+  const canonicalProducts = Array.isArray(value.products)
+    ? value.products
+        .map(mapCanonicalProduct)
+        .filter((item): item is ProductRecord => Boolean(item))
+    : undefined;
   return mapStore(
     {
       ...store,
@@ -363,6 +435,7 @@ function mapCanonicalBusiness(
     businessId,
     Number(business.version) || 1,
     stringValue(business.capability_key) || 'general',
+    canonicalProducts,
   );
 }
 
@@ -491,6 +564,59 @@ export async function reconcileBusiness(input: {
   const businessId = stringValue(business?.id);
   if (!businessId) throw new Error('Usaha lama belum berhasil dipulihkan.');
   return { businessId, replayed: boolValue(root.replayed) };
+}
+
+export type CreateBusinessProductInput = {
+  name: string;
+  category: string;
+  priceLabel: string;
+  sourceType: ProductSourceType;
+  ownerLabel?: string;
+  stockCount: number | null;
+  stockUnit: string;
+  minStockAlert: number | null;
+  stockMode: ProductStockMode;
+  consignmentTerms?: string;
+  notes?: string;
+};
+
+export async function createBusinessProduct(
+  businessId: string,
+  input: CreateBusinessProductInput,
+): Promise<BusinessRecord> {
+  const { token, account } = await requireAuthenticatedActor();
+  const organizations = await listWorkspaceOrganizations(token);
+  await requestJson(
+    `${MARKETPLACE_URL}/v1/businesses/${encodeURIComponent(businessId)}/products`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: input.name,
+        category: input.category,
+        price_label: input.priceLabel,
+        source_type: input.sourceType,
+        owner_label: stringValue(input.ownerLabel) || null,
+        stock_count: input.stockCount,
+        stock_unit: input.stockUnit,
+        min_stock_alert: input.minStockAlert,
+        stock_mode: input.stockMode,
+        consignment_terms: stringValue(input.consignmentTerms) || null,
+        notes: stringValue(input.notes) || null,
+      }),
+    },
+  );
+  const aggregate = await getCanonicalAggregate(token, businessId);
+  const updated = aggregate
+    ? mapCanonicalBusiness(aggregate, account, organizations)
+    : null;
+  if (!updated) {
+    throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
+  }
+  return updated;
 }
 
 export async function updateBusiness(
