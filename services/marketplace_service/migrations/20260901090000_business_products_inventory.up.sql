@@ -119,14 +119,36 @@ WITH raw_legacy_products AS (
     NULLIF(BTRIM(COALESCE(legacy_product->>'consignment_terms', legacy_product->>'consignmentTerms')), '') AS consignment_terms,
     NULLIF(BTRIM(legacy_product->>'notes'), '') AS notes,
     CASE
-      WHEN COALESCE(legacy_product->>'stock_count', legacy_product->>'stockCount') ~ '^[0-9]+([.][0-9]+)?$'
-        THEN COALESCE(legacy_product->>'stock_count', legacy_product->>'stockCount')::DOUBLE PRECISION
+      WHEN pg_input_is_valid(
+        COALESCE(legacy_product->>'stock_count', legacy_product->>'stockCount'),
+        'double precision'
+      ) THEN CASE
+        WHEN COALESCE(legacy_product->>'stock_count', legacy_product->>'stockCount')::DOUBLE PRECISION >= 0
+          AND COALESCE(legacy_product->>'stock_count', legacy_product->>'stockCount')::DOUBLE PRECISION NOT IN (
+            'NaN'::DOUBLE PRECISION,
+            'Infinity'::DOUBLE PRECISION,
+            '-Infinity'::DOUBLE PRECISION
+          )
+          THEN COALESCE(legacy_product->>'stock_count', legacy_product->>'stockCount')::DOUBLE PRECISION
+        ELSE NULL
+      END
       ELSE NULL
     END AS stock_count,
     COALESCE(NULLIF(BTRIM(COALESCE(legacy_product->>'stock_unit', legacy_product->>'stockUnit')), ''), 'pcs') AS stock_unit,
     CASE
-      WHEN COALESCE(legacy_product->>'min_stock_alert', legacy_product->>'minStockAlert') ~ '^[0-9]+([.][0-9]+)?$'
-        THEN COALESCE(legacy_product->>'min_stock_alert', legacy_product->>'minStockAlert')::DOUBLE PRECISION
+      WHEN pg_input_is_valid(
+        COALESCE(legacy_product->>'min_stock_alert', legacy_product->>'minStockAlert'),
+        'double precision'
+      ) THEN CASE
+        WHEN COALESCE(legacy_product->>'min_stock_alert', legacy_product->>'minStockAlert')::DOUBLE PRECISION >= 0
+          AND COALESCE(legacy_product->>'min_stock_alert', legacy_product->>'minStockAlert')::DOUBLE PRECISION NOT IN (
+            'NaN'::DOUBLE PRECISION,
+            'Infinity'::DOUBLE PRECISION,
+            '-Infinity'::DOUBLE PRECISION
+          )
+          THEN COALESCE(legacy_product->>'min_stock_alert', legacy_product->>'minStockAlert')::DOUBLE PRECISION
+        ELSE NULL
+      END
       ELSE NULL
     END AS min_stock_alert,
     CASE LOWER(COALESCE(legacy_product->>'stock_mode', legacy_product->>'stockMode', 'manual'))
