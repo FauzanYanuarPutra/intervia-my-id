@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 const MAX_PRODUCT_NAME_LEN: usize = 160;
@@ -91,6 +93,226 @@ pub(crate) struct BusinessProduct {
     pub(crate) notes: Option<String>,
 }
 
+#[derive(Debug)]
+pub(crate) enum ProductRepositoryError {
+    BusinessNotFound,
+    Database,
+}
+
+impl From<sqlx::Error> for ProductRepositoryError {
+    fn from(_error: sqlx::Error) -> Self {
+        Self::Database
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct ProductRepository {
+    db: PgPool,
+}
+
+impl ProductRepository {
+    pub(crate) fn new(db: PgPool) -> Self {
+        Self { db }
+    }
+
+    pub(crate) async fn list_for_business(
+        &self,
+        business_id: Uuid,
+        organization_id: Uuid,
+    ) -> Result<Vec<BusinessProduct>, ProductRepositoryError> {
+        let rows = sqlx::query_as::<_, ProductRow>(PRODUCT_SELECT)
+            .bind(business_id)
+            .bind(organization_id)
+            .fetch_all(&self.db)
+            .await?;
+        Ok(rows.into_iter().map(ProductRow::into_product).collect())
+    }
+
+    pub(crate) async fn create(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        command: &ValidatedCreateBusinessProduct,
+    ) -> Result<BusinessProduct, ProductRepositoryError> {
+        let mut transaction = self.db.begin().await?;
+        let business_exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM businesses WHERE id = $1 AND organization_id = $2)",
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        if !business_exists {
+            return Err(ProductRepositoryError::BusinessNotFound);
+        }
+
+        let product_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO business_products (
+              id, business_id, organization_id, name, category, price_label,
+              status, source_type, owner_label, consignment_terms, notes
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10)
+            "#,
+        )
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(&command.name)
+        .bind(&command.category)
+        .bind(&command.price_label)
+        .bind(command.source_type.as_str())
+        .bind(&command.owner_label)
+        .bind(&command.consignment_terms)
+        .bind(&command.notes)
+        .execute(&mut *transaction)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_inventory (
+              id, product_id, business_id, organization_id, stock_count,
+              stock_unit, min_stock_alert, stock_mode
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(command.stock_count)
+        .bind(&command.stock_unit)
+        .bind(command.min_stock_alert)
+        .bind(command.stock_mode.as_str())
+        .execute(&mut *transaction)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO events.event_outbox (
+              aggregate_type, aggregate_id, event_type, payload, routing_key
+            )
+            VALUES ('business', $1, 'marketplace.business.product_created', $2,
+                    'marketplace.business.product_created')
+            "#,
+        )
+        .bind(business_id.to_string())
+        .bind(json!({
+            "event_version": 1,
+            "actor_id": actor_id,
+            "business_id": business_id,
+            "organization_id": organization_id,
+            "product_id": product_id,
+            "version": 1,
+        }))
+        .execute(&mut *transaction)
+        .await?;
+
+        let row = sqlx::query_as::<_, ProductRow>(PRODUCT_SELECT_BY_ID)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(product_id)
+            .fetch_one(&mut *transaction)
+            .await?;
+        transaction.commit().await?;
+        Ok(row.into_product())
+    }
+}
+
+const PRODUCT_SELECT: &str = r#"
+    SELECT
+      product.id,
+      product.name,
+      product.category,
+      product.price_label,
+      product.status,
+      product.source_type,
+      product.owner_label,
+      inventory.stock_count,
+      inventory.stock_unit,
+      inventory.min_stock_alert,
+      inventory.stock_mode,
+      inventory.updated_at AS stock_updated_at,
+      product.consignment_terms,
+      product.notes
+    FROM business_products product
+    JOIN business_inventory inventory
+      ON inventory.product_id = product.id
+     AND inventory.business_id = product.business_id
+     AND inventory.organization_id = product.organization_id
+    WHERE product.business_id = $1 AND product.organization_id = $2
+    ORDER BY product.created_at ASC, product.id ASC
+"#;
+
+const PRODUCT_SELECT_BY_ID: &str = r#"
+    SELECT
+      product.id,
+      product.name,
+      product.category,
+      product.price_label,
+      product.status,
+      product.source_type,
+      product.owner_label,
+      inventory.stock_count,
+      inventory.stock_unit,
+      inventory.min_stock_alert,
+      inventory.stock_mode,
+      inventory.updated_at AS stock_updated_at,
+      product.consignment_terms,
+      product.notes
+    FROM business_products product
+    JOIN business_inventory inventory
+      ON inventory.product_id = product.id
+     AND inventory.business_id = product.business_id
+     AND inventory.organization_id = product.organization_id
+    WHERE product.business_id = $1
+      AND product.organization_id = $2
+      AND product.id = $3
+"#;
+
+#[derive(FromRow)]
+struct ProductRow {
+    id: Uuid,
+    name: String,
+    category: String,
+    price_label: String,
+    status: String,
+    source_type: String,
+    owner_label: Option<String>,
+    stock_count: Option<f64>,
+    stock_unit: String,
+    min_stock_alert: Option<f64>,
+    stock_mode: String,
+    stock_updated_at: DateTime<Utc>,
+    consignment_terms: Option<String>,
+    notes: Option<String>,
+}
+
+impl ProductRow {
+    fn into_product(self) -> BusinessProduct {
+        BusinessProduct {
+            id: self.id,
+            name: self.name,
+            category: self.category,
+            price_label: self.price_label,
+            status: self.status,
+            source_type: self.source_type,
+            owner_label: self.owner_label,
+            stock_count: self.stock_count,
+            stock_unit: self.stock_unit,
+            min_stock_alert: self.min_stock_alert,
+            stock_mode: self.stock_mode,
+            stock_health: stock_health(self.stock_count, self.min_stock_alert).to_owned(),
+            stock_updated_at: self.stock_updated_at,
+            consignment_terms: self.consignment_terms,
+            notes: self.notes,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProductValidationError {
     InvalidName,
@@ -137,8 +359,9 @@ pub(crate) fn validate_create_request(
         .ok_or(ProductValidationError::InvalidStockUnit)?;
     validate_non_negative_finite(request.min_stock_alert)
         .ok_or(ProductValidationError::InvalidMinimumStock)?;
-    let consignment_terms = normalize_optional(request.consignment_terms, MAX_CONSIGNMENT_TERMS_LEN)
-        .ok_or(ProductValidationError::InvalidConsignmentTerms)?;
+    let consignment_terms =
+        normalize_optional(request.consignment_terms, MAX_CONSIGNMENT_TERMS_LEN)
+            .ok_or(ProductValidationError::InvalidConsignmentTerms)?;
     let notes = normalize_optional(request.notes, MAX_NOTES_LEN)
         .ok_or(ProductValidationError::InvalidNotes)?;
 
@@ -161,7 +384,7 @@ pub(crate) fn stock_health(stock: Option<f64>, minimum: Option<f64>) -> &'static
     match stock {
         None => "perlu-cocokkan",
         Some(value) if value <= 0.0 => "habis",
-        Some(value) if minimum.is_some_and(|minimum| value < minimum) => "tipis",
+        Some(value) if minimum.is_some_and(|minimum| value <= minimum) => "tipis",
         Some(_) => "aman",
     }
 }
@@ -256,7 +479,7 @@ mod tests {
         assert_eq!(stock_health(None, Some(2.0)), "perlu-cocokkan");
         assert_eq!(stock_health(Some(0.0), Some(2.0)), "habis");
         assert_eq!(stock_health(Some(1.0), Some(2.0)), "tipis");
-        assert_eq!(stock_health(Some(2.0), Some(2.0)), "aman");
+        assert_eq!(stock_health(Some(2.0), Some(2.0)), "tipis");
         assert_eq!(stock_health(Some(10.0), None), "aman");
     }
 }
