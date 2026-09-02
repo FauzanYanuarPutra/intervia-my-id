@@ -2,6 +2,7 @@ use super::domain::{
     store_slug, BusinessAggregate, BusinessLocation, BusinessRecord, BusinessStore,
     ValidatedBusinessProfileUpdate, ValidatedProvisionCommand,
 };
+use super::products::{ProductRepository, ProductRepositoryError};
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use sha2::Digest;
@@ -651,7 +652,11 @@ async fn load_aggregate(
     let business = fetch_business(db, business_id, organization_id).await?;
     let store = fetch_store(db, business_id).await?;
     let location = fetch_location(db, business_id).await?;
-    build_aggregate(business, store, location)
+    let products = ProductRepository::new(db.clone())
+        .list_for_business(business_id, organization_id)
+        .await
+        .map_err(map_product_repository_error)?;
+    build_aggregate(business, store, location, products)
 }
 
 async fn load_aggregate_in_transaction(
@@ -672,7 +677,14 @@ async fn load_aggregate_in_transaction(
         .bind(business_id)
         .fetch_optional(&mut **transaction)
         .await?;
-    build_aggregate(business, store, location)
+    let products = ProductRepository::list_for_business_in_transaction(
+        transaction,
+        business_id,
+        organization_id,
+    )
+    .await
+    .map_err(map_product_repository_error)?;
+    build_aggregate(business, store, location, products)
 }
 
 async fn fetch_business(
@@ -708,6 +720,7 @@ fn build_aggregate(
     business: Option<BusinessRow>,
     store: Option<StoreRow>,
     location: Option<LocationRow>,
+    products: Vec<super::products::BusinessProduct>,
 ) -> Result<BusinessAggregate, RepositoryError> {
     let business = business.ok_or(RepositoryError::IncompleteAggregate)?;
     let store = store.ok_or(RepositoryError::IncompleteAggregate)?;
@@ -755,7 +768,12 @@ fn build_aggregate(
             created_at: location.created_at,
             updated_at: location.updated_at,
         },
+        products,
     })
+}
+
+fn map_product_repository_error(_error: ProductRepositoryError) -> RepositoryError {
+    RepositoryError::Database
 }
 
 const BUSINESS_QUERY: &str = r#"

@@ -2,6 +2,7 @@ use super::products::{
     stock_health, validate_create_request, CreateBusinessProductRequest, ProductRepository,
     ProductRepositoryError, ProductSourceType, ProductStockMode,
 };
+use super::repository::BusinessRepository;
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -33,6 +34,7 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
     let organization_id = Uuid::new_v4();
     let other_organization_id = Uuid::new_v4();
     let business_id = Uuid::new_v4();
+    let store_id = Uuid::new_v4();
 
     sqlx::query(
         r#"
@@ -47,6 +49,46 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
     .bind(actor_id)
     .bind(Uuid::new_v4())
     .bind("0".repeat(64))
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"
+        INSERT INTO umkm_stores (
+          id, owner_user_id, organization_id, name, slug, city, address,
+          lat, lng, is_active, online_order_enabled, offline_order_enabled, metadata
+        ) VALUES ($1, $2, $3, 'Lajukan Juice', $4, 'Bandung', 'Jl. Contoh',
+                  -6.9, 107.6, TRUE, TRUE, TRUE, '{}'::JSONB)
+        "#,
+    )
+    .bind(store_id)
+    .bind(actor_id)
+    .bind(organization_id)
+    .bind(format!("lajukan-juice-{store_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO business_store_links (business_id, store_id, link_type) VALUES ($1, $2, 'primary')",
+    )
+    .bind(business_id)
+    .bind(store_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"
+        INSERT INTO business_locations (
+          id, business_id, store_id, organization_id, name, address, city,
+          lat, lng, status, is_primary, public_visibility
+        ) VALUES ($1, $2, $3, $4, 'Lokasi utama', 'Jl. Contoh', 'Bandung',
+                  -6.9, 107.6, 'active', TRUE, TRUE)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(business_id)
+    .bind(store_id)
+    .bind(organization_id)
     .execute(&pool)
     .await
     .unwrap();
@@ -68,6 +110,14 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
         .unwrap();
     assert_eq!(mine.len(), 1);
     assert_eq!(mine[0].id, created.id);
+
+    let aggregate = BusinessRepository::new(pool.clone())
+        .get_for_organization(business_id, organization_id)
+        .await
+        .unwrap()
+        .expect("business aggregate");
+    assert_eq!(aggregate.products.len(), 1);
+    assert_eq!(aggregate.products[0].id, created.id);
 
     let other_tenant = repository
         .list_for_business(business_id, other_organization_id)

@@ -3,6 +3,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::products::BusinessProduct;
+
 const MAX_NAME_LEN: usize = 160;
 const MAX_ADDRESS_LEN: usize = 500;
 const MAX_DESCRIPTION_LEN: usize = 2_000;
@@ -153,6 +155,7 @@ pub(crate) struct BusinessAggregate {
     pub(crate) business: BusinessRecord,
     pub(crate) primary_store: BusinessStore,
     pub(crate) primary_location: BusinessLocation,
+    pub(crate) products: Vec<BusinessProduct>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -551,6 +554,7 @@ impl<T> TransposeOption<T> for Option<Option<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::businesses::products::BusinessProduct;
     use serde_json::json;
     use uuid::Uuid;
 
@@ -727,6 +731,80 @@ mod tests {
         let serialized = serde_json::to_value(dto).expect("serialize public store");
         let object = serialized.as_object().expect("public store object");
         assert_eq!(object.len(), 15);
+    }
+
+    #[test]
+    fn business_aggregate_serializes_canonical_products_outside_store_metadata() {
+        let now = chrono::Utc::now();
+        let product_id = Uuid::new_v4();
+        let aggregate = BusinessAggregate {
+            business: BusinessRecord {
+                id: Uuid::new_v4(),
+                organization_id: Uuid::new_v4(),
+                name: "Kedai Cuk".to_owned(),
+                capability_key: "food_beverage".to_owned(),
+                status: "active".to_owned(),
+                version: 1,
+                created_at: now,
+                updated_at: now,
+            },
+            primary_store: BusinessStore {
+                id: Uuid::new_v4(),
+                name: "Kedai Cuk".to_owned(),
+                slug: "kedai-cuk".to_owned(),
+                description: None,
+                city: "Bandung".to_owned(),
+                address: "Jl. Contoh".to_owned(),
+                lat: -6.9,
+                lng: 107.6,
+                phone: None,
+                is_active: true,
+                online_order_enabled: true,
+                offline_order_enabled: true,
+                metadata: json!({ "products": [{ "id": "legacy-product" }] }),
+                created_at: now,
+                updated_at: now,
+            },
+            primary_location: BusinessLocation {
+                id: Uuid::new_v4(),
+                store_id: Uuid::new_v4(),
+                name: "Lokasi utama".to_owned(),
+                address: "Jl. Contoh".to_owned(),
+                city: "Bandung".to_owned(),
+                lat: Some(-6.9),
+                lng: Some(107.6),
+                phone: None,
+                status: "active".to_owned(),
+                is_primary: true,
+                public_visibility: true,
+                created_at: now,
+                updated_at: now,
+            },
+            products: vec![BusinessProduct {
+                id: product_id,
+                name: "Jus mangga".to_owned(),
+                category: "Minuman".to_owned(),
+                price_label: "Rp10.000".to_owned(),
+                status: "active".to_owned(),
+                source_type: "owned".to_owned(),
+                owner_label: None,
+                stock_count: Some(4.0),
+                stock_unit: "cup".to_owned(),
+                min_stock_alert: Some(2.0),
+                stock_mode: "manual".to_owned(),
+                stock_health: "aman".to_owned(),
+                stock_updated_at: now,
+                consignment_terms: None,
+                notes: None,
+            }],
+        };
+
+        let serialized = serde_json::to_value(aggregate).expect("serialize business aggregate");
+        assert_eq!(serialized["products"][0]["id"], product_id.to_string());
+        assert_eq!(
+            serialized["primary_store"]["metadata"]["products"][0]["id"],
+            "legacy-product"
+        );
     }
 
     #[test]

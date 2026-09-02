@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 const MAX_PRODUCT_NAME_LEN: usize = 160;
@@ -124,6 +124,19 @@ impl ProductRepository {
             .bind(business_id)
             .bind(organization_id)
             .fetch_all(&self.db)
+            .await?;
+        Ok(rows.into_iter().map(ProductRow::into_product).collect())
+    }
+
+    pub(crate) async fn list_for_business_in_transaction(
+        transaction: &mut Transaction<'_, Postgres>,
+        business_id: Uuid,
+        organization_id: Uuid,
+    ) -> Result<Vec<BusinessProduct>, ProductRepositoryError> {
+        let rows = sqlx::query_as::<_, ProductRow>(PRODUCT_SELECT)
+            .bind(business_id)
+            .bind(organization_id)
+            .fetch_all(&mut **transaction)
             .await?;
         Ok(rows.into_iter().map(ProductRow::into_product).collect())
     }
