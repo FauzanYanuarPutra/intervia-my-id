@@ -6,6 +6,7 @@ import { PortalShell } from '@/components/portal/PortalShell';
 import { SectionCard } from '@/components/portal/SectionCard';
 import { StatCard } from '@/components/portal/StatCard';
 import { StatusBadge } from '@/components/portal/StatusBadge';
+import { ProductManageForm } from '@/components/forms/ProductManageForm';
 import { ProductQuickForm } from '@/components/forms/ProductQuickForm';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -37,18 +38,19 @@ export default async function BusinessProductsPage({ params }: PageProps) {
   if (!business) notFound();
 
   const canManage = hasPermission(business, 'manageProducts');
+  const activeProductsCount = business.products.filter(product => product.status === 'live').length;
   const attentionCount = (business.lowStockProductsCount ?? 0) + (business.stockCheckCount ?? 0);
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="products">
       <SectionCard
         eyebrow="Katalog"
-        title="Produk"
-        description="Kelola produk, harga, sumber barang, dan kesehatan stok tanpa kehilangan fokus pada hal yang perlu ditindak."
+        title="Produk & stok"
+        description="Kelola katalog canonical Lajukan. Perubahan produk dan stok dari sini menjadi sumber data untuk operasional usaha dan etalase pembeli."
       >
         <div className="space-y-4">
           <section className="grid gap-3 sm:grid-cols-3">
-            <StatCard label="Produk aktif" value={business.productsCount} icon={Boxes} note={`${business.ownedProductsCount ?? business.productsCount} stok sendiri`} />
+            <StatCard label="Produk aktif" value={activeProductsCount} icon={Boxes} note={`${business.ownedProductsCount ?? business.productsCount} stok sendiri`} />
             <StatCard label="Barang titipan" value={business.consignmentProductsCount ?? 0} icon={PackagePlus} note="Produk dengan sumber konsinyasi" />
             <StatCard label="Perlu cek stok" value={attentionCount} icon={TriangleAlert} note={attentionCount ? 'Prioritaskan sebelum menerima order baru' : 'Tidak ada perhatian stok'} />
           </section>
@@ -92,7 +94,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
 
                           <div>
                             <p className="text-[11px] font-semibold text-portal-soft lg:hidden">Status</p>
-                            <div className="mt-1 lg:mt-0"><StatusBadge tone={product.status === 'live' ? 'success' : 'neutral'}>{product.status === 'live' ? 'Aktif' : 'Draft'}</StatusBadge></div>
+                            <div className="mt-1 lg:mt-0"><StatusBadge tone={product.status === 'live' ? 'success' : 'neutral'}>{product.status === 'live' ? 'Aktif' : 'Diarsipkan'}</StatusBadge></div>
                           </div>
                         </div>
 
@@ -103,6 +105,8 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                             {product.stockUpdatedAt ? <span>Update stok: {product.stockUpdatedAt}</span> : null}
                           </div>
                         ) : null}
+
+                        {canManage ? <ProductManageForm businessId={business.id} product={product} /> : null}
                       </article>
                     ))}
                   </div>
