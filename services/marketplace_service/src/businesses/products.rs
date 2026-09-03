@@ -11,6 +11,7 @@ const MAX_STOCK_UNIT_LEN: usize = 40;
 const MAX_OWNER_LABEL_LEN: usize = 160;
 const MAX_CONSIGNMENT_TERMS_LEN: usize = 1_000;
 const MAX_NOTES_LEN: usize = 2_000;
+const MAX_INVENTORY_REASON_LEN: usize = 160;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -59,6 +60,27 @@ pub(crate) struct CreateBusinessProductRequest {
     pub(crate) notes: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct UpdateBusinessProductRequest {
+    pub(crate) name: Option<String>,
+    pub(crate) category: Option<String>,
+    pub(crate) price_label: Option<String>,
+    pub(crate) status: Option<String>,
+    pub(crate) source_type: Option<ProductSourceType>,
+    pub(crate) owner_label: Option<String>,
+    pub(crate) min_stock_alert: Option<f64>,
+    pub(crate) stock_unit: Option<String>,
+    pub(crate) stock_mode: Option<ProductStockMode>,
+    pub(crate) consignment_terms: Option<String>,
+    pub(crate) notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct AdjustBusinessInventoryRequest {
+    pub(crate) stock_count: Option<f64>,
+    pub(crate) reason: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ValidatedCreateBusinessProduct {
     pub(crate) name: String,
@@ -96,6 +118,7 @@ pub(crate) struct BusinessProduct {
 #[derive(Debug)]
 pub(crate) enum ProductRepositoryError {
     BusinessNotFound,
+    Validation(ProductValidationError),
     Database,
 }
 
@@ -149,16 +172,7 @@ impl ProductRepository {
         command: &ValidatedCreateBusinessProduct,
     ) -> Result<BusinessProduct, ProductRepositoryError> {
         let mut transaction = self.db.begin().await?;
-        let business_exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM businesses WHERE id = $1 AND organization_id = $2)",
-        )
-        .bind(business_id)
-        .bind(organization_id)
-        .fetch_one(&mut *transaction)
-        .await?;
-        if !business_exists {
-            return Err(ProductRepositoryError::BusinessNotFound);
-        }
+        ensure_business_exists(&mut transaction, business_id, organization_id).await?;
         let store_id = sqlx::query_scalar::<_, Uuid>(
             r#"
             SELECT store_id
@@ -212,15 +226,19 @@ impl ProductRepository {
         .bind(&command.category)
         .bind(price_cents)
         .bind(stock_qty)
-        .bind(price_cents > 0 && command.stock_count != Some(0.0))
-        .bind(json!({
-            "canonical_business_product_id": product_id,
-            "canonical_business_id": business_id,
-            "price_label": command.price_label,
-            "source_type": command.source_type.as_str(),
-            "stock_mode": command.stock_mode.as_str(),
-            "stock_known": command.stock_count.is_some(),
-        }))
+        .bind(storefront_is_available(
+            "active",
+            price_cents,
+            command.stock_count,
+        ))
+        .bind(public_metadata(
+            product_id,
+            business_id,
+            &command.price_label,
+            command.source_type.as_str(),
+            command.stock_mode.as_str(),
+            command.stock_count,
+        ))
         .execute(&mut *transaction)
         .await?;
 
@@ -244,36 +262,307 @@ impl ProductRepository {
         .execute(&mut *transaction)
         .await?;
 
-        sqlx::query(
-            r#"
-            INSERT INTO events.event_outbox (
-              aggregate_type, aggregate_id, event_type, payload, routing_key
-            )
-            VALUES ('business', $1, 'marketplace.business.product_created', $2,
-                    'marketplace.business.product_created')
-            "#,
+        insert_outbox_event(
+            &mut transaction,
+            actor_id,
+            business_id,
+            organization_id,
+            product_id,
+            "marketplace.business.product_created",
+            json!({ "version": 1 }),
         )
-        .bind(business_id.to_string())
-        .bind(json!({
-            "event_version": 1,
-            "actor_id": actor_id,
-            "business_id": business_id,
-            "organization_id": organization_id,
-            "product_id": product_id,
-            "version": 1,
-        }))
-        .execute(&mut *transaction)
         .await?;
 
-        let row = sqlx::query_as::<_, ProductRow>(PRODUCT_SELECT_BY_ID)
-            .bind(business_id)
-            .bind(organization_id)
-            .bind(product_id)
-            .fetch_one(&mut *transaction)
-            .await?;
+        let row = fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
         transaction.commit().await?;
         Ok(row.into_product())
     }
+
+    pub(crate) async fn update(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        product_id: Uuid,
+        request: UpdateBusinessProductRequest,
+    ) -> Result<BusinessProduct, ProductRepositoryError> {
+        let request = validate_update_request(request).map_err(ProductRepositoryError::Validation)?;
+        let mut transaction = self.db.begin().await?;
+        ensure_product_exists(
+            &mut transaction,
+            business_id,
+            organization_id,
+            product_id,
+        )
+        .await?;
+
+        let source_type = request.source_type.map(ProductSourceType::as_str);
+        let stock_mode = request.stock_mode.map(ProductStockMode::as_str);
+        sqlx::query(
+            r#"
+            UPDATE business_products
+            SET name = COALESCE($4, name),
+                category = COALESCE($5, category),
+                price_label = COALESCE($6, price_label),
+                status = COALESCE($7, status),
+                source_type = COALESCE($8, source_type),
+                owner_label = COALESCE($9, owner_label),
+                consignment_terms = COALESCE($10, consignment_terms),
+                notes = COALESCE($11, notes),
+                version = version + 1,
+                updated_at = NOW()
+            WHERE id = $1 AND business_id = $2 AND organization_id = $3
+            "#,
+        )
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(&request.name)
+        .bind(&request.category)
+        .bind(&request.price_label)
+        .bind(&request.status)
+        .bind(source_type)
+        .bind(&request.owner_label)
+        .bind(&request.consignment_terms)
+        .bind(&request.notes)
+        .execute(&mut *transaction)
+        .await?;
+
+        if request.min_stock_alert.is_some() || request.stock_unit.is_some() || stock_mode.is_some() {
+            sqlx::query(
+                r#"
+                UPDATE business_inventory
+                SET min_stock_alert = COALESCE($4, min_stock_alert),
+                    stock_unit = COALESCE($5, stock_unit),
+                    stock_mode = COALESCE($6, stock_mode),
+                    updated_at = NOW()
+                WHERE product_id = $1 AND business_id = $2 AND organization_id = $3
+                "#,
+            )
+            .bind(product_id)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(request.min_stock_alert)
+            .bind(&request.stock_unit)
+            .bind(stock_mode)
+            .execute(&mut *transaction)
+            .await?;
+        }
+
+        let row = fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
+        sync_public_projection(&mut transaction, business_id, &row).await?;
+        insert_outbox_event(
+            &mut transaction,
+            actor_id,
+            business_id,
+            organization_id,
+            product_id,
+            "marketplace.business.product_updated",
+            json!({ "version": 1 }),
+        )
+        .await?;
+        transaction.commit().await?;
+        Ok(row.into_product())
+    }
+
+    pub(crate) async fn adjust_inventory(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        product_id: Uuid,
+        request: AdjustBusinessInventoryRequest,
+    ) -> Result<BusinessProduct, ProductRepositoryError> {
+        let request =
+            validate_inventory_adjustment(request).map_err(ProductRepositoryError::Validation)?;
+        let mut transaction = self.db.begin().await?;
+        ensure_product_exists(
+            &mut transaction,
+            business_id,
+            organization_id,
+            product_id,
+        )
+        .await?;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE business_inventory
+            SET stock_count = $4, updated_at = NOW()
+            WHERE product_id = $1 AND business_id = $2 AND organization_id = $3
+            "#,
+        )
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(request.stock_count)
+        .execute(&mut *transaction)
+        .await?;
+        if result.rows_affected() != 1 {
+            return Err(ProductRepositoryError::BusinessNotFound);
+        }
+
+        let row = fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
+        sync_public_projection(&mut transaction, business_id, &row).await?;
+        insert_outbox_event(
+            &mut transaction,
+            actor_id,
+            business_id,
+            organization_id,
+            product_id,
+            "marketplace.business.inventory_adjusted",
+            json!({
+                "version": 1,
+                "stock_count": request.stock_count,
+                "reason": request.reason,
+            }),
+        )
+        .await?;
+        transaction.commit().await?;
+        Ok(row.into_product())
+    }
+}
+
+async fn ensure_business_exists(
+    transaction: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Result<(), ProductRepositoryError> {
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM businesses WHERE id = $1 AND organization_id = $2)",
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    if exists {
+        Ok(())
+    } else {
+        Err(ProductRepositoryError::BusinessNotFound)
+    }
+}
+
+async fn ensure_product_exists(
+    transaction: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    product_id: Uuid,
+) -> Result<(), ProductRepositoryError> {
+    let exists: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+          SELECT 1
+          FROM business_products
+          WHERE id = $1 AND business_id = $2 AND organization_id = $3
+        )
+        "#,
+    )
+    .bind(product_id)
+    .bind(business_id)
+    .bind(organization_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    if exists {
+        Ok(())
+    } else {
+        Err(ProductRepositoryError::BusinessNotFound)
+    }
+}
+
+async fn fetch_product_row(
+    transaction: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    product_id: Uuid,
+) -> Result<ProductRow, ProductRepositoryError> {
+    sqlx::query_as::<_, ProductRow>(PRODUCT_SELECT_BY_ID)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(product_id)
+        .fetch_optional(&mut **transaction)
+        .await?
+        .ok_or(ProductRepositoryError::BusinessNotFound)
+}
+
+async fn sync_public_projection(
+    transaction: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    row: &ProductRow,
+) -> Result<(), ProductRepositoryError> {
+    let price_cents = price_label_to_cents(&row.price_label);
+    let stock_qty = storefront_stock_quantity(row.stock_count);
+    let metadata = public_metadata(
+        row.id,
+        business_id,
+        &row.price_label,
+        &row.source_type,
+        &row.stock_mode,
+        row.stock_count,
+    );
+    let result = sqlx::query(
+        r#"
+        UPDATE umkm_products
+        SET name = $2,
+            slug = $3,
+            category = $4,
+            price_cents = $5,
+            stock_qty = $6,
+            is_available = $7,
+            metadata = COALESCE(metadata, '{}'::JSONB) || $8,
+            updated_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(row.id)
+    .bind(&row.name)
+    .bind(storefront_product_slug(&row.name, row.id))
+    .bind(&row.category)
+    .bind(price_cents)
+    .bind(stock_qty)
+    .bind(storefront_is_available(
+        &row.status,
+        price_cents,
+        row.stock_count,
+    ))
+    .bind(metadata)
+    .execute(&mut **transaction)
+    .await?;
+    if result.rows_affected() == 1 {
+        Ok(())
+    } else {
+        Err(ProductRepositoryError::Database)
+    }
+}
+
+async fn insert_outbox_event(
+    transaction: &mut Transaction<'_, Postgres>,
+    actor_id: Uuid,
+    business_id: Uuid,
+    organization_id: Uuid,
+    product_id: Uuid,
+    event_type: &'static str,
+    details: serde_json::Value,
+) -> Result<(), ProductRepositoryError> {
+    sqlx::query(
+        r#"
+        INSERT INTO events.event_outbox (
+          aggregate_type, aggregate_id, event_type, payload, routing_key
+        )
+        VALUES ('business', $1, $2, $3, $2)
+        "#,
+    )
+    .bind(business_id.to_string())
+    .bind(event_type)
+    .bind(json!({
+        "event_version": 1,
+        "actor_id": actor_id,
+        "business_id": business_id,
+        "organization_id": organization_id,
+        "product_id": product_id,
+        "details": details,
+    }))
+    .execute(&mut **transaction)
+    .await?;
+    Ok(())
 }
 
 fn price_label_to_cents(price_label: &str) -> i64 {
@@ -287,7 +576,32 @@ fn price_label_to_cents(price_label: &str) -> i64 {
 }
 
 fn storefront_stock_quantity(stock_count: Option<f64>) -> i32 {
-    stock_count.unwrap_or(0.0).floor().min(f64::from(i32::MAX)) as i32
+    stock_count
+        .unwrap_or(0.0)
+        .floor()
+        .clamp(0.0, f64::from(i32::MAX)) as i32
+}
+
+fn storefront_is_available(status: &str, price_cents: i64, stock_count: Option<f64>) -> bool {
+    status == "active" && price_cents > 0 && stock_count != Some(0.0)
+}
+
+fn public_metadata(
+    product_id: Uuid,
+    business_id: Uuid,
+    price_label: &str,
+    source_type: &str,
+    stock_mode: &str,
+    stock_count: Option<f64>,
+) -> serde_json::Value {
+    json!({
+        "canonical_business_product_id": product_id,
+        "canonical_business_id": business_id,
+        "price_label": price_label,
+        "source_type": source_type,
+        "stock_mode": stock_mode,
+        "stock_known": stock_count.is_some(),
+    })
 }
 
 fn storefront_product_slug(name: &str, product_id: Uuid) -> String {
@@ -407,12 +721,15 @@ pub(crate) enum ProductValidationError {
     Name,
     Category,
     PriceLabel,
+    Status,
     OwnerLabel,
     StockCount,
     StockUnit,
     MinimumStock,
     ConsignmentTerms,
     Notes,
+    InventoryReason,
+    EmptyUpdate,
 }
 
 impl ProductValidationError {
@@ -421,12 +738,15 @@ impl ProductValidationError {
             Self::Name => "invalid_product_name",
             Self::Category => "invalid_product_category",
             Self::PriceLabel => "invalid_product_price_label",
+            Self::Status => "invalid_product_status",
             Self::OwnerLabel => "invalid_product_owner_label",
             Self::StockCount => "invalid_product_stock_count",
             Self::StockUnit => "invalid_product_stock_unit",
             Self::MinimumStock => "invalid_product_min_stock_alert",
             Self::ConsignmentTerms => "invalid_product_consignment_terms",
             Self::Notes => "invalid_product_notes",
+            Self::InventoryReason => "invalid_inventory_reason",
+            Self::EmptyUpdate => "empty_product_update",
         }
     }
 }
@@ -466,6 +786,81 @@ pub(crate) fn validate_create_request(
         consignment_terms,
         notes,
     })
+}
+
+fn validate_update_request(
+    mut request: UpdateBusinessProductRequest,
+) -> Result<UpdateBusinessProductRequest, ProductValidationError> {
+    let has_update = request.name.is_some()
+        || request.category.is_some()
+        || request.price_label.is_some()
+        || request.status.is_some()
+        || request.source_type.is_some()
+        || request.owner_label.is_some()
+        || request.min_stock_alert.is_some()
+        || request.stock_unit.is_some()
+        || request.stock_mode.is_some()
+        || request.consignment_terms.is_some()
+        || request.notes.is_some();
+    if !has_update {
+        return Err(ProductValidationError::EmptyUpdate);
+    }
+
+    request.name = request
+        .name
+        .map(|value| {
+            normalize_required(value, 2, MAX_PRODUCT_NAME_LEN).ok_or(ProductValidationError::Name)
+        })
+        .transpose()?;
+    request.category = request
+        .category
+        .map(|value| {
+            normalize_required(value, 1, MAX_CATEGORY_LEN).ok_or(ProductValidationError::Category)
+        })
+        .transpose()?;
+    request.price_label = request
+        .price_label
+        .map(|value| {
+            normalize_required(value, 1, MAX_PRICE_LABEL_LEN)
+                .ok_or(ProductValidationError::PriceLabel)
+        })
+        .transpose()?;
+    request.status = request
+        .status
+        .map(|value| {
+            let normalized = value.trim().to_ascii_lowercase();
+            match normalized.as_str() {
+                "active" | "archived" => Ok(normalized),
+                _ => Err(ProductValidationError::Status),
+            }
+        })
+        .transpose()?;
+    request.owner_label = normalize_optional(request.owner_label, MAX_OWNER_LABEL_LEN)
+        .ok_or(ProductValidationError::OwnerLabel)?;
+    validate_non_negative_finite(request.min_stock_alert)
+        .ok_or(ProductValidationError::MinimumStock)?;
+    request.stock_unit = request
+        .stock_unit
+        .map(|value| {
+            normalize_required(value, 1, MAX_STOCK_UNIT_LEN)
+                .ok_or(ProductValidationError::StockUnit)
+        })
+        .transpose()?;
+    request.consignment_terms =
+        normalize_optional(request.consignment_terms, MAX_CONSIGNMENT_TERMS_LEN)
+            .ok_or(ProductValidationError::ConsignmentTerms)?;
+    request.notes =
+        normalize_optional(request.notes, MAX_NOTES_LEN).ok_or(ProductValidationError::Notes)?;
+    Ok(request)
+}
+
+fn validate_inventory_adjustment(
+    mut request: AdjustBusinessInventoryRequest,
+) -> Result<AdjustBusinessInventoryRequest, ProductValidationError> {
+    validate_non_negative_finite(request.stock_count).ok_or(ProductValidationError::StockCount)?;
+    request.reason = normalize_optional(request.reason, MAX_INVENTORY_REASON_LEN)
+        .ok_or(ProductValidationError::InventoryReason)?;
+    Ok(request)
 }
 
 pub(crate) fn stock_health(stock: Option<f64>, minimum: Option<f64>) -> &'static str {
@@ -580,6 +975,27 @@ mod tests {
         assert_eq!(
             storefront_stock_quantity(Some(f64::from(i32::MAX) + 10.0)),
             i32::MAX
+        );
+    }
+
+    #[test]
+    fn product_status_is_limited_to_database_contract() {
+        let request = UpdateBusinessProductRequest {
+            name: None,
+            category: None,
+            price_label: None,
+            status: Some("inactive".to_owned()),
+            source_type: None,
+            owner_label: None,
+            min_stock_alert: None,
+            stock_unit: None,
+            stock_mode: None,
+            consignment_terms: None,
+            notes: None,
+        };
+        assert_eq!(
+            validate_update_request(request).unwrap_err(),
+            ProductValidationError::Status
         );
     }
 }
