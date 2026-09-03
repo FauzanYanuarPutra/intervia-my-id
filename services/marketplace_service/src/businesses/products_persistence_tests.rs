@@ -197,7 +197,7 @@ async fn product_update_and_inventory_adjustment_keep_public_projection_in_sync(
                 name: Some("Jus mangga premium".to_owned()),
                 category: None,
                 price_label: Some("Rp12.500".to_owned()),
-                status: Some("inactive".to_owned()),
+                status: Some("archived".to_owned()),
                 source_type: None,
                 owner_label: None,
                 min_stock_alert: Some(3.0),
@@ -211,7 +211,7 @@ async fn product_update_and_inventory_adjustment_keep_public_projection_in_sync(
         .unwrap();
     assert_eq!(updated.name, "Jus mangga premium");
     assert_eq!(updated.price_label, "Rp12.500");
-    assert_eq!(updated.status, "inactive");
+    assert_eq!(updated.status, "archived");
 
     let adjusted = repository
         .adjust_inventory(
