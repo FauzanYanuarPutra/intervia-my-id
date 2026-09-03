@@ -14,12 +14,15 @@ const messages: Record<string, string> = {
   invalid_product_name: 'Nama produk minimal dua karakter.',
   invalid_product_category: 'Pilih kategori produk yang valid.',
   invalid_product_price_label: 'Isi harga produk.',
+  invalid_product_status: 'Status produk tidak valid.',
   invalid_product_owner_label: 'Nama penitip atau supplier terlalu panjang.',
   invalid_product_stock_count: 'Jumlah stok harus berupa angka nol atau lebih.',
   invalid_product_stock_unit: 'Isi satuan stok, misalnya pcs atau botol.',
   invalid_product_min_stock_alert: 'Batas stok tipis harus berupa angka nol atau lebih.',
   invalid_product_consignment_terms: 'Skema titip jual terlalu panjang.',
   invalid_product_notes: 'Catatan produk terlalu panjang.',
+  invalid_inventory_reason: 'Alasan perubahan stok terlalu panjang.',
+  empty_product_update: 'Tidak ada perubahan produk untuk disimpan.',
 };
 
 function errorRecord(error: unknown): Record<string, unknown> | null {
