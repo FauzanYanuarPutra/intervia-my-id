@@ -124,6 +124,40 @@ describe('persistent WWW store provisioning', () => {
     ).rejects.toThrow('marketplace_invalid_response');
   });
 
+  it('reads a canonical business product projection through the public storefront catalog', async () => {
+    const projectedProduct = {
+      id: '66666666-6666-4666-8666-666666666666',
+      store_id: STORE_ID,
+      name: 'Jus mangga',
+      slug: 'jus-mangga-66666666',
+      description: null,
+      category: 'Minuman',
+      price_cents: 1_000_000,
+      stock_qty: 2,
+      is_available: true,
+      image_url: null,
+      metadata: {
+        canonical_business_product_id: '66666666-6666-4666-8666-666666666666',
+      },
+      created_at: '2026-09-03T00:00:00Z',
+      updated_at: '2026-09-03T00:00:00Z',
+    };
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        data: { store: { id: STORE_ID }, items: [projectedProduct], count: 1 },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchImpl);
+
+    await expect(
+      listUmkmProducts({ storeId: STORE_ID, includeUnavailable: false }),
+    ).resolves.toEqual([projectedProduct]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.stringContaining(`/v1/umkm/stores/${STORE_ID}/products`),
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+  });
+
   it('treats a Marketplace detail 404 as authoritative', async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()

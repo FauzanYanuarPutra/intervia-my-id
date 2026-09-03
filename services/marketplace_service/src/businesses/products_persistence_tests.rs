@@ -111,6 +111,28 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
     assert_eq!(mine.len(), 1);
     assert_eq!(mine[0].id, created.id);
 
+    let public_projection: (Uuid, i64, i32, bool, serde_json::Value) = sqlx::query_as(
+        r#"
+        SELECT store_id, price_cents, stock_qty, is_available, metadata
+        FROM umkm_products
+        WHERE id = $1
+        "#,
+    )
+    .bind(created.id)
+    .fetch_one(&pool)
+    .await
+    .expect("public storefront product projection");
+    assert_eq!(public_projection.0, store_id);
+    assert_eq!(public_projection.1, 1_000_000);
+    assert_eq!(public_projection.2, 2);
+    assert!(public_projection.3);
+    assert_eq!(
+        public_projection.4["canonical_business_product_id"],
+        created.id.to_string()
+    );
+    assert_eq!(public_projection.4["stock_known"], true);
+    assert!(public_projection.4.get("notes").is_none());
+
     let aggregate = BusinessRepository::new(pool.clone())
         .get_for_organization(business_id, organization_id)
         .await

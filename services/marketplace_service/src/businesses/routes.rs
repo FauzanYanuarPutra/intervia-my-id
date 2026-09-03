@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn product_validation_errors_use_stable_bad_request_responses() {
         let response = error_response(BusinessServiceError::ProductValidation(
-            super::super::products::ProductValidationError::InvalidName,
+            super::super::products::ProductValidationError::Name,
         ));
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);

@@ -159,6 +159,17 @@ impl ProductRepository {
         if !business_exists {
             return Err(ProductRepositoryError::BusinessNotFound);
         }
+        let store_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT store_id
+            FROM business_store_links
+            WHERE business_id = $1 AND link_type = 'primary'
+            "#,
+        )
+        .bind(business_id)
+        .fetch_optional(&mut *transaction)
+        .await?
+        .ok_or(ProductRepositoryError::Database)?;
 
         let product_id = Uuid::new_v4();
         sqlx::query(
@@ -180,6 +191,36 @@ impl ProductRepository {
         .bind(&command.owner_label)
         .bind(&command.consignment_terms)
         .bind(&command.notes)
+        .execute(&mut *transaction)
+        .await?;
+
+        let price_cents = price_label_to_cents(&command.price_label);
+        let stock_qty = storefront_stock_quantity(command.stock_count);
+        sqlx::query(
+            r#"
+            INSERT INTO umkm_products (
+              id, store_id, name, slug, description, category, price_cents,
+              stock_qty, is_available, image_url, metadata
+            )
+            VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, NULL, $9)
+            "#,
+        )
+        .bind(product_id)
+        .bind(store_id)
+        .bind(&command.name)
+        .bind(storefront_product_slug(&command.name, product_id))
+        .bind(&command.category)
+        .bind(price_cents)
+        .bind(stock_qty)
+        .bind(price_cents > 0 && command.stock_count != Some(0.0))
+        .bind(json!({
+            "canonical_business_product_id": product_id,
+            "canonical_business_id": business_id,
+            "price_label": command.price_label,
+            "source_type": command.source_type.as_str(),
+            "stock_mode": command.stock_mode.as_str(),
+            "stock_known": command.stock_count.is_some(),
+        }))
         .execute(&mut *transaction)
         .await?;
 
@@ -233,6 +274,41 @@ impl ProductRepository {
         transaction.commit().await?;
         Ok(row.into_product())
     }
+}
+
+fn price_label_to_cents(price_label: &str) -> i64 {
+    price_label
+        .chars()
+        .filter(char::is_ascii_digit)
+        .collect::<String>()
+        .parse::<i64>()
+        .unwrap_or(0)
+        .saturating_mul(100)
+}
+
+fn storefront_stock_quantity(stock_count: Option<f64>) -> i32 {
+    stock_count.unwrap_or(0.0).floor().min(f64::from(i32::MAX)) as i32
+}
+
+fn storefront_product_slug(name: &str, product_id: Uuid) -> String {
+    let base = name
+        .to_lowercase()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    let base = if base.is_empty() { "produk" } else { &base };
+    let suffix = product_id.simple().to_string();
+    format!("{base}-{}", &suffix[..8])
 }
 
 const PRODUCT_SELECT: &str = r#"
@@ -328,29 +404,29 @@ impl ProductRow {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProductValidationError {
-    InvalidName,
-    InvalidCategory,
-    InvalidPriceLabel,
-    InvalidOwnerLabel,
-    InvalidStockCount,
-    InvalidStockUnit,
-    InvalidMinimumStock,
-    InvalidConsignmentTerms,
-    InvalidNotes,
+    Name,
+    Category,
+    PriceLabel,
+    OwnerLabel,
+    StockCount,
+    StockUnit,
+    MinimumStock,
+    ConsignmentTerms,
+    Notes,
 }
 
 impl ProductValidationError {
     pub(crate) const fn code(self) -> &'static str {
         match self {
-            Self::InvalidName => "invalid_product_name",
-            Self::InvalidCategory => "invalid_product_category",
-            Self::InvalidPriceLabel => "invalid_product_price_label",
-            Self::InvalidOwnerLabel => "invalid_product_owner_label",
-            Self::InvalidStockCount => "invalid_product_stock_count",
-            Self::InvalidStockUnit => "invalid_product_stock_unit",
-            Self::InvalidMinimumStock => "invalid_product_min_stock_alert",
-            Self::InvalidConsignmentTerms => "invalid_product_consignment_terms",
-            Self::InvalidNotes => "invalid_product_notes",
+            Self::Name => "invalid_product_name",
+            Self::Category => "invalid_product_category",
+            Self::PriceLabel => "invalid_product_price_label",
+            Self::OwnerLabel => "invalid_product_owner_label",
+            Self::StockCount => "invalid_product_stock_count",
+            Self::StockUnit => "invalid_product_stock_unit",
+            Self::MinimumStock => "invalid_product_min_stock_alert",
+            Self::ConsignmentTerms => "invalid_product_consignment_terms",
+            Self::Notes => "invalid_product_notes",
         }
     }
 }
@@ -359,24 +435,23 @@ pub(crate) fn validate_create_request(
     request: CreateBusinessProductRequest,
 ) -> Result<ValidatedCreateBusinessProduct, ProductValidationError> {
     let name = normalize_required(request.name, 2, MAX_PRODUCT_NAME_LEN)
-        .ok_or(ProductValidationError::InvalidName)?;
+        .ok_or(ProductValidationError::Name)?;
     let category = normalize_required(request.category, 1, MAX_CATEGORY_LEN)
-        .ok_or(ProductValidationError::InvalidCategory)?;
+        .ok_or(ProductValidationError::Category)?;
     let price_label = normalize_required(request.price_label, 1, MAX_PRICE_LABEL_LEN)
-        .ok_or(ProductValidationError::InvalidPriceLabel)?;
+        .ok_or(ProductValidationError::PriceLabel)?;
     let owner_label = normalize_optional(request.owner_label, MAX_OWNER_LABEL_LEN)
-        .ok_or(ProductValidationError::InvalidOwnerLabel)?;
-    validate_non_negative_finite(request.stock_count)
-        .ok_or(ProductValidationError::InvalidStockCount)?;
+        .ok_or(ProductValidationError::OwnerLabel)?;
+    validate_non_negative_finite(request.stock_count).ok_or(ProductValidationError::StockCount)?;
     let stock_unit = normalize_required(request.stock_unit, 1, MAX_STOCK_UNIT_LEN)
-        .ok_or(ProductValidationError::InvalidStockUnit)?;
+        .ok_or(ProductValidationError::StockUnit)?;
     validate_non_negative_finite(request.min_stock_alert)
-        .ok_or(ProductValidationError::InvalidMinimumStock)?;
+        .ok_or(ProductValidationError::MinimumStock)?;
     let consignment_terms =
         normalize_optional(request.consignment_terms, MAX_CONSIGNMENT_TERMS_LEN)
-            .ok_or(ProductValidationError::InvalidConsignmentTerms)?;
-    let notes = normalize_optional(request.notes, MAX_NOTES_LEN)
-        .ok_or(ProductValidationError::InvalidNotes)?;
+            .ok_or(ProductValidationError::ConsignmentTerms)?;
+    let notes =
+        normalize_optional(request.notes, MAX_NOTES_LEN).ok_or(ProductValidationError::Notes)?;
 
     Ok(ValidatedCreateBusinessProduct {
         name,
@@ -451,7 +526,7 @@ mod tests {
 
         assert_eq!(
             validate_create_request(request).unwrap_err(),
-            ProductValidationError::InvalidName
+            ProductValidationError::Name
         );
     }
 
@@ -462,7 +537,7 @@ mod tests {
             request.stock_count = stock_count;
             assert_eq!(
                 validate_create_request(request).unwrap_err(),
-                ProductValidationError::InvalidStockCount
+                ProductValidationError::StockCount
             );
         }
 
@@ -471,7 +546,7 @@ mod tests {
             request.min_stock_alert = minimum;
             assert_eq!(
                 validate_create_request(request).unwrap_err(),
-                ProductValidationError::InvalidMinimumStock
+                ProductValidationError::MinimumStock
             );
         }
     }
@@ -494,5 +569,17 @@ mod tests {
         assert_eq!(stock_health(Some(1.0), Some(2.0)), "tipis");
         assert_eq!(stock_health(Some(2.0), Some(2.0)), "tipis");
         assert_eq!(stock_health(Some(10.0), None), "aman");
+    }
+
+    #[test]
+    fn storefront_projection_converts_rupiah_labels_and_bounds_stock() {
+        assert_eq!(price_label_to_cents("Rp10.000"), 1_000_000);
+        assert_eq!(price_label_to_cents("Hubungi"), 0);
+        assert_eq!(storefront_stock_quantity(Some(12.9)), 12);
+        assert_eq!(storefront_stock_quantity(None), 0);
+        assert_eq!(
+            storefront_stock_quantity(Some(f64::from(i32::MAX) + 10.0)),
+            i32::MAX
+        );
     }
 }

@@ -30,6 +30,7 @@ import {
 import { isPublicUmkmStoreVisible } from '@/lib/super-app/umkm-public-discovery';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import {
+  getStorefrontProductStockStatus,
   isStorefrontProductInStock,
   loadStorefrontCatalog,
 } from '@/lib/super-app/umkm-storefront-products';
@@ -180,7 +181,8 @@ function ProductCard({
   product: UmkmProduct;
   isId: boolean;
 }) {
-  const inStock = isStorefrontProductInStock(product);
+  const stockStatus = getStorefrontProductStockStatus(product);
+  const inStock = stockStatus === 'in_stock';
   const image = productImage(product);
 
   return (
@@ -215,9 +217,15 @@ function ProductCard({
             </span>
           </div>
         )}
-        {!inStock ? (
+        {stockStatus !== 'in_stock' ? (
           <span className="absolute left-3 top-3 rounded-full bg-slate-950/78 px-2.5 py-1 text-[11px] font-bold text-white">
-            {isId ? 'Stok habis' : 'Out of stock'}
+            {stockStatus === 'unknown'
+              ? isId
+                ? 'Stok perlu dikonfirmasi'
+                : 'Stock needs confirmation'
+              : isId
+                ? 'Stok habis'
+                : 'Out of stock'}
           </span>
         ) : null}
       </div>

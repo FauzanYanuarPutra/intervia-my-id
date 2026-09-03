@@ -27,7 +27,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
   const [category, setCategory] = useState(categoryOptions[0]);
   const [sourceType, setSourceType] =
     useState<(typeof sourceTypeOptions)[number]['value']>('owned');
-  const [priceLabel, setPriceLabel] = useState('');
+  const [priceRupiah, setPriceRupiah] = useState('');
   const [ownerLabel, setOwnerLabel] = useState('');
   const [stockCount, setStockCount] = useState('');
   const [minStockAlert, setMinStockAlert] = useState('');
@@ -47,8 +47,9 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       return;
     }
 
-    if (priceLabel.trim().length < 2) {
-      setError('Harga produk belum valid.');
+    const normalizedPrice = Number(priceRupiah);
+    if (!Number.isSafeInteger(normalizedPrice) || normalizedPrice <= 0) {
+      setError('Harga harus berupa angka lebih dari nol.');
       return;
     }
 
@@ -65,7 +66,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         body: JSON.stringify({
           name: name.trim(),
           category,
-          priceLabel: priceLabel.trim(),
+          priceLabel: `Rp${new Intl.NumberFormat('id-ID').format(normalizedPrice)}`,
           sourceType,
           ownerLabel: ownerLabel.trim(),
           stockCount: stockCount.trim() ? Number(stockCount) : null,
@@ -85,7 +86,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       }
 
       setName('');
-      setPriceLabel('');
+      setPriceRupiah('');
       setOwnerLabel('');
       setStockCount('');
       setMinStockAlert('');
@@ -151,13 +152,15 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
         </label>
 
         <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-          Harga
+          Harga (Rp)
           <input
             required
-            maxLength={80}
-            value={priceLabel}
-            onChange={event => setPriceLabel(event.target.value)}
-            placeholder="Rp18.000"
+            type="number"
+            min="1"
+            step="1"
+            value={priceRupiah}
+            onChange={event => setPriceRupiah(event.target.value)}
+            placeholder="18000"
             className="portal-input"
           />
         </label>

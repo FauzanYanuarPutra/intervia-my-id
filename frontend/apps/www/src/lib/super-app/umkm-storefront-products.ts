@@ -4,10 +4,22 @@ export type StorefrontCatalogResult =
   | { status: 'ready'; products: UmkmProduct[] }
   | { status: 'unavailable'; products: [] };
 
+export type StorefrontProductStockStatus =
+  | 'in_stock'
+  | 'out_of_stock'
+  | 'unknown';
+
+export function getStorefrontProductStockStatus(
+  product: Pick<UmkmProduct, 'stock_qty' | 'metadata'>,
+): StorefrontProductStockStatus {
+  if (product.metadata?.stock_known === false) return 'unknown';
+  return product.stock_qty > 0 ? 'in_stock' : 'out_of_stock';
+}
+
 export function isStorefrontProductInStock(
-  product: Pick<UmkmProduct, 'stock_qty'>,
+  product: Pick<UmkmProduct, 'stock_qty' | 'metadata'>,
 ): boolean {
-  return product.stock_qty > 0;
+  return getStorefrontProductStockStatus(product) === 'in_stock';
 }
 
 export function selectPublishedStorefrontProducts(

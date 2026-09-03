@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { UmkmProduct } from './umkm-commerce';
 import {
+  getStorefrontProductStockStatus,
   isStorefrontProductInStock,
   loadStorefrontCatalog,
   selectPublishedStorefrontProducts,
@@ -52,6 +53,16 @@ describe('public UMKM storefront products', () => {
     expect(
       isStorefrontProductInStock(buildProduct('available', { stock_qty: 3 })),
     ).toBe(true);
+  });
+
+  it('keeps unknown canonical stock distinct from a confirmed stockout', () => {
+    const product = buildProduct('unknown-stock', {
+      stock_qty: 0,
+      metadata: { stock_known: false },
+    });
+
+    expect(getStorefrontProductStockStatus(product)).toBe('unknown');
+    expect(isStorefrontProductInStock(product)).toBe(false);
   });
 
   it('distinguishes an unavailable catalog from a genuinely empty catalog', async () => {
