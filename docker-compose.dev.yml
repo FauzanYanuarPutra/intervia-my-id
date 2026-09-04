@@ -20,6 +20,14 @@ services:
     ports:
       - "127.0.0.1:${PORT_RABBITMQ:-5672}:5672"
       - "127.0.0.1:${PORT_RABBITMQ_UI:-15672}:15672"
+    # `rabbitmq-diagnostics ping` only proves the Erlang runtime/CLI is alive.
+    # Downstream services need the AMQP listener to be accepting connections.
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
 
   scylla_db:
     ports:
