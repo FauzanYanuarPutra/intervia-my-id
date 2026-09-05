@@ -25,10 +25,15 @@ describe('buildStaticPublicPageMetadata', () => {
   });
 
   it('keeps legal and trust pages indexable with page-specific metadata', () => {
-    for (const page of ['trust', 'privacy', 'terms'] as const) {
+    for (const page of ['trust', 'privacy', 'terms', 'cookie-policy', 'refund-policy'] as const) {
       const metadata = buildStaticPublicPageMetadata(page, 'id');
       expect(metadata.robots).toEqual({ index: true, follow: true });
       expect(metadata.alternates?.canonical).toBe(`https://www.lajukan.com/id/${page}`);
+      expect(metadata.alternates?.languages).toEqual({
+        id: `https://www.lajukan.com/id/${page}`,
+        en: `https://www.lajukan.com/en/${page}`,
+        'x-default': `https://www.lajukan.com/id/${page}`,
+      });
       expect(metadata.title).toBeTruthy();
       expect(metadata.description).toBeTruthy();
     }
