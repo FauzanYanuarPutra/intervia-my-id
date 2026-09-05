@@ -48,17 +48,15 @@ jobs:
         run: |
           set -euo pipefail
           for service in identity_service marketplace_service community_service ai_service; do
-            if [[ -f "services/$service/Cargo.toml" ]]; then
-              (cd "services/$service" && cargo fmt)
-            fi
+            [[ -f "services/$service/Cargo.toml" ]] || continue
+            (cd "services/$service" && cargo fmt)
           done
 
       - name: Format Chat service
         shell: bash
         run: |
           set -euo pipefail
-          cd services/chat_service
-          mix format
+          (cd services/chat_service && mix format)
 
       - name: Remediate frontend compatible dependencies
         shell: bash
@@ -68,10 +66,11 @@ jobs:
             dir="frontend/apps/$app"
             [[ -f "$dir/package.json" ]] || continue
             pushd "$dir" >/dev/null
-            npm install --package-lock-only --ignore-scripts
-            npm install --package-lock-only --ignore-scripts next@16.2.0
-            npm install --package-lock-only --ignore-scripts --save-dev postcss@8.5.8
-            npm update --package-lock-only --ignore-scripts
+            # @emoji-mart/react 1.1.1 is the current upstream release and has a stale React <=18 peer declaration.
+            # Use legacy peer resolution only while regenerating the lockfile, then prove runtime compatibility below with lint/test/build.
+            npm install --package-lock-only --ignore-scripts --legacy-peer-deps next@16.3.4
+            npm install --package-lock-only --ignore-scripts --legacy-peer-deps --save-dev postcss@8.5.8
+            npm update --package-lock-only --ignore-scripts --legacy-peer-deps
             popd >/dev/null
           done
 
@@ -134,7 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           cd frontend/apps/www
-          npm ci --ignore-scripts
+          npm ci --ignore-scripts --legacy-peer-deps
           npm run lint
           npm test
           npm run build
