@@ -16,8 +16,10 @@ jobs:
         with:
           ref: hardening/quality-security-wave10-20260905
           fetch-depth: 0
+
       - name: Install pinned Rust toolchain
         run: rustup show
+
       - name: Fix marketplace lint and formatting
         working-directory: services/marketplace_service
         run: |
@@ -25,24 +27,137 @@ jobs:
           cargo clippy --locked --all-targets --fix --allow-dirty --allow-staged -- -D warnings || true
           python - <<'PY'
           from pathlib import Path
-          targets = [Path('src/main.rs'), Path('src/order_engine.rs')]
-          names = ['insert_state_transition','find_reusable_pending_topup_for_transaction','insert_wallet_ledger_entry_tx','build_provider_checkout','update_transaction_status']
-          for path in targets:
-              text = path.read_text(encoding='utf-8')
-              for name in names:
-                  needle = f'async fn {name}('
-                  if needle in text and f'#[expect(clippy::too_many_arguments' not in text[max(0,text.index(needle)-120):text.index(needle)]:
-                      text = text.replace(needle, '#[expect(clippy::too_many_arguments, reason = "existing transactional boundary; refactor separately")]\n'+needle, 1)
-              if path.name == 'main.rs':
-                  needle = 'enum CollectEventsRequest {'
-                  if needle in text and '#[expect(clippy::large_enum_variant' not in text[max(0,text.index(needle)-120):text.index(needle)]:
-                      text = text.replace(needle, '#[expect(clippy::large_enum_variant, reason = "wire request enum preserves existing JSON contract")]\n'+needle, 1)
-              path.write_text(text, encoding='utf-8')
+
+          main = Path('src/main.rs')
+          order = Path('src/order_engine.rs')
+          main_text = main.read_text(encoding='utf-8')
+          order_text = order.read_text(encoding='utf-8')
+
+          # Keep existing transactional function boundaries while making the exception explicit and local.
+          for name in [
+              'find_reusable_pending_topup_for_transaction',
+              'insert_wallet_ledger_entry_tx',
+              'build_provider_checkout',
+              'update_transaction_status',
+          ]:
+              needle = f'async fn {name}('
+              idx = main_text.find(needle)
+              if idx >= 0 and '#[expect(clippy::too_many_arguments' not in main_text[max(0, idx-160):idx]:
+                  main_text = main_text.replace(
+                      needle,
+                      '#[expect(clippy::too_many_arguments, reason = "existing transactional boundary; refactor separately")]\n' + needle,
+                      1,
+                  )
+
+          needle = 'async fn insert_state_transition('
+          idx = order_text.find(needle)
+          if idx >= 0 and '#[expect(clippy::too_many_arguments' not in order_text[max(0, idx-160):idx]:
+              order_text = order_text.replace(
+                  needle,
+                  '#[expect(clippy::too_many_arguments, reason = "existing transactional boundary; refactor separately")]\n' + needle,
+                  1,
+              )
+
+          enum_needle = 'enum CollectEventsRequest {'
+          idx = main_text.find(enum_needle)
+          if idx >= 0 and '#[expect(clippy::large_enum_variant' not in main_text[max(0, idx-160):idx]:
+              main_text = main_text.replace(
+                  enum_needle,
+                  '#[expect(clippy::large_enum_variant, reason = "wire request enum preserves existing JSON contract")]\n' + enum_needle,
+                  1,
+              )
+
+          order_old = '''        let is_top = input
+              .category_specific_metadata
+              .as_ref()
+              .and_then(|v| v.get("payment_terms"))
+              .and_then(|v| v.as_str())
+              == Some("TOP");
+          if is_top {
+              OrderBaseStatus::PendingPayment
+          } else {
+              OrderBaseStatus::PendingPayment
+          }'''
+          order_new = '''        let _is_top = input
+              .category_specific_metadata
+              .as_ref()
+              .and_then(|v| v.get("payment_terms"))
+              .and_then(|v| v.as_str())
+              == Some("TOP");
+          OrderBaseStatus::PendingPayment'''
+          if order_old in order_text:
+              order_text = order_text.replace(order_old, order_new, 1)
+
+          demand_old = '''    match metadata_listing_side(metadata).as_deref() {
+          Some("demand")
+          | Some("need")
+          | Some("needs")
+          | Some("request")
+          | Some("requested")
+          | Some("seeker")
+          | Some("buyer request")
+          | Some("buy request")
+          | Some("butuh")
+          | Some("mencari") => true,
+          _ => false,
+      }'''
+          demand_new = '''    matches!(
+          metadata_listing_side(metadata).as_deref(),
+          Some("demand")
+              | Some("need")
+              | Some("needs")
+              | Some("request")
+              | Some("requested")
+              | Some("seeker")
+              | Some("buyer request")
+              | Some("buy request")
+              | Some("butuh")
+              | Some("mencari")
+      )'''
+          if demand_old in main_text:
+              main_text = main_text.replace(demand_old, demand_new, 1)
+
+          actor_old = '''        if value.starts_with('@') {
+              value
+          } else if value.contains(' ') || value.contains('.') {
+              value
+          } else if value == "Seseorang" || value == "Someone" {
+              value
+          } else {
+              format!("@{value}")
+          }'''
+          actor_new = '''        if value.starts_with('@')
+              || value.contains(' ')
+              || value.contains('.')
+              || value == "Seseorang"
+              || value == "Someone"
+          {
+              value
+          } else {
+              format!("@{value}")
+          }'''
+          if actor_old in main_text:
+              main_text = main_text.replace(actor_old, actor_new, 1)
+
+          main_text = main_text.replace(
+              'completed.sort_by(|left, right| right.created_at.cmp(&left.created_at));',
+              'completed.sort_by_key(|item| std::cmp::Reverse(item.created_at));',
+              1,
+          )
+          main_text = main_text.replace(
+              'Ok(count) if count == 0 => sleep(Duration::from_millis(poll_ms)).await,',
+              'Ok(0) => sleep(Duration::from_millis(poll_ms)).await,',
+              1,
+          )
+
+          main.write_text(main_text, encoding='utf-8')
+          order.write_text(order_text, encoding='utf-8')
           PY
           cargo fmt
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
+
       - name: Fix community lint and formatting
         working-directory: services/community_service
         run: |
@@ -52,23 +167,26 @@ jobs:
           path = Path('src/main.rs')
           text = path.read_text(encoding='utf-8')
           replacements = {
-            '    store_name: Option<String>,': '    #[serde(rename = "storeName")]\n    _store_name: Option<String>,',
-            '    store_city: Option<String>,': '    #[serde(rename = "storeCity")]\n    _store_city: Option<String>,',
-            '    storefront_path: Option<String>,': '    #[serde(rename = "storefrontPath")]\n    _storefront_path: Option<String>,',
+              '    store_name: Option<String>,': '    #[serde(rename = "storeName")]\n    _store_name: Option<String>,',
+              '    store_city: Option<String>,': '    #[serde(rename = "storeCity")]\n    _store_city: Option<String>,',
+              '    storefront_path: Option<String>,': '    #[serde(rename = "storefrontPath")]\n    _storefront_path: Option<String>,',
           }
-          for old,new in replacements.items():
-              if old in text: text=text.replace(old,new,1)
-          path.write_text(text,encoding='utf-8')
+          for old, new in replacements.items():
+              if old in text:
+                  text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
           PY
           cargo clippy --locked --all-targets --fix --allow-dirty --allow-staged -- -D warnings || true
           cargo fmt
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
+
       - uses: erlef/setup-beam@v1
         with:
           otp-version: '26.2'
           elixir-version: '1.17.3'
+
       - name: Format and verify chat
         working-directory: services/chat_service
         env:
@@ -79,6 +197,7 @@ jobs:
           mix format
           mix format --check-formatted
           mix test
+
       - name: Remove one-shot helpers and commit
         run: |
           set -euo pipefail
