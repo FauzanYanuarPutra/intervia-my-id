@@ -1,0 +1,139 @@
+name: Media Durability Remediation
+
+on:
+  push:
+    branches:
+      - hardening/media-durability-20260905
+
+permissions:
+  contents: write
+
+concurrency:
+  group: media-durability-remediate
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: hardening/media-durability-20260905
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Format Rust services
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in identity_service marketplace_service community_service ai_service; do
+            if [[ -f "services/$service/Cargo.toml" ]]; then
+              (cd "services/$service" && cargo fmt)
+            fi
+          done
+
+      - name: Format Chat service
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd services/chat_service
+          mix format
+
+      - name: Remediate frontend compatible dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for app in www cms crm usaha; do
+            dir="frontend/apps/$app"
+            [[ -f "$dir/package.json" ]] || continue
+            pushd "$dir" >/dev/null
+            npm install --package-lock-only --ignore-scripts
+            npm install --package-lock-only --ignore-scripts next@16.2.0
+            npm install --package-lock-only --ignore-scripts --save-dev postcss@8.5.8
+            # Re-resolve the existing manifest so stale transitive locks (including sharp) can move to patched compatible versions.
+            npm update --package-lock-only --ignore-scripts
+            popd >/dev/null
+          done
+
+      - name: Update compatible Rust lockfile dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in identity_service marketplace_service community_service ai_service; do
+            dir="services/$service"
+            [[ -f "$dir/Cargo.toml" ]] || continue
+            (cd "$dir" && cargo update)
+          done
+
+      - name: Verify frontend production audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          for app in www cms crm usaha; do
+            dir="frontend/apps/$app"
+            [[ -f "$dir/package-lock.json" ]] || continue
+            echo "== npm audit: $app =="
+            (cd "$dir" && npm audit --omit=dev --audit-level=high)
+          done
+
+      - name: Verify Rust security audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install cargo-audit --locked
+          for service in identity_service marketplace_service community_service ai_service; do
+            dir="services/$service"
+            [[ -f "$dir/Cargo.lock" ]] || continue
+            echo "== cargo audit: $service =="
+            (cd "$dir" && cargo audit)
+          done
+
+      - name: Verify Rust quality
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in identity_service marketplace_service community_service ai_service; do
+            dir="services/$service"
+            [[ -f "$dir/Cargo.toml" ]] || continue
+            (cd "$dir" && cargo fmt --check)
+            (cd "$dir" && cargo clippy --all-targets --all-features -- -D warnings)
+            (cd "$dir" && cargo test --all-targets --all-features)
+          done
+
+      - name: Verify Chat quality
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd services/chat_service
+          mix deps.get
+          mix format --check-formatted
+          mix test
+
+      - name: Verify public frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd frontend/apps/www
+          npm ci --ignore-scripts
+          npm run lint
+          npm test -- --run
+          npm run build
+
+      - name: Commit verified remediation and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/media-durability-remediate.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No remediation changes were needed.'
+            exit 0
+          fi
+          git commit -m 'chore: remediate quality and security baseline'
+          git push origin HEAD:hardening/media-durability-20260905
