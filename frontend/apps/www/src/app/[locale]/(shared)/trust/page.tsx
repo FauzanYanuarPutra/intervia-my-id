@@ -121,11 +121,17 @@ export default async function TrustCenterPage({ params }: PageProps) {
                 : 'A concise guide to accounts, data, payments, reviews, reports, and important rules on Lajukan.'}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Link href="#trust-topics" className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm">
+              <Link
+                href="#trust-topics"
+                className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm"
+              >
                 {isId ? 'Lihat topik' : 'View topics'}
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/support" className="ui-button-secondary inline-flex items-center gap-2 px-4 text-sm">
+              <Link
+                href="/support"
+                className="ui-button-secondary inline-flex items-center gap-2 px-4 text-sm"
+              >
                 <LifeBuoy className="h-4 w-4" />
                 {isId ? 'Minta bantuan' : 'Get support'}
               </Link>
@@ -137,7 +143,14 @@ export default async function TrustCenterPage({ params }: PageProps) {
               {isId ? 'Yang bisa dicek di sini' : 'What you can check here'}
             </p>
             <div className="mt-3 grid gap-2 text-sm text-[color:var(--app-text)]">
-              {(isId ? ['Keamanan akun', 'Hak data pribadi', 'Pembayaran & refund'] : ['Account security', 'Personal data rights', 'Payments & refunds']).map(item => (
+              {(isId
+                ? ['Keamanan akun', 'Hak data pribadi', 'Pembayaran & refund']
+                : [
+                    'Account security',
+                    'Personal data rights',
+                    'Payments & refunds',
+                  ]
+              ).map(item => (
                 <div key={item} className="flex items-center gap-2">
                   <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                     <ShieldCheck className="h-3.5 w-3.5" />
@@ -147,7 +160,8 @@ export default async function TrustCenterPage({ params }: PageProps) {
               ))}
             </div>
             <div className="mt-4 rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-              {isId ? 'Terakhir diperbarui' : 'Last updated'}: {pickText(locale, TRUST_LAST_UPDATED)}
+              {isId ? 'Terakhir diperbarui' : 'Last updated'}:{' '}
+              {pickText(locale, TRUST_LAST_UPDATED)}
             </div>
           </div>
         </div>
@@ -157,10 +171,20 @@ export default async function TrustCenterPage({ params }: PageProps) {
         {quickActions.map(item => {
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href} className="ui-panel-muted ui-card-hover rounded-[22px] p-4">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]"><Icon className="h-5 w-5" /></span>
-              <h2 className="mt-3 text-sm font-bold text-[color:var(--app-text)]">{item.title}</h2>
-              <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">{item.description}</p>
+            <Link
+              key={item.href}
+              href={item.href}
+              className="ui-panel-muted ui-card-hover rounded-[22px] p-4"
+            >
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h2 className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
+                {item.title}
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                {item.description}
+              </p>
             </Link>
           );
         })}
@@ -169,31 +193,81 @@ export default async function TrustCenterPage({ params }: PageProps) {
       <section id="trust-topics" className="scroll-mt-24 space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="inline-flex rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">{isId ? 'Topik utama' : 'Core topics'}</p>
-            <h2 className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">{isId ? 'Pilih yang ingin dicek' : 'Choose what you need to check'}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">{isId ? 'Bahasannya dibuat singkat: apa risikonya, kontrolnya apa, dan harus ke mana kalau butuh bantuan.' : 'Each topic explains the risk, the control, and where to go when you need help.'}</p>
+            <p className="inline-flex rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+              {isId ? 'Topik utama' : 'Core topics'}
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">
+              {isId
+                ? 'Pilih yang ingin dicek'
+                : 'Choose what you need to check'}
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Bahasannya dibuat singkat: apa risikonya, kontrolnya apa, dan harus ke mana kalau butuh bantuan.'
+                : 'Each topic explains the risk, the control, and where to go when you need help.'}
+            </p>
           </div>
         </div>
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {TRUST_TOPICS.map(topic => (
-            <Link key={topic.slug} href={`/trust/${topic.slug}`} className="ui-panel-muted ui-card-hover flex min-h-[218px] flex-col rounded-[24px] p-4">
+            <Link
+              key={topic.slug}
+              href={`/trust/${topic.slug}`}
+              className="ui-panel-muted ui-card-hover flex min-h-[218px] flex-col rounded-[24px] p-4"
+            >
               <TrustBadge label={pickText(locale, topic.badge)} />
-              <h3 className="mt-3 text-lg font-bold text-[color:var(--app-text)]">{pickText(locale, topic.shortTitle)}</h3>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">{pickText(locale, topic.summary)}</p>
-              <div className="mt-3 rounded-[14px] bg-white/70 px-3 py-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] dark:bg-slate-950/45"><span className="font-bold text-[color:var(--app-text)]">{isId ? 'Untuk:' : 'For:'}</span> {pickText(locale, topic.audience)}</div>
-              <span className="mt-auto inline-flex pt-4 text-xs font-semibold text-[color:var(--app-accent)]">{isId ? 'Buka detail' : 'Open detail'}</span>
+              <h3 className="mt-3 text-lg font-bold text-[color:var(--app-text)]">
+                {pickText(locale, topic.shortTitle)}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {pickText(locale, topic.summary)}
+              </p>
+              <div className="mt-3 rounded-[14px] bg-white/70 px-3 py-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] dark:bg-slate-950/45">
+                <span className="font-bold text-[color:var(--app-text)]">
+                  {isId ? 'Untuk:' : 'For:'}
+                </span>{' '}
+                {pickText(locale, topic.audience)}
+              </div>
+              <span className="mt-auto inline-flex pt-4 text-xs font-semibold text-[color:var(--app-accent)]">
+                {isId ? 'Buka detail' : 'Open detail'}
+              </span>
             </Link>
           ))}
         </div>
       </section>
 
       <section className="space-y-3">
-        <SummaryCard title={isId ? 'Aturan penting, versi ringkas' : 'Concise legal references'} description={isId ? 'Untuk hal legal, mulai dari ringkasan dulu. Detail tetap tersedia di halaman masing-masing.' : 'Start with concise summaries. Full details stay available in each legal page.'} meta={isId ? 'Aturan dasar' : 'Legal'}>
-          <InfoChips items={[isId ? 'Consent & hak data' : 'Consent & data rights', isId ? 'Transaksi & sengketa' : 'Transactions & disputes', isId ? 'Cookie & preferensi' : 'Cookies & preferences']} />
+        <SummaryCard
+          title={
+            isId ? 'Aturan penting, versi ringkas' : 'Concise legal references'
+          }
+          description={
+            isId
+              ? 'Untuk hal legal, mulai dari ringkasan dulu. Detail tetap tersedia di halaman masing-masing.'
+              : 'Start with concise summaries. Full details stay available in each legal page.'
+          }
+          meta={isId ? 'Aturan dasar' : 'Legal'}
+        >
+          <InfoChips
+            items={[
+              isId ? 'Consent & hak data' : 'Consent & data rights',
+              isId ? 'Transaksi & sengketa' : 'Transactions & disputes',
+              isId ? 'Cookie & preferensi' : 'Cookies & preferences',
+            ]}
+          />
         </SummaryCard>
+
         <div className="grid gap-3 md:grid-cols-3">
           {LEGAL_SUMMARIES.map(item => (
-            <LegalSummaryCard key={item.key} title={pickText(locale, item.title)} summary={pickText(locale, item.summary)} bullets={item.bullets.map(bullet => pickText(locale, bullet))} href={item.href} cta={isId ? 'Baca ringkas' : 'Read summary'} />
+            <LegalSummaryCard
+              key={item.key}
+              title={pickText(locale, item.title)}
+              summary={pickText(locale, item.summary)}
+              bullets={item.bullets.map(bullet => pickText(locale, bullet))}
+              href={item.href}
+              cta={isId ? 'Baca ringkas' : 'Read summary'}
+            />
           ))}
         </div>
       </section>
@@ -201,11 +275,27 @@ export default async function TrustCenterPage({ params }: PageProps) {
       <section className="ui-panel rounded-[24px] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="inline-flex rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">{isId ? 'Butuh bantuan' : 'Support'}</p>
-            <h2 className="mt-2 text-xl font-bold text-[color:var(--app-text)]">{isId ? 'Ada masalah akun, data, transaksi, atau konten?' : 'Need help with account, data, transaction, or content issues?'}</h2>
-            <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">{isId ? 'Kirim lewat support supaya ada riwayat dan bisa ditindak dengan jelas.' : 'Use support so there is a clear trail and the issue can be handled properly.'}</p>
+            <p className="inline-flex rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+              {isId ? 'Butuh bantuan' : 'Support'}
+            </p>
+            <h2 className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
+              {isId
+                ? 'Ada masalah akun, data, transaksi, atau konten?'
+                : 'Need help with account, data, transaction, or content issues?'}
+            </h2>
+            <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Kirim lewat support supaya ada riwayat dan bisa ditindak dengan jelas.'
+                : 'Use support so there is a clear trail and the issue can be handled properly.'}
+            </p>
           </div>
-          <Link href="/support" className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm"><LifeBuoy className="h-4 w-4" />{isId ? 'Buka support' : 'Open support'}</Link>
+          <Link
+            href="/support"
+            className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm"
+          >
+            <LifeBuoy className="h-4 w-4" />
+            {isId ? 'Buka support' : 'Open support'}
+          </Link>
         </div>
       </section>
     </main>
