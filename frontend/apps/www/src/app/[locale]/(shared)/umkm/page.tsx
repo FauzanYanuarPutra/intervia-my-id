@@ -29,7 +29,6 @@ type PageProps = {
 
 function toDiscoveryStore(store: UmkmStore): DiscoveryStore {
   const publicStore = projectPublicUmkmStore(store);
-
   return {
     id: publicStore.id,
     slug: publicStore.slug,
@@ -46,43 +45,35 @@ function toDiscoveryStore(store: UmkmStore): DiscoveryStore {
   };
 }
 
-async function getDeepLinkedStore(
-  storeSlug: string,
-  storeId: string,
-): Promise<UmkmStore | null> {
+async function getDeepLinkedStore(storeSlug: string, storeId: string): Promise<UmkmStore | null> {
   if (storeSlug) {
     const store = await getUmkmStoreBySlug(storeSlug).catch(() => null);
     if (store) return store;
   }
-
-  if (storeId) {
-    return getUmkmStoreById(storeId).catch(() => null);
-  }
-
+  if (storeId) return getUmkmStoreById(storeId).catch(() => null);
   return null;
 }
 
-export async function generateMetadata({
-  params,
-}: Pick<PageProps, 'params'>): Promise<Metadata> {
+export async function generateMetadata({ params }: Pick<PageProps, 'params'>): Promise<Metadata> {
   const { locale } = await params;
   const isId = locale === 'id';
-  const title = isId
-    ? 'Temukan Usaha di Lajukan'
-    : 'Discover Businesses on Lajukan';
+  const lang = isId ? 'id' : 'en';
+  const title = isId ? 'Peta Usaha di Lajukan' : 'Lajukan Business Map';
   const description = isId
-    ? 'Cari dan bandingkan profil usaha, lokasi, kategori, serta jalur kontak yang tersedia di Lajukan.'
-    : 'Find and compare business profiles, locations, categories, and available contact options on Lajukan.';
-  const canonical = `https://www.lajukan.com/${isId ? 'id' : 'en'}/umkm`;
+    ? 'Lihat usaha lokal melalui peta. Untuk pencarian bisnis utama, gunakan Jelajahi Lajukan.'
+    : 'Find local businesses on the map. Use Lajukan Explore for primary business discovery.';
+  const canonical = `https://www.lajukan.com/${lang}/explore?type=businesses`;
 
   return {
     title,
     description,
+    robots: { index: false, follow: true },
     alternates: {
       canonical,
       languages: {
-        'id-ID': 'https://www.lajukan.com/id/umkm',
-        'en-US': 'https://www.lajukan.com/en/umkm',
+        id: 'https://www.lajukan.com/id/explore?type=businesses',
+        en: 'https://www.lajukan.com/en/explore?type=businesses',
+        'x-default': 'https://www.lajukan.com/id/explore?type=businesses',
       },
     },
     openGraph: {
@@ -99,37 +90,15 @@ export async function generateMetadata({
 export default async function UmkmPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   const resolvedSearchParams = await searchParams;
-  const deepLinkedSlug =
-    resolvedSearchParams.store?.trim() ||
-    resolvedSearchParams.business?.trim() ||
-    '';
+  const deepLinkedSlug = resolvedSearchParams.store?.trim() || resolvedSearchParams.business?.trim() || '';
   const deepLinkedStoreId = resolvedSearchParams.storeId?.trim() || '';
   const [listedStoresResult, deepLinkedStoreResult] = await Promise.allSettled([
-    listUmkmStores({
-      query: resolvedSearchParams.q?.trim() || undefined,
-      city: resolvedSearchParams.city?.trim() || undefined,
-      activeOnly: true,
-      limit: 10,
-    }),
+    listUmkmStores({ query: resolvedSearchParams.q?.trim() || undefined, city: resolvedSearchParams.city?.trim() || undefined, activeOnly: true, limit: 10 }),
     getDeepLinkedStore(deepLinkedSlug, deepLinkedStoreId),
   ]);
-
-  const listedStores =
-    listedStoresResult.status === 'fulfilled'
-      ? listedStoresResult.value
-          .filter(isPublicUmkmStoreVisible)
-          .map(toDiscoveryStore)
-      : undefined;
-  const deepLinkedStore =
-    deepLinkedStoreResult.status === 'fulfilled' &&
-    deepLinkedStoreResult.value &&
-    isPublicUmkmStoreVisible(deepLinkedStoreResult.value)
-      ? toDiscoveryStore(deepLinkedStoreResult.value)
-      : null;
-  const initialStores =
-    listedStores === undefined && !deepLinkedStore
-      ? undefined
-      : mergeDeepLinkedUmkmStore(listedStores || [], deepLinkedStore);
+  const listedStores = listedStoresResult.status === 'fulfilled' ? listedStoresResult.value.filter(isPublicUmkmStoreVisible).map(toDiscoveryStore) : undefined;
+  const deepLinkedStore = deepLinkedStoreResult.status === 'fulfilled' && deepLinkedStoreResult.value && isPublicUmkmStoreVisible(deepLinkedStoreResult.value) ? toDiscoveryStore(deepLinkedStoreResult.value) : null;
+  const initialStores = listedStores === undefined && !deepLinkedStore ? undefined : mergeDeepLinkedUmkmStore(listedStores || [], deepLinkedStore);
 
   return (
     <UmkmDiscoveryClient
@@ -138,9 +107,7 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
       initialQuery={resolvedSearchParams.q || ''}
       initialCity={resolvedSearchParams.city || ''}
       initialCategory={resolvedSearchParams.category || ''}
-      initialStoreSlug={
-        resolvedSearchParams.store || resolvedSearchParams.business || ''
-      }
+      initialStoreSlug={resolvedSearchParams.store || resolvedSearchParams.business || ''}
       initialStoreId={resolvedSearchParams.storeId || ''}
       initialMapOnly={resolvedSearchParams.view === 'map'}
       initialStores={initialStores}

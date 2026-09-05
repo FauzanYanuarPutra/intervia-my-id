@@ -44,7 +44,8 @@ const nextConfig = {
   async redirects() {
     const redirects = [
       { source: '/:locale(id|en)/search', destination: '/:locale/explore', permanent: true },
-      { source: '/:locale(id|en)/umkm', destination: '/:locale/explore?type=businesses', permanent: true },
+      // Keep the dedicated UMKM discovery/map surface reachable until its map,
+      // city filtering, and store deep-link behavior have parity inside Explore.
     ];
     if (REQUIRES_EXTERNAL_HTTPS) {
       redirects.push({
