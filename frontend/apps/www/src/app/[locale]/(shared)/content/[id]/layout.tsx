@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { buildContentHref } from '@/lib/content/routes';
 import { SectorProvider } from '@/context/SectorContext';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
+import { schemaAvailabilityFromMetadata } from '@/lib/seo/publicDetailSeo';
 import {
   getPublicContent,
   isPublicContentActive,
@@ -63,20 +64,24 @@ function getContentImage(content: ContentSeoItem): string {
   const meta = content.metadata || {};
   const image =
     readString(content.cover_image) ||
-    (Array.isArray(content.image_urls)
-      ? readString(content.image_urls[0])
-      : '') ||
+    (Array.isArray(content.image_urls) ? readString(content.image_urls[0]) : '') ||
     readString(meta.cover_image) ||
     readString(meta.image_url) ||
     readString(meta.thumbnail);
   return image ? absoluteUrl(image) : absoluteUrl('/og-image.png');
 }
 
-function getDescription(content: ContentSeoItem, title: string): string {
+function getDescription(
+  content: ContentSeoItem,
+  title: string,
+  locale: string,
+): string {
   return (
     stripText(content.summary) ||
     stripText(content.body) ||
-    `Temukan ${title} di Lajukan. Chat pemilik listing, cek detail, dan simpan untuk kebutuhan usaha.`
+    (locale === 'id'
+      ? `Temukan ${title} di Lajukan. Cek detail listing dan profil penyedia sebelum menghubungi.`
+      : `Find ${title} on Lajukan. Review the listing and provider profile before getting in touch.`)
   );
 }
 
@@ -91,8 +96,7 @@ function getCanonicalPath(content: ContentSeoItem, fallbackId: string): string {
 function getSchemaType(
   content: ContentSeoItem,
 ): 'Product' | 'Service' | 'JobPosting' | 'WebPage' {
-  const type =
-    `${content.content_type || ''} ${content.type || ''}`.toLowerCase();
+  const type = `${content.content_type || ''} ${content.type || ''}`.toLowerCase();
   if (type.includes('job')) return 'JobPosting';
   if (type.includes('service')) return 'Service';
   if (type.includes('product')) return 'Product';
@@ -101,9 +105,7 @@ function getSchemaType(
 
 async function getContent(id: string): Promise<ContentSeoItem | null> {
   const result = await getPublicContent(id);
-  if (result.status !== 'found' || !isPublicContentActive(result.content)) {
-    return null;
-  }
+  if (result.status !== 'found' || !isPublicContentActive(result.content)) return null;
   return result.content as ContentSeoItem;
 }
 
@@ -112,10 +114,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const content = await getContent(id);
   if (!content?.title) {
     return {
-      title:
-        locale === 'id'
-          ? 'Listing tidak ditemukan | Lajukan'
-          : 'Listing not found | Lajukan',
+      title: locale === 'id' ? 'Listing tidak ditemukan | Lajukan' : 'Listing not found | Lajukan',
       description:
         locale === 'id'
           ? 'Listing Lajukan belum tersedia atau sudah tidak aktif.'
@@ -124,7 +123,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
   const title = stripText(content.title, 80);
-  const description = getDescription(content, title);
+  const description = getDescription(content, title, locale);
   const canonicalPath = getCanonicalPath(content, id);
   const canonical = `${SITE_URL}/${locale}${canonicalPath}`;
   const idUrl = `${SITE_URL}/id${canonicalPath}`;
@@ -144,14 +143,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       'produk lokal',
       ...(Array.isArray(content.tags) ? content.tags.slice(0, 8) : []),
     ],
-    alternates: {
-      canonical,
-      languages: {
-        id: idUrl,
-        en: enUrl,
-        'x-default': idUrl,
-      },
-    },
+    alternates: { canonical, languages: { id: idUrl, en: enUrl, 'x-default': idUrl } },
     openGraph: {
       title: `${title} | Lajukan`,
       description,
@@ -160,14 +152,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: 'article',
       locale: locale === 'id' ? 'id_ID' : 'en_US',
       alternateLocale: locale === 'id' ? ['en_US'] : ['id_ID'],
-      images: [
-        {
-          url: image,
-          width: 1200,
-          height: 630,
-          alt: title,
-        },
-      ],
+      images: [{ url: image, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: 'summary_large_image',
@@ -182,7 +167,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 function buildJsonLd(content: ContentSeoItem, locale: string, id: string) {
   if (!content?.title) return null;
   const title = stripText(content.title, 110);
-  const description = getDescription(content, title);
+  const description = getDescription(content, title, locale);
   const canonicalPath = getCanonicalPath(content, id);
   const url = `${SITE_URL}/${locale}${canonicalPath}`;
   const image = getContentImage(content);
@@ -198,11 +183,7 @@ function buildJsonLd(content: ContentSeoItem, locale: string, id: string) {
     inLanguage: locale === 'id' ? 'id-ID' : 'en-US',
     datePublished: content.created_at || undefined,
     dateModified: content.updated_at || content.created_at || undefined,
-    isPartOf: {
-      '@type': 'WebSite',
-      name: SITE_NAME,
-      url: SITE_URL,
-    },
+    isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: SITE_URL },
   } as Record<string, unknown>;
 
   if (
@@ -210,11 +191,12 @@ function buildJsonLd(content: ContentSeoItem, locale: string, id: string) {
     typeof content.price_cents === 'number' &&
     content.price_cents > 0
   ) {
+    const availability = schemaAvailabilityFromMetadata(content.metadata);
     base.offers = {
       '@type': 'Offer',
       priceCurrency: content.currency || 'IDR',
       price: Math.round(content.price_cents / 100),
-      availability: 'https://schema.org/InStock',
+      ...(availability ? { availability } : {}),
       url,
     };
   }
@@ -225,24 +207,14 @@ function buildJsonLd(content: ContentSeoItem, locale: string, id: string) {
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: [
-        {
-          '@type': 'ListItem',
-          position: 1,
-          name: 'Lajukan',
-          item: `${SITE_URL}/${locale}/home`,
-        },
+        { '@type': 'ListItem', position: 1, name: 'Lajukan', item: `${SITE_URL}/${locale}/home` },
         {
           '@type': 'ListItem',
           position: 2,
           name: locale === 'id' ? 'Cari' : 'Search',
           item: `${SITE_URL}/${locale}/explore`,
         },
-        {
-          '@type': 'ListItem',
-          position: 3,
-          name: title,
-          item: url,
-        },
+        { '@type': 'ListItem', position: 3, name: title, item: url },
       ],
     },
   ];
@@ -258,9 +230,7 @@ export default async function ContentIdLayout({ children, params }: Props) {
       {jsonLd ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: serializeJsonLd(jsonLd),
-          }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       ) : null}
       <SectorProvider>{children}</SectorProvider>

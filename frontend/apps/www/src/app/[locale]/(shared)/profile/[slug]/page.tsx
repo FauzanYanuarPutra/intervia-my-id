@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { buildPublicProfileMetadata } from '@/lib/seo/publicDetailSeo';
 import {
   getPublicProfileSocial,
   resolvePublicProfile,
@@ -14,9 +15,7 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale, slug } = await params;
   const result = await resolvePublicProfile(slug);
   if (result.status !== 'found') {
@@ -33,27 +32,20 @@ export async function generateMetadata({
     readString(result.profile.full_name) ||
     readString(result.profile.username) ||
     (locale === 'id' ? 'Profil pengguna' : 'User profile');
-  const bio =
+  const description = (
     readString(result.profile.bio) ||
     readString(result.profile.headline) ||
     (locale === 'id'
       ? `Lihat profil publik ${name} di Lajukan.`
-      : `View ${name}'s public profile on Lajukan.`);
-  const canonical = `https://www.lajukan.com/${locale}/profile/${result.canonicalSlug}`;
+      : `View ${name}'s public profile on Lajukan.`)
+  ).slice(0, 160);
 
-  return {
-    title: `${name} | Lajukan`,
-    description: bio.slice(0, 160),
-    alternates: {
-      canonical,
-      languages: {
-        id: `https://www.lajukan.com/id/profile/${result.canonicalSlug}`,
-        en: `https://www.lajukan.com/en/profile/${result.canonicalSlug}`,
-        'x-default': `https://www.lajukan.com/id/profile/${result.canonicalSlug}`,
-      },
-    },
-    robots: { index: true, follow: true },
-  };
+  return buildPublicProfileMetadata({
+    locale,
+    canonicalSlug: result.canonicalSlug,
+    name,
+    description,
+  });
 }
 
 export default async function PublicProfilePage({ params }: PageProps) {
