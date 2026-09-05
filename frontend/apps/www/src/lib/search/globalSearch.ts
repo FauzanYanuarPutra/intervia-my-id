@@ -194,40 +194,40 @@ export function emptyGlobalSearchResponse(query: string): GlobalSearchResponse {
   };
 }
 
-function normalizedSearchText(value: string): string {
-  return value.toLocaleLowerCase('id-ID').replace(/\s+/g, ' ').trim();
+/**
+ * Remove only explicit duplicate entities while preserving the first result
+ * and the backend-provided order. Title similarity is intentionally ignored:
+ * two providers can legitimately publish listings with the same title.
+ */
+export function dedupeGlobalSearchItems(
+  items: GlobalSearchItem[],
+): GlobalSearchItem[] {
+  const seenEntities = new Set<string>();
+  const seenHrefs = new Set<string>();
+
+  return items.filter(item => {
+    const id = item.id.trim();
+    const href = item.href.trim();
+    const entityKey = id ? `${item.kind}:${id}` : '';
+
+    if (entityKey && seenEntities.has(entityKey)) return false;
+    if (href && seenHrefs.has(href)) return false;
+
+    if (entityKey) seenEntities.add(entityKey);
+    if (href) seenHrefs.add(href);
+    return true;
+  });
 }
 
-function fieldRelevance(value: string, query: string, weight: number): number {
-  const text = normalizedSearchText(value);
-  if (!text) return 0;
-  if (text === query) return weight * 8;
-
-  const words = text.split(/[^a-z0-9]+/).filter(Boolean);
-  if (words.some(word => word === query)) return weight * 6;
-  if (words.some(word => word.startsWith(query))) return weight * 4;
-  if (text.includes(query)) return weight * 2;
-  return 0;
-}
-
+/**
+ * Compatibility boundary for existing callers. Marketplace services already
+ * return an ordered result set, so the browser must not apply a competing
+ * relevance model. The raw query is kept in the signature to avoid breaking
+ * call sites while ranking authority moves fully to the backend.
+ */
 export function rankGlobalSearchItems(
   items: GlobalSearchItem[],
-  rawQuery: string,
+  _rawQuery: string,
 ): GlobalSearchItem[] {
-  const query = normalizedSearchText(rawQuery);
-  if (query.length < 2 || items.length < 2) return items;
-
-  return items
-    .map((item, index) => ({
-      item,
-      index,
-      score:
-        fieldRelevance(item.title, query, 12) +
-        fieldRelevance(item.ownerName, query, 8) +
-        fieldRelevance(item.label, query, 5) +
-        fieldRelevance(item.summary, query, 3) +
-        fieldRelevance(item.location, query, 2),
-    }))
-    .sort((left, right) => right.score - left.score || left.index - right.index)
-    .map(entry => entry.item);
+  return dedupeGlobalSearchItems(items);
 }
