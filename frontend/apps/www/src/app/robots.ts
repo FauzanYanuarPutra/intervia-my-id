@@ -15,6 +15,7 @@ const PRIVATE_ROUTE_PATHS = [
   'my-projects',
   'my-listings',
   'onboarding',
+  'search',
 ];
 
 const DISALLOW_ROUTES = [
@@ -24,12 +25,8 @@ const DISALLOW_ROUTES = [
   '/tmp/',
   ...['id', 'en'].flatMap(locale => [
     ...PRIVATE_ROUTE_PATHS.map(path => `/${locale}/${path}`),
-
-    // Owner profile only.
-    // Jangan gunakan `/${locale}/profile` karena public profile
-    // berada di bawah /profile/[slug].
     `/${locale}/profile$`,
-
+    `/${locale}/profile/super-admin*`,
     `/${locale}/content/*/edit`,
   ]),
 ];
@@ -37,21 +34,9 @@ const DISALLOW_ROUTES = [
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      {
-        userAgent: '*',
-        allow: '/',
-        disallow: DISALLOW_ROUTES,
-      },
-      {
-        userAgent: ['Googlebot', 'Googlebot-Image', 'Googlebot-News'],
-        allow: '/',
-        disallow: DISALLOW_ROUTES,
-      },
-      {
-        userAgent: 'Bingbot',
-        allow: '/',
-        disallow: DISALLOW_ROUTES,
-      },
+      { userAgent: '*', allow: '/', disallow: DISALLOW_ROUTES },
+      { userAgent: ['Googlebot', 'Googlebot-Image', 'Googlebot-News'], allow: '/', disallow: DISALLOW_ROUTES },
+      { userAgent: 'Bingbot', allow: '/', disallow: DISALLOW_ROUTES },
     ],
     sitemap: ['https://www.lajukan.com/sitemap.xml'],
     host: 'https://www.lajukan.com',
