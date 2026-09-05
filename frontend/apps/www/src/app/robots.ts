@@ -16,6 +16,9 @@ const PRIVATE_ROUTE_PATHS = [
   'my-listings',
   'onboarding',
   'search',
+  // /umkm remains reachable for the dedicated nearby-business map and deep
+  // links, but Explore is the canonical indexable business discovery surface.
+  'umkm',
 ];
 
 const DISALLOW_ROUTES = [
