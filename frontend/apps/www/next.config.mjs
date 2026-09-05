@@ -44,6 +44,7 @@ const nextConfig = {
   async redirects() {
     const redirects = [
       { source: '/:locale(id|en)/search', destination: '/:locale/explore', permanent: true },
+      { source: '/:locale(id|en)/umkm', destination: '/:locale/explore?type=businesses', permanent: true },
     ];
     if (REQUIRES_EXTERNAL_HTTPS) {
       redirects.push({
