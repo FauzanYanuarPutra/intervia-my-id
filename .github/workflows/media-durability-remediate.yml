@@ -23,6 +23,21 @@ jobs:
           ref: hardening/media-durability-20260905
           fetch-depth: 0
 
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28.0'
+          elixir-version: '1.18.4'
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/apps/www/package-lock.json
+            frontend/apps/cms/package-lock.json
+            frontend/apps/crm/package-lock.json
+            frontend/apps/usaha/package-lock.json
+
       - name: Configure git
         run: |
           git config user.name github-actions[bot]
@@ -56,7 +71,6 @@ jobs:
             npm install --package-lock-only --ignore-scripts
             npm install --package-lock-only --ignore-scripts next@16.2.0
             npm install --package-lock-only --ignore-scripts --save-dev postcss@8.5.8
-            # Re-resolve the existing manifest so stale transitive locks (including sharp) can move to patched compatible versions.
             npm update --package-lock-only --ignore-scripts
             popd >/dev/null
           done
@@ -122,7 +136,7 @@ jobs:
           cd frontend/apps/www
           npm ci --ignore-scripts
           npm run lint
-          npm test -- --run
+          npm test
           npm run build
 
       - name: Commit verified remediation and remove temporary workflow
