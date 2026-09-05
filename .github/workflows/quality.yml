@@ -69,13 +69,6 @@ jobs:
           if [[ -f frontend/package.json && -f frontend/package-lock.json ]]; then
             cd frontend
             npm ci --legacy-peer-deps --no-audit --no-fund
-            # The lockfile records @parcel/watcher@2.5.6 and its Linux x64
-            # optional dependency, but Windows-generated npm lock state may omit
-            # the platform package entry. Restore only that native optional
-            # package in Linux CI so Next/next-intl can load next.config.mjs.
-            if [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" && ! -d node_modules/@parcel/watcher-linux-x64-glibc ]]; then
-              npm install --no-save --legacy-peer-deps --no-audit --no-fund @parcel/watcher-linux-x64-glibc@2.5.6
-            fi
             npm run lint --workspaces --if-present
             npm run test:unit --workspaces --if-present
             npm run test --workspaces --if-present
@@ -88,7 +81,20 @@ jobs:
           for app in www usaha cms crm; do
             dir="frontend/apps/$app"
             [[ -f "$dir/package.json" ]] || continue
-            (cd "$dir" && npm ci --legacy-peer-deps --no-audit --no-fund && npm run lint --if-present && npm run test:unit --if-present && npm run test --if-present && npm run build --if-present)
+            (
+              cd "$dir"
+              npm ci --legacy-peer-deps --no-audit --no-fund
+              # next-intl loads @parcel/watcher while reading www/next.config.mjs.
+              # The Windows-generated lock can omit Linux's native optional package,
+              # so restore it in the same app node_modules used by the build.
+              if [[ "$app" == "www" && "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" && ! -d node_modules/@parcel/watcher-linux-x64-glibc ]]; then
+                npm install --no-save --legacy-peer-deps --no-audit --no-fund @parcel/watcher-linux-x64-glibc@2.5.6
+              fi
+              npm run lint --if-present
+              npm run test:unit --if-present
+              npm run test --if-present
+              npm run build --if-present
+            )
           done
 
   rust:
