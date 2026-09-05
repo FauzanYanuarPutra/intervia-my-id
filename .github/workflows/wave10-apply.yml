@@ -1,0 +1,88 @@
+name: Wave 10 Apply Verified Fixes
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.head_ref == 'hardening/quality-security-wave10-20260905'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: hardening/quality-security-wave10-20260905
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Format and verify marketplace service
+        working-directory: services/marketplace_service
+        run: |
+          set -euo pipefail
+          cargo fmt
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      - name: Fix and verify community service
+        working-directory: services/community_service
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/main.rs')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              '    store_name: Option<String>,': '    #[serde(rename = "storeName")]\n    _store_name: Option<String>,',
+              '    store_city: Option<String>,': '    #[serde(rename = "storeCity")]\n    _store_city: Option<String>,',
+              '    storefront_path: Option<String>,': '    #[serde(rename = "storefrontPath")]\n    _storefront_path: Option<String>,',
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one {old!r}, found {count}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          cargo clippy --locked --all-targets --fix --allow-dirty --allow-staged -- -D warnings || true
+          cargo fmt
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: '26.2'
+          elixir-version: '1.17.3'
+
+      - name: Format and verify chat service
+        working-directory: services/chat_service
+        env:
+          MIX_ENV: test
+        run: |
+          set -euo pipefail
+          mix deps.get --only test
+          mix format
+          mix format --check-formatted
+          mix test
+
+      - name: Remove one-shot Wave 10 helper workflows
+        run: |
+          rm -f .github/workflows/wave10-autofix.yml .github/workflows/wave10-apply.yml
+
+      - name: Commit verified quality fixes
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'No changes to commit'; exit 1; }
+          git commit -m 'fix: restore service quality gates'
+          git push origin HEAD:hardening/quality-security-wave10-20260905
