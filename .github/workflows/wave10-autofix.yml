@@ -1,0 +1,60 @@
+name: Wave 10 Autofix Artifact
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  generate-fixes:
+    if: github.head_ref == 'hardening/quality-security-wave10-20260905'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Format marketplace service
+        working-directory: services/marketplace_service
+        run: cargo fmt
+
+      - name: Apply community Clippy machine fixes
+        working-directory: services/community_service
+        run: |
+          cargo clippy --locked --all-targets --fix --allow-dirty --allow-staged -- -D warnings || true
+          cargo fmt
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28.0'
+          elixir-version: '1.19.0'
+
+      - name: Format chat service
+        working-directory: services/chat_service
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+          mix format
+
+      - name: Capture patch
+        run: |
+          git diff --binary > wave10-autofix.patch
+          git status --short > wave10-autofix-status.txt
+          test -s wave10-autofix.patch
+
+      - name: Upload autofix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wave10-autofix
+          path: |
+            wave10-autofix.patch
+            wave10-autofix-status.txt
+          if-no-files-found: error
+          retention-days: 1
