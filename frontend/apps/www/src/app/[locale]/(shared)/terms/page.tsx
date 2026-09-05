@@ -1,4 +1,3 @@
-import { Metadata } from 'next';
 import {
   Ban,
   CreditCard,
@@ -20,18 +19,6 @@ import {
   LegalSectionView,
   SummaryCard,
 } from '@/components/trust/TrustUI';
-
-export const metadata: Metadata = {
-  title: 'Syarat & Ketentuan | Lajukan',
-  description:
-    'Aturan penggunaan Lajukan, hak dan kewajiban pengguna, serta status layanan transaksi dan pembayaran.',
-  keywords: [
-    'syarat ketentuan',
-    'terms of service',
-    'lajukan',
-    'aturan marketplace',
-  ],
-};
 
 type PageProps = {
   params: Promise<{ locale: string }>;
