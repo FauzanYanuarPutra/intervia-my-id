@@ -8,7 +8,9 @@ export type StaticPublicPage =
   | 'contact'
   | 'trust'
   | 'privacy'
-  | 'terms';
+  | 'terms'
+  | 'cookie-policy'
+  | 'refund-policy';
 
 type Copy = {
   titleId: string;
@@ -53,6 +55,18 @@ const COPY: Record<StaticPublicPage, Copy> = {
     titleEn: 'Terms of Service | Lajukan',
     descriptionId: 'Baca aturan penggunaan Lajukan, hak dan kewajiban pengguna, serta ketentuan layanan dan transaksi.',
     descriptionEn: 'Read Lajukan usage rules, user rights and responsibilities, and service and transaction terms.',
+  },
+  'cookie-policy': {
+    titleId: 'Kebijakan Cookie | Lajukan',
+    titleEn: 'Cookie Policy | Lajukan',
+    descriptionId: 'Pelajari jenis cookie yang digunakan Lajukan, tujuan penggunaannya, serta cara mengontrol preferensi cookie.',
+    descriptionEn: 'Learn which cookies Lajukan uses, why they are used, and how to control your cookie preferences.',
+  },
+  'refund-policy': {
+    titleId: 'Kebijakan Refund, Retur & Pembatalan | Lajukan',
+    titleEn: 'Refund, Return & Cancellation Policy | Lajukan',
+    descriptionId: 'Pelajari alur bantuan Lajukan untuk refund, retur produk, pembatalan, komplain layanan, dan bukti yang perlu disiapkan.',
+    descriptionEn: 'Learn Lajukan support flows for refunds, product returns, cancellations, service complaints, and required evidence.',
   },
 };
 
