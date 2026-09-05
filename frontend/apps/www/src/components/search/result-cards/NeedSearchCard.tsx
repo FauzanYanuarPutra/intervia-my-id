@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   CalendarClock,
   Clock3,
   MapPin,
@@ -12,6 +13,7 @@ import {
   getListingSideVerbLabel,
   getListingValueFallback,
 } from '@/lib/content/listingSide';
+import { getExploreResultAction } from '@/lib/discovery/exploreResultConversion';
 import type { GlobalSearchItem } from '@/lib/search/globalSearch';
 import { SearchCardEyebrow, searchCardBorderClass } from './SearchCardParts';
 import { cn } from '@/lib/utils';
@@ -106,25 +108,13 @@ export function NeedSearchCard({
       label: budgetLabel || getListingValueFallback('demand', locale),
     },
     item.location
-      ? {
-          key: 'location',
-          icon: MapPin,
-          label: item.location,
-        }
+      ? { key: 'location', icon: MapPin, label: item.location }
       : null,
     deadlineLabel
-      ? {
-          key: 'deadline',
-          icon: CalendarClock,
-          label: deadlineLabel,
-        }
+      ? { key: 'deadline', icon: CalendarClock, label: deadlineLabel }
       : null,
     quantityLabel
-      ? {
-          key: 'quantity',
-          icon: Package,
-          label: quantityLabel,
-        }
+      ? { key: 'quantity', icon: Package, label: quantityLabel }
       : null,
   ].filter(Boolean) as Array<{
     key: string;
@@ -135,22 +125,12 @@ export function NeedSearchCard({
   const statusLabel = requestStatusLabel(item, locale);
   const sideStatusLabel = `${getListingSideVerbLabel('demand', locale)} - ${statusLabel}`;
   const actorLabel = getListingSideActorLabel('demand', locale).toLowerCase();
-
-  const title = (
-    <h3
-      className={cn(
-        'mt-1.5 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]',
-        interactive && 'group-hover:text-[#1d4ed8]',
-      )}
-    >
-      {item.title}
-    </h3>
-  );
+  const action = getExploreResultAction('needs', locale);
 
   const card = (
     <article
       className={cn(
-        'flex h-full min-h-[152px] flex-col rounded-xl border bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
+        'flex h-full min-h-[164px] flex-col rounded-xl border bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.4)]',
         interactive &&
           'cursor-pointer transition motion-reduce:transform-none hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.3)]',
         searchCardBorderClass('blue'),
@@ -158,14 +138,18 @@ export function NeedSearchCard({
     >
       <SearchCardEyebrow
         icon={Clock3}
-        label={
-          item.label ||
-          (locale === 'id' ? `Kebutuhan ${actorLabel}` : 'Buyer need')
-        }
+        label={item.label || (locale === 'id' ? `Kebutuhan ${actorLabel}` : 'Buyer need')}
         tone="blue"
         sideLabel={sideStatusLabel}
       />
-      {title}
+      <h3
+        className={cn(
+          'mt-1.5 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]',
+          interactive && 'group-hover:text-[#1d4ed8]',
+        )}
+      >
+        {item.title}
+      </h3>
       <p className="mt-1 line-clamp-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
         {item.summary ||
           (locale === 'id'
@@ -183,12 +167,16 @@ export function NeedSearchCard({
               key={fact.key}
               className="inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded-full bg-[#eff6ff] px-2 py-1 font-semibold text-[#1d4ed8]"
             >
-              <FactIcon className="h-3 w-3 shrink-0" />
+              <FactIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
               <span className="truncate">{fact.label}</span>
             </span>
           );
         })}
       </div>
+      <p className="mt-auto flex items-center gap-1 pt-2 text-[10px] font-black text-[#1d4ed8] sm:text-[11px]">
+        {action.label}
+        <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
+      </p>
     </article>
   );
 
