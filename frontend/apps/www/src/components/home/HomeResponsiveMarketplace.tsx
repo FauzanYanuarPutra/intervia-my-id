@@ -1957,74 +1957,42 @@ function HeroVisualStage({
     user?.full_name ||
     'Sobat Bisnis';
 
-  const quickSearches = isId
-    ? [
-        'Produk',
-        'Jasa',
-        'Bahan Usaha',
-        'Mesin & Alat',
-        'Tempat Usaha',
-        'Peluang Usaha',
-      ]
-    : [
-        'Products',
-        'Services',
-        'Business Supplies',
-        'Machines & Tools',
-        'Business Places',
-        'Business Opportunities',
-      ];
-
   return (
     <section
-      className={`mx-auto w-full max-w-7xl px-0 pt-3 pb-5 sm:pt-4 sm:pb-6 ${
-        className || ''
-      }`}
+      className={cn(
+        'mx-auto w-full max-w-7xl px-0 pb-5 pt-3 sm:pb-6 sm:pt-4',
+        className,
+      )}
+      aria-labelledby="home-main-heading"
     >
       {/* HERO */}
       <div
-        className={`
-          relative
-          isolate
-          overflow-hidden
-          rounded-3xl
-          px-4
-          py-5
-          sm:px-6
-          sm:py-7
-          md:px-8
-          md:py-8
-
-          !border
-          !border-emerald-100
-          !bg-emerald-50
-
-          dark:!border-emerald-900/60
-          dark:!bg-zinc-950
-
-          ${
-            isAuthenticated
-              ? 'min-h-[145px]'
-              : 'min-h-[175px]'
-          }
-        `}
+        className={cn(
+          'relative isolate overflow-hidden rounded-3xl border border-emerald-100',
+          'bg-[linear-gradient(135deg,#f0fdf4_0%,#ecfdf5_45%,#f8fafc_100%)]',
+          'px-4 py-6 sm:px-7 sm:py-8 md:px-9 md:py-10',
+          'dark:border-emerald-900/60',
+          'dark:bg-[linear-gradient(135deg,#09090b_0%,#071510_55%,#09090b_100%)]',
+          isAuthenticated
+            ? 'min-h-[150px]'
+            : 'min-h-[220px] sm:min-h-[250px]',
+        )}
       >
-        {/* Background decoration */}
+        {/* DECORATION */}
         <div
           aria-hidden="true"
           className="
             pointer-events-none
             absolute
-            -right-16
-            -top-16
+            -right-20
+            -top-24
             z-0
-            h-44
-            w-44
+            h-64
+            w-64
             rounded-full
-            !bg-emerald-200/25
+            bg-emerald-300/20
             blur-3xl
-
-            dark:!bg-emerald-900/20
+            dark:bg-emerald-700/10
           "
         />
 
@@ -2033,30 +2001,50 @@ function HeroVisualStage({
           className="
             pointer-events-none
             absolute
-            -bottom-20
-            left-1/3
+            -bottom-28
+            left-[20%]
+            z-0
+            h-64
+            w-64
+            rounded-full
+            bg-white/70
+            blur-3xl
+            dark:bg-emerald-950/20
+          "
+        />
+
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute
+            right-[20%]
+            top-[25%]
             z-0
             h-40
             w-40
             rounded-full
-            !bg-white/50
+            bg-amber-100/30
             blur-3xl
-
-            dark:!bg-emerald-950/20
+            dark:bg-amber-900/5
           "
         />
 
-        <div className="relative z-10 flex items-center">
-          {/* LEFT */}
+        {/* CONTENT */}
+        <div
+          className={cn(
+            'relative z-10',
+            !isAuthenticated &&
+              'mx-auto flex max-w-5xl items-center justify-between gap-3 sm:gap-6',
+          )}
+        >
           <div
-            className={`
-              min-w-0
-              ${
-                isAuthenticated
-                  ? 'max-w-3xl'
-                  : 'max-w-[calc(100%-105px)] sm:max-w-[calc(100%-160px)] md:max-w-[calc(100%-210px)]'
-              }
-            `}
+            className={cn(
+              'min-w-0',
+              isAuthenticated
+                ? 'max-w-3xl'
+                : 'max-w-[calc(100%-90px)] sm:max-w-[calc(100%-160px)] md:max-w-[720px]',
+            )}
           >
             {isAuthenticated ? (
               <>
@@ -2066,33 +2054,29 @@ function HeroVisualStage({
                     text-[10px]
                     font-extrabold
                     uppercase
-                    tracking-[0.12em]
-                    !text-emerald-700
-
+                    tracking-[0.14em]
+                    text-emerald-700
                     sm:text-xs
-
-                    dark:!text-emerald-400
+                    dark:text-emerald-400
                   "
                 >
-                  {isId
-                    ? 'Selamat datang kembali'
-                    : 'Welcome back'}
+                  {isId ? 'Selamat datang kembali' : 'Welcome back'}
                 </p>
 
                 <h1
+                  id="home-main-heading"
                   className="
-                    text-[clamp(1.35rem,3vw,2.35rem)]
+                    text-[clamp(1.4rem,3vw,2.4rem)]
                     font-black
-                    leading-[0.98]
+                    leading-[1]
                     tracking-[-0.055em]
-                    !text-zinc-950
-
-                    dark:!text-white
+                    text-zinc-950
+                    dark:text-white
                   "
                 >
                   {isId ? 'Halo, ' : 'Hi, '}
 
-                  <span className="!text-emerald-700 dark:!text-emerald-400">
+                  <span className="text-emerald-700 dark:text-emerald-400">
                     {displayName}
                   </span>
 
@@ -2106,94 +2090,119 @@ function HeroVisualStage({
                     text-xs
                     font-semibold
                     leading-5
-                    !text-zinc-700
-
+                    text-zinc-700
                     sm:text-sm
                     sm:leading-6
-
-                    dark:!text-zinc-300
+                    dark:text-zinc-300
                   "
                 >
                   {isId
-                    ? 'Temukan produk, jasa, supplier, tempat usaha, dan peluang yang cocok untukmu.'
-                    : 'Find products, services, suppliers, business places, and opportunities that fit you.'}
+                    ? 'Cari produk, supplier, jasa, bahan usaha, mesin, tempat usaha, dan peluang yang cocok untuk kebutuhan bisnismu.'
+                    : 'Find products, suppliers, services, business supplies, equipment, places, and opportunities that fit your business.'}
                 </p>
               </>
             ) : (
               <>
+                {/* SEO EYEBROW */}
                 <p
                   className="
-                    mb-1
+                    mb-2
                     text-[10px]
                     font-extrabold
                     uppercase
-                    tracking-[0.12em]
-                    !text-emerald-700
-
+                    tracking-[0.14em]
+                    text-emerald-700
                     sm:text-xs
-
-                    dark:!text-emerald-400
+                    dark:text-emerald-400
                   "
                 >
                   {isId
-                    ? 'Platform usaha & peluang'
-                    : 'Business & opportunity platform'}
+                    ? 'Platform UMKM & kebutuhan usaha'
+                    : 'Business & SME marketplace'}
                 </p>
 
+                {/* SINGLE MAIN H1 */}
                 <h1
+                  id="home-main-heading"
                   className="
-                    text-[clamp(1.5rem,4vw,2.8rem)]
+                    max-w-[740px]
+                    text-[clamp(1.55rem,4vw,3rem)]
                     font-black
-                    leading-[0.96]
-                    tracking-[-0.065em]
-                    !text-zinc-950
-
-                    dark:!text-white
+                    leading-[0.98]
+                    tracking-[-0.06em]
+                    text-zinc-950
+                    dark:text-white
                   "
                 >
                   {isId ? (
                     <>
-                      Temukan yang kamu butuhkan
-                      <br className="hidden sm:block" />
-                      <span className="!text-emerald-700 dark:!text-emerald-400">
-                        untuk usahamu 🚀
+                      Temukan supplier, jasa, mesin,
+                      <br className="hidden sm:block" /> dan kebutuhan{' '}
+                      <span className="text-emerald-700 dark:text-emerald-400">
+                        untuk usahamu.
                       </span>
                     </>
                   ) : (
                     <>
-                      Find what you need
-                      <br className="hidden sm:block" />
-                      <span className="!text-emerald-700 dark:!text-emerald-400">
-                        for your business 🚀
+                      Find suppliers, services, equipment,
+                      <br className="hidden sm:block" /> and everything{' '}
+                      <span className="text-emerald-700 dark:text-emerald-400">
+                        your business needs.
                       </span>
                     </>
                   )}
                 </h1>
 
+                {/* SEO + HUMAN FRIENDLY DESCRIPTION */}
                 <p
                   className="
-                    mt-2
-                    max-w-2xl
+                    mt-3
+                    max-w-[680px]
                     text-xs
-                    font-semibold
+                    font-medium
                     leading-5
-                    !text-zinc-700
-
-                    sm:text-sm
+                    text-zinc-700
+                    sm:text-[14px]
                     sm:leading-6
-
-                    dark:!text-zinc-300
+                    dark:text-zinc-300
                   "
                 >
                   {isId
-                    ? 'Produk, jasa, bahan usaha, mesin, tempat usaha, supplier, dan peluang bisnis dalam satu tempat.'
-                    : 'Products, services, supplies, machines, business places, suppliers, and opportunities in one place.'}
+                    ? 'Cari produk, bahan usaha, supplier, jasa profesional, mesin dan alat, tempat usaha, serta peluang bisnis dari berbagai daerah di Indonesia.'
+                    : 'Discover products, business supplies, suppliers, professional services, equipment, business locations, and opportunities across Indonesia.'}
                 </p>
+
+                {/* TRUST / CONTEXT */}
+                <div className="mt-3 hidden flex-wrap items-center gap-x-4 gap-y-1.5 sm:flex">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                    <CheckCircle2
+                      className="h-3.5 w-3.5 text-emerald-600"
+                      aria-hidden="true"
+                    />
+                    {isId ? 'Untuk UMKM & bisnis' : 'For SMEs & businesses'}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                    <MapPin
+                      className="h-3.5 w-3.5 text-emerald-600"
+                      aria-hidden="true"
+                    />
+                    {isId ? 'Temukan yang terdekat' : 'Find nearby options'}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                    <MessageCircle
+                      className="h-3.5 w-3.5 text-emerald-600"
+                      aria-hidden="true"
+                    />
+                    {isId ? 'Hubungi langsung' : 'Connect directly'}
+                  </span>
+                </div>
               </>
             )}
           </div>
 
-          {/* RIGHT IMAGE */}
+          {/* HERO IMAGE */}
           {!isAuthenticated ? (
             <div
               className="
@@ -2201,15 +2210,14 @@ function HeroVisualStage({
                 relative
                 ml-auto
                 h-[105px]
-                w-[100px]
+                w-[88px]
                 shrink-0
-
-                sm:h-[135px]
-                sm:w-[145px]
-
-                md:h-[165px]
-                md:w-[190px]
+                sm:h-[150px]
+                sm:w-[150px]
+                md:h-[190px]
+                md:w-[210px]
               "
+              aria-hidden="true"
             >
               <Image
                 src={HOME_HERO_IMAGE}
@@ -2217,20 +2225,18 @@ function HeroVisualStage({
                 width={500}
                 height={500}
                 priority
-                aria-hidden="true"
                 className="
                   absolute
-                  right-[-10px]
+                  right-[-18px]
                   top-1/2
-                  w-[145px]
+                  w-[140px]
                   -translate-y-1/2
                   object-contain
-
-                  sm:right-[-15px]
-                  sm:w-[200px]
-
-                  md:right-[-20px]
-                  md:w-[250px]
+                  drop-shadow-[0_20px_25px_rgba(5,150,105,0.14)]
+                  sm:right-[-12px]
+                  sm:w-[205px]
+                  md:right-[-18px]
+                  md:w-[270px]
                 "
               />
             </div>
@@ -2239,13 +2245,11 @@ function HeroVisualStage({
       </div>
 
       {/* SEARCH */}
-      <div className="relative z-20 -mt-5 px-2 sm:px-4">
+      <div className="relative z-20 mx-auto -mt-5 max-w-4xl px-2 sm:-mt-6 sm:px-5">
         <form
           role="search"
           aria-label={
-            isId
-              ? 'Cari kebutuhan usaha'
-              : 'Search business needs'
+            isId ? 'Cari kebutuhan usaha' : 'Search business needs'
           }
           onSubmit={event => {
             event.preventDefault();
@@ -2260,20 +2264,18 @@ function HeroVisualStage({
             items-center
             gap-2
             rounded-2xl
+            border
+            border-zinc-200
+            bg-white
             px-3
-
-            !border
-            !border-zinc-200
-            !bg-white
-            !shadow-[0_14px_34px_-22px_rgba(15,23,42,0.38)]
-
-            focus-within:!border-emerald-400
-
+            shadow-[0_18px_45px_-24px_rgba(15,23,42,0.45)]
+            transition
+            focus-within:border-emerald-400
+            focus-within:shadow-[0_20px_50px_-25px_rgba(5,150,105,0.32)]
             sm:h-14
             sm:px-4
-
-            dark:!border-zinc-700
-            dark:!bg-zinc-900
+            dark:border-zinc-700
+            dark:bg-zinc-900
           "
         >
           <Search
@@ -2281,12 +2283,10 @@ function HeroVisualStage({
               h-4
               w-4
               shrink-0
-              !text-emerald-600
-
+              text-emerald-600
               sm:h-5
               sm:w-5
-
-              dark:!text-emerald-400
+              dark:text-emerald-400
             "
             aria-hidden="true"
           />
@@ -2297,17 +2297,15 @@ function HeroVisualStage({
             enterKeyHint="search"
             autoComplete="off"
             value={query}
-            onChange={event =>
-              onQueryChange(event.target.value)
-            }
+            onChange={event => onQueryChange(event.target.value)}
             placeholder={
               isAuthenticated
                 ? isId
                   ? 'Cari apa yang kamu butuhkan hari ini...'
                   : 'What do you need today?'
                 : isId
-                  ? 'Cari produk, jasa, supplier, atau peluang...'
-                  : 'Search products, services, suppliers, or opportunities...'
+                  ? 'Cari supplier, produk, jasa, mesin, tempat usaha...'
+                  : 'Search suppliers, products, services, equipment...'
             }
             className="
               min-w-0
@@ -2315,14 +2313,12 @@ function HeroVisualStage({
               bg-transparent
               text-sm
               font-semibold
-              !text-zinc-900
+              text-zinc-900
               outline-none
-              !placeholder:text-zinc-400
-
+              placeholder:text-zinc-400
               sm:text-[15px]
-
-              dark:!text-white
-              dark:!placeholder:text-zinc-500
+              dark:text-white
+              dark:placeholder:text-zinc-500
             "
           />
 
@@ -2335,14 +2331,14 @@ function HeroVisualStage({
               items-center
               justify-center
               rounded-xl
-              px-4
+              bg-emerald-600
+              px-5
               text-xs
               font-extrabold
-              !bg-emerald-600
-              !text-white
+              text-white
               transition
-              hover:!bg-emerald-700
-
+              hover:bg-emerald-700
+              active:scale-[0.98]
               sm:inline-flex
             "
           >
@@ -2360,23 +2356,18 @@ function HeroVisualStage({
               items-center
               justify-center
               rounded-xl
-              !text-zinc-500
+              text-zinc-500
               transition
-
-              hover:!bg-zinc-100
-              hover:!text-zinc-900
-
+              hover:bg-zinc-100
+              hover:text-zinc-900
               sm:h-9
               sm:w-9
-
-              dark:!text-zinc-400
-              dark:hover:!bg-zinc-800
-              dark:hover:!text-white
+              dark:text-zinc-400
+              dark:hover:bg-zinc-800
+              dark:hover:text-white
             "
             aria-label={
-              isId
-                ? 'Filter pencarian'
-                : 'Search filters'
+              isId ? 'Filter pencarian' : 'Search filters'
             }
           >
             <SlidersHorizontal
@@ -2385,6 +2376,29 @@ function HeroVisualStage({
             />
           </button>
         </form>
+
+        {/* MOBILE SUPPORTING COPY */}
+        {!isAuthenticated ? (
+          <p
+            className="
+              mx-auto
+              mt-2
+              max-w-2xl
+              px-3
+              text-center
+              text-[10px]
+              font-medium
+              leading-4
+              text-zinc-500
+              sm:hidden
+              dark:text-zinc-400
+            "
+          >
+            {isId
+              ? 'Produk • Supplier • Jasa • Mesin • Bahan Usaha • Tempat Usaha'
+              : 'Products • Suppliers • Services • Equipment • Supplies • Places'}
+          </p>
+        ) : null}
       </div>
     </section>
   );
@@ -5705,3 +5719,5 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     </MarketplacePageFrame>
   );
 }
+
+
