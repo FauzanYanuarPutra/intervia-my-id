@@ -81,7 +81,26 @@ jobs:
           for app in www usaha cms crm; do
             dir="frontend/apps/$app"
             [[ -f "$dir/package.json" ]] || continue
-            (cd "$dir" && npm ci --legacy-peer-deps --no-audit --no-fund && npm run lint --if-present && npm run test:unit --if-present && npm run test --if-present && npm run build --if-present)
+            (
+              cd "$dir"
+              npm ci --legacy-peer-deps --no-audit --no-fund
+              # Windows-generated lock state can omit Linux native optional packages.
+              # Restore only the bindings required by next-intl/Next config loading,
+              # in the same app node_modules used by the build.
+              if [[ "$app" == "www" && "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
+                if [[ ! -d node_modules/@parcel/watcher-linux-x64-glibc ]]; then
+                  npm install --no-save --legacy-peer-deps --no-audit --no-fund @parcel/watcher-linux-x64-glibc@2.5.6
+                fi
+                if [[ ! -d node_modules/@swc/core-linux-x64-gnu ]]; then
+                  swc_version=$(node -p "require('./node_modules/next-intl/node_modules/@swc/core/package.json').version")
+                  npm install --no-save --legacy-peer-deps --no-audit --no-fund "@swc/core-linux-x64-gnu@$swc_version"
+                fi
+              fi
+              npm run lint --if-present
+              npm run test:unit --if-present
+              npm run test --if-present
+              npm run build --if-present
+            )
           done
 
   rust:

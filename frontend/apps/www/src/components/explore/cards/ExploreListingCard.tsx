@@ -133,10 +133,12 @@ export function ExploreListingCard({
           ) : null}
         </div>
 
-        <p className="mt-auto flex items-center gap-1 pt-2 text-[10px] font-black text-[color:var(--app-accent)] sm:text-[11px]">
-          {action.label}
-          <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
-        </p>
+        {interactive ? (
+          <p className="mt-auto flex items-center gap-1 pt-2 text-[10px] font-black text-[color:var(--app-accent)] sm:text-[11px]">
+            {action.label}
+            <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
+          </p>
+        ) : null}
       </div>
     </article>
   );

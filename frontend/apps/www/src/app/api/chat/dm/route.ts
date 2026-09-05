@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/serverAuth';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
+import {
+  isSelfDm,
+  isUuidLike,
+  sanitizeDmLeadInput,
+} from '@/lib/chat/dmContract';
 
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
 const MARKETPLACE_URL =
@@ -8,35 +13,12 @@ const MARKETPLACE_URL =
   process.env.MARKETPLACE_URL ||
   'http://localhost:8081';
 
-function isUuidLike(value: string | undefined): boolean {
-  if (!value) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
 function buildLeadPayload(
   input: unknown,
   roomId: string,
   peerUserId?: string,
 ): Record<string, unknown> {
-  const lead: Record<string, unknown> = {};
-  if (input && typeof input === 'object' && !Array.isArray(input)) {
-    const source = input as Record<string, unknown>;
-    if (typeof source.name === 'string') lead.name = source.name;
-    if (typeof source.sector === 'string') lead.sector = source.sector;
-    if (typeof source.source === 'string') lead.source = source.source;
-    if (typeof source.stage === 'string') lead.stage = source.stage;
-    if (typeof source.currency === 'string') lead.currency = source.currency;
-    if (typeof source.chat_room_id === 'string') lead.chat_room_id = source.chat_room_id;
-    if (source.value_cents != null) lead.value_cents = source.value_cents;
-    if (typeof source.content_id === 'string' && isUuidLike(source.content_id)) {
-      lead.content_id = source.content_id;
-    }
-    if (source.metadata && typeof source.metadata === 'object') {
-      lead.metadata = source.metadata;
-    }
-  }
+  const lead = sanitizeDmLeadInput(input);
 
   if (!lead.source) lead.source = 'chat';
   if (!lead.name) {
@@ -83,20 +65,26 @@ export async function POST(req: NextRequest) {
 
     const leadInput =
       payload.lead && typeof payload.lead === 'object'
-        ? (payload.lead as Record<string, unknown>)
+        ? payload.lead
         : null;
     const skipLead = payload.skip_lead === true;
 
     if (!peerUserIdRaw) {
       return NextResponse.json(
         { error: 'peer_user_id is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (!isUuidLike(peerUserIdRaw)) {
       return NextResponse.json(
         { error: 'Invalid peer_user_id format' },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+    if (isSelfDm(auth.ctx.userId, peerUserIdRaw)) {
+      return NextResponse.json(
+        { error: 'Cannot create a direct message with yourself' },
+        { status: 400 },
       );
     }
 
@@ -109,7 +97,11 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({ peer_user_id: peerUserIdRaw }),
     });
 
-    const data = await res.json().catch(() => ({})) as { data?: { room_id?: string }; room_id?: string; error?: string };
+    const data = (await res.json().catch(() => ({}))) as {
+      data?: { room_id?: string };
+      room_id?: string;
+      error?: string;
+    };
     const roomId = data.room_id ?? data.data?.room_id;
     if (res.ok && roomId) {
       if (!skipLead) {
@@ -121,7 +113,7 @@ export async function POST(req: NextRequest) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(leadPayload),
-        }).catch((leadError) => {
+        }).catch(leadError => {
           console.error('[CRM_LEAD_CREATE_ERROR]', leadError);
         });
       }
