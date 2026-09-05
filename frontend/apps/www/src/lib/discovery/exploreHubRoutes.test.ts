@@ -6,9 +6,9 @@ import {
 } from './exploreHubRoutes';
 
 describe('Explore hub routes', () => {
-  it('keeps the default supply search URL minimal', () => {
+  it('emits canonical supply intent explicitly', () => {
     expect(buildExploreHubSearchHref('id', 'supply', ' supplier kemasan ')).toBe(
-      '/id/explore?q=supplier+kemasan',
+      '/id/explore?q=supplier+kemasan&side=supply',
     );
   });
 

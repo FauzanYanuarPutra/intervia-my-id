@@ -9,10 +9,10 @@ type Props = { children: ReactNode; params: Promise<{ locale: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   if (locale !== 'id' && locale !== 'en') notFound();
-  return buildStaticPublicPageMetadata('refund-policy', locale);
+  return buildStaticPublicPageMetadata('cookie-policy', locale);
 }
 
-export default async function RefundPolicyLayout({ children, params }: Props) {
+export default async function CookiePolicyLayout({ children, params }: Props) {
   const { locale } = await params;
   if (locale !== 'id' && locale !== 'en') notFound();
   return children;

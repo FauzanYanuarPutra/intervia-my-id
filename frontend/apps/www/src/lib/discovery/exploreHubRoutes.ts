@@ -14,8 +14,9 @@ export function buildExploreHubSearchHref(
   const params = new URLSearchParams();
 
   if (clean) params.set('q', clean);
+  params.set('side', intent);
+
   if (intent === 'demand') {
-    params.set('side', 'demand');
     params.set('tab', 'needs');
   }
 
