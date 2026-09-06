@@ -184,7 +184,12 @@ impl IntoResponse for OrderEngineError {
 fn order_engine_api_enabled() -> bool {
     std::env::var("ORDER_ENGINE_API_ENABLED")
         .ok()
-        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -192,10 +197,7 @@ fn order_engine_api_enabled() -> bool {
 /// flows use the category-specific APIs, which can resolve catalog prices and
 /// ownership authoritatively. Keeping this API disabled by default prevents a
 /// caller from supplying arbitrary actors or monetary values.
-fn require_order_operator(
-    headers: &HeaderMap,
-    state: &AppState,
-) -> Result<Uuid, OrderEngineError> {
+fn require_order_operator(headers: &HeaderMap, state: &AppState) -> Result<Uuid, OrderEngineError> {
     if !order_engine_api_enabled() {
         return Err(OrderEngineError::Disabled);
     }

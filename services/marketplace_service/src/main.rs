@@ -37,9 +37,9 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod businesses;
 mod identity_projection;
 mod order_engine;
-mod businesses;
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
 };
@@ -426,9 +426,7 @@ struct ListContentQuery {
 fn resolve_content_list_status(value: Option<String>) -> Result<String, &'static str> {
     match clean_text(value).map(|status| status.to_ascii_lowercase()) {
         None => Ok("active".to_string()),
-        Some(status) if matches!(status.as_str(), "active" | "draft" | "archived") => {
-            Ok(status)
-        }
+        Some(status) if matches!(status.as_str(), "active" | "draft" | "archived") => Ok(status),
         Some(_) => Err("unsupported content status"),
     }
 }
@@ -439,9 +437,7 @@ fn can_list_content_status(
     actor_user_id: Option<Uuid>,
     privileged: bool,
 ) -> bool {
-    status == "active"
-        || privileged
-        || (owner_id.is_some() && owner_id == actor_user_id)
+    status == "active" || privileged || (owner_id.is_some() && owner_id == actor_user_id)
 }
 
 fn resolve_public_content_offset(value: Option<i64>) -> Result<i64, &'static str> {
@@ -1150,14 +1146,11 @@ fn is_public_reference_response_metadata(metadata: &Value) -> bool {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_ascii_lowercase();
-    let explicitly_non_transactional = metadata
-        .get("is_transactional")
-        .and_then(|value| {
-            value
-                .as_bool()
-                .or_else(|| value.as_str().map(|raw| raw.eq_ignore_ascii_case("true")))
-        })
-        == Some(false);
+    let explicitly_non_transactional = metadata.get("is_transactional").and_then(|value| {
+        value
+            .as_bool()
+            .or_else(|| value.as_str().map(|raw| raw.eq_ignore_ascii_case("true")))
+    }) == Some(false);
 
     record_kind.contains("reference")
         && (market_side == "reference" || explicitly_non_transactional)
@@ -1276,9 +1269,7 @@ fn project_public_reference_metadata(metadata: &Value) -> Value {
     if let Some(value) = project_reference_object(source.get("source"), SOURCE_FIELDS) {
         projected.insert("source".to_string(), value);
     }
-    if let Some(value) =
-        project_reference_object(source.get("image_credit"), IMAGE_CREDIT_FIELDS)
-    {
+    if let Some(value) = project_reference_object(source.get("image_credit"), IMAGE_CREDIT_FIELDS) {
         projected.insert("image_credit".to_string(), value);
     }
     Value::Object(projected)
@@ -1378,7 +1369,9 @@ impl ContentResponse {
             title: value.title,
             summary: value.summary,
             body: value.body,
-            price_cents: (!is_public_reference).then_some(value.price_cents).flatten(),
+            price_cents: (!is_public_reference)
+                .then_some(value.price_cents)
+                .flatten(),
             price_unit: (!is_public_reference).then_some(price_unit).flatten(),
             currency: (!is_public_reference).then_some(value.currency).flatten(),
             tags: value.tags,
@@ -1391,11 +1384,15 @@ impl ContentResponse {
             original_price_cents: (!is_public_reference)
                 .then_some(value.original_price_cents)
                 .flatten(),
-            seller_type: (!is_public_reference).then_some(value.seller_type).flatten(),
+            seller_type: (!is_public_reference)
+                .then_some(value.seller_type)
+                .flatten(),
             minimum_order: (!is_public_reference)
                 .then_some(value.minimum_order)
                 .flatten(),
-            promo_label: (!is_public_reference).then_some(value.promo_label).flatten(),
+            promo_label: (!is_public_reference)
+                .then_some(value.promo_label)
+                .flatten(),
             promo_start_at: (!is_public_reference)
                 .then_some(value.promo_start_at)
                 .flatten(),
@@ -9402,13 +9399,13 @@ async fn list_umkm_stores(
                 .map(PublicUmkmStoreRow::into_public)
                 .collect::<Vec<_>>();
             (
-            StatusCode::OK,
-            Json(json!({
-                "data": {
-                    "items": items,
-                    "count": items.len()
-                }
-            })),
+                StatusCode::OK,
+                Json(json!({
+                    "data": {
+                        "items": items,
+                        "count": items.len()
+                    }
+                })),
             )
                 .into_response()
         }
@@ -9428,13 +9425,11 @@ async fn get_umkm_store(
     Path(store_ref): Path<String>,
 ) -> impl IntoResponse {
     match find_public_umkm_store_row(&state.db, store_ref.as_str()).await {
-        Ok(Some(store)) => {
-            (
-                StatusCode::OK,
-                Json(json!({ "data": { "store": store.into_public() } })),
-            )
-                .into_response()
-        }
+        Ok(Some(store)) => (
+            StatusCode::OK,
+            Json(json!({ "data": { "store": store.into_public() } })),
+        )
+            .into_response(),
         Ok(None) => err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
         Err(error) => {
             tracing::error!("get_umkm_store error: {:?}", error);
@@ -11512,8 +11507,11 @@ async fn list_content(
         .as_ref()
         .is_some_and(|claims| has_cms_access(claims) || has_agent_access(claims));
     if !can_list_content_status(&status, owner_id, actor_user_id, privileged) {
-        return err(StatusCode::FORBIDDEN, "content status is not publicly accessible")
-            .into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "content status is not publicly accessible",
+        )
+        .into_response();
     }
 
     let rows = sqlx::query_as::<_, ContentRow>(
@@ -23865,10 +23863,7 @@ mod tests {
 
     #[test]
     fn content_list_status_requires_owner_or_privileged_scope() {
-        assert_eq!(
-            resolve_content_list_status(None).as_deref(),
-            Ok("active")
-        );
+        assert_eq!(resolve_content_list_status(None).as_deref(), Ok("active"));
         assert_eq!(
             resolve_content_list_status(Some("ARCHIVED".to_string())).as_deref(),
             Ok("archived")
@@ -24638,8 +24633,8 @@ mod tests {
 
     #[test]
     fn map_reference_cursor_round_trips_and_rejects_invalid_values() {
-        let updated_at = DateTime::<Utc>::from_timestamp_micros(1_722_470_400_123_456)
-            .expect("valid timestamp");
+        let updated_at =
+            DateTime::<Utc>::from_timestamp_micros(1_722_470_400_123_456).expect("valid timestamp");
         let id = Uuid::new_v4();
         let encoded = encode_map_reference_cursor(updated_at.clone(), id);
 

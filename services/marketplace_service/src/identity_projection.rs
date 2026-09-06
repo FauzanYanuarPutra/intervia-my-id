@@ -232,8 +232,7 @@ fn clean_avatar_url(value: Option<&str>) -> Option<String> {
 
 fn normalized_kyc_status(value: Option<&str>) -> Option<String> {
     let normalized = value?.trim().to_ascii_lowercase();
-    matches!(normalized.as_str(), "none" | "basic" | "full" | "enhanced")
-        .then_some(normalized)
+    matches!(normalized.as_str(), "none" | "basic" | "full" | "enhanced").then_some(normalized)
 }
 
 fn profile_trust_from_metadata(metadata: Option<&Value>) -> ProfileTrustInput {
@@ -241,15 +240,9 @@ fn profile_trust_from_metadata(metadata: Option<&Value>) -> ProfileTrustInput {
     ProfileTrustInput {
         email_verified: json_bool(verification.and_then(|value| value.get("email_verified"))),
         phone_verified: json_bool(verification.and_then(|value| value.get("phone_verified"))),
-        document_verified: json_bool(
-            verification.and_then(|value| value.get("document_verified")),
-        ),
-        liveness_verified: json_bool(
-            verification.and_then(|value| value.get("liveness_verified")),
-        ),
-        identity_verified: json_bool(
-            verification.and_then(|value| value.get("identity_verified")),
-        ),
+        document_verified: json_bool(verification.and_then(|value| value.get("document_verified"))),
+        liveness_verified: json_bool(verification.and_then(|value| value.get("liveness_verified"))),
+        identity_verified: json_bool(verification.and_then(|value| value.get("identity_verified"))),
         kyc_status: normalized_kyc_status(
             verification
                 .and_then(|value| value.get("kyc_status"))
@@ -360,7 +353,9 @@ fn sanitize_identity_event(
         .or_else(|| parse_timestamp(data.get("created_at")))
         .ok_or_else(|| anyhow!("identity event missing source timestamp"))?;
     if source_updated_at > now + ChronoDuration::minutes(MAX_SOURCE_CLOCK_SKEW_MINUTES) {
-        return Err(anyhow!("identity event source timestamp is too far in the future"));
+        return Err(anyhow!(
+            "identity event source timestamp is too far in the future"
+        ));
     }
 
     let projection_data = if is_user_record {
@@ -387,16 +382,15 @@ fn sanitize_identity_event(
                 _ => "disabled",
             }
             .to_string();
-            let has_email = json_bool(data.get("has_email"))
-                || json_text(&data_value, "email").is_some();
+            let has_email =
+                json_bool(data.get("has_email")) || json_text(&data_value, "email").is_some();
             let has_phone = json_bool(data.get("has_phone"))
                 || json_text(&data_value, "phone")
                     .map(|value| value.chars().filter(char::is_ascii_digit).count() >= 8)
                     .unwrap_or(false);
             let deleted_at = parse_timestamp(data.get("deleted_at"));
-            let active = status == "active"
-                && json_bool(data.get("is_active"))
-                && deleted_at.is_none();
+            let active =
+                status == "active" && json_bool(data.get("is_active")) && deleted_at.is_none();
             IdentityProjectionData::User {
                 has_email,
                 has_phone,
@@ -580,13 +574,11 @@ fn apply_event_to_state(
     event: &IdentityProjectionEvent,
 ) -> ProjectionOutcome {
     let (current_timestamp, current_event_id, current_operation) = match &event.data {
-        IdentityProjectionData::User { .. } => {
-            (
-                state.identity_user_updated_at.to_owned(),
-                state.identity_user_event_id,
-                state.identity_user_operation.as_deref(),
-            )
-        }
+        IdentityProjectionData::User { .. } => (
+            state.identity_user_updated_at.to_owned(),
+            state.identity_user_event_id,
+            state.identity_user_operation.as_deref(),
+        ),
         IdentityProjectionData::Profile { .. } => (
             state.identity_profile_updated_at.to_owned(),
             state.identity_profile_event_id,
@@ -645,7 +637,8 @@ fn apply_event_to_state(
             state.identity_profile_updated_at = Some(event.source_updated_at.to_owned());
             state.identity_profile_event_id = Some(event.event_id);
             state.identity_profile_operation = Some(event.operation.as_str().to_string());
-            if event.operation == IdentityOperation::Deleted || state.identity_deleted_at.is_some() {
+            if event.operation == IdentityOperation::Deleted || state.identity_deleted_at.is_some()
+            {
                 state.username = None;
                 state.full_name = None;
                 state.avatar_url = None;
@@ -940,11 +933,7 @@ async fn consume_identity_session(
             .message_id()
             .as_ref()
             .map(ToString::to_string);
-        let property_event_type = delivery
-            .properties
-            .kind()
-            .as_ref()
-            .map(ToString::to_string);
+        let property_event_type = delivery.properties.kind().as_ref().map(ToString::to_string);
         let event = match sanitize_identity_event(
             &raw,
             property_event_id.as_deref(),
@@ -1148,10 +1137,7 @@ async fn process_identity_inbox_batch(
     Ok(processed)
 }
 
-pub(crate) async fn run_identity_inbox_processor(
-    db: PgPool,
-    config: IdentityProjectionConfig,
-) {
+pub(crate) async fn run_identity_inbox_processor(db: PgPool, config: IdentityProjectionConfig) {
     let mut failure_delay_seconds = 1u64;
     loop {
         match process_identity_inbox_batch(
@@ -1273,13 +1259,8 @@ mod tests {
                 }
             }
         });
-        let event = sanitize_identity_event(
-            &raw,
-            None,
-            None,
-            timestamp("2026-08-10T00:01:00Z"),
-        )
-        .unwrap();
+        let event =
+            sanitize_identity_event(&raw, None, None, timestamp("2026-08-10T00:01:00Z")).unwrap();
         let stored = serde_json::to_string(&event).unwrap();
 
         assert!(stored.contains("pelaku_umkm"));
@@ -1293,13 +1274,8 @@ mod tests {
     fn inactive_and_deleted_users_are_never_transaction_eligible() {
         let event_id = Uuid::new_v4();
         let raw = raw_user_event(event_id, "2026-08-10T00:00:00Z", false);
-        let event = sanitize_identity_event(
-            &raw,
-            None,
-            None,
-            timestamp("2026-08-10T00:01:00Z"),
-        )
-        .unwrap();
+        let event =
+            sanitize_identity_event(&raw, None, None, timestamp("2026-08-10T00:01:00Z")).unwrap();
         let mut state = ProjectionState::placeholder(event.aggregate_id);
         assert_eq!(
             apply_event_to_state(&mut state, &event),
@@ -1369,13 +1345,9 @@ mod tests {
         let mut deleted_raw = raw_user_event(Uuid::new_v4(), "2026-08-10T00:02:00Z", true);
         deleted_raw["event_type"] = Value::String("identity.user.deleted".to_string());
         deleted_raw["operation"] = Value::String("DELETE".to_string());
-        let deleted = sanitize_identity_event(
-            &deleted_raw,
-            None,
-            None,
-            timestamp("2026-08-10T00:03:00Z"),
-        )
-        .unwrap();
+        let deleted =
+            sanitize_identity_event(&deleted_raw, None, None, timestamp("2026-08-10T00:03:00Z"))
+                .unwrap();
         assert_eq!(deleted.aggregate_id, user_id);
 
         let mut state = ProjectionState::placeholder(user_id);
