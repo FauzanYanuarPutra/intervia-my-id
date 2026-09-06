@@ -7,5 +7,6 @@ mod products_persistence_tests;
 mod repository;
 mod routes;
 mod service;
+pub(crate) mod settlement;
 
 pub(crate) use routes::router;
