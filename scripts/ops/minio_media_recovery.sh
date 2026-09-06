@@ -16,10 +16,10 @@ cleanup() {
 trap cleanup EXIT
 
 make_tmp() {
-  local file
+  local var_name="$1" file
   file="$(mktemp)"
   tmp_files+=("$file")
-  printf '%s\n' "$file"
+  printf -v "$var_name" '%s' "$file"
 }
 
 inventory_volumes() {
@@ -27,9 +27,10 @@ inventory_volumes() {
   docker volume ls --format '{{.Name}}' | grep -Ei '(^|[_-])minio([_-]|$)|minio.*data|data.*minio' || true
   echo
   echo "Current MinIO container mounts:"
-  ids="$(docker ps -aq --filter 'name=minio')"
-  if [[ -n "$ids" ]]; then
-    docker inspect $ids --format '{{.Name}} {{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}} -> {{.Source}}{{end}}{{end}}'
+  local -a ids=()
+  mapfile -t ids < <(docker ps -aq --filter 'name=minio')
+  if ((${#ids[@]})); then
+    docker inspect "${ids[@]}" --format '{{.Name}} {{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}} -> {{.Source}}{{end}}{{end}}'
   else
     echo "No MinIO container found."
   fi
@@ -59,8 +60,8 @@ list_objects() {
 compare_objects() {
   require_aliases
   local active_file source_file
-  active_file="$(make_tmp)"
-  source_file="$(make_tmp)"
+  make_tmp active_file
+  make_tmp source_file
   list_objects "$active_alias" > "$active_file"
   list_objects "$source_alias" > "$source_file"
   echo "Objects present in historical source but missing from active bucket:"
@@ -74,9 +75,9 @@ recover_objects() {
   }
   require_aliases
   local active_file source_file missing_file recovered key
-  active_file="$(make_tmp)"
-  source_file="$(make_tmp)"
-  missing_file="$(make_tmp)"
+  make_tmp active_file
+  make_tmp source_file
+  make_tmp missing_file
   list_objects "$active_alias" > "$active_file"
   list_objects "$source_alias" > "$source_file"
   comm -23 "$source_file" "$active_file" > "$missing_file"
