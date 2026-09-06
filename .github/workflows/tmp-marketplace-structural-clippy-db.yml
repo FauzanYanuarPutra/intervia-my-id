@@ -1,0 +1,106 @@
+name: Temporary Marketplace Structural Clippy Repair With DB
+
+on:
+  push:
+    branches: [fix/marketplace-quality-fresh-20260906]
+    paths:
+      - '.github/workflows/tmp-marketplace-structural-clippy-db.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/marketplace-quality-fresh-20260906
+          fetch-depth: 0
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Apply asserted structural repairs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one match in {path}, found {count}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          order = 'services/marketplace_service/src/order_engine.rs'
+          main = 'services/marketplace_service/src/main.rs'
+
+          replace_once(order, 'async fn insert_state_transition(\n', '#[expect(clippy::too_many_arguments, reason = "state transition persistence mirrors the audit record columns explicitly")]\nasync fn insert_state_transition(\n')
+          replace_once(order, '''    fn base_status_on_create(&self, input: &CreateOrderRequest) -> OrderBaseStatus {\n        let is_top = input\n            .category_specific_metadata\n            .as_ref()\n            .and_then(|v| v.get("payment_terms"))\n            .and_then(|v| v.as_str())\n            == Some("TOP");\n        if is_top {\n            OrderBaseStatus::PendingPayment\n        } else {\n            OrderBaseStatus::PendingPayment\n        }\n    }''', '''    fn base_status_on_create(&self, _input: &CreateOrderRequest) -> OrderBaseStatus {\n        OrderBaseStatus::PendingPayment\n    }''')
+
+          replace_once(main, '    Single(TrackEventRequest),\n', '    Single(Box<TrackEventRequest>),\n')
+          p = Path(main)
+          text = p.read_text()
+          candidates = [
+              ('CollectEventsRequest::Single(event) => vec![event],', 'CollectEventsRequest::Single(event) => vec![*event],'),
+              ('CollectEventsRequest::Single(event) => vec![event]', 'CollectEventsRequest::Single(event) => vec![*event]'),
+          ]
+          for old, new in candidates:
+              if old in text:
+                  text = text.replace(old, new, 1)
+                  break
+          else:
+              raise SystemExit('could not find CollectEventsRequest::Single match arm')
+          p.write_text(text)
+
+          replace_once(main, '''fn is_demand_listing_metadata(metadata: &Value) -> bool {\n    match metadata_listing_side(metadata).as_deref() {\n        Some("demand")\n        | Some("need")\n        | Some("needs")\n        | Some("request")\n        | Some("requested")\n        | Some("seeker")\n        | Some("buyer request")\n        | Some("buy request")\n        | Some("butuh")\n        | Some("mencari") => true,\n        _ => false,\n    }\n}''', '''fn is_demand_listing_metadata(metadata: &Value) -> bool {\n    matches!(\n        metadata_listing_side(metadata).as_deref(),\n        Some("demand")\n            | Some("need")\n            | Some("needs")\n            | Some("request")\n            | Some("requested")\n            | Some("seeker")\n            | Some("buyer request")\n            | Some("buy request")\n            | Some("butuh")\n            | Some("mencari")\n    )\n}''')
+
+          for fn_name, reason in [
+              ('find_reusable_pending_topup_for_transaction', 'lookup criteria intentionally mirror the reusable top-up identity tuple'),
+              ('insert_wallet_ledger_entry_tx', 'ledger persistence mirrors immutable accounting entry columns explicitly'),
+              ('build_provider_checkout', 'provider checkout adapter keeps externally meaningful payment fields explicit'),
+              ('update_transaction_status', 'transaction transition command keeps authorization and metadata controls explicit'),
+          ]:
+              replace_once(main, f'async fn {fn_name}(\n', f'#[expect(clippy::too_many_arguments, reason = "{reason}")]\nasync fn {fn_name}(\n')
+
+          replace_once(main, '''    .map(|value| {\n        if value.starts_with('@') {\n            value\n        } else if value.contains(' ') || value.contains('.') {\n            value\n        } else if value == "Seseorang" || value == "Someone" {\n            value\n        } else {\n            format!("@{value}")\n        }\n    })''', '''    .map(|value| {\n        if value.starts_with('@')\n            || value.contains(' ')\n            || value.contains('.')\n            || value == "Seseorang"\n            || value == "Someone"\n        {\n            value\n        } else {\n            format!("@{value}")\n        }\n    })''')
+          replace_once(main, '                    completed.sort_by(|left, right| right.created_at.cmp(&left.created_at));\n', '                    completed.sort_by_key(|item| std::cmp::Reverse(item.created_at));\n')
+          replace_once(main, '                    Ok(count) if count == 0 => sleep(Duration::from_millis(poll_ms)).await,\n', '                    Ok(0) => sleep(Duration::from_millis(poll_ms)).await,\n')
+      - name: Format
+        working-directory: services/marketplace_service
+        run: cargo fmt --check
+      - name: Clippy strict
+        working-directory: services/marketplace_service
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Full tests with Postgres
+        working-directory: services/marketplace_service
+        run: cargo test --locked
+      - name: Commit verified repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add services/marketplace_service
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git commit -m 'fix: resolve remaining marketplace clippy debt'
+          git push origin HEAD:fix/marketplace-quality-fresh-20260906
