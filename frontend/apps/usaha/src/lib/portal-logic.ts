@@ -14,7 +14,11 @@ const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
   info: 'viewInfo',
   locations: 'viewInfo',
   products: 'viewProducts',
+  inventory: 'viewInventory',
   orders: 'viewOrders',
+  finance: 'viewFinance',
+  channels: 'viewChannels',
+  reports: 'viewReports',
   operations: 'viewOperations',
   team: 'viewTeam',
   buyerPage: 'viewBuyerPage',
@@ -23,13 +27,17 @@ const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
 
 const sectionOrder: PortalSection[] = [
   'home',
+  'orders',
+  'products',
+  'inventory',
+  'finance',
+  'channels',
+  'reports',
+  'operations',
   'info',
   'locations',
-  'products',
-  'orders',
-  'operations',
-  'team',
   'buyerPage',
+  'team',
   'security',
 ];
 
@@ -50,7 +58,11 @@ export function buildSectionHref(businessId: string, section: PortalSection) {
     case 'info': return `/businesses/${businessId}/info`;
     case 'locations': return `/businesses/${businessId}/locations`;
     case 'products': return `/businesses/${businessId}/products`;
+    case 'inventory': return `/businesses/${businessId}/inventory`;
     case 'orders': return `/businesses/${businessId}/orders`;
+    case 'finance': return `/businesses/${businessId}/finance`;
+    case 'channels': return `/businesses/${businessId}/channels`;
+    case 'reports': return `/businesses/${businessId}/reports`;
     case 'operations': return `/businesses/${businessId}/operations`;
     case 'team': return `/businesses/${businessId}/team`;
     case 'buyerPage': return `/businesses/${businessId}/buyer-page`;
@@ -74,6 +86,7 @@ export function getSetupSteps(business: BusinessRecord): ProgressStep[] {
     { id: 'info', label: 'Lengkapi profil usaha', hint: 'Nama, kategori dan kontak harus jelas.', done: business.infoComplete },
     { id: 'locations', label: 'Pastikan lokasi utama', hint: 'Alamat dan pin peta membantu pelanggan menemukan cabang.', done: locations.some(item => item.isPrimary) },
     { id: 'products', label: 'Isi katalog', hint: 'Tambahkan produk atau jasa yang paling sering dicari.', done: business.productsCount > 0 },
+    { id: 'costing', label: 'Hitung HPP produk utama', hint: 'Masukkan bahan, kemasan dan resep supaya harga jual tidak menebak.', done: false },
     { id: 'operations', label: 'Atur operasional', hint: 'Atur jam buka sesuai kondisi lapangan.', done: business.schedule.trim().length >= 5 && business.schedule !== 'Belum diatur' },
     { id: 'buyer-page', label: 'Siapkan halaman pembeli', hint: 'Preview harus jelas sebelum link dibagikan.', done: business.buyerPageReady },
   ];
