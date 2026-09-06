@@ -57,7 +57,7 @@ defmodule ChatService.MixProject do
       {:hammer_backend_redis, "~> 6.0"},
       {:xandra, "~> 0.19"},
       {:redix, "~> 1.5"},
-      {:decimal, "~> 2.3"},
+      {:decimal, "~> 3.1"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
