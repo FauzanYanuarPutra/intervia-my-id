@@ -1,5 +1,6 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Boxes, PackagePlus, TriangleAlert } from 'lucide-react';
+import { Boxes, Calculator, PackagePlus, Store, TriangleAlert } from 'lucide-react';
 import { DataPanel } from '@/components/portal/DataPanel';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { PortalShell } from '@/components/portal/PortalShell';
@@ -38,17 +39,26 @@ export default async function BusinessProductsPage({ params }: PageProps) {
   if (!business) notFound();
 
   const canManage = hasPermission(business, 'manageProducts');
+  const canViewCosting = hasPermission(business, 'viewCosting');
+  const canViewChannels = hasPermission(business, 'viewChannels');
   const activeProductsCount = business.products.filter(product => product.status === 'live').length;
   const attentionCount = (business.lowStockProductsCount ?? 0) + (business.stockCheckCount ?? 0);
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="products">
       <SectionCard
-        eyebrow="Katalog"
-        title="Produk & stok"
-        description="Kelola katalog canonical Lajukan. Perubahan produk dan stok dari sini menjadi sumber data untuk operasional usaha dan etalase pembeli."
+        eyebrow="Produk & HPP"
+        title="Produk, modal, stok, dan harga jual"
+        description="Kelola katalog canonical Lajukan, lalu hitung HPP dan harga per kanal tanpa memisahkan data produk ke banyak tempat."
       >
         <div className="space-y-4">
+          {(canViewCosting || canViewChannels) ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="portal-panel group p-4 transition hover:border-portal-forest/30 hover:bg-portal-mist/40 sm:p-5"><div className="portal-icon-tile"><Calculator className="h-4 w-4" /></div><p className="mt-3 font-bold text-portal-ink">Hitung HPP & resep</p><p className="mt-1 text-sm leading-6 text-portal-soft">Masukkan bahan, kemasan, yield dan stok untuk tahu modal per porsi dan batas produksi.</p><span className="mt-3 inline-flex text-xs font-bold text-portal-forest">Buka kalkulator HPP →</span></Link> : null}
+              {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="portal-panel group p-4 transition hover:border-portal-forest/30 hover:bg-portal-mist/40 sm:p-5"><div className="portal-icon-tile"><Store className="h-4 w-4" /></div><p className="mt-3 font-bold text-portal-ink">Atur harga per kanal</p><p className="mt-1 text-sm leading-6 text-portal-soft">Cek margin GoFood, GrabFood, ShopeeFood, offline, dan copy data merchant dari satu tempat.</p><span className="mt-3 inline-flex text-xs font-bold text-portal-forest">Buka Kanal Jual →</span></Link> : null}
+            </div>
+          ) : null}
+
           <section className="grid gap-3 sm:grid-cols-3">
             <StatCard label="Produk aktif" value={activeProductsCount} icon={Boxes} note={`${business.ownedProductsCount ?? business.productsCount} stok sendiri`} />
             <StatCard label="Barang titipan" value={business.consignmentProductsCount ?? 0} icon={PackagePlus} note="Produk dengan sumber konsinyasi" />
