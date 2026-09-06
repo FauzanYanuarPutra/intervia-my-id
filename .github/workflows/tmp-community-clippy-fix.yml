@@ -1,0 +1,68 @@
+name: Temporary Community Clippy Fix
+
+on:
+  push:
+    branches: [fix/community-clippy-20260906]
+    paths:
+      - '.github/workflows/tmp-community-clippy-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/community-clippy-20260906
+          fetch-depth: 0
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/community_service
+      - name: Preserve accepted reel metadata without dead fields
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('services/community_service/src/main.rs')
+          text = path.read_text()
+          replacements = {
+              '    store_name: Option<String>,': '    #[serde(rename = "storeName")]\n    _store_name: Option<String>,',
+              '    store_city: Option<String>,': '    #[serde(rename = "storeCity")]\n    _store_city: Option<String>,',
+              '    storefront_path: Option<String>,': '    #[serde(rename = "storefrontPath")]\n    _storefront_path: Option<String>,',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected source fragment: {old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+      - name: Apply machine-safe Clippy suggestions
+        working-directory: services/community_service
+        run: cargo clippy --fix --locked --all-targets --allow-dirty --allow-staged -- -D warnings
+      - name: Format
+        working-directory: services/community_service
+        run: cargo fmt
+      - name: Verify format
+        working-directory: services/community_service
+        run: cargo fmt --check
+      - name: Verify Clippy
+        working-directory: services/community_service
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Run tests
+        working-directory: services/community_service
+        run: cargo test --locked
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- services/community_service; then
+            echo 'No repair changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add services/community_service
+          git commit -m 'fix: satisfy community clippy gate'
+          git push origin HEAD:fix/community-clippy-20260906
