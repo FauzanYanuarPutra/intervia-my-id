@@ -331,6 +331,7 @@ async fn append_outbox_event(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_state_transition(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     order_id: Uuid,

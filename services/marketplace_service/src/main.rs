@@ -3965,10 +3965,7 @@ fn reward_coin_payment_rules() -> RewardCoinPaymentRules {
 }
 
 fn weekly_claimed_today(weekly: &WeeklyLoginRewardProgress) -> bool {
-    weekly
-        .claimed_dates
-        .iter()
-        .any(|date| *date == weekly.today)
+    weekly.claimed_dates.contains(&weekly.today)
 }
 
 fn reward_coin_max_discount_cents(amount_cents: i64) -> i64 {
@@ -4400,12 +4397,7 @@ fn normalize_reason_code_candidate(value: Option<String>) -> Option<String> {
     if raw.len() > MAX_REASON_CODE_LEN {
         return None;
     }
-    Some(
-        raw.trim()
-            .to_lowercase()
-            .replace('-', "_")
-            .replace(' ', "_"),
-    )
+    Some(raw.trim().to_lowercase().replace(['-', ' '], "_"))
 }
 
 fn normalize_cancel_reason_code(value: Option<String>) -> Option<String> {
@@ -4442,11 +4434,7 @@ fn normalize_dispute_reason_code(value: Option<String>) -> Option<String> {
 
 fn normalize_dispute_decision(value: Option<String>) -> Option<String> {
     let raw = clean_text(value)?;
-    let normalized = raw
-        .trim()
-        .to_lowercase()
-        .replace('-', "_")
-        .replace(' ', "_");
+    let normalized = raw.trim().to_lowercase().replace(['-', ' '], "_");
     match normalized.as_str() {
         "buyer_win_full_refund"
         | "seller_win_full_release"
@@ -4462,8 +4450,7 @@ fn normalize_evidence_type(value: Option<String>) -> String {
         .unwrap_or_else(|| "other".to_string())
         .trim()
         .to_lowercase()
-        .replace('-', "_")
-        .replace(' ', "_");
+        .replace(['-', ' '], "_");
     match raw.as_str() {
         "photo" | "video" | "tracking" | "invoice" | "chat_export" | "inspection_report"
         | "other" => raw,
@@ -4567,11 +4554,7 @@ fn normalize_dispute_evidence_attachments(
 
 fn normalize_delivery_review_decision(value: Option<String>) -> Option<String> {
     let raw = clean_text(value)?;
-    let normalized = raw
-        .trim()
-        .to_lowercase()
-        .replace('-', "_")
-        .replace(' ', "_");
+    let normalized = raw.trim().to_lowercase().replace(['-', ' '], "_");
     match normalized.as_str() {
         "accept" | "request_revision" => Some(normalized),
         _ => None,
@@ -6035,7 +6018,7 @@ fn metadata_listing_side(metadata: &Value) -> Option<String> {
         ["request_mode"].as_slice(),
     ] {
         if let Some(value) = clean_json_string(json_lookup(metadata, path)) {
-            let normalized = value.replace('_', " ").replace('-', " ");
+            let normalized = value.replace(['_', '-'], " ");
             if !normalized.trim().is_empty() {
                 return Some(normalized);
             }
@@ -6462,8 +6445,8 @@ async fn ensure_transaction_actor_verified(
             Json(json!({
                 "error": format!("{} must complete verification before continuing this transaction.", actor_role),
                 "code": "verification_required",
-                "buyer_verified": if actor_role == "buyer" { false } else { true },
-                "seller_verified": if actor_role == "seller" { false } else { true }
+                "buyer_verified": actor_role != "buyer",
+                "seller_verified": actor_role != "seller"
             })),
         )
             .into_response(),
@@ -7646,6 +7629,7 @@ fn normalize_reusable_payment_method(value: Option<&str>) -> Option<String> {
         .filter(|raw| !raw.is_empty() && raw != "auto" && raw != "all" && raw != "any")
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn find_reusable_pending_topup_for_transaction(
     db: &PgPool,
     user_id: Uuid,
@@ -11384,7 +11368,7 @@ async fn list_map_references(
     if let Some((cursor_updated_at, cursor_id)) = cursor {
         statement
             .push(" AND (updated_at < ")
-            .push_bind(cursor_updated_at.clone())
+            .push_bind(cursor_updated_at)
             .push(" OR (updated_at = ")
             .push_bind(cursor_updated_at)
             .push(" AND id > ")
@@ -11432,7 +11416,7 @@ async fn list_map_references(
             let next_cursor = if has_more && ranking_origin.is_none() && text_query.is_none() {
                 items
                     .last()
-                    .map(|item| encode_map_reference_cursor(item.updated_at.clone(), item.id))
+                    .map(|item| encode_map_reference_cursor(item.updated_at, item.id))
             } else {
                 None
             };
@@ -17826,7 +17810,7 @@ async fn reconcile_pending_midtrans_topups_for_user(
 
         if extract_topup_payment_due_at(&topup.payment_payload)
             .as_ref()
-            .map(|deadline| Utc::now() > deadline.to_owned())
+            .map(|deadline| Utc::now() > *deadline)
             .unwrap_or(false)
         {
             continue;
@@ -18151,7 +18135,7 @@ async fn handle_midtrans_wallet_notify(
         && current.status == "pending"
         && payment_due_at
             .as_ref()
-            .map(|deadline| Utc::now() > deadline.to_owned())
+            .map(|deadline| Utc::now() > *deadline)
             .unwrap_or(false)
     {
         target_status = "expired".to_string();
@@ -18612,6 +18596,7 @@ async fn lock_wallet_account_tx(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_wallet_ledger_entry_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: Uuid,
@@ -19474,6 +19459,7 @@ async fn settle_wallet_topup_in_tx(
     Ok((updated_topup, updated_account))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_provider_checkout(
     state: &Arc<AppState>,
     provider: &str,
@@ -22913,6 +22899,7 @@ async fn delete_banner(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn update_transaction_status(
     state: &Arc<AppState>,
     id: Uuid,
@@ -22977,7 +22964,7 @@ async fn update_transaction_status(
     if !seller_only && !buyer_only && !is_buyer && !is_seller {
         return err(StatusCode::FORBIDDEN, "forbidden").into_response();
     }
-    if !allowed_current.iter().any(|s| *s == txn.status.as_str()) {
+    if !allowed_current.contains(&txn.status.as_str()) {
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
     }
 
@@ -24636,7 +24623,7 @@ mod tests {
         let updated_at =
             DateTime::<Utc>::from_timestamp_micros(1_722_470_400_123_456).expect("valid timestamp");
         let id = Uuid::new_v4();
-        let encoded = encode_map_reference_cursor(updated_at.clone(), id);
+        let encoded = encode_map_reference_cursor(updated_at, id);
 
         assert_eq!(
             parse_map_reference_cursor(Some(encoded)),
