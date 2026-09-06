@@ -1,0 +1,55 @@
+name: Temporary Frontend Production Security Refresh
+
+on:
+  push:
+    branches: [security/frontend-production-deps-20260906]
+    paths:
+      - '.github/workflows/tmp-frontend-security-refresh.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: security/frontend-production-deps-20260906
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+      - name: Refresh lockfiles within declared semver ranges
+        shell: bash
+        run: |
+          set -euo pipefail
+          for dir in frontend/packages frontend/apps/www frontend/apps/usaha frontend/apps/cms frontend/apps/crm; do
+            [[ -f "$dir/package-lock.json" ]] || continue
+            echo "Refreshing $dir"
+            (cd "$dir" && npm audit fix --package-lock-only --legacy-peer-deps --no-audit --no-fund)
+          done
+      - name: Verify high severity production audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          for dir in frontend/packages frontend/apps/www frontend/apps/usaha frontend/apps/cms frontend/apps/crm; do
+            [[ -f "$dir/package-lock.json" ]] || continue
+            echo "Auditing $dir"
+            (cd "$dir" && npm ci --legacy-peer-deps --no-audit --no-fund && npm audit --omit=dev --audit-level=high) || failed=1
+          done
+          exit "$failed"
+      - name: Commit verified lockfile refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/**/package-lock.json
+          if git diff --cached --quiet; then
+            echo 'No lockfile changes required.'
+            exit 0
+          fi
+          git commit -m 'chore: refresh frontend production dependency locks'
+          git push origin HEAD:security/frontend-production-deps-20260906
