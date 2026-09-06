@@ -44,3 +44,9 @@ jobs:
           grep -q 'business_channel_settings' migrations/20260906002000_usaha_business_control_center.up.sql
           grep -q 'business_finance_entries' migrations/20260906002000_usaha_business_control_center.up.sql
           grep -q 'DROP TABLE IF EXISTS business_ingredients' migrations/20260906002000_usaha_business_control_center.down.sql
+          test -s migrations/20260906003000_usaha_business_settlements.up.sql
+          test -s migrations/20260906003000_usaha_business_settlements.down.sql
+          grep -q 'business_settlements' migrations/20260906003000_usaha_business_settlements.up.sql
+          grep -q 'expected_transfer_amount' migrations/20260906003000_usaha_business_settlements.up.sql
+          grep -q 'difference_amount' migrations/20260906003000_usaha_business_settlements.up.sql
+          grep -q 'DROP TABLE IF EXISTS business_settlements' migrations/20260906003000_usaha_business_settlements.down.sql
