@@ -1,3 +1,4 @@
+# Temporary branch-only remediation workflow. Remove after verified remediation is committed.
 name: Media Durability Remediation
 
 on:
