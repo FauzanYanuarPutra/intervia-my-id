@@ -86,6 +86,50 @@ jobs:
           cd "$DEPLOY_PATH"
           if [[ "$TARGET_ENV" == production ]]; then overlay=docker-compose.prod.yml; env_file=.env.production; else overlay=docker-compose.staging.yml; env_file=.env.staging; fi
           [[ -f "$env_file" ]] || { echo "Missing server-managed $DEPLOY_PATH/$env_file" >&2; exit 1; }
+
+          # Resolve production media storage before Compose evaluates the overlay.
+          # Never source the server env file: read only the single non-secret value we need.
+          if [[ "$TARGET_ENV" == production ]]; then
+            configured_minio_volume="$(awk -F= '$1 == "MINIO_DATA_VOLUME" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
+            [[ -z "$configured_minio_volume" || "$configured_minio_volume" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+              echo "MINIO_DATA_VOLUME in $env_file contains an invalid Docker volume name." >&2
+              exit 1
+            }
+
+            mapfile -t active_minio_volumes < <(
+              docker ps -q --filter 'label=com.docker.compose.service=minio' |
+                xargs -r docker inspect --format '{{range .Mounts}}{{if and (eq .Destination "/data") (eq .Type "volume")}}{{.Name}}{{println}}{{end}}{{end}}' |
+                sed '/^$/d' | sort -u
+            )
+
+            if [[ -n "$configured_minio_volume" ]]; then
+              docker volume inspect "$configured_minio_volume" >/dev/null 2>&1 || {
+                echo "Configured production MinIO volume '$configured_minio_volume' does not exist. Refusing to create an empty replacement." >&2
+                exit 1
+              }
+              if ((${#active_minio_volumes[@]} > 1)); then
+                printf 'Multiple active MinIO /data volumes detected: %s\n' "${active_minio_volumes[*]}" >&2
+                exit 1
+              fi
+              if ((${#active_minio_volumes[@]} == 1)) && [[ "${active_minio_volumes[0]}" != "$configured_minio_volume" ]]; then
+                echo "Configured MINIO_DATA_VOLUME '$configured_minio_volume' differs from active MinIO /data volume '${active_minio_volumes[0]}'. Refusing storage switch." >&2
+                exit 1
+              fi
+              export MINIO_DATA_VOLUME="$configured_minio_volume"
+            else
+              if ((${#active_minio_volumes[@]} != 1)); then
+                echo "MINIO_DATA_VOLUME is unset and exactly one active named MinIO /data volume could not be resolved. Set it explicitly in $env_file after inventorying production storage." >&2
+                exit 1
+              fi
+              export MINIO_DATA_VOLUME="${active_minio_volumes[0]}"
+              docker volume inspect "$MINIO_DATA_VOLUME" >/dev/null 2>&1 || {
+                echo "Resolved active MinIO volume '$MINIO_DATA_VOLUME' no longer exists." >&2
+                exit 1
+              }
+              echo "Resolved production MINIO_DATA_VOLUME from active MinIO: $MINIO_DATA_VOLUME"
+            fi
+          fi
+
           compose=(--env-file "$env_file" -f docker-compose.yml -f "$overlay")
           release_marker="$DEPLOY_PATH/.last-successful-${TARGET_ENV}-image-tag"
           previous_image_tag=""
@@ -114,7 +158,9 @@ jobs:
           docker compose "${compose[@]}" pull
           deployment_started=1
           docker compose "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420
-          bash scripts/ops/minio_storage_probe.sh "${compose[@]}"
+          if [[ "$TARGET_ENV" == production ]]; then
+            bash scripts/ops/minio_storage_probe.sh "${compose[@]}"
+          fi
           app_domain="$(awk -F= '$1 == "APP_DOMAIN" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
           [[ "$app_domain" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "APP_DOMAIN is missing or invalid in $env_file." >&2; false; }
           curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "www.${app_domain}:443:127.0.0.1" "https://www.${app_domain}/" >/dev/null
