@@ -2,9 +2,9 @@
 name: Media Durability Remediation
 
 on:
-  push:
-    branches:
-      - hardening/media-durability-20260905
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,7 +15,9 @@ concurrency:
 
 jobs:
   remediate:
-    if: github.actor != 'github-actions[bot]'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.ref == 'hardening/media-durability-20260905'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -72,6 +74,7 @@ jobs:
             npm install --package-lock-only --ignore-scripts --legacy-peer-deps next@16.3.4
             npm install --package-lock-only --ignore-scripts --legacy-peer-deps --save-dev postcss@8.5.8
             npm update --package-lock-only --ignore-scripts --legacy-peer-deps
+            npm audit fix --package-lock-only --ignore-scripts --legacy-peer-deps || true
             popd >/dev/null
           done
 
