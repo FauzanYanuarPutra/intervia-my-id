@@ -1,3 +1,4 @@
+pub(crate) mod control;
 pub(crate) mod domain;
 mod identity_client;
 mod products;
