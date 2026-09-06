@@ -194,4 +194,6 @@ services:
 
 volumes:
   minio_data:
-    name: ${MINIO_DATA_VOLUME:-lajukan_minio_data}
+    # Never silently create/switch production media storage. deploy.yml resolves this
+    # to the existing /data named volume before Docker Compose is evaluated.
+    name: ${MINIO_DATA_VOLUME:?MINIO_DATA_VOLUME must resolve to the existing production MinIO volume}
