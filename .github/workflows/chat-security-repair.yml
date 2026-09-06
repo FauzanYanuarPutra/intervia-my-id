@@ -30,17 +30,7 @@ jobs:
         run: |
           mix deps.get --only test
           mix deps.update phoenix plug_cowboy guardian html_sanitize_ex decimal
-      - name: Verify formatting
-        run: mix format --check-formatted
-      - name: Run tests
-        env:
-          MIX_ENV: test
-        run: mix test
-      - name: Audit advisories
-        env:
-          MIX_ENV: test
-        run: mix hex.audit
-      - name: Commit lockfile changes
+      - name: Commit dependency refresh before strict verification
         working-directory: .
         shell: bash
         run: |
@@ -54,3 +44,13 @@ jobs:
           git add services/chat_service/mix.lock services/chat_service/mix.exs
           git commit -m "security: refresh chat dependency lockfile"
           git push origin HEAD:security/chat-dependencies-20260907
+      - name: Verify formatting
+        run: mix format --check-formatted
+      - name: Run tests
+        env:
+          MIX_ENV: test
+        run: mix test
+      - name: Audit advisories
+        env:
+          MIX_ENV: test
+        run: mix hex.audit
