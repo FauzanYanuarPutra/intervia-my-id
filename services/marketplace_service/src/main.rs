@@ -37,9 +37,9 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod businesses;
 mod identity_projection;
 mod order_engine;
-mod businesses;
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
 };
@@ -426,9 +426,7 @@ struct ListContentQuery {
 fn resolve_content_list_status(value: Option<String>) -> Result<String, &'static str> {
     match clean_text(value).map(|status| status.to_ascii_lowercase()) {
         None => Ok("active".to_string()),
-        Some(status) if matches!(status.as_str(), "active" | "draft" | "archived") => {
-            Ok(status)
-        }
+        Some(status) if matches!(status.as_str(), "active" | "draft" | "archived") => Ok(status),
         Some(_) => Err("unsupported content status"),
     }
 }
@@ -439,9 +437,7 @@ fn can_list_content_status(
     actor_user_id: Option<Uuid>,
     privileged: bool,
 ) -> bool {
-    status == "active"
-        || privileged
-        || (owner_id.is_some() && owner_id == actor_user_id)
+    status == "active" || privileged || (owner_id.is_some() && owner_id == actor_user_id)
 }
 
 fn resolve_public_content_offset(value: Option<i64>) -> Result<i64, &'static str> {
@@ -1150,14 +1146,11 @@ fn is_public_reference_response_metadata(metadata: &Value) -> bool {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_ascii_lowercase();
-    let explicitly_non_transactional = metadata
-        .get("is_transactional")
-        .and_then(|value| {
-            value
-                .as_bool()
-                .or_else(|| value.as_str().map(|raw| raw.eq_ignore_ascii_case("true")))
-        })
-        == Some(false);
+    let explicitly_non_transactional = metadata.get("is_transactional").and_then(|value| {
+        value
+            .as_bool()
+            .or_else(|| value.as_str().map(|raw| raw.eq_ignore_ascii_case("true")))
+    }) == Some(false);
 
     record_kind.contains("reference")
         && (market_side == "reference" || explicitly_non_transactional)
@@ -1276,9 +1269,7 @@ fn project_public_reference_metadata(metadata: &Value) -> Value {
     if let Some(value) = project_reference_object(source.get("source"), SOURCE_FIELDS) {
         projected.insert("source".to_string(), value);
     }
-    if let Some(value) =
-        project_reference_object(source.get("image_credit"), IMAGE_CREDIT_FIELDS)
-    {
+    if let Some(value) = project_reference_object(source.get("image_credit"), IMAGE_CREDIT_FIELDS) {
         projected.insert("image_credit".to_string(), value);
     }
     Value::Object(projected)
@@ -1378,7 +1369,9 @@ impl ContentResponse {
             title: value.title,
             summary: value.summary,
             body: value.body,
-            price_cents: (!is_public_reference).then_some(value.price_cents).flatten(),
+            price_cents: (!is_public_reference)
+                .then_some(value.price_cents)
+                .flatten(),
             price_unit: (!is_public_reference).then_some(price_unit).flatten(),
             currency: (!is_public_reference).then_some(value.currency).flatten(),
             tags: value.tags,
@@ -1391,11 +1384,15 @@ impl ContentResponse {
             original_price_cents: (!is_public_reference)
                 .then_some(value.original_price_cents)
                 .flatten(),
-            seller_type: (!is_public_reference).then_some(value.seller_type).flatten(),
+            seller_type: (!is_public_reference)
+                .then_some(value.seller_type)
+                .flatten(),
             minimum_order: (!is_public_reference)
                 .then_some(value.minimum_order)
                 .flatten(),
-            promo_label: (!is_public_reference).then_some(value.promo_label).flatten(),
+            promo_label: (!is_public_reference)
+                .then_some(value.promo_label)
+                .flatten(),
             promo_start_at: (!is_public_reference)
                 .then_some(value.promo_start_at)
                 .flatten(),
@@ -3968,10 +3965,7 @@ fn reward_coin_payment_rules() -> RewardCoinPaymentRules {
 }
 
 fn weekly_claimed_today(weekly: &WeeklyLoginRewardProgress) -> bool {
-    weekly
-        .claimed_dates
-        .iter()
-        .any(|date| *date == weekly.today)
+    weekly.claimed_dates.contains(&weekly.today)
 }
 
 fn reward_coin_max_discount_cents(amount_cents: i64) -> i64 {
@@ -4403,12 +4397,7 @@ fn normalize_reason_code_candidate(value: Option<String>) -> Option<String> {
     if raw.len() > MAX_REASON_CODE_LEN {
         return None;
     }
-    Some(
-        raw.trim()
-            .to_lowercase()
-            .replace('-', "_")
-            .replace(' ', "_"),
-    )
+    Some(raw.trim().to_lowercase().replace(['-', ' '], "_"))
 }
 
 fn normalize_cancel_reason_code(value: Option<String>) -> Option<String> {
@@ -4445,11 +4434,7 @@ fn normalize_dispute_reason_code(value: Option<String>) -> Option<String> {
 
 fn normalize_dispute_decision(value: Option<String>) -> Option<String> {
     let raw = clean_text(value)?;
-    let normalized = raw
-        .trim()
-        .to_lowercase()
-        .replace('-', "_")
-        .replace(' ', "_");
+    let normalized = raw.trim().to_lowercase().replace(['-', ' '], "_");
     match normalized.as_str() {
         "buyer_win_full_refund"
         | "seller_win_full_release"
@@ -4465,8 +4450,7 @@ fn normalize_evidence_type(value: Option<String>) -> String {
         .unwrap_or_else(|| "other".to_string())
         .trim()
         .to_lowercase()
-        .replace('-', "_")
-        .replace(' ', "_");
+        .replace(['-', ' '], "_");
     match raw.as_str() {
         "photo" | "video" | "tracking" | "invoice" | "chat_export" | "inspection_report"
         | "other" => raw,
@@ -4570,11 +4554,7 @@ fn normalize_dispute_evidence_attachments(
 
 fn normalize_delivery_review_decision(value: Option<String>) -> Option<String> {
     let raw = clean_text(value)?;
-    let normalized = raw
-        .trim()
-        .to_lowercase()
-        .replace('-', "_")
-        .replace(' ', "_");
+    let normalized = raw.trim().to_lowercase().replace(['-', ' '], "_");
     match normalized.as_str() {
         "accept" | "request_revision" => Some(normalized),
         _ => None,
@@ -6038,7 +6018,7 @@ fn metadata_listing_side(metadata: &Value) -> Option<String> {
         ["request_mode"].as_slice(),
     ] {
         if let Some(value) = clean_json_string(json_lookup(metadata, path)) {
-            let normalized = value.replace('_', " ").replace('-', " ");
+            let normalized = value.replace(['_', '-'], " ");
             if !normalized.trim().is_empty() {
                 return Some(normalized);
             }
@@ -6465,8 +6445,8 @@ async fn ensure_transaction_actor_verified(
             Json(json!({
                 "error": format!("{} must complete verification before continuing this transaction.", actor_role),
                 "code": "verification_required",
-                "buyer_verified": if actor_role == "buyer" { false } else { true },
-                "seller_verified": if actor_role == "seller" { false } else { true }
+                "buyer_verified": actor_role != "buyer",
+                "seller_verified": actor_role != "seller"
             })),
         )
             .into_response(),
@@ -7649,6 +7629,7 @@ fn normalize_reusable_payment_method(value: Option<&str>) -> Option<String> {
         .filter(|raw| !raw.is_empty() && raw != "auto" && raw != "all" && raw != "any")
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn find_reusable_pending_topup_for_transaction(
     db: &PgPool,
     user_id: Uuid,
@@ -9402,13 +9383,13 @@ async fn list_umkm_stores(
                 .map(PublicUmkmStoreRow::into_public)
                 .collect::<Vec<_>>();
             (
-            StatusCode::OK,
-            Json(json!({
-                "data": {
-                    "items": items,
-                    "count": items.len()
-                }
-            })),
+                StatusCode::OK,
+                Json(json!({
+                    "data": {
+                        "items": items,
+                        "count": items.len()
+                    }
+                })),
             )
                 .into_response()
         }
@@ -9428,13 +9409,11 @@ async fn get_umkm_store(
     Path(store_ref): Path<String>,
 ) -> impl IntoResponse {
     match find_public_umkm_store_row(&state.db, store_ref.as_str()).await {
-        Ok(Some(store)) => {
-            (
-                StatusCode::OK,
-                Json(json!({ "data": { "store": store.into_public() } })),
-            )
-                .into_response()
-        }
+        Ok(Some(store)) => (
+            StatusCode::OK,
+            Json(json!({ "data": { "store": store.into_public() } })),
+        )
+            .into_response(),
         Ok(None) => err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
         Err(error) => {
             tracing::error!("get_umkm_store error: {:?}", error);
@@ -11389,7 +11368,7 @@ async fn list_map_references(
     if let Some((cursor_updated_at, cursor_id)) = cursor {
         statement
             .push(" AND (updated_at < ")
-            .push_bind(cursor_updated_at.clone())
+            .push_bind(cursor_updated_at)
             .push(" OR (updated_at = ")
             .push_bind(cursor_updated_at)
             .push(" AND id > ")
@@ -11437,7 +11416,7 @@ async fn list_map_references(
             let next_cursor = if has_more && ranking_origin.is_none() && text_query.is_none() {
                 items
                     .last()
-                    .map(|item| encode_map_reference_cursor(item.updated_at.clone(), item.id))
+                    .map(|item| encode_map_reference_cursor(item.updated_at, item.id))
             } else {
                 None
             };
@@ -11512,8 +11491,11 @@ async fn list_content(
         .as_ref()
         .is_some_and(|claims| has_cms_access(claims) || has_agent_access(claims));
     if !can_list_content_status(&status, owner_id, actor_user_id, privileged) {
-        return err(StatusCode::FORBIDDEN, "content status is not publicly accessible")
-            .into_response();
+        return err(
+            StatusCode::FORBIDDEN,
+            "content status is not publicly accessible",
+        )
+        .into_response();
     }
 
     let rows = sqlx::query_as::<_, ContentRow>(
@@ -17828,7 +17810,7 @@ async fn reconcile_pending_midtrans_topups_for_user(
 
         if extract_topup_payment_due_at(&topup.payment_payload)
             .as_ref()
-            .map(|deadline| Utc::now() > deadline.to_owned())
+            .map(|deadline| Utc::now() > *deadline)
             .unwrap_or(false)
         {
             continue;
@@ -18153,7 +18135,7 @@ async fn handle_midtrans_wallet_notify(
         && current.status == "pending"
         && payment_due_at
             .as_ref()
-            .map(|deadline| Utc::now() > deadline.to_owned())
+            .map(|deadline| Utc::now() > *deadline)
             .unwrap_or(false)
     {
         target_status = "expired".to_string();
@@ -18614,6 +18596,7 @@ async fn lock_wallet_account_tx(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_wallet_ledger_entry_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: Uuid,
@@ -19476,6 +19459,7 @@ async fn settle_wallet_topup_in_tx(
     Ok((updated_topup, updated_account))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_provider_checkout(
     state: &Arc<AppState>,
     provider: &str,
@@ -22915,6 +22899,7 @@ async fn delete_banner(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn update_transaction_status(
     state: &Arc<AppState>,
     id: Uuid,
@@ -22979,7 +22964,7 @@ async fn update_transaction_status(
     if !seller_only && !buyer_only && !is_buyer && !is_seller {
         return err(StatusCode::FORBIDDEN, "forbidden").into_response();
     }
-    if !allowed_current.iter().any(|s| *s == txn.status.as_str()) {
+    if !allowed_current.contains(&txn.status.as_str()) {
         return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
     }
 
@@ -23865,10 +23850,7 @@ mod tests {
 
     #[test]
     fn content_list_status_requires_owner_or_privileged_scope() {
-        assert_eq!(
-            resolve_content_list_status(None).as_deref(),
-            Ok("active")
-        );
+        assert_eq!(resolve_content_list_status(None).as_deref(), Ok("active"));
         assert_eq!(
             resolve_content_list_status(Some("ARCHIVED".to_string())).as_deref(),
             Ok("archived")
@@ -24638,10 +24620,10 @@ mod tests {
 
     #[test]
     fn map_reference_cursor_round_trips_and_rejects_invalid_values() {
-        let updated_at = DateTime::<Utc>::from_timestamp_micros(1_722_470_400_123_456)
-            .expect("valid timestamp");
+        let updated_at =
+            DateTime::<Utc>::from_timestamp_micros(1_722_470_400_123_456).expect("valid timestamp");
         let id = Uuid::new_v4();
-        let encoded = encode_map_reference_cursor(updated_at.clone(), id);
+        let encoded = encode_map_reference_cursor(updated_at, id);
 
         assert_eq!(
             parse_map_reference_cursor(Some(encoded)),
