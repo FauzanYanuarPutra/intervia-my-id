@@ -1,10 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 mode="${1:-inventory}"
 bucket="${MINIO_BUCKET:-laju-chat}"
 active_alias="${ACTIVE_ALIAS:-active}"
 source_alias="${SOURCE_ALIAS:-historical}"
+
+tmp_files=()
+cleanup() {
+  if ((${#tmp_files[@]})); then
+    rm -f -- "${tmp_files[@]}"
+  fi
+}
+trap cleanup EXIT
+
+make_tmp() {
+  local file
+  file="$(mktemp)"
+  tmp_files+=("$file")
+  printf '%s\n' "$file"
+}
 
 inventory_volumes() {
   echo "Docker volumes that may contain MinIO data:"
@@ -34,15 +50,17 @@ require_aliases() {
 
 list_objects() {
   local alias="$1"
-  mc find "$alias/$bucket" --type f --name 'content/*' --name 'forum/*' --print '{path}' 2>/dev/null |
-    sed "s#^$alias/$bucket/##" | sort -u
+  mc find "$alias/$bucket" --type f --print '{path}' 2>/dev/null |
+    sed "s#^$alias/$bucket/##" |
+    awk '/^(content|forum)\//' |
+    sort -u
 }
 
 compare_objects() {
   require_aliases
-  active_file="$(mktemp)"
-  source_file="$(mktemp)"
-  trap 'rm -f "$active_file" "$source_file"' RETURN
+  local active_file source_file
+  active_file="$(make_tmp)"
+  source_file="$(make_tmp)"
   list_objects "$active_alias" > "$active_file"
   list_objects "$source_alias" > "$source_file"
   echo "Objects present in historical source but missing from active bucket:"
@@ -55,10 +73,10 @@ recover_objects() {
     exit 3
   }
   require_aliases
-  active_file="$(mktemp)"
-  source_file="$(mktemp)"
-  missing_file="$(mktemp)"
-  trap 'rm -f "$active_file" "$source_file" "$missing_file"' RETURN
+  local active_file source_file missing_file recovered key
+  active_file="$(make_tmp)"
+  source_file="$(make_tmp)"
+  missing_file="$(make_tmp)"
   list_objects "$active_alias" > "$active_file"
   list_objects "$source_alias" > "$source_file"
   comm -23 "$source_file" "$active_file" > "$missing_file"
