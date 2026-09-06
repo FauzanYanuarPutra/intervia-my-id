@@ -7,9 +7,7 @@ on:
         description: Deployment environment
         type: choice
         required: true
-        options:
-          - staging
-          - production
+        options: [staging, production]
       image_tag:
         description: Immutable image tag, for example sha-<40-char-git-sha>
         type: string
@@ -30,18 +28,13 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v7
-
       - name: Validate immutable tag
         shell: bash
         env:
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
-          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
-            echo "image_tag must be sha- followed by the full 40-character commit SHA." >&2
-            exit 1
-          fi
-
+          [[ "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]] || { echo "image_tag must be sha- followed by the full 40-character commit SHA." >&2; exit 1; }
       - name: Prepare SSH
         shell: bash
         env:
@@ -54,7 +47,6 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-
       - name: Package deployment contract
         shell: bash
         env:
@@ -62,15 +54,8 @@ jobs:
         run: |
           set -euo pipefail
           overlay="docker-compose.${TARGET_ENV}.yml"
-          if [[ "$TARGET_ENV" == "production" ]]; then
-            overlay="docker-compose.prod.yml"
-          fi
-          tar -czf /tmp/lajukan-deploy.tgz \
-            docker-compose.yml \
-            "$overlay" \
-            infrastructure/caddy \
-            services/chat_service/priv/scylladb
-
+          [[ "$TARGET_ENV" == "production" ]] && overlay="docker-compose.prod.yml"
+          tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" infrastructure/caddy services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh
       - name: Upload deployment contract
         shell: bash
         env:
@@ -79,9 +64,7 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
           set -euo pipefail
-          port="${DEPLOY_PORT:-22}"
-          scp -P "$port" /tmp/lajukan-deploy.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/lajukan-deploy.tgz"
-
+          scp -P "${DEPLOY_PORT:-22}" /tmp/lajukan-deploy.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/lajukan-deploy.tgz"
       - name: Apply deployment
         shell: bash
         env:
@@ -95,81 +78,95 @@ jobs:
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
-          port="${DEPLOY_PORT:-22}"
-          ssh -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' TARGET_ENV='$TARGET_ENV' IMAGE_TAG='$IMAGE_TAG' DOCKERHUB_NAMESPACE='$DOCKERHUB_NAMESPACE' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash -s" <<'REMOTE'
+          ssh -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' TARGET_ENV='$TARGET_ENV' IMAGE_TAG='$IMAGE_TAG' DOCKERHUB_NAMESPACE='$DOCKERHUB_NAMESPACE' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash -s" <<'REMOTE'
           set -euo pipefail
-
           mkdir -p "$DEPLOY_PATH"
           tar -xzf /tmp/lajukan-deploy.tgz -C "$DEPLOY_PATH"
           rm -f /tmp/lajukan-deploy.tgz
           cd "$DEPLOY_PATH"
+          if [[ "$TARGET_ENV" == production ]]; then overlay=docker-compose.prod.yml; env_file=.env.production; else overlay=docker-compose.staging.yml; env_file=.env.staging; fi
+          [[ -f "$env_file" ]] || { echo "Missing server-managed $DEPLOY_PATH/$env_file" >&2; exit 1; }
 
-          if [[ "$TARGET_ENV" == "production" ]]; then
-            overlay="docker-compose.prod.yml"
-            env_file=".env.production"
-          else
-            overlay="docker-compose.staging.yml"
-            env_file=".env.staging"
+          # Resolve production media storage before Compose evaluates the overlay.
+          # Never source the server env file: read only the single non-secret value we need.
+          if [[ "$TARGET_ENV" == production ]]; then
+            configured_minio_volume="$(awk -F= '$1 == "MINIO_DATA_VOLUME" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
+            [[ -z "$configured_minio_volume" || "$configured_minio_volume" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+              echo "MINIO_DATA_VOLUME in $env_file contains an invalid Docker volume name." >&2
+              exit 1
+            }
+
+            mapfile -t active_minio_volumes < <(
+              docker ps -q --filter 'label=com.docker.compose.service=minio' |
+                xargs -r docker inspect --format '{{range .Mounts}}{{if and (eq .Destination "/data") (eq .Type "volume")}}{{.Name}}{{println}}{{end}}{{end}}' |
+                sed '/^$/d' | sort -u
+            )
+
+            if [[ -n "$configured_minio_volume" ]]; then
+              docker volume inspect "$configured_minio_volume" >/dev/null 2>&1 || {
+                echo "Configured production MinIO volume '$configured_minio_volume' does not exist. Refusing to create an empty replacement." >&2
+                exit 1
+              }
+              if ((${#active_minio_volumes[@]} > 1)); then
+                printf 'Multiple active MinIO /data volumes detected: %s\n' "${active_minio_volumes[*]}" >&2
+                exit 1
+              fi
+              if ((${#active_minio_volumes[@]} == 1)) && [[ "${active_minio_volumes[0]}" != "$configured_minio_volume" ]]; then
+                echo "Configured MINIO_DATA_VOLUME '$configured_minio_volume' differs from active MinIO /data volume '${active_minio_volumes[0]}'. Refusing storage switch." >&2
+                exit 1
+              fi
+              export MINIO_DATA_VOLUME="$configured_minio_volume"
+            else
+              if ((${#active_minio_volumes[@]} != 1)); then
+                echo "MINIO_DATA_VOLUME is unset and exactly one active named MinIO /data volume could not be resolved. Set it explicitly in $env_file after inventorying production storage." >&2
+                exit 1
+              fi
+              export MINIO_DATA_VOLUME="${active_minio_volumes[0]}"
+              docker volume inspect "$MINIO_DATA_VOLUME" >/dev/null 2>&1 || {
+                echo "Resolved active MinIO volume '$MINIO_DATA_VOLUME' no longer exists." >&2
+                exit 1
+              }
+              echo "Resolved production MINIO_DATA_VOLUME from active MinIO: $MINIO_DATA_VOLUME"
+            fi
           fi
 
-          [[ -f "$env_file" ]] || {
-            echo "Missing server-managed $DEPLOY_PATH/$env_file" >&2
-            exit 1
-          }
-
+          compose=(--env-file "$env_file" -f docker-compose.yml -f "$overlay")
           release_marker="$DEPLOY_PATH/.last-successful-${TARGET_ENV}-image-tag"
           previous_image_tag=""
           if [[ -f "$release_marker" ]]; then
             previous_image_tag="$(tr -d '\r\n' < "$release_marker")"
-            if [[ ! "$previous_image_tag" =~ ^sha-[0-9a-f]{40}$ ]]; then
-              echo "Ignoring invalid previous release marker." >&2
-              previous_image_tag=""
-            fi
+            [[ "$previous_image_tag" =~ ^sha-[0-9a-f]{40}$ ]] || previous_image_tag=""
           fi
-
           deployment_started=0
           rollback_on_error() {
-            status=$?
-            trap - ERR
+            status=$?; trap - ERR
             echo "Deployment health gate failed for $IMAGE_TAG." >&2
-            docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" ps -a || true
-            docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" logs --no-color --tail=200 || true
-
-            if [[ "$deployment_started" == "1" && -n "$previous_image_tag" ]]; then
+            docker compose "${compose[@]}" ps -a || true
+            docker compose "${compose[@]}" logs --no-color --tail=200 || true
+            if [[ "$deployment_started" == 1 && -n "$previous_image_tag" ]]; then
               echo "Rolling back to $previous_image_tag." >&2
               export IMAGE_TAG="$previous_image_tag"
-              docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" pull || true
-              docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" up -d --remove-orphans --wait --wait-timeout 420 || true
-            else
-              echo "No validated previous release marker is available for automatic rollback." >&2
+              docker compose "${compose[@]}" pull || true
+              docker compose "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420 || true
             fi
             exit "$status"
           }
           trap rollback_on_error ERR
-
           printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_NAMESPACE" --password-stdin
-
           export IMAGE_TAG DOCKERHUB_NAMESPACE
-          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" config --quiet
-          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" pull
+          docker compose "${compose[@]}" config --quiet
+          docker compose "${compose[@]}" pull
           deployment_started=1
-          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" up -d --remove-orphans --wait --wait-timeout 420
-
-          app_domain="$(awk -F= '$1 == "APP_DOMAIN" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
-          if [[ ! "$app_domain" =~ ^[A-Za-z0-9.-]+$ ]]; then
-            echo "APP_DOMAIN is missing or invalid in $env_file." >&2
-            false
+          docker compose "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420
+          if [[ "$TARGET_ENV" == production ]]; then
+            bash scripts/ops/minio_storage_probe.sh "${compose[@]}"
           fi
-
-          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 \
-            --resolve "www.${app_domain}:443:127.0.0.1" "https://www.${app_domain}/" >/dev/null
-          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 \
-            --resolve "api.${app_domain}:443:127.0.0.1" "https://api.${app_domain}/health" >/dev/null
-          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 \
-            --resolve "chat.${app_domain}:443:127.0.0.1" "https://chat.${app_domain}/api/ready" >/dev/null
-
+          app_domain="$(awk -F= '$1 == "APP_DOMAIN" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
+          [[ "$app_domain" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "APP_DOMAIN is missing or invalid in $env_file." >&2; false; }
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "www.${app_domain}:443:127.0.0.1" "https://www.${app_domain}/" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "api.${app_domain}:443:127.0.0.1" "https://api.${app_domain}/health" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "chat.${app_domain}:443:127.0.0.1" "https://chat.${app_domain}/api/ready" >/dev/null
           printf '%s\n' "$IMAGE_TAG" > "$release_marker"
           trap - ERR
-          docker compose --env-file "$env_file" -f docker-compose.yml -f "$overlay" ps
+          docker compose "${compose[@]}" ps
           REMOTE

@@ -6,6 +6,7 @@ import {
   CreateBucketCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -17,6 +18,7 @@ const accessKey = process.env.MINIO_ACCESS_KEY ?? process.env.MINIO_USER;
 const secretKey = process.env.MINIO_SECRET_KEY ?? process.env.MINIO_PASS;
 const bucket = process.env.MINIO_BUCKET ?? 'laju-chat';
 const publicUrl = process.env.MINIO_PUBLIC_URL ?? '';
+const appEnv = process.env.APP_ENV || process.env.ENV || process.env.NODE_ENV;
 
 let cachedClient: S3Client | null = null;
 let bucketReady: Promise<void> | null = null;
@@ -78,7 +80,8 @@ async function ensureBucket(client: S3Client): Promise<void> {
     bucketReady = client
       .send(new HeadBucketCommand({ Bucket: bucket }))
       .then(() => undefined)
-      .catch(async () => {
+      .catch(async error => {
+        if (appEnv === 'production') throw error;
         await client.send(new CreateBucketCommand({ Bucket: bucket }));
       });
   }
@@ -102,7 +105,6 @@ export async function uploadToMinIO(
   const personalAiUserId = roomId.startsWith('personal-ai/')
     ? safeRoomKey(roomId.slice('personal-ai/'.length))
     : '';
-  // Support content/forum public-ish media, personal AI private media, or chat media.
   const key =
     roomId === 'content'
       ? `content/${randomUUID()}${ext}`
@@ -125,7 +127,14 @@ export async function uploadToMinIO(
     }),
   );
 
-  // Prefer proxy URL so client fetches via our API (no CORS, MinIO stays internal)
+  const verified = await client.send(
+    new HeadObjectCommand({ Bucket: bucket, Key: key }),
+  );
+  const verifiedLength = Number(verified.ContentLength ?? 0);
+  if (verifiedLength <= 0 || verifiedLength !== buffer.byteLength) {
+    throw new Error('MinIO object verification failed');
+  }
+
   const url = personalAiUserId
     ? `/api/ai/personal/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
     : roomId === 'content' || roomId === 'forum'

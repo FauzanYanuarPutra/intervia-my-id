@@ -94,10 +94,8 @@ services:
 
   scylla_db:
     profiles: [development-database]
-
   scylla_keyspace_setup:
     profiles: [development-database]
-
   scylla_migrate:
     image: ${SCYLLA_IMAGE:-scylladb/scylla:2025.2}
     restart: "no"
@@ -143,11 +141,7 @@ services:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-cms:${IMAGE_TAG:?IMAGE_TAG is required}
     pull_policy: always
-    environment:
-      ENV: production
-      APP_ENV: production
-      NODE_ENV: production
-      NEXT_PUBLIC_APP_ENV: production
+    environment: { ENV: production, APP_ENV: production, NODE_ENV: production, NEXT_PUBLIC_APP_ENV: production }
 
   crm:
     build: !reset null
@@ -197,3 +191,9 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     networks: !override [edge, app, media]
+
+volumes:
+  minio_data:
+    # Never silently create/switch production media storage. deploy.yml resolves this
+    # to the existing /data named volume before Docker Compose is evaluated.
+    name: ${MINIO_DATA_VOLUME:?MINIO_DATA_VOLUME must resolve to the existing production MinIO volume}
