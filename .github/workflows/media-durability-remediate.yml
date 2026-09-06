@@ -88,6 +88,15 @@ jobs:
             (cd "$dir" && cargo update)
           done
 
+      - name: Diagnose vulnerable Rust dependency chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q 'name = "rsa"' services/marketplace_service/Cargo.lock; then
+            echo '== cargo tree -i rsa: marketplace_service =='
+            (cd services/marketplace_service && cargo tree -i rsa)
+          fi
+
       - name: Verify frontend production audits
         shell: bash
         run: |
