@@ -95,7 +95,7 @@ impl BusinessService {
         self.product_repository.adjust_inventory(actor_id, business_id, organization_id, product_id, request).await.map_err(map_product_repository_error)
     }
 
-    async fn management_organization_for_business(
+    pub(crate) async fn management_organization_for_business(
         &self, authorization: &str, business_id: Uuid,
     ) -> Result<Uuid, BusinessServiceError> {
         let organizations = self.identity.list_organizations(authorization).await.map_err(map_identity_error)?;
