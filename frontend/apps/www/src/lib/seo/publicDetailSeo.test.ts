@@ -46,7 +46,10 @@ describe('buildPublicProfileMetadata', () => {
     expect(metadata.openGraph?.url).toBe(
       'https://www.lajukan.com/en/profile/toko-maju',
     );
-    expect(metadata.twitter?.card).toBe('summary_large_image');
+    const twitter = metadata.twitter;
+    expect(twitter && 'card' in twitter ? twitter.card : undefined).toBe(
+      'summary_large_image',
+    );
     expect(metadata.robots).toEqual({ index: true, follow: true });
   });
 });
