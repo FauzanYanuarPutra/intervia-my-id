@@ -1,0 +1,50 @@
+name: Rust JWT Security Repair
+
+on:
+  push:
+    branches:
+      - security/rust-jwt-aws-lc-20260907
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair-locks:
+    if: github.actor != 'github-actions[bot]' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Refresh identity aws-lc lock resolution
+        working-directory: services/identity_service
+        run: cargo update -p aws-lc-rs
+      - name: Refresh marketplace aws-lc lock resolution
+        working-directory: services/marketplace_service
+        run: cargo update -p aws-lc-rs
+      - name: Commit lockfiles before strict verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/identity_service/Cargo.lock services/marketplace_service/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "No lockfile changes produced."
+          else
+            git commit -m "security: refresh aws-lc JWT lockfiles"
+            git push origin HEAD:security/rust-jwt-aws-lc-20260907
+          fi
+      - name: Verify identity locked build and tests
+        working-directory: services/identity_service
+        run: |
+          cargo build --locked
+          cargo test --locked
+      - name: Verify marketplace locked build and tests
+        working-directory: services/marketplace_service
+        run: |
+          cargo build --locked
+          cargo test --locked
