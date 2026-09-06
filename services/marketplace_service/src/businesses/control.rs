@@ -221,7 +221,13 @@ impl ControlRepository {
         .bind(request.waste_percent)
         .bind(request.stock_quantity)
         .bind(request.minimum_stock)
-        .bind(request.supplier_name.as_deref().map(normalize).filter(|value| !value.is_empty()))
+        .bind(
+            request
+                .supplier_name
+                .as_deref()
+                .map(normalize)
+                .filter(|value| !value.is_empty()),
+        )
         .fetch_one(&self.db)
         .await
         .map_err(Into::into)
@@ -246,7 +252,9 @@ impl ControlRepository {
         .bind(product_id)
         .fetch_optional(&self.db)
         .await?;
-        let Some(recipe) = recipe else { return Ok(None); };
+        let Some(recipe) = recipe else {
+            return Ok(None);
+        };
         let items = self.recipe_items(recipe.id).await?;
         Ok(Some(RecipeAggregate { recipe, items }))
     }
@@ -268,7 +276,9 @@ impl ControlRepository {
         .bind(organization_id)
         .fetch_one(&mut *tx)
         .await?;
-        if !product_exists { return Err(ControlRepositoryError::NotFound); }
+        if !product_exists {
+            return Err(ControlRepositoryError::NotFound);
+        }
 
         for item in &request.items {
             let ingredient_exists = sqlx::query_scalar::<_, bool>(
@@ -279,7 +289,11 @@ impl ControlRepository {
             .bind(organization_id)
             .fetch_one(&mut *tx)
             .await?;
-            if !ingredient_exists { return Err(ControlRepositoryError::Validation("ingredient_not_in_business")); }
+            if !ingredient_exists {
+                return Err(ControlRepositoryError::Validation(
+                    "ingredient_not_in_business",
+                ));
+            }
         }
 
         let recipe = sqlx::query_as::<_, RecipeRecord>(
@@ -322,7 +336,10 @@ impl ControlRepository {
         Ok(RecipeAggregate { recipe, items })
     }
 
-    async fn recipe_items(&self, recipe_id: Uuid) -> Result<Vec<RecipeItemRecord>, ControlRepositoryError> {
+    async fn recipe_items(
+        &self,
+        recipe_id: Uuid,
+    ) -> Result<Vec<RecipeItemRecord>, ControlRepositoryError> {
         sqlx::query_as::<_, RecipeItemRecord>(
             r#"
             SELECT item.id, item.ingredient_id, ingredient.name AS ingredient_name,
@@ -439,7 +456,13 @@ impl ControlRepository {
         .bind(request.amount)
         .bind(request.occurred_on)
         .bind(normalize(&request.note))
-        .bind(request.channel_key.as_deref().map(|value| value.trim().to_ascii_lowercase()).filter(|value| !value.is_empty()))
+        .bind(
+            request
+                .channel_key
+                .as_deref()
+                .map(|value| value.trim().to_ascii_lowercase())
+                .filter(|value| !value.is_empty()),
+        )
         .bind(actor_id)
         .fetch_one(&self.db)
         .await
@@ -487,7 +510,11 @@ async fn ensure_business(
     .bind(organization_id)
     .fetch_one(db)
     .await?;
-    if exists { Ok(()) } else { Err(ControlRepositoryError::NotFound) }
+    if exists {
+        Ok(())
+    } else {
+        Err(ControlRepositoryError::NotFound)
+    }
 }
 
 fn normalize(value: &str) -> String {
@@ -498,58 +525,171 @@ fn validate_ingredient(request: &CreateIngredientRequest) -> Result<(), ControlR
     let name = normalize(&request.name);
     let purchase_unit = normalize(&request.purchase_unit);
     let recipe_unit = normalize(&request.recipe_unit);
-    if name.is_empty() || name.chars().count() > MAX_NAME_LEN { return Err(ControlRepositoryError::Validation("invalid_ingredient_name")); }
-    if purchase_unit.is_empty() || purchase_unit.chars().count() > MAX_UNIT_LEN || recipe_unit.is_empty() || recipe_unit.chars().count() > MAX_UNIT_LEN { return Err(ControlRepositoryError::Validation("invalid_unit")); }
-    if !matches!(request.kind.trim(), "ingredient" | "packaging" | "semi_finished" | "utility" | "labor") { return Err(ControlRepositoryError::Validation("invalid_ingredient_kind")); }
-    if request.conversion_factor <= Decimal::ZERO || request.purchase_quantity <= Decimal::ZERO { return Err(ControlRepositoryError::Validation("invalid_quantity")); }
-    if request.purchase_price_amount < 0 || request.stock_quantity < Decimal::ZERO || request.minimum_stock < Decimal::ZERO { return Err(ControlRepositoryError::Validation("negative_amount_not_allowed")); }
-    if request.yield_percent <= Decimal::ZERO || request.yield_percent > Decimal::from(100) { return Err(ControlRepositoryError::Validation("invalid_yield_percent")); }
-    if request.waste_percent < Decimal::ZERO || request.waste_percent >= Decimal::from(100) { return Err(ControlRepositoryError::Validation("invalid_waste_percent")); }
+    if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
+        return Err(ControlRepositoryError::Validation(
+            "invalid_ingredient_name",
+        ));
+    }
+    if purchase_unit.is_empty()
+        || purchase_unit.chars().count() > MAX_UNIT_LEN
+        || recipe_unit.is_empty()
+        || recipe_unit.chars().count() > MAX_UNIT_LEN
+    {
+        return Err(ControlRepositoryError::Validation("invalid_unit"));
+    }
+    if !matches!(
+        request.kind.trim(),
+        "ingredient" | "packaging" | "semi_finished" | "utility" | "labor"
+    ) {
+        return Err(ControlRepositoryError::Validation(
+            "invalid_ingredient_kind",
+        ));
+    }
+    if request.conversion_factor <= Decimal::ZERO || request.purchase_quantity <= Decimal::ZERO {
+        return Err(ControlRepositoryError::Validation("invalid_quantity"));
+    }
+    if request.purchase_price_amount < 0
+        || request.stock_quantity < Decimal::ZERO
+        || request.minimum_stock < Decimal::ZERO
+    {
+        return Err(ControlRepositoryError::Validation(
+            "negative_amount_not_allowed",
+        ));
+    }
+    if request.yield_percent <= Decimal::ZERO || request.yield_percent > Decimal::from(100) {
+        return Err(ControlRepositoryError::Validation("invalid_yield_percent"));
+    }
+    if request.waste_percent < Decimal::ZERO || request.waste_percent >= Decimal::from(100) {
+        return Err(ControlRepositoryError::Validation("invalid_waste_percent"));
+    }
     Ok(())
 }
 
 fn validate_recipe(request: &ReplaceRecipeRequest) -> Result<(), ControlRepositoryError> {
     let name = normalize(&request.name);
-    if name.is_empty() || name.chars().count() > MAX_NAME_LEN { return Err(ControlRepositoryError::Validation("invalid_recipe_name")); }
-    if request.servings <= Decimal::ZERO { return Err(ControlRepositoryError::Validation("invalid_servings")); }
-    if request.items.is_empty() { return Err(ControlRepositoryError::Validation("recipe_items_required")); }
+    if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
+        return Err(ControlRepositoryError::Validation("invalid_recipe_name"));
+    }
+    if request.servings <= Decimal::ZERO {
+        return Err(ControlRepositoryError::Validation("invalid_servings"));
+    }
+    if request.items.is_empty() {
+        return Err(ControlRepositoryError::Validation("recipe_items_required"));
+    }
     let mut ids = std::collections::HashSet::new();
     for item in &request.items {
-        if item.quantity <= Decimal::ZERO { return Err(ControlRepositoryError::Validation("invalid_recipe_quantity")); }
-        if !ids.insert(item.ingredient_id) { return Err(ControlRepositoryError::Validation("duplicate_recipe_ingredient")); }
-        if item.waste_percent_override.is_some_and(|value| value < Decimal::ZERO || value >= Decimal::from(100)) { return Err(ControlRepositoryError::Validation("invalid_waste_percent")); }
+        if item.quantity <= Decimal::ZERO {
+            return Err(ControlRepositoryError::Validation(
+                "invalid_recipe_quantity",
+            ));
+        }
+        if !ids.insert(item.ingredient_id) {
+            return Err(ControlRepositoryError::Validation(
+                "duplicate_recipe_ingredient",
+            ));
+        }
+        if item
+            .waste_percent_override
+            .is_some_and(|value| value < Decimal::ZERO || value >= Decimal::from(100))
+        {
+            return Err(ControlRepositoryError::Validation("invalid_waste_percent"));
+        }
     }
     Ok(())
 }
 
-fn validate_channel(channel_key: &str, request: &UpsertChannelRequest) -> Result<String, ControlRepositoryError> {
+fn validate_channel(
+    channel_key: &str,
+    request: &UpsertChannelRequest,
+) -> Result<String, ControlRepositoryError> {
     let key = channel_key.trim().to_ascii_lowercase();
-    if key.is_empty() || key.chars().count() > MAX_CHANNEL_KEY_LEN || !key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') { return Err(ControlRepositoryError::Validation("invalid_channel_key")); }
+    if key.is_empty()
+        || key.chars().count() > MAX_CHANNEL_KEY_LEN
+        || !key
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+    {
+        return Err(ControlRepositoryError::Validation("invalid_channel_key"));
+    }
     let display = normalize(&request.display_name);
-    if display.is_empty() || display.chars().count() > MAX_NAME_LEN { return Err(ControlRepositoryError::Validation("invalid_channel_name")); }
-    if !(0..=10000).contains(&request.fee_rate_bps) || !(0..10000).contains(&request.target_margin_bps) { return Err(ControlRepositoryError::Validation("invalid_channel_rate")); }
-    if request.fee_rate_bps + request.target_margin_bps >= 10000 { return Err(ControlRepositoryError::Validation("channel_rate_exceeds_price")); }
-    if request.fixed_fee_amount < 0 || request.merchant_promo_amount < 0 { return Err(ControlRepositoryError::Validation("negative_amount_not_allowed")); }
-    if !request.metadata.is_object() { return Err(ControlRepositoryError::Validation("invalid_channel_metadata")); }
+    if display.is_empty() || display.chars().count() > MAX_NAME_LEN {
+        return Err(ControlRepositoryError::Validation("invalid_channel_name"));
+    }
+    if !(0..=10000).contains(&request.fee_rate_bps)
+        || !(0..10000).contains(&request.target_margin_bps)
+    {
+        return Err(ControlRepositoryError::Validation("invalid_channel_rate"));
+    }
+    if request.fee_rate_bps + request.target_margin_bps >= 10000 {
+        return Err(ControlRepositoryError::Validation(
+            "channel_rate_exceeds_price",
+        ));
+    }
+    if request.fixed_fee_amount < 0 || request.merchant_promo_amount < 0 {
+        return Err(ControlRepositoryError::Validation(
+            "negative_amount_not_allowed",
+        ));
+    }
+    if !request.metadata.is_object() {
+        return Err(ControlRepositoryError::Validation(
+            "invalid_channel_metadata",
+        ));
+    }
     Ok(key)
 }
 
 fn validate_finance(request: &CreateFinanceEntryRequest) -> Result<(), ControlRepositoryError> {
     if !matches!(
         request.entry_type.trim(),
-        "sale_income" | "other_income" | "ingredient_purchase" | "packaging_purchase" |
-        "rent" | "utilities" | "salary" | "transport" | "marketing" | "equipment" |
-        "owner_capital" | "owner_drawing" | "receivable_payment" | "payable_payment" | "other_expense"
-    ) { return Err(ControlRepositoryError::Validation("invalid_finance_entry_type")); }
-    if request.amount <= 0 { return Err(ControlRepositoryError::Validation("invalid_finance_amount")); }
-    if normalize(&request.account_key).is_empty() || request.account_key.chars().count() > MAX_NAME_LEN { return Err(ControlRepositoryError::Validation("invalid_finance_account")); }
-    if request.note.chars().count() > MAX_NOTE_LEN { return Err(ControlRepositoryError::Validation("finance_note_too_long")); }
-    if request.channel_key.as_ref().is_some_and(|value| value.chars().count() > MAX_CHANNEL_KEY_LEN) { return Err(ControlRepositoryError::Validation("invalid_channel_key")); }
+        "sale_income"
+            | "other_income"
+            | "ingredient_purchase"
+            | "packaging_purchase"
+            | "rent"
+            | "utilities"
+            | "salary"
+            | "transport"
+            | "marketing"
+            | "equipment"
+            | "owner_capital"
+            | "owner_drawing"
+            | "receivable_payment"
+            | "payable_payment"
+            | "other_expense"
+    ) {
+        return Err(ControlRepositoryError::Validation(
+            "invalid_finance_entry_type",
+        ));
+    }
+    if request.amount <= 0 {
+        return Err(ControlRepositoryError::Validation("invalid_finance_amount"));
+    }
+    if normalize(&request.account_key).is_empty()
+        || request.account_key.chars().count() > MAX_NAME_LEN
+    {
+        return Err(ControlRepositoryError::Validation(
+            "invalid_finance_account",
+        ));
+    }
+    if request.note.chars().count() > MAX_NOTE_LEN {
+        return Err(ControlRepositoryError::Validation("finance_note_too_long"));
+    }
+    if request
+        .channel_key
+        .as_ref()
+        .is_some_and(|value| value.chars().count() > MAX_CHANNEL_KEY_LEN)
+    {
+        return Err(ControlRepositoryError::Validation("invalid_channel_key"));
+    }
     Ok(())
 }
 
-const fn default_true() -> bool { true }
-fn default_cash() -> String { "cash".to_owned() }
+const fn default_true() -> bool {
+    true
+}
+fn default_cash() -> String {
+    "cash".to_owned()
+}
 
 #[cfg(test)]
 mod tests {
@@ -577,25 +717,40 @@ mod tests {
         assert!(validate_ingredient(&ingredient()).is_ok());
         let mut invalid = ingredient();
         invalid.yield_percent = Decimal::ZERO;
-        assert!(matches!(validate_ingredient(&invalid), Err(ControlRepositoryError::Validation("invalid_yield_percent"))));
+        assert!(matches!(
+            validate_ingredient(&invalid),
+            Err(ControlRepositoryError::Validation("invalid_yield_percent"))
+        ));
     }
 
     #[test]
     fn channel_validation_rejects_impossible_fee_plus_margin() {
         let request = UpsertChannelRequest {
-            display_name: "GoFood".to_owned(), fee_rate_bps: 7000,
-            fixed_fee_amount: 0, merchant_promo_amount: 0,
-            target_margin_bps: 3000, enabled: true, metadata: serde_json::json!({}),
+            display_name: "GoFood".to_owned(),
+            fee_rate_bps: 7000,
+            fixed_fee_amount: 0,
+            merchant_promo_amount: 0,
+            target_margin_bps: 3000,
+            enabled: true,
+            metadata: serde_json::json!({}),
         };
-        assert!(matches!(validate_channel("gofood", &request), Err(ControlRepositoryError::Validation("channel_rate_exceeds_price"))));
+        assert!(matches!(
+            validate_channel("gofood", &request),
+            Err(ControlRepositoryError::Validation(
+                "channel_rate_exceeds_price"
+            ))
+        ));
     }
 
     #[test]
     fn finance_validation_keeps_owner_drawing_distinct() {
         let request = CreateFinanceEntryRequest {
-            entry_type: "owner_drawing".to_owned(), account_key: "cash".to_owned(),
-            amount: 50_000, occurred_on: NaiveDate::from_ymd_opt(2026, 9, 6).unwrap(),
-            note: "Ambil pribadi".to_owned(), channel_key: None,
+            entry_type: "owner_drawing".to_owned(),
+            account_key: "cash".to_owned(),
+            amount: 50_000,
+            occurred_on: NaiveDate::from_ymd_opt(2026, 9, 6).unwrap(),
+            note: "Ambil pribadi".to_owned(),
+            channel_key: None,
         };
         assert!(validate_finance(&request).is_ok());
     }
