@@ -522,11 +522,14 @@ struct CreateReelRequest {
     allow_comments: Option<bool>,
     store_id: Option<String>,
     store_slug: Option<String>,
-    store_name: Option<String>,
-    store_city: Option<String>,
+    #[serde(rename = "storeName")]
+    _store_name: Option<String>,
+    #[serde(rename = "storeCity")]
+    _store_city: Option<String>,
     #[serde(rename = "storePhone")]
     _store_phone: Option<String>,
-    storefront_path: Option<String>,
+    #[serde(rename = "storefrontPath")]
+    _storefront_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -3537,8 +3540,8 @@ async fn list_groups(
     let recommended = data
         .iter()
         .filter(|group| group.viewer_membership_status.as_deref() != Some("active"))
-        .cloned()
         .take(8)
+        .cloned()
         .collect::<Vec<_>>();
     Ok(Json(GroupsResponse {
         data,
@@ -6120,8 +6123,7 @@ async fn vote_poll_option(
         ));
     }
     if let Some(option_count) = payload.option_count {
-        if option_count < 2
-            || option_count > MAX_POLL_OPTION_INDEX + 1
+        if !(2..=MAX_POLL_OPTION_INDEX + 1).contains(&option_count)
             || payload.option_index >= option_count
         {
             return Err(ApiError::new(
@@ -7256,7 +7258,7 @@ async fn create_reel(
     .bind(&capture_mode)
     .bind(&live_status)
     .bind(&live_title)
-    .bind(&live_scheduled_at)
+    .bind(live_scheduled_at)
     .bind(&metadata)
     .bind(&visibility)
     .bind(allow_comments)
@@ -7539,7 +7541,7 @@ async fn update_reel(
     .bind(&capture_mode)
     .bind(&live_status)
     .bind(&live_title)
-    .bind(&live_scheduled_at)
+    .bind(live_scheduled_at)
     .bind(&metadata)
     .bind(&visibility)
     .bind(allow_comments)
@@ -7858,15 +7860,12 @@ async fn record_reel_event(
     .await
     .map_err(internal_error)?;
 
-    match event.as_str() {
-        "share" => {
-            sqlx::query("UPDATE reel.lajukan_reels SET shares_count = shares_count + 1, updated_at = now() WHERE id = $1")
-                .bind(&reel_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(internal_error)?;
-        }
-        _ => {}
+    if event.as_str() == "share" {
+        sqlx::query("UPDATE reel.lajukan_reels SET shares_count = shares_count + 1, updated_at = now() WHERE id = $1")
+            .bind(&reel_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(internal_error)?;
     }
     tx.commit().await.map_err(internal_error)?;
 
@@ -9013,14 +9012,14 @@ async fn build_overview(db: &PgPool, viewer_id: Option<&str>) -> ApiResult<Commu
     let recommended_groups = groups
         .iter()
         .filter(|group| group.viewer_membership_status.as_deref() != Some("active"))
-        .cloned()
         .take(8)
+        .cloned()
         .collect::<Vec<_>>();
     let joined_groups = groups
         .iter()
         .filter(|group| group.viewer_membership_status.as_deref() == Some("active"))
-        .cloned()
         .take(8)
+        .cloned()
         .collect::<Vec<_>>();
     let trending_tags = sqlx::query_as::<_, ForumTag>(
         r#"
