@@ -83,6 +83,28 @@ export type ControlFinanceEntry = {
   updated_at: string;
 };
 
+export type ControlSettlement = {
+  id: string;
+  business_id: string;
+  organization_id: string;
+  channel_key: string;
+  period_start: string;
+  period_end: string;
+  gross_sales_amount: number;
+  platform_fee_amount: number;
+  merchant_promo_amount: number;
+  refunds_amount: number;
+  other_deductions_amount: number;
+  expected_transfer_amount: number;
+  actual_transfer_amount: number;
+  difference_amount: number;
+  status: 'matched' | 'short' | 'excess';
+  note: string;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type JsonRecord = Record<string, unknown>;
 
 export class BusinessControlHttpError extends Error {
@@ -225,6 +247,22 @@ export async function createControlFinanceEntry(
   input: Record<string, unknown>,
 ) {
   return requestControl(businessPath(businessId, '/finance-entries'), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listControlSettlements(businessId: string) {
+  return items<ControlSettlement>(
+    await requestControl(businessPath(businessId, '/settlements')),
+  );
+}
+
+export async function createControlSettlement(
+  businessId: string,
+  input: Record<string, unknown>,
+) {
+  return requestControl(businessPath(businessId, '/settlements'), {
     method: 'POST',
     body: JSON.stringify(input),
   });
