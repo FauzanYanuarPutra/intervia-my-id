@@ -27,7 +27,18 @@ jobs:
         run: cargo check --locked
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
-      - name: Business route and service tests
-        run: cargo test --locked businesses::routes::tests businesses::service::tests
+      - name: Business route tests
+        run: cargo test --locked businesses::routes::tests
+      - name: Business service tests
+        run: cargo test --locked businesses::service::tests
       - name: Release build locked
         run: cargo build --release --locked
+      - name: Migration contract
+        run: |
+          test -s migrations/20260906002000_usaha_business_control_center.up.sql
+          test -s migrations/20260906002000_usaha_business_control_center.down.sql
+          grep -q 'business_ingredients' migrations/20260906002000_usaha_business_control_center.up.sql
+          grep -q 'business_recipes' migrations/20260906002000_usaha_business_control_center.up.sql
+          grep -q 'business_channel_settings' migrations/20260906002000_usaha_business_control_center.up.sql
+          grep -q 'business_finance_entries' migrations/20260906002000_usaha_business_control_center.up.sql
+          grep -q 'DROP TABLE IF EXISTS business_ingredients' migrations/20260906002000_usaha_business_control_center.down.sql
