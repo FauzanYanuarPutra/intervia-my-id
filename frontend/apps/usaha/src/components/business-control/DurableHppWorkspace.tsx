@@ -35,6 +35,20 @@ type RecipeItem = {
   wastePercentOverride: number | null;
 };
 
+type RecipeApiItem = {
+  ingredient_id?: string | number;
+  quantity?: string | number | null;
+  waste_percent_override?: string | number | null;
+};
+
+type RecipeApiAggregate = {
+  recipe?: {
+    name?: string | null;
+    servings?: string | number | null;
+  };
+  items?: RecipeApiItem[];
+};
+
 type Props = {
   businessId: string;
   ingredients: Ingredient[];
@@ -87,15 +101,15 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         }
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.error || 'Gagal memuat resep.');
-        const aggregate = payload?.data?.recipe;
+        const aggregate = payload?.data?.recipe as RecipeApiAggregate | undefined;
         if (!cancelled && aggregate) {
           setRecipeName(aggregate.recipe?.name || product?.name || 'Resep utama');
           setServings(n(aggregate.recipe?.servings) || 1);
-          setItems(Array.isArray(aggregate.items) ? aggregate.items.map((item: any) => ({
-            ingredientId: String(item.ingredient_id),
+          setItems(Array.isArray(aggregate.items) ? aggregate.items.map(item => ({
+            ingredientId: String(item.ingredient_id ?? ''),
             quantity: n(item.quantity),
             wastePercentOverride: item.waste_percent_override === null || item.waste_percent_override === undefined ? null : n(item.waste_percent_override),
-          })) : []);
+          })).filter(item => item.ingredientId) : []);
           const selected = products.find(item => item.id === productId);
           setSellingPrice(priceFromLabel(selected?.priceLabel));
         }
@@ -107,7 +121,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
     }
     load();
     return () => { cancelled = true; };
-  }, [businessId, productId]);
+  }, [businessId, productId, product?.name, products]);
 
   const costRows = useMemo(() => items.flatMap(item => {
     const ingredient = ingredientMap.get(item.ingredientId);
