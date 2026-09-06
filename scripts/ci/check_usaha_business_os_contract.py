@@ -35,9 +35,12 @@ def main() -> int:
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', 'activeOrders', 'locations', 'Hitung HPP', 'Pahami uang', 'Kanal Jual')
+    require('frontend/apps/usaha/src/app/page.tsx', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'summarizeControlCenter', 'jakartaDateKey')
+    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/reports/page.tsx', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'summarizeControlCenter', 'jakartaDateKey')
     require('frontend/apps/usaha/src/lib/business-control/costing.ts', 'calculateRecipeCost', 'recommendChannelPrice', 'calculateProductionCapacity')
     require('frontend/apps/usaha/src/lib/business-control/finance.ts', 'summarizeBusinessDay', 'ownerDrawing', 'cashMovement')
     require('frontend/apps/usaha/src/lib/business-control/ledger.ts', 'summarizeFinanceEntries', 'ownerCapital', 'ownerDrawing')
+    require('frontend/apps/usaha/src/lib/business-control/insights.ts', 'summarizeControlCenter', 'jakartaDateKey', 'Asia/Jakarta')
     require('frontend/apps/usaha/src/lib/business-control-server.ts', '/ingredients', '/channels', '/finance-entries', '/recipe')
     require('frontend/apps/usaha/src/components/business-control/DurableHppWorkspace.tsx', 'Simpan resep', '/recipe', 'calculateRecipeCost')
     require('frontend/apps/usaha/src/components/business-control/IngredientWorkspace.tsx', 'Simpan bahan', '/ingredients')
@@ -46,7 +49,7 @@ def main() -> int:
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/products/hpp/page.tsx', 'DurableHppWorkspace', 'listControlIngredients')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/finance/page.tsx', 'FinanceLedger', 'listControlFinanceEntries')
-    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/inventory/page.tsx', 'IngredientWorkspace', 'listControlIngredients')
+    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/inventory/page.tsx', 'IngredientWorkspace', 'listControlIngredients', "hasPermission(business, 'viewCosting')")
     for compose in ['docker-compose.dev.yml', 'docker-compose.staging.yml', 'docker-compose.prod.yml']:
         require(compose, 'USAHA_GOOGLE_REDIRECT_URI', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'INTERNAL_API_URL')
     if ERRORS:
