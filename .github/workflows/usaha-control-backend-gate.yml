@@ -27,6 +27,8 @@ jobs:
         run: cargo check --locked
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
+      - name: Settlement domain tests
+        run: cargo test --locked businesses::settlement::tests
       - name: Business route tests
         run: cargo test --locked businesses::routes::tests
       - name: Business service tests
