@@ -273,7 +273,8 @@ impl ProductRepository {
         )
         .await?;
 
-        let row = fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
+        let row =
+            fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
         transaction.commit().await?;
         Ok(row.into_product())
     }
@@ -286,15 +287,10 @@ impl ProductRepository {
         product_id: Uuid,
         request: UpdateBusinessProductRequest,
     ) -> Result<BusinessProduct, ProductRepositoryError> {
-        let request = validate_update_request(request).map_err(ProductRepositoryError::Validation)?;
+        let request =
+            validate_update_request(request).map_err(ProductRepositoryError::Validation)?;
         let mut transaction = self.db.begin().await?;
-        ensure_product_exists(
-            &mut transaction,
-            business_id,
-            organization_id,
-            product_id,
-        )
-        .await?;
+        ensure_product_exists(&mut transaction, business_id, organization_id, product_id).await?;
 
         let source_type = request.source_type.map(ProductSourceType::as_str);
         let stock_mode = request.stock_mode.map(ProductStockMode::as_str);
@@ -328,7 +324,8 @@ impl ProductRepository {
         .execute(&mut *transaction)
         .await?;
 
-        if request.min_stock_alert.is_some() || request.stock_unit.is_some() || stock_mode.is_some() {
+        if request.min_stock_alert.is_some() || request.stock_unit.is_some() || stock_mode.is_some()
+        {
             sqlx::query(
                 r#"
                 UPDATE business_inventory
@@ -349,7 +346,8 @@ impl ProductRepository {
             .await?;
         }
 
-        let row = fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
+        let row =
+            fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
         sync_public_projection(&mut transaction, business_id, &row).await?;
         insert_outbox_event(
             &mut transaction,
@@ -376,13 +374,7 @@ impl ProductRepository {
         let request =
             validate_inventory_adjustment(request).map_err(ProductRepositoryError::Validation)?;
         let mut transaction = self.db.begin().await?;
-        ensure_product_exists(
-            &mut transaction,
-            business_id,
-            organization_id,
-            product_id,
-        )
-        .await?;
+        ensure_product_exists(&mut transaction, business_id, organization_id, product_id).await?;
 
         let result = sqlx::query(
             r#"
@@ -401,7 +393,8 @@ impl ProductRepository {
             return Err(ProductRepositoryError::BusinessNotFound);
         }
 
-        let row = fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
+        let row =
+            fetch_product_row(&mut transaction, business_id, organization_id, product_id).await?;
         sync_public_projection(&mut transaction, business_id, &row).await?;
         insert_outbox_event(
             &mut transaction,
