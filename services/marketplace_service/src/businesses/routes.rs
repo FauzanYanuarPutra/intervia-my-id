@@ -25,6 +25,7 @@ use super::{
     },
     repository::BusinessRepository,
     service::{BusinessService, BusinessServiceError},
+    settlement::{CreateSettlementRequest, SettlementRepository, SettlementRepositoryError},
 };
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
@@ -67,6 +68,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route(
             "/v1/businesses/{business_id}/finance-entries",
             get(list_finance_entries).post(create_finance_entry),
+        )
+        .route(
+            "/v1/businesses/{business_id}/settlements",
+            get(list_settlements).post(create_settlement),
         )
 }
 
@@ -262,6 +267,33 @@ async fn create_finance_entry(
     }
 }
 
+async fn list_settlements(
+    State(state): State<Arc<AppState>>, headers: HeaderMap, Path(business_id): Path<Uuid>,
+) -> Response {
+    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    match SettlementRepository::new(state.db.clone()).list(business_id, organization_id, 200).await {
+        Ok(items) => (StatusCode::OK, Json(json!({ "data": { "count": items.len(), "items": items } }))).into_response(),
+        Err(error) => settlement_error_response(error),
+    }
+}
+
+async fn create_settlement(
+    State(state): State<Arc<AppState>>, headers: HeaderMap, Path(business_id): Path<Uuid>,
+    Json(payload): Json<CreateSettlementRequest>,
+) -> Response {
+    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    match SettlementRepository::new(state.db.clone()).create(actor_id, business_id, organization_id, payload).await {
+        Ok(item) => (StatusCode::CREATED, Json(json!({ "data": { "settlement": item } }))).into_response(),
+        Err(error) => settlement_error_response(error),
+    }
+}
+
 async fn provision(
     State(state): State<Arc<AppState>>, headers: HeaderMap,
     Json(payload): Json<ProvisionBusinessRequest>,
@@ -351,6 +383,14 @@ fn control_error_response(error: ControlRepositoryError) -> Response {
     }
 }
 
+fn settlement_error_response(error: SettlementRepositoryError) -> Response {
+    match error {
+        SettlementRepositoryError::Validation(error) => api_error(StatusCode::BAD_REQUEST, error.code()),
+        SettlementRepositoryError::NotFound => api_error(StatusCode::NOT_FOUND, "business_settlement_resource_not_found"),
+        SettlementRepositoryError::Database => api_error(StatusCode::SERVICE_UNAVAILABLE, "business_settlement_storage_unavailable"),
+    }
+}
+
 fn error_response(error: BusinessServiceError) -> Response {
     match error {
         BusinessServiceError::Validation(error) => api_error(StatusCode::BAD_REQUEST, error.code()),
@@ -396,6 +436,14 @@ mod tests {
     #[test]
     fn control_validation_errors_use_stable_bad_request_responses() {
         let response = control_error_response(ControlRepositoryError::Validation("invalid_finance_amount"));
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn settlement_validation_errors_use_stable_bad_request_responses() {
+        let response = settlement_error_response(SettlementRepositoryError::Validation(
+            super::super::settlement::SettlementValidationError::InvalidPeriod,
+        ));
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }
