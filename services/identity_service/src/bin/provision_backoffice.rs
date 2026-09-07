@@ -1,5 +1,6 @@
 use std::{env, process};
 
+use anyhow::{anyhow, bail, Context, Result};
 use identity_service::backoffice::{
     is_backoffice_eligible, normalize_backoffice_target, parse_backoffice_roles, BackofficeTarget,
 };
@@ -11,7 +12,7 @@ fn usage() -> &'static str {
     "usage: provision_backoffice --user <email|@username> --roles <admin,content_admin,sales,support>"
 }
 
-fn parse_args() -> Result<(String, String), String> {
+fn parse_args() -> Result<(String, String)> {
     let mut args = env::args().skip(1);
     let mut user = None;
     let mut roles = None;
@@ -20,48 +21,40 @@ fn parse_args() -> Result<(String, String), String> {
         match argument.as_str() {
             "--user" => user = args.next(),
             "--roles" => roles = args.next(),
-            "--help" | "-h" => return Err(usage().to_string()),
-            other => return Err(format!("unknown argument: {other}\n{}", usage())),
+            "--help" | "-h" => bail!(usage()),
+            other => bail!("unknown argument: {other}\n{}", usage()),
         }
     }
 
     match (user, roles) {
         (Some(user), Some(roles)) => Ok((user, roles)),
-        _ => Err(usage().to_string()),
+        _ => bail!(usage()),
     }
 }
 
 #[tokio::main]
 async fn main() {
     if let Err(error) = run().await {
-        eprintln!("backoffice provisioning failed: {error}");
+        eprintln!("backoffice provisioning failed: {error:#}");
         process::exit(1);
     }
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let (raw_target, raw_roles) = parse_args().map_err(|error| format!("{error}"))?;
+async fn run() -> Result<()> {
+    let (raw_target, raw_roles) = parse_args()?;
     let target = normalize_backoffice_target(&raw_target)?;
     let requested_roles = parse_backoffice_roles(&raw_roles)?;
-    let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is required")?;
+    let database_url = env::var("DATABASE_URL").context("DATABASE_URL is required")?;
 
-    let pool = PgPoolOptions::new()
-        .max_connections(2)
-        .connect(&database_url)
-        .await?;
+    let pool = PgPoolOptions::new().max_connections(2).connect(&database_url).await?;
     let mut transaction = pool.begin().await?;
 
     let lookup = match &target {
         BackofficeTarget::Email(email) => sqlx::query(
             r#"
-            SELECT
-              u.id,
-              u.email::text AS email,
-              up.username::text AS username,
-              u.is_active,
-              (u.status::text = 'banned') AS is_banned,
-              u.email_verified,
-              u.phone_verified
+            SELECT u.id, u.email::text AS email, up.username::text AS username,
+                   u.is_active, (u.status::text = 'banned') AS is_banned,
+                   u.email_verified, u.phone_verified
             FROM core.users u
             LEFT JOIN core.user_profiles up ON up.user_id = u.id
             WHERE u.deleted_at IS NULL AND lower(u.email::text) = lower($1)
@@ -73,14 +66,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .await?,
         BackofficeTarget::Username(username) => sqlx::query(
             r#"
-            SELECT
-              u.id,
-              u.email::text AS email,
-              up.username::text AS username,
-              u.is_active,
-              (u.status::text = 'banned') AS is_banned,
-              u.email_verified,
-              u.phone_verified
+            SELECT u.id, u.email::text AS email, up.username::text AS username,
+                   u.is_active, (u.status::text = 'banned') AS is_banned,
+                   u.email_verified, u.phone_verified
             FROM core.users u
             JOIN core.user_profiles up ON up.user_id = u.id
             WHERE u.deleted_at IS NULL AND lower(up.username::text) = lower($1)
@@ -92,12 +80,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .await?,
     };
 
-    if lookup.len() != 1 {
-        return Err(if lookup.is_empty() {
-            "target Lajukan account was not found".into()
-        } else {
-            "target is ambiguous; provisioning aborted".into()
-        });
+    if lookup.is_empty() {
+        bail!("target Lajukan account was not found");
+    }
+    if lookup.len() > 1 {
+        bail!("target is ambiguous; provisioning aborted");
     }
 
     let row = &lookup[0];
@@ -110,9 +97,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let phone_verified: bool = row.try_get("phone_verified")?;
 
     if !is_backoffice_eligible(is_active, is_banned, email_verified, phone_verified) {
-        return Err(
-            "target must be active, not banned, and have a verified email or phone".into(),
-        );
+        bail!("target must be active, not banned, and have a verified email or phone");
     }
 
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
@@ -125,8 +110,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         let role_name = requested_role.as_str();
         let role_id: Uuid = sqlx::query_scalar(
             r#"
-            SELECT id
-            FROM core.roles
+            SELECT id FROM core.roles
             WHERE lower(name::text) = lower($1) AND role_type = 'global'
             LIMIT 1
             "#,
@@ -134,7 +118,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .bind(role_name)
         .fetch_optional(&mut *transaction)
         .await?
-        .ok_or_else(|| format!("required global role is missing: {role_name}"))?;
+        .ok_or_else(|| anyhow!("required global role is missing: {role_name}"))?;
 
         sqlx::query(
             r#"
@@ -152,9 +136,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     sqlx::query(
         r#"
-        INSERT INTO events.audit_logs (
-          entity, action, actor_id, user_id, metadata, created_at
-        ) VALUES ('user', 'backoffice.roles.provisioned', NULL, $1, $2, NOW())
+        INSERT INTO events.audit_logs (entity, action, actor_id, user_id, metadata, created_at)
+        VALUES ('user', 'backoffice.roles.provisioned', NULL, $1, $2, NOW())
         "#,
     )
     .bind(user_id)
@@ -176,6 +159,5 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         granted.join(",")
     );
     println!("existing access tokens may need to be refreshed before new roles appear");
-
     Ok(())
 }
