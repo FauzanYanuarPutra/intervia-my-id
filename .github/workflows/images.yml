@@ -63,30 +63,44 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Require registry credentials
+      - name: Resolve registry publishing mode
+        id: registry
         shell: bash
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -euo pipefail
-          [[ -n "$DOCKERHUB_USERNAME" ]] || { echo "DOCKERHUB_USERNAME is missing" >&2; exit 1; }
-          [[ -n "$DOCKERHUB_TOKEN" ]] || { echo "DOCKERHUB_TOKEN is missing" >&2; exit 1; }
+          if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "namespace=$DOCKERHUB_USERNAME" >> "$GITHUB_OUTPUT"
+            echo "Docker Hub credentials are configured; this run will build and publish immutable images."
+            exit 0
+          fi
+
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          echo "namespace=local" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "Manual image publication requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN repository/environment secrets." >&2
+            exit 1
+          fi
+          echo "Docker Hub credentials are not configured; validating image builds without publishing."
 
       - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v3
+        if: steps.registry.outputs.available == 'true'
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push immutable image
+      - name: Build image and publish when registry credentials exist
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.context }}/${{ matrix.dockerfile }}
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:sha-${{ github.sha }}
+          push: ${{ steps.registry.outputs.available == 'true' }}
+          tags: ${{ steps.registry.outputs.namespace }}/${{ matrix.image }}:sha-${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: mode=max
