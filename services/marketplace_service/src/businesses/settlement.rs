@@ -179,8 +179,8 @@ impl SettlementRepository {
         organization_id: Uuid,
         request: CreateSettlementRequest,
     ) -> Result<SettlementRecord, SettlementRepositoryError> {
-        let validated = validate_settlement(&request)
-            .map_err(SettlementRepositoryError::Validation)?;
+        let validated =
+            validate_settlement(&request).map_err(SettlementRepositoryError::Validation)?;
         ensure_business(&self.db, business_id, organization_id).await?;
 
         sqlx::query_as::<_, SettlementRecord>(

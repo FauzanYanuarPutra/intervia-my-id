@@ -302,9 +302,17 @@ async fn cross_tenant_product_mutation_is_not_found(pool: PgPool) {
 
 #[sqlx::test(migrations = "./migrations")]
 async fn legacy_numeric_overflow_does_not_abort_product_backfill(pool: PgPool) {
-    sqlx::raw_sql(include_str!(
-        "../../migrations/20260901090000_business_products_inventory.down.sql"
-    ))
+    // This test needs the schema state immediately before the historical product
+    // migration. Later migrations add foreign keys to business_products, so
+    // replaying that migration's old down.sql directly is no longer a valid
+    // fixture setup. The SQLx test database is disposable, making CASCADE safe
+    // here while leaving applied production migrations immutable.
+    sqlx::raw_sql(
+        r#"
+        DROP TABLE IF EXISTS business_inventory CASCADE;
+        DROP TABLE IF EXISTS business_products CASCADE;
+        "#,
+    )
     .execute(&pool)
     .await
     .unwrap();

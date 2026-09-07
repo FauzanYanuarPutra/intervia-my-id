@@ -361,9 +361,11 @@ export default function CmsDashboard() {
 
   useEffect(() => {
     if (!accessToken) return;
-    loadContent({ offset: 0 });
-    loadSectors();
-    loadBanners();
+    queueMicrotask(() => {
+      void loadContent({ offset: 0 });
+      void loadSectors();
+      void loadBanners();
+    });
   }, [accessToken, loadBanners, loadContent, loadSectors]);
 
   const resetContentForm = () => {
