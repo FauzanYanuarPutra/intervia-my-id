@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { AlertTriangle, Loader2, Save } from 'lucide-react';
 import {
   calculateChannelMargin,
   recommendChannelPrice,
@@ -31,7 +31,7 @@ type EditableChannel = {
 type Props = {
   businessId: string;
   initialChannels: Channel[];
-  defaultPrice: number;
+  defaultPrice: number | null;
   defaultHpp?: number;
 };
 
@@ -69,7 +69,7 @@ function initialRows(saved: Channel[]) {
 
 export function ChannelSettingsWorkspace({ businessId, initialChannels, defaultPrice, defaultHpp = 0 }: Props) {
   const [rows, setRows] = useState(() => initialRows(initialChannels));
-  const [price, setPrice] = useState(defaultPrice);
+  const [price, setPrice] = useState(defaultPrice ?? 0);
   const [hpp, setHpp] = useState(defaultHpp);
   const [savingKey, setSavingKey] = useState('');
   const [message, setMessage] = useState('');
@@ -111,6 +111,12 @@ export function ChannelSettingsWorkspace({ businessId, initialChannels, defaultP
         <p className="portal-kicker">Simulasi bersama</p>
         <h2 className="mt-1 text-lg font-bold text-portal-ink">Bandingkan kanal dengan harga produk yang sama</h2>
         <p className="mt-1 text-sm text-portal-soft">Masukkan HPP produk nyata dari halaman resep. Fee dan promo tidak diisi otomatis karena kondisi merchant bisa berbeda.</p>
+        {defaultPrice === null ? (
+          <div className="mt-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>Belum ada harga jual produk yang tercatat. Simulasi dimulai dari Rp0 sampai kamu memasukkan harga nyata; Lajukan tidak memakai harga contoh.</p>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-semibold text-portal-soft">Harga jual
             <input type="number" min="0" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" value={price} onChange={event => setPrice(Number(event.target.value) || 0)} />
