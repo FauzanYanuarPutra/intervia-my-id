@@ -1,0 +1,145 @@
+name: CRM Wave 2 Navigation
+on:
+  push:
+    branches: [feat/crm-workspace-wave2-20260907]
+permissions:
+  contents: write
+jobs:
+  implement:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/crm-workspace-wave2-20260907
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            frontend/packages/package-lock.json
+            frontend/apps/crm/package-lock.json
+      - name: Build shared UI
+        working-directory: frontend/packages
+        run: |
+          npm ci --legacy-peer-deps --no-audit --no-fund
+          npm run build
+      - name: Install CRM dependencies
+        working-directory: frontend/apps/crm
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Prove navigation contract RED
+        working-directory: frontend/apps/crm
+        run: |
+          set -euo pipefail
+          mkdir -p src/components/crm/__tests__
+          cat > src/components/crm/__tests__/navigation.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { CRM_NAV_ITEMS, PRIMARY_CRM_PAGES, SECONDARY_CRM_PAGES } from '../navigation';
+          describe('CRM navigation contract', () => {
+            it('keeps operator work primary and admin/analytics secondary', () => {
+              expect(PRIMARY_CRM_PAGES).toEqual(['dashboard','pipeline','users','listings','transactions','chat','disputes']);
+              expect(SECONDARY_CRM_PAGES).toEqual(['analytics','settings']);
+              expect(CRM_NAV_ITEMS.map(item => item.id)).toEqual([...PRIMARY_CRM_PAGES, ...SECONDARY_CRM_PAGES]);
+            });
+            it('uses task-oriented Indonesian labels for primary work', () => {
+              expect(CRM_NAV_ITEMS.find(item => item.id === 'dashboard')?.label).toBe('Hari ini');
+              expect(CRM_NAV_ITEMS.find(item => item.id === 'chat')?.label).toBe('Percakapan');
+              expect(CRM_NAV_ITEMS.find(item => item.id === 'disputes')?.label).toBe('Support & Risiko');
+            });
+          });
+          EOF
+          if npm test -- src/components/crm/__tests__/navigation.test.ts; then
+            echo 'Expected navigation test to be RED before extraction' >&2
+            exit 1
+          fi
+      - name: Extract navigation and domain contracts
+        working-directory: frontend/apps/crm
+        run: |
+          set -euo pipefail
+          cat > src/components/crm/types.ts <<'EOF'
+          export type PageId =
+            | 'dashboard'
+            | 'pipeline'
+            | 'users'
+            | 'listings'
+            | 'transactions'
+            | 'chat'
+            | 'analytics'
+            | 'disputes'
+            | 'settings';
+
+          export type IconName =
+            | 'analytics'
+            | 'bell'
+            | 'chat'
+            | 'chevron'
+            | 'dashboard'
+            | 'disputes'
+            | 'listings'
+            | 'logout'
+            | 'menu'
+            | 'pipeline'
+            | 'search'
+            | 'settings'
+            | 'transactions'
+            | 'users';
+
+          export type CrmNavItem = {
+            id: PageId;
+            label: string;
+            hint: string;
+            icon: IconName;
+          };
+          EOF
+          cat > src/components/crm/navigation.ts <<'EOF'
+          import type { CrmNavItem, PageId } from './types';
+
+          export const PRIMARY_CRM_PAGES = [
+            'dashboard', 'pipeline', 'users', 'listings', 'transactions', 'chat', 'disputes',
+          ] as const satisfies readonly PageId[];
+
+          export const SECONDARY_CRM_PAGES = [
+            'analytics', 'settings',
+          ] as const satisfies readonly PageId[];
+
+          export const CRM_NAV_ITEMS: readonly CrmNavItem[] = [
+            { id: 'dashboard', label: 'Hari ini', hint: 'Prioritas operasional', icon: 'dashboard' },
+            { id: 'pipeline', label: 'Pipeline', hint: 'Lead dan follow-up', icon: 'pipeline' },
+            { id: 'users', label: 'Kontak & User', hint: 'Profil, KYC, dan trust', icon: 'users' },
+            { id: 'listings', label: 'Moderasi Listing', hint: 'Report dan listing nakal', icon: 'listings' },
+            { id: 'transactions', label: 'Transactions', hint: 'Escrow dan order', icon: 'transactions' },
+            { id: 'chat', label: 'Percakapan', hint: 'Inbox prospek & support', icon: 'chat' },
+            { id: 'disputes', label: 'Support & Risiko', hint: 'Tiket, dispute, dan risiko', icon: 'disputes' },
+            { id: 'analytics', label: 'Analytics', hint: 'GMV dan konversi', icon: 'analytics' },
+            { id: 'settings', label: 'Administrasi', hint: 'Role dan pengaturan', icon: 'settings' },
+          ];
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/components/crm/CrmCommandCenter.tsx')
+          s=p.read_text()
+          start=s.index('type PageId =')
+          end=s.index('\nconst CRM_DEMO_DATA_ENABLED = false;')
+          replacement="import { CRM_NAV_ITEMS } from './navigation';\nimport type { IconName, PageId } from './types';\n"
+          s=s[:start]+replacement+s[end:]
+          s=s.replace('NAV_ITEMS.map', 'CRM_NAV_ITEMS.map')
+          s=s.replace('NAV_ITEMS.find', 'CRM_NAV_ITEMS.find')
+          s=s.replace('NAV_ITEMS', 'CRM_NAV_ITEMS')
+          p.write_text(s)
+          PY
+      - name: Verify CRM wave 2 GREEN
+        working-directory: frontend/apps/crm
+        run: |
+          set -euo pipefail
+          npm test -- src/components/crm/__tests__/navigation.test.ts src/components/crm/__tests__/operationsPriority.test.ts
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Persist verified product changes
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/apps/crm/src/components/crm/types.ts frontend/apps/crm/src/components/crm/navigation.ts frontend/apps/crm/src/components/crm/__tests__/navigation.test.ts frontend/apps/crm/src/components/crm/CrmCommandCenter.tsx
+          git commit -m 'refactor: extract CRM navigation contracts'
+          git push origin HEAD:feat/crm-workspace-wave2-20260907
