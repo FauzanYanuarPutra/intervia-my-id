@@ -68,8 +68,8 @@ jobs:
           )
           if 'sqlx = { version = "0.9.0"' not in text or '"macros",' not in text:
               raise SystemExit('expected Marketplace SQLx 0.9 with macros feature')
-          if 'serde = { version = "1", features = ["derive"] }' not in text:
-              raise SystemExit('Serde derive feature changed unexpectedly')
+          if 'serde = { version = "1", features = [' not in text or '"derive"' not in text:
+              raise SystemExit('Marketplace Serde derive feature is missing')
           cargo.write_text(text)
 
           source = Path('services/marketplace_service/src/main.rs')
@@ -97,7 +97,10 @@ jobs:
         working-directory: services/marketplace_service
         run: |
           set -euo pipefail
-          ! grep -q '^name = "rsa"$' Cargo.lock
+          if grep -q '^name = "rsa"$' Cargo.lock; then
+            echo 'rsa remains in Marketplace Cargo.lock' >&2
+            exit 1
+          fi
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Verify Rust services
