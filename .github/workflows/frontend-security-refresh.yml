@@ -20,13 +20,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 20
-      - name: Merge canonical quality baseline
+      - name: Merge current main
         run: |
           set -euo pipefail
-          git fetch origin fix/marketplace-quality-current-20260907
+          git fetch origin main
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git merge --no-edit origin/fix/marketplace-quality-current-20260907
+          git merge --no-edit origin/main
       - name: Apply non-forced production audit fixes
         run: |
           set -euo pipefail
@@ -54,6 +54,13 @@ jobs:
             dir="frontend/apps/$app"
             cd "$GITHUB_WORKSPACE/$dir"
             npm ci --legacy-peer-deps --no-audit --no-fund
+            if [[ "$app" == "www" && "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
+              swc_version=$(node -p "require('./node_modules/next-intl/node_modules/@swc/core/package.json').version")
+              npm install --no-save --legacy-peer-deps --no-audit --no-fund \
+                @parcel/watcher-linux-x64-glibc@2.5.6 \
+                "@swc/core-linux-x64-gnu@$swc_version"
+              node -e "require.resolve('@parcel/watcher-linux-x64-glibc'); require.resolve('@swc/core-linux-x64-gnu')"
+            fi
             npm run lint --if-present
             npm run test:unit --if-present
             npm run test --if-present
