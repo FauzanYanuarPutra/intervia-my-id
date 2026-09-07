@@ -1,2 +1,1 @@
-#[cfg(test)]
-mod domain;
+//! Backoffice integration boundary for the identity service.
