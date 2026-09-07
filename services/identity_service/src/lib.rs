@@ -1,5 +1,6 @@
 // src/lib.rs
 
+pub mod backoffice;
 pub mod config;
 pub mod db;
 pub mod organizations;
