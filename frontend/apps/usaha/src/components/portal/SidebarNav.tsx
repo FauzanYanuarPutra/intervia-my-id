@@ -28,33 +28,23 @@ const groups: Array<{
 }> = [
   { label: 'Hari ini', items: [{ id: 'home', label: 'Beranda', icon: LayoutDashboard }] },
   {
-    label: 'Jualan & uang',
+    label: 'Kerja utama',
     items: [
       { id: 'orders', label: 'Jualan', icon: ShoppingBag },
+      { id: 'products', label: 'Produk & HPP', icon: Calculator },
+      { id: 'inventory', label: 'Stok & Belanja', icon: PackageSearch },
       { id: 'finance', label: 'Uang', icon: WalletCards },
+      { id: 'channels', label: 'Kanal Jual', icon: Boxes },
       { id: 'reports', label: 'Laporan', icon: BarChart3 },
     ],
   },
   {
-    label: 'Produk',
-    items: [
-      { id: 'products', label: 'Produk & HPP', icon: Calculator },
-      { id: 'inventory', label: 'Stok & Belanja', icon: PackageSearch },
-      { id: 'channels', label: 'Kanal Jual', icon: Boxes },
-    ],
-  },
-  {
-    label: 'Usaha',
+    label: 'Pengaturan usaha',
     items: [
       { id: 'operations', label: 'Operasional', icon: ClipboardList },
       { id: 'info', label: 'Profil usaha', icon: Building2 },
       { id: 'locations', label: 'Lokasi & Outlet', icon: MapPinned },
       { id: 'buyerPage', label: 'Halaman pembeli', icon: Store },
-    ],
-  },
-  {
-    label: 'Akses',
-    items: [
       { id: 'team', label: 'Tim', icon: UsersRound },
       { id: 'security', label: 'Keamanan', icon: ShieldCheck },
     ],

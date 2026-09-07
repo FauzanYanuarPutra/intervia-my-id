@@ -9,12 +9,11 @@ import { StatCard } from '@/components/portal/StatCard';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { ProductManageForm } from '@/components/forms/ProductManageForm';
 import { ProductQuickForm } from '@/components/forms/ProductQuickForm';
+import { productPrimaryMode } from '@/lib/business-control/progressive-disclosure';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
-type PageProps = {
-  params: Promise<{ businessId: string }>;
-};
+type PageProps = { params: Promise<{ businessId: string }> };
 
 function stockTone(stockHealth: string | undefined): 'success' | 'warning' | 'danger' | 'neutral' {
   if (stockHealth === 'aman') return 'success';
@@ -35,39 +34,34 @@ export default async function BusinessProductsPage({ params }: PageProps) {
   const { businessId } = await params;
   const { account, businesses, activeBusiness } = await resolvePortalBusinessPageState(businessId);
   const business = activeBusiness;
-
   if (!business) notFound();
 
   const canManage = hasPermission(business, 'manageProducts');
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewChannels = hasPermission(business, 'viewChannels');
+  const primaryMode = productPrimaryMode({ productCount: business.products.length, canManage });
   const activeProductsCount = business.products.filter(product => product.status === 'live').length;
   const attentionCount = (business.lowStockProductsCount ?? 0) + (business.stockCheckCount ?? 0);
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="products">
-      <SectionCard
-        eyebrow="Produk & HPP"
-        title="Produk, modal, stok, dan harga jual"
-        description="Kelola katalog canonical Lajukan, lalu hitung HPP dan harga per kanal tanpa memisahkan data produk ke banyak tempat."
-      >
+      <SectionCard eyebrow="Produk & HPP" title="Mulai dari produk yang benar-benar kamu jual" description="Produk tetap menjadi pusat. Resep, HPP, stok, dan harga kanal baru dibuka setelah produk tersedia dan hanya untuk peran yang berhak.">
         <div className="space-y-4">
-          {(canViewCosting || canViewChannels) ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="portal-panel group p-4 transition hover:border-portal-forest/30 hover:bg-portal-mist/40 sm:p-5"><div className="portal-icon-tile"><Calculator className="h-4 w-4" /></div><p className="mt-3 font-bold text-portal-ink">Hitung HPP & resep</p><p className="mt-1 text-sm leading-6 text-portal-soft">Masukkan bahan, kemasan, yield dan stok untuk tahu modal per porsi dan batas produksi.</p><span className="mt-3 inline-flex text-xs font-bold text-portal-forest">Buka kalkulator HPP →</span></Link> : null}
-              {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="portal-panel group p-4 transition hover:border-portal-forest/30 hover:bg-portal-mist/40 sm:p-5"><div className="portal-icon-tile"><Store className="h-4 w-4" /></div><p className="mt-3 font-bold text-portal-ink">Atur harga per kanal</p><p className="mt-1 text-sm leading-6 text-portal-soft">Cek margin GoFood, GrabFood, ShopeeFood, offline, dan copy data merchant dari satu tempat.</p><span className="mt-3 inline-flex text-xs font-bold text-portal-forest">Buka Kanal Jual →</span></Link> : null}
-            </div>
+          {primaryMode === 'add-product' ? (
+            <DataPanel title="Tambah produk pertama" description="Isi produk utama dulu. HPP dan pengaturan kanal bisa menyusul setelah katalog punya data nyata.">
+              <div className="p-4 sm:p-5"><ProductQuickForm businessId={business.id} /></div>
+            </DataPanel>
           ) : null}
 
-          <section className="grid gap-3 sm:grid-cols-3">
-            <StatCard label="Produk aktif" value={activeProductsCount} icon={Boxes} note={`${business.ownedProductsCount ?? business.productsCount} stok sendiri`} />
-            <StatCard label="Barang titipan" value={business.consignmentProductsCount ?? 0} icon={PackagePlus} note="Produk dengan sumber konsinyasi" />
-            <StatCard label="Perlu cek stok" value={attentionCount} icon={TriangleAlert} note={attentionCount ? 'Prioritaskan sebelum menerima order baru' : 'Tidak ada perhatian stok'} />
-          </section>
+          {business.products.length ? (
+            <>
+              <section className="grid gap-3 sm:grid-cols-3">
+                <StatCard label="Produk aktif" value={activeProductsCount} icon={Boxes} note={`${business.ownedProductsCount ?? business.productsCount} stok sendiri`} />
+                <StatCard label="Barang titipan" value={business.consignmentProductsCount ?? 0} icon={PackagePlus} note="Produk dengan sumber konsinyasi" />
+                <StatCard label="Perlu cek stok" value={attentionCount} icon={TriangleAlert} note={attentionCount ? 'Prioritaskan sebelum menerima order baru' : 'Tidak ada perhatian stok'} />
+              </section>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <DataPanel title="Daftar produk" description={`${business.products.length} produk tercatat pada workspace ini.`}>
-              {business.products.length ? (
+              <DataPanel title="Daftar produk" description={`${business.products.length} produk tercatat. Identitas jual, harga, stok, dan status ditampilkan sebelum detail biaya.`}>
                 <div>
                   <div className="hidden grid-cols-[minmax(220px,1.5fr)_minmax(140px,.8fr)_120px_120px_110px] gap-4 border-b border-portal-line bg-[#fafbf9] px-5 py-3 text-[11px] font-bold text-portal-soft lg:grid">
                     <span>Produk</span><span>Sumber</span><span>Harga</span><span>Stok</span><span>Status</span>
@@ -83,31 +77,11 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                             </div>
                             <p className="mt-1 truncate text-xs text-portal-soft">{product.category}{product.notes ? ` · ${product.notes}` : ''}</p>
                           </div>
-
-                          <div className="text-sm">
-                            <p className="font-semibold text-portal-ink">{product.sourceType === 'consignment' ? 'Konsinyasi' : 'Stok sendiri'}</p>
-                            <p className="mt-1 text-xs text-portal-soft">{product.ownerLabel ?? (product.sourceType === 'consignment' ? 'Pemilik belum dicatat' : 'Milik usaha')}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-[11px] font-semibold text-portal-soft lg:hidden">Harga</p>
-                            <p className="mt-1 text-sm font-bold text-portal-ink lg:mt-0">{product.priceLabel}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-[11px] font-semibold text-portal-soft lg:hidden">Kondisi stok</p>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 lg:mt-0">
-                              <StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge>
-                              <span className="text-xs text-portal-soft">{product.stockLabel}</span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-[11px] font-semibold text-portal-soft lg:hidden">Status</p>
-                            <div className="mt-1 lg:mt-0"><StatusBadge tone={product.status === 'live' ? 'success' : 'neutral'}>{product.status === 'live' ? 'Aktif' : 'Diarsipkan'}</StatusBadge></div>
-                          </div>
+                          <div className="text-sm"><p className="font-semibold text-portal-ink">{product.sourceType === 'consignment' ? 'Konsinyasi' : 'Stok sendiri'}</p><p className="mt-1 text-xs text-portal-soft">{product.ownerLabel ?? (product.sourceType === 'consignment' ? 'Pemilik belum dicatat' : 'Milik usaha')}</p></div>
+                          <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Harga</p><p className="mt-1 text-sm font-bold text-portal-ink lg:mt-0">{product.priceLabel || 'Belum ada harga'}</p></div>
+                          <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Kondisi stok</p><div className="mt-1 flex flex-wrap items-center gap-2 lg:mt-0"><StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge><span className="text-xs text-portal-soft">{product.stockLabel}</span></div></div>
+                          <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Status</p><div className="mt-1 lg:mt-0"><StatusBadge tone={product.status === 'live' ? 'success' : 'neutral'}>{product.status === 'live' ? 'Aktif' : 'Diarsipkan'}</StatusBadge></div></div>
                         </div>
-
                         {(product.consignmentTerms || product.stockUpdatedAt || product.stockMode === 'estimated') ? (
                           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft">
                             {product.consignmentTerms ? <span>Skema: <strong className="font-semibold text-portal-ink">{product.consignmentTerms}</strong></span> : null}
@@ -115,27 +89,33 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                             {product.stockUpdatedAt ? <span>Update stok: {product.stockUpdatedAt}</span> : null}
                           </div>
                         ) : null}
-
                         {canManage ? <ProductManageForm businessId={business.id} product={product} /> : null}
                       </article>
                     ))}
                   </div>
                 </div>
-              ) : (
-                <EmptyState title="Belum ada produk" description="Tambahkan produk pertama supaya katalog usaha dan halaman pembeli mulai hidup." icon={Boxes} />
-              )}
-            </DataPanel>
+              </DataPanel>
 
-            <DataPanel title={canManage ? 'Tambah produk cepat' : 'Akses katalog'} description={canManage ? 'Masukkan produk inti tanpa meninggalkan halaman katalog.' : 'Peranmu saat ini hanya dapat melihat katalog.'}>
-              <div className="p-4 sm:p-5">
-                {canManage ? (
-                  <ProductQuickForm businessId={business.id} />
-                ) : (
-                  <p className="text-sm leading-6 text-portal-soft">Tambah atau ubah produk membutuhkan akses owner atau manager.</p>
-                )}
-              </div>
-            </DataPanel>
-          </div>
+              {canManage ? (
+                <details className="portal-panel group">
+                  <summary className="cursor-pointer list-none p-4 font-bold text-portal-ink sm:p-5">Tambah produk lain <span className="ml-2 text-xs font-semibold text-portal-forest">Buka form</span></summary>
+                  <div className="border-t border-portal-line p-4 sm:p-5"><ProductQuickForm businessId={business.id} /></div>
+                </details>
+              ) : null}
+
+              {(canViewCosting || canViewChannels) ? (
+                <details className="portal-panel group">
+                  <summary className="cursor-pointer list-none p-4 sm:p-5"><span className="font-bold text-portal-ink">Pengaturan lanjutan produk</span><span className="ml-2 text-xs font-semibold text-portal-soft">HPP, resep, dan harga kanal</span></summary>
+                  <div className="grid gap-3 border-t border-portal-line p-4 sm:grid-cols-2 sm:p-5">
+                    {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="rounded-xl border border-portal-line p-4 transition hover:bg-portal-mist/40"><Calculator className="h-4 w-4 text-portal-forest" /><p className="mt-3 font-bold text-portal-ink">Atur resep & HPP</p><p className="mt-1 text-sm leading-6 text-portal-soft">Hubungkan bahan dan kemasan untuk menghitung modal dari data nyata.</p></Link> : null}
+                    {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="rounded-xl border border-portal-line p-4 transition hover:bg-portal-mist/40"><Store className="h-4 w-4 text-portal-forest" /><p className="mt-3 font-bold text-portal-ink">Atur harga per kanal</p><p className="mt-1 text-sm leading-6 text-portal-soft">Gunakan asumsi fee dan promo merchant yang tersimpan, bukan angka hard-code.</p></Link> : null}
+                  </div>
+                </details>
+              ) : null}
+            </>
+          ) : primaryMode === 'view-only' ? (
+            <EmptyState title="Belum ada produk" description="Belum ada katalog yang dapat dilihat. Tambah atau ubah produk membutuhkan akses owner atau manager." icon={Boxes} />
+          ) : null}
         </div>
       </SectionCard>
     </PortalShell>

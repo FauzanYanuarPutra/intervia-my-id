@@ -34,19 +34,29 @@ def main() -> int:
     require('frontend/apps/www/src/lib/usahaWorkspace.ts', 'NEXT_PUBLIC_USAHA_URL')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
-    require('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', 'activeOrders', 'locations', 'Hitung HPP', 'Pahami uang', 'Kanal Jual')
-    require('frontend/apps/usaha/src/app/page.tsx', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'summarizeControlCenter', 'jakartaDateKey')
+
+    # Action-first Home: one primary decision engine fed only by durable, permission-aware reads.
+    # Recipe readiness deliberately remains unknown until an aggregate/list endpoint exists;
+    # Home must not fan out one recipe request per product.
+    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'listControlSettlements', 'const recipeCount = null')
+    require('frontend/apps/usaha/src/app/page.tsx', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: null')
+    forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000', 'getControlRecipe', 'business.products.map')
+    require('frontend/apps/usaha/src/lib/business-control/next-actions.ts', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: number | null')
+    require('frontend/apps/usaha/src/lib/business-control/progressive-disclosure.ts', 'sortStockAttentionFirst', 'productPrimaryMode', 'shouldShowSettlementWorkspace', 'channelSimulationReadiness')
+
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/reports/page.tsx', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'summarizeControlCenter', 'jakartaDateKey')
     require('frontend/apps/usaha/src/lib/business-control/costing.ts', 'calculateRecipeCost', 'recommendChannelPrice', 'calculateProductionCapacity')
     require('frontend/apps/usaha/src/lib/business-control/finance.ts', 'summarizeBusinessDay', 'ownerDrawing', 'cashMovement')
     require('frontend/apps/usaha/src/lib/business-control/ledger.ts', 'summarizeFinanceEntries', 'ownerCapital', 'ownerDrawing')
     require('frontend/apps/usaha/src/lib/business-control/insights.ts', 'summarizeControlCenter', 'jakartaDateKey', 'Asia/Jakarta')
-    require('frontend/apps/usaha/src/lib/business-control-server.ts', '/ingredients', '/channels', '/finance-entries', '/recipe')
+    require('frontend/apps/usaha/src/lib/business-control-server.ts', '/ingredients', '/channels', '/finance-entries', '/recipe', '/settlements')
     require('frontend/apps/usaha/src/components/business-control/DurableHppWorkspace.tsx', 'Simpan resep', '/recipe', 'calculateRecipeCost')
     require('frontend/apps/usaha/src/components/business-control/IngredientWorkspace.tsx', 'Simpan bahan', '/ingredients')
     require('frontend/apps/usaha/src/components/business-control/FinanceLedger.tsx', 'Simpan transaksi', '/finance-entries')
     require('frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx', 'GoFood', 'GrabFood', 'ShopeeFood', 'Simpan kanal')
-    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack')
+    forbid('frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx', 'defaultPrice ?? 15000', 'defaultPrice || 15000')
+    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack', 'parseRecordedProductPrice')
+    forbid('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', '|| 15000', '|| 15_000')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/products/hpp/page.tsx', 'DurableHppWorkspace', 'listControlIngredients')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/finance/page.tsx', 'FinanceLedger', 'listControlFinanceEntries')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/inventory/page.tsx', 'IngredientWorkspace', 'listControlIngredients', "hasPermission(business, 'viewCosting')")
