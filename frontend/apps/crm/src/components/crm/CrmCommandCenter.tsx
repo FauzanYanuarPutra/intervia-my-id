@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { OperationsPriorityPanel } from "./OperationsPriorityPanel";
 import { buildOperationsPriorities } from "./operationsPriority";
+import { CRM_NAV_ITEMS } from "./navigation";
+import type { IconName, PageId } from "./types";
 import { useAuth, useRequireAuth } from "@/context/AuthContext";
 import {
   activityApi,
@@ -18,33 +20,6 @@ import {
   type SuperAppTrustProfile,
   type SupportTicket,
 } from "@/lib/api";
-
-type PageId =
-  | "dashboard"
-  | "pipeline"
-  | "users"
-  | "listings"
-  | "transactions"
-  | "chat"
-  | "analytics"
-  | "disputes"
-  | "settings";
-
-type IconName =
-  | "analytics"
-  | "bell"
-  | "chat"
-  | "chevron"
-  | "dashboard"
-  | "disputes"
-  | "listings"
-  | "logout"
-  | "menu"
-  | "pipeline"
-  | "search"
-  | "settings"
-  | "transactions"
-  | "users";
 
 type CrmKpi = {
   label: string;
@@ -151,58 +126,6 @@ type TrustProfileUpdatePayload = Parameters<
 >[2];
 
 type UnknownRecord = Record<string, unknown>;
-
-const NAV_ITEMS: Array<{
-  id: PageId;
-  label: string;
-  hint: string;
-  icon: IconName;
-}> = [
-    {
-      id: "dashboard",
-      label: "Hari ini",
-      hint: "Prioritas operasional",
-      icon: "dashboard",
-    },
-    {
-      id: "pipeline",
-      label: "Pipeline",
-      hint: "Lead dan follow-up",
-      icon: "pipeline",
-    },
-    { id: "users", label: "Kontak & User", hint: "Profil, KYC, dan trust", icon: "users" },
-    {
-      id: "listings",
-      label: "Moderasi Listing",
-      hint: "Report dan listing nakal",
-      icon: "listings",
-    },
-    {
-      id: "transactions",
-      label: "Transactions",
-      hint: "Escrow dan order",
-      icon: "transactions",
-    },
-    { id: "chat", label: "Percakapan", hint: "Inbox prospek & support", icon: "chat" },
-    {
-      id: "analytics",
-      label: "Analytics",
-      hint: "GMV dan konversi",
-      icon: "analytics",
-    },
-    {
-      id: "disputes",
-      label: "Support & Risiko",
-      hint: "Tiket, dispute, dan risiko",
-      icon: "disputes",
-    },
-    {
-      id: "settings",
-      label: "Administrasi",
-      hint: "Role dan pengaturan",
-      icon: "settings",
-    },
-  ];
 
 const CRM_DEMO_DATA_ENABLED = false;
 
@@ -2049,7 +1972,7 @@ function Sidebar({
           </button>
 
           <nav className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-            {NAV_ITEMS.map(item => {
+            {CRM_NAV_ITEMS.map(item => {
               const active = activePage === item.id;
               return (
                 <button
@@ -2117,7 +2040,7 @@ function TopBar({
   onToggleProfile: () => void;
   onLogout: () => void;
 }) {
-  const page = NAV_ITEMS.find(item => item.id === activePage) || NAV_ITEMS[0];
+  const page = CRM_NAV_ITEMS.find(item => item.id === activePage) || CRM_NAV_ITEMS[0];
   return (
     <header className="z-30 shrink-0 border-b border-slate-200 bg-white/90 ">
       <div className="mx-auto flex h-16 max-w-[1540px] items-center gap-3 px-1 sm:px-3 md:px-6 lg:px-8">
