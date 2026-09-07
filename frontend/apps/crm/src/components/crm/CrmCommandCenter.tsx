@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { OperationsPriorityPanel } from "./OperationsPriorityPanel";
+import { buildOperationsPriorities } from "./operationsPriority";
 import { useAuth, useRequireAuth } from "@/context/AuthContext";
 import {
   activityApi,
@@ -158,17 +160,17 @@ const NAV_ITEMS: Array<{
 }> = [
     {
       id: "dashboard",
-      label: "Dashboard",
-      hint: "Ringkasan bisnis",
+      label: "Hari ini",
+      hint: "Prioritas operasional",
       icon: "dashboard",
     },
     {
       id: "pipeline",
-      label: "CRM Pipeline",
-      hint: "Follow-up deal",
+      label: "Pipeline",
+      hint: "Lead dan follow-up",
       icon: "pipeline",
     },
-    { id: "users", label: "Users", hint: "Buyer, seller, talent", icon: "users" },
+    { id: "users", label: "Kontak & User", hint: "Profil, KYC, dan trust", icon: "users" },
     {
       id: "listings",
       label: "Moderasi Listing",
@@ -181,7 +183,7 @@ const NAV_ITEMS: Array<{
       hint: "Escrow dan order",
       icon: "transactions",
     },
-    { id: "chat", label: "Chat CRM", hint: "Inbox prospek", icon: "chat" },
+    { id: "chat", label: "Percakapan", hint: "Inbox prospek & support", icon: "chat" },
     {
       id: "analytics",
       label: "Analytics",
@@ -190,14 +192,14 @@ const NAV_ITEMS: Array<{
     },
     {
       id: "disputes",
-      label: "Disputes",
-      hint: "Kasus dan risiko",
+      label: "Support & Risiko",
+      hint: "Tiket, dispute, dan risiko",
       icon: "disputes",
     },
     {
       id: "settings",
-      label: "Settings",
-      hint: "Role dan moderasi",
+      label: "Administrasi",
+      hint: "Role dan pengaturan",
       icon: "settings",
     },
   ];
@@ -1807,27 +1809,32 @@ export default function CrmCommandCenter() {
       ).length,
     [data.orders],
   );
+  const pendingKycCount = data.users.filter(item => item.kyc === "Pending").length;
+  const reportedListingCount = data.listings.filter(item => item.reportCount > 0).length;
+  const unreadChatCount = data.chats.reduce((sum, item) => sum + Math.max(0, item.unread), 0);
+  const operationPriorities = useMemo(() => buildOperationsPriorities({ leads: data.leads, tickets: data.tickets, orders: data.orders, chats: data.chats, users: data.users, listings: data.listings }), [data]);
+
   const kpis: CrmKpi[] = useMemo(
     () => [
       {
         label: "Total User",
         value: String(data.users.length),
         note: "Buyer, seller, talent, dan admin yang terpantau.",
-        trend: "+12%",
+        trend: pendingKycCount ? `${pendingKycCount} review` : "tercatat",
         tone: "green",
       },
       {
         label: "Listing Aktif",
         value: String(data.listings.filter(item => item.status === "active").length),
         note: "Katalog yang sudah bisa ditemukan user.",
-        trend: "+8%",
+        trend: reportedListingCount ? `${reportedListingCount} report` : "tercatat",
         tone: "blue",
       },
       {
         label: "Total GMV",
         value: formatCurrency(gmvCents),
         note: "Nilai transaksi dan order yang masuk CRM.",
-        trend: "+18%",
+        trend: `${data.orders.length} order`,
         tone: "green",
       },
       {
@@ -1841,11 +1848,11 @@ export default function CrmCommandCenter() {
         label: "Chat Aktif",
         value: String(data.chats.length),
         note: "Percakapan prospek dan support aktif.",
-        trend: "live",
+        trend: unreadChatCount ? `${unreadChatCount} unread` : "tercatat",
         tone: "rose",
       },
     ],
-    [data.chats.length, data.listings, data.users.length, gmvCents, pendingTransactions],
+    [data.chats.length, data.listings, data.orders.length, data.users.length, gmvCents, pendingKycCount, pendingTransactions, reportedListingCount, unreadChatCount],
   );
 
   const chartData = useMemo(
@@ -1943,6 +1950,10 @@ export default function CrmCommandCenter() {
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
                   {notice}
                 </div>
+              ) : null}
+
+              {activePage === "dashboard" ? (
+                <OperationsPriorityPanel items={operationPriorities} onOpen={destination => setActivePage(destination)} />
               ) : null}
 
               {activePage === "dashboard" ? (
