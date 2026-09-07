@@ -17,20 +17,22 @@ jobs:
           ref: security/rust-jwt-aws-lc-20260907
       - name: Install pinned Rust toolchain
         run: rustup show
-      - name: Show RSA and jsonwebtoken v9 dependency paths
+      - name: Trace stale RSA lockfile owner
         working-directory: services/marketplace_service
         run: |
           set -uo pipefail
           echo '=== rsa, all targets ==='
           cargo tree --locked --target all -i rsa || true
+          echo '=== sqlx-mysql, all targets ==='
+          cargo tree --locked --target all -i sqlx-mysql || true
           echo '=== jsonwebtoken 9.3.1, all targets ==='
           cargo tree --locked --target all -i jsonwebtoken@9.3.1 || true
-          echo '=== lockfile packages mentioning jsonwebtoken ==='
-          awk '
-            /^\[\[package\]\]$/ { block="" }
-            { block = block $0 "\n" }
-            /^$/ {
-              if (block ~ /jsonwebtoken/) printf "%s", block
-              block=""
-            }
-          ' Cargo.lock
+          echo '=== packages whose lock entry depends on rsa ==='
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('Cargo.lock').read_text()
+          blocks = text.split('[[package]]')
+          for block in blocks:
+              if '"rsa"' in block:
+                  print('[[package]]' + block)
+          PY
