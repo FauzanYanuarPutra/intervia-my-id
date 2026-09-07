@@ -27,7 +27,7 @@ The family identity is shared, but each application optimizes for a different jo
 
 ## 2. Implementation Order
 
-Work proceeds in six waves and each wave is independently reviewable and mergeable.
+Work proceeds in seven stages and each stage is independently reviewable and mergeable.
 
 1. Finish active security and Usaha simplification work already in flight.
 2. Shared UI foundation.
