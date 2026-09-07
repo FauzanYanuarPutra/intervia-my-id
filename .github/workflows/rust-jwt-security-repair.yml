@@ -86,15 +86,20 @@ jobs:
               raise SystemExit('audited dynamic store query was not applied')
           source.write_text(text)
           PY
-      - name: Refresh lockfiles and patched advisory versions
+      - name: Refresh only present vulnerable package versions
         run: |
           set -euo pipefail
           for service in identity_service marketplace_service community_service ai_service; do
             cd "$GITHUB_WORKSPACE/services/$service"
-            cargo update
-            cargo update -p bytes --precise 1.11.1
-            cargo update -p quinn-proto --precise 0.11.15
-            cargo update -p rustls-webpki --precise 0.103.13
+            if grep -q '^name = "bytes"$' Cargo.lock; then
+              cargo update -p bytes
+            fi
+            if grep -q '^name = "quinn-proto"$' Cargo.lock; then
+              cargo update -p quinn-proto
+            fi
+            if grep -q '^name = "rustls-webpki"$' Cargo.lock; then
+              cargo update -p rustls-webpki
+            fi
           done
       - name: Assert patched advisory floors
         run: |
