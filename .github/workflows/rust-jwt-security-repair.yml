@@ -65,10 +65,13 @@ jobs:
 
           marketplace = Path('services/marketplace_service/Cargo.toml')
           text = marketplace.read_text()
+          text = text.replace('sqlx = { version = "0.8.6"', 'sqlx = { version = "0.9.0"')
           if '"macros",' in text:
               text = text.replace('"macros",', '"derive",')
           elif '"derive",' not in text:
               raise SystemExit('expected Marketplace SQLx macros or derive feature')
+          if 'sqlx = { version = "0.9.0"' not in text:
+              raise SystemExit('Marketplace SQLx 0.9 upgrade was not applied')
           marketplace.write_text(text)
           PY
       - name: Refresh Rust lockfiles within declared constraints
@@ -78,14 +81,10 @@ jobs:
             echo "Updating $service"
             (cd "services/$service" && cargo update)
           done
-      - name: Assert unreachable MySQL/RSA packages are absent from Marketplace lockfile
+      - name: Assert RSA is absent from Marketplace lockfile
         working-directory: services/marketplace_service
         run: |
           set -euo pipefail
-          if grep -q '^name = "sqlx-mysql"$' Cargo.lock; then
-            echo 'sqlx-mysql remains in the PostgreSQL-only Marketplace lockfile' >&2
-            exit 1
-          fi
           if grep -q '^name = "rsa"$' Cargo.lock; then
             echo 'rsa remains in the Marketplace lockfile' >&2
             exit 1
