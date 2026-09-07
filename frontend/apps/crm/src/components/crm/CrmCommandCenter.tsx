@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { OperationsPriorityPanel } from "./OperationsPriorityPanel";
+import { PipelineWorkspace } from "./PipelineWorkspace";
 import { buildOperationsPriorities } from "./operationsPriority";
 import { CRM_NAV_ITEMS } from "./navigation";
 import type { IconName, PageId } from "./types";
@@ -1887,7 +1888,7 @@ export default function CrmCommandCenter() {
                   onOpenPage={setActivePage}
                 />
               ) : null}
-              {activePage === "pipeline" ? <PipelinePage leads={filteredData.leads} /> : null}
+              {activePage === "pipeline" ? <PipelineWorkspace leads={filteredData.leads} /> : null}
               {activePage === "users" ? (
                 <UsersPage users={filteredData.users} onTrustAction={handleUserTrustAction} />
               ) : null}
@@ -2282,65 +2283,6 @@ function ActivityItem({ activity }: { activity: CrmActivityRow }) {
         <p className="text-sm font-bold text-slate-900">{activity.title}</p>
         <p className="line-clamp-2 text-xs leading-5 text-slate-500">{activity.body}</p>
         <p className="mt-1 text-[11px] font-semibold text-slate-400">{formatDate(activity.at)}</p>
-      </div>
-    </div>
-  );
-}
-
-function PipelinePage({ leads }: { leads: CrmLead[] }) {
-  const columns = [
-    { id: "new", label: "Lead Baru", help: "Baru masuk dari listing/chat" },
-    { id: "interested", label: "Tertarik", help: "Butuh follow-up agent" },
-    { id: "negotiation", label: "Negosiasi", help: "Harga dan scope dibahas" },
-    { id: "locked", label: "Escrow", help: "Deal mulai dikunci" },
-    { id: "completed", label: "Selesai", help: "Deal sukses" },
-  ] as const;
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        label="CRM Pipeline"
-        title="Follow-up prospek sampai jadi deal."
-        body="Bahasa dibuat sederhana agar agent langsung tahu siapa yang harus dihubungi dulu."
-      />
-      <div className="grid gap-4 xl:grid-cols-5">
-        {columns.map(column => {
-          const items = leads.filter(lead => stageGroup(lead.stage) === column.id);
-          return (
-            <ShellCard key={column.id} className="min-h-[420px] p-3">
-              <div className="mb-3 rounded-2xl bg-slate-50 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold text-slate-900">{column.label}</p>
-                  <Badge tone={column.id === "completed" ? "success" : "neutral"}>{items.length}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">{column.help}</p>
-              </div>
-              <div className="space-y-3">
-                {items.map(lead => (
-                  <div key={lead.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-2 text-sm font-bold text-slate-950">{lead.requester_name || lead.name}</p>
-                      {column.id === "negotiation" || column.id === "locked" ? (
-                        <Badge tone="warning">Hot Lead 🔥</Badge>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
-                      {asString(lead.metadata?.listing_title) || lead.sector || "Listing yang dilihat"}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between text-xs">
-                      <span className="font-bold text-emerald-700">
-                        {formatCurrency(lead.value_cents || 0, lead.currency || "IDR")}
-                      </span>
-                      <span className="text-slate-400">{formatDate(lead.updated_at)}</span>
-                    </div>
-                  </div>
-                ))}
-                {!items.length ? (
-                  <EmptyState title="Kosong" body="Belum ada lead di tahap ini." />
-                ) : null}
-              </div>
-            </ShellCard>
-          );
-        })}
       </div>
     </div>
   );
