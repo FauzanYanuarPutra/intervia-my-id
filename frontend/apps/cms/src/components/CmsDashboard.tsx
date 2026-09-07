@@ -4,10 +4,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { contentApi, sectorApi, bannerApi } from '@/lib/api';
 import { Button, Card, Input } from '@/ui';
-import { GuidedTour, Modal, useGuidedTour, type TourStep } from 'lajukan-ui';
+import { Alert, ConfirmDialog, GuidedTour, StatusBadge, useGuidedTour, type TourStep } from 'lajukan-ui';
 import { CmsOverview } from './cms/CmsOverview';
-import { getCmsQueueSummary } from './cms/contentPresentation';
-import type { CmsWorkspaceId } from './cms/types';
+import { getCmsQueueSummary, getContentStatusTone } from './cms/contentPresentation';
+import type { Banner, CmsWorkspaceId, ContentItem, Sector } from './cms/types';
 
 const CONTENT_TYPES = [
   { id: 'product', label: 'Produk' },
@@ -41,53 +41,6 @@ const BANNER_LOCATIONS = [
   'content_sidebar',
   'dashboard',
 ];
-type ContentItem = {
-  id: string;
-  title: string;
-  type?: string;
-  content_type?: string;
-  content_status?: string;
-  status?: string;
-  summary?: string | null;
-  body?: string | null;
-  price_cents?: number | null;
-  currency?: string | null;
-  tags?: string[] | null;
-  cover_image?: string | null;
-  slug?: string | null;
-  metadata?: Record<string, unknown> | null;
-  updated_at?: string | null;
-  created_at?: string | null;
-};
-
-type Sector = {
-  id: string;
-  name_id: string;
-  name_en: string;
-  description_id?: string | null;
-  description_en?: string | null;
-  color?: string | null;
-  icon_key?: string | null;
-  is_active: boolean;
-  sort_order?: number | null;
-  updated_at?: string | null;
-};
-
-type Banner = {
-  id: string;
-  name: string;
-  location: string;
-  status: string;
-  image_url?: string | null;
-  link_url?: string | null;
-  headline?: string | null;
-  subheadline?: string | null;
-  start_at?: string | null;
-  end_at?: string | null;
-  metadata?: Record<string, unknown> | null;
-  updated_at?: string | null;
-};
-
 type ContentFormState = {
   id?: string;
   title: string;
@@ -1016,9 +969,7 @@ export default function CmsDashboard() {
             </div>
 
             {contentError && (
-              <div className="mb-3 p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-                {contentError}
-              </div>
+              <Alert tone="danger">{contentError}</Alert>
             )}
 
             {contentLoading && contentItems.length === 0 ? (
@@ -1036,9 +987,10 @@ export default function CmsDashboard() {
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-[color:var(--color-text)]">{item.title}</p>
-                          <p className="text-xs text-[color:var(--color-text)]">
-                            {item.type || item.content_type} - {sector} - {status}
-                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[color:var(--color-text-soft)]">
+                            <span>{item.type || item.content_type} · {sector}</span>
+                            <StatusBadge tone={getContentStatusTone(status)}>{status}</StatusBadge>
+                          </div>
                           <p className="text-[11px] text-[color:var(--color-text-soft)]">
                             {formatDate(item.updated_at || item.created_at)}
                           </p>
@@ -1088,9 +1040,7 @@ export default function CmsDashboard() {
           <Card title={contentForm.id ? 'Edit Konten' : 'Tambah Konten'} data-tour="cms-content-form">
             <form onSubmit={handleContentSubmit} className="space-y-3">
               {contentFormError && (
-                <div className="p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-                  {contentFormError}
-                </div>
+                <Alert tone="danger">{contentFormError}</Alert>
               )}
               <Input
                 label="Judul"
@@ -1215,9 +1165,7 @@ export default function CmsDashboard() {
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <Card title="Daftar Sektor">
             {sectorError && (
-              <div className="mb-3 p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-                {sectorError}
-              </div>
+              <Alert tone="danger">{sectorError}</Alert>
             )}
             {sectorLoading && sectors.length === 0 ? (
               <p className="text-sm text-[color:var(--color-text-soft)]">Memuat...</p>
@@ -1271,9 +1219,7 @@ export default function CmsDashboard() {
           >
             <form onSubmit={handleSectorSubmit} className="space-y-3">
               {sectorFormError && (
-                <div className="p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-                  {sectorFormError}
-                </div>
+                <Alert tone="danger">{sectorFormError}</Alert>
               )}
               <Input
                 label="ID"
@@ -1359,9 +1305,7 @@ export default function CmsDashboard() {
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <Card title="Daftar Banner">
             {bannerError && (
-              <div className="mb-3 p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-                {bannerError}
-              </div>
+              <Alert tone="danger">{bannerError}</Alert>
             )}
             {bannerLoading && banners.length === 0 ? (
               <p className="text-sm text-[color:var(--color-text-soft)]">Memuat...</p>
@@ -1403,9 +1347,7 @@ export default function CmsDashboard() {
           <Card title={bannerForm.id ? 'Edit Banner' : 'Tambah Banner'}>
             <form onSubmit={handleBannerSubmit} className="space-y-3">
               {bannerFormError && (
-                <div className="p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-                  {bannerFormError}
-                </div>
+                <Alert tone="danger">{bannerFormError}</Alert>
               )}
               <Input
                 label="Nama"
@@ -1510,37 +1452,16 @@ export default function CmsDashboard() {
       )}
         </main>
       </div>
-      <Modal
+      <ConfirmDialog
         open={Boolean(confirmDialog)}
-        onClose={closeConfirmDialog}
         title={confirmDialog?.title || 'Konfirmasi'}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={closeConfirmDialog}
-              disabled={confirmLoading}
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              variant={confirmDialog?.tone === 'danger' ? 'danger' : 'primary'}
-              onClick={() => void handleConfirmDialog()}
-              disabled={confirmLoading}
-            >
-              {confirmLoading
-                ? 'Memproses...'
-                : (confirmDialog?.confirmLabel ?? 'Lanjutkan')}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm leading-6 text-[color:var(--color-text)]">
-          {confirmDialog?.description}
-        </p>
-      </Modal>
+        description={confirmDialog?.description || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Lanjutkan'}
+        tone={confirmDialog?.tone === 'danger' ? 'danger' : 'primary'}
+        loading={confirmLoading}
+        onConfirm={() => void handleConfirmDialog()}
+        onOpenChange={(open) => { if (!open) closeConfirmDialog(); }}
+      />
     </div>
   );
 }
