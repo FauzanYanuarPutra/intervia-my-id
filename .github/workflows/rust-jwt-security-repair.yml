@@ -52,8 +52,7 @@ jobs:
               'services/community_service/Cargo.toml',
           ]:
               path = Path(rel)
-              text = path.read_text()
-              text = text.replace(
+              text = path.read_text().replace(
                   'jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }',
                   'jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }',
               )
@@ -87,11 +86,33 @@ jobs:
               raise SystemExit('audited dynamic store query was not applied')
           source.write_text(text)
           PY
-      - name: Refresh lockfiles
+      - name: Refresh lockfiles and patched advisory versions
         run: |
           set -euo pipefail
           for service in identity_service marketplace_service community_service ai_service; do
-            (cd "services/$service" && cargo update)
+            cd "$GITHUB_WORKSPACE/services/$service"
+            cargo update
+            cargo update -p bytes --precise 1.11.1
+            cargo update -p quinn-proto --precise 0.11.15
+            cargo update -p rustls-webpki --precise 0.103.13
+          done
+      - name: Assert patched advisory floors
+        run: |
+          set -euo pipefail
+          for service in identity_service marketplace_service community_service ai_service; do
+            lock="$GITHUB_WORKSPACE/services/$service/Cargo.lock"
+            if grep -A2 '^name = "bytes"$' "$lock" | grep -q 'version = "1.10.1"'; then
+              echo "$service still has vulnerable bytes 1.10.1" >&2
+              exit 1
+            fi
+            if grep -A2 '^name = "quinn-proto"$' "$lock" | grep -q 'version = "0.11.14"'; then
+              echo "$service still has vulnerable quinn-proto 0.11.14" >&2
+              exit 1
+            fi
+            if grep -A2 '^name = "rustls-webpki"$' "$lock" | grep -q 'version = "0.103.8"'; then
+              echo "$service still has vulnerable rustls-webpki 0.103.8" >&2
+              exit 1
+            fi
           done
       - name: Assert Marketplace RSA removal
         working-directory: services/marketplace_service
@@ -100,6 +121,14 @@ jobs:
           if grep -q '^name = "rsa"$' Cargo.lock; then
             echo 'rsa remains in Marketplace Cargo.lock' >&2
             exit 1
+          fi
+      - name: Persist dependency refresh
+        run: |
+          set -euo pipefail
+          git add services/*/Cargo.toml services/*/Cargo.lock services/marketplace_service/src/main.rs
+          if ! git diff --cached --quiet; then
+            git commit -m 'security: refresh Rust dependency advisories'
+            git push origin HEAD:security/rust-jwt-aws-lc-20260907
           fi
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
@@ -114,11 +143,3 @@ jobs:
             cargo test --locked
             cargo audit
           done
-      - name: Commit verified repair
-        run: |
-          set -euo pipefail
-          git add services/*/Cargo.toml services/*/Cargo.lock services/marketplace_service/src/main.rs
-          if ! git diff --cached --quiet; then
-            git commit -m 'security: refresh Rust dependency advisories'
-          fi
-          git push origin HEAD:security/rust-jwt-aws-lc-20260907
