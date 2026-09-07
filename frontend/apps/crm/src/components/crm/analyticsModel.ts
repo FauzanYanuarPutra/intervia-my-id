@@ -1,0 +1,2 @@
+export type AnalyticsSummary={users:number;listings:number;transactions:number;gmvCents:number;openSupport:number};
+export function buildAnalyticsSummary(input:{users:number;listings:number;transactions:Array<{amountCents:number}>;openSupport:number}):AnalyticsSummary{return {users:input.users,listings:input.listings,transactions:input.transactions.length,gmvCents:input.transactions.reduce((sum,item)=>sum+Math.max(0,item.amountCents||0),0),openSupport:input.openSupport}}
