@@ -37,11 +37,23 @@ pub async fn create_organization_invitation(
     };
     let username = match normalize_invitee_username(&payload.username) {
         Ok(value) => value,
-        Err(error) => return (StatusCode::BAD_REQUEST, Json(json!({ "error": error.to_string() }))).into_response(),
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": error.to_string() })),
+            )
+                .into_response()
+        }
     };
     let role_name = match validate_invitation_role(&payload.role) {
         Ok(value) => value,
-        Err(error) => return (StatusCode::BAD_REQUEST, Json(json!({ "error": error.to_string() }))).into_response(),
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": error.to_string() })),
+            )
+                .into_response()
+        }
     };
 
     let mut tx = match state.db.begin().await {
@@ -72,7 +84,11 @@ pub async fn create_organization_invitation(
         Err(_) => return service_unavailable(),
     };
     if !can_invite {
-        return (StatusCode::FORBIDDEN, Json(json!({ "error": "organization invite permission required" }))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "organization invite permission required" })),
+        )
+            .into_response();
     }
 
     let invitee_user_id: Uuid = match sqlx::query_scalar(
@@ -91,12 +107,22 @@ pub async fn create_organization_invitation(
     .await
     {
         Ok(Some(value)) => value,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({ "error": "username not found" }))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "username not found" })),
+            )
+                .into_response()
+        }
         Err(_) => return service_unavailable(),
     };
 
     if invitee_user_id == actor_user_id {
-        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "you cannot invite yourself" }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "you cannot invite yourself" })),
+        )
+            .into_response();
     }
 
     let already_member: bool = match sqlx::query_scalar(
@@ -111,7 +137,11 @@ pub async fn create_organization_invitation(
         Err(_) => return service_unavailable(),
     };
     if already_member {
-        return (StatusCode::CONFLICT, Json(json!({ "error": "user is already an organization member" }))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "user is already an organization member" })),
+        )
+            .into_response();
     }
 
     let role_id: Uuid = match sqlx::query_scalar(
@@ -122,7 +152,13 @@ pub async fn create_organization_invitation(
     .await
     {
         Ok(Some(value)) => value,
-        Ok(None) => return (StatusCode::CONFLICT, Json(json!({ "error": "organization role is not provisioned" }))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({ "error": "organization role is not provisioned" })),
+            )
+                .into_response()
+        }
         Err(_) => return service_unavailable(),
     };
 
@@ -155,7 +191,12 @@ pub async fn create_organization_invitation(
     )
     .bind(actor_user_id)
     .bind(invitee_user_id)
-    .bind(json!({ "organization_id": organization_id, "invitation_id": invitation_id, "role": role_name, "username": username }))
+    .bind(json!({
+        "organization_id": organization_id,
+        "invitation_id": invitation_id,
+        "role": role_name,
+        "username": username
+    }))
     .execute(&mut *tx)
     .await
     .is_err()
@@ -167,7 +208,18 @@ pub async fn create_organization_invitation(
         return service_unavailable();
     }
 
-    (StatusCode::CREATED, Json(json!({ "data": { "invitation_id": invitation_id, "username": username, "role": role_name, "status": "pending" } }))).into_response()
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "data": {
+                "invitation_id": invitation_id,
+                "username": username,
+                "role": role_name,
+                "status": "pending"
+            }
+        })),
+    )
+        .into_response()
 }
 
 pub async fn list_my_organization_invitations(
@@ -203,7 +255,11 @@ pub async fn list_my_organization_invitations(
         Err(_) => return service_unavailable(),
     };
 
-    (StatusCode::OK, Json(json!({ "data": { "count": items.len(), "items": items } }))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({ "data": { "count": items.len(), "items": items } })),
+    )
+        .into_response()
 }
 
 pub async fn accept_organization_invitation(
@@ -251,14 +307,20 @@ async fn respond_to_invitation(
     .await
     {
         Ok(Some(value)) => value,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({ "error": "pending invitation not found" }))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "pending invitation not found" })),
+            )
+                .into_response()
+        }
         Err(_) => return service_unavailable(),
     };
 
     let (organization_id, role_id) = invitation;
     let status = if accept { "accepted" } else { "rejected" };
-    if accept {
-        if sqlx::query(
+    if accept
+        && sqlx::query(
             r#"
             INSERT INTO core.organization_users (org_id, user_id, role_id, status)
             VALUES ($1, $2, $3, 'active')
@@ -272,17 +334,18 @@ async fn respond_to_invitation(
         .execute(&mut *tx)
         .await
         .is_err()
-        {
-            return service_unavailable();
-        }
+    {
+        return service_unavailable();
     }
 
-    if sqlx::query("UPDATE core.organization_invitations SET status = $2, responded_at = NOW(), updated_at = NOW() WHERE id = $1")
-        .bind(invitation_id)
-        .bind(status)
-        .execute(&mut *tx)
-        .await
-        .is_err()
+    if sqlx::query(
+        "UPDATE core.organization_invitations SET status = $2, responded_at = NOW(), updated_at = NOW() WHERE id = $1",
+    )
+    .bind(invitation_id)
+    .bind(status)
+    .execute(&mut *tx)
+    .await
+    .is_err()
     {
         return service_unavailable();
     }
@@ -293,9 +356,16 @@ async fn respond_to_invitation(
         VALUES ('organization', $1, $2, $2, $3, NOW())
         "#,
     )
-    .bind(if accept { "organization.invitation.accepted" } else { "organization.invitation.rejected" })
+    .bind(if accept {
+        "organization.invitation.accepted"
+    } else {
+        "organization.invitation.rejected"
+    })
     .bind(actor_user_id)
-    .bind(json!({ "organization_id": organization_id, "invitation_id": invitation_id }))
+    .bind(json!({
+        "organization_id": organization_id,
+        "invitation_id": invitation_id
+    }))
     .execute(&mut *tx)
     .await
     .is_err()
@@ -306,27 +376,65 @@ async fn respond_to_invitation(
     if tx.commit().await.is_err() {
         return service_unavailable();
     }
-    (StatusCode::OK, Json(json!({ "data": { "invitation_id": invitation_id, "organization_id": organization_id, "status": status } }))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({
+            "data": {
+                "invitation_id": invitation_id,
+                "organization_id": organization_id,
+                "status": status
+            }
+        })),
+    )
+        .into_response()
 }
 
-fn authenticate_actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, axum::response::Response> {
+fn authenticate_actor(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Uuid, axum::response::Response> {
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, Json(json!({ "error": "missing token" }))).into_response())?;
+        .ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "error": "missing token" })),
+            )
+                .into_response()
+        })?;
 
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
-    let claims = decode::<AccessClaims>(token, &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()), &validation)
-        .map_err(|_| (StatusCode::UNAUTHORIZED, Json(json!({ "error": "invalid token" }))).into_response())?
-        .claims;
-    Uuid::parse_str(&claims.sub)
-        .map_err(|_| (StatusCode::UNAUTHORIZED, Json(json!({ "error": "invalid token subject" }))).into_response())
+    let claims = decode::<AccessClaims>(
+        token,
+        &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+        &validation,
+    )
+    .map_err(|_| {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "invalid token" })),
+        )
+            .into_response()
+    })?
+    .claims;
+    Uuid::parse_str(&claims.sub).map_err(|_| {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "invalid token subject" })),
+        )
+            .into_response()
+    })
 }
 
 fn service_unavailable() -> axum::response::Response {
-    (StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "error": "organization invitation service unavailable" }))).into_response()
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(json!({ "error": "organization invitation service unavailable" })),
+    )
+        .into_response()
 }
