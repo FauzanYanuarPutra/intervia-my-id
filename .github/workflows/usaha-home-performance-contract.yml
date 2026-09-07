@@ -1,0 +1,12 @@
+name: Usaha Home Performance Contract
+
+on:
+  push:
+    branches: [feature/usaha-ux-simplification-20260907]
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: python -m unittest scripts.config.test_usaha_ui_contract
