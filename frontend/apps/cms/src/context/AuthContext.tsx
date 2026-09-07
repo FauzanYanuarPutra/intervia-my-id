@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 
 const ALLOWED_ROLES = ['content_admin', 'admin', 'super_admin'];
+const SESSION_MARKER = 'cookie-session';
 
 type User = {
   id: string;
@@ -16,6 +17,7 @@ type User = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
+  /** Compatibility marker only. Real credentials live in HttpOnly cookies. */
   accessToken: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -30,38 +32,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const clearAuth = useCallback(() => {
-    setUser(null);
-    setAccessToken(null);
+  const clearLegacyBrowserTokens = useCallback(() => {
     localStorage.removeItem('cms_access_token');
     localStorage.removeItem('cms_refresh_token');
     localStorage.removeItem('cms_session_id');
   }, []);
 
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    setAccessToken(null);
+    clearLegacyBrowserTokens();
+  }, [clearLegacyBrowserTokens]);
+
   const checkAccess = useCallback((roles: string[]) => {
-    return roles.some(role => ALLOWED_ROLES.includes(role));
+    return roles.some(role => ALLOWED_ROLES.includes(String(role).trim().toLowerCase()));
   }, []);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem('cms_access_token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
+    clearLegacyBrowserTokens();
     try {
-      const userData = await authApi.me(token);
+      const userData = await authApi.me('');
       if (!checkAccess(userData.roles || [])) {
         throw new Error('Access denied: insufficient permissions');
       }
       setUser(userData);
-      setAccessToken(token);
+      setAccessToken(SESSION_MARKER);
     } catch {
       clearAuth();
     } finally {
       setLoading(false);
     }
-  }, [clearAuth, checkAccess]);
+  }, [clearAuth, clearLegacyBrowserTokens, checkAccess]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -70,47 +71,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadUser]);
 
   const login = async (email: string, password: string) => {
-    const response = await authApi.login(email, password);
-    
-    const roles = response.roles || [];
-    if (!checkAccess(roles)) {
+    await authApi.login(email, password);
+    const userData = await authApi.me('');
+    if (!checkAccess(userData.roles || [])) {
+      await authApi.logout('').catch(() => undefined);
       throw new Error('Access denied: You do not have permission to access CMS');
     }
 
-    localStorage.setItem('cms_access_token', response.access_token);
-    localStorage.setItem('cms_refresh_token', response.refresh_token);
-    localStorage.setItem('cms_session_id', response.session_id);
-
-    setAccessToken(response.access_token);
-    
-    const userData = await authApi.me(response.access_token);
+    clearLegacyBrowserTokens();
     setUser(userData);
-    
-    router.push('/');
+    setAccessToken(SESSION_MARKER);
+    router.replace('/');
   };
 
   const logout = async () => {
-    if (accessToken) {
-      try {
-        await authApi.logout(accessToken);
-      } catch {
-        // Ignore logout errors
-      }
+    try {
+      await authApi.logout('');
+    } catch {
+      // Always clear local UI state even when the upstream logout endpoint is unavailable.
     }
     clearAuth();
-    router.push('/login');
+    router.replace('/login');
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        accessToken,
-        isAuthenticated: !!user,
-        login,
-        logout,
-      }}
+      value={{ user, loading, accessToken, isAuthenticated: !!user, login, logout }}
     >
       {children}
     </AuthContext.Provider>
@@ -119,9 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 }
 
@@ -130,9 +114,7 @@ export function useRequireAuth() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push('/login');
-    }
+    if (!loading && !isAuthenticated) router.replace('/login');
   }, [isAuthenticated, loading, router]);
 
   return { isAuthenticated, loading };
