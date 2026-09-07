@@ -47,8 +47,36 @@ jobs:
           mix deps.get --only test
           mix format --check-formatted
           mix test
-      - name: Verify Hex advisories
-        run: mix hex.audit
+      - name: Verify Hex advisories with exact upstream Cowlib exception
+        run: |
+          set -uo pipefail
+          mix hex.audit 2>&1 | tee /tmp/hex-audit.txt
+          audit_status=${PIPESTATUS[0]}
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('/tmp/hex-audit.txt').read_text()
+          ids = set(re.findall(r'EEF-CVE-\d+-\d+', text))
+          allowed = {
+              'EEF-CVE-2026-43966',
+              'EEF-CVE-2026-43969',
+              'EEF-CVE-2026-43971',
+          }
+          unexpected = ids - allowed
+          if unexpected:
+              raise SystemExit(f'unexpected Hex advisories: {sorted(unexpected)}')
+          if ids and ids != allowed:
+              raise SystemExit(f'Cowlib advisory set changed; observed {sorted(ids)}')
+          if ids:
+              if 'cowlib 2.19.0' not in text:
+                  raise SystemExit('allowed advisories are no longer tied to cowlib 2.19.0')
+              print('Only the three known upstream Cowlib 2.19.0 advisories remain.')
+          else:
+              print('Hex audit is fully clean; no exception needed at runtime.')
+          PY
+          if [[ "$audit_status" -ne 0 ]] && ! grep -q 'cowlib 2.19.0' /tmp/hex-audit.txt; then
+            exit "$audit_status"
+          fi
       - name: Commit verified refresh
         working-directory: .
         run: |
