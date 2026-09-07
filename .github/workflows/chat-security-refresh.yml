@@ -1,0 +1,60 @@
+name: Chat Security Refresh
+
+on:
+  push:
+    branches:
+      - security/chat-dependencies-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: services/chat_service
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: security/chat-dependencies-20260907
+          fetch-depth: 0
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '26.2'
+          elixir-version: '1.17.3'
+      - name: Merge current main
+        working-directory: .
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-edit origin/main
+      - name: Refresh vulnerable dependency families
+        run: |
+          set -euo pipefail
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+          mix deps.update cowboy cowlib guardian html_sanitize_ex mochiweb phoenix phoenix_pubsub plug_cowboy websock_adapter amqp decimal redix
+      - name: Verify Chat
+        env:
+          MIX_ENV: test
+        run: |
+          set -euo pipefail
+          mix deps.get --only test
+          mix format --check-formatted
+          mix test
+      - name: Verify Hex advisories
+        run: mix hex.audit
+      - name: Commit verified refresh
+        working-directory: .
+        run: |
+          set -euo pipefail
+          git add services/chat_service/mix.lock services/chat_service/mix.exs
+          if ! git diff --cached --quiet; then
+            git commit -m 'security: refresh chat dependency advisories'
+          fi
+          git push origin HEAD:security/chat-dependencies-20260907
