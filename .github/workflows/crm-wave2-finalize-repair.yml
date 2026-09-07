@@ -25,7 +25,7 @@ jobs:
           set -euo pipefail
           cd frontend/packages && npm ci --legacy-peer-deps --no-audit --no-fund && npm run build
           cd ../apps/crm && npm ci --legacy-peer-deps --no-audit --no-fund
-      - name: Recover verified workspace-generation scripts
+      - name: Recover workspace-generation scripts with anchored shell fix
         run: |
           set -euo pipefail
           git show 4fd84a37d42dff650eddbe74c7c00666dcf41481:.github/workflows/crm-wave2-finalize.yml > /tmp/finalize-template.yml
@@ -44,24 +44,26 @@ jobs:
               Path(out).write_text('set -euo pipefail\n'+textwrap.dedent('\n'.join(body))+'\n')
           extract('Create remaining CRM workspaces','/tmp/create-workspaces.sh')
           extract('Replace synthetic/demo paths and old domain pages','/tmp/replace-shell.sh')
+          p=Path('/tmp/replace-shell.sh')
+          s=p.read_text()
+          old="calc_start=s.index('  const gmvCents =');calc_end=s.index('  const operationPriorities =',calc_start);s=s[:calc_start]+s[calc_end:]"
+          new="component_metrics_anchor=s.index('  const transactions = useMemo(() => normalizeTransactions(data.orders), [data.orders]);');calc_start=s.index('  const gmvCents =',component_metrics_anchor);calc_end=s.index('  const operationPriorities =',calc_start);s=s[:calc_start]+s[calc_end:]"
+          if old not in s: raise SystemExit('metric cleanup transform anchor not found')
+          p.write_text(s.replace(old,new,1))
           PY
           chmod +x /tmp/create-workspaces.sh /tmp/replace-shell.sh
       - name: Recreate final workspaces
         working-directory: frontend/apps/crm
         run: /tmp/create-workspaces.sh
-      - name: Reproduce shell transform
+      - name: Apply corrected shell transform
         working-directory: frontend/apps/crm
         run: /tmp/replace-shell.sh
-      - name: Diagnose and verify transformed CRM
+      - name: Verify transformed CRM
         working-directory: frontend/apps/crm
         run: |
           set -euo pipefail
           npm test
-          if ! npm run lint; then
-            echo '--- parser context 200-355 ---'
-            nl -ba src/components/crm/CrmCommandCenter.tsx | sed -n '200,355p'
-            exit 1
-          fi
+          npm run lint
           npm run typecheck
           npm run build
           test "$(grep -c 'SAMPLE_' src/components/crm/CrmCommandCenter.tsx || true)" = "0"
