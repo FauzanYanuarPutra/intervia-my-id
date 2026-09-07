@@ -1,0 +1,52 @@
+name: Marketplace rkyv Repair
+
+on:
+  push:
+    branches: [security/rust-jwt-aws-lc-20260907]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: security/rust-jwt-aws-lc-20260907
+      - name: Prune stale Marketplace lock entries
+        working-directory: services/marketplace_service
+        run: |
+          set -euo pipefail
+          cargo update
+          if grep -q '^name = "rkyv"$' Cargo.lock; then
+            echo 'ordinary cargo update left stale rkyv; regenerating lockfile from current manifest'
+            rm Cargo.lock
+            cargo generate-lockfile
+          fi
+          if grep -q '^name = "rkyv"$' Cargo.lock; then
+            echo 'rkyv still present after lock regeneration' >&2
+            exit 1
+          fi
+          cargo tree --locked -i rkyv --target all 2>&1 | tee /tmp/rkyv-tree.txt
+          grep -q 'nothing to print' /tmp/rkyv-tree.txt || true
+      - name: Verify Marketplace after lock prune
+        working-directory: services/marketplace_service
+        run: |
+          set -euo pipefail
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+          cargo install cargo-audit --locked
+          cargo audit
+      - name: Persist verified Marketplace lock prune
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add services/marketplace_service/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m 'security: prune unreachable Marketplace rkyv lock entry'
+            git push origin HEAD:security/rust-jwt-aws-lc-20260907
+          fi
