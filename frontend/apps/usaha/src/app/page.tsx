@@ -22,7 +22,6 @@ import { ProgressTracker } from '@/components/portal/ProgressTracker';
 import { StatCard } from '@/components/portal/StatCard';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import {
-  getControlRecipe,
   listControlChannels,
   listControlFinanceEntries,
   listControlIngredients,
@@ -67,14 +66,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const canViewFinance = hasPermission(business, 'viewFinance');
   const canViewChannels = hasPermission(business, 'viewChannels');
 
-  const [ingredients, financeEntries, channels, settlements, recipes] = await Promise.all([
+  const [ingredients, financeEntries, channels, settlements] = await Promise.all([
     canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
     canViewFinance ? listControlFinanceEntries(business.id) : Promise.resolve([]),
     canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
     canViewFinance ? listControlSettlements(business.id) : Promise.resolve([]),
-    canViewCosting
-      ? Promise.all(business.products.map(product => getControlRecipe(business.id, product.id)))
-      : Promise.resolve([]),
   ]);
 
   const control = summarizeControlCenter({
@@ -87,7 +83,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     (business.lowStockProductsCount ?? 0) +
     (business.stockCheckCount ?? 0) +
     (canViewCosting ? control.lowIngredientCount : 0);
-  const recipeCount = canViewCosting ? recipes.filter(Boolean).length : null;
+  // Home intentionally does not fan out one recipe request per product. Until a
+  // durable aggregate/list endpoint exists, recipe readiness remains unknown.
+  const recipeCount = null;
   const unreconciledSettlementCount = canViewFinance
     ? settlements.filter(item => item.status !== 'matched').length
     : 0;
