@@ -24,6 +24,10 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use identity_service::config::{AppState, Config};
 use identity_service::db;
+use identity_service::organizations::invitations::{
+    accept_organization_invitation, create_organization_invitation,
+    list_my_organization_invitations, reject_organization_invitation,
+};
 use identity_service::organizations::routes::{
     create_organization, ensure_organization, get_organization, list_organization_members,
     list_organizations,
@@ -515,6 +519,22 @@ async fn main() -> Result<()> {
         .route(
             "/organizations/{id}/members",
             get(list_organization_members),
+        )
+        .route(
+            "/organizations/{id}/invitations",
+            post(create_organization_invitation),
+        )
+        .route(
+            "/organization-invitations",
+            get(list_my_organization_invitations),
+        )
+        .route(
+            "/organization-invitations/{id}/accept",
+            post(accept_organization_invitation),
+        )
+        .route(
+            "/organization-invitations/{id}/reject",
+            post(reject_organization_invitation),
         )
         .layer(TraceLayer::new_for_http())
         .layer(cors)
