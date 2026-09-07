@@ -64,7 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearAuth, checkAccess]);
 
   useEffect(() => {
-    loadUser();
+    queueMicrotask(() => {
+      void loadUser();
+    });
   }, [loadUser]);
 
   const login = async (email: string, password: string) => {
