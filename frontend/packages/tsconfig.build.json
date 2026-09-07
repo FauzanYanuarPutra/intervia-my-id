@@ -9,6 +9,15 @@
     "sourceMap": false,
     "declarationMap": false
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["dist", "node_modules"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "**/__tests__/**",
+    "test/**",
+    "vitest.config.ts"
+  ]
 }

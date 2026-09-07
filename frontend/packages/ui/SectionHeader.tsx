@@ -1,0 +1,2 @@
+import * as React from 'react'; import { cn } from '../utils/cn';
+export function SectionHeader({title,description,action,className}: {title:React.ReactNode;description?:React.ReactNode;action?:React.ReactNode;className?:string}){return <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between',className)}><div><h2 className="text-lg font-semibold text-[color:var(--color-text)]">{title}</h2>{description?<p className="mt-1 text-sm leading-6 text-[color:var(--color-text-soft)]">{description}</p>:null}</div>{action}</div>}
