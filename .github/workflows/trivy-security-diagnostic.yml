@@ -1,0 +1,20 @@
+name: Trivy Security Diagnostic
+
+on:
+  push:
+    branches: [security/rust-jwt-aws-lc-20260907]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
+        with:
+          version: v0.70.0
+          cache: false
+      - name: Print fresh HIGH and CRITICAL findings
+        run: trivy fs --format table --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln .
