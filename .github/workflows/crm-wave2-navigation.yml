@@ -116,14 +116,21 @@ jobs:
           EOF
           python - <<'PY'
           from pathlib import Path
+          import re
           p=Path('src/components/crm/CrmCommandCenter.tsx')
           s=p.read_text()
-          start=s.index('type PageId =')
-          end=s.index('\nconst CRM_DEMO_DATA_ENABLED = false;')
-          replacement="import { CRM_NAV_ITEMS } from './navigation';\nimport type { IconName, PageId } from './types';\n"
-          s=s[:start]+replacement+s[end:]
-          s=s.replace('NAV_ITEMS.map', 'CRM_NAV_ITEMS.map')
-          s=s.replace('NAV_ITEMS.find', 'CRM_NAV_ITEMS.find')
+          page_start=s.index('type PageId =')
+          page_end=s.index('\n\ntype IconName =', page_start)
+          s=s[:page_start]+s[page_end+2:]
+          icon_start=s.index('type IconName =')
+          icon_end=s.index('\n\ntype CrmKpi =', icon_start)
+          s=s[:icon_start]+s[icon_end+2:]
+          nav_start=s.index('const NAV_ITEMS:')
+          nav_end=s.index('\n\nconst CRM_DEMO_DATA_ENABLED', nav_start)
+          s=s[:nav_start]+s[nav_end+2:]
+          anchor='import { buildOperationsPriorities } from "./operationsPriority";\n'
+          s=s.replace(anchor, anchor+'import { CRM_NAV_ITEMS } from "./navigation";\nimport type { IconName, PageId } from "./types";\n', 1)
+          s=re.sub(r'\bNAV_ITEMS\b', 'CRM_NAV_ITEMS', s)
           p.write_text(s)
           PY
       - name: Verify CRM wave 2 GREEN
