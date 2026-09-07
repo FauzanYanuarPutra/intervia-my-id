@@ -1,0 +1,4 @@
+export type CmsWorkspaceId='overview'|'content'|'sectors'|'banners';
+export type ContentItem={id:string;title:string;type?:string;content_type?:string;content_status?:string;status?:string;summary?:string|null;body?:string|null;price_cents?:number|null;currency?:string|null;tags?:string[]|null;cover_image?:string|null;slug?:string|null;metadata?:Record<string,unknown>|null;updated_at?:string|null;created_at?:string|null};
+export type Sector={id:string;name_id:string;name_en:string;description_id?:string|null;description_en?:string|null;color?:string|null;icon_key?:string|null;is_active:boolean;sort_order?:number|null;updated_at?:string|null};
+export type Banner={id:string;name:string;location:string;status:string;image_url?:string|null;link_url?:string|null;headline?:string|null;subheadline?:string|null;start_at?:string|null;end_at?:string|null;metadata?:Record<string,unknown>|null;updated_at?:string|null};
