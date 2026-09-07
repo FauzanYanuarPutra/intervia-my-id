@@ -72,6 +72,56 @@ jobs:
         run: cargo install cargo-audit --locked
       - run: cargo audit
 
+  hex-audit:
+    name: Hex audit / chat_service
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services/chat_service
+    steps:
+      - uses: actions/checkout@v7
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "26.2"
+          elixir-version: "1.17.3"
+      - name: Install locked dependencies
+        run: mix deps.get
+      - name: Audit Hex dependencies
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          mix hex.audit 2>&1 | tee /tmp/hex-audit.txt
+          audit_status=${PIPESTATUS[0]}
+          set -e
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          text = Path('/tmp/hex-audit.txt').read_text()
+          ids = set(re.findall(r'EEF-CVE-\d+-\d+', text))
+          allowed = {
+              'EEF-CVE-2026-43966',
+              'EEF-CVE-2026-43969',
+              'EEF-CVE-2026-43971',
+          }
+          unexpected = ids - allowed
+          if unexpected:
+              raise SystemExit(f'unexpected Hex advisories: {sorted(unexpected)}')
+          if ids and ids != allowed:
+              raise SystemExit(f'known Cowlib advisory set changed; observed {sorted(ids)}')
+          if ids:
+              if 'cowlib 2.19.0' not in text:
+                  raise SystemExit('known advisories are no longer tied to cowlib 2.19.0')
+              print('Only the three known upstream Cowlib 2.19.0 advisories remain.')
+          else:
+              print('Hex audit is clean; no exception is currently needed.')
+          PY
+          if [[ "$audit_status" -ne 0 ]] && ! grep -q 'cowlib 2.19.0' /tmp/hex-audit.txt; then
+            exit "$audit_status"
+          fi
+
   npm-audit:
     name: npm production dependency audit
     runs-on: ubuntu-latest
