@@ -79,7 +79,7 @@ jobs:
           function date(value: string): string { const parsed=new Date(value); return Number.isNaN(parsed.getTime()) ? '-' : new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',year:'numeric'}).format(parsed); }
           export function PipelineWorkspace({leads}:{leads:CrmLead[]}) {
             return <div className="space-y-5">
-              <PageHeader eyebrow="CRM Pipeline" title="Follow-up prospek sampai jadi deal." description="Bahasa dibuat sederhana agar agent langsung tahu siapa yang harus dihubungi dulu." />
+              <div className="space-y-2"><p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">CRM Pipeline</p><PageHeader title="Follow-up prospek sampai jadi deal." description="Bahasa dibuat sederhana agar agent langsung tahu siapa yang harus dihubungi dulu." /></div>
               <div className="grid gap-4 xl:grid-cols-5">
                 {PIPELINE_COLUMNS.map(column=>{const items=leads.filter(lead=>groupPipelineStage(lead.stage)===column.id);return <Card key={column.id} className="min-h-[420px] p-3">
                   <div className="mb-3 rounded-2xl bg-[color:var(--color-surface-muted)] p-3"><div className="flex items-center justify-between"><p className="text-sm font-bold">{column.label}</p><StatusBadge tone={column.id==='completed'?'success':'neutral'}>{items.length}</StatusBadge></div><p className="mt-1 text-xs text-[color:var(--color-text-soft)]">{column.help}</p></div>
