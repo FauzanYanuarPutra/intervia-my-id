@@ -5,6 +5,7 @@ import { MerchantCopyPack } from '@/components/business-control/MerchantCopyPack
 import { PortalShell } from '@/components/portal/PortalShell';
 import { SectionCard } from '@/components/portal/SectionCard';
 import { listControlChannels } from '@/lib/business-control-server';
+import { parseRecordedProductPrice } from '@/lib/business-control/channel-readiness';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
@@ -19,7 +20,7 @@ export default async function BusinessChannelsPage({ params }: PageProps) {
   const canView = hasPermission(business, 'viewChannels');
   const channels = canView ? await listControlChannels(business.id) : [];
   const product = business.products.find(item => item.status === 'live') ?? business.products[0];
-  const numericPrice = Number((product?.priceLabel ?? '').replace(/[^0-9]/g, '')) || 15000;
+  const numericPrice = parseRecordedProductPrice(product?.priceLabel);
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="channels">
@@ -35,7 +36,7 @@ export default async function BusinessChannelsPage({ params }: PageProps) {
             <MerchantCopyPack business={business} />
 
             <div>
-              <div className="mb-3"><p className="portal-kicker">Harga & margin per kanal</p><h2 className="mt-1 text-lg font-bold text-portal-ink">Bandingkan sebelum pasang harga</h2><p className="mt-1 text-sm text-portal-soft">Harga awal memakai {product?.name ?? 'produk utama'}. Masukkan HPP hasil resep untuk melihat sisa bersih dan harga minimum target.</p></div>
+              <div className="mb-3"><p className="portal-kicker">Harga & margin per kanal</p><h2 className="mt-1 text-lg font-bold text-portal-ink">Bandingkan sebelum pasang harga</h2><p className="mt-1 text-sm text-portal-soft">{numericPrice !== null ? `Harga awal memakai ${product?.name ?? 'produk utama'} yang sudah tercatat.` : 'Belum ada harga produk valid yang tercatat. Isi harga nyata di simulasi; Lajukan tidak membuat harga contoh.'} Masukkan HPP hasil resep untuk melihat sisa bersih dan harga minimum target.</p></div>
               <ChannelSettingsWorkspace businessId={business.id} initialChannels={channels} defaultPrice={numericPrice} />
             </div>
           </div>
