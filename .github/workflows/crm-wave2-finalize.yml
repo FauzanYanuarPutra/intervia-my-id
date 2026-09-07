@@ -1,0 +1,218 @@
+name: CRM Wave 2 Finalize
+on:
+  push:
+    branches: [feat/crm-workspace-wave2-20260907]
+permissions:
+  contents: write
+jobs:
+  implement:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/crm-workspace-wave2-20260907
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            frontend/packages/package-lock.json
+            frontend/apps/crm/package-lock.json
+      - name: Install and build dependencies
+        run: |
+          set -euo pipefail
+          cd frontend/packages && npm ci --legacy-peer-deps --no-audit --no-fund && npm run build
+          cd ../apps/crm && npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Prove operational queue contracts RED
+        working-directory: frontend/apps/crm
+        run: |
+          set -euo pipefail
+          cat > src/components/crm/__tests__/queues.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { rankConversations, rankRiskTransactions, rankSupportTickets } from '../queues';
+          describe('CRM operational queues',()=>{
+            it('ranks unread hot conversations first without inventing messages',()=>{
+              const ranked=rankConversations([
+                {id:'a',name:'A',lastMessage:'real-a',stage:'Warm',source:'chat',listingTitle:'L',updatedAt:'2026-09-01',unread:0},
+                {id:'b',name:'B',lastMessage:'real-b',stage:'Hot',source:'chat',listingTitle:'L',updatedAt:'2026-09-02',unread:1},
+              ]);
+              expect(ranked.map(x=>x.id)).toEqual(['b','a']);
+              expect(ranked[0].lastMessage).toBe('real-b');
+            });
+            it('ranks urgent support before normal support',()=>{
+              const base={requester_user_id:'u',requester_email:'u@example.com',requester_name:'U',category:'support',subject:'S',status:'open',assigned_agent_id:null,support_room_id:null,source:'support',created_at:'2026-09-01',updated_at:'2026-09-01',resolved_at:null,first_response_at:null,latest_message:null,latest_message_at:null};
+              const ranked=rankSupportTickets([{...base,id:'n',priority:'normal'},{...base,id:'u',priority:'urgent'}]);
+              expect(ranked.map(x=>x.id)).toEqual(['u','n']);
+            });
+            it('ranks disputed/high-risk transactions first',()=>{
+              const ranked=rankRiskTransactions([
+                {id:'a',buyer:'1',seller:'2',amountCents:1,status:'completed',serviceType:'x',riskScore:10,updatedAt:'2026-09-02'},
+                {id:'b',buyer:'1',seller:'2',amountCents:1,status:'disputed',serviceType:'x',riskScore:80,updatedAt:'2026-09-01'},
+              ]);
+              expect(ranked.map(x=>x.id)).toEqual(['b','a']);
+            });
+          });
+          EOF
+          if npm test -- src/components/crm/__tests__/queues.test.ts; then echo 'Expected queue tests RED' >&2; exit 1; fi
+      - name: Implement operational queue models
+        working-directory: frontend/apps/crm
+        run: |
+          cat > src/components/crm/queues.ts <<'EOF'
+          import type { SupportTicket } from '@/lib/api';
+          import type { CrmChatRow, CrmTransactionRow } from './models';
+          const time=(value:string)=>{const n=new Date(value).getTime();return Number.isFinite(n)?n:0};
+          export function rankConversations(items:CrmChatRow[]):CrmChatRow[]{return [...items].sort((a,b)=>((b.unread>0?4:0)+(b.stage==='Hot'?3:b.stage==='Warm'?1:0))-((a.unread>0?4:0)+(a.stage==='Hot'?3:a.stage==='Warm'?1:0))||time(b.updatedAt)-time(a.updatedAt)||a.id.localeCompare(b.id))}
+          export function rankSupportTickets(items:SupportTicket[]):SupportTicket[]{const score=(x:SupportTicket)=>(x.priority==='urgent'?5:x.priority==='high'?4:0)+(['open','in_progress','pending_customer'].includes(x.status)?2:0)+(x.category==='dispute'?2:0);return [...items].sort((a,b)=>score(b)-score(a)||time(b.updated_at)-time(a.updated_at)||a.id.localeCompare(b.id))}
+          export function rankRiskTransactions(items:CrmTransactionRow[]):CrmTransactionRow[]{const score=(x:CrmTransactionRow)=>(x.status==='disputed'?100:0)+x.riskScore;return [...items].sort((a,b)=>score(b)-score(a)||time(b.updatedAt)-time(a.updatedAt)||a.id.localeCompare(b.id))}
+          EOF
+          npm test -- src/components/crm/__tests__/queues.test.ts
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/crm/queues.ts src/components/crm/__tests__/queues.test.ts
+          git commit -m 'feat: rank CRM operational queues'
+          git push origin HEAD:feat/crm-workspace-wave2-20260907
+      - name: Prove durable dashboard and analytics contracts RED
+        working-directory: frontend/apps/crm
+        run: |
+          set -euo pipefail
+          cat > src/components/crm/__tests__/dashboardData.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { createEmptyDashboardData } from '../dashboardData';
+          describe('CRM dashboard data',()=>{it('starts empty and never injects sample collections',()=>{const data=createEmptyDashboardData();expect(data.leads).toEqual([]);expect(data.orders).toEqual([]);expect(data.users).toEqual([]);expect(data.sampleCollections).toEqual([])})});
+          EOF
+          cat > src/components/crm/__tests__/analyticsModel.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { buildAnalyticsSummary } from '../analyticsModel';
+          describe('CRM analytics summary',()=>{it('uses exact durable counts and amounts without synthetic multipliers',()=>{const s=buildAnalyticsSummary({users:2,listings:3,transactions:[{amountCents:100},{amountCents:250}],openSupport:4});expect(s).toEqual({users:2,listings:3,transactions:2,gmvCents:350,openSupport:4})})});
+          EOF
+          if npm test -- src/components/crm/__tests__/dashboardData.test.ts src/components/crm/__tests__/analyticsModel.test.ts; then echo 'Expected durable data tests RED' >&2; exit 1; fi
+      - name: Implement durable dashboard and analytics models
+        working-directory: frontend/apps/crm
+        run: |
+          cat > src/components/crm/dashboardData.ts <<'EOF'
+          import type { DashboardData } from './models';
+          export function createEmptyDashboardData():DashboardData{return {leads:[],activities:[],tickets:[],orders:[],trustProfiles:[],users:[],listings:[],chats:[],sampleCollections:[],emptyCollections:[],failures:[]}}
+          EOF
+          cat > src/components/crm/analyticsModel.ts <<'EOF'
+          export type AnalyticsSummary={users:number;listings:number;transactions:number;gmvCents:number;openSupport:number};
+          export function buildAnalyticsSummary(input:{users:number;listings:number;transactions:Array<{amountCents:number}>;openSupport:number}):AnalyticsSummary{return {users:input.users,listings:input.listings,transactions:input.transactions.length,gmvCents:input.transactions.reduce((sum,item)=>sum+Math.max(0,item.amountCents||0),0),openSupport:input.openSupport}}
+          EOF
+          npm test -- src/components/crm/__tests__/dashboardData.test.ts src/components/crm/__tests__/analyticsModel.test.ts
+          git add src/components/crm/dashboardData.ts src/components/crm/analyticsModel.ts src/components/crm/__tests__/dashboardData.test.ts src/components/crm/__tests__/analyticsModel.test.ts
+          git commit -m 'refactor: use durable CRM dashboard models'
+          git push origin HEAD:feat/crm-workspace-wave2-20260907
+      - name: Create remaining CRM workspaces
+        working-directory: frontend/apps/crm
+        run: |
+          cat > src/components/crm/ConversationWorkspace.tsx <<'EOF'
+          'use client';
+          import { useMemo, useState } from 'react';
+          import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
+          import type { CrmChatRow } from './models';
+          import { rankConversations } from './queues';
+          export function ConversationWorkspace({chats}:{chats:CrmChatRow[]}){const ranked=useMemo(()=>rankConversations(chats),[chats]);const [selectedId,setSelectedId]=useState<string>('');const selected=ranked.find(x=>x.id===selectedId)||ranked[0]||null;return <div className="space-y-5"><PageHeader title="Percakapan" description="Antrian percakapan real: unread dan prospek panas didahulukan tanpa membuat isi chat contoh."/><div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]"><Card className="p-3"><div className="space-y-2">{ranked.map(chat=><button key={chat.id} type="button" onClick={()=>setSelectedId(chat.id)} className={`w-full rounded-2xl border p-3 text-left ${selected?.id===chat.id?'border-emerald-300 bg-emerald-50':'border-[color:var(--color-border)]'}`}><div className="flex items-start justify-between gap-2"><p className="font-bold">{chat.name}</p>{chat.unread?<StatusBadge tone="success">{chat.unread} unread</StatusBadge>:null}</div><p className="mt-1 line-clamp-2 text-xs text-[color:var(--color-text-soft)]">{chat.lastMessage}</p></button>)}{!ranked.length?<EmptyState title="Belum ada percakapan" description="Percakapan akan muncul ketika data real tersedia."/>:null}</div></Card><Card className="p-5">{selected?<div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold">{selected.name}</h2><StatusBadge tone={selected.stage==='Hot'?'warning':'neutral'}>{selected.stage}</StatusBadge></div><p className="mt-4 rounded-2xl bg-[color:var(--color-surface-muted)] p-4 text-sm leading-6">{selected.lastMessage}</p><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-[color:var(--color-text-soft)]">Sumber</dt><dd className="font-bold">{selected.source}</dd></div><div><dt className="text-[color:var(--color-text-soft)]">Listing</dt><dd className="font-bold">{selected.listingTitle||'-'}</dd></div></dl></div>:<EmptyState title="Pilih percakapan" description="Tidak ada isi chat contoh yang disisipkan oleh CRM."/>}</Card></div></div>}
+          EOF
+          cat > src/components/crm/SupportWorkspace.tsx <<'EOF'
+          import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
+          import type { SupportTicket } from '@/lib/api';
+          import { rankSupportTickets } from './queues';
+          export function SupportWorkspace({tickets,failed=false}:{tickets:SupportTicket[];failed?:boolean}){const ranked=rankSupportTickets(tickets);return <div className="space-y-4"><PageHeader title="Support" description="Tiket urgent dan yang masih terbuka muncul lebih dulu."/>{failed?<div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">Sumber support gagal dibaca. Data kosong tidak dianggap sukses.</div>:null}<div className="grid gap-3">{ranked.map(t=><Card key={t.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{t.subject}</p><p className="mt-1 text-sm text-[color:var(--color-text-soft)]">{t.latest_message||t.requester_email}</p></div><StatusBadge tone={t.priority==='urgent'?'danger':t.priority==='high'?'warning':'neutral'}>{t.priority}</StatusBadge></div></Card>)}{!failed&&!ranked.length?<EmptyState title="Support kosong" description="Belum ada tiket support real yang perlu ditangani."/>:null}</div></div>}
+          EOF
+          cat > src/components/crm/RiskWorkspace.tsx <<'EOF'
+          import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
+          import type { CrmTransactionRow, CrmUserRow } from './models';
+          import { rankRiskTransactions } from './queues';
+          export function RiskWorkspace({transactions,users}:{transactions:CrmTransactionRow[];users:CrmUserRow[]}){const risky=rankRiskTransactions(transactions).filter(x=>x.status==='disputed'||x.riskScore>=35);const riskyUsers=users.filter(x=>x.risk!=='low');return <div className="space-y-4"><PageHeader title="Risiko & dispute" description="Kasus transaksi dan user dengan sinyal risiko nyata; diagnosis teknis tetap sekunder."/><div className="grid gap-4 xl:grid-cols-2"><Card className="p-4"><h3 className="font-bold">Transaksi perlu review</h3><div className="mt-3 space-y-2">{risky.map(x=><div key={x.id} className="rounded-2xl border border-[color:var(--color-border)] p-3"><div className="flex justify-between gap-2"><p className="font-bold">{x.id}</p><StatusBadge tone={x.riskScore>=70||x.status==='disputed'?'danger':'warning'}>{x.status==='disputed'?'Dispute':`Risk ${x.riskScore}`}</StatusBadge></div></div>)}{!risky.length?<EmptyState title="Tidak ada transaksi berisiko" description="Tidak ada kasus yang melewati ambang review saat ini."/>:null}</div></Card><Card className="p-4"><h3 className="font-bold">User perlu review</h3><div className="mt-3 space-y-2">{riskyUsers.map(u=><div key={u.id} className="rounded-2xl border border-[color:var(--color-border)] p-3"><div className="flex justify-between gap-2"><p className="font-bold">{u.name}</p><StatusBadge tone={u.risk==='high'?'danger':'warning'}>{u.risk}</StatusBadge></div><p className="mt-1 text-xs text-[color:var(--color-text-soft)]">{u.riskStrikes} strike · hold {u.manualHold?'aktif':'tidak'}</p></div>)}{!riskyUsers.length?<EmptyState title="Tidak ada user berisiko" description="Belum ada user dengan sinyal risiko sedang/tinggi."/>:null}</div></Card></div></div>}
+          EOF
+          cat > src/components/crm/SupportRiskWorkspace.tsx <<'EOF'
+          import type { SupportTicket } from '@/lib/api';
+          import type { CrmTransactionRow, CrmUserRow } from './models';
+          import { SupportWorkspace } from './SupportWorkspace';
+          import { RiskWorkspace } from './RiskWorkspace';
+          export function SupportRiskWorkspace(props:{tickets:SupportTicket[];transactions:CrmTransactionRow[];users:CrmUserRow[];supportFailed?:boolean}){return <div className="space-y-8"><SupportWorkspace tickets={props.tickets} failed={props.supportFailed}/><RiskWorkspace transactions={props.transactions} users={props.users}/></div>}
+          EOF
+          cat > src/components/crm/TransactionWorkspace.tsx <<'EOF'
+          import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
+          import type { CrmTransactionRow } from './models';
+          import { rankRiskTransactions } from './queues';
+          const money=(c:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Math.max(0,c)/100);
+          export function TransactionWorkspace({transactions}:{transactions:CrmTransactionRow[]}){const items=rankRiskTransactions(transactions);return <div className="space-y-5"><PageHeader title="Transactions" description="Order bermasalah dan berisiko tampil lebih dulu; nilai berasal langsung dari order yang dimuat."/><div className="grid gap-3 lg:grid-cols-2">{items.map(tx=><Card key={tx.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{tx.id}</p><p className="mt-1 text-xs text-[color:var(--color-text-soft)]">{tx.buyer} → {tx.seller} · {tx.serviceType}</p></div><StatusBadge tone={tx.status==='disputed'||tx.riskScore>=70?'danger':tx.status==='completed'?'success':'warning'}>{tx.status}</StatusBadge></div><p className="mt-4 text-xl font-bold">{money(tx.amountCents)}</p></Card>)}{!items.length?<EmptyState title="Belum ada transaksi" description="Transaksi real akan muncul saat order tersedia."/>:null}</div></div>}
+          EOF
+          cat > src/components/crm/AnalyticsWorkspace.tsx <<'EOF'
+          import { Card, EmptyState, PageHeader } from 'lajukan-ui';
+          import type { CrmListingRow, CrmTransactionRow, CrmUserRow } from './models';
+          import { buildAnalyticsSummary } from './analyticsModel';
+          const money=(c:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Math.max(0,c)/100);
+          export function AnalyticsWorkspace({users,listings,transactions,openSupport}:{users:CrmUserRow[];listings:CrmListingRow[];transactions:CrmTransactionRow[];openSupport:number}){const s=buildAnalyticsSummary({users:users.length,listings:listings.length,transactions,openSupport});const sellers=[...users].filter(u=>u.role==='Seller'||u.role==='Talent').sort((a,b)=>b.gmvCents-a.gmvCents).slice(0,5);return <div className="space-y-5"><PageHeader title="Analytics" description="Ringkasan langsung dari data yang tersedia—tanpa funnel, traffic, atau AI insight hasil perkalian buatan."/><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{[['User',s.users],['Listing',s.listings],['Transaksi',s.transactions],['GMV',money(s.gmvCents)],['Support terbuka',s.openSupport]].map(([label,value])=><Card key={String(label)} className="p-4"><p className="text-xs font-semibold text-[color:var(--color-text-soft)]">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p></Card>)}</div><Card className="p-5"><h3 className="font-bold">Kontributor GMV teratas</h3><div className="mt-3 space-y-2">{sellers.map(u=><div key={u.id} className="flex justify-between gap-3 rounded-2xl border border-[color:var(--color-border)] p-3"><span className="font-semibold">{u.name}</span><span className="font-bold">{money(u.gmvCents)}</span></div>)}{!sellers.length?<EmptyState title="Belum ada kontributor" description="Ranking hanya muncul dari GMV user yang benar-benar dimuat."/>:null}</div></Card></div>}
+          EOF
+          cat > src/components/crm/AdministrationWorkspace.tsx <<'EOF'
+          import { Card, PageHeader } from 'lajukan-ui';
+          export function AdministrationWorkspace(){return <div className="space-y-5"><PageHeader title="Administrasi" description="Akses sensitif mengikuti otorisasi backend. CRM tidak menampilkan tombol pura-pura untuk endpoint yang belum tersedia."/><Card className="p-5"><h2 className="font-bold">Kontrak akses</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--color-text-soft)]">Perubahan KYC/trust dan moderasi listing tetap dilakukan di workspace yang sudah punya API resmi. Pengelolaan role global tidak disimulasikan di halaman ini.</p></Card></div>}
+          EOF
+          cat > src/components/crm/OperationsOverview.tsx <<'EOF'
+          import { Card, EmptyState, PageHeader, StatusBadge } from 'lajukan-ui';
+          import type { DashboardData } from './models';
+          export function OperationsOverview({data}:{data:DashboardData}){const openSupport=data.tickets.filter(t=>['open','in_progress','pending_customer'].includes(t.status)).length;const pendingKyc=data.users.filter(u=>u.kyc==='Pending').length;const riskyOrders=data.orders.filter(o=>o.status==='disputed'||o.risk_score>=70).length;const reported=data.listings.filter(l=>l.reportCount>0).length;return <div className="space-y-5"><PageHeader title="Hari ini" description="Ringkasan operasional yang bisa ditindaklanjuti; tidak ada metrik hasil estimasi atau data demo."/><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Support terbuka',openSupport],['KYC perlu review',pendingKyc],['Order berisiko',riskyOrders],['Listing dilaporkan',reported]].map(([label,value])=><Card key={String(label)} className="p-4"><p className="text-xs font-semibold text-[color:var(--color-text-soft)]">{label}</p><div className="mt-2 flex items-center gap-2"><p className="text-2xl font-bold">{value}</p>{Number(value)>0?<StatusBadge tone="warning">Perlu cek</StatusBadge>:null}</div></Card>)}</div><Card className="p-5"><h2 className="font-bold">Aktivitas terbaru</h2><div className="mt-3 space-y-2">{data.activities.slice(0,6).map(a=><div key={a.id} className="rounded-2xl border border-[color:var(--color-border)] p-3"><p className="font-semibold">{a.title}</p><p className="mt-1 text-xs text-[color:var(--color-text-soft)]">{a.body}</p></div>)}{!data.activities.length?<EmptyState title="Belum ada aktivitas" description="Aktivitas real akan muncul ketika service mengirim data."/>:null}</div></Card></div>}
+          EOF
+      - name: Replace synthetic/demo paths and old domain pages
+        working-directory: frontend/apps/crm
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/components/crm/CrmCommandCenter.tsx');s=p.read_text()
+          imports='''import { ConversationWorkspace } from "./ConversationWorkspace";\nimport { SupportRiskWorkspace } from "./SupportRiskWorkspace";\nimport { TransactionWorkspace } from "./TransactionWorkspace";\nimport { AnalyticsWorkspace } from "./AnalyticsWorkspace";\nimport { AdministrationWorkspace } from "./AdministrationWorkspace";\nimport { OperationsOverview } from "./OperationsOverview";\nimport { createEmptyDashboardData } from "./dashboardData";\n'''
+          anchor='import { ContactWorkspace } from "./ContactWorkspace";\n';s=s.replace(anchor,anchor+imports,1)
+          sample_start=s.index('const CRM_DEMO_DATA_ENABLED = false;');sample_end=s.index('function asRecord(',sample_start);s=s[:sample_start]+s[sample_end:]
+          synthetic_start=s.index('function buildDailySeries(');synthetic_end=s.index('function buildInitialData(',synthetic_start);s=s[:synthetic_start]+s[synthetic_end:]
+          bi=s.index('function buildInitialData()');be=s.index('\nfunction resolveMediaUrl(',bi);s=s[:bi]+'function buildInitialData(): DashboardData {\n  return createEmptyDashboardData();\n}\n'+s[be:]
+          calc_start=s.index('  const gmvCents =');calc_end=s.index('  const operationPriorities =',calc_start);s=s[:calc_start]+s[calc_end:]
+          # Remove KPI/chart blocks between operationPriorities and filteredData.
+          kpi_start=s.index('  const kpis:',s.index('  const operationPriorities ='))
+          filtered=s.index('  const filteredData =',kpi_start);s=s[:kpi_start]+s[filtered:]
+          old='''{activePage === "dashboard" ? (\n                <DashboardHome\n                  data={filteredData}\n                  chartData={chartData}\n                  kpis={kpis}\n                  onOpenPage={setActivePage}\n                />\n              ) : null}''';s=s.replace(old,'{activePage === "dashboard" ? <OperationsOverview data={filteredData} /> : null}',1)
+          s=s.replace('{activePage === "transactions" ? <TransactionsPage transactions={transactions} /> : null}','{activePage === "transactions" ? <TransactionWorkspace transactions={transactions} /> : null}',1)
+          s=s.replace('{activePage === "chat" ? <ChatPage chats={filteredData.chats} /> : null}','{activePage === "chat" ? <ConversationWorkspace chats={filteredData.chats} /> : null}',1)
+          analytics_old='''{activePage === "analytics" ? (\n                <AnalyticsPage\n                  users={filteredData.users}\n                  listings={filteredData.listings}\n                  transactions={transactions}\n                  chartData={chartData}\n                />\n              ) : null}'''
+          analytics_new='{activePage === "analytics" ? <AnalyticsWorkspace users={filteredData.users} listings={filteredData.listings} transactions={transactions} openSupport={openIssues} /> : null}'
+          s=s.replace(analytics_old,analytics_new,1)
+          dispute_old='''{activePage === "disputes" ? (\n                <DisputesPage tickets={data.tickets} transactions={transactions} users={data.users} />\n              ) : null}'''
+          s=s.replace(dispute_old,'{activePage === "disputes" ? <SupportRiskWorkspace tickets={data.tickets} transactions={transactions} users={data.users} supportFailed={data.failures.includes("support") || data.failures.includes("tickets")} /> : null}',1)
+          s=s.replace('{activePage === "settings" ? <SettingsPage /> : null}','{activePage === "settings" ? <AdministrationWorkspace /> : null}',1)
+          def remove(start_marker,end_marker):
+            nonlocal_s=None
+          # Mechanical page-block removal using known adjacent function markers.
+          for start_marker,end_marker in [
+            ('function DashboardHome(','function ListingsPage('),
+            ('function TransactionsPage(','function ChatPage('),
+            ('function ChatPage(','function AnalyticsPage('),
+            ('function AnalyticsPage(','function DisputesPage('),
+            ('function DisputesPage(','function SettingsPage('),
+            ('function SettingsPage()','function PageHeader('),
+          ]:
+            if start_marker in s and end_marker in s:
+              a=s.index(start_marker);b=s.index(end_marker,a);s=s[:a]+s[b:]
+          p.write_text(s)
+          PY
+      - name: Verify finalized CRM GREEN
+        working-directory: frontend/apps/crm
+        run: |
+          set -euo pipefail
+          npm test
+          npm run lint
+          npm run typecheck
+          npm run build
+          test "$(grep -c 'SAMPLE_' src/components/crm/CrmCommandCenter.tsx || true)" = "0"
+          test "$(grep -c 'CRM_DEMO_DATA_ENABLED' src/components/crm/CrmCommandCenter.tsx || true)" = "0"
+          test "$(grep -c 'buildFunnel' src/components/crm/CrmCommandCenter.tsx || true)" = "0"
+          lines=$(wc -l < src/components/crm/CrmCommandCenter.tsx)
+          echo "CrmCommandCenter lines: $lines"
+          test "$lines" -lt 2300
+      - name: Persist finalized CRM
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/apps/crm/src/components/crm
+          git commit -m 'refactor: complete CRM operations workspace decomposition'
+          git push origin HEAD:feat/crm-workspace-wave2-20260907
