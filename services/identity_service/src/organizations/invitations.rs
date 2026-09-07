@@ -25,6 +25,13 @@ struct AccessClaims {
     exp: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActorAuthError {
+    MissingToken,
+    InvalidToken,
+    InvalidSubject,
+}
+
 pub async fn create_organization_invitation(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -33,7 +40,7 @@ pub async fn create_organization_invitation(
 ) -> impl IntoResponse {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor) => actor,
-        Err(response) => return response,
+        Err(error) => return actor_auth_error_response(error),
     };
     let username = match normalize_invitee_username(&payload.username) {
         Ok(value) => value,
@@ -228,7 +235,7 @@ pub async fn list_my_organization_invitations(
 ) -> impl IntoResponse {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor) => actor,
-        Err(response) => return response,
+        Err(error) => return actor_auth_error_response(error),
     };
 
     let items = match sqlx::query_as::<_, OrganizationInvitationView>(
@@ -286,7 +293,7 @@ async fn respond_to_invitation(
 ) -> axum::response::Response {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor) => actor,
-        Err(response) => return response,
+        Err(error) => return actor_auth_error_response(error),
     };
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
@@ -389,23 +396,14 @@ async fn respond_to_invitation(
         .into_response()
 }
 
-fn authenticate_actor(
-    state: &AppState,
-    headers: &HeaderMap,
-) -> Result<Uuid, axum::response::Response> {
+fn authenticate_actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, ActorAuthError> {
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": "missing token" })),
-            )
-                .into_response()
-        })?;
+        .ok_or(ActorAuthError::MissingToken)?;
 
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
@@ -414,21 +412,19 @@ fn authenticate_actor(
         &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
         &validation,
     )
-    .map_err(|_| {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "error": "invalid token" })),
-        )
-            .into_response()
-    })?
+    .map_err(|_| ActorAuthError::InvalidToken)?
     .claims;
-    Uuid::parse_str(&claims.sub).map_err(|_| {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "error": "invalid token subject" })),
-        )
-            .into_response()
-    })
+
+    Uuid::parse_str(&claims.sub).map_err(|_| ActorAuthError::InvalidSubject)
+}
+
+fn actor_auth_error_response(error: ActorAuthError) -> axum::response::Response {
+    let message = match error {
+        ActorAuthError::MissingToken => "missing token",
+        ActorAuthError::InvalidToken => "invalid token",
+        ActorAuthError::InvalidSubject => "invalid token subject",
+    };
+    (StatusCode::UNAUTHORIZED, Json(json!({ "error": message }))).into_response()
 }
 
 fn service_unavailable() -> axum::response::Response {
