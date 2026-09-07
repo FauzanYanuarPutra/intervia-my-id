@@ -5,6 +5,9 @@ import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { contentApi, sectorApi, bannerApi } from '@/lib/api';
 import { Button, Card, Input } from '@/ui';
 import { GuidedTour, Modal, useGuidedTour, type TourStep } from 'lajukan-ui';
+import { CmsOverview } from './cms/CmsOverview';
+import { getCmsQueueSummary } from './cms/contentPresentation';
+import type { CmsWorkspaceId } from './cms/types';
 
 const CONTENT_TYPES = [
   { id: 'product', label: 'Produk' },
@@ -222,7 +225,7 @@ export default function CmsDashboard() {
   const { user, accessToken, logout } = useAuth();
   const wwwUrl = process.env.NEXT_PUBLIC_WWW_URL || 'http://localhost:3000';
 
-  const [activeTab, setActiveTab] = useState<'content' | 'sectors' | 'banners'>('content');
+  const [activeTab, setActiveTab] = useState<CmsWorkspaceId>('overview');
 
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [contentLoading, setContentLoading] = useState(false);
@@ -706,12 +709,20 @@ export default function CmsDashboard() {
   const bannerActiveCount = banners.filter((banner) => banner.status === 'active').length;
   const bannerScheduledCount = banners.filter((banner) => banner.status === 'scheduled').length;
 
+  const editorialSummary = getCmsQueueSummary({ content: contentItems, sectors, banners });
+
   const tabItems: Array<{
-    id: 'content' | 'sectors' | 'banners';
+    id: CmsWorkspaceId;
     label: string;
     description: string;
     count: number;
   }> = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      description: 'Antrean dan prioritas',
+      count: editorialSummary.totalAttentionCount,
+    },
     {
       id: 'content',
       label: 'Konten',
@@ -940,6 +951,10 @@ export default function CmsDashboard() {
               </div>
             ))}
           </section>
+
+      {activeTab === 'overview' && (
+        <CmsOverview summary={editorialSummary} onNavigate={setActiveTab} />
+      )}
 
       {activeTab === 'content' && (
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
