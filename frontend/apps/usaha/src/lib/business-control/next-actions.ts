@@ -19,6 +19,8 @@ export type MerchantNextAction = {
 export type MerchantNextActionInput = {
   businessId: string;
   canViewCosting: boolean;
+  canViewFinance: boolean;
+  canViewChannels: boolean;
   productCount: number;
   ingredientCount: number;
   recipeCount: number | null;
@@ -70,6 +72,7 @@ export function buildMerchantNextActions(input: MerchantNextActionInput): Mercha
   }
 
   if (
+    input.canViewChannels &&
     input.enabledChannelCount > 0 &&
     input.productsMissingChannelPriceCount !== null &&
     input.productsMissingChannelPriceCount > 0
@@ -83,7 +86,11 @@ export function buildMerchantNextActions(input: MerchantNextActionInput): Mercha
     });
   }
 
-  if (input.enabledChannelCount > 0 && input.unreconciledSettlementCount > 0) {
+  if (
+    input.canViewFinance &&
+    input.enabledChannelCount > 0 &&
+    input.unreconciledSettlementCount > 0
+  ) {
     actions.push({
       kind: 'reconcile_settlement',
       title: 'Cocokkan transfer platform',
@@ -93,7 +100,7 @@ export function buildMerchantNextActions(input: MerchantNextActionInput): Mercha
     });
   }
 
-  if (input.financeEntryCount === 0) {
+  if (input.canViewFinance && input.financeEntryCount === 0) {
     actions.push({
       kind: 'record_money',
       title: 'Catat uang pertama',
