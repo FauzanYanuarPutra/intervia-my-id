@@ -1,8 +1,13 @@
-use identity_service::organizations::domain::{normalize_invitee_username, validate_invitation_role};
+use identity_service::organizations::domain::{
+    normalize_invitee_username, validate_invitation_role,
+};
 
 #[test]
 fn invite_username_is_normalized_like_lajukan_identity() {
-    assert_eq!(normalize_invitee_username(" @Kasir.Utama ").unwrap(), "kasir.utama");
+    assert_eq!(
+        normalize_invitee_username(" @Kasir.Utama ").unwrap(),
+        "kasir.utama"
+    );
     assert_eq!(normalize_invitee_username("stok_01").unwrap(), "stok_01");
     assert!(normalize_invitee_username("@").is_err());
     assert!(normalize_invitee_username("a").is_err());
