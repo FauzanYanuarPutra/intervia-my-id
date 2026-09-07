@@ -120,9 +120,9 @@ pub fn normalize_invitee_username(value: &str) -> Result<String, OrganizationVal
         || username.starts_with('.')
         || username.ends_with('.')
         || username.contains("..")
-        || !username
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '.')
+        || !username.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '_' || character == '.'
+        })
     {
         return Err(OrganizationValidationError::InvalidInviteeUsername);
     }
@@ -155,7 +155,9 @@ fn slugify(value: &str) -> String {
 
     for character in value.chars().flat_map(char::to_lowercase) {
         if character.is_ascii_alphanumeric() {
-            if slug.len() == 64 { break; }
+            if slug.len() == 64 {
+                break;
+            }
             slug.push(character);
             previous_was_dash = false;
         } else if !previous_was_dash && !slug.is_empty() && slug.len() < 64 {
@@ -173,7 +175,11 @@ mod tests {
 
     #[test]
     fn organization_input_normalizes_name_and_slug() {
-        let validated = validate_create_organization("  Kedai   Kopi Nusantara  ", Some(" Kedai Kopi Nusantara ")).expect("valid organization");
+        let validated = validate_create_organization(
+            "  Kedai   Kopi Nusantara  ",
+            Some(" Kedai Kopi Nusantara "),
+        )
+        .expect("valid organization");
         assert_eq!(validated.name, "Kedai Kopi Nusantara");
         assert_eq!(validated.slug, "kedai-kopi-nusantara");
     }
@@ -192,18 +198,27 @@ mod tests {
 
     #[test]
     fn ensure_request_hash_is_stable_for_equivalent_names() {
-        let first = validate_ensure_organization("  Kedai   Kopi Nusantara  ").expect("valid ensure request");
-        let second = validate_ensure_organization("Kedai Kopi Nusantara").expect("valid ensure request");
+        let first = validate_ensure_organization("  Kedai   Kopi Nusantara  ")
+            .expect("valid ensure request");
+        let second =
+            validate_ensure_organization("Kedai Kopi Nusantara").expect("valid ensure request");
         assert_eq!(first.request_hash, second.request_hash);
-        assert_eq!(first.request_hash, "c6cd0fd3aba6155c4403e5ce47c619b0dd5537f5698c7dd86add6619523915cb");
+        assert_eq!(
+            first.request_hash,
+            "c6cd0fd3aba6155c4403e5ce47c619b0dd5537f5698c7dd86add6619523915cb"
+        );
     }
 
     #[test]
     fn ensure_slug_candidates_are_deterministic_and_bounded() {
-        let input = validate_ensure_organization(&format!("Kedai {}", "Panjang ".repeat(13))).expect("valid ensure request");
+        let input = validate_ensure_organization(&format!("Kedai {}", "Panjang ".repeat(13)))
+            .expect("valid ensure request");
         assert!(input.slug.len() <= 64);
         assert_eq!(organization_slug_candidate(&input.slug, 0), input.slug);
-        assert_eq!(organization_slug_candidate("kedai-kopi-nusantara", 7), "kedai-kopi-nusantara-7");
+        assert_eq!(
+            organization_slug_candidate("kedai-kopi-nusantara", 7),
+            "kedai-kopi-nusantara-7"
+        );
         assert!(organization_slug_candidate(&input.slug, 999_999).len() <= 64);
     }
 }
