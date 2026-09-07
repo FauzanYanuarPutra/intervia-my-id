@@ -42,7 +42,7 @@ RUN if [ ! -d migrations ]; then \
 
 RUN find src -type f -name '*.rs' -exec touch {} +
 
-RUN cargo build --release --locked
+RUN cargo build --release --locked --bin identity_service --bin provision_backoffice
 
 RUN rustup component add rustfmt clippy
 
@@ -63,6 +63,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=builder /app/target/release/identity_service /usr/local/bin/app_service
+COPY --from=builder /app/target/release/provision_backoffice /usr/local/bin/provision_backoffice
 
 EXPOSE 8080
 
