@@ -41,7 +41,12 @@ impl<'a> OrganizationRepository<'a> {
               o.name::text AS name,
               o.slug::text AS slug,
               o.owner_user_id,
-              COALESCE(r.name, 'org_member') AS current_user_role,
+              CASE
+                WHEN r.name = 'org_manager' THEN 'manager'
+                WHEN r.name = 'org_cashier' THEN 'cashier'
+                WHEN r.name = 'org_viewer' THEN 'viewer'
+                ELSE COALESCE(r.name::text, 'org_member')
+              END AS current_user_role,
               COALESCE(o.created_at, NOW()) AS created_at,
               COALESCE(o.updated_at, o.created_at, NOW()) AS updated_at
             FROM core.organizations o
@@ -70,7 +75,12 @@ impl<'a> OrganizationRepository<'a> {
               o.name::text AS name,
               o.slug::text AS slug,
               o.owner_user_id,
-              COALESCE(r.name, 'org_member') AS current_user_role,
+              CASE
+                WHEN r.name = 'org_manager' THEN 'manager'
+                WHEN r.name = 'org_cashier' THEN 'cashier'
+                WHEN r.name = 'org_viewer' THEN 'viewer'
+                ELSE COALESCE(r.name::text, 'org_member')
+              END AS current_user_role,
               COALESCE(o.created_at, NOW()) AS created_at,
               COALESCE(o.updated_at, o.created_at, NOW()) AS updated_at
             FROM core.organizations o
@@ -109,7 +119,12 @@ impl<'a> OrganizationRepository<'a> {
               u.email::text AS email,
               up.username::text AS username,
               up.full_name,
-              COALESCE(r.name, 'org_member') AS role,
+              CASE
+                WHEN r.name = 'org_manager' THEN 'manager'
+                WHEN r.name = 'org_cashier' THEN 'cashier'
+                WHEN r.name = 'org_viewer' THEN 'viewer'
+                ELSE COALESCE(r.name::text, 'org_member')
+              END AS role,
               COALESCE(ou.status, 'active') AS status,
               COALESCE(ou.created_at, NOW()) AS joined_at
             FROM core.organization_users ou
