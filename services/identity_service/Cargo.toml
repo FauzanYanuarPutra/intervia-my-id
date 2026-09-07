@@ -34,7 +34,7 @@ lapin = "3.7.1"
 argon2 = "0.5"
 bcrypt = "0.15"
 
-jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }
+jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }
 
 uuid = { version = "1", features = ["v4", "serde"] }
 

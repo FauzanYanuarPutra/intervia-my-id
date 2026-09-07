@@ -23,7 +23,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha512};
-use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres, QueryBuilder, Row};
+use sqlx::{postgres::PgPoolOptions, AssertSqlSafe, FromRow, PgPool, Postgres, QueryBuilder, Row};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -9362,7 +9362,7 @@ async fn list_umkm_stores(
         LIMIT $5
         "#,
     );
-    let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(&store_sql)
+    let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(AssertSqlSafe(store_sql))
         .bind(id)
         .bind(slug)
         .bind(text_query)
