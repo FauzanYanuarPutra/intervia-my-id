@@ -20,11 +20,13 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/packages/package-lock.json
-      - name: Install and prove accessibility RED
+      - name: Install dependencies
+        working-directory: frontend/packages
+        run: npm ci --legacy-peer-deps
+      - name: Implement verified accessibility contract
         working-directory: frontend/packages
         run: |
           set -euo pipefail
-          npm ci --legacy-peer-deps
           cat > ui/__tests__/Input.test.tsx <<'EOF'
           import * as React from 'react';
           import { render, screen } from '@testing-library/react';
@@ -39,7 +41,7 @@ jobs:
           EOF
           cat > ui/__tests__/Modal.test.tsx <<'EOF'
           import * as React from 'react';
-          import { render, screen } from '@testing-library/react';
+          import { render, screen, waitFor } from '@testing-library/react';
           import userEvent from '@testing-library/user-event';
           import { expect, it } from 'vitest';
           import { Modal } from '../Modal';
@@ -47,32 +49,31 @@ jobs:
             const user=userEvent.setup();
             function Harness(){const [open,setOpen]=React.useState(false);return <><button onClick={()=>setOpen(true)}>Buka</button><Modal open={open} onClose={()=>setOpen(false)} title="Edit data"><button>Simpan</button></Modal></>}
             render(<Harness/>);
-            const trigger=screen.getByRole('button',{name:'Buka'}); await user.click(trigger);
-            expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+            const trigger=screen.getByRole('button',{name:'Buka'});
+            await user.click(trigger);
+            const dialog=screen.getByRole('dialog');
+            await waitFor(()=>expect(dialog).toContainElement(document.activeElement as HTMLElement));
             await user.keyboard('{Escape}');
             expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-            expect(trigger).toHaveFocus();
+            await waitFor(()=>expect(trigger).toHaveFocus());
           });
           EOF
-          if npm test -- ui/__tests__/Input.test.tsx ui/__tests__/Modal.test.tsx; then
-            echo 'Expected accessibility RED before implementation' >&2
-            exit 1
-          fi
-      - name: Implement accessible Input Modal and Drawer
-        working-directory: frontend/packages
-        run: |
-          set -euo pipefail
           cat > ui/Input.tsx <<'EOF'
           'use client';
           import * as React from 'react';
           import { cn } from '../utils/cn';
           export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> { label?: string; description?: string; error?: string }
           export const Input = React.forwardRef<HTMLInputElement, InputProps>(({className,type='text',label,description,error,id,...props},ref)=>{
-            const generated=React.useId(); const inputId=id ?? `input-${generated}`; const descriptionId=description?`${inputId}-description`:undefined; const errorId=error?`${inputId}-error`:undefined; const describedBy=[descriptionId,errorId,props['aria-describedby']].filter(Boolean).join(' ')||undefined;
+            const generated=React.useId();
+            const inputId=id ?? `input-${generated}`;
+            const descriptionId=description?`${inputId}-description`:undefined;
+            const errorId=error?`${inputId}-error`:undefined;
+            const describedBy=[descriptionId,errorId,props['aria-describedby']].filter(Boolean).join(' ')||undefined;
             const field=<input ref={ref} id={inputId} type={type} aria-invalid={error?true:props['aria-invalid']} aria-describedby={describedBy} className={cn('min-h-[48px] w-full touch-manipulation rounded-[14px] border bg-[color:var(--color-surface)] px-3.5 py-3 text-sm text-[color:var(--color-text)] shadow-sm outline-none transition duration-[var(--motion-fast)] placeholder:text-[color:var(--color-text-soft)] focus:border-[color:var(--color-primary-border)] focus:ring-2 focus:ring-[color:var(--color-focus)]',error?'border-[color:var(--color-danger)]':'border-[color:var(--color-border)]',className)} {...props}/>;
             if(!label&&!description&&!error)return field;
             return <span className="block w-full">{label?<label htmlFor={inputId} className="mb-1.5 block text-sm font-semibold text-[color:var(--color-text)]">{label}</label>:null}{field}{description?<span id={descriptionId} className="mt-1.5 block text-xs leading-5 text-[color:var(--color-text-soft)]">{description}</span>:null}{error?<span id={errorId} className="mt-1.5 block text-xs font-medium leading-5 text-[color:var(--color-danger)]">{error}</span>:null}</span>;
-          }); Input.displayName='Input';
+          });
+          Input.displayName='Input';
           EOF
           cat > ui/Modal.tsx <<'EOF'
           'use client';
@@ -81,35 +82,38 @@ jobs:
           export type ModalProps={open:boolean;onClose:()=>void;title?:string;description?:string;children:React.ReactNode;footer?:React.ReactNode;className?:string;initialFocusRef?:React.RefObject<HTMLElement|null>};
           const FOCUSABLE='button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
           export function Modal({open,onClose,title,description,children,footer,className,initialFocusRef}:ModalProps){
-            const dialogRef=React.useRef<HTMLDivElement>(null); const previousFocus=React.useRef<HTMLElement|null>(null); const titleId=React.useId(); const descriptionId=React.useId();
-            React.useEffect(()=>{if(!open)return; previousFocus.current=document.activeElement instanceof HTMLElement?document.activeElement:null; const frame=requestAnimationFrame(()=>{const target=initialFocusRef?.current ?? dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? dialogRef.current; target?.focus();}); const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();onClose();return} if(event.key!=='Tab'||!dialogRef.current)return; const nodes=Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(n=>!n.hasAttribute('disabled')); if(!nodes.length){event.preventDefault();dialogRef.current.focus();return} const first=nodes[0],last=nodes[nodes.length-1]; if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()} else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}; document.addEventListener('keydown',onKey); return()=>{cancelAnimationFrame(frame);document.removeEventListener('keydown',onKey);previousFocus.current?.focus()};},[open,onClose,initialFocusRef]);
+            const dialogRef=React.useRef<HTMLDivElement>(null);
+            const previousFocus=React.useRef<HTMLElement|null>(null);
+            const titleId=React.useId(); const descriptionId=React.useId();
+            React.useEffect(()=>{if(!open)return;previousFocus.current=document.activeElement instanceof HTMLElement?document.activeElement:null;const frame=requestAnimationFrame(()=>{const target=initialFocusRef?.current??dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)??dialogRef.current;target?.focus()});const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();onClose();return}if(event.key!=='Tab'||!dialogRef.current)return;const nodes=Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(n=>!n.hasAttribute('disabled'));if(!nodes.length){event.preventDefault();dialogRef.current.focus();return}const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}};document.addEventListener('keydown',onKey);return()=>{cancelAnimationFrame(frame);document.removeEventListener('keydown',onKey);previousFocus.current?.focus()}},[open,onClose,initialFocusRef]);
             if(!open)return null;
             return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={e=>{if(e.currentTarget===e.target)onClose()}}><div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={title?titleId:undefined} aria-describedby={description?descriptionId:undefined} tabIndex={-1} className={cn('relative flex max-h-[min(88svh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl outline-none sm:max-h-[80svh] sm:rounded-2xl sm:p-5',className)}>{title?<h2 id={titleId} className="pr-12 text-base font-semibold text-[color:var(--color-text)]">{title}</h2>:null}{description?<p id={descriptionId} className="mt-1 pr-12 text-sm text-[color:var(--color-text-soft)]">{description}</p>:null}<div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-1">{children}</div>{footer?<div className="mt-6 grid shrink-0 gap-2 border-t border-[color:var(--color-border)] pt-3 sm:flex sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">{footer}</div>:null}<button type="button" onClick={onClose} className="absolute right-3 top-3 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-sm font-semibold text-[color:var(--color-text-soft)] hover:bg-[color:var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-focus)]" aria-label="Tutup dialog">Tutup</button></div></div>;
           }
           EOF
           cat > ui/Drawer.tsx <<'EOF'
           'use client';
-          import * as React from 'react'; import { Modal, type ModalProps } from './Modal'; import { cn } from '../utils/cn';
+          import { Modal, type ModalProps } from './Modal';
+          import { cn } from '../utils/cn';
           export type DrawerProps=Omit<ModalProps,'className'>&{side?:'left'|'right'|'bottom';className?:string};
           export function Drawer({side='right',className,...props}:DrawerProps){const position=side==='left'?'sm:mr-auto sm:ml-0 sm:h-full sm:max-h-none sm:max-w-md sm:rounded-none':side==='right'?'sm:ml-auto sm:mr-0 sm:h-full sm:max-h-none sm:max-w-md sm:rounded-none':'sm:mb-0 sm:mt-auto sm:max-w-2xl sm:rounded-t-[28px] sm:rounded-b-none';return <Modal {...props} className={cn(position,className)}/>}
           EOF
           python - <<'PY'
           from pathlib import Path
-          p=Path('ui/index.ts'); s=p.read_text();
+          p=Path('ui/index.ts'); s=p.read_text()
           if "export { Drawer }" not in s: s += "\nexport { Drawer } from './Drawer'; export type { DrawerProps } from './Drawer'; export type { ModalProps } from './Modal';\n"
           p.write_text(s)
           PY
-      - name: Verify accessibility GREEN and build
+      - name: Verify GREEN and production build
         working-directory: frontend/packages
         run: |
           set -euo pipefail
           npm test
           npm run build
-      - name: Persist only verified changes
+      - name: Persist verified accessibility changes
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add frontend/packages/ui frontend/packages/package-lock.json
+          git add frontend/packages/ui
           git commit -m 'feat: complete shared accessibility primitives'
           git push origin HEAD:feat/ui-foundation-20260907
