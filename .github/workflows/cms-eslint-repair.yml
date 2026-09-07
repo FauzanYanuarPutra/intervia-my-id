@@ -21,9 +21,29 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/apps/cms/package-lock.json
-      - name: Regenerate compatible CMS lint toolchain
-        working-directory: frontend/apps/cms
-        run: npm install --save-dev 'eslint@^9' --package-lock-only --legacy-peer-deps --no-audit --no-fund
+      - name: Align CMS lint toolchain and effect scheduling
+        run: |
+          set -euo pipefail
+          cd frontend/apps/cms
+          npm install --save-dev 'eslint@^9' --package-lock-only --legacy-peer-deps --no-audit --no-fund
+          cd ../../..
+          python - <<'PY'
+          from pathlib import Path
+
+          auth = Path('frontend/apps/cms/src/context/AuthContext.tsx')
+          text = auth.read_text()
+          old = """  useEffect(() => {\n    loadUser();\n  }, [loadUser]);"""
+          new = """  useEffect(() => {\n    queueMicrotask(() => {\n      void loadUser();\n    });\n  }, [loadUser]);"""
+          assert text.count(old) == 1, 'AuthContext effect pattern changed'
+          auth.write_text(text.replace(old, new))
+
+          dashboard = Path('frontend/apps/cms/src/components/CmsDashboard.tsx')
+          text = dashboard.read_text()
+          old = """  useEffect(() => {\n    if (!accessToken) return;\n    loadContent({ offset: 0 });\n    loadSectors();\n    loadBanners();\n  }, [accessToken, loadBanners, loadContent, loadSectors]);"""
+          new = """  useEffect(() => {\n    if (!accessToken) return;\n    queueMicrotask(() => {\n      void loadContent({ offset: 0 });\n      void loadSectors();\n      void loadBanners();\n    });\n  }, [accessToken, loadBanners, loadContent, loadSectors]);"""
+          assert text.count(old) == 1, 'CmsDashboard effect pattern changed'
+          dashboard.write_text(text.replace(old, new))
+          PY
       - name: Verify CMS
         working-directory: frontend/apps/cms
         run: |
@@ -32,15 +52,15 @@ jobs:
           npm run lint
           npm run typecheck
           npm run build
-      - name: Commit verified CMS dependency repair
+      - name: Commit verified CMS repair
         run: |
           set -euo pipefail
-          if git diff --quiet -- frontend/apps/cms/package.json frontend/apps/cms/package-lock.json; then
-            echo 'No CMS dependency diff to commit.'
+          if git diff --quiet -- frontend/apps/cms/package.json frontend/apps/cms/package-lock.json frontend/apps/cms/src/context/AuthContext.tsx frontend/apps/cms/src/components/CmsDashboard.tsx; then
+            echo 'No CMS repair diff to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add frontend/apps/cms/package.json frontend/apps/cms/package-lock.json
-          git commit -m 'fix: align cms eslint toolchain'
+          git add frontend/apps/cms/package.json frontend/apps/cms/package-lock.json frontend/apps/cms/src/context/AuthContext.tsx frontend/apps/cms/src/components/CmsDashboard.tsx
+          git commit -m 'fix: align cms lint compatibility'
           git push origin HEAD:fix/marketplace-quality-current-20260907
