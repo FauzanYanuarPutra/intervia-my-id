@@ -17,22 +17,19 @@ jobs:
           ref: security/rust-jwt-aws-lc-20260907
       - name: Install pinned Rust toolchain
         run: rustup show
-      - name: Trace stale RSA lockfile owner
+      - name: Inspect SQLx macro and derive usage
         working-directory: services/marketplace_service
         run: |
           set -uo pipefail
-          echo '=== rsa, all targets ==='
-          cargo tree --locked --target all -i rsa || true
-          echo '=== sqlx-mysql, all targets ==='
+          echo '=== compile-time sqlx macros ==='
+          grep -RInE 'sqlx::(query|query_as|query_scalar|migrate)!' src tests 2>/dev/null || true
+          echo '=== sqlx derives ==='
+          grep -RInE '(derive\([^)]*(sqlx::)?(FromRow|Type)|sqlx::FromRow|sqlx::Type)' src tests 2>/dev/null || true
+          echo '=== all FromRow references ==='
+          grep -RIn 'FromRow' src tests 2>/dev/null || true
+          echo '=== all sqlx::migrate references ==='
+          grep -RIn 'sqlx::migrate' src tests 2>/dev/null || true
+          echo '=== dependency paths ==='
+          cargo tree --locked --target all -i sqlx-macros || true
           cargo tree --locked --target all -i sqlx-mysql || true
-          echo '=== jsonwebtoken 9.3.1, all targets ==='
-          cargo tree --locked --target all -i jsonwebtoken@9.3.1 || true
-          echo '=== packages whose lock entry depends on rsa ==='
-          python - <<'PY'
-          from pathlib import Path
-          text = Path('Cargo.lock').read_text()
-          blocks = text.split('[[package]]')
-          for block in blocks:
-              if '"rsa"' in block:
-                  print('[[package]]' + block)
-          PY
+          cargo tree --locked --target all -i rsa || true
