@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { accessTokenFromCookieHeader } from '@/lib/sessionProxy';
 
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
 
@@ -17,7 +18,10 @@ export async function GET(
   const { id } = await context.params;
   const roomId = safeDecodeRoomId(id);
   try {
-    const token = req.headers.get('authorization')?.replace('Bearer ', '') || null;
+    const token =
+      accessTokenFromCookieHeader(req.headers.get('cookie')) ||
+      req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+      null;
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -54,7 +58,7 @@ export async function GET(
         attachments: Array.isArray(m.attachments) ? m.attachments : [],
         created_at: m.sent_at ?? '',
       }));
-      const roomName = (data as { room_name?: string }).room_name ?? roomId;
+      const roomName = data.room_name ?? roomId;
       return NextResponse.json({ messages, room_name: roomName }, { status: res.status });
     }
 
