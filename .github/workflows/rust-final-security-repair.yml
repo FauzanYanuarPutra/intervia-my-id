@@ -1,0 +1,56 @@
+name: Rust Final Security Repair
+
+on:
+  push:
+    branches: [security/rust-jwt-aws-lc-20260907]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: security/rust-jwt-aws-lc-20260907
+          fetch-depth: 0
+      - name: Refresh AI rustls stack
+        working-directory: services/ai_service
+        run: |
+          set -euo pipefail
+          cargo update -p reqwest
+          cargo update -p rustls-webpki
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Refresh Identity OpenSSL patch
+        working-directory: services/identity_service
+        run: |
+          set -euo pipefail
+          cargo update -p openssl
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Assert repaired versions
+        run: |
+          set -euo pipefail
+          if grep -A2 '^name = "rustls-webpki"$' services/ai_service/Cargo.lock | grep -q 'version = "0.101.7"'; then
+            echo 'AI still contains vulnerable rustls-webpki 0.101.7' >&2
+            exit 1
+          fi
+          if grep -A2 '^name = "openssl"$' services/identity_service/Cargo.lock | grep -q 'version = "0.10.74"'; then
+            echo 'Identity still contains vulnerable openssl 0.10.74' >&2
+            exit 1
+          fi
+      - name: Persist verified lockfiles
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add services/ai_service/Cargo.lock services/identity_service/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m 'security: refresh final Rust advisory locks'
+            git push origin HEAD:security/rust-jwt-aws-lc-20260907
+          fi
