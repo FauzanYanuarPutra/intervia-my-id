@@ -15,9 +15,7 @@ const DEPLOYMENT_ENV = (
   process.env.NODE_ENV ||
   'development'
 ).toLowerCase();
-const REQUIRES_EXTERNAL_HTTPS = ['staging', 'production'].includes(
-  DEPLOYMENT_ENV,
-);
+const REQUIRES_EXTERNAL_HTTPS = ['staging', 'production'].includes(DEPLOYMENT_ENV);
 const CRM_ORIGIN =
   (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
   'https://crm.lajukan.com';
@@ -39,6 +37,10 @@ const nextConfig = {
   outputFileTracingRoot: path.resolve(CONFIG_DIR, '../..'),
   poweredByHeader: false,
   compress: true,
+  env: {
+    // Browser code must never address the internal marketplace service directly.
+    NEXT_PUBLIC_MARKETPLACE_URL: '/api/marketplace',
+  },
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -54,12 +56,7 @@ const nextConfig = {
       { source: '/:path*', headers: SECURITY_HEADERS },
       {
         source: '/fonts/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
     ];
   },
@@ -68,9 +65,7 @@ const nextConfig = {
     return [
       {
         source: '/:path*',
-        has: [
-          { type: 'header', key: 'x-forwarded-proto', value: 'http' },
-        ],
+        has: [{ type: 'header', key: 'x-forwarded-proto', value: 'http' }],
         destination: `${CRM_ORIGIN}/:path*`,
         permanent: true,
       },
@@ -104,10 +99,7 @@ const config = createNextIntlPlugin()(nextConfig);
 const originalWebpack = config.webpack;
 
 config.webpack = (webpackConfig, options) => {
-  const result = originalWebpack
-    ? originalWebpack(webpackConfig, options)
-    : webpackConfig;
-
+  const result = originalWebpack ? originalWebpack(webpackConfig, options) : webpackConfig;
   result.resolve = result.resolve || {};
   result.resolve.alias = {
     ...(result.resolve.alias || {}),
