@@ -42,11 +42,12 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git merge --no-edit origin/main
-      - name: Use AWS-LC JWT backend consistently
+      - name: Use safe dependency feature sets
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
+
           for rel in [
               'services/identity_service/Cargo.toml',
               'services/marketplace_service/Cargo.toml',
@@ -61,6 +62,14 @@ jobs:
               elif new not in text:
                   raise SystemExit(f'unexpected jsonwebtoken configuration in {rel}')
               path.write_text(text)
+
+          marketplace = Path('services/marketplace_service/Cargo.toml')
+          text = marketplace.read_text()
+          if '"macros",' in text:
+              text = text.replace('"macros",', '"derive",')
+          elif '"derive",' not in text:
+              raise SystemExit('expected Marketplace SQLx macros or derive feature')
+          marketplace.write_text(text)
           PY
       - name: Refresh Rust lockfiles within declared constraints
         run: |
@@ -69,6 +78,18 @@ jobs:
             echo "Updating $service"
             (cd "services/$service" && cargo update)
           done
+      - name: Assert unreachable MySQL/RSA packages are absent from Marketplace lockfile
+        working-directory: services/marketplace_service
+        run: |
+          set -euo pipefail
+          if grep -q '^name = "sqlx-mysql"$' Cargo.lock; then
+            echo 'sqlx-mysql remains in the PostgreSQL-only Marketplace lockfile' >&2
+            exit 1
+          fi
+          if grep -q '^name = "rsa"$' Cargo.lock; then
+            echo 'rsa remains in the Marketplace lockfile' >&2
+            exit 1
+          fi
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Verify Rust services and advisories
@@ -80,7 +101,6 @@ jobs:
             cargo fmt --check
             cargo clippy --locked --all-targets -- -D warnings
             cargo test --locked
-            cargo tree -i rsa || true
             cargo audit
           done
       - name: Commit verified Rust security refresh
