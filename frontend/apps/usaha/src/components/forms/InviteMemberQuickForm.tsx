@@ -46,6 +46,14 @@ function extractSuggestions(payload: unknown): UserSuggestion[] {
     .filter((item): item is UserSuggestion => Boolean(item));
 }
 
+export function shouldQueryUsernameSuggestions(
+  normalizedUsername: string,
+  selectedUser: UserSuggestion | null,
+): boolean {
+  if (normalizedUsername.length < 2) return false;
+  return selectedUser?.username.toLowerCase() !== normalizedUsername;
+}
+
 export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps) {
   const router = useRouter();
   const [username, setUsername] = useState('');
@@ -61,16 +69,11 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
     () => username.trim().replace(/^@/, '').toLowerCase(),
     [username],
   );
+  const shouldQuerySuggestions = shouldQueryUsernameSuggestions(normalizedUsername, selectedUser);
+  const visibleSuggestions = shouldQuerySuggestions ? suggestions : [];
 
   useEffect(() => {
-    if (selectedUser && selectedUser.username.toLowerCase() === normalizedUsername) {
-      setSuggestions([]);
-      return;
-    }
-    if (normalizedUsername.length < 2) {
-      setSuggestions([]);
-      return;
-    }
+    if (!shouldQuerySuggestions) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -98,7 +101,7 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [normalizedUsername, selectedUser]);
+  }, [normalizedUsername, shouldQuerySuggestions]);
 
   function chooseUser(user: UserSuggestion) {
     setSelectedUser(user);
@@ -169,12 +172,15 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
               setUsername(event.target.value);
               setSelectedUser(null);
               setError('');
+              if (event.target.value.trim().replace(/^@/, '').length < 2) {
+                setSuggestions([]);
+              }
             }}
             placeholder="Cari @username"
             autoComplete="off"
             className="portal-input pl-9"
           />
-          {isSearching ? (
+          {isSearching && shouldQuerySuggestions ? (
             <span className="absolute right-3 top-3 text-xs text-portal-soft">Mencari...</span>
           ) : null}
         </div>
@@ -182,9 +188,9 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
           Anggota harus sudah punya akun Lajukan. Undangan baru aktif setelah mereka menerima.
         </p>
 
-        {suggestions.length ? (
+        {visibleSuggestions.length ? (
           <div className="overflow-hidden rounded-2xl border border-portal-line bg-white shadow-sm">
-            {suggestions.map(user => (
+            {visibleSuggestions.map(user => (
               <button
                 key={user.id}
                 type="button"
