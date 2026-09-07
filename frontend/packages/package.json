@@ -7,7 +7,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "tsc -w -p tsconfig.build.json --preserveWatchOutput"
+    "dev": "tsc -w -p tsconfig.build.json --preserveWatchOutput",
+    "test": "vitest run"
   },
   "sideEffects": [
     "**/*.css"
@@ -29,7 +30,13 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
-    "typescript": "7.0.2"
+    "@testing-library/dom": "^10.4.1",
+    "typescript": "7.0.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
   },
   "exports": {
     ".": {

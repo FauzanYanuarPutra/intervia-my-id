@@ -1,54 +1,13 @@
-"use client";
-
-import * as React from "react";
-import { cn } from "../utils/cn";
-
-type ModalProps = {
-  open: boolean;
-  onClose: () => void;
-  title?: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  className?: string;
-};
-
-export function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  footer,
-  className,
-}: ModalProps) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--color-surface)_50%,_transparent)] p-0  sm:items-center sm:p-4">
-      <div
-        className={cn(
-          "relative flex max-h-[min(88svh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--color-surface)_95%,_transparent)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl dark:border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--color-surface)_90%,_transparent)] sm:max-h-[80svh] sm:rounded-2xl sm:p-5",
-          className,
-        )}
-      >
-        {title ? (
-          <h2 className="text-base font-semibold text-[color:var(--color-text)] dark:text-[color:var(--color-text-inverse)]">
-            {title}
-          </h2>
-        ) : null}
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-1">{children}</div>
-        {footer ? (
-          <div className="mt-6 grid shrink-0 gap-2 border-t border-[color:color-mix(in_srgb,_var(--color-border)_70%,_transparent)] pt-3 sm:flex sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            {footer}
-          </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-3 top-3 inline-flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-2xl border border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--color-surface)_90%,_transparent)] px-2.5 py-1 text-xs font-semibold text-[color:var(--color-text)] shadow-sm hover:bg-[color:var(--color-surface-muted)] dark:border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--color-surface)_80%,_transparent)] dark:text-[color:var(--color-text-soft)] dark:hover:bg-[color:var(--color-surface)]"
-          aria-label="Close"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
+'use client';
+import * as React from 'react';
+import { cn } from '../utils/cn';
+export type ModalProps={open:boolean;onClose:()=>void;title?:string;description?:string;children:React.ReactNode;footer?:React.ReactNode;className?:string;initialFocusRef?:React.RefObject<HTMLElement|null>};
+const FOCUSABLE='button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+export function Modal({open,onClose,title,description,children,footer,className,initialFocusRef}:ModalProps){
+  const dialogRef=React.useRef<HTMLDivElement>(null);
+  const previousFocus=React.useRef<HTMLElement|null>(null);
+  const titleId=React.useId(); const descriptionId=React.useId();
+  React.useEffect(()=>{if(!open)return;previousFocus.current=document.activeElement instanceof HTMLElement?document.activeElement:null;const frame=requestAnimationFrame(()=>{const target=initialFocusRef?.current??dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)??dialogRef.current;target?.focus()});const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();onClose();return}if(event.key!=='Tab'||!dialogRef.current)return;const nodes=Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(n=>!n.hasAttribute('disabled'));if(!nodes.length){event.preventDefault();dialogRef.current.focus();return}const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}};document.addEventListener('keydown',onKey);return()=>{cancelAnimationFrame(frame);document.removeEventListener('keydown',onKey);previousFocus.current?.focus()}},[open,onClose,initialFocusRef]);
+  if(!open)return null;
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={e=>{if(e.currentTarget===e.target)onClose()}}><div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={title?titleId:undefined} aria-describedby={description?descriptionId:undefined} tabIndex={-1} className={cn('relative flex max-h-[min(88svh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl outline-none sm:max-h-[80svh] sm:rounded-2xl sm:p-5',className)}>{title?<h2 id={titleId} className="pr-12 text-base font-semibold text-[color:var(--color-text)]">{title}</h2>:null}{description?<p id={descriptionId} className="mt-1 pr-12 text-sm text-[color:var(--color-text-soft)]">{description}</p>:null}<div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-1">{children}</div>{footer?<div className="mt-6 grid shrink-0 gap-2 border-t border-[color:var(--color-border)] pt-3 sm:flex sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">{footer}</div>:null}<button type="button" onClick={onClose} className="absolute right-3 top-3 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-sm font-semibold text-[color:var(--color-text-soft)] hover:bg-[color:var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-focus)]" aria-label="Tutup dialog">Tutup</button></div></div>;
 }
