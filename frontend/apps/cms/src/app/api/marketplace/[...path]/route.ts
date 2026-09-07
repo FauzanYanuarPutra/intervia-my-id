@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { accessTokenFromCookieHeader } from '@/lib/sessionProxy';
 
 function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
@@ -23,24 +24,23 @@ function buildMarketplaceHeaders(req: NextRequest, hasBody: boolean): Headers {
   const headers = new Headers();
   if (hasBody) headers.set('Content-Type', 'application/json');
 
-  for (const key of [
-    'authorization',
-    'user-agent',
-    'x-forwarded-for',
-    'x-real-ip',
-    'x-device-id',
-  ]) {
+  for (const key of ['user-agent', 'x-forwarded-for', 'x-real-ip', 'x-device-id']) {
     const value = req.headers.get(key);
     if (value) headers.set(key, value);
+  }
+
+  const cookieAccessToken = accessTokenFromCookieHeader(req.headers.get('cookie'));
+  const incomingAuthorization = req.headers.get('authorization');
+  if (cookieAccessToken) {
+    headers.set('Authorization', `Bearer ${cookieAccessToken}`);
+  } else if (incomingAuthorization) {
+    headers.set('Authorization', incomingAuthorization);
   }
 
   return headers;
 }
 
-async function forwardToMarketplace(
-  req: NextRequest,
-  params: Promise<{ path?: string[] }>,
-) {
+async function forwardToMarketplace(req: NextRequest, params: Promise<{ path?: string[] }>) {
   const resolvedParams = await params;
   const path = `/${(resolvedParams.path || []).join('/')}`;
   const query = req.nextUrl.search || '';
@@ -63,8 +63,8 @@ async function forwardToMarketplace(
       return new NextResponse(payload, {
         status: upstream.status,
         headers: {
-          'Content-Type':
-            upstream.headers.get('content-type') || 'application/json',
+          'Content-Type': upstream.headers.get('content-type') || 'application/json',
+          'Cache-Control': 'no-store',
           'x-marketplace-proxy-target': baseUrl,
         },
       });
@@ -74,49 +74,22 @@ async function forwardToMarketplace(
     }
   }
 
-  console.error('[CMS_MARKETPLACE_PROXY_ERROR]', {
-    path,
-    candidates,
-    errors,
-  });
-
-  return NextResponse.json(
-    { error: 'Marketplace service unavailable' },
-    { status: 503 },
-  );
+  console.error('[CMS_MARKETPLACE_PROXY_ERROR]', { path, candidates, errors });
+  return NextResponse.json({ error: 'Marketplace service unavailable' }, { status: 503 });
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ path?: string[] }> },
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
   return forwardToMarketplace(req, params);
 }
-
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ path?: string[] }> },
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
   return forwardToMarketplace(req, params);
 }
-
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ path?: string[] }> },
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
   return forwardToMarketplace(req, params);
 }
-
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ path?: string[] }> },
-) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
   return forwardToMarketplace(req, params);
 }
-
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ path?: string[] }> },
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
   return forwardToMarketplace(req, params);
 }
