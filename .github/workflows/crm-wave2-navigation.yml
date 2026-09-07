@@ -124,7 +124,6 @@ jobs:
           s=s[:start]+replacement+s[end:]
           s=s.replace('NAV_ITEMS.map', 'CRM_NAV_ITEMS.map')
           s=s.replace('NAV_ITEMS.find', 'CRM_NAV_ITEMS.find')
-          s=s.replace('NAV_ITEMS', 'CRM_NAV_ITEMS')
           p.write_text(s)
           PY
       - name: Verify CRM wave 2 GREEN
