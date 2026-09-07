@@ -44,14 +44,17 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
         for component in ("PageHeader", "ActionCard", "StatCard", "DataPanel"):
             self.assertIn(component, source)
 
-    def test_products_prioritize_operational_scanability(self) -> None:
+    def test_products_prioritize_product_first_progressive_disclosure(self) -> None:
         source = (
             USAHA / "app/(portal)/businesses/[businessId]/products/page.tsx"
         ).read_text(encoding="utf-8")
         self.assertIn("DataPanel", source)
         self.assertIn("StatCard", source)
         self.assertIn("StatusBadge", source)
-        self.assertIn("lg:grid-cols-[minmax(0,1fr)_320px]", source)
+        self.assertIn("productPrimaryMode", source)
+        self.assertIn("Pengaturan lanjutan produk", source)
+        self.assertIn("<details", source)
+        self.assertNotIn("lg:grid-cols-[minmax(0,1fr)_320px]", source)
 
 
 if __name__ == "__main__":
