@@ -1,0 +1,25 @@
+name: CRM Resync Main
+on:
+  push:
+    branches: [feat/crm-operations-workspace-20260907]
+permissions:
+  contents: write
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/crm-operations-workspace-20260907
+          fetch-depth: 0
+      - name: Rebase onto latest main and self-clean
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git rebase origin/main
+          git rm .github/workflows/crm-resync-main.yml
+          git commit -m 'ci: remove temporary CRM resync workflow'
+          git push --force-with-lease origin HEAD:feat/crm-operations-workspace-20260907
