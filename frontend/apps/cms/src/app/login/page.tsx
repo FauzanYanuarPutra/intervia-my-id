@@ -16,7 +16,10 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      const nextPath = typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('next');
+      await login(email, password, nextPath);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login gagal. Coba lagi.');
     } finally {
@@ -29,41 +32,14 @@ export default function LoginPage() {
       <div className="w-full max-w-sm bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg p-6 shadow-sm">
         <h1 className="text-xl font-semibold text-[color:var(--color-text)] mb-1">Lajukan CMS</h1>
         <p className="text-sm text-[color:var(--color-text)] mb-6">Kelola konten & sektor</p>
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-              {error}
-            </div>
-          )}
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@contoh.com"
-            required
-          />
-          <Input
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-          />
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Memproses...' : 'Masuk'}
-          </Button>
+          {error && <div className="p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">{error}</div>}
+          <Input label="Email atau username" type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@contoh.com atau @username" autoComplete="username" required />
+          <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required />
+          <Button type="submit" disabled={loading} className="w-full">{loading ? 'Memproses...' : 'Masuk'}</Button>
         </form>
-
         <p className="mt-6 text-center">
-          <a
-            href={process.env.NEXT_PUBLIC_WWW_URL || 'http://localhost:3000'}
-            className="text-sm text-[color:var(--color-text)] hover:text-[color:var(--color-text)]"
-          >
-            ← Kembali ke situs
-          </a>
+          <a href={process.env.NEXT_PUBLIC_WWW_URL || 'http://localhost:3000'} className="text-sm text-[color:var(--color-text)] hover:text-[color:var(--color-text)]">← Kembali ke situs</a>
         </p>
       </div>
     </div>
