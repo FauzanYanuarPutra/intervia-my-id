@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ExternalLink,
   Search,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   useRouter,
@@ -12,6 +13,7 @@ import {
 } from 'next/navigation';
 
 import { ExploreSearchResults } from '@/components/explore/ExploreSearchResults';
+import { ExploreFilterDrawer } from '@/components/explore/ExploreFilterDrawer';
 import { EmblaDesktopControls } from '@/components/common/EmblaDesktopControls';
 import { Header } from '@/components/layout/Header';
 import {
@@ -253,6 +255,8 @@ export function ExploreAllSearchClient({
 
   const [retryKey, setRetryKey] =
     useState(0);
+
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const {
     emblaRef: categoryRailRef,
@@ -1209,20 +1213,7 @@ export function ExploreAllSearchClient({
           2
       : normalizedQueryLength >= 2;
 
-  const advancedFilterCount =
-    EXPLORE_ADVANCED_FILTER_KEYS.filter(
-      key => {
-        const value =
-          new URLSearchParams(
-            searchKey,
-          ).get(key);
-
-        return Boolean(
-          value &&
-            value.trim(),
-        );
-      },
-    ).length;
+  const advancedFilterCount = EXPLORE_ADVANCED_FILTER_KEYS.filter(key => { const value = new URLSearchParams(searchKey).get(key); return Boolean(value && value.trim()); }).length;
 
   const clearAdvancedFilters =
     () => {
@@ -1632,20 +1623,7 @@ export function ExploreAllSearchClient({
                   </Link>
                 ) : null}
 
-                {advancedFilterCount >
-                0 ? (
-                  <button
-                    type="button"
-                    onClick={
-                      clearAdvancedFilters
-                    }
-                    className="inline-flex min-h-7 items-center rounded-[8px] px-2 text-[9px] font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40 sm:text-[10px]"
-                  >
-                    {isId
-                      ? `Hapus filter (${advancedFilterCount})`
-                      : `Clear (${advancedFilterCount})`}
-                  </button>
-                ) : null}
+                <button type="button" onClick={()=>setFilterOpen(true)} className="inline-flex min-h-8 items-center gap-1.5 rounded-[9px] border border-zinc-200 bg-white px-2.5 text-[10px] font-black text-zinc-700 transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200"><SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />{isId?'Filter':'Filters'}{advancedFilterCount>0?<span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{advancedFilterCount}</span>:null}</button>
               </div>
             </div>
 
@@ -1908,6 +1886,8 @@ export function ExploreAllSearchClient({
             ) : null}
           </ExploreSurface>
         )}
+
+        {filterOpen && !referenceMode && !peopleMode ? <ExploreFilterDrawer onClose={()=>setFilterOpen(false)} value={{location:state.location,distanceKm:state.distanceKm,sort:state.sort}} onApply={changes=>updateParams(changes,'replace')} onClear={clearAdvancedFilters} isId={isId} /> : null}
 
         <section className="mt-2 min-w-0 sm:mt-3">
           <ExploreSearchResults
