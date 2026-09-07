@@ -1,0 +1,36 @@
+name: Rust RSA Diagnostic
+
+on:
+  push:
+    branches:
+      - security/rust-jwt-aws-lc-20260907
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: security/rust-jwt-aws-lc-20260907
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Show RSA and jsonwebtoken v9 dependency paths
+        working-directory: services/marketplace_service
+        run: |
+          set -uo pipefail
+          echo '=== rsa, all targets ==='
+          cargo tree --locked --target all -i rsa || true
+          echo '=== jsonwebtoken 9.3.1, all targets ==='
+          cargo tree --locked --target all -i jsonwebtoken@9.3.1 || true
+          echo '=== lockfile packages mentioning jsonwebtoken ==='
+          awk '
+            /^\[\[package\]\]$/ { block="" }
+            { block = block $0 "\n" }
+            /^$/ {
+              if (block ~ /jsonwebtoken/) printf "%s", block
+              block=""
+            }
+          ' Cargo.lock
