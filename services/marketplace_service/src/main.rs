@@ -773,7 +773,7 @@ struct TrackEventRequest {
 #[serde(untagged)]
 enum CollectEventsRequest {
     Batch { events: Vec<TrackEventRequest> },
-    Single(TrackEventRequest),
+    Single(Box<TrackEventRequest>),
 }
 
 #[derive(Debug)]
@@ -2690,7 +2690,7 @@ async fn collect_events(
     Json(payload): Json<CollectEventsRequest>,
 ) -> impl IntoResponse {
     let raw_events = match payload {
-        CollectEventsRequest::Single(event) => vec![event],
+        CollectEventsRequest::Single(event) => vec![*event],
         CollectEventsRequest::Batch { events } => events,
     };
 
@@ -6028,19 +6028,19 @@ fn metadata_listing_side(metadata: &Value) -> Option<String> {
 }
 
 fn is_demand_listing_metadata(metadata: &Value) -> bool {
-    match metadata_listing_side(metadata).as_deref() {
+    matches!(
+        metadata_listing_side(metadata).as_deref(),
         Some("demand")
-        | Some("need")
-        | Some("needs")
-        | Some("request")
-        | Some("requested")
-        | Some("seeker")
-        | Some("buyer request")
-        | Some("buy request")
-        | Some("butuh")
-        | Some("mencari") => true,
-        _ => false,
-    }
+            | Some("need")
+            | Some("needs")
+            | Some("request")
+            | Some("requested")
+            | Some("seeker")
+            | Some("buyer request")
+            | Some("buy request")
+            | Some("butuh")
+            | Some("mencari")
+    )
 }
 
 fn json_has_value_at(value: &Value, path: &[&str]) -> bool {
@@ -8036,11 +8036,12 @@ async fn push_social_notification_for_event(
     )
     .or(actor_profile_name)
     .map(|value| {
-        if value.starts_with('@') {
-            value
-        } else if value.contains(' ') || value.contains('.') {
-            value
-        } else if value == "Seseorang" || value == "Someone" {
+        if value.starts_with('@')
+            || value.contains(' ')
+            || value.contains('.')
+            || value == "Seseorang"
+            || value == "Someone"
+        {
             value
         } else {
             format!("@{value}")
@@ -9215,7 +9216,7 @@ async fn list_lajukan_requests(
                             std::cmp::Ordering::Greater
                         }
                     });
-                    completed.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+                    completed.sort_by_key(|item| std::cmp::Reverse(item.created_at));
 
                     let payload = LajukanRequestsPayload {
                         active,
@@ -23690,7 +23691,7 @@ async fn run_outbox_publisher(
         match connect_outbox_channel(&rabbitmq_url, &exchange).await {
             Ok(channel) => loop {
                 match publish_outbox_batch(&db, &channel, &exchange, batch_size).await {
-                    Ok(count) if count == 0 => sleep(Duration::from_millis(poll_ms)).await,
+                    Ok(0) => sleep(Duration::from_millis(poll_ms)).await,
                     Ok(_) => {}
                     Err(error) => {
                         tracing::warn!("outbox publish error: {:?}", error);

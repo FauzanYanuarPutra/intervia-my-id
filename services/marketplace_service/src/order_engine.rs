@@ -448,18 +448,8 @@ impl OrderCategoryStrategy for SupplyChainStrategy {
         }
     }
 
-    fn base_status_on_create(&self, input: &CreateOrderRequest) -> OrderBaseStatus {
-        let is_top = input
-            .category_specific_metadata
-            .as_ref()
-            .and_then(|v| v.get("payment_terms"))
-            .and_then(|v| v.as_str())
-            == Some("TOP");
-        if is_top {
-            OrderBaseStatus::PendingPayment
-        } else {
-            OrderBaseStatus::PendingPayment
-        }
+    fn base_status_on_create(&self, _input: &CreateOrderRequest) -> OrderBaseStatus {
+        OrderBaseStatus::PendingPayment
     }
 }
 
