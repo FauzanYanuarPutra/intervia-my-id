@@ -16,5 +16,5 @@ jobs:
         with:
           version: v0.70.0
           cache: false
-      - name: Print fresh HIGH and CRITICAL findings
-        run: trivy fs --format table --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln .
+      - name: Print fresh HIGH and CRITICAL findings including secrets
+        run: trivy fs --format table --severity HIGH,CRITICAL --ignore-unfixed .
