@@ -1,0 +1,46 @@
+name: CMS ESLint Repair
+
+on:
+  push:
+    branches:
+      - fix/marketplace-quality-current-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/marketplace-quality-current-20260907
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/apps/cms/package-lock.json
+      - name: Regenerate compatible CMS lint toolchain
+        working-directory: frontend/apps/cms
+        run: npm install --save-dev 'eslint@^9' --package-lock-only --legacy-peer-deps --no-audit --no-fund
+      - name: Verify CMS
+        working-directory: frontend/apps/cms
+        run: |
+          set -euo pipefail
+          npm ci --legacy-peer-deps --no-audit --no-fund
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Commit verified CMS dependency repair
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- frontend/apps/cms/package.json frontend/apps/cms/package-lock.json; then
+            echo 'No CMS dependency diff to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/apps/cms/package.json frontend/apps/cms/package-lock.json
+          git commit -m 'fix: align cms eslint toolchain'
+          git push origin HEAD:fix/marketplace-quality-current-20260907
