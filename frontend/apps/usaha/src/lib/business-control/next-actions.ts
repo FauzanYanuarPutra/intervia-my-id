@@ -21,10 +21,10 @@ export type MerchantNextActionInput = {
   canViewCosting: boolean;
   productCount: number;
   ingredientCount: number;
-  recipeCount: number;
+  recipeCount: number | null;
   lowStockCount: number;
   enabledChannelCount: number;
-  productsMissingChannelPriceCount: number;
+  productsMissingChannelPriceCount: number | null;
   unreconciledSettlementCount: number;
   financeEntryCount: number;
 };
@@ -69,7 +69,11 @@ export function buildMerchantNextActions(input: MerchantNextActionInput): Mercha
     });
   }
 
-  if (input.enabledChannelCount > 0 && input.productsMissingChannelPriceCount > 0) {
+  if (
+    input.enabledChannelCount > 0 &&
+    input.productsMissingChannelPriceCount !== null &&
+    input.productsMissingChannelPriceCount > 0
+  ) {
     actions.push({
       kind: 'set_channel_price',
       title: 'Lengkapi harga kanal jual',
