@@ -36,9 +36,11 @@ def main() -> int:
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
 
     # Action-first Home: one primary decision engine fed only by durable, permission-aware reads.
-    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'listControlSettlements', 'getControlRecipe')
+    # Recipe readiness deliberately remains unknown until an aggregate/list endpoint exists;
+    # Home must not fan out one recipe request per product.
+    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'listControlSettlements', 'const recipeCount = null')
     require('frontend/apps/usaha/src/app/page.tsx', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: null')
-    forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000')
+    forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000', 'getControlRecipe', 'business.products.map')
     require('frontend/apps/usaha/src/lib/business-control/next-actions.ts', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: number | null')
     require('frontend/apps/usaha/src/lib/business-control/progressive-disclosure.ts', 'sortStockAttentionFirst', 'productPrimaryMode', 'shouldShowSettlementWorkspace', 'channelSimulationReadiness')
 
