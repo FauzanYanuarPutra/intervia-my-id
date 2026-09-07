@@ -66,47 +66,48 @@ jobs:
           s=p.read_text()
           start=s.index('    const leads = liveLeads.length')
           end=s.index('\n\n    setData({',start)
-          replacement='''    const leads = liveLeads;
-    const activitiesSource = liveActivities;
-    const tickets = liveTickets;
-    const orders = liveOrders;
-    const trustProfiles = liveTrust;
-    const normalizedListings = normalizeListings(liveContent);
-    const users = normalizeUsers(liveUsers, trustProfiles, orders, leads);
-    const safeUsers = users;
-    const chats = normalizeChats(tickets, leads);
-    const listings = attachListingReports(normalizedListings, tickets);
-    const activities = normalizeActivities(activitiesSource, listings, orders, tickets);
-    const emptyCollections = [
-      !liveLeads.length ? "leads" : "",
-      !liveActivities.length ? "activities" : "",
-      !liveTickets.length ? "tickets" : "",
-      !liveOrders.length ? "orders" : "",
-      !liveTrust.length ? "trustProfiles" : "",
-      !liveContent.length ? "listings" : "",
-      !liveUsers.length ? "users" : "",
-    ].filter(Boolean);
-    const sampleCollections: string[] = [];'''
+          replacement="\n".join([
+              '    const leads = liveLeads;',
+              '    const activitiesSource = liveActivities;',
+              '    const tickets = liveTickets;',
+              '    const orders = liveOrders;',
+              '    const trustProfiles = liveTrust;',
+              '    const normalizedListings = normalizeListings(liveContent);',
+              '    const users = normalizeUsers(liveUsers, trustProfiles, orders, leads);',
+              '    const safeUsers = users;',
+              '    const chats = normalizeChats(tickets, leads);',
+              '    const listings = attachListingReports(normalizedListings, tickets);',
+              '    const activities = normalizeActivities(activitiesSource, listings, orders, tickets);',
+              '    const emptyCollections = [',
+              '      !liveLeads.length ? "leads" : "",',
+              '      !liveActivities.length ? "activities" : "",',
+              '      !liveTickets.length ? "tickets" : "",',
+              '      !liveOrders.length ? "orders" : "",',
+              '      !liveTrust.length ? "trustProfiles" : "",',
+              '      !liveContent.length ? "listings" : "",',
+              '      !liveUsers.length ? "users" : "",',
+              '    ].filter(Boolean);',
+              '    const sampleCollections: string[] = [];',
+          ])
           s=s[:start]+replacement+s[end:]
           s=s.replace('      emptyCollections: CRM_DEMO_DATA_ENABLED ? [] : emptyCollections,','      emptyCollections,',1)
           s=s.replace('      lastMessage: `Minat pada ${asString(lead.metadata?.listing_title) || lead.name}`,','      lastMessage: "",',1)
           banner_start=s.find('              {data.sampleCollections.length ? (')
           if banner_start!=-1:
-            banner_end=s.index('              {data.emptyCollections.length ? (',banner_start)
-            s=s[:banner_start]+s[banner_end:]
+              banner_end=s.index('              {data.emptyCollections.length ? (',banner_start)
+              s=s[:banner_start]+s[banner_end:]
           if 'function formatDate(' in s:
-            a=s.index('function formatDate(');b=s.index('\nfunction compactId(',a);s=s[:a]+s[b+1:]
+              a=s.index('function formatDate(');b=s.index('\nfunction compactId(',a);s=s[:a]+s[b+1:]
           if 'function normalizeStage(' in s:
-            a=s.index('function normalizeStage(');b=s.index('\nfunction stageGroup(',a);s=s[:a]+s[b+1:]
+              a=s.index('function normalizeStage(');b=s.index('\nfunction stageGroup(',a);s=s[:a]+s[b+1:]
           if 'function riskLabel(' in s:
-            a=s.index('function riskLabel(');b=s.index('\nfunction iconPaths(',a);s=s[:a]+s[b+1:]
+              a=s.index('function riskLabel(');b=s.index('\nfunction iconPaths(',a);s=s[:a]+s[b+1:]
           if 'function LineChart(' in s:
-            a=s.index('function LineChart(');b=s.index('export default function CrmCommandCenter()',a);s=s[:a]+s[b:]
+              a=s.index('function LineChart(');b=s.index('export default function CrmCommandCenter()',a);s=s[:a]+s[b:]
           s=s.replace("import type { ChartPoint, CrmActivityRow, CrmChatRow, CrmInsight, CrmKpi, CrmListingRow, CrmTransactionRow, CrmUserRow, DashboardData, UnknownRecord } from './models';","import type { CrmActivityRow, CrmChatRow, CrmListingRow, CrmTransactionRow, CrmUserRow, DashboardData, UnknownRecord } from './models';",1)
           p.write_text(s)
           q=Path('src/components/crm/ConversationWorkspace.tsx')
-          c=q.read_text().replace('{selected.lastMessage}</p>','{selected.lastMessage || \'Pesan belum tersedia dari sumber chat.\'}</p>')
-          q.write_text(c)
+          q.write_text(q.read_text().replace('{selected.lastMessage}</p>',"{selected.lastMessage || 'Pesan belum tersedia dari sumber chat.'}</p>"))
           PY
       - name: Verify transformed CRM
         working-directory: frontend/apps/crm
