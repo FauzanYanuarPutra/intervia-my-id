@@ -58,10 +58,8 @@ jobs:
           set -euo pipefail
           npm test
           if ! npm run lint; then
-            echo '--- parser context 330-380 ---'
-            nl -ba src/components/crm/CrmCommandCenter.tsx | sed -n '330,380p'
-            echo '--- parser context 1-120 ---'
-            nl -ba src/components/crm/CrmCommandCenter.tsx | sed -n '1,120p'
+            echo '--- parser context 200-355 ---'
+            nl -ba src/components/crm/CrmCommandCenter.tsx | sed -n '200,355p'
             exit 1
           fi
           npm run typecheck
