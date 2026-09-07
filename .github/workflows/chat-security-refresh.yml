@@ -50,8 +50,10 @@ jobs:
       - name: Verify Hex advisories with exact upstream Cowlib exception
         run: |
           set -uo pipefail
+          set +e
           mix hex.audit 2>&1 | tee /tmp/hex-audit.txt
           audit_status=${PIPESTATUS[0]}
+          set -e
           python - <<'PY'
           from pathlib import Path
           import re
