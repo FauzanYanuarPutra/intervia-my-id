@@ -46,12 +46,16 @@ async fn run() -> Result<()> {
     let requested_roles = parse_backoffice_roles(&raw_roles)?;
     let database_url = env::var("DATABASE_URL").context("DATABASE_URL is required")?;
 
-    let pool = PgPoolOptions::new().max_connections(2).connect(&database_url).await?;
+    let pool = PgPoolOptions::new()
+        .max_connections(2)
+        .connect(&database_url)
+        .await?;
     let mut transaction = pool.begin().await?;
 
     let lookup = match &target {
-        BackofficeTarget::Email(email) => sqlx::query(
-            r#"
+        BackofficeTarget::Email(email) => {
+            sqlx::query(
+                r#"
             SELECT u.id, u.email::text AS email, up.username::text AS username,
                    u.is_active, (u.status::text = 'banned') AS is_banned,
                    u.email_verified, u.phone_verified
@@ -60,12 +64,14 @@ async fn run() -> Result<()> {
             WHERE u.deleted_at IS NULL AND lower(u.email::text) = lower($1)
             LIMIT 2
             "#,
-        )
-        .bind(email)
-        .fetch_all(&mut *transaction)
-        .await?,
-        BackofficeTarget::Username(username) => sqlx::query(
-            r#"
+            )
+            .bind(email)
+            .fetch_all(&mut *transaction)
+            .await?
+        }
+        BackofficeTarget::Username(username) => {
+            sqlx::query(
+                r#"
             SELECT u.id, u.email::text AS email, up.username::text AS username,
                    u.is_active, (u.status::text = 'banned') AS is_banned,
                    u.email_verified, u.phone_verified
@@ -74,10 +80,11 @@ async fn run() -> Result<()> {
             WHERE u.deleted_at IS NULL AND lower(up.username::text) = lower($1)
             LIMIT 2
             "#,
-        )
-        .bind(username)
-        .fetch_all(&mut *transaction)
-        .await?,
+            )
+            .bind(username)
+            .fetch_all(&mut *transaction)
+            .await?
+        }
     };
 
     if lookup.is_empty() {
