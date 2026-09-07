@@ -84,8 +84,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     today: jakartaDateKey(),
   });
   const lowStockCount =
-    business.lowStockProductsCount +
-    business.stockCheckCount +
+    (business.lowStockProductsCount ?? 0) +
+    (business.stockCheckCount ?? 0) +
     (canViewCosting ? control.lowIngredientCount : 0);
   const recipeCount = canViewCosting ? recipes.filter(Boolean).length : null;
   const unreconciledSettlementCount = canViewFinance
