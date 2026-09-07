@@ -2,8 +2,7 @@ name: Rust Security Repair
 
 on:
   push:
-    branches:
-      - security/rust-jwt-aws-lc-20260907
+    branches: [security/rust-jwt-aws-lc-20260907]
 
 permissions:
   contents: write
@@ -19,8 +18,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
+        ports: [5432:5432]
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
@@ -42,7 +40,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git merge --no-edit origin/main
-      - name: Use safe dependency feature sets
+      - name: Apply targeted Rust security changes
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -55,58 +53,54 @@ jobs:
           ]:
               path = Path(rel)
               text = path.read_text()
-              old = 'jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }'
-              new = 'jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }'
-              if old in text:
-                  text = text.replace(old, new)
-              elif new not in text:
+              text = text.replace(
+                  'jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }',
+                  'jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }',
+              )
+              if 'jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }' not in text:
                   raise SystemExit(f'unexpected jsonwebtoken configuration in {rel}')
               path.write_text(text)
 
-          marketplace = Path('services/marketplace_service/Cargo.toml')
-          text = marketplace.read_text()
-          text = text.replace('sqlx = { version = "0.8.6"', 'sqlx = { version = "0.9.0"')
-          text = text.replace('sqlx = { version = "0.9.0", default-features = false, features = [\n    "runtime-tokio-rustls",\n    "postgres",\n    "uuid",\n    "chrono",\n    "json",\n    "rust_decimal",\n    "derive",\n    "migrate",\n] }', 'sqlx = { version = "0.9.0", default-features = false, features = [\n    "runtime-tokio-rustls",\n    "postgres",\n    "uuid",\n    "chrono",\n    "json",\n    "rust_decimal",\n    "macros",\n    "migrate",\n] }')
-          if '"derive",' in text and 'sqlx = { version = "0.9.0"' in text:
-              text = text.replace('"derive",', '"macros",')
+          cargo = Path('services/marketplace_service/Cargo.toml')
+          text = cargo.read_text().replace(
+              'sqlx = { version = "0.8.6"',
+              'sqlx = { version = "0.9.0"',
+          )
           if 'sqlx = { version = "0.9.0"' not in text or '"macros",' not in text:
-              raise SystemExit('Marketplace SQLx 0.9 macros configuration was not applied')
-          marketplace.write_text(text)
+              raise SystemExit('expected Marketplace SQLx 0.9 with macros feature')
+          if 'serde = { version = "1", features = ["derive"] }' not in text:
+              raise SystemExit('Serde derive feature changed unexpectedly')
+          cargo.write_text(text)
 
           source = Path('services/marketplace_service/src/main.rs')
           text = source.read_text()
-          old_import = 'use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres, QueryBuilder, Row};'
-          new_import = 'use sqlx::{postgres::PgPoolOptions, AssertSqlSafe, FromRow, PgPool, Postgres, QueryBuilder, Row};'
-          if old_import in text:
-              text = text.replace(old_import, new_import)
-          elif new_import not in text:
-              raise SystemExit('unexpected SQLx import layout in Marketplace main.rs')
-          old_query = 'let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(&store_sql)'
-          new_query = 'let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(AssertSqlSafe(store_sql))'
-          if old_query in text:
-              text = text.replace(old_query, new_query, 1)
-          elif new_query not in text:
-              raise SystemExit('expected audited dynamic store query was not found')
+          text = text.replace(
+              'use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres, QueryBuilder, Row};',
+              'use sqlx::{postgres::PgPoolOptions, AssertSqlSafe, FromRow, PgPool, Postgres, QueryBuilder, Row};',
+          )
+          text = text.replace(
+              'let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(&store_sql)',
+              'let rows = sqlx::query_as::<_, PublicUmkmStoreRow>(AssertSqlSafe(store_sql))',
+              1,
+          )
+          if 'AssertSqlSafe(store_sql)' not in text:
+              raise SystemExit('audited dynamic store query was not applied')
           source.write_text(text)
           PY
-      - name: Refresh Rust lockfiles within declared constraints
+      - name: Refresh lockfiles
         run: |
           set -euo pipefail
           for service in identity_service marketplace_service community_service ai_service; do
-            echo "Updating $service"
             (cd "services/$service" && cargo update)
           done
-      - name: Assert RSA is absent from Marketplace lockfile
+      - name: Assert Marketplace RSA removal
         working-directory: services/marketplace_service
         run: |
           set -euo pipefail
-          if grep -q '^name = "rsa"$' Cargo.lock; then
-            echo 'rsa remains in the Marketplace lockfile' >&2
-            exit 1
-          fi
+          ! grep -q '^name = "rsa"$' Cargo.lock
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
-      - name: Verify Rust services and advisories
+      - name: Verify Rust services
         run: |
           set -euo pipefail
           for service in identity_service marketplace_service community_service ai_service; do
@@ -117,14 +111,10 @@ jobs:
             cargo test --locked
             cargo audit
           done
-      - name: Commit verified Rust security refresh
+      - name: Commit verified repair
         run: |
           set -euo pipefail
-          git add \
-            services/identity_service/Cargo.toml services/identity_service/Cargo.lock \
-            services/marketplace_service/Cargo.toml services/marketplace_service/Cargo.lock services/marketplace_service/src/main.rs \
-            services/community_service/Cargo.toml services/community_service/Cargo.lock \
-            services/ai_service/Cargo.toml services/ai_service/Cargo.lock
+          git add services/*/Cargo.toml services/*/Cargo.lock services/marketplace_service/src/main.rs
           if ! git diff --cached --quiet; then
             git commit -m 'security: refresh Rust dependency advisories'
           fi
