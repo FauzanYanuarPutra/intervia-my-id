@@ -1,50 +1,97 @@
-name: Rust JWT Security Repair
+name: Rust Security Repair
 
 on:
   push:
     branches:
       - security/rust-jwt-aws-lc-20260907
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  repair-locks:
-    if: github.actor != 'github-actions[bot]' || github.event_name == 'workflow_dispatch'
+  repair:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: security/rust-jwt-aws-lc-20260907
+          fetch-depth: 0
       - name: Install pinned Rust toolchain
         run: rustup show
-      - name: Refresh identity aws-lc lock resolution
-        working-directory: services/identity_service
-        run: cargo update -p aws-lc-rs
-      - name: Refresh marketplace aws-lc lock resolution
-        working-directory: services/marketplace_service
-        run: cargo update -p aws-lc-rs
-      - name: Commit lockfiles before strict verification
-        shell: bash
+      - name: Merge current main
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add services/identity_service/Cargo.lock services/marketplace_service/Cargo.lock
-          if git diff --cached --quiet; then
-            echo "No lockfile changes produced."
-          else
-            git commit -m "security: refresh aws-lc JWT lockfiles"
-            git push origin HEAD:security/rust-jwt-aws-lc-20260907
+          git fetch origin main
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-edit origin/main
+      - name: Use AWS-LC JWT backend consistently
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          for rel in [
+              'services/identity_service/Cargo.toml',
+              'services/marketplace_service/Cargo.toml',
+              'services/community_service/Cargo.toml',
+          ]:
+              path = Path(rel)
+              text = path.read_text()
+              old = 'jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }'
+              new = 'jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }'
+              if old in text:
+                  text = text.replace(old, new)
+              elif new not in text:
+                  raise SystemExit(f'unexpected jsonwebtoken configuration in {rel}')
+              path.write_text(text)
+          PY
+      - name: Refresh Rust lockfiles within declared constraints
+        run: |
+          set -euo pipefail
+          for service in identity_service marketplace_service community_service ai_service; do
+            echo "Updating $service"
+            (cd "services/$service" && cargo update)
+          done
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Verify Rust services and advisories
+        run: |
+          set -euo pipefail
+          for service in identity_service marketplace_service community_service ai_service; do
+            echo "=== $service ==="
+            cd "$GITHUB_WORKSPACE/services/$service"
+            cargo fmt --check
+            cargo clippy --locked --all-targets -- -D warnings
+            cargo test --locked
+            cargo tree -i rsa || true
+            cargo audit
+          done
+      - name: Commit verified Rust security refresh
+        run: |
+          set -euo pipefail
+          git add \
+            services/identity_service/Cargo.toml services/identity_service/Cargo.lock \
+            services/marketplace_service/Cargo.toml services/marketplace_service/Cargo.lock \
+            services/community_service/Cargo.toml services/community_service/Cargo.lock \
+            services/ai_service/Cargo.toml services/ai_service/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m 'security: refresh Rust dependency advisories'
           fi
-      - name: Verify identity locked build and tests
-        working-directory: services/identity_service
-        run: |
-          cargo build --locked
-          cargo test --locked
-      - name: Verify marketplace locked build and tests
-        working-directory: services/marketplace_service
-        run: |
-          cargo build --locked
-          cargo test --locked
+          git push origin HEAD:security/rust-jwt-aws-lc-20260907
