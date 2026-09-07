@@ -8,10 +8,7 @@ mod tests {
 
     #[test]
     fn maps_access_profiles_to_the_exact_allowlisted_roles() {
-        assert_eq!(
-            ProvisionAccess::Cms.role_names(),
-            &["content_admin"]
-        );
+        assert_eq!(ProvisionAccess::Cms.role_names(), &["content_admin"]);
         assert_eq!(ProvisionAccess::Crm.role_names(), &["sales", "support"]);
         assert_eq!(
             ProvisionAccess::Both.role_names(),
