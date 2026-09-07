@@ -25,7 +25,8 @@ type MobileNavProps = {
 
 export function MobileNav({ business, currentSection }: MobileNavProps) {
   if (!business) return null;
-  const visible = new Set(visiblePortalSections(business.permissions));
+  const activeBusiness = business;
+  const visible = new Set(visiblePortalSections(activeBusiness.permissions));
 
   const primaryCandidates = [
     { id: 'home' as const, label: 'Beranda', icon: LayoutDashboard },
@@ -58,7 +59,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
     const Icon = item.icon;
     const active = currentSection === item.id;
     return (
-      <Link key={item.id} href={buildSectionHref(business.id, item.id)} aria-current={active ? 'page' : undefined} className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? 'bg-portal-mist text-portal-forest' : 'text-portal-ink hover:bg-portal-mist/70'}`}>
+      <Link key={item.id} href={buildSectionHref(activeBusiness.id, item.id)} aria-current={active ? 'page' : undefined} className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? 'bg-portal-mist text-portal-forest' : 'text-portal-ink hover:bg-portal-mist/70'}`}>
         <Icon className="h-4 w-4" /> {item.label}
       </Link>
     );
@@ -71,7 +72,7 @@ export function MobileNav({ business, currentSection }: MobileNavProps) {
           const Icon = item.icon;
           const active = currentSection === item.id;
           return (
-            <Link key={item.id} href={buildSectionHref(business.id, item.id)} aria-current={active ? 'page' : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-2 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${active ? 'bg-portal-mist text-portal-forest' : 'text-portal-soft hover:bg-portal-mist/70'}`}>
+            <Link key={item.id} href={buildSectionHref(activeBusiness.id, item.id)} aria-current={active ? 'page' : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-2 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${active ? 'bg-portal-mist text-portal-forest' : 'text-portal-soft hover:bg-portal-mist/70'}`}>
               <Icon className="h-[18px] w-[18px]" />
               {item.label}
             </Link>
