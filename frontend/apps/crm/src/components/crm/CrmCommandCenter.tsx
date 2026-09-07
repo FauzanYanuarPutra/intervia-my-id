@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { OperationsPriorityPanel } from "./OperationsPriorityPanel";
 import { PipelineWorkspace } from "./PipelineWorkspace";
+import { ContactWorkspace } from "./ContactWorkspace";
 import { buildOperationsPriorities } from "./operationsPriority";
 import { CRM_NAV_ITEMS } from "./navigation";
 import type { IconName, PageId } from "./types";
@@ -22,111 +23,13 @@ import {
   type SupportTicket,
 } from "@/lib/api";
 
-type CrmKpi = {
-  label: string;
-  value: string;
-  note: string;
-  trend: string;
-  tone: "green" | "blue" | "amber" | "rose";
-};
+import type { ChartPoint, CrmActivityRow, CrmChatRow, CrmInsight, CrmKpi, CrmListingRow, CrmTransactionRow, CrmUserRow, DashboardData, UnknownRecord } from './models';
 
-type ChartPoint = {
-  label: string;
-  value: number;
-};
-
-type CrmUserRow = {
-  id: string;
-  name: string;
-  handle: string;
-  role: "Buyer" | "Seller" | "Talent" | "Admin";
-  kyc: "Verified" | "Pending" | "Rejected";
-  approvalStatus: string;
-  manualHold: boolean;
-  riskStrikes: number;
-  transactions: number;
-  gmvCents: number;
-  lastActive: string;
-  risk: "low" | "medium" | "high";
-  city: string;
-};
-
-type CrmListingRow = {
-  id: string;
-  title: string;
-  category: string;
-  priceCents: number;
-  currency: string;
-  location: string;
-  status: "active" | "pending" | "rejected" | "draft";
-  rawStatus: string;
-  image: string;
-  ownerId: string;
-  featured: boolean;
-  updatedAt: string;
-  metadata: UnknownRecord;
-  reportCount: number;
-  reporters: string[];
-  reportReasons: string[];
-  reportTicketIds: string[];
-  moderationStatus: string;
-};
-
-type CrmTransactionRow = {
-  id: string;
-  buyer: string;
-  seller: string;
-  amountCents: number;
-  status: string;
-  serviceType: string;
-  riskScore: number;
-  updatedAt: string;
-};
-
-type CrmChatRow = {
-  id: string;
-  name: string;
-  lastMessage: string;
-  stage: "Hot" | "Warm" | "Cold";
-  source: string;
-  listingTitle: string;
-  updatedAt: string;
-  unread: number;
-};
-
-type CrmActivityRow = {
-  id: string;
-  title: string;
-  body: string;
-  type: "user" | "listing" | "chat" | "transaction" | "dispute" | "done";
-  at: string;
-};
-
-type CrmInsight = {
-  title: string;
-  body: string;
-  tone: "green" | "blue" | "amber";
-};
-
-type DashboardData = {
-  leads: CrmLead[];
-  activities: CrmActivityRow[];
-  tickets: SupportTicket[];
-  orders: SuperAppOrder[];
-  trustProfiles: SuperAppTrustProfile[];
-  users: CrmUserRow[];
-  listings: CrmListingRow[];
-  chats: CrmChatRow[];
-  sampleCollections: string[];
-  emptyCollections: string[];
-  failures: string[];
-};
 
 type TrustProfileUpdatePayload = Parameters<
   typeof superAppApi.upsertTrustProfile
 >[2];
 
-type UnknownRecord = Record<string, unknown>;
 
 const CRM_DEMO_DATA_ENABLED = false;
 
@@ -1172,12 +1075,6 @@ function riskLabel(risk: CrmUserRow["risk"]): string {
   return "Risiko Rendah";
 }
 
-function kycLabel(kyc: CrmUserRow["kyc"]): string {
-  if (kyc === "Verified") return "Terverifikasi ✔️";
-  if (kyc === "Rejected") return "Ditolak";
-  return "Perlu Dicek";
-}
-
 function iconPaths(name: IconName): string[] {
   switch (name) {
     case "analytics":
@@ -1890,7 +1787,7 @@ export default function CrmCommandCenter() {
               ) : null}
               {activePage === "pipeline" ? <PipelineWorkspace leads={filteredData.leads} /> : null}
               {activePage === "users" ? (
-                <UsersPage users={filteredData.users} onTrustAction={handleUserTrustAction} />
+                <ContactWorkspace users={filteredData.users} listings={filteredData.listings} orders={data.orders} tickets={data.tickets} trustProfiles={data.trustProfiles} onTrustAction={handleUserTrustAction} />
               ) : null}
               {activePage === "listings" ? (
                 <ListingsPage
@@ -2284,123 +2181,6 @@ function ActivityItem({ activity }: { activity: CrmActivityRow }) {
         <p className="line-clamp-2 text-xs leading-5 text-slate-500">{activity.body}</p>
         <p className="mt-1 text-[11px] font-semibold text-slate-400">{formatDate(activity.at)}</p>
       </div>
-    </div>
-  );
-}
-
-function UsersPage({
-  users,
-  onTrustAction,
-}: {
-  users: CrmUserRow[];
-  onTrustAction: (
-    user: CrmUserRow,
-    action: "approve" | "reject" | "warn" | "hold" | "release",
-  ) => void;
-}) {
-  const [role, setRole] = useState("all");
-  const [kyc, setKyc] = useState("all");
-  const [activity, setActivity] = useState("all");
-  const filtered = users.filter(user => {
-    const roleOk = role === "all" || user.role === role;
-    const kycOk = kyc === "all" || user.kyc === kyc;
-    const activityOk = activity === "all" || (activity === "risk" ? user.risk !== "low" : true);
-    return roleOk && kycOk && activityOk;
-  });
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        label="Trust & KYC"
-        title="Kelola user nakal tanpa bikin admin bingung."
-        body="Approve/reject KYC, beri peringatan, manual hold, atau lepas hold langsung dari trust profile."
-      />
-      <FilterBar
-        filters={[
-          { label: "Role", value: role, onChange: setRole, options: ["all", "Buyer", "Seller", "Talent", "Admin"] },
-          { label: "Status KYC", value: kyc, onChange: setKyc, options: ["all", "Verified", "Pending", "Rejected"] },
-          { label: "Aktivitas", value: activity, onChange: setActivity, options: ["all", "risk"] },
-        ]}
-      />
-      <ShellCard className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-[1180px] w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Nama user</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">KYC</th>
-                <th className="px-4 py-3">Transaksi</th>
-                <th className="px-4 py-3">GMV kontribusi</th>
-                <th className="px-4 py-3">Last active</th>
-                <th className="px-4 py-3">Risiko</th>
-                <th className="px-4 py-3">Trust action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map(user => (
-                <tr key={user.id} className="hover:bg-slate-50/70">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-xs font-bold text-white">
-                        {user.name.slice(0, 1)}
-                      </span>
-                      <div>
-                        <p className="font-bold text-slate-950">{user.name}</p>
-                        <p className="text-xs text-slate-500">{user.handle} - {user.city}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4"><Badge tone="blue">{user.role}</Badge></td>
-                  <td className="px-4 py-4"><Badge tone={user.kyc === "Verified" ? "success" : user.kyc === "Rejected" ? "danger" : "warning"}>{kycLabel(user.kyc)}</Badge></td>
-                  <td className="px-4 py-4 font-bold text-slate-800">{user.transactions}</td>
-                  <td className="px-4 py-4 font-bold text-slate-800">{formatCurrency(user.gmvCents)}</td>
-                  <td className="px-4 py-4 text-slate-500">{formatDate(user.lastActive)}</td>
-                  <td className="px-4 py-4">
-                    <div className="grid gap-1">
-                      <Badge tone={user.risk === "high" ? "danger" : user.risk === "medium" ? "warning" : "success"}>{riskLabel(user.risk)}</Badge>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        {user.manualHold ? "Manual hold aktif" : `${user.riskStrikes} strike`}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex min-w-[280px] flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => onTrustAction(user, "approve")}
-                        className="rounded-xl bg-emerald-600 px-2.5 py-2 text-[11px] font-bold text-white"
-                      >
-                        Approve KYC
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onTrustAction(user, "reject")}
-                        className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] font-bold text-rose-700"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onTrustAction(user, "warn")}
-                        className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] font-bold text-amber-700"
-                      >
-                        Alert
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onTrustAction(user, user.manualHold ? "release" : "hold")}
-                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-bold text-slate-700"
-                      >
-                        {user.manualHold ? "Lepas hold" : "Hold akun"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </ShellCard>
     </div>
   );
 }

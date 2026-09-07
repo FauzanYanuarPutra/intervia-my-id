@@ -1,0 +1,11 @@
+import type { CrmLead, SuperAppOrder, SuperAppTrustProfile, SupportTicket } from '@/lib/api';
+export type UnknownRecord = Record<string, unknown>;
+export type CrmKpi={label:string;value:string;note:string;trend:string;tone:'green'|'blue'|'amber'|'rose'};
+export type ChartPoint={label:string;value:number};
+export type CrmUserRow={id:string;name:string;handle:string;role:'Buyer'|'Seller'|'Talent'|'Admin';kyc:'Verified'|'Pending'|'Rejected';approvalStatus:string;manualHold:boolean;riskStrikes:number;transactions:number;gmvCents:number;lastActive:string;risk:'low'|'medium'|'high';city:string};
+export type CrmListingRow={id:string;title:string;category:string;priceCents:number;currency:string;location:string;status:'active'|'pending'|'rejected'|'draft';rawStatus:string;image:string;ownerId:string;featured:boolean;updatedAt:string;metadata:UnknownRecord;reportCount:number;reporters:string[];reportReasons:string[];reportTicketIds:string[];moderationStatus:string};
+export type CrmTransactionRow={id:string;buyer:string;seller:string;amountCents:number;status:string;serviceType:string;riskScore:number;updatedAt:string};
+export type CrmChatRow={id:string;name:string;lastMessage:string;stage:'Hot'|'Warm'|'Cold';source:string;listingTitle:string;updatedAt:string;unread:number};
+export type CrmActivityRow={id:string;title:string;body:string;type:'user'|'listing'|'chat'|'transaction'|'dispute'|'done';at:string};
+export type CrmInsight={title:string;body:string;tone:'green'|'blue'|'amber'};
+export type DashboardData={leads:CrmLead[];activities:CrmActivityRow[];tickets:SupportTicket[];orders:SuperAppOrder[];trustProfiles:SuperAppTrustProfile[];users:CrmUserRow[];listings:CrmListingRow[];chats:CrmChatRow[];sampleCollections:string[];emptyCollections:string[];failures:string[]};
