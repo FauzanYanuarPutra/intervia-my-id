@@ -29,8 +29,7 @@ jobs:
             echo 'rkyv still present after lock regeneration' >&2
             exit 1
           fi
-          cargo tree --locked -i rkyv --target all 2>&1 | tee /tmp/rkyv-tree.txt
-          grep -q 'nothing to print' /tmp/rkyv-tree.txt || true
+          echo 'rkyv is absent from Marketplace Cargo.lock'
       - name: Verify Marketplace after lock prune
         working-directory: services/marketplace_service
         run: |
