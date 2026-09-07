@@ -73,9 +73,9 @@ pub fn normalize_backoffice_target(raw: &str) -> Result<BackofficeTarget, Backof
         || normalized.starts_with('.')
         || normalized.ends_with('.')
         || normalized.contains("..")
-        || !normalized
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '.')
+        || !normalized.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '_' || character == '.'
+        })
     {
         return Err(BackofficeInputError::InvalidTarget);
     }
