@@ -62,6 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > src/components/crm/models.ts <<'EOF'
+          import type { CrmLead, SuperAppOrder, SuperAppTrustProfile, SupportTicket } from '@/lib/api';
           export type UnknownRecord = Record<string, unknown>;
           export type CrmKpi={label:string;value:string;note:string;trend:string;tone:'green'|'blue'|'amber'|'rose'};
           export type ChartPoint={label:string;value:number};
@@ -71,6 +72,7 @@ jobs:
           export type CrmChatRow={id:string;name:string;lastMessage:string;stage:'Hot'|'Warm'|'Cold';source:string;listingTitle:string;updatedAt:string;unread:number};
           export type CrmActivityRow={id:string;title:string;body:string;type:'user'|'listing'|'chat'|'transaction'|'dispute'|'done';at:string};
           export type CrmInsight={title:string;body:string;tone:'green'|'blue'|'amber'};
+          export type DashboardData={leads:CrmLead[];activities:CrmActivityRow[];tickets:SupportTicket[];orders:SuperAppOrder[];trustProfiles:SuperAppTrustProfile[];users:CrmUserRow[];listings:CrmListingRow[];chats:CrmChatRow[];sampleCollections:string[];emptyCollections:string[];failures:string[]};
           EOF
           cat > src/components/crm/contact360.ts <<'EOF'
           import type { SuperAppOrder, SuperAppTrustProfile, SupportTicket } from '@/lib/api';
@@ -79,13 +81,7 @@ jobs:
           export type Contact360Model={user:CrmUserRow;listings:CrmListingRow[];orders:SuperAppOrder[];support:SupportTicket[];trust:SuperAppTrustProfile|null};
           export function buildContact360(input:AuthorizedContactSources):Contact360Model{
             const id=input.user.id;
-            return {
-              user:input.user,
-              listings:input.listings.filter(item=>item.ownerId===id),
-              orders:input.orders.filter(order=>[order.requester_id,order.partner_id,order.merchant_id,order.provider_id].includes(id)),
-              support:input.tickets.filter(ticket=>ticket.requester_user_id===id),
-              trust:input.trustProfile?.user_id===id?input.trustProfile:null,
-            };
+            return {user:input.user,listings:input.listings.filter(item=>item.ownerId===id),orders:input.orders.filter(order=>[order.requester_id,order.partner_id,order.merchant_id,order.provider_id].includes(id)),support:input.tickets.filter(ticket=>ticket.requester_user_id===id),trust:input.trustProfile?.user_id===id?input.trustProfile:null};
           }
           EOF
           cat > src/components/crm/ContactDetail.tsx <<'EOF'
@@ -93,13 +89,7 @@ jobs:
           import { Card, EmptyState, StatusBadge } from 'lajukan-ui';
           import type { Contact360Model } from './contact360';
           function money(cents:number){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Math.max(0,cents)/100)}
-          export function ContactDetail({model}:{model:Contact360Model}){
-            const u=model.user;
-            return <div className="grid gap-4 xl:grid-cols-2">
-              <Card className="p-5"><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold">{u.name}</h2><StatusBadge tone={u.kyc==='Verified'?'success':u.kyc==='Rejected'?'danger':'warning'}>{u.kyc}</StatusBadge><StatusBadge tone={u.risk==='high'?'danger':u.risk==='medium'?'warning':'success'}>{u.risk}</StatusBadge></div><p className="mt-2 text-sm text-[color:var(--color-text-soft)]">{u.handle} · {u.role} · {u.city}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-[color:var(--color-text-soft)]">Transaksi</dt><dd className="font-bold">{u.transactions}</dd></div><div><dt className="text-[color:var(--color-text-soft)]">GMV</dt><dd className="font-bold">{money(u.gmvCents)}</dd></div><div><dt className="text-[color:var(--color-text-soft)]">Risk strike</dt><dd className="font-bold">{u.riskStrikes}</dd></div><div><dt className="text-[color:var(--color-text-soft)]">Manual hold</dt><dd className="font-bold">{u.manualHold?'Aktif':'Tidak'}</dd></div></dl></Card>
-              <Card className="p-5"><h3 className="font-bold">Riwayat yang tersedia</h3><div className="mt-4 grid gap-2 text-sm"><p>{model.listings.length} listing</p><p>{model.orders.length} order</p><p>{model.support.length} tiket support</p><p>{model.trust?'Trust profile tersedia':'Trust profile belum tersedia'}</p></div>{!model.listings.length&&!model.orders.length&&!model.support.length&&!model.trust?<EmptyState className="mt-4" title="Belum ada riwayat terkait" description="CRM tidak membuat data pengganti ketika sumber belum tersedia."/>:null}</Card>
-            </div>;
-          }
+          export function ContactDetail({model}:{model:Contact360Model}){const u=model.user;return <div className="grid gap-4 xl:grid-cols-2"><Card className="p-5"><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold">{u.name}</h2><StatusBadge tone={u.kyc==='Verified'?'success':u.kyc==='Rejected'?'danger':'warning'}>{u.kyc}</StatusBadge><StatusBadge tone={u.risk==='high'?'danger':u.risk==='medium'?'warning':'success'}>{u.risk}</StatusBadge></div><p className="mt-2 text-sm text-[color:var(--color-text-soft)]">{u.handle} · {u.role} · {u.city}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-[color:var(--color-text-soft)]">Transaksi</dt><dd className="font-bold">{u.transactions}</dd></div><div><dt className="text-[color:var(--color-text-soft)]">GMV</dt><dd className="font-bold">{money(u.gmvCents)}</dd></div><div><dt className="text-[color:var(--color-text-soft)]">Risk strike</dt><dd className="font-bold">{u.riskStrikes}</dd></div><div><dt className="text-[color:var(--color-text-soft)]">Manual hold</dt><dd className="font-bold">{u.manualHold?'Aktif':'Tidak'}</dd></div></dl></Card><Card className="p-5"><h3 className="font-bold">Riwayat yang tersedia</h3><div className="mt-4 grid gap-2 text-sm"><p>{model.listings.length} listing</p><p>{model.orders.length} order</p><p>{model.support.length} tiket support</p><p>{model.trust?'Trust profile tersedia':'Trust profile belum tersedia'}</p></div>{!model.listings.length&&!model.orders.length&&!model.support.length&&!model.trust?<EmptyState className="mt-4" title="Belum ada riwayat terkait" description="CRM tidak membuat data pengganti ketika sumber belum tersedia."/>:null}</Card></div>}
           EOF
           cat > src/components/crm/ContactWorkspace.tsx <<'EOF'
           'use client';
@@ -109,32 +99,22 @@ jobs:
           import type { CrmListingRow, CrmUserRow } from './models';
           import { buildContact360 } from './contact360';
           import { ContactDetail } from './ContactDetail';
-          export function ContactWorkspace({users,listings,orders,tickets,trustProfiles,onTrustAction}:{users:CrmUserRow[];listings:CrmListingRow[];orders:SuperAppOrder[];tickets:SupportTicket[];trustProfiles:SuperAppTrustProfile[];onTrustAction:(user:CrmUserRow,action:'approve'|'reject'|'warn'|'hold'|'release')=>void}){
-            const [selectedId,setSelectedId]=useState<string|null>(null); const [query,setQuery]=useState('');
-            const filtered=useMemo(()=>{const q=query.trim().toLowerCase();return q?users.filter(u=>`${u.name} ${u.handle} ${u.role} ${u.city}`.toLowerCase().includes(q)):users},[users,query]);
-            const selected=users.find(u=>u.id===selectedId)||null;
-            const model=selected?buildContact360({user:selected,listings,orders,tickets,trustProfile:trustProfiles.find(t=>t.user_id===selected.id)||null}):null;
-            return <div className="space-y-5"><PageHeader title="Kontak & User" description="Cari user, cek KYC/trust, lalu lihat Customer 360 hanya dari sumber yang memang tersedia."/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari nama, handle, role, atau kota" className="min-h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 text-sm outline-none focus:ring-4 focus:ring-emerald-100"/>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filtered.map(u=><Card key={u.id} className="p-4"><button type="button" onClick={()=>setSelectedId(u.id)} className="w-full text-left"><div className="flex items-start justify-between gap-2"><div><p className="font-bold">{u.name}</p><p className="text-xs text-[color:var(--color-text-soft)]">{u.handle} · {u.city}</p></div><StatusBadge tone={u.risk==='high'?'danger':u.risk==='medium'?'warning':'success'}>{u.risk}</StatusBadge></div></button><div className="mt-3 flex flex-wrap gap-2"><button onClick={()=>onTrustAction(u,'approve')} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Approve</button><button onClick={()=>onTrustAction(u,'reject')} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700">Reject</button><button onClick={()=>onTrustAction(u,u.manualHold?'release':'hold')} className="rounded-xl border border-[color:var(--color-border)] px-3 py-2 text-xs font-bold">{u.manualHold?'Lepas hold':'Hold'}</button></div></Card>)}</div>
-              {!filtered.length?<EmptyState title="Tidak ada user yang cocok" description="Ubah pencarian atau tunggu data real masuk dari API."/>:null}{model?<ContactDetail model={model}/>:null}
-            </div>;
-          }
+          export function ContactWorkspace({users,listings,orders,tickets,trustProfiles,onTrustAction}:{users:CrmUserRow[];listings:CrmListingRow[];orders:SuperAppOrder[];tickets:SupportTicket[];trustProfiles:SuperAppTrustProfile[];onTrustAction:(user:CrmUserRow,action:'approve'|'reject'|'warn'|'hold'|'release')=>void}){const [selectedId,setSelectedId]=useState<string|null>(null);const [query,setQuery]=useState('');const filtered=useMemo(()=>{const q=query.trim().toLowerCase();return q?users.filter(u=>`${u.name} ${u.handle} ${u.role} ${u.city}`.toLowerCase().includes(q)):users},[users,query]);const selected=users.find(u=>u.id===selectedId)||null;const model=selected?buildContact360({user:selected,listings,orders,tickets,trustProfile:trustProfiles.find(t=>t.user_id===selected.id)||null}):null;return <div className="space-y-5"><PageHeader title="Kontak & User" description="Cari user, cek KYC/trust, lalu lihat Customer 360 hanya dari sumber yang memang tersedia."/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari nama, handle, role, atau kota" className="min-h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 text-sm outline-none focus:ring-4 focus:ring-emerald-100"/><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filtered.map(u=><Card key={u.id} className="p-4"><button type="button" onClick={()=>setSelectedId(u.id)} className="w-full text-left"><div className="flex items-start justify-between gap-2"><div><p className="font-bold">{u.name}</p><p className="text-xs text-[color:var(--color-text-soft)]">{u.handle} · {u.city}</p></div><StatusBadge tone={u.risk==='high'?'danger':u.risk==='medium'?'warning':'success'}>{u.risk}</StatusBadge></div></button><div className="mt-3 flex flex-wrap gap-2"><button onClick={()=>onTrustAction(u,'approve')} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Approve</button><button onClick={()=>onTrustAction(u,'reject')} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700">Reject</button><button onClick={()=>onTrustAction(u,u.manualHold?'release':'hold')} className="rounded-xl border border-[color:var(--color-border)] px-3 py-2 text-xs font-bold">{u.manualHold?'Lepas hold':'Hold'}</button></div></Card>)}</div>{!filtered.length?<EmptyState title="Tidak ada user yang cocok" description="Ubah pencarian atau tunggu data real masuk dari API."/>:null}{model?<ContactDetail model={model}/>:null}</div>}
           EOF
           python - <<'PY'
           from pathlib import Path
           p=Path('src/components/crm/CrmCommandCenter.tsx');s=p.read_text()
-          type_start=s.index('type CrmKpi =')
-          type_end=s.index('\ntype TrustProfileUpdatePayload',type_start)
-          s=s[:type_start]+"import type { ChartPoint, CrmActivityRow, CrmChatRow, CrmInsight, CrmKpi, CrmListingRow, CrmTransactionRow, CrmUserRow, UnknownRecord } from './models';\n\n"+s[type_end:]
-          anchor='import { PipelineWorkspace } from "./PipelineWorkspace";\n'
-          s=s.replace(anchor,anchor+'import { ContactWorkspace } from "./ContactWorkspace";\n',1)
+          type_start=s.index('type CrmKpi =');type_end=s.index('\ntype TrustProfileUpdatePayload',type_start)
+          s=s[:type_start]+"import type { ChartPoint, CrmActivityRow, CrmChatRow, CrmInsight, CrmKpi, CrmListingRow, CrmTransactionRow, CrmUserRow, DashboardData, UnknownRecord } from './models';\n\n"+s[type_end:]
+          s=s.replace('\ntype UnknownRecord = Record<string, unknown>;\n','\n',1)
+          anchor='import { PipelineWorkspace } from "./PipelineWorkspace";\n';s=s.replace(anchor,anchor+'import { ContactWorkspace } from "./ContactWorkspace";\n',1)
           old='{activePage === "users" ? (\n                <UsersPage users={filteredData.users} onTrustAction={handleUserTrustAction} />\n              ) : null}'
           new='{activePage === "users" ? (\n                <ContactWorkspace users={filteredData.users} listings={filteredData.listings} orders={data.orders} tickets={data.tickets} trustProfiles={data.trustProfiles} onTrustAction={handleUserTrustAction} />\n              ) : null}'
           if old not in s: raise SystemExit('users route anchor not found')
           s=s.replace(old,new,1)
-          start=s.index('function UsersPage(')
-          end=s.index('\nfunction ListingsPage(',start)
-          s=s[:start]+s[end+1:]
+          start=s.index('function UsersPage(');end=s.index('\nfunction ListingsPage(',start);s=s[:start]+s[end+1:]
+          if 'function kycLabel(' in s:
+            start=s.index('function kycLabel(');end=s.index('\nfunction iconPaths(',start);s=s[:start]+s[end+1:]
           p.write_text(s)
           PY
       - name: Verify Contact workspace GREEN
