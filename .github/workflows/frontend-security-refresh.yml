@@ -1,0 +1,70 @@
+name: Frontend Security Refresh
+
+on:
+  push:
+    branches:
+      - security/frontend-dependency-audit-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: security/frontend-dependency-audit-20260907
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - name: Merge canonical quality baseline
+        run: |
+          set -euo pipefail
+          git fetch origin fix/marketplace-quality-current-20260907
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-edit origin/fix/marketplace-quality-current-20260907
+      - name: Apply non-forced production audit fixes
+        run: |
+          set -euo pipefail
+          for dir in frontend/apps/www frontend/apps/usaha frontend/apps/cms frontend/apps/crm; do
+            echo "Refreshing $dir"
+            (cd "$dir" && npm audit fix --package-lock-only --legacy-peer-deps --no-fund)
+          done
+      - name: Verify production audits
+        run: |
+          set -euo pipefail
+          for dir in frontend/packages frontend/apps/www frontend/apps/usaha frontend/apps/cms frontend/apps/crm; do
+            [[ -f "$dir/package-lock.json" ]] || continue
+            echo "Auditing $dir"
+            (cd "$dir" && npm audit --omit=dev --audit-level=high)
+          done
+      - name: Build shared UI
+        working-directory: frontend/packages
+        run: |
+          npm ci --legacy-peer-deps --no-audit --no-fund
+          npm run build
+      - name: Verify frontend applications
+        run: |
+          set -euo pipefail
+          for app in www usaha cms crm; do
+            dir="frontend/apps/$app"
+            cd "$GITHUB_WORKSPACE/$dir"
+            npm ci --legacy-peer-deps --no-audit --no-fund
+            npm run lint --if-present
+            npm run test:unit --if-present
+            npm run test --if-present
+            npm run typecheck --if-present
+            npm run build --if-present
+          done
+      - name: Commit verified refresh
+        run: |
+          set -euo pipefail
+          git add frontend/apps/*/package.json frontend/apps/*/package-lock.json frontend/apps/www/src/lib/seo/publicDetailSeo.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'security: refresh frontend production dependencies'
+          fi
+          git push origin HEAD:security/frontend-dependency-audit-20260907
