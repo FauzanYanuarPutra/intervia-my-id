@@ -1,0 +1,181 @@
+name: Marketplace Clippy Repair
+
+on:
+  push:
+    branches:
+      - fix/marketplace-quality-current-20260907
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-clippy-repair-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/marketplace-quality-current-20260907
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Apply current-tree Clippy repairs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          order = Path('services/marketplace_service/src/order_engine.rs')
+          text = order.read_text()
+          old = '''    fn base_status_on_create(&self, input: &CreateOrderRequest) -> OrderBaseStatus {
+                  let is_top = input
+                      .category_specific_metadata
+                      .as_ref()
+                      .and_then(|v| v.get("payment_terms"))
+                      .and_then(|v| v.as_str())
+                      == Some("TOP");
+                  if is_top {
+                      OrderBaseStatus::PendingPayment
+                  } else {
+                      OrderBaseStatus::PendingPayment
+                  }
+              }'''
+          new = '''    fn base_status_on_create(&self, _input: &CreateOrderRequest) -> OrderBaseStatus {
+                  OrderBaseStatus::PendingPayment
+              }'''
+          if old not in text:
+              raise SystemExit('expected base_status_on_create block not found')
+          order.write_text(text.replace(old, new, 1))
+
+          main = Path('services/marketplace_service/src/main.rs')
+          text = main.read_text()
+
+          replacements = [
+              (
+                  '''enum CollectEventsRequest {
+              Batch { events: Vec<TrackEventRequest> },
+              Single(TrackEventRequest),
+          }''',
+                  '''enum CollectEventsRequest {
+              Batch { events: Vec<TrackEventRequest> },
+              Single(Box<TrackEventRequest>),
+          }'''
+              ),
+              (
+                  '''fn is_demand_listing_metadata(metadata: &Value) -> bool {
+              match metadata_listing_side(metadata).as_deref() {
+                  Some("demand")
+                  | Some("need")
+                  | Some("needs")
+                  | Some("request")
+                  | Some("requested")
+                  | Some("seeker")
+                  | Some("buyer request")
+                  | Some("buy request")
+                  | Some("butuh")
+                  | Some("mencari") => true,
+                  _ => false,
+              }
+          }''',
+                  '''fn is_demand_listing_metadata(metadata: &Value) -> bool {
+              matches!(
+                  metadata_listing_side(metadata).as_deref(),
+                  Some("demand")
+                      | Some("need")
+                      | Some("needs")
+                      | Some("request")
+                      | Some("requested")
+                      | Some("seeker")
+                      | Some("buyer request")
+                      | Some("buy request")
+                      | Some("butuh")
+                      | Some("mencari")
+              )
+          }'''
+              ),
+              (
+                  '''    .map(|value| {
+                  if value.starts_with('@') {
+                      value
+                  } else if value.contains(' ') || value.contains('.') {
+                      value
+                  } else if value == "Seseorang" || value == "Someone" {
+                      value
+                  } else {
+                      format!("@{value}")
+                  }
+              })''',
+                  '''    .map(|value| {
+                  if value.starts_with('@')
+                      || value.contains(' ')
+                      || value.contains('.')
+                      || value == "Seseorang"
+                      || value == "Someone"
+                  {
+                      value
+                  } else {
+                      format!("@{value}")
+                  }
+              })'''
+              ),
+              (
+                  '''                    completed.sort_by(|left, right| right.created_at.cmp(&left.created_at));''',
+                  '''                    completed.sort_by_key(|item| std::cmp::Reverse(item.created_at));'''
+              ),
+              (
+                  '''                    Ok(count) if count == 0 => sleep(Duration::from_millis(poll_ms)).await,''',
+                  '''                    Ok(0) => sleep(Duration::from_millis(poll_ms)).await,'''
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'expected replacement block not found: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          single_patterns = [
+              ('CollectEventsRequest::Single(event) => vec![event],', 'CollectEventsRequest::Single(event) => vec![*event],'),
+              ('CollectEventsRequest::Single(event) => vec![event]', 'CollectEventsRequest::Single(event) => vec![*event]'),
+          ]
+          replaced_single = False
+          for old, new in single_patterns:
+              if old in text:
+                  text = text.replace(old, new, 1)
+                  replaced_single = True
+                  break
+          if not replaced_single:
+              raise SystemExit('CollectEventsRequest::Single match arm not found')
+
+          main.write_text(text)
+
+      - name: Format
+        working-directory: services/marketplace_service
+        run: cargo fmt
+
+      - name: Clippy
+        working-directory: services/marketplace_service
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Tests
+        working-directory: services/marketplace_service
+        run: cargo test --locked
+
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- services/marketplace_service/src/main.rs services/marketplace_service/src/order_engine.rs; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service/src/main.rs services/marketplace_service/src/order_engine.rs
+          git commit -m "fix: clear remaining marketplace clippy findings"
+          git push origin HEAD:fix/marketplace-quality-current-20260907
