@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { accessTokenFromCookieHeader } from '@/lib/sessionProxy';
 
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
 
 export async function POST(req: NextRequest) {
   try {
-    const token = req.headers.get('authorization')?.replace('Bearer ', '') || null;
+    const token =
+      accessTokenFromCookieHeader(req.headers.get('cookie')) ||
+      req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+      null;
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,6 +33,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      cache: 'no-store',
     });
 
     const data = await res.json().catch(() => ({}));
