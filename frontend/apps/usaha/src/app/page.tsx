@@ -16,6 +16,7 @@ import { ActionCard } from '@/components/portal/ActionCard';
 import { ReconcileBusinessButton } from '@/components/forms/ReconcileBusinessButton';
 import { DataPanel } from '@/components/portal/DataPanel';
 import { PageHeader } from '@/components/portal/PageHeader';
+import { PendingOrganizationInvitations } from '@/components/portal/PendingOrganizationInvitations';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { PortfolioPanel } from '@/components/portal/PortfolioPanel';
 import { ProgressTracker } from '@/components/portal/ProgressTracker';
@@ -42,7 +43,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   if (!business) {
     return (
       <PortalShell activeBusiness={null} availableBusinesses={[]} viewerName={viewerName} currentSection="home">
-        <section className="mx-auto grid min-h-[calc(100vh-140px)] max-w-5xl place-items-center py-8">
+        <section className="mx-auto grid min-h-[calc(100vh-140px)] max-w-5xl gap-4 py-8">
+          <PendingOrganizationInvitations />
           <div className="portal-panel w-full overflow-hidden p-6 sm:p-9 lg:p-12">
             <span className="portal-icon-tile h-12 w-12"><Building2 className="h-5 w-5" /></span>
             <p className="portal-kicker mt-6">Mulai dari sini</p>
@@ -133,6 +135,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         meta={<><StatusBadge tone={business.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge><span className="text-xs text-portal-soft">{business.city} · {business.category}</span></>}
         action={<Link href={primaryAction.href} className="portal-button-primary">Kerjakan sekarang <ArrowRight className="h-4 w-4" /></Link>}
       />
+
+      <PendingOrganizationInvitations />
 
       <DataPanel title="Prioritas utama" description="Satu tindakan paling penting berdasarkan fondasi usaha, stok, HPP, keuangan, dan settlement yang benar-benar tercatat.">
         <div className="p-4 sm:p-5">

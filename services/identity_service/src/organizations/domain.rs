@@ -16,6 +16,12 @@ pub struct EnsureOrganizationRequest {
     pub name: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CreateOrganizationInvitationRequest {
+    pub username: String,
+    pub role: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedOrganizationInput {
     pub name: String,
@@ -35,6 +41,10 @@ pub enum OrganizationValidationError {
     InvalidName,
     #[error("organization slug must contain 3 to 64 URL-safe characters")]
     InvalidSlug,
+    #[error("invitee username must contain 3 to 30 supported characters")]
+    InvalidInviteeUsername,
+    #[error("unsupported organization invitation role")]
+    InvalidInvitationRole,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
@@ -57,6 +67,19 @@ pub struct OrganizationMemberView {
     pub role: String,
     pub status: String,
     pub joined_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct OrganizationInvitationView {
+    pub id: Uuid,
+    pub org_id: Uuid,
+    pub organization_name: String,
+    pub invitee_user_id: Uuid,
+    pub invitee_username: Option<String>,
+    pub role: String,
+    pub status: String,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }
 
 pub fn validate_create_organization(
@@ -89,6 +112,30 @@ pub fn validate_ensure_organization(
         slug: validated.slug,
         request_hash,
     })
+}
+
+pub fn normalize_invitee_username(value: &str) -> Result<String, OrganizationValidationError> {
+    let username = value.trim().trim_start_matches('@').to_ascii_lowercase();
+    if !(3..=30).contains(&username.len())
+        || username.starts_with('.')
+        || username.ends_with('.')
+        || username.contains("..")
+        || !username.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '_' || character == '.'
+        })
+    {
+        return Err(OrganizationValidationError::InvalidInviteeUsername);
+    }
+    Ok(username)
+}
+
+pub fn validate_invitation_role(value: &str) -> Result<String, OrganizationValidationError> {
+    let role = value.trim().to_ascii_lowercase();
+    match role.as_str() {
+        "org_admin" | "org_manager" | "org_cashier" | "org_inventory" | "org_accounting"
+        | "org_viewer" => Ok(role),
+        _ => Err(OrganizationValidationError::InvalidInvitationRole),
+    }
 }
 
 pub fn organization_slug_candidate(base_slug: &str, collision_index: u32) -> String {
@@ -133,7 +180,6 @@ mod tests {
             Some(" Kedai Kopi Nusantara "),
         )
         .expect("valid organization");
-
         assert_eq!(validated.name, "Kedai Kopi Nusantara");
         assert_eq!(validated.slug, "kedai-kopi-nusantara");
     }
@@ -156,11 +202,10 @@ mod tests {
             .expect("valid ensure request");
         let second =
             validate_ensure_organization("Kedai Kopi Nusantara").expect("valid ensure request");
-
         assert_eq!(first.request_hash, second.request_hash);
         assert_eq!(
             first.request_hash,
-            "c6cd0fd3aba6155c4403e5ce47c619b0dd5537f5698c7dd86add6619523915cb",
+            "c6cd0fd3aba6155c4403e5ce47c619b0dd5537f5698c7dd86add6619523915cb"
         );
     }
 
@@ -168,12 +213,11 @@ mod tests {
     fn ensure_slug_candidates_are_deterministic_and_bounded() {
         let input = validate_ensure_organization(&format!("Kedai {}", "Panjang ".repeat(13)))
             .expect("valid ensure request");
-
         assert!(input.slug.len() <= 64);
         assert_eq!(organization_slug_candidate(&input.slug, 0), input.slug);
         assert_eq!(
             organization_slug_candidate("kedai-kopi-nusantara", 7),
-            "kedai-kopi-nusantara-7",
+            "kedai-kopi-nusantara-7"
         );
         assert!(organization_slug_candidate(&input.slug, 999_999).len() <= 64);
     }
