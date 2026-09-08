@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import CreateMarketplaceShell from './CreateMarketplaceShell';
+import ListingDraftRecoveryBoundary from './ListingDraftRecoveryBoundary';
 import { SectorProvider } from '@/context/SectorContext';
 
 type LayoutProps = {
@@ -9,7 +10,9 @@ type LayoutProps = {
 export default function CreateLayout({ children }: LayoutProps) {
   return (
     <SectorProvider>
-      <CreateMarketplaceShell>{children}</CreateMarketplaceShell>
+      <ListingDraftRecoveryBoundary>
+        <CreateMarketplaceShell>{children}</CreateMarketplaceShell>
+      </ListingDraftRecoveryBoundary>
     </SectorProvider>
   );
 }
@@ -45,7 +48,7 @@ export async function generateMetadata({
         : 'Create a Listing or Brief | Lajukan',
       description: isId
         ? 'Masuk ke jalur Cari Kebutuhan atau Tawarkan, lalu lanjut ke form supplier, talent, rental, lokasi, atau jasa yang paling cocok.'
-        : 'Start from the need or sell flow, then continue to the supplier, talent, rental, property, or service form that fits best.',
+        : 'Start from the need or sell flow, then continue to the supplier, talent, rental, property, service form that fits best.',
       url: canonical,
       type: 'website',
       siteName: 'Lajukan',
