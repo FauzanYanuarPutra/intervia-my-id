@@ -64,7 +64,8 @@ defmodule ChatService.MixProject do
       {:elixir_uuid, "~> 1.2"},
       {:phoenix_pubsub_redis, "~> 3.0"},
       {:html_entities, "~> 0.5"},
-      {:html_sanitize_ex, "~> 1.4"}
+      {:html_sanitize_ex, "~> 1.4"},
+      {:ecto, "~> 3.10"}
     ]
   end
 end
