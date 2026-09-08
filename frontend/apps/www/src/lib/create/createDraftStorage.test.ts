@@ -7,6 +7,7 @@ import {
   getTemporaryCreateDraftKey,
   hasTemporaryCreateDraftProgress,
   readTemporaryCreateDraft,
+  renewTemporaryCreateDraftAfterMissingServerDraft,
   writeTemporaryCreateDraft,
 } from './createDraftStorage';
 
@@ -149,5 +150,43 @@ describe('temporary create draft storage', () => {
         formValues: { title: 'Supplier kopi' },
       }),
     ).toBe(true);
+  });
+
+  it('renews a missing server draft without losing listing progress or uploaded media', () => {
+    const original = {
+      ...createEmptyTemporaryDraft(),
+      draftId: 'dd11fd6d-fb2e-4715-abf3-863c3d79654b',
+      draftVersion: 7,
+      intent: 'offer' as const,
+      categorySlug: 'materials-suppliers',
+      subcategorySlug: 'packaging',
+      industryIds: ['other'],
+      currentStep: 9,
+      formValues: {
+        title: 'FOAM TRAY TGP',
+        location: 'Bandung, Lengkong, Jawa Barat, Indonesia',
+      },
+      media: [
+        {
+          id: 'media-1',
+          url: '/api/content/media/laju-chat/content/photo.jpg',
+          preview: '/api/content/media/laju-chat/content/photo.jpg',
+          name: 'IMG_6331.jpeg',
+          status: 'uploaded' as const,
+        },
+      ],
+    };
+
+    const renewed = renewTemporaryCreateDraftAfterMissingServerDraft(original);
+
+    expect(renewed.draftId).toBeUndefined();
+    expect(renewed.draftVersion).toBeUndefined();
+    expect(renewed.idempotencyKey).not.toBe(original.idempotencyKey);
+    expect(renewed.idempotencyKey).toMatch(/^create-/);
+    expect(renewed.currentStep).toBe(9);
+    expect(renewed.formValues).toEqual(original.formValues);
+    expect(renewed.media).toEqual(original.media);
+    expect(renewed.categorySlug).toBe(original.categorySlug);
+    expect(renewed.subcategorySlug).toBe(original.subcategorySlug);
   });
 });
