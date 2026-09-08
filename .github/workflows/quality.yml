@@ -88,7 +88,12 @@ jobs:
               # Install the required native bindings in one npm transaction: sequential
               # --no-save installs can prune the binding installed by the previous call.
               if [[ "$app" == "www" && "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
-                swc_version=$(node -p "require('./node_modules/next-intl/node_modules/@swc/core/package.json').version")
+                swc_core_package=$(find node_modules -path '*/@swc/core/package.json' -print -quit)
+                if [[ -z "$swc_core_package" ]]; then
+                  echo "Unable to resolve @swc/core package for Linux native binding"
+                  exit 1
+                fi
+                swc_version=$(node -p "require('./${swc_core_package}').version")
                 npm install --no-save --legacy-peer-deps --no-audit --no-fund \
                   @parcel/watcher-linux-x64-glibc@2.5.6 \
                   "@swc/core-linux-x64-gnu@$swc_version"
