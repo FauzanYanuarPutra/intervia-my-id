@@ -57,16 +57,13 @@ defmodule ChatService.MixProject do
       {:hammer_backend_redis, "~> 6.0"},
       {:xandra, "~> 0.19"},
       {:redix, "~> 1.5"},
-      {:decimal, "~> 3.1"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
       {:elixir_uuid, "~> 1.2"},
       {:phoenix_pubsub_redis, "~> 3.0"},
       {:html_entities, "~> 0.5"},
-      {:html_sanitize_ex, "~> 1.4"},
-      {:ecto, "~> 3.10"},
-      {:ecto_sql, "~> 3.10"}
+      {:html_sanitize_ex, "~> 1.4"}
     ]
   end
 end
