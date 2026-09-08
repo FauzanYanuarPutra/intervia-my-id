@@ -311,6 +311,20 @@ export function writeTemporaryCreateDraft(
   return next;
 }
 
+export function renewTemporaryCreateDraftAfterMissingServerDraft(
+  draft: TemporaryCreateDraft,
+): TemporaryCreateDraft {
+  const freshIdentity = createEmptyTemporaryDraft();
+  return {
+    ...draft,
+    draftId: undefined,
+    draftVersion: undefined,
+    idempotencyKey: freshIdentity.idempotencyKey,
+    updatedAt: new Date().toISOString(),
+    draftStorageVersion: TEMP_CREATE_DRAFT_VERSION,
+  };
+}
+
 export function clearTemporaryCreateDraft(ownerId: string) {
   if (typeof window === 'undefined') return;
   const key = getTemporaryCreateDraftKey(ownerId);
