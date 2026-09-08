@@ -58,6 +58,7 @@ function jsonResponse(body: unknown, status = 200) {
 describe('listing draft recovery fetch', () => {
   it('recreates a missing server draft, rotates idempotency, and retries the latest snapshot', async () => {
     let localDraft = staleDraft();
+    const originalIdempotencyKey = localDraft.idempotencyKey;
     const calls: Array<{ url: string; method: string; body?: unknown }> = [];
 
     const baseFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -123,7 +124,7 @@ describe('listing draft recovery fetch', () => {
       media: patchBody().media,
     });
     expect((createCall?.body as Record<string, unknown>).idempotency_key).not.toBe(
-      staleDraft().idempotencyKey,
+      originalIdempotencyKey,
     );
 
     const retryCall = calls.find(
@@ -189,9 +190,12 @@ describe('listing draft recovery fetch', () => {
 
   it('treats an owner-matching published content item as already published instead of duplicating it', async () => {
     let localDraft = staleDraft();
+    let postCount = 0;
+
     const baseFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      if (method === 'POST') postCount += 1;
       if (method === 'PATCH' && url.endsWith(`/api/listing-drafts/${STALE_ID}`)) {
         return jsonResponse({ error: 'Listing draft not found' }, 404);
       }
@@ -230,10 +234,7 @@ describe('listing draft recovery fetch', () => {
     expect(await publishResponse.json()).toMatchObject({
       listing: { id: STALE_ID, slug: 'foam-tray-tgp' },
     });
-
-    expect(
-      baseFetch.mock.calls.some(([, init]) => (init?.method || 'GET').toUpperCase() === 'POST'),
-    ).toBe(false);
+    expect(postCount).toBe(0);
   });
 
   it('fails closed when the stale id resolves to content owned by another user', async () => {
