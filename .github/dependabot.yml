@@ -1,23 +1,18 @@
 version: 2
 
 updates:
-  # Frontend layout on the current repository. When Stage 03 converts frontend/
-  # into a root npm workspace, collapse these directories into /frontend.
+  # Keep frontend dependency PRs scoped to one application/package at a time.
+  # Cross-directory grouping made a single npm hoisting issue block 27 updates.
   - package-ecosystem: npm
-    directories:
-      - /frontend/apps/www
-      - /frontend/apps/usaha
-      - /frontend/apps/cms
-      - /frontend/apps/crm
-      - /frontend/packages
+    directory: /frontend/apps/www
     schedule:
       interval: weekly
       day: monday
       time: "02:00"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
-      frontend-minor-patch:
+      www-minor-patch:
         update-types:
           - minor
           - patch
@@ -25,22 +20,135 @@ updates:
       - dependencies
       - frontend
 
-  - package-ecosystem: cargo
-    directories:
-      - /services/identity_service
-      - /services/marketplace_service
-      - /services/community_service
-      - /services/ai_service
+  - package-ecosystem: npm
+    directory: /frontend/apps/usaha
+    schedule:
+      interval: weekly
+      day: monday
+      time: "02:15"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    groups:
+      usaha-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - frontend
+
+  - package-ecosystem: npm
+    directory: /frontend/apps/cms
+    schedule:
+      interval: weekly
+      day: monday
+      time: "02:30"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 3
+    groups:
+      cms-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - frontend
+
+  - package-ecosystem: npm
+    directory: /frontend/apps/crm
+    schedule:
+      interval: weekly
+      day: monday
+      time: "02:45"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 3
+    groups:
+      crm-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - frontend
+
+  - package-ecosystem: npm
+    directory: /frontend/packages
     schedule:
       interval: weekly
       day: monday
       time: "03:00"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     groups:
-      rust-minor-patch:
+      shared-frontend-minor-patch:
         update-types:
           - minor
+          - patch
+    labels:
+      - dependencies
+      - frontend
+
+  # Keep Rust lock resolution isolated per service. Group only patch updates;
+  # pre-1.0 minor upgrades can contain breaking API changes and should stay standalone.
+  - package-ecosystem: cargo
+    directory: /services/identity_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:15"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    groups:
+      identity-patch:
+        update-types:
+          - patch
+    labels:
+      - dependencies
+      - rust
+
+  - package-ecosystem: cargo
+    directory: /services/marketplace_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:30"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    groups:
+      marketplace-patch:
+        update-types:
+          - patch
+    labels:
+      - dependencies
+      - rust
+
+  - package-ecosystem: cargo
+    directory: /services/community_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:45"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    groups:
+      community-patch:
+        update-types:
+          - patch
+    labels:
+      - dependencies
+      - rust
+
+  - package-ecosystem: cargo
+    directory: /services/ai_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    groups:
+      ai-patch:
+        update-types:
           - patch
     labels:
       - dependencies
@@ -51,7 +159,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
-      time: "04:00"
+      time: "04:15"
       timezone: Asia/Jakarta
     open-pull-requests-limit: 5
     labels:
@@ -65,7 +173,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
-      time: "05:00"
+      time: "04:30"
       timezone: Asia/Jakarta
     open-pull-requests-limit: 5
     labels:
@@ -77,7 +185,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
-      time: "06:00"
+      time: "05:00"
       timezone: Asia/Jakarta
     open-pull-requests-limit: 5
     labels:
