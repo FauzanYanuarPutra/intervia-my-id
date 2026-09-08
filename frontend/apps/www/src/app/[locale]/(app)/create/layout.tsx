@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import CreateMarketplaceShell from './CreateMarketplaceShell';
+import ListingDraftRecoveryBoundary from './ListingDraftRecoveryBoundary';
 import { SectorProvider } from '@/context/SectorContext';
 
 type LayoutProps = {
@@ -9,7 +10,9 @@ type LayoutProps = {
 export default function CreateLayout({ children }: LayoutProps) {
   return (
     <SectorProvider>
-      <CreateMarketplaceShell>{children}</CreateMarketplaceShell>
+      <ListingDraftRecoveryBoundary>
+        <CreateMarketplaceShell>{children}</CreateMarketplaceShell>
+      </ListingDraftRecoveryBoundary>
     </SectorProvider>
   );
 }

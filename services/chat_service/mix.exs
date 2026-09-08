@@ -65,8 +65,7 @@ defmodule ChatService.MixProject do
       {:phoenix_pubsub_redis, "~> 3.0"},
       {:html_entities, "~> 0.5"},
       {:html_sanitize_ex, "~> 1.4"},
-      {:ecto, "~> 3.10"},
-      {:ecto_sql, "~> 3.10"}
+      {:ecto, "~> 3.10"}
     ]
   end
 end

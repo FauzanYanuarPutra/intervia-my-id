@@ -91,8 +91,16 @@ jobs:
         with:
           otp-version: "26.2"
           elixir-version: "1.17.3"
-      - name: Install locked dependencies
-        run: mix deps.get
+      - name: Install active locked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mix deps.get
+          # Remove historical lock entries that are no longer reachable from
+          # mix.exs before auditing. This keeps the audit aligned with the
+          # dependency graph that is actually compiled and shipped.
+          mix deps.unlock --unused
+          mix deps.get
       - name: Audit Hex dependencies
         shell: bash
         run: |
