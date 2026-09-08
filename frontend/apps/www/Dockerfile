@@ -101,7 +101,12 @@ RUN set -eux; \
       OPTIONAL_NATIVE_PACKAGES="${OPTIONAL_NATIVE_PACKAGES} @parcel/watcher-linux-x64-glibc@${PARCEL_WATCHER_VERSION}"; \
     fi; \
     if ! node -e "require.resolve('@swc/core-linux-x64-gnu/package.json')"; then \
-      SWC_CORE_VERSION=$(node -p "require('./node_modules/next-intl/node_modules/@swc/core/package.json').version"); \
+      SWC_CORE_PACKAGE=$(find node_modules -path '*/@swc/core/package.json' -print -quit); \
+      if [ -z "$SWC_CORE_PACKAGE" ]; then \
+        echo "Unable to resolve @swc/core package for Linux native binding"; \
+        exit 1; \
+      fi; \
+      SWC_CORE_VERSION=$(node -p "require('./${SWC_CORE_PACKAGE}').version"); \
       OPTIONAL_NATIVE_PACKAGES="${OPTIONAL_NATIVE_PACKAGES} @swc/core-linux-x64-gnu@${SWC_CORE_VERSION}"; \
     fi; \
     if [ -n "${OPTIONAL_NATIVE_PACKAGES}" ]; then \
