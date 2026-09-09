@@ -7,17 +7,15 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{user_id_from_auth, AppState};
 
 use super::{
-    identity_client::IdentityClient,
-    products::ProductRepository,
-    repository::BusinessRepository,
-    sales::{CreateSaleRequest, SaleRepository, SaleRepositoryError},
-    service::{BusinessService, BusinessServiceError},
+    identity_client::{IdentityClient, IdentityClientError},
+    repository::{BusinessRepository, RepositoryError},
+    sales::{CreateSaleRequest, SaleAggregate, SaleRepository, SaleRepositoryError},
 };
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
@@ -32,19 +30,26 @@ async fn list_sales(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let access = match sales_access_context(&state, &headers, business_id).await {
         Ok(value) => value,
         Err(response) => return response,
     };
     match SaleRepository::new(state.db.clone())
-        .list(business_id, organization_id, 200)
+        .list(business_id, access.organization_id, 200)
         .await
     {
-        Ok(items) => (
-            StatusCode::OK,
-            Json(json!({ "data": { "count": items.len(), "items": items } })),
-        )
-            .into_response(),
+        Ok(items) => {
+            let items = if access.can_view_costs {
+                items
+            } else {
+                items.into_iter().map(redact_sale_costs).collect()
+            };
+            (
+                StatusCode::OK,
+                Json(json!({ "data": { "count": items.len(), "items": items } })),
+            )
+                .into_response()
+        }
         Err(error) => sale_error_response(error),
     }
 }
@@ -55,8 +60,7 @@ async fn create_sale(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateSaleRequest>,
 ) -> Response {
-    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await
-    {
+    let access = match sales_access_context(&state, &headers, business_id).await {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -71,50 +75,90 @@ async fn create_sale(
 
     match SaleRepository::new(state.db.clone())
         .create(
-            actor_id,
+            access.actor_id,
             business_id,
-            organization_id,
+            access.organization_id,
             idempotency_key,
             payload,
         )
         .await
     {
-        Ok(outcome) => (
-            if outcome.replayed {
-                StatusCode::OK
+        Ok(outcome) => {
+            let sale = if access.can_view_costs {
+                outcome.sale
             } else {
-                StatusCode::CREATED
-            },
-            Json(json!({ "data": { "sale": outcome.sale, "replayed": outcome.replayed } })),
-        )
-            .into_response(),
+                redact_sale_costs(outcome.sale)
+            };
+            (
+                if outcome.replayed {
+                    StatusCode::OK
+                } else {
+                    StatusCode::CREATED
+                },
+                Json(json!({ "data": { "sale": sale, "replayed": outcome.replayed } })),
+            )
+                .into_response()
+        }
         Err(error) => sale_error_response(error),
     }
 }
 
-async fn management_context(
+#[derive(Debug, Clone, Copy)]
+struct SalesAccessContext {
+    actor_id: Uuid,
+    organization_id: Uuid,
+    can_view_costs: bool,
+}
+
+async fn sales_access_context(
     state: &AppState,
     headers: &HeaderMap,
     business_id: Uuid,
-) -> Result<(Uuid, Uuid), Response> {
+) -> Result<SalesAccessContext, Response> {
     let (actor_id, authorization) =
         actor_and_authorization(state, headers).map_err(actor_auth_error_response)?;
-    let organization_id = service(state)
-        .management_organization_for_business(&authorization, business_id)
+    let identity = IdentityClient::new(
+        state.http_client.clone(),
+        state.identity_service_url.clone(),
+    );
+    let organizations = identity
+        .list_organizations(&authorization)
         .await
-        .map_err(business_error_response)?;
-    Ok((actor_id, organization_id))
+        .map_err(identity_error_response)?;
+    let repository = BusinessRepository::new(state.db.clone());
+
+    for organization in organizations {
+        let business = repository
+            .get_for_organization(business_id, organization.id)
+            .await
+            .map_err(repository_error_response)?;
+        if business.is_none() {
+            continue;
+        }
+        if !organization.can_record_sales() {
+            return Err(api_error(
+                StatusCode::FORBIDDEN,
+                "business_sales_access_denied",
+            ));
+        }
+        return Ok(SalesAccessContext {
+            actor_id,
+            organization_id: organization.id,
+            can_view_costs: organization.can_view_sale_costs(),
+        });
+    }
+
+    Err(api_error(StatusCode::NOT_FOUND, "business_not_found"))
 }
 
-fn service(state: &AppState) -> BusinessService {
-    BusinessService::new(
-        BusinessRepository::new(state.db.clone()),
-        ProductRepository::new(state.db.clone()),
-        IdentityClient::new(
-            state.http_client.clone(),
-            state.identity_service_url.clone(),
-        ),
-    )
+fn redact_sale_costs(mut sale: SaleAggregate) -> SaleAggregate {
+    sale.sale.cogs_amount = None;
+    for line in &mut sale.lines {
+        line.unit_cogs_amount = None;
+        line.line_cogs_amount = None;
+        line.cost_snapshot = Value::Null;
+    }
+    sale
 }
 
 fn actor_and_authorization(
@@ -139,6 +183,24 @@ enum ActorAuthError {
 
 fn actor_auth_error_response(_error: ActorAuthError) -> Response {
     api_error(StatusCode::UNAUTHORIZED, "auth_required")
+}
+
+fn identity_error_response(error: IdentityClientError) -> Response {
+    match error {
+        IdentityClientError::AccessDenied => {
+            api_error(StatusCode::FORBIDDEN, "business_sales_access_denied")
+        }
+        IdentityClientError::Unavailable | IdentityClientError::InvalidResponse => {
+            api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable")
+        }
+    }
+}
+
+fn repository_error_response(_error: RepositoryError) -> Response {
+    api_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "business_sale_storage_unavailable",
+    )
 }
 
 fn parse_idempotency_key(value: Option<&str>) -> Result<Uuid, &'static str> {
@@ -168,22 +230,6 @@ fn sale_error_response(error: SaleRepositoryError) -> Response {
     }
 }
 
-fn business_error_response(error: BusinessServiceError) -> Response {
-    match error {
-        BusinessServiceError::AccessDenied => {
-            api_error(StatusCode::FORBIDDEN, "business_access_denied")
-        }
-        BusinessServiceError::NotFound => api_error(StatusCode::NOT_FOUND, "business_not_found"),
-        BusinessServiceError::IdentityUnavailable => {
-            api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable")
-        }
-        _ => api_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "business_access_unavailable",
-        ),
-    }
-}
-
 fn api_error(status: StatusCode, code: &'static str) -> Response {
     (status, Json(json!({ "error": code }))).into_response()
 }
@@ -191,6 +237,8 @@ fn api_error(status: StatusCode, code: &'static str) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{NaiveDate, Utc};
+    use rust_decimal::Decimal;
 
     #[test]
     fn sale_idempotency_key_is_required_and_must_be_uuid() {
@@ -220,5 +268,51 @@ mod tests {
             sale_error_response(SaleRepositoryError::Database).status(),
             StatusCode::SERVICE_UNAVAILABLE
         );
+    }
+
+    #[test]
+    fn cashier_response_redacts_cogs_and_recipe_snapshot() {
+        let now = Utc::now();
+        let aggregate = SaleAggregate {
+            sale: super::super::sales::SaleRecord {
+                id: Uuid::new_v4(),
+                business_id: Uuid::new_v4(),
+                organization_id: Uuid::new_v4(),
+                occurred_on: NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
+                channel_key: None,
+                account_key: "cash".to_owned(),
+                status: "completed".to_owned(),
+                gross_amount: 10_000,
+                discount_amount: 0,
+                final_amount: 10_000,
+                cogs_amount: Some(4_000),
+                cost_complete: true,
+                created_by_user_id: Uuid::new_v4(),
+                created_at: now,
+                updated_at: now,
+            },
+            lines: vec![super::super::sales::SaleLineRecord {
+                id: Uuid::new_v4(),
+                sale_id: Uuid::new_v4(),
+                product_id: Uuid::new_v4(),
+                product_name: "Produk".to_owned(),
+                quantity: Decimal::ONE,
+                unit_price_amount: 10_000,
+                discount_amount: 0,
+                final_revenue_amount: 10_000,
+                unit_cogs_amount: Some(4_000),
+                line_cogs_amount: Some(4_000),
+                cost_snapshot: json!({"recipe_name":"rahasia"}),
+                created_at: now,
+                updated_at: now,
+            }],
+        };
+
+        let redacted = redact_sale_costs(aggregate);
+        assert_eq!(redacted.sale.cogs_amount, None);
+        assert_eq!(redacted.lines[0].unit_cogs_amount, None);
+        assert_eq!(redacted.lines[0].line_cogs_amount, None);
+        assert_eq!(redacted.lines[0].cost_snapshot, Value::Null);
+        assert!(redacted.sale.cost_complete);
     }
 }
