@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "frontend"
 APPS = ("www", "usaha", "cms", "crm")
+NODE_MAJOR = "22"
 
 
 def fail(message: str) -> None:
@@ -22,6 +23,30 @@ def load_json(path: Path) -> dict:
         fail(f"missing required file: {path.relative_to(ROOT)}")
     except json.JSONDecodeError as exc:
         fail(f"invalid JSON in {path.relative_to(ROOT)}: {exc}")
+
+
+def check_node_runtime_alignment() -> None:
+    nvmrc = ROOT / ".nvmrc"
+    if not nvmrc.is_file():
+        fail("missing .nvmrc; repository Node runtime must be explicit")
+    if nvmrc.read_text(encoding="utf-8").strip() != NODE_MAJOR:
+        fail(f".nvmrc must pin Node {NODE_MAJOR}")
+
+    expected_base = f"FROM node:{NODE_MAJOR}-bullseye-slim"
+    for app in APPS:
+        dockerfile = FRONTEND / "apps" / app / "Dockerfile"
+        source = dockerfile.read_text(encoding="utf-8")
+        if expected_base not in source:
+            fail(f"{app}: Dockerfile must use {expected_base}")
+
+    for workflow in (
+        ".github/workflows/quality.yml",
+        ".github/workflows/security.yml",
+        ".github/workflows/usaha-business-os-gate.yml",
+    ):
+        source = (ROOT / workflow).read_text(encoding="utf-8")
+        if 'actions/setup-node@v7' in source and f'node-version: "{NODE_MAJOR}"' not in source:
+            fail(f"{workflow}: setup-node must use Node {NODE_MAJOR}")
 
 
 def check_shared_package() -> None:
@@ -81,10 +106,11 @@ def check_app(app: str) -> None:
 
 
 def main() -> int:
+    check_node_runtime_alignment()
     check_shared_package()
     for app in APPS:
         check_app(app)
-    print("Frontend runtime contract OK: www, usaha, cms, crm")
+    print("Frontend runtime contract OK: Node 22, www, usaha, cms, crm")
     return 0
 
 
