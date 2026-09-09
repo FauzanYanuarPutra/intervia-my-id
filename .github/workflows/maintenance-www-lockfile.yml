@@ -23,7 +23,7 @@ jobs:
           cache-dependency-path: frontend/apps/www/package-lock.json
       - name: Regenerate package lock
         working-directory: frontend/apps/www
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        run: npm install --package-lock-only --legacy-peer-deps --ignore-scripts --no-audit --no-fund
       - name: Verify patched Nodemailer is locked
         working-directory: frontend/apps/www
         shell: bash
