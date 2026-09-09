@@ -1,14 +1,21 @@
-use rust_decimal::Decimal;
+use chrono::{DateTime, NaiveDate, Utc};
+use rust_decimal::{prelude::ToPrimitive, Decimal, RoundingStrategy};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
+
+const MAX_SALE_LINES: usize = 100;
+const MAX_CHANNEL_KEY_LEN: usize = 80;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SaleCostingError {
-    InvalidPurchasePrice,
-    InvalidPurchaseQuantity,
-    InvalidConversionFactor,
-    InvalidYieldPercent,
-    InvalidWastePercent,
-    InvalidServings,
+    PurchasePrice,
+    PurchaseQuantity,
+    ConversionFactor,
+    YieldPercent,
+    WastePercent,
+    Servings,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,7 +30,7 @@ pub(crate) struct SnapshotIngredientInput {
     pub(crate) waste_percent: Decimal,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) struct CostSnapshotItem {
     pub(crate) ingredient_id: Uuid,
     pub(crate) ingredient_name: String,
@@ -32,7 +39,7 @@ pub(crate) struct CostSnapshotItem {
     pub(crate) line_cost: Decimal,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) struct CostSnapshot {
     pub(crate) recipe_id: Uuid,
     pub(crate) recipe_version: i64,
@@ -40,6 +47,629 @@ pub(crate) struct CostSnapshot {
     pub(crate) servings: Decimal,
     pub(crate) items: Vec<CostSnapshotItem>,
     pub(crate) production_hpp_per_unit: Decimal,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct CreateSaleLineRequest {
+    pub(crate) product_id: Uuid,
+    pub(crate) quantity: Decimal,
+    pub(crate) unit_price_amount: i64,
+    #[serde(default)]
+    pub(crate) discount_amount: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct CreateSaleRequest {
+    pub(crate) occurred_on: NaiveDate,
+    pub(crate) channel_key: Option<String>,
+    #[serde(default = "default_cash")]
+    pub(crate) account_key: String,
+    pub(crate) lines: Vec<CreateSaleLineRequest>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub(crate) struct SaleRecord {
+    pub(crate) id: Uuid,
+    pub(crate) business_id: Uuid,
+    pub(crate) organization_id: Uuid,
+    pub(crate) occurred_on: NaiveDate,
+    pub(crate) channel_key: Option<String>,
+    pub(crate) account_key: String,
+    pub(crate) status: String,
+    pub(crate) gross_amount: i64,
+    pub(crate) discount_amount: i64,
+    pub(crate) final_amount: i64,
+    pub(crate) cogs_amount: Option<i64>,
+    pub(crate) cost_complete: bool,
+    pub(crate) created_by_user_id: Uuid,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub(crate) struct SaleLineRecord {
+    pub(crate) id: Uuid,
+    pub(crate) sale_id: Uuid,
+    pub(crate) product_id: Uuid,
+    pub(crate) product_name: String,
+    pub(crate) quantity: Decimal,
+    pub(crate) unit_price_amount: i64,
+    pub(crate) discount_amount: i64,
+    pub(crate) final_revenue_amount: i64,
+    pub(crate) unit_cogs_amount: Option<i64>,
+    pub(crate) line_cogs_amount: Option<i64>,
+    pub(crate) cost_snapshot: Value,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SaleAggregate {
+    pub(crate) sale: SaleRecord,
+    pub(crate) lines: Vec<SaleLineRecord>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct CreateSaleOutcome {
+    pub(crate) sale: SaleAggregate,
+    pub(crate) replayed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SaleRepositoryError {
+    NotFound,
+    Validation(&'static str),
+    IncompleteCosting,
+    IdempotencyConflict,
+    Database,
+}
+
+impl From<sqlx::Error> for SaleRepositoryError {
+    fn from(_: sqlx::Error) -> Self {
+        Self::Database
+    }
+}
+
+#[derive(Debug, FromRow)]
+struct RecipeRow {
+    id: Uuid,
+    version: i64,
+    name: String,
+    servings: Decimal,
+}
+
+#[derive(Debug, FromRow)]
+struct IngredientCostRow {
+    ingredient_id: Uuid,
+    ingredient_name: String,
+    recipe_quantity: Decimal,
+    purchase_price_amount: i64,
+    purchase_quantity: Decimal,
+    conversion_factor: Decimal,
+    yield_percent: Decimal,
+    waste_percent: Decimal,
+}
+
+struct PreparedSaleLine {
+    product_id: Uuid,
+    product_name: String,
+    quantity: Decimal,
+    unit_price_amount: i64,
+    discount_amount: i64,
+    final_revenue_amount: i64,
+    unit_cogs_amount: i64,
+    line_cogs_amount: i64,
+    cost_snapshot: Value,
+}
+
+#[derive(Clone)]
+pub(crate) struct SaleRepository {
+    db: PgPool,
+}
+
+impl SaleRepository {
+    pub(crate) fn new(db: PgPool) -> Self {
+        Self { db }
+    }
+
+    pub(crate) async fn list(
+        &self,
+        business_id: Uuid,
+        organization_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<SaleAggregate>, SaleRepositoryError> {
+        ensure_business_pool(&self.db, business_id, organization_id).await?;
+        let sales = sqlx::query_as::<_, SaleRecord>(SALE_SELECT_LIST)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(limit.clamp(1, 500))
+            .fetch_all(&self.db)
+            .await?;
+
+        let mut aggregates = Vec::with_capacity(sales.len());
+        for sale in sales {
+            let lines = load_lines_pool(&self.db, sale.id).await?;
+            aggregates.push(SaleAggregate { sale, lines });
+        }
+        Ok(aggregates)
+    }
+
+    pub(crate) async fn create(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        idempotency_key: Uuid,
+        request: CreateSaleRequest,
+    ) -> Result<CreateSaleOutcome, SaleRepositoryError> {
+        let normalized = validate_request(request)?;
+        let mut tx = self.db.begin().await?;
+        ensure_business_tx(&mut tx, business_id, organization_id).await?;
+
+        if let Some(existing) = find_by_idempotency_tx(&mut tx, business_id, idempotency_key).await?
+        {
+            if existing.organization_id != organization_id {
+                return Err(SaleRepositoryError::IdempotencyConflict);
+            }
+            let lines = load_lines_tx(&mut tx, existing.id).await?;
+            tx.commit().await?;
+            return Ok(CreateSaleOutcome {
+                sale: SaleAggregate {
+                    sale: existing,
+                    lines,
+                },
+                replayed: true,
+            });
+        }
+
+        let mut prepared = Vec::with_capacity(normalized.lines.len());
+        let mut gross_amount = 0_i64;
+        let mut discount_amount = 0_i64;
+        let mut final_amount = 0_i64;
+        let mut cogs_amount = 0_i64;
+
+        for line in &normalized.lines {
+            let prepared_line = prepare_line(&mut tx, business_id, organization_id, line).await?;
+            let line_gross = prepared_line
+                .final_revenue_amount
+                .checked_add(prepared_line.discount_amount)
+                .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+            gross_amount = gross_amount
+                .checked_add(line_gross)
+                .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+            discount_amount = discount_amount
+                .checked_add(prepared_line.discount_amount)
+                .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+            final_amount = final_amount
+                .checked_add(prepared_line.final_revenue_amount)
+                .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+            cogs_amount = cogs_amount
+                .checked_add(prepared_line.line_cogs_amount)
+                .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+            prepared.push(prepared_line);
+        }
+
+        if final_amount <= 0 {
+            return Err(SaleRepositoryError::Validation(
+                "sale_final_amount_must_be_positive",
+            ));
+        }
+
+        let sale_id = Uuid::new_v4();
+        let inserted_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO business_sales (
+              id, business_id, organization_id, idempotency_key, occurred_on,
+              channel_key, account_key, status, gross_amount, discount_amount,
+              final_amount, cogs_amount, cost_complete, created_by_user_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8,$9,$10,$11,TRUE,$12)
+            ON CONFLICT (business_id, idempotency_key) DO NOTHING
+            RETURNING id
+            "#,
+        )
+        .bind(sale_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(idempotency_key)
+        .bind(normalized.occurred_on)
+        .bind(normalized.channel_key.as_deref())
+        .bind(&normalized.account_key)
+        .bind(gross_amount)
+        .bind(discount_amount)
+        .bind(final_amount)
+        .bind(cogs_amount)
+        .bind(actor_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if inserted_id.is_none() {
+            tx.rollback().await?;
+            let existing = find_by_idempotency_pool(&self.db, business_id, idempotency_key)
+                .await?
+                .ok_or(SaleRepositoryError::IdempotencyConflict)?;
+            if existing.organization_id != organization_id {
+                return Err(SaleRepositoryError::IdempotencyConflict);
+            }
+            let lines = load_lines_pool(&self.db, existing.id).await?;
+            return Ok(CreateSaleOutcome {
+                sale: SaleAggregate {
+                    sale: existing,
+                    lines,
+                },
+                replayed: true,
+            });
+        }
+
+        for line in prepared {
+            sqlx::query(
+                r#"
+                INSERT INTO business_sale_lines (
+                  sale_id, product_id, product_name, quantity, unit_price_amount,
+                  discount_amount, final_revenue_amount, unit_cogs_amount,
+                  line_cogs_amount, cost_snapshot
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                "#,
+            )
+            .bind(sale_id)
+            .bind(line.product_id)
+            .bind(line.product_name)
+            .bind(line.quantity)
+            .bind(line.unit_price_amount)
+            .bind(line.discount_amount)
+            .bind(line.final_revenue_amount)
+            .bind(line.unit_cogs_amount)
+            .bind(line.line_cogs_amount)
+            .bind(line.cost_snapshot)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        let finance = sqlx::query(
+            r#"
+            INSERT INTO business_finance_entries (
+              business_id, organization_id, entry_type, account_key, amount,
+              occurred_on, note, channel_key, source_type, source_id, created_by_user_id
+            ) VALUES ($1,$2,'sale_income',$3,$4,$5,'Penjualan tercatat',$6,'business_sale',$7,$8)
+            ON CONFLICT (business_id, source_type, source_id)
+              WHERE source_type IS NOT NULL AND source_id IS NOT NULL
+              DO NOTHING
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(&normalized.account_key)
+        .bind(final_amount)
+        .bind(normalized.occurred_on)
+        .bind(normalized.channel_key.as_deref())
+        .bind(sale_id)
+        .bind(actor_id)
+        .execute(&mut *tx)
+        .await?;
+
+        if finance.rows_affected() != 1 {
+            tx.rollback().await?;
+            return Err(SaleRepositoryError::IdempotencyConflict);
+        }
+
+        let sale = load_sale_tx(&mut tx, sale_id)
+            .await?
+            .ok_or(SaleRepositoryError::Database)?;
+        let lines = load_lines_tx(&mut tx, sale_id).await?;
+        tx.commit().await?;
+
+        Ok(CreateSaleOutcome {
+            sale: SaleAggregate { sale, lines },
+            replayed: false,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct NormalizedSaleRequest {
+    occurred_on: NaiveDate,
+    channel_key: Option<String>,
+    account_key: String,
+    lines: Vec<CreateSaleLineRequest>,
+}
+
+fn validate_request(request: CreateSaleRequest) -> Result<NormalizedSaleRequest, SaleRepositoryError> {
+    if request.lines.is_empty() || request.lines.len() > MAX_SALE_LINES {
+        return Err(SaleRepositoryError::Validation("invalid_sale_lines"));
+    }
+    let account_key = request.account_key.trim().to_ascii_lowercase();
+    if !matches!(
+        account_key.as_str(),
+        "cash" | "bank" | "ewallet" | "receivable"
+    ) {
+        return Err(SaleRepositoryError::Validation("invalid_sale_account"));
+    }
+    let channel_key = request
+        .channel_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase);
+    if channel_key
+        .as_ref()
+        .is_some_and(|value| value.chars().count() > MAX_CHANNEL_KEY_LEN)
+    {
+        return Err(SaleRepositoryError::Validation("invalid_sale_channel"));
+    }
+    for line in &request.lines {
+        if line.quantity <= Decimal::ZERO {
+            return Err(SaleRepositoryError::Validation("invalid_sale_quantity"));
+        }
+        if line.unit_price_amount < 0 || line.discount_amount < 0 {
+            return Err(SaleRepositoryError::Validation("invalid_sale_amount"));
+        }
+    }
+    Ok(NormalizedSaleRequest {
+        occurred_on: request.occurred_on,
+        channel_key,
+        account_key,
+        lines: request.lines,
+    })
+}
+
+async fn prepare_line(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    line: &CreateSaleLineRequest,
+) -> Result<PreparedSaleLine, SaleRepositoryError> {
+    let product_name = sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT name FROM business_products
+        WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'
+        FOR SHARE
+        "#,
+    )
+    .bind(line.product_id)
+    .bind(business_id)
+    .bind(organization_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(SaleRepositoryError::NotFound)?;
+
+    let recipe = sqlx::query_as::<_, RecipeRow>(
+        r#"
+        SELECT id, version, name, servings
+        FROM business_recipes
+        WHERE business_id=$1 AND organization_id=$2 AND product_id=$3 AND status='active'
+        FOR SHARE
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(line.product_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(SaleRepositoryError::IncompleteCosting)?;
+
+    let ingredient_rows = sqlx::query_as::<_, IngredientCostRow>(
+        r#"
+        SELECT
+          bi.id AS ingredient_id,
+          bi.name AS ingredient_name,
+          ri.quantity AS recipe_quantity,
+          bi.purchase_price_amount,
+          bi.purchase_quantity,
+          bi.conversion_factor,
+          bi.yield_percent,
+          COALESCE(ri.waste_percent_override, bi.waste_percent) AS waste_percent
+        FROM business_recipe_items ri
+        JOIN business_ingredients bi ON bi.id=ri.ingredient_id
+        WHERE ri.recipe_id=$1
+          AND bi.business_id=$2
+          AND bi.organization_id=$3
+          AND bi.status='active'
+        ORDER BY ri.position, ri.id
+        FOR SHARE OF bi
+        "#,
+    )
+    .bind(recipe.id)
+    .bind(business_id)
+    .bind(organization_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    if ingredient_rows.is_empty() {
+        return Err(SaleRepositoryError::IncompleteCosting);
+    }
+    let ingredient_inputs = ingredient_rows
+        .into_iter()
+        .map(|row| SnapshotIngredientInput {
+            ingredient_id: row.ingredient_id,
+            ingredient_name: row.ingredient_name,
+            recipe_quantity: row.recipe_quantity,
+            purchase_price_amount: row.purchase_price_amount,
+            purchase_quantity: row.purchase_quantity,
+            conversion_factor: row.conversion_factor,
+            yield_percent: row.yield_percent,
+            waste_percent: row.waste_percent,
+        })
+        .collect::<Vec<_>>();
+
+    let snapshot = calculate_line_snapshot(
+        recipe.id,
+        recipe.version,
+        recipe.name,
+        recipe.servings,
+        &ingredient_inputs,
+    )
+    .map_err(|_| SaleRepositoryError::IncompleteCosting)?;
+
+    let gross = decimal_money(Decimal::from(line.unit_price_amount) * line.quantity)?;
+    if line.discount_amount > gross {
+        return Err(SaleRepositoryError::Validation(
+            "sale_discount_exceeds_line_total",
+        ));
+    }
+    let final_revenue_amount = gross - line.discount_amount;
+    let unit_cogs_amount = decimal_money(snapshot.production_hpp_per_unit)?;
+    let line_cogs_amount = decimal_money(snapshot.production_hpp_per_unit * line.quantity)?;
+    let cost_snapshot =
+        serde_json::to_value(snapshot).map_err(|_| SaleRepositoryError::Database)?;
+
+    Ok(PreparedSaleLine {
+        product_id: line.product_id,
+        product_name,
+        quantity: line.quantity,
+        unit_price_amount: line.unit_price_amount,
+        discount_amount: line.discount_amount,
+        final_revenue_amount,
+        unit_cogs_amount,
+        line_cogs_amount,
+        cost_snapshot,
+    })
+}
+
+fn decimal_money(value: Decimal) -> Result<i64, SaleRepositoryError> {
+    if value < Decimal::ZERO {
+        return Err(SaleRepositoryError::Validation("invalid_sale_amount"));
+    }
+    value
+        .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero)
+        .to_i64()
+        .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))
+}
+
+async fn ensure_business_pool(
+    db: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Result<(), SaleRepositoryError> {
+    let exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM businesses WHERE id=$1 AND organization_id=$2)",
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .fetch_one(db)
+    .await?;
+    if exists {
+        Ok(())
+    } else {
+        Err(SaleRepositoryError::NotFound)
+    }
+}
+
+async fn ensure_business_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Result<(), SaleRepositoryError> {
+    let exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM businesses WHERE id=$1 AND organization_id=$2)",
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if exists {
+        Ok(())
+    } else {
+        Err(SaleRepositoryError::NotFound)
+    }
+}
+
+async fn find_by_idempotency_pool(
+    db: &PgPool,
+    business_id: Uuid,
+    idempotency_key: Uuid,
+) -> Result<Option<SaleRecord>, SaleRepositoryError> {
+    sqlx::query_as::<_, SaleRecord>(SALE_SELECT_BY_IDEMPOTENCY)
+        .bind(business_id)
+        .bind(idempotency_key)
+        .fetch_optional(db)
+        .await
+        .map_err(Into::into)
+}
+
+async fn find_by_idempotency_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    idempotency_key: Uuid,
+) -> Result<Option<SaleRecord>, SaleRepositoryError> {
+    sqlx::query_as::<_, SaleRecord>(SALE_SELECT_BY_IDEMPOTENCY)
+        .bind(business_id)
+        .bind(idempotency_key)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(Into::into)
+}
+
+async fn load_sale_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    sale_id: Uuid,
+) -> Result<Option<SaleRecord>, SaleRepositoryError> {
+    sqlx::query_as::<_, SaleRecord>(SALE_SELECT_BY_ID)
+        .bind(sale_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(Into::into)
+}
+
+async fn load_lines_pool(
+    db: &PgPool,
+    sale_id: Uuid,
+) -> Result<Vec<SaleLineRecord>, SaleRepositoryError> {
+    sqlx::query_as::<_, SaleLineRecord>(SALE_LINE_SELECT)
+        .bind(sale_id)
+        .fetch_all(db)
+        .await
+        .map_err(Into::into)
+}
+
+async fn load_lines_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    sale_id: Uuid,
+) -> Result<Vec<SaleLineRecord>, SaleRepositoryError> {
+    sqlx::query_as::<_, SaleLineRecord>(SALE_LINE_SELECT)
+        .bind(sale_id)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(Into::into)
+}
+
+const SALE_SELECT_LIST: &str = r#"
+SELECT id, business_id, organization_id, occurred_on, channel_key, account_key, status,
+  gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
+  created_by_user_id, created_at, updated_at
+FROM business_sales
+WHERE business_id=$1 AND organization_id=$2
+ORDER BY occurred_on DESC, created_at DESC
+LIMIT $3
+"#;
+
+const SALE_SELECT_BY_IDEMPOTENCY: &str = r#"
+SELECT id, business_id, organization_id, occurred_on, channel_key, account_key, status,
+  gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
+  created_by_user_id, created_at, updated_at
+FROM business_sales
+WHERE business_id=$1 AND idempotency_key=$2
+LIMIT 1
+"#;
+
+const SALE_SELECT_BY_ID: &str = r#"
+SELECT id, business_id, organization_id, occurred_on, channel_key, account_key, status,
+  gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
+  created_by_user_id, created_at, updated_at
+FROM business_sales
+WHERE id=$1
+LIMIT 1
+"#;
+
+const SALE_LINE_SELECT: &str = r#"
+SELECT id, sale_id, product_id, product_name, quantity, unit_price_amount,
+  discount_amount, final_revenue_amount, unit_cogs_amount, line_cogs_amount,
+  cost_snapshot, created_at, updated_at
+FROM business_sale_lines
+WHERE sale_id=$1
+ORDER BY created_at, id
+"#;
+
+fn default_cash() -> String {
+    "cash".to_owned()
 }
 
 pub(crate) fn calculate_effective_ingredient_unit_cost(
@@ -50,21 +680,21 @@ pub(crate) fn calculate_effective_ingredient_unit_cost(
     waste_percent: Decimal,
 ) -> Result<Decimal, SaleCostingError> {
     if purchase_price_amount < 0 {
-        return Err(SaleCostingError::InvalidPurchasePrice);
+        return Err(SaleCostingError::PurchasePrice);
     }
     if purchase_quantity <= Decimal::ZERO {
-        return Err(SaleCostingError::InvalidPurchaseQuantity);
+        return Err(SaleCostingError::PurchaseQuantity);
     }
     if conversion_factor <= Decimal::ZERO {
-        return Err(SaleCostingError::InvalidConversionFactor);
+        return Err(SaleCostingError::ConversionFactor);
     }
 
     let hundred = Decimal::from(100);
     if yield_percent <= Decimal::ZERO || yield_percent > hundred {
-        return Err(SaleCostingError::InvalidYieldPercent);
+        return Err(SaleCostingError::YieldPercent);
     }
     if waste_percent < Decimal::ZERO || waste_percent >= hundred {
-        return Err(SaleCostingError::InvalidWastePercent);
+        return Err(SaleCostingError::WastePercent);
     }
 
     let base_cost = Decimal::from(purchase_price_amount) / purchase_quantity / conversion_factor;
@@ -82,7 +712,7 @@ pub(crate) fn calculate_line_snapshot(
     ingredients: &[SnapshotIngredientInput],
 ) -> Result<CostSnapshot, SaleCostingError> {
     if servings <= Decimal::ZERO {
-        return Err(SaleCostingError::InvalidServings);
+        return Err(SaleCostingError::Servings);
     }
 
     let mut snapshot_items = Vec::with_capacity(ingredients.len());
@@ -121,7 +751,6 @@ pub(crate) fn calculate_line_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal::Decimal;
 
     #[test]
     fn effective_cost_applies_conversion_yield_and_waste() {
@@ -163,5 +792,24 @@ mod tests {
         assert_eq!(snapshot.items.len(), 1);
         assert_eq!(snapshot.items[0].quantity_per_unit, Decimal::from(150));
         assert!(snapshot.production_hpp_per_unit > Decimal::ZERO);
+    }
+
+    #[test]
+    fn sale_request_validation_rejects_invalid_account_and_quantity() {
+        let request = CreateSaleRequest {
+            occurred_on: NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
+            channel_key: Some("offline".into()),
+            account_key: "wallet-that-does-not-exist".into(),
+            lines: vec![CreateSaleLineRequest {
+                product_id: Uuid::nil(),
+                quantity: Decimal::ONE,
+                unit_price_amount: 12_000,
+                discount_amount: 0,
+            }],
+        };
+        assert_eq!(
+            validate_request(request).unwrap_err(),
+            SaleRepositoryError::Validation("invalid_sale_account")
+        );
     }
 }
