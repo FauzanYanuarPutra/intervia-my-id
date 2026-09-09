@@ -206,7 +206,8 @@ impl SaleRepository {
         let mut tx = self.db.begin().await?;
         ensure_business_tx(&mut tx, business_id, organization_id).await?;
 
-        if let Some(existing) = find_by_idempotency_tx(&mut tx, business_id, idempotency_key).await?
+        if let Some(existing) =
+            find_by_idempotency_tx(&mut tx, business_id, idempotency_key).await?
         {
             if existing.organization_id != organization_id {
                 return Err(SaleRepositoryError::IdempotencyConflict);
@@ -372,7 +373,9 @@ struct NormalizedSaleRequest {
     lines: Vec<CreateSaleLineRequest>,
 }
 
-fn validate_request(request: CreateSaleRequest) -> Result<NormalizedSaleRequest, SaleRepositoryError> {
+fn validate_request(
+    request: CreateSaleRequest,
+) -> Result<NormalizedSaleRequest, SaleRepositoryError> {
     if request.lines.is_empty() || request.lines.len() > MAX_SALE_LINES {
         return Err(SaleRepositoryError::Validation("invalid_sale_lines"));
     }

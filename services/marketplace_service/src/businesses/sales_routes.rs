@@ -55,7 +55,8 @@ async fn create_sale(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateSaleRequest>,
 ) -> Response {
-    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -176,7 +177,10 @@ fn business_error_response(error: BusinessServiceError) -> Response {
         BusinessServiceError::IdentityUnavailable => {
             api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable")
         }
-        _ => api_error(StatusCode::SERVICE_UNAVAILABLE, "business_access_unavailable"),
+        _ => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_access_unavailable",
+        ),
     }
 }
 
