@@ -7,6 +7,8 @@
         -Server
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-Permitted-Cross-Domain-Policies "none"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
     }
@@ -38,6 +40,10 @@ usaha.{$APP_DOMAIN} {
 
 api.{$APP_DOMAIN} {
     import security_headers
+
+    @auth_no_store path /auth /auth/*
+    header @auth_no_store Cache-Control "no-store"
+    header @auth_no_store Pragma "no-cache"
 
     @identity path /auth /auth/* /users /users/*
     handle @identity {
