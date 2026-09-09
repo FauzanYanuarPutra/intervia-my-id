@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import { normalizeWorkspaceRole } from '@/lib/business-role';
 import { permissionMap } from '@/lib/portal-access';
 import {
   buildBusinessGoogleMapsUrl,
@@ -192,13 +193,6 @@ export async function listWorkspaceOrganizations(
     .filter(item => item.id && item.name);
 }
 
-function normalizeRole(value: string, isOwner: boolean): PortalRole {
-  if (isOwner || value === 'owner') return 'owner';
-  if (['admin', 'manager', 'org_admin'].includes(value)) return 'manager';
-  if (['cashier', 'staff', 'operator'].includes(value)) return 'cashier';
-  return 'viewer';
-}
-
 function metadataOf(store: JsonRecord): JsonRecord {
   return record(store.metadata) ?? {};
 }
@@ -340,7 +334,7 @@ function mapStore(
     stringValue(metadata.organization_id ?? metadata.organizationId);
   const organization = organizations.find(item => item.id === organizationId);
   const ownerUserId = stringValue(store.owner_user_id);
-  const role = normalizeRole(
+  const role = normalizeWorkspaceRole(
     organization?.currentUserRole ?? '',
     ownerUserId === actor.id || organization?.ownerUserId === actor.id,
   );
