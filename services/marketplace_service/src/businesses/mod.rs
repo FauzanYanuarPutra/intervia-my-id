@@ -6,6 +6,7 @@ mod products;
 mod products_persistence_tests;
 mod repository;
 mod routes;
+pub(crate) mod sales;
 mod service;
 pub(crate) mod settlement;
 
