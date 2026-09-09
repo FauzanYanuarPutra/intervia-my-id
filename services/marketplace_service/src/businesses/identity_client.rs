@@ -21,10 +21,7 @@ impl OrganizationSummary {
     }
 
     pub(crate) fn can_view_sale_costs(&self) -> bool {
-        matches!(
-            self.current_user_role.as_str(),
-            "org_admin" | "org_manager"
-        )
+        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
     }
 }
 
