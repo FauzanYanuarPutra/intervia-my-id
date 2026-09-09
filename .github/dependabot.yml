@@ -1,8 +1,9 @@
 version: 2
 
 updates:
-  # Keep frontend dependency PRs scoped to one application/package at a time.
-  # Cross-directory grouping made a single npm hoisting issue block 27 updates.
+  # Keep frontend updates scoped per application/package. Regular version
+  # updates are intentionally limited to minor/patch releases; Dependabot
+  # security updates are not restricted by allow.update-types.
   - package-ecosystem: npm
     directory: /frontend/apps/www
     schedule:
@@ -10,15 +11,20 @@ updates:
       day: monday
       time: "02:00"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       www-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - minor
           - patch
-    labels:
-      - dependencies
-      - frontend
 
   - package-ecosystem: npm
     directory: /frontend/apps/usaha
@@ -27,15 +33,20 @@ updates:
       day: monday
       time: "02:15"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       usaha-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - minor
           - patch
-    labels:
-      - dependencies
-      - frontend
 
   - package-ecosystem: npm
     directory: /frontend/apps/cms
@@ -44,15 +55,20 @@ updates:
       day: monday
       time: "02:30"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       cms-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - minor
           - patch
-    labels:
-      - dependencies
-      - frontend
 
   - package-ecosystem: npm
     directory: /frontend/apps/crm
@@ -61,15 +77,20 @@ updates:
       day: monday
       time: "02:45"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       crm-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - minor
           - patch
-    labels:
-      - dependencies
-      - frontend
 
   - package-ecosystem: npm
     directory: /frontend/packages
@@ -78,18 +99,24 @@ updates:
       day: monday
       time: "03:00"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       shared-frontend-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - minor
           - patch
-    labels:
-      - dependencies
-      - frontend
 
-  # Keep Rust lock resolution isolated per service. Group only patch updates;
-  # pre-1.0 minor upgrades can contain breaking API changes and should stay standalone.
+  # Keep Rust lock resolution isolated per service. Regular version updates are
+  # patch-only because pre-1.0 minor releases can contain breaking API changes.
+  # Security updates remain eligible even when they require a larger jump.
   - package-ecosystem: cargo
     directory: /services/identity_service
     schedule:
@@ -97,14 +124,18 @@ updates:
       day: monday
       time: "03:15"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
     groups:
       identity-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - patch
-    labels:
-      - dependencies
-      - rust
 
   - package-ecosystem: cargo
     directory: /services/marketplace_service
@@ -113,14 +144,18 @@ updates:
       day: monday
       time: "03:30"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
     groups:
       marketplace-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - patch
-    labels:
-      - dependencies
-      - rust
 
   - package-ecosystem: cargo
     directory: /services/community_service
@@ -129,14 +164,18 @@ updates:
       day: monday
       time: "03:45"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
     groups:
       community-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - patch
-    labels:
-      - dependencies
-      - rust
 
   - package-ecosystem: cargo
     directory: /services/ai_service
@@ -145,14 +184,18 @@ updates:
       day: monday
       time: "04:00"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
     groups:
       ai-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - patch
-    labels:
-      - dependencies
-      - rust
 
   - package-ecosystem: mix
     directory: /services/chat_service
@@ -161,12 +204,9 @@ updates:
       day: monday
       time: "04:15"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - elixir
+    open-pull-requests-limit: 2
 
-  # Keep Python service dependency resolution independent too. A broken OCR update
+  # Keep Python service dependency resolution independent. A broken OCR update
   # must not block liveness updates (and vice versa).
   - package-ecosystem: pip
     directory: /services/ocr_service
@@ -175,10 +215,7 @@ updates:
       day: monday
       time: "04:30"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - python
+    open-pull-requests-limit: 2
 
   - package-ecosystem: pip
     directory: /services/liveness_service
@@ -187,10 +224,7 @@ updates:
       day: monday
       time: "04:45"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - python
+    open-pull-requests-limit: 2
 
   - package-ecosystem: github-actions
     directory: /
@@ -199,7 +233,4 @@ updates:
       day: monday
       time: "05:00"
       timezone: Asia/Jakarta
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - ci
+    open-pull-requests-limit: 2
