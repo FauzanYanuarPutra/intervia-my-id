@@ -166,14 +166,26 @@ updates:
       - dependencies
       - elixir
 
+  # Keep Python service dependency resolution independent too. A broken OCR update
+  # must not block liveness updates (and vice versa).
   - package-ecosystem: pip
-    directories:
-      - /services/ocr_service
-      - /services/liveness_service
+    directory: /services/ocr_service
     schedule:
       interval: weekly
       day: monday
       time: "04:30"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+
+  - package-ecosystem: pip
+    directory: /services/liveness_service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
       timezone: Asia/Jakarta
     open-pull-requests-limit: 5
     labels:
