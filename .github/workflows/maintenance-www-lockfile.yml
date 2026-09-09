@@ -1,0 +1,39 @@
+name: Maintenance WWW Lockfile
+
+on:
+  pull_request:
+    paths:
+      - "frontend/apps/www/package.json"
+      - "frontend/apps/www/package-lock.json"
+      - ".github/workflows/maintenance-www-lockfile.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/apps/www/package-lock.json
+      - name: Regenerate package lock
+        working-directory: frontend/apps/www
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify patched Nodemailer is locked
+        working-directory: frontend/apps/www
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const l=require("./package-lock.json"); const v=l.packages["node_modules/nodemailer"]?.version; if (!v || v === "9.1.0" || v === "9.0.2") throw new Error(`unsafe nodemailer lock: ${v}`); console.log(`nodemailer locked at ${v}`)'
+      - name: Upload regenerated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: www-package-lock
+          path: frontend/apps/www/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
