@@ -81,5 +81,8 @@ async fn finance_source_reference_is_unique_per_business(pool: PgPool) {
     .execute(&pool)
     .await;
 
-    assert!(duplicate.is_err(), "duplicate source effect must be rejected");
+    assert!(
+        duplicate.is_err(),
+        "duplicate source effect must be rejected"
+    );
 }
