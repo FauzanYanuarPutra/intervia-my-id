@@ -125,6 +125,13 @@ fn parse_organization_list(body: &str) -> Result<Vec<OrganizationSummary>, Ident
 mod tests {
     use super::*;
 
+    fn organization(role: &str) -> OrganizationSummary {
+        OrganizationSummary {
+            id: Uuid::new_v4(),
+            current_user_role: role.to_owned(),
+        }
+    }
+
     #[test]
     fn organization_list_parses_the_identity_envelope() {
         let body = r#"{"data":{"count":1,"items":[{"id":"76b836f4-3032-433f-8ac7-04a88f1a8511","name":"Cuk","slug":"cuk","owner_user_id":"44444444-4444-4444-8444-444444444444","current_user_role":"org_admin"}]}}"#;
@@ -141,11 +148,24 @@ mod tests {
 
     #[test]
     fn ordinary_organization_members_cannot_mutate_businesses() {
-        let member = OrganizationSummary {
-            id: Uuid::new_v4(),
-            current_user_role: "org_member".to_owned(),
-        };
+        assert!(!organization("org_member").can_manage_businesses());
+    }
 
-        assert!(!member.can_manage_businesses());
+    #[test]
+    fn sales_recording_allows_admin_manager_and_cashier_only() {
+        assert!(organization("org_admin").can_record_sales());
+        assert!(organization("org_manager").can_record_sales());
+        assert!(organization("org_cashier").can_record_sales());
+        assert!(!organization("org_inventory").can_record_sales());
+        assert!(!organization("org_accounting").can_record_sales());
+        assert!(!organization("org_viewer").can_record_sales());
+    }
+
+    #[test]
+    fn sales_cost_visibility_excludes_cashiers() {
+        assert!(organization("org_admin").can_view_sale_costs());
+        assert!(organization("org_manager").can_view_sale_costs());
+        assert!(!organization("org_cashier").can_view_sale_costs());
+        assert!(!organization("org_viewer").can_view_sale_costs());
     }
 }
