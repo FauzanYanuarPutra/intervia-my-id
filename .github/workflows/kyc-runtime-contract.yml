@@ -104,6 +104,7 @@ jobs:
   kyc-runtime-gate:
     name: KYC runtime gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs: [contract, liveness-runtime]
     steps:

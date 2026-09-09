@@ -83,6 +83,7 @@ jobs:
   gate:
     name: Usaha business OS gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs: [contract, frontend]
     steps:
