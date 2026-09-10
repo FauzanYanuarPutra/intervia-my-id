@@ -40,7 +40,7 @@ Wave 2B covers four public intent types:
 3. **Request Quotation (RFQ)** — buyer requests merchant quotation instead of immediate checkout.
 4. **Demand / Need request** — structured requirement that can later be matched/responded to by suppliers, while still generating operational context when directed to a merchant.
 
-The first implementation should prioritize the most mature current flow: canonical product order plus directed RFQ/request, while keeping the public API shape extensible to services and B2B later.
+Implementation proceeds in the sequence defined in section 18. The first implementation checkpoint is product order creation and merchant receipt; RFQ/inquiry follows only after the order path is green and merged.
 
 ## Out of scope for Wave 2B
 - Full marketplace payment settlement redesign.
@@ -77,15 +77,15 @@ A buyer may become a business customer when enough real identity exists and a qu
 
 Create a category-specific public boundary under Marketplace rather than enabling the generic order engine.
 
-Suggested conceptual endpoints:
+Preferred fallback routes when no existing category-specific route already owns the behavior:
 
 - `POST /api/public/commerce/orders`
+- `GET /api/public/commerce/orders/:id`
 - `POST /api/public/commerce/rfqs`
 - `POST /api/public/commerce/inquiries`
 - `POST /api/public/commerce/requests`
-- `GET /api/public/commerce/orders/:id` for the authenticated buyer's safe view
 
-Exact routes should follow current repository conventions discovered during implementation; externally observable existing routes must not be broken.
+Implementation must first search existing routes. If an equivalent public category-specific route already exists, characterize and extend it rather than introducing a duplicate. Otherwise use the fallback routes above. Existing externally observable routes must not be broken.
 
 ## Public create-order input
 Caller may provide only intent-level fields such as:
@@ -131,25 +131,19 @@ If any critical input cannot be resolved safely, fail closed with a stable domai
 
 # 4. Commerce Record Semantics
 
-## Separate lifecycle dimensions
-Do not overload a single status.
+## Keep lifecycle dimensions separate
+Do not overload one status field to represent commercial, payment, and fulfillment state.
 
-### Order status
-Represents commercial acceptance/progress, e.g.:
-`PENDING_CONFIRMATION -> ACCEPTED -> PROCESSING -> COMPLETED`
-with terminal alternatives such as `REJECTED`, `CANCELLED`, `EXPIRED`.
+### Existing base status is authoritative
+Wave 2B must reuse the existing `OrderBaseStatus` state machine unless characterization proves a concrete business state cannot be represented safely.
 
-Where existing `OrderBaseStatus` names already cover the behavior, preserve them rather than introducing parallel semantics.
+Do not add `ACCEPTED` or `PENDING_CONFIRMATION` merely for naming preference. Public order creation uses the current category strategy's initial base/payment status. Merchant acceptance should use the existing `accepted_at` field plus an already-valid base transition when possible. A new base-status enum value requires a separately justified schema/state-machine expansion with migration and transition tests.
 
 ### Payment status
-Independent values such as:
-`UNPAID`, `PENDING`, `PAID`, `FAILED`, `REFUNDED`, etc.
+Existing payment status remains independent from base status. A merchant accepting an order must not imply payment unless payment has actually been confirmed by the supported payment/recording flow.
 
 ### Fulfillment status
-If current schema does not yet provide a dedicated dimension, Wave 2B should introduce one only if required to avoid abusing base status. Preferred progression:
-`UNFULFILLED -> PREPARING -> READY -> SHIPPED/IN_SERVICE -> DELIVERED -> FULFILLED`
-
-The implementation plan must first inventory the existing schema/migrations and choose expand/backfill rather than destructive replacement.
+Implementation must inventory the current schema before adding any fulfillment dimension. If fulfillment can be represented without corrupting base/payment semantics, preserve the current schema. If not, introduce an explicit fulfillment status by expand/backfill migration rather than encoding it into arbitrary metadata.
 
 ## Source attribution
 Every inbound record must retain durable attribution:
@@ -168,18 +162,20 @@ Do not store arbitrary frontend blobs as the canonical contract.
 
 A public order is valid only when all of the following hold atomically:
 
-- buyer is authenticated when the flow requires identity;
+- buyer identity is derived from authentication when identity is required;
 - product/service is public and orderable;
 - owning business is active/publishable;
 - requested quantity is positive and within supported numeric bounds;
 - selected variant belongs to the selected product;
 - authoritative price is resolved server-side;
-- availability is sufficient or the flow explicitly supports merchant confirmation/backorder;
+- effective public availability is sufficient for the requested quantity;
 - merchant attribution is canonical;
 - idempotency key is unique within the appropriate buyer/action scope;
 - no cross-tenant identifiers are accepted from the caller.
 
-No sale, inventory decrement, or revenue recognition should happen merely because a buyer created an unaccepted/unpaid order unless the existing commerce policy explicitly requires reservation.
+Wave 2B does not support implicit backorder in the first order implementation. If availability is insufficient, creation fails with a stable conflict/domain error and the client must refresh/retry intentionally.
+
+No sale, inventory decrement, or revenue recognition happens merely because a buyer submits an order.
 
 ---
 
@@ -187,15 +183,13 @@ No sale, inventory decrement, or revenue recognition should happen merely becaus
 
 Wave 2A provides safe public availability. Wave 2B must not immediately consume ingredient inventory when a buyer merely submits an order.
 
-Recommended policy for the first implementation:
+For Wave 2B.1 and 2B.2 the policy is explicit:
 
-- **No hard inventory decrement on order submission.**
-- Add or use a reservation mechanism only where a payment/acceptance flow truly requires it.
-- If reservation is introduced, `available = on_hand/capacity - active_reservations` must become a documented canonical invariant.
-- Reservation must expire/release safely on cancellation, rejection, or timeout.
-- Duplicate retries must not reserve twice.
+- **No inventory reservation and no hard inventory decrement on order submission.**
+- Availability is revalidated at order creation and again at the business event that causes sale/inventory effects.
+- A rejected, cancelled, or expired order produces no inventory consumption.
 
-Because reservation semantics affect Wave 2A availability, procurement, and POS concurrency, implementation must not add a partial reservation field without end-to-end tests.
+If later payment/acceptance behavior proves reservation is required, reservation becomes a separately reviewed sub-change because it alters the Wave 2A availability invariant. It must include durable reservation rows/uniqueness, expiry/release behavior, duplicate-retry safety, and end-to-end concurrency tests before it can ship.
 
 ---
 
@@ -248,26 +242,26 @@ Recommended views:
 - **Pertanyaan** — inquiries where useful;
 - **Selesai** — completed/closed records.
 
-Each row/card should show only actionable information:
+Each row/card shows only actionable information:
 - buyer/customer display identity allowed to merchant;
 - source (`WWW`);
 - product/service;
 - quantity/value where known;
-- order/payment/fulfillment state;
-- age/received time;
-- next required action.
+- current base/payment/fulfillment state as independently defined;
+- received time/age;
+- next permitted action.
 
 Avoid fake unread counts or decorative KPIs.
 
 ## Merchant actions
-Depending on type and current lifecycle:
-- accept;
+Depending on record type and current lifecycle:
+- accept/respond through the existing safe lifecycle;
 - reject with reason;
 - contact/respond;
-- mark processing;
-- initiate quotation;
-- record/confirm payment through existing safe payment flow;
-- fulfill/complete;
+- mark processing through permitted transition;
+- initiate quotation for RFQ;
+- record/confirm payment only through existing safe payment flow;
+- fulfill/complete through permitted transition;
 - cancel/refund only through permitted state transition.
 
 Every merchant action is authorized against the target business and actor role server-side.
@@ -278,35 +272,36 @@ Every merchant action is authorized against the target business and actor role s
 
 An inbound order must not create duplicate operational records as it progresses.
 
-When policy conditions are met, the same canonical order should drive downstream effects:
+When existing business policy reaches the correct completion/payment event, the same canonical order drives downstream effects:
 
-`order -> payment/acceptance -> fulfillment -> sale/COGS/inventory/customer/reporting`
+`order -> accepted/paid/fulfilled according to policy -> sale -> historical COGS -> inventory movement -> finance/customer/reporting`
 
-If the existing Business OS sale model remains a distinct aggregate, conversion must be explicit and idempotent with durable source linkage:
+The existing Business OS sale aggregate remains distinct unless repository inspection proves it is already the same aggregate. If distinct, conversion is explicit and idempotent with durable relational source linkage:
 
-- `business_sale.source_type = order` (or equivalent canonical relationship);
-- `source_order_id` unique where one order maps to one sale;
-- retry cannot produce a second sale;
-- historical COGS uses the same rules already established in Wave 1;
-- inventory consumption occurs once at the correct business event;
-- finance effects remain source-linked and transactional.
+- sale stores a canonical source-order relationship;
+- source-order uniqueness prevents a second sale for the same conversion event;
+- retry returns/reuses the existing conversion result;
+- historical COGS uses Wave 1 rules;
+- inventory consumption occurs once at the designated sale/completion event;
+- finance effects remain source-linked and transactional;
+- rejected/cancelled/expired orders cannot produce sale effects.
 
-Do not copy values into unrelated metadata when a relational source link exists or can be added safely.
+Do not copy source links only into unrelated metadata when a relational key can be added safely.
 
 ---
 
 # 10. Customer Attribution
 
-Qualifying WWW actions should progressively create/link customer identity for the merchant.
+Qualifying WWW actions progressively create/link customer identity for the merchant.
 
 Priority order:
-1. completed/accepted order;
+1. successfully converted order/sale;
 2. RFQ with identifiable buyer;
 3. meaningful inquiry/chat interaction where enough identity is known.
 
 Customer creation/linking must be idempotent and scoped to the merchant/business. The same platform user may be a customer of many businesses without those businesses seeing each other's private relationship data.
 
-Customer data exposed to the merchant must follow privacy rules and verified identity boundaries.
+Customer data exposed to the merchant follows privacy rules and verified identity boundaries.
 
 ---
 
@@ -315,7 +310,7 @@ Customer data exposed to the merchant must follow privacy rules and verified ide
 Required:
 - derive buyer identity from auth claims;
 - derive seller/business from canonical target object;
-- server-side price resolution;
+- resolve price server-side;
 - tenant authorization on every merchant operation;
 - ownership checks on buyer-side reads/cancellations;
 - rate limits for inquiry/RFQ/order creation;
@@ -325,7 +320,7 @@ Required:
 - no authorization/JWT/contact-sensitive payload logging;
 - public DTO allowlists.
 
-High-risk actions must fail closed.
+High-risk actions fail closed.
 
 ---
 
@@ -336,14 +331,14 @@ Every create/convert action that can be retried must be idempotent.
 At minimum:
 - public order create;
 - RFQ create;
-- quotation-to-order conversion later;
 - order-to-sale conversion;
 - payment callback processing;
-- inventory reservation/release if introduced.
+- future quotation-to-order conversion;
+- future reservation/release if reservation is approved later.
 
-Idempotency must be enforced by durable uniqueness, not only application-memory checks.
+Idempotency is enforced by durable uniqueness, not only application-memory checks.
 
-Concurrent merchant transitions use row/version locking or an existing optimistic-concurrency mechanism. Illegal or stale transitions return stable conflict errors instead of silently overwriting state.
+Concurrent merchant transitions use row/version locking or the existing optimistic-concurrency mechanism. Illegal or stale transitions return stable conflict errors instead of silently overwriting state.
 
 ---
 
@@ -353,17 +348,17 @@ Use transactional outbox semantics for events coupled to DB state.
 
 Candidate events:
 - `order.created`;
-- `order.accepted`;
+- `order.accepted` only if acceptance is an actual canonical event in the implemented lifecycle;
 - `order.rejected`;
 - `order.payment_changed`;
-- `order.fulfillment_changed`;
+- `order.fulfillment_changed` only if a canonical fulfillment dimension exists;
 - `order.completed`;
 - `rfq.created`;
 - `inquiry.created`.
 
-Consumers must be idempotent.
+Consumers are idempotent.
 
-Structured telemetry should include non-sensitive fields such as:
+Structured telemetry includes non-sensitive fields such as:
 - request/correlation ID;
 - aggregate ID;
 - business ID when safe for internal logs;
@@ -378,7 +373,7 @@ Useful metrics:
 - inbound order count;
 - RFQ/inquiry count;
 - merchant response latency;
-- acceptance/rejection rate;
+- rejection/completion rate where definitions are stable;
 - transition conflicts;
 - idempotent replay count;
 - failed public commerce requests by stable reason;
@@ -388,17 +383,17 @@ Useful metrics:
 
 # 14. Frontend WWW
 
-WWW detail surfaces should expose only actions supported by the backend for that item/business.
+WWW detail surfaces expose only actions supported by the backend for that item/business.
 
-Recommended CTA priority:
+CTA priority:
 - `Pesan` / `Beli` when directly orderable;
 - `Minta Penawaran` for quotation-oriented products/services;
 - `Tanya` as low-friction fallback.
 
 Requirements:
 - loading, validation, success, retry, and conflict states;
-- prevent duplicate submission while still relying on backend idempotency;
-- clear confirmation with a buyer-visible reference;
+- prevent duplicate button submission while still relying on backend idempotency;
+- clear confirmation with buyer-visible reference;
 - authenticated-user return path after login;
 - mobile-first forms;
 - price/availability revalidation on submit;
@@ -418,7 +413,7 @@ Requirements:
 - optimistic UI only where rollback/error state is reliable;
 - consistent permission-disabled states;
 - customer/context drill-through without exposing platform-internal secrets;
-- no duplicate order and sale views that disagree about status.
+- no duplicate order and sale views that disagree about source or lifecycle.
 
 ---
 
@@ -431,40 +426,44 @@ Before modifying the existing engine, lock current behavior for:
 - idempotency;
 - allowed transitions;
 - outbox uniqueness;
-- buyer/operator authorization boundary;
-- server-authoritative catalog price/merchant resolution on category-specific public paths.
+- operator-only generic order boundary;
+- any existing category-specific public order behavior discovered during implementation.
 
 ## Public commerce tests
 Must prove:
-- caller-supplied merchant/price cannot override canonical values;
+- caller cannot authoritatively submit merchant/organization/seller identity;
+- caller-supplied monetary fields are absent/ignored by contract and cannot override canonical price;
 - unpublished/unavailable product fails correctly;
+- insufficient quantity fails without side effects;
 - quantity validation;
-- variant ownership validation;
+- variant ownership validation where variants are supported;
 - duplicate idempotency key returns/reuses one canonical record;
 - buyer cannot read/cancel another buyer's order;
-- cross-tenant merchant mutation fails closed.
+- no sale/inventory/finance effect occurs on order creation.
 
 ## Merchant operational tests
 Must prove:
 - inbound WWW record appears only for its owning business;
+- cross-tenant merchant access fails closed;
 - merchant transitions obey role and lifecycle;
 - payment state remains independent from base/fulfillment state;
-- rejected/cancelled records do not create sale/inventory effects;
-- qualifying completion/conversion produces at most one sale;
+- rejected/cancelled/expired records do not create sale/inventory effects;
+- qualifying conversion produces at most one sale;
 - sale uses historical COGS/inventory behavior already proven in Wave 1;
 - customer linkage is idempotent and business-scoped.
 
 ## Frontend tests
-WWW and Usaha must cover:
+WWW and Usaha cover:
 - supported CTA rendering;
-- validation/error states;
-- submission replay protection;
-- order/RFQ inbox states;
+- validation/error/conflict states;
+- duplicate-submit UX protection;
+- buyer confirmation/reference;
+- merchant order/RFQ inbox states;
 - permission handling;
 - responsive critical paths.
 
 ## Full verification before merge
-At minimum use relevant repository gates for:
+Use relevant repository gates for:
 - Rust format/clippy/tests;
 - PostgreSQL migrations and integration tests;
 - WWW and Usaha lint/test/typecheck/build;
@@ -479,13 +478,13 @@ At minimum use relevant repository gates for:
 
 Prefer expand/backfill/switch/verify/contract.
 
-Implementation must inventory the current `orders`, `order_items`, state transition, payment, source metadata, and Business OS sales/customer schemas before introducing columns/tables.
+Implementation inventories the current `orders`, `order_items`, state-transition, payment, outbox, source-attribution, Business OS sales, customer, and merchant-membership schemas before introducing columns/tables.
 
 Rules:
 - never rewrite applied migrations;
 - new schema in versioned migration;
-- indexes for buyer, merchant/business, status, source, and idempotency lookup as justified by query shape;
-- durable unique constraints for idempotency/source conversions;
+- indexes for actual buyer/merchant/status/source/idempotency query shapes;
+- durable unique constraints for idempotency and source conversions;
 - rollback/recovery documented for risky DDL;
 - no giant metadata JSON as substitute for relational lifecycle state.
 
@@ -493,45 +492,47 @@ Rules:
 
 # 18. Delivery Decomposition
 
-Wave 2B is too important for one unreviewable code dump. Deliver as coherent implementation PRs only when boundaries justify it, while keeping one canonical target architecture.
+Wave 2B is an umbrella commerce loop and is delivered sequentially. Each checkpoint is independently testable and mergeable; the next checkpoint starts from updated `main`.
 
-Recommended implementation sequence:
-
-### 2B.1 — Public Order Boundary
+### 2B.1 — Public Product Order Boundary
+- characterize existing order engine/public routes;
 - server-authoritative product/merchant/price resolution;
 - buyer auth;
+- effective availability validation;
 - idempotent canonical order create;
 - safe buyer order read;
-- source attribution;
-- tests.
+- `WWW` source attribution;
+- no order-creation inventory/finance side effects;
+- backend tests and WWW order-submit UI.
 
 ### 2B.2 — Usaha Inbound Orders
 - merchant-scoped list/detail;
-- actionable status transitions;
+- actionable existing lifecycle transitions;
 - WWW source visibility;
 - role/tenant authorization;
-- Usaha UI states.
+- Usaha responsive inbox UI and states.
 
 ### 2B.3 — Order → Sale/Customer Loop
 - explicit idempotent source linkage;
 - customer linkage;
-- sale/COGS/inventory/finance effects at correct lifecycle event;
+- conversion at the defined lifecycle event;
+- sale/COGS/inventory/finance effects exactly once;
 - reporting/dashboard source consistency.
 
 ### 2B.4 — RFQ / Inquiry
 - canonical directed RFQ/inquiry;
-- Usaha inbox;
-- chat/context link where supported;
+- Usaha inbox integration;
+- chat/context link through supported boundary where available;
 - future quotation/CRM hooks without implementing full Wave 4 CRM.
 
-### 2B.5 — Hardening
-- abuse/rate-limit controls;
-- observability;
+### 2B.5 — Commerce Hardening
+- rate/abuse controls;
+- observability/metrics;
 - stale transition/concurrency tests;
-- runtime and security gates;
+- runtime/security gates;
 - docs/contracts cleanup.
 
-If repository inspection during implementation shows an existing category-specific public order flow already covers part of these responsibilities, extend and characterize it rather than duplicating it.
+If repository inspection shows an existing category-specific public flow already covers a checkpoint, extend and characterize it rather than duplicating it.
 
 ---
 
@@ -542,11 +543,12 @@ Wave 2B is complete when a real WWW buyer action can reach a merchant's Usaha wo
 Specifically:
 - WWW never authors authoritative price or merchant identity;
 - one buyer submission creates at most one canonical record;
-- the owning merchant sees the inbound work without manual copying;
+- the owning merchant sees inbound work without manual copying;
 - another merchant cannot see or mutate it;
-- lifecycle, payment, and fulfillment semantics do not conflict;
-- accepted/completed commerce can reach sale/customer/reporting without duplicate transactions;
-- unavailable/rejected/cancelled flows do not produce accidental inventory/finance effects;
+- base/payment/fulfillment semantics do not conflict;
+- order creation alone causes no sale/inventory/finance effect;
+- qualifying commerce can reach sale/customer/reporting without duplicate transactions;
+- unavailable/rejected/cancelled/expired flows do not produce accidental inventory/finance effects;
 - public/private data boundaries remain intact;
 - all affected CI/runtime/security gates are green before merge.
 
@@ -555,4 +557,4 @@ After Wave 2B, proceed to Wave 3 Procurement:
 
 `low stock -> supplier -> PO -> goods receipt -> inventory movement -> payable/payment linkage`
 
-Then Wave 4 CRM can consume trustworthy WWW interaction/order/RFQ/customer data rather than inventing parallel CRM records.
+Then Wave 4 CRM consumes trustworthy WWW interaction/order/RFQ/customer data rather than inventing parallel CRM records.
