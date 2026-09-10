@@ -1,11 +1,11 @@
+#[cfg(test)]
+mod availability_persistence_tests;
 pub(crate) mod control;
 pub(crate) mod domain;
 mod identity_client;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;
-#[cfg(test)]
-mod availability_persistence_tests;
 mod repository;
 mod routes;
 pub(crate) mod sales;
