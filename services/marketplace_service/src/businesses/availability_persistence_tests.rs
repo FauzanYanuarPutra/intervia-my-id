@@ -2,8 +2,8 @@ use super::control::{
     ControlRepository, CreateIngredientRequest, RecipeItemInput, ReplaceRecipeRequest,
 };
 use super::products::{
-    validate_create_request, CreateBusinessProductRequest, ProductRepository, ProductSourceType,
-    ProductStockMode,
+    validate_create_request, AdjustBusinessInventoryRequest, CreateBusinessProductRequest,
+    ProductRepository, ProductSourceType, ProductStockMode,
 };
 use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository};
 use chrono::NaiveDate;
@@ -186,63 +186,119 @@ fn sale_request(product_id: Uuid) -> CreateSaleRequest {
     }
 }
 
+async fn public_stock(pool: &PgPool, product_id: Uuid) -> (i32, bool) {
+    sqlx::query_as("SELECT stock_qty, is_available FROM umkm_products WHERE id=$1")
+        .bind(product_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
 #[sqlx::test(migrations = "./migrations")]
 async fn recipe_capacity_limits_public_stock(pool: PgPool) {
     let context = create_recipe_backed_product(&pool, Decimal::from(300)).await;
 
-    let public_stock: (i32, bool) =
-        sqlx::query_as("SELECT stock_qty, is_available FROM umkm_products WHERE id=$1")
-            .bind(context.product_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-
-    assert_eq!(public_stock, (2, true));
+    assert_eq!(public_stock(&pool, context.product_id).await, (2, true));
 }
 
 #[sqlx::test(migrations = "./migrations")]
 async fn recipe_without_one_sellable_unit_fails_closed_publicly(pool: PgPool) {
     let context = create_recipe_backed_product(&pool, Decimal::from(149)).await;
 
-    let public_stock: (i32, bool) =
-        sqlx::query_as("SELECT stock_qty, is_available FROM umkm_products WHERE id=$1")
-            .bind(context.product_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-
-    assert_eq!(public_stock, (0, false));
+    assert_eq!(public_stock(&pool, context.product_id).await, (0, false));
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn completed_sale_refreshes_public_recipe_capacity(pool: PgPool) {
+async fn product_inventory_adjustments_cannot_override_recipe_capacity(pool: PgPool) {
     let context = create_recipe_backed_product(&pool, Decimal::from(300)).await;
+    let repository = ProductRepository::new(pool.clone());
 
-    // Isolate this contract from recipe-save synchronization: start the sale
-    // from the public quantity that the recipe currently supports.
-    sqlx::query("UPDATE umkm_products SET stock_qty=2, is_available=TRUE WHERE id=$1")
-        .bind(context.product_id)
-        .execute(&pool)
+    repository
+        .adjust_inventory(
+            context.actor_id,
+            context.business_id,
+            context.organization_id,
+            context.product_id,
+            AdjustBusinessInventoryRequest {
+                stock_count: None,
+                reason: Some("Gunakan kapasitas resep".to_owned()),
+            },
+        )
         .await
         .unwrap();
+    assert_eq!(public_stock(&pool, context.product_id).await, (2, true));
 
-    SaleRepository::new(pool.clone())
+    repository
+        .adjust_inventory(
+            context.actor_id,
+            context.business_id,
+            context.organization_id,
+            context.product_id,
+            AdjustBusinessInventoryRequest {
+                stock_count: Some(1.0),
+                reason: Some("Stok jadi dibatasi barang jadi".to_owned()),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(public_stock(&pool, context.product_id).await, (1, true));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn archived_recipe_ingredient_fails_closed_publicly(pool: PgPool) {
+    let context = create_recipe_backed_product(&pool, Decimal::from(300)).await;
+
+    sqlx::query(
+        "UPDATE business_ingredients SET status='archived', updated_at=NOW() WHERE business_id=$1 AND organization_id=$2",
+    )
+    .bind(context.business_id)
+    .bind(context.organization_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(public_stock(&pool, context.product_id).await, (0, false));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn completed_sale_refreshes_public_recipe_capacity_and_replay_does_not_drift(pool: PgPool) {
+    let context = create_recipe_backed_product(&pool, Decimal::from(300)).await;
+    let repository = SaleRepository::new(pool.clone());
+    let idempotency_key = Uuid::new_v4();
+
+    let first = repository
         .create(
             context.actor_id,
             context.business_id,
             context.organization_id,
-            Uuid::new_v4(),
+            idempotency_key,
             sale_request(context.product_id),
         )
         .await
         .unwrap();
+    assert!(!first.replayed);
+    assert_eq!(public_stock(&pool, context.product_id).await, (0, false));
 
-    let public_stock: (i32, bool) =
-        sqlx::query_as("SELECT stock_qty, is_available FROM umkm_products WHERE id=$1")
-            .bind(context.product_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let replay = repository
+        .create(
+            context.actor_id,
+            context.business_id,
+            context.organization_id,
+            idempotency_key,
+            sale_request(context.product_id),
+        )
+        .await
+        .unwrap();
+    assert!(replay.replayed);
+    assert_eq!(public_stock(&pool, context.product_id).await, (0, false));
 
-    assert_eq!(public_stock, (0, false));
+    let remaining_stock: Decimal = sqlx::query_scalar(
+        "SELECT stock_quantity FROM business_ingredients WHERE business_id=$1 AND organization_id=$2",
+    )
+    .bind(context.business_id)
+    .bind(context.organization_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(remaining_stock, Decimal::ZERO);
 }
