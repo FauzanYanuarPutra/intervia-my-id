@@ -6,6 +6,9 @@ mod identity_client;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;
+mod public_commerce;
+#[cfg(test)]
+mod public_commerce_tests;
 mod repository;
 mod routes;
 pub(crate) mod sales;
