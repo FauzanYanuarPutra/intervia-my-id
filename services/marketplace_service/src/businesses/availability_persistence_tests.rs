@@ -5,9 +5,18 @@ use super::products::{
     validate_create_request, CreateBusinessProductRequest, ProductRepository, ProductSourceType,
     ProductStockMode,
 };
+use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository};
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
+
+struct RecipeBackedProductContext {
+    actor_id: Uuid,
+    organization_id: Uuid,
+    business_id: Uuid,
+    product_id: Uuid,
+}
 
 async fn seed_business(pool: &PgPool) -> (Uuid, Uuid, Uuid) {
     let actor_id = Uuid::new_v4();
@@ -111,7 +120,10 @@ fn ingredient_request(stock_quantity: Decimal) -> CreateIngredientRequest {
     }
 }
 
-async fn create_recipe_backed_product(pool: &PgPool, ingredient_stock: Decimal) -> Uuid {
+async fn create_recipe_backed_product(
+    pool: &PgPool,
+    ingredient_stock: Decimal,
+) -> RecipeBackedProductContext {
     let (actor_id, organization_id, business_id) = seed_business(pool).await;
     let product_repository = ProductRepository::new(pool.clone());
     let product = product_repository
@@ -152,16 +164,35 @@ async fn create_recipe_backed_product(pool: &PgPool, ingredient_stock: Decimal) 
         .await
         .unwrap();
 
-    product.id
+    RecipeBackedProductContext {
+        actor_id,
+        organization_id,
+        business_id,
+        product_id: product.id,
+    }
+}
+
+fn sale_request(product_id: Uuid) -> CreateSaleRequest {
+    CreateSaleRequest {
+        occurred_on: NaiveDate::from_ymd_opt(2026, 9, 10).unwrap(),
+        channel_key: Some("offline".to_owned()),
+        account_key: "cash".to_owned(),
+        lines: vec![CreateSaleLineRequest {
+            product_id,
+            quantity: Decimal::from(2),
+            unit_price_amount: 10_000,
+            discount_amount: 0,
+        }],
+    }
 }
 
 #[sqlx::test(migrations = "./migrations")]
 async fn recipe_capacity_limits_public_stock(pool: PgPool) {
-    let product_id = create_recipe_backed_product(&pool, Decimal::from(300)).await;
+    let context = create_recipe_backed_product(&pool, Decimal::from(300)).await;
 
     let public_stock: (i32, bool) =
         sqlx::query_as("SELECT stock_qty, is_available FROM umkm_products WHERE id=$1")
-            .bind(product_id)
+            .bind(context.product_id)
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -171,11 +202,44 @@ async fn recipe_capacity_limits_public_stock(pool: PgPool) {
 
 #[sqlx::test(migrations = "./migrations")]
 async fn recipe_without_one_sellable_unit_fails_closed_publicly(pool: PgPool) {
-    let product_id = create_recipe_backed_product(&pool, Decimal::from(149)).await;
+    let context = create_recipe_backed_product(&pool, Decimal::from(149)).await;
 
     let public_stock: (i32, bool) =
         sqlx::query_as("SELECT stock_qty, is_available FROM umkm_products WHERE id=$1")
-            .bind(product_id)
+            .bind(context.product_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    assert_eq!(public_stock, (0, false));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn completed_sale_refreshes_public_recipe_capacity(pool: PgPool) {
+    let context = create_recipe_backed_product(&pool, Decimal::from(300)).await;
+
+    // Isolate this contract from recipe-save synchronization: start the sale
+    // from the public quantity that the recipe currently supports.
+    sqlx::query("UPDATE umkm_products SET stock_qty=2, is_available=TRUE WHERE id=$1")
+        .bind(context.product_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    SaleRepository::new(pool.clone())
+        .create(
+            context.actor_id,
+            context.business_id,
+            context.organization_id,
+            Uuid::new_v4(),
+            sale_request(context.product_id),
+        )
+        .await
+        .unwrap();
+
+    let public_stock: (i32, bool) =
+        sqlx::query_as("SELECT stock_qty, is_available FROM umkm_products WHERE id=$1")
+            .bind(context.product_id)
             .fetch_one(&pool)
             .await
             .unwrap();
