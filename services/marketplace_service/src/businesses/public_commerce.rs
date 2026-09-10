@@ -18,16 +18,6 @@ pub(crate) enum PublicFulfillmentMode {
     Digital,
 }
 
-impl PublicFulfillmentMode {
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::Courier => "courier",
-            Self::Pickup => "pickup",
-            Self::Digital => "digital",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct PublicOrderItemInput {
     pub(crate) product_id: Uuid,
@@ -81,8 +71,6 @@ pub(crate) enum PublicCommerceError {
     Unavailable,
     InsufficientStock,
     MixedBusiness,
-    IdempotencyConflict,
-    Forbidden,
     Storage,
 }
 
@@ -176,6 +164,10 @@ mod tests {
             validate_request(&request(201)),
             Err(PublicCommerceError::Validation("quantity_too_large"))
         );
-        assert!(validate_request(&request(1)).is_ok());
+
+        let valid = request(1);
+        assert_ne!(valid.items[0].product_id, Uuid::nil());
+        assert_eq!(valid.fulfillment_mode, Some(PublicFulfillmentMode::Pickup));
+        assert!(validate_request(&valid).is_ok());
     }
 }
