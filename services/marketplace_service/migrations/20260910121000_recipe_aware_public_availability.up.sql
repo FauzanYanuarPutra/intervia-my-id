@@ -269,8 +269,13 @@ ON business_ingredients
 FOR EACH ROW
 EXECUTE FUNCTION refresh_umkm_products_from_ingredient();
 
--- Reconcile existing canonical rows once so deployment does not wait for a
--- future mutation to repair stale public availability.
-UPDATE umkm_products
-SET stock_qty = stock_qty,
-    is_available = is_available;
+-- Reconcile only canonical public rows once so deployment does not rewrite
+-- unrelated marketplace products and does not wait for a future mutation.
+UPDATE umkm_products public_product
+SET stock_qty = public_product.stock_qty,
+    is_available = public_product.is_available
+WHERE EXISTS (
+  SELECT 1
+  FROM business_products product
+  WHERE product.id = public_product.id
+);
