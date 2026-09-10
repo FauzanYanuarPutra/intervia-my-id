@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod availability_persistence_tests;
 pub(crate) mod control;
 pub(crate) mod domain;
 mod identity_client;
