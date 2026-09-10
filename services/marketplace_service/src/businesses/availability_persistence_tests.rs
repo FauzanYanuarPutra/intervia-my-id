@@ -324,6 +324,69 @@ async fn product_inventory_adjustments_cannot_override_recipe_capacity(pool: PgP
         .await
         .unwrap();
     assert_eq!(public_stock(&pool, context.product_id).await, (1, true));
+
+    repository
+        .adjust_inventory(
+            context.actor_id,
+            context.business_id,
+            context.organization_id,
+            context.product_id,
+            AdjustBusinessInventoryRequest {
+                stock_count: Some(0.0),
+                reason: Some("Barang jadi habis".to_owned()),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(public_stock(&pool, context.product_id).await, (0, false));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn no_recipe_unknown_stock_preserves_existing_orderable_behavior(pool: PgPool) {
+    let (actor_id, organization_id, business_id) = seed_business(&pool).await;
+    let mut request = product_request();
+    request.stock_count = None;
+    let product = ProductRepository::new(pool.clone())
+        .create(
+            actor_id,
+            business_id,
+            organization_id,
+            &validate_create_request(request).unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(public_stock(&pool, product.id).await, (0, true));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn noncanonical_public_product_is_not_rewritten_by_canonical_guard(pool: PgPool) {
+    let (_, _, business_id) = seed_business(&pool).await;
+    let store_id: Uuid = sqlx::query_scalar(
+        "SELECT store_id FROM business_store_links WHERE business_id=$1 AND link_type='primary'",
+    )
+    .bind(business_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let public_product_id = Uuid::new_v4();
+
+    sqlx::query(
+        r#"
+        INSERT INTO umkm_products (
+          id, store_id, name, slug, category, price_cents,
+          stock_qty, is_available, metadata
+        ) VALUES ($1,$2,'Produk publik lama',$3,'general',1000000,7,TRUE,'{}'::JSONB)
+        "#,
+    )
+    .bind(public_product_id)
+    .bind(store_id)
+    .bind(format!("produk-publik-{public_product_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(public_stock(&pool, public_product_id).await, (7, true));
 }
 
 #[sqlx::test(migrations = "./migrations")]
