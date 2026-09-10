@@ -26,11 +26,7 @@ async fn seed_business(pool: &PgPool) -> (Uuid, Uuid, Uuid) {
     (actor_id, organization_id, business_id)
 }
 
-async fn seed_ingredient(
-    pool: &PgPool,
-    business_id: Uuid,
-    organization_id: Uuid,
-) -> Uuid {
+async fn seed_ingredient(pool: &PgPool, business_id: Uuid, organization_id: Uuid) -> Uuid {
     let ingredient_id = Uuid::new_v4();
     sqlx::query(
         r#"
@@ -104,7 +100,10 @@ async fn sale_consumption_movement_must_decrease_stock(pool: PgPool) {
     .execute(&pool)
     .await;
 
-    assert!(invalid.is_err(), "sale consumption must use a negative delta");
+    assert!(
+        invalid.is_err(),
+        "sale consumption must use a negative delta"
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
