@@ -113,7 +113,7 @@ async fn seed_public_product(
     .bind(product_id)
     .bind(business_id)
     .bind(organization_id)
-    .bind(stock_count.map(Decimal::from))
+    .bind(stock_count.map(|value| value as f64))
     .execute(pool)
     .await
     .unwrap();
@@ -243,7 +243,7 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
     let seeded = seed_public_product(&pool, 1_250_000, Some(10)).await;
     let repository = PublicCommerceRepository::new(pool.clone());
 
-    let before: Option<Decimal> = sqlx::query_scalar(
+    let before: Option<f64> = sqlx::query_scalar(
         "SELECT stock_count FROM business_inventory WHERE product_id=$1 AND business_id=$2",
     )
     .bind(seeded.product_id)
@@ -261,7 +261,7 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
         .await
         .unwrap();
 
-    let after: Option<Decimal> = sqlx::query_scalar(
+    let after: Option<f64> = sqlx::query_scalar(
         "SELECT stock_count FROM business_inventory WHERE product_id=$1 AND business_id=$2",
     )
     .bind(seeded.product_id)
