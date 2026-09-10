@@ -33,12 +33,8 @@ CREATE TABLE business_inventory_movements (
         CHECK (quantity_after = quantity_before + quantity_delta),
     CONSTRAINT ck_business_inventory_movements_source_pair
         CHECK ((source_type IS NULL) = (source_id IS NULL)),
-    CONSTRAINT ck_business_inventory_movements_direction
-        CHECK (
-            (movement_type IN ('sale_consumption', 'waste', 'return_out') AND quantity_delta < 0)
-            OR (movement_type IN ('purchase_receipt', 'return_in') AND quantity_delta > 0)
-            OR movement_type = 'adjustment'
-        ),
+    CONSTRAINT ck_business_inventory_movements_sale_direction
+        CHECK (movement_type <> 'sale_consumption' OR quantity_delta < 0),
     CONSTRAINT ck_business_inventory_movements_sale_source
         CHECK (
             movement_type <> 'sale_consumption'
