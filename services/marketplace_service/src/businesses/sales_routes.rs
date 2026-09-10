@@ -257,6 +257,10 @@ mod tests {
             StatusCode::CONFLICT
         );
         assert_eq!(
+            sale_error_response(SaleRepositoryError::InsufficientStock).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
             sale_error_response(SaleRepositoryError::Validation("invalid_sale_lines")).status(),
             StatusCode::BAD_REQUEST
         );
