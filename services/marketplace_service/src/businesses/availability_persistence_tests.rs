@@ -209,6 +209,88 @@ async fn recipe_without_one_sellable_unit_fails_closed_publicly(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn multi_ingredient_capacity_uses_limiting_input_and_recipe_servings(pool: PgPool) {
+    let (actor_id, organization_id, business_id) = seed_business(&pool).await;
+    let product = ProductRepository::new(pool.clone())
+        .create(
+            actor_id,
+            business_id,
+            organization_id,
+            &validate_create_request(product_request()).unwrap(),
+        )
+        .await
+        .unwrap();
+    let control = ControlRepository::new(pool.clone());
+
+    let mango = control
+        .create_ingredient(
+            business_id,
+            organization_id,
+            ingredient_request(Decimal::from(900)),
+        )
+        .await
+        .unwrap();
+    let mut sugar_request = ingredient_request(Decimal::from(200));
+    sugar_request.name = "Gula".to_owned();
+    let sugar = control
+        .create_ingredient(business_id, organization_id, sugar_request)
+        .await
+        .unwrap();
+
+    control
+        .replace_recipe(
+            business_id,
+            organization_id,
+            product.id,
+            ReplaceRecipeRequest {
+                name: "Resep dua cup".to_owned(),
+                servings: Decimal::from(2),
+                items: vec![
+                    RecipeItemInput {
+                        ingredient_id: mango.id,
+                        quantity: Decimal::from(300),
+                        waste_percent_override: None,
+                    },
+                    RecipeItemInput {
+                        ingredient_id: sugar.id,
+                        quantity: Decimal::from(100),
+                        waste_percent_override: None,
+                    },
+                ],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(public_stock(&pool, product.id).await, (4, true));
+
+    control
+        .replace_recipe(
+            business_id,
+            organization_id,
+            product.id,
+            ReplaceRecipeRequest {
+                name: "Resep dua cup lebih manis".to_owned(),
+                servings: Decimal::from(2),
+                items: vec![
+                    RecipeItemInput {
+                        ingredient_id: mango.id,
+                        quantity: Decimal::from(300),
+                        waste_percent_override: None,
+                    },
+                    RecipeItemInput {
+                        ingredient_id: sugar.id,
+                        quantity: Decimal::from(200),
+                        waste_percent_override: None,
+                    },
+                ],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(public_stock(&pool, product.id).await, (2, true));
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn product_inventory_adjustments_cannot_override_recipe_capacity(pool: PgPool) {
     let context = create_recipe_backed_product(&pool, Decimal::from(300)).await;
     let repository = ProductRepository::new(pool.clone());
