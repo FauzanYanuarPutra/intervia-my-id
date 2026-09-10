@@ -7,14 +7,17 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 struct SeededPublicProduct {
-    organization_id: Uuid,
     business_id: Uuid,
     store_id: Uuid,
     merchant_id: Uuid,
     product_id: Uuid,
 }
 
-async fn seed_public_product(pool: &PgPool, price_cents: i64, stock_count: Option<i64>) -> SeededPublicProduct {
+async fn seed_public_product(
+    pool: &PgPool,
+    price_cents: i64,
+    stock_count: Option<i64>,
+) -> SeededPublicProduct {
     let organization_id = Uuid::new_v4();
     let business_id = Uuid::new_v4();
     let store_id = Uuid::new_v4();
@@ -88,7 +91,10 @@ async fn seed_public_product(pool: &PgPool, price_cents: i64, stock_count: Optio
     )
     .bind(product_id)
     .bind(store_id)
-    .bind(format!("product-{}", &product_id.simple().to_string()[..12]))
+    .bind(format!(
+        "product-{}",
+        &product_id.simple().to_string()[..12]
+    ))
     .bind(price_cents)
     .bind(stock_count.unwrap_or(0) as i32)
     .execute(pool)
@@ -113,7 +119,6 @@ async fn seed_public_product(pool: &PgPool, price_cents: i64, stock_count: Optio
     .unwrap();
 
     SeededPublicProduct {
-        organization_id,
         business_id,
         store_id,
         merchant_id,
@@ -155,7 +160,10 @@ async fn creates_server_authoritative_canonical_order(pool: PgPool) {
     assert!(!created.replayed);
     assert_eq!(created.order.business_id, seeded.business_id);
     assert_eq!(created.order.source_type, "www");
-    assert_eq!(created.order.source_surface.as_deref(), Some("www_umkm_storefront"));
+    assert_eq!(
+        created.order.source_surface.as_deref(),
+        Some("www_umkm_storefront")
+    );
     assert_eq!(created.order.currency, "IDR");
     assert_eq!(created.order.subtotal_amount, Decimal::from(25_000));
     assert_eq!(created.order.total_amount, Decimal::from(25_000));
@@ -206,14 +214,13 @@ async fn idempotent_retry_reuses_order_items_and_outbox(pool: PgPool) {
     assert!(replay.replayed);
     assert_eq!(replay.order.id, first.order.id);
 
-    let order_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM orders WHERE user_id=$1 AND idempotency_key=$2",
-    )
-    .bind(buyer_id)
-    .bind(idempotency_key.to_string())
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let order_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM orders WHERE user_id=$1 AND idempotency_key=$2")
+            .bind(buyer_id)
+            .bind(idempotency_key.to_string())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let item_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM order_items WHERE order_id=$1")
         .bind(first.order.id)
         .fetch_one(&pool)
@@ -262,11 +269,12 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
     .fetch_one(&pool)
     .await
     .unwrap();
-    let sale_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM business_sales WHERE business_id=$1")
-        .bind(seeded.business_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let sale_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_sales WHERE business_id=$1")
+            .bind(seeded.business_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let finance_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1",
     )
