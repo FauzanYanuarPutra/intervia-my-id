@@ -26,6 +26,30 @@ async fn seed_business(pool: &PgPool) -> (Uuid, Uuid, Uuid) {
     (actor_id, organization_id, business_id)
 }
 
+async fn seed_ingredient(
+    pool: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Uuid {
+    let ingredient_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO business_ingredients (
+          id, business_id, organization_id, name, kind, purchase_unit, recipe_unit,
+          conversion_factor, purchase_price_amount, purchase_quantity, yield_percent,
+          waste_percent, stock_quantity, minimum_stock, status
+        ) VALUES ($1,$2,$3,'Gula','ingredient','kg','g',1000,18000,1,100,0,1000,0,'active')
+        "#,
+    )
+    .bind(ingredient_id)
+    .bind(business_id)
+    .bind(organization_id)
+    .execute(pool)
+    .await
+    .unwrap();
+    ingredient_id
+}
+
 #[sqlx::test(migrations = "./migrations")]
 async fn sales_tables_are_available_after_migrations(pool: PgPool) {
     let sales_table: Option<String> =
@@ -55,6 +79,58 @@ async fn inventory_movement_table_is_available_after_migrations(pool: PgPool) {
         movement_table.as_deref(),
         Some("business_inventory_movements"),
         "canonical inventory movement ledger must exist before sale consumption is enabled"
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn sale_consumption_movement_must_decrease_stock(pool: PgPool) {
+    let (actor_id, organization_id, business_id) = seed_business(&pool).await;
+    let ingredient_id = seed_ingredient(&pool, business_id, organization_id).await;
+
+    let invalid = sqlx::query(
+        r#"
+        INSERT INTO business_inventory_movements (
+          business_id, organization_id, ingredient_id, movement_type,
+          quantity_delta, quantity_before, quantity_after,
+          source_type, source_id, created_by_user_id
+        ) VALUES ($1,$2,$3,'sale_consumption',10,1000,1010,'business_sale',$4,$5)
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(ingredient_id)
+    .bind(Uuid::new_v4())
+    .bind(actor_id)
+    .execute(&pool)
+    .await;
+
+    assert!(invalid.is_err(), "sale consumption must use a negative delta");
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn sale_consumption_movement_requires_sale_source(pool: PgPool) {
+    let (actor_id, organization_id, business_id) = seed_business(&pool).await;
+    let ingredient_id = seed_ingredient(&pool, business_id, organization_id).await;
+
+    let missing_source = sqlx::query(
+        r#"
+        INSERT INTO business_inventory_movements (
+          business_id, organization_id, ingredient_id, movement_type,
+          quantity_delta, quantity_before, quantity_after,
+          source_type, source_id, created_by_user_id
+        ) VALUES ($1,$2,$3,'sale_consumption',-10,1000,990,NULL,NULL,$4)
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(ingredient_id)
+    .bind(actor_id)
+    .execute(&pool)
+    .await;
+
+    assert!(
+        missing_source.is_err(),
+        "sale consumption must be linked to a canonical business sale"
     );
 }
 
