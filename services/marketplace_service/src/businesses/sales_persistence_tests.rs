@@ -238,3 +238,151 @@ async fn sale_requires_complete_costing(pool: PgPool) {
         .unwrap_err();
     assert_eq!(error, SaleRepositoryError::IncompleteCosting);
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn posting_sale_consumes_recipe_stock_and_writes_one_movement(pool: PgPool) {
+    let seeded = seed_costed_product(&pool).await;
+    let created = SaleRepository::new(pool.clone())
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            sale_request(seeded.product_id),
+        )
+        .await
+        .unwrap();
+
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stock, Decimal::from(4_700));
+
+    let movement: (Decimal, Decimal, Decimal, Uuid, String, String) = sqlx::query_as(
+        r#"
+        SELECT quantity_delta, quantity_before, quantity_after, source_id, source_type, movement_type
+        FROM business_inventory_movements
+        WHERE business_id=$1 AND ingredient_id=$2
+        "#,
+    )
+    .bind(seeded.business_id)
+    .bind(seeded.ingredient_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(movement.0, Decimal::from(-300));
+    assert_eq!(movement.1, Decimal::from(5_000));
+    assert_eq!(movement.2, Decimal::from(4_700));
+    assert_eq!(movement.3, created.sale.sale.id);
+    assert_eq!(movement.4, "business_sale");
+    assert_eq!(movement.5, "sale_consumption");
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn replayed_sale_does_not_consume_inventory_twice(pool: PgPool) {
+    let seeded = seed_costed_product(&pool).await;
+    let repository = SaleRepository::new(pool.clone());
+    let idempotency_key = Uuid::new_v4();
+
+    let first = repository
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            idempotency_key,
+            sale_request(seeded.product_id),
+        )
+        .await
+        .unwrap();
+    let replay = repository
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            idempotency_key,
+            sale_request(seeded.product_id),
+        )
+        .await
+        .unwrap();
+
+    assert!(!first.replayed);
+    assert!(replay.replayed);
+    assert_eq!(replay.sale.sale.id, first.sale.sale.id);
+
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stock, Decimal::from(4_700));
+
+    let movement_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_inventory_movements WHERE business_id=$1 AND source_type='business_sale' AND source_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(first.sale.sale.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(movement_count, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn insufficient_stock_rejects_sale_without_business_effects(pool: PgPool) {
+    let seeded = seed_costed_product(&pool).await;
+    sqlx::query("UPDATE business_ingredients SET stock_quantity=200 WHERE id=$1")
+        .bind(seeded.ingredient_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let error = SaleRepository::new(pool.clone())
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            sale_request(seeded.product_id),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error, SaleRepositoryError::InsufficientStock);
+
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stock, Decimal::from(200));
+
+    let sale_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_sales WHERE business_id=$1")
+            .bind(seeded.business_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let finance_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1 AND source_type='business_sale'",
+    )
+    .bind(seeded.business_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let movement_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_inventory_movements WHERE business_id=$1",
+    )
+    .bind(seeded.business_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(sale_count, 0);
+    assert_eq!(finance_count, 0);
+    assert_eq!(movement_count, 0);
+}
