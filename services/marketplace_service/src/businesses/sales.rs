@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::{prelude::ToPrimitive, Decimal, RoundingStrategy};
 use serde::{Deserialize, Serialize};
@@ -120,6 +122,7 @@ pub(crate) enum SaleRepositoryError {
     NotFound,
     Validation(&'static str),
     IncompleteCosting,
+    InsufficientStock,
     IdempotencyConflict,
     Database,
 }
@@ -150,6 +153,12 @@ struct IngredientCostRow {
     waste_percent: Decimal,
 }
 
+#[derive(Debug, Clone)]
+struct PreparedIngredientConsumption {
+    ingredient_id: Uuid,
+    quantity: Decimal,
+}
+
 struct PreparedSaleLine {
     product_id: Uuid,
     product_name: String,
@@ -160,6 +169,7 @@ struct PreparedSaleLine {
     unit_cogs_amount: i64,
     line_cogs_amount: i64,
     cost_snapshot: Value,
+    ingredient_consumptions: Vec<PreparedIngredientConsumption>,
 }
 
 #[derive(Clone)]
@@ -301,7 +311,7 @@ impl SaleRepository {
             });
         }
 
-        for line in prepared {
+        for line in &prepared {
             sqlx::query(
                 r#"
                 INSERT INTO business_sale_lines (
@@ -313,16 +323,30 @@ impl SaleRepository {
             )
             .bind(sale_id)
             .bind(line.product_id)
-            .bind(line.product_name)
+            .bind(&line.product_name)
             .bind(line.quantity)
             .bind(line.unit_price_amount)
             .bind(line.discount_amount)
             .bind(line.final_revenue_amount)
             .bind(line.unit_cogs_amount)
             .bind(line.line_cogs_amount)
-            .bind(line.cost_snapshot)
+            .bind(line.cost_snapshot.clone())
             .execute(&mut *tx)
             .await?;
+        }
+
+        if let Err(error) = consume_ingredient_inventory(
+            &mut tx,
+            actor_id,
+            business_id,
+            organization_id,
+            sale_id,
+            &prepared,
+        )
+        .await
+        {
+            tx.rollback().await?;
+            return Err(error);
         }
 
         let finance = sqlx::query(
@@ -467,7 +491,6 @@ async fn prepare_line(
           AND bi.organization_id=$3
           AND bi.status='active'
         ORDER BY ri.position, ri.id
-        FOR SHARE OF bi
         "#,
     )
     .bind(recipe.id)
@@ -511,8 +534,16 @@ async fn prepare_line(
     let final_revenue_amount = gross - line.discount_amount;
     let unit_cogs_amount = decimal_money(snapshot.production_hpp_per_unit)?;
     let line_cogs_amount = decimal_money(snapshot.production_hpp_per_unit * line.quantity)?;
+    let ingredient_consumptions = snapshot
+        .items
+        .iter()
+        .map(|item| PreparedIngredientConsumption {
+            ingredient_id: item.ingredient_id,
+            quantity: item.quantity_per_unit * line.quantity,
+        })
+        .collect();
     let cost_snapshot =
-        serde_json::to_value(snapshot).map_err(|_| SaleRepositoryError::Database)?;
+        serde_json::to_value(&snapshot).map_err(|_| SaleRepositoryError::Database)?;
 
     Ok(PreparedSaleLine {
         product_id: line.product_id,
@@ -524,7 +555,79 @@ async fn prepare_line(
         unit_cogs_amount,
         line_cogs_amount,
         cost_snapshot,
+        ingredient_consumptions,
     })
+}
+
+async fn consume_ingredient_inventory(
+    tx: &mut Transaction<'_, Postgres>,
+    actor_id: Uuid,
+    business_id: Uuid,
+    organization_id: Uuid,
+    sale_id: Uuid,
+    prepared_lines: &[PreparedSaleLine],
+) -> Result<(), SaleRepositoryError> {
+    let mut required_by_ingredient = BTreeMap::<Uuid, Decimal>::new();
+    for line in prepared_lines {
+        for consumption in &line.ingredient_consumptions {
+            if consumption.quantity <= Decimal::ZERO {
+                return Err(SaleRepositoryError::Database);
+            }
+            *required_by_ingredient
+                .entry(consumption.ingredient_id)
+                .or_insert(Decimal::ZERO) += consumption.quantity;
+        }
+    }
+
+    for (ingredient_id, required_quantity) in required_by_ingredient {
+        let balance = sqlx::query_as::<_, (Decimal, Decimal)>(
+            r#"
+            UPDATE business_ingredients
+            SET stock_quantity = stock_quantity - $4, updated_at = NOW()
+            WHERE id=$1
+              AND business_id=$2
+              AND organization_id=$3
+              AND status='active'
+              AND stock_quantity >= $4
+            RETURNING stock_quantity + $4 AS quantity_before, stock_quantity AS quantity_after
+            "#,
+        )
+        .bind(ingredient_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(required_quantity)
+        .fetch_optional(&mut **tx)
+        .await?;
+
+        let Some((quantity_before, quantity_after)) = balance else {
+            return Err(SaleRepositoryError::InsufficientStock);
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_inventory_movements (
+              business_id, organization_id, ingredient_id, movement_type,
+              quantity_delta, quantity_before, quantity_after,
+              source_type, source_id, note, created_by_user_id
+            ) VALUES (
+              $1,$2,$3,'sale_consumption',$4,$5,$6,
+              'business_sale',$7,'Konsumsi bahan dari penjualan',$8
+            )
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(ingredient_id)
+        .bind(-required_quantity)
+        .bind(quantity_before)
+        .bind(quantity_after)
+        .bind(sale_id)
+        .bind(actor_id)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(())
 }
 
 fn decimal_money(value: Decimal) -> Result<i64, SaleRepositoryError> {
