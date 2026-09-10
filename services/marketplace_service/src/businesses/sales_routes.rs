@@ -217,6 +217,9 @@ fn sale_error_response(error: SaleRepositoryError) -> Response {
         SaleRepositoryError::IncompleteCosting => {
             api_error(StatusCode::CONFLICT, "sale_costing_incomplete")
         }
+        SaleRepositoryError::InsufficientStock => {
+            api_error(StatusCode::CONFLICT, "sale_inventory_insufficient")
+        }
         SaleRepositoryError::NotFound => {
             api_error(StatusCode::NOT_FOUND, "business_sale_resource_not_found")
         }
