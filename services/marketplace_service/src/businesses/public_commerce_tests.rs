@@ -275,13 +275,12 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
             .fetch_one(&pool)
             .await
             .unwrap();
-    let finance_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1",
-    )
-    .bind(seeded.business_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let finance_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1")
+            .bind(seeded.business_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
 
     assert_eq!(before, after);
     assert_eq!(sale_count, 0);
