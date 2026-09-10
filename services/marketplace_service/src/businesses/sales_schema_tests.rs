@@ -44,6 +44,21 @@ async fn sales_tables_are_available_after_migrations(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn inventory_movement_table_is_available_after_migrations(pool: PgPool) {
+    let movement_table: Option<String> =
+        sqlx::query_scalar("SELECT to_regclass('public.business_inventory_movements')::text")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    assert_eq!(
+        movement_table.as_deref(),
+        Some("business_inventory_movements"),
+        "canonical inventory movement ledger must exist before sale consumption is enabled"
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn finance_source_reference_is_unique_per_business(pool: PgPool) {
     let (actor_id, organization_id, business_id) = seed_business(&pool).await;
     let source_id = Uuid::new_v4();
