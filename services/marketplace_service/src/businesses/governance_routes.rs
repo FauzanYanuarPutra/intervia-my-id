@@ -30,10 +30,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
             "/v1/businesses/{business_id}/branches",
             get(list_branches).post(create_branch),
         )
-        .route(
-            "/v1/businesses/{business_id}/members",
-            get(list_members),
-        )
+        .route("/v1/businesses/{business_id}/members", get(list_members))
 }
 
 async fn get_governance(
@@ -41,7 +38,8 @@ async fn get_governance(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -63,7 +61,8 @@ async fn list_branches(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -86,7 +85,8 @@ async fn create_branch(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateBranchRequest>,
 ) -> Response {
-    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -108,7 +108,8 @@ async fn list_members(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match governance_context(&state, &headers, business_id).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -159,9 +160,13 @@ fn service(state: &AppState) -> BusinessService {
 fn governance_error_response(error: GovernanceError) -> Response {
     match error {
         GovernanceError::Validation(code) => api_error(StatusCode::BAD_REQUEST, code),
-        GovernanceError::Forbidden => api_error(StatusCode::FORBIDDEN, "business_permission_denied"),
+        GovernanceError::Forbidden => {
+            api_error(StatusCode::FORBIDDEN, "business_permission_denied")
+        }
         GovernanceError::NotFound => api_error(StatusCode::NOT_FOUND, "business_not_found"),
-        GovernanceError::Conflict => api_error(StatusCode::CONFLICT, "business_governance_conflict"),
+        GovernanceError::Conflict => {
+            api_error(StatusCode::CONFLICT, "business_governance_conflict")
+        }
         GovernanceError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_governance_storage_unavailable",
@@ -171,10 +176,17 @@ fn governance_error_response(error: GovernanceError) -> Response {
 
 fn business_error_response(error: BusinessServiceError) -> Response {
     match error {
-        BusinessServiceError::AccessDenied => api_error(StatusCode::FORBIDDEN, "business_access_denied"),
+        BusinessServiceError::AccessDenied => {
+            api_error(StatusCode::FORBIDDEN, "business_access_denied")
+        }
         BusinessServiceError::NotFound => api_error(StatusCode::NOT_FOUND, "business_not_found"),
-        BusinessServiceError::IdentityUnavailable => api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable"),
-        _ => api_error(StatusCode::SERVICE_UNAVAILABLE, "business_governance_context_unavailable"),
+        BusinessServiceError::IdentityUnavailable => {
+            api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable")
+        }
+        _ => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_governance_context_unavailable",
+        ),
     }
 }
 
