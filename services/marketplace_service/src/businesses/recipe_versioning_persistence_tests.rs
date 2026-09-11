@@ -98,5 +98,8 @@ async fn legacy_recipe_is_not_fabricated_into_version_history(pool: PgPool) {
     .await
     .unwrap();
 
-    assert_eq!(version_count, 0, "migration/runtime must not invent recipe history");
+    assert_eq!(
+        version_count, 0,
+        "migration/runtime must not invent recipe history"
+    );
 }
