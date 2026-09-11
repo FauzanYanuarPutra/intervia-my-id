@@ -9,6 +9,9 @@ mod governance_routes;
 #[cfg(test)]
 mod governance_tests;
 mod identity_client;
+mod inventory;
+#[cfg(test)]
+mod inventory_tests;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;
