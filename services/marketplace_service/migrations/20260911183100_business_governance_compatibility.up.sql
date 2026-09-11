@@ -5,20 +5,6 @@ ALTER TABLE business_locations
   ALTER COLUMN branch_code SET DEFAULT 'MAIN',
   ALTER COLUMN branch_kind SET DEFAULT 'store';
 
--- The first additive migration briefly backfilled descriptive/legal tables from
--- technical creator/location data. Remove those inferred rows: creator access is
--- an authorization fact, not proof of legal ownership; location text is not a
--- reliable jurisdiction declaration; a display name is not necessarily a legal
--- entity name.
-DELETE FROM business_relationships
-WHERE metadata->>'source' = 'wave_2b2_creator_backfill';
-
-DELETE FROM business_jurisdictions
-WHERE metadata->>'source' = 'wave_2b2_primary_location_backfill';
-
-DELETE FROM business_legal_profiles
-WHERE metadata->>'source' = 'wave_2b2_business_name_backfill';
-
 -- Location-scoped grants and compliance facts must point to a location from the
 -- same business/organization boundary. The nullable legacy columns remain
 -- supported; composite FKs apply whenever a location is present.
