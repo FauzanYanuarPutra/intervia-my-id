@@ -24,7 +24,10 @@ fn stock_in_and_out_operations_use_positive_quantities() {
     ] {
         let mut request = base_request(operation);
         request.quantity = Some(Decimal::from(10));
-        if matches!(operation, InventoryOperation::Waste | InventoryOperation::ReturnOut) {
+        if matches!(
+            operation,
+            InventoryOperation::Waste | InventoryOperation::ReturnOut
+        ) {
             request.reason = Some("operational reason".into());
         }
         assert!(normalize_mutation(request).is_ok());
