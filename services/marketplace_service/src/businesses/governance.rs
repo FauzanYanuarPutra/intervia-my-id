@@ -451,8 +451,20 @@ impl GovernanceRepository {
         .bind(payload.city.trim())
         .bind(payload.district.trim())
         .bind(payload.postal_code.trim())
-        .bind(payload.phone.as_deref().map(str::trim).filter(|value| !value.is_empty()))
-        .bind(payload.whatsapp.as_deref().map(str::trim).filter(|value| !value.is_empty()))
+        .bind(
+            payload
+                .phone
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
+        )
+        .bind(
+            payload
+                .whatsapp
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
+        )
         .bind(payload.timezone.trim())
         .bind(payload.business_hours)
         .bind(payload.special_hours)
