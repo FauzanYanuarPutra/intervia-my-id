@@ -26,6 +26,8 @@ mod public_commerce_routes;
 mod public_commerce_tests;
 mod recipes;
 #[cfg(test)]
+mod recipe_sales_versioning_tests;
+#[cfg(test)]
 mod recipe_versioning_persistence_tests;
 mod repository;
 mod routes;
