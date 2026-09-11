@@ -38,6 +38,10 @@ jobs:
         run: cargo test --locked businesses::routes::tests
       - name: Business service tests
         run: cargo test --locked businesses::service::tests
+      - name: Governance schema tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+        run: cargo test --locked businesses::governance_schema_tests
       - name: Release build locked
         run: cargo build --release --locked
       - name: Migration contract
@@ -55,3 +59,14 @@ jobs:
           grep -q 'expected_transfer_amount' migrations/20260906003000_usaha_business_settlements.up.sql
           grep -q 'difference_amount' migrations/20260906003000_usaha_business_settlements.up.sql
           grep -q 'DROP TABLE IF EXISTS business_settlements' migrations/20260906003000_usaha_business_settlements.down.sql
+          test -s migrations/20260911112000_business_governance_foundation.up.sql
+          test -s migrations/20260911112000_business_governance_foundation.down.sql
+          grep -q 'business_branches' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'business_relationships' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'business_access_grants' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'business_role_permissions' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'business_jurisdictions' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'business_evidence' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'business_audit_events' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'reject_business_governance_history_mutation' migrations/20260911112000_business_governance_foundation.up.sql
+          grep -q 'DROP TABLE IF EXISTS business_audit_events' migrations/20260911112000_business_governance_foundation.down.sql
