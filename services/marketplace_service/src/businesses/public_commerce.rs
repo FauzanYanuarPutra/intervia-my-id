@@ -485,7 +485,8 @@ fn authenticated_buyer_id(
     headers: &HeaderMap,
     jwt_secret: &str,
 ) -> Result<Uuid, PublicCommerceError> {
-    let claims = auth_claims_from_headers(headers, jwt_secret).ok_or(PublicCommerceError::Unauthorized)?;
+    let claims =
+        auth_claims_from_headers(headers, jwt_secret).ok_or(PublicCommerceError::Unauthorized)?;
     Uuid::parse_str(&claims.sub).map_err(|_| PublicCommerceError::Unauthorized)
 }
 
