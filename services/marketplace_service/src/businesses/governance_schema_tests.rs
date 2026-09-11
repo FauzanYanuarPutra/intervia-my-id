@@ -159,10 +159,11 @@ async fn audit_and_evidence_records_are_append_only(pool: PgPool) {
     .await
     .unwrap();
 
-    let evidence_update = sqlx::query("UPDATE business_evidence SET storage_ref = 'changed' WHERE id = $1")
-        .bind(evidence_id)
-        .execute(&pool)
-        .await;
+    let evidence_update =
+        sqlx::query("UPDATE business_evidence SET storage_ref = 'changed' WHERE id = $1")
+            .bind(evidence_id)
+            .execute(&pool)
+            .await;
     assert!(evidence_update.is_err(), "evidence must be immutable");
 
     let audit_delete = sqlx::query("DELETE FROM business_audit_events WHERE id = $1")
@@ -190,5 +191,8 @@ async fn effective_periods_reject_inverted_rights_windows(pool: PgPool) {
     .execute(&pool)
     .await;
 
-    assert!(result.is_err(), "effective_until must be later than effective_from");
+    assert!(
+        result.is_err(),
+        "effective_until must be later than effective_from"
+    );
 }
