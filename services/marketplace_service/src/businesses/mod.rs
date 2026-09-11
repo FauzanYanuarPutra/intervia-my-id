@@ -2,6 +2,8 @@
 mod availability_persistence_tests;
 pub(crate) mod control;
 pub(crate) mod domain;
+#[cfg(test)]
+mod governance_schema_tests;
 mod identity_client;
 mod products;
 #[cfg(test)]
