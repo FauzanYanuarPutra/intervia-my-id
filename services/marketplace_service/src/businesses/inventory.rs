@@ -180,6 +180,7 @@ pub(crate) fn normalize_mutation(
             evidence_refs.push(evidence.to_owned());
         }
     }
+    evidence_refs.sort();
 
     let mut normalized = NormalizedInventoryMutation {
         ingredient_id: request.ingredient_id,
