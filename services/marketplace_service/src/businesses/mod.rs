@@ -5,6 +5,7 @@ pub(crate) mod domain;
 mod governance;
 #[cfg(test)]
 mod governance_migration_tests;
+mod governance_routes;
 #[cfg(test)]
 mod governance_tests;
 mod identity_client;
@@ -28,6 +29,7 @@ pub(crate) mod settlement;
 
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
+        .merge(governance_routes::router())
         .merge(sales_routes::router())
         .merge(public_commerce_routes::router())
 }
