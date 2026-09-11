@@ -1,20 +1,20 @@
+import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { enforceRateLimit } from '@/lib/rateLimit';
+import { createPublicCommerceOrder } from '@/lib/server/publicCommerceOrder';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { hasUmkmStorePermission } from '@/lib/super-app/umkm-authorization';
-import { superAppEntityIdSchema } from '@/lib/super-app/idSchema';
-import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   createUmkmOrder,
   getUmkmOrderById,
-  listUmkmProducts,
   getUmkmStoreById,
   listUmkmOrdersByStore,
 } from '@/lib/super-app/umkm-commerce';
-import { buildUmkmShippingQuote } from '@/lib/super-app/umkm-shipping';
+import { superAppEntityIdSchema } from '@/lib/super-app/idSchema';
 
 const CreateOrderSchema = z.object({
   store_id: superAppEntityIdSchema,
@@ -46,6 +46,17 @@ const CreateOrderSchema = z.object({
   address_confirmed: z.boolean().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
+
+function optionalTrimmed(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function resolveIdempotencyKey(req: NextRequest): string {
+  const supplied = req.headers.get('idempotency-key')?.trim();
+  if (supplied && z.string().uuid().safeParse(supplied).success) return supplied;
+  return randomUUID();
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -190,11 +201,51 @@ export async function POST(req: NextRequest) {
     if (!parsed.ok) return parsed.response;
     const payload = parsed.data;
 
+    if (payload.channel === 'online') {
+      const auth = await requireAuth(req);
+      if (!auth.ok) return auth.res;
+
+      const canonicalOrder = await createPublicCommerceOrder({
+        token: auth.ctx.token,
+        idempotencyKey: resolveIdempotencyKey(req),
+        intent: {
+          items: payload.items.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            ...(optionalTrimmed(item.notes) ? { note: optionalTrimmed(item.notes) } : {}),
+          })),
+          ...(payload.fulfillment_mode
+            ? { fulfillment_mode: payload.fulfillment_mode }
+            : {}),
+          ...(optionalTrimmed(payload.notes) ? { note: optionalTrimmed(payload.notes) } : {}),
+          source_surface: 'www_umkm_storefront',
+        },
+      });
+
+      if (!canonicalOrder.ok) {
+        return NextResponse.json(
+          { error: canonicalOrder.error },
+          { status: canonicalOrder.status },
+        );
+      }
+
+      return NextResponse.json(
+        { data: canonicalOrder.data },
+        { status: canonicalOrder.status },
+      );
+    }
+
     if (payload.delivery_lat !== undefined && payload.delivery_lng === undefined) {
-      return NextResponse.json({ error: 'delivery_lat and delivery_lng must be provided together' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'delivery_lat and delivery_lng must be provided together' },
+        { status: 400 },
+      );
     }
     if (payload.delivery_lng !== undefined && payload.delivery_lat === undefined) {
-      return NextResponse.json({ error: 'delivery_lat and delivery_lng must be provided together' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'delivery_lat and delivery_lng must be provided together' },
+        { status: 400 },
+      );
     }
 
     const hasBearer = req.headers.get('authorization')?.startsWith('Bearer ');
@@ -203,121 +254,6 @@ export async function POST(req: NextRequest) {
     const auth = shouldAuth ? await requireAuth(req) : null;
     if (auth && !auth.ok) return auth.res;
     const authCtx = auth && auth.ok ? auth.ctx : null;
-
-    let shippingQuote:
-      | Awaited<
-          ReturnType<typeof buildUmkmShippingQuote>
-        >
-      | null = null;
-    let selectedShippingOption:
-      | Awaited<ReturnType<typeof buildUmkmShippingQuote>>['options'][number]
-      | null = null;
-    let resolvedFulfillmentMode: 'courier' | 'pickup' | 'digital' = 'courier';
-
-    if (payload.channel === 'online') {
-      const address = (payload.delivery_address || '').trim();
-      const name = (payload.customer_name || '').trim();
-      const phone = (payload.customer_phone || '').trim();
-      if (!name || name.length < 2) {
-        return NextResponse.json({ error: 'Customer name is required' }, { status: 400 });
-      }
-      if (!phone || phone.length < 6) {
-        return NextResponse.json({ error: 'Customer phone is required' }, { status: 400 });
-      }
-      if ((payload.payment_timing || 'prepay') === 'prepay' && payload.payment_method === 'wallet') {
-        return NextResponse.json(
-          { error: 'Wallet balance payment is not available yet for UMKM online checkout' },
-          { status: 409 },
-        );
-      }
-      if (payload.payment_method === 'wallet' && !authCtx) {
-        return NextResponse.json({ error: 'Login required for wallet payment' }, { status: 401 });
-      }
-
-      const store = await getUmkmStoreById(payload.store_id);
-      if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
-
-      const products = await listUmkmProducts({
-        storeId: store.id,
-        channel: 'online',
-        includeUnavailable: false,
-        limit: 500,
-      });
-      const productMap = new Map(products.map((product) => [product.id, product]));
-      const missingProducts = payload.items
-        .filter((item) => !productMap.has(item.product_id))
-        .map((item) => item.product_id);
-      if (missingProducts.length > 0) {
-        return NextResponse.json(
-          {
-            error: `Some products are no longer available for online checkout: ${missingProducts.join(', ')}`,
-          },
-          { status: 409 },
-        );
-      }
-
-      const selectedProducts = payload.items.map((item) => {
-        const product = productMap.get(item.product_id)!;
-        return {
-          id: product.id,
-          name: product.name,
-          price_cents: product.price_cents,
-          metadata: product.metadata,
-          quantity: item.quantity,
-        };
-      });
-
-      shippingQuote = await buildUmkmShippingQuote({
-        store,
-        selectedProducts,
-        deliveryAddress: payload.delivery_address,
-        deliveryLat: payload.delivery_lat,
-        deliveryLng: payload.delivery_lng,
-        deliveryDestinationId: payload.delivery_destination_id,
-        preferredMode: payload.fulfillment_mode,
-      });
-      const recommendedOptionId = shippingQuote.recommended_option_id;
-      resolvedFulfillmentMode = payload.fulfillment_mode || shippingQuote.profile.default_mode;
-      selectedShippingOption =
-        (payload.shipping_option_id
-          ? shippingQuote.options.find((option) => option.id === payload.shipping_option_id)
-          : null) ||
-        shippingQuote.options.find(
-          (option) =>
-            option.mode === resolvedFulfillmentMode &&
-            option.id === recommendedOptionId,
-        ) ||
-        shippingQuote.options.find((option) => option.mode === resolvedFulfillmentMode) ||
-        shippingQuote.options.find((option) => option.id === recommendedOptionId) ||
-        shippingQuote.options[0] ||
-        null;
-
-      if (!selectedShippingOption) {
-        return NextResponse.json(
-          { error: 'No fulfillment option is available for the selected items' },
-          { status: 400 },
-        );
-      }
-      if (payload.fulfillment_mode && selectedShippingOption.mode !== payload.fulfillment_mode) {
-        return NextResponse.json(
-          { error: `Selected items do not support fulfillment mode: ${payload.fulfillment_mode}` },
-          { status: 400 },
-        );
-      }
-      resolvedFulfillmentMode = selectedShippingOption.mode;
-
-      if (selectedShippingOption.mode === 'courier') {
-        if (address.length < 6) {
-          return NextResponse.json({ error: 'Delivery address is required' }, { status: 400 });
-        }
-        if (payload.address_confirmed !== true) {
-          return NextResponse.json(
-            { error: 'Delivery address confirmation is required' },
-            { status: 400 },
-          );
-        }
-      }
-    }
 
     const metadata = {
       ...payload.metadata,
@@ -333,18 +269,7 @@ export async function POST(req: NextRequest) {
         : {}),
       ...(payload.payment_timing ? { payment_timing: payload.payment_timing } : {}),
       ...(authCtx ? { customer_user_id: authCtx.userId } : {}),
-      ...(payload.channel === 'online'
-        ? {
-            fulfillment_mode: resolvedFulfillmentMode,
-            order_composition: shippingQuote?.profile || null,
-            shipping_option: selectedShippingOption || null,
-            shipping_integration: shippingQuote?.integration || null,
-            shipping_fee_cents:
-              selectedShippingOption?.mode === 'courier'
-                ? selectedShippingOption.fee_cents
-                : 0,
-          }
-        : { fulfillment_mode: 'dine_in' }),
+      { fulfillment_mode: 'dine_in' },
     };
 
     const bundle = await createUmkmOrder({
@@ -360,11 +285,8 @@ export async function POST(req: NextRequest) {
       mergeIntoOpenOfflineOrder: payload.merge_into_open_offline_order,
       paymentMethod: payload.payment_method,
       paymentTiming: payload.payment_timing,
-      fulfillmentMode: payload.channel === 'online' ? resolvedFulfillmentMode : 'dine_in',
-      shippingFeeCents:
-        payload.channel === 'online' && selectedShippingOption?.mode === 'courier'
-          ? selectedShippingOption.fee_cents
-          : 0,
+      fulfillmentMode: 'dine_in',
+      shippingFeeCents: 0,
     });
 
     return NextResponse.json({ data: bundle }, { status: 201 });
