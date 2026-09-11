@@ -19,6 +19,41 @@ WHERE metadata->>'source' = 'wave_2b2_primary_location_backfill';
 DELETE FROM business_legal_profiles
 WHERE metadata->>'source' = 'wave_2b2_business_name_backfill';
 
+-- Location-scoped grants and compliance facts must point to a location from the
+-- same business/organization boundary. The nullable legacy columns remain
+-- supported; composite FKs apply whenever a location is present.
+ALTER TABLE business_locations
+  ADD CONSTRAINT uq_business_locations_id_business_organization
+    UNIQUE (id, business_id, organization_id);
+
+ALTER TABLE business_member_roles
+  DROP CONSTRAINT business_member_roles_location_id_fkey,
+  ADD CONSTRAINT fk_business_member_roles_location_scope
+    FOREIGN KEY (location_id, business_id, organization_id)
+    REFERENCES business_locations(id, business_id, organization_id)
+    ON DELETE CASCADE;
+
+ALTER TABLE business_jurisdictions
+  DROP CONSTRAINT business_jurisdictions_location_id_fkey,
+  ADD CONSTRAINT fk_business_jurisdictions_location_scope
+    FOREIGN KEY (location_id, business_id, organization_id)
+    REFERENCES business_locations(id, business_id, organization_id)
+    ON DELETE RESTRICT;
+
+-- Audit events are immutable snapshots. FK actions must never UPDATE or DELETE
+-- an audit row behind the append-only trigger, so both references are restrictive.
+ALTER TABLE business_audit_events
+  DROP CONSTRAINT business_audit_events_location_id_fkey,
+  DROP CONSTRAINT fk_business_audit_events_business_scope,
+  ADD CONSTRAINT fk_business_audit_events_location_scope
+    FOREIGN KEY (location_id, business_id, organization_id)
+    REFERENCES business_locations(id, business_id, organization_id)
+    ON DELETE RESTRICT,
+  ADD CONSTRAINT fk_business_audit_events_business_scope
+    FOREIGN KEY (business_id, organization_id)
+    REFERENCES businesses(id, organization_id)
+    ON DELETE RESTRICT;
+
 CREATE OR REPLACE FUNCTION initialize_business_governance_access()
 RETURNS trigger
 LANGUAGE plpgsql
