@@ -209,15 +209,20 @@ export async function POST(req: NextRequest) {
         token: auth.ctx.token,
         idempotencyKey: resolveIdempotencyKey(req),
         intent: {
-          items: payload.items.map((item) => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            ...(optionalTrimmed(item.notes) ? { note: optionalTrimmed(item.notes) } : {}),
-          })),
+          items: payload.items.map((item) => {
+            const note = optionalTrimmed(item.notes);
+            return {
+              product_id: item.product_id,
+              quantity: item.quantity,
+              ...(note ? { note } : {}),
+            };
+          }),
           ...(payload.fulfillment_mode
             ? { fulfillment_mode: payload.fulfillment_mode }
             : {}),
-          ...(optionalTrimmed(payload.notes) ? { note: optionalTrimmed(payload.notes) } : {}),
+          ...(optionalTrimmed(payload.notes)
+            ? { note: optionalTrimmed(payload.notes) }
+            : {}),
           source_surface: 'www_umkm_storefront',
         },
       });
@@ -269,7 +274,7 @@ export async function POST(req: NextRequest) {
         : {}),
       ...(payload.payment_timing ? { payment_timing: payload.payment_timing } : {}),
       ...(authCtx ? { customer_user_id: authCtx.userId } : {}),
-      { fulfillment_mode: 'dine_in' },
+      fulfillment_mode: 'dine_in',
     };
 
     const bundle = await createUmkmOrder({
