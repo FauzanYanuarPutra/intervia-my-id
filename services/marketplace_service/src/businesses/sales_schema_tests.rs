@@ -5,6 +5,23 @@ async fn seed_business(pool: &PgPool) -> (Uuid, Uuid, Uuid) {
     let actor_id = Uuid::new_v4();
     let organization_id = Uuid::new_v4();
     let business_id = Uuid::new_v4();
+    let store_id = Uuid::new_v4();
+    let primary_location_id = Uuid::new_v4();
+
+    sqlx::query(
+        r#"
+        INSERT INTO umkm_stores (
+          id, owner_user_id, organization_id, name, slug, address, lat, lng
+        ) VALUES ($1,$2,$3,'Lajukan Juice',$4,'Test address',-6.2,106.7)
+        "#,
+    )
+    .bind(store_id)
+    .bind(actor_id)
+    .bind(organization_id)
+    .bind(format!("sales-schema-test-{business_id}"))
+    .execute(pool)
+    .await
+    .unwrap();
 
     sqlx::query(
         r#"
@@ -19,6 +36,31 @@ async fn seed_business(pool: &PgPool) -> (Uuid, Uuid, Uuid) {
     .bind(actor_id)
     .bind(Uuid::new_v4())
     .bind("0".repeat(64))
+    .execute(pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO business_store_links (business_id, store_id, link_type) VALUES ($1,$2,'primary')",
+    )
+    .bind(business_id)
+    .bind(store_id)
+    .execute(pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_locations (
+          id, store_id, organization_id, business_id, name,
+          branch_code, branch_kind, is_primary, public_visibility
+        ) VALUES ($1,$2,$3,$4,'Kios Utama','MAIN','kiosk',TRUE,TRUE)
+        "#,
+    )
+    .bind(primary_location_id)
+    .bind(store_id)
+    .bind(organization_id)
+    .bind(business_id)
     .execute(pool)
     .await
     .unwrap();

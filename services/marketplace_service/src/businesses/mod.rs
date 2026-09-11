@@ -9,6 +9,14 @@ mod governance_routes;
 #[cfg(test)]
 mod governance_tests;
 mod identity_client;
+mod inventory;
+#[cfg(test)]
+mod inventory_persistence_tests;
+mod inventory_routes;
+#[cfg(test)]
+mod inventory_routes_tests;
+#[cfg(test)]
+mod inventory_tests;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;
@@ -30,6 +38,7 @@ pub(crate) mod settlement;
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
         .merge(governance_routes::router())
+        .merge(inventory_routes::router())
         .merge(sales_routes::router())
         .merge(public_commerce_routes::router())
 }
