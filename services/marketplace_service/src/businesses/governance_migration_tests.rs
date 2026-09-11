@@ -19,7 +19,11 @@ async fn governance_tables_exist_after_migrations(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(found.as_deref(), Some(table), "missing governance table {table}");
+        assert_eq!(
+            found.as_deref(),
+            Some(table),
+            "missing governance table {table}"
+        );
     }
 }
 
