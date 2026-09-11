@@ -186,7 +186,10 @@ async fn secondary_branch_mutation_does_not_change_primary_compatibility_stock(p
     assert!(!outcome.replayed);
     assert_eq!(outcome.command.quantity_before, Decimal::ZERO);
     assert_eq!(outcome.command.quantity_after, Decimal::from(25));
-    assert_eq!(outcome.movement.as_ref().unwrap().location_id, seeded.secondary_location_id);
+    assert_eq!(
+        outcome.movement.as_ref().unwrap().location_id,
+        seeded.secondary_location_id
+    );
 
     let legacy_stock: Decimal =
         sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
@@ -293,13 +296,12 @@ async fn retry_is_exactly_once_and_evidence_order_is_canonical(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    let movement_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM business_inventory_movements WHERE command_id=$1",
-    )
-    .bind(first.command.id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let movement_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_inventory_movements WHERE command_id=$1")
+            .bind(first.command.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let audit_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM business_audit_events WHERE subject_type='business_inventory_command' AND subject_id=$1",
     )
@@ -388,13 +390,12 @@ async fn stocktake_noop_records_fact_without_inventing_stock_movement(pool: PgPo
     assert_eq!(outcome.command.quantity_after, Decimal::from(100));
     assert!(outcome.movement.is_none());
 
-    let movement_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM business_inventory_movements WHERE command_id=$1",
-    )
-    .bind(outcome.command.id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let movement_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_inventory_movements WHERE command_id=$1")
+            .bind(outcome.command.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let audit_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM business_audit_events WHERE subject_type='business_inventory_command' AND subject_id=$1",
     )
@@ -430,13 +431,12 @@ async fn insufficient_stock_has_no_command_movement_or_audit_side_effect(pool: P
         .unwrap_err();
     assert_eq!(error, InventoryError::InsufficientStock);
 
-    let commands: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM business_inventory_commands WHERE business_id=$1",
-    )
-    .bind(seeded.business_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let commands: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_inventory_commands WHERE business_id=$1")
+            .bind(seeded.business_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let movements: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM business_inventory_movements WHERE business_id=$1 AND command_id IS NOT NULL",
     )
@@ -629,16 +629,16 @@ async fn inventory_commands_and_movements_are_append_only(pool: PgPool) {
         .await
         .unwrap();
 
-    let command_update = sqlx::query(
-        "UPDATE business_inventory_commands SET reason='tampered' WHERE id=$1",
-    )
-    .bind(outcome.command.id)
-    .execute(&pool)
-    .await;
-    let movement_delete = sqlx::query("DELETE FROM business_inventory_movements WHERE command_id=$1")
-        .bind(outcome.command.id)
-        .execute(&pool)
-        .await;
+    let command_update =
+        sqlx::query("UPDATE business_inventory_commands SET reason='tampered' WHERE id=$1")
+            .bind(outcome.command.id)
+            .execute(&pool)
+            .await;
+    let movement_delete =
+        sqlx::query("DELETE FROM business_inventory_movements WHERE command_id=$1")
+            .bind(outcome.command.id)
+            .execute(&pool)
+            .await;
 
     assert!(command_update.is_err());
     assert!(movement_delete.is_err());
