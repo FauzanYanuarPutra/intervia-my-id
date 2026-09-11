@@ -12,10 +12,7 @@ fn inventory_mutation_requires_uuid_idempotency_key() {
         parse_inventory_idempotency_key(Some("not-a-uuid")),
         Err("invalid_idempotency_key")
     );
-    assert!(parse_inventory_idempotency_key(Some(
-        "3d69acb2-aed8-4c48-b62d-30034e0440eb"
-    ))
-    .is_ok());
+    assert!(parse_inventory_idempotency_key(Some("3d69acb2-aed8-4c48-b62d-30034e0440eb")).is_ok());
 }
 
 #[test]
