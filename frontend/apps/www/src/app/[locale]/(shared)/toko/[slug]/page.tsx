@@ -35,6 +35,7 @@ import {
   loadStorefrontCatalog,
 } from '@/lib/super-app/umkm-storefront-products';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
+import { StorefrontProductOrderAction } from './StorefrontProductOrderAction';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -177,9 +178,11 @@ function StorePill({
 function ProductCard({
   product,
   isId,
+  onlineOrderEnabled,
 }: {
   product: UmkmProduct;
   isId: boolean;
+  onlineOrderEnabled: boolean;
 }) {
   const stockStatus = getStorefrontProductStockStatus(product);
   const inStock = stockStatus === 'in_stock';
@@ -253,6 +256,16 @@ function ProductCard({
             </p>
           ) : null}
         </div>
+        <StorefrontProductOrderAction
+          storeId={product.store_id}
+          productId={product.id}
+          productName={product.name}
+          onlineOrderEnabled={onlineOrderEnabled}
+          productAvailable={
+            product.is_available && stockStatus !== 'out_of_stock'
+          }
+          isId={isId}
+        />
       </div>
     </article>
   );
@@ -768,6 +781,7 @@ export default async function TokoPage({ params }: PageProps) {
                       key={product.id}
                       product={product}
                       isId={isId}
+                      onlineOrderEnabled={store.online_order_enabled}
                     />
                   ))}
                 </div>
