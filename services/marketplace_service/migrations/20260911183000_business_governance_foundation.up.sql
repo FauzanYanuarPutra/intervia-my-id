@@ -260,9 +260,10 @@ CREATE TRIGGER trg_business_audit_events_append_only
 BEFORE UPDATE OR DELETE ON business_audit_events
 FOR EACH ROW EXECUTE FUNCTION reject_business_audit_event_mutation();
 
--- Backfill one system owner role per existing business.
+-- Backfill technical access only. This preserves application behavior without
+-- asserting that the creator is a legal owner, worker, partner, or other party.
 INSERT INTO business_roles (organization_id, business_id, role_key, name, is_system)
-SELECT organization_id, id, 'owner', 'Owner', TRUE
+SELECT organization_id, id, 'owner', 'Owner access', TRUE
 FROM businesses
 ON CONFLICT (business_id, role_key) DO NOTHING;
 
@@ -273,14 +274,16 @@ CROSS JOIN business_permissions p
 WHERE r.role_key = 'owner' AND r.is_system = TRUE
 ON CONFLICT DO NOTHING;
 
--- Preserve legacy creator access as the initial business owner membership.
 INSERT INTO business_memberships (
   organization_id, business_id, user_id, status, effective_from,
   metadata
 )
 SELECT
   organization_id, id, created_by_user_id, 'active', created_at,
-  jsonb_build_object('source', 'wave_2b2_creator_backfill')
+  jsonb_build_object(
+    'source', 'wave_2b2_creator_access_backfill',
+    'legal_relationship_inferred', false
+  )
 FROM businesses
 ON CONFLICT (business_id, user_id) DO NOTHING;
 
@@ -301,61 +304,8 @@ JOIN businesses b
 WHERE m.user_id = b.created_by_user_id
 ON CONFLICT DO NOTHING;
 
-INSERT INTO business_relationships (
-  organization_id, business_id, relationship_type, party_user_id,
-  effective_from, recorded_by_user_id, metadata
-)
-SELECT
-  organization_id, id, 'owner', created_by_user_id,
-  created_at, created_by_user_id,
-  jsonb_build_object('source', 'wave_2b2_creator_backfill')
-FROM businesses b
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM business_relationships r
-  WHERE r.business_id = b.id
-    AND r.organization_id = b.organization_id
-    AND r.relationship_type = 'owner'
-    AND r.party_user_id = b.created_by_user_id
-    AND r.effective_until IS NULL
-);
-
--- Backfill jurisdiction only from recorded primary location facts. Blank legacy
--- country data is deliberately represented as Indonesia because Marketplace has
--- always been an Indonesia-only product at this stage; no regulatory rule is
--- inferred from this value.
-INSERT INTO business_jurisdictions (
-  organization_id, business_id, location_id, country_code,
-  province, city, district, effective_from, metadata
-)
-SELECT
-  b.organization_id, b.id, l.id, 'ID',
-  COALESCE(l.province, ''), COALESCE(l.city, ''), COALESCE(l.district, ''),
-  COALESCE(l.created_at, b.created_at),
-  jsonb_build_object('source', 'wave_2b2_primary_location_backfill')
-FROM businesses b
-JOIN business_locations l
-  ON l.business_id = b.id
- AND l.is_primary = TRUE
-WHERE NOT EXISTS (
-  SELECT 1 FROM business_jurisdictions j
-  WHERE j.business_id = b.id AND j.effective_until IS NULL
-);
-
-INSERT INTO business_legal_profiles (
-  organization_id, business_id, legal_name, entity_type,
-  effective_from, recorded_by_user_id, metadata
-)
-SELECT
-  organization_id, id, name, 'other',
-  created_at, created_by_user_id,
-  jsonb_build_object('source', 'wave_2b2_business_name_backfill', 'unverified_legal_profile', true)
-FROM businesses b
-WHERE NOT EXISTS (
-  SELECT 1 FROM business_legal_profiles lp
-  WHERE lp.business_id = b.id AND lp.effective_until IS NULL
-);
-
+-- Legal relationship, jurisdiction and legal-profile tables intentionally remain
+-- empty until facts are explicitly recorded with an accountable actor/evidence.
 INSERT INTO business_audit_events (
   organization_id, business_id, actor_user_id,
   event_key, subject_type, subject_id, reason, metadata, occurred_at
@@ -363,6 +313,12 @@ INSERT INTO business_audit_events (
 SELECT
   organization_id, id, NULL,
   'governance.backfilled', 'business', id,
-  'Wave 2B.2 governance foundation backfill',
-  jsonb_build_object('source', 'migration_20260911183000'), NOW()
+  'Wave 2B.2 technical governance access backfill',
+  jsonb_build_object(
+    'source', 'migration_20260911183000',
+    'legal_relationship_inferred', false,
+    'jurisdiction_inferred', false,
+    'legal_profile_inferred', false
+  ),
+  NOW()
 FROM businesses;
