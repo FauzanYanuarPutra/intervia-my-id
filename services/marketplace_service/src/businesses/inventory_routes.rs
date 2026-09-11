@@ -15,14 +15,15 @@ use crate::{user_id_from_auth, AppState};
 use super::inventory::{InventoryError, InventoryMutationRequest, InventoryRepository};
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/v1/businesses/{business_id}/branches/{location_id}/inventory",
-        get(list_inventory),
-    )
-    .route(
-        "/v1/businesses/{business_id}/branches/{location_id}/inventory/mutations",
-        axum::routing::post(mutate_inventory),
-    )
+    Router::new()
+        .route(
+            "/v1/businesses/{business_id}/branches/{location_id}/inventory",
+            get(list_inventory),
+        )
+        .route(
+            "/v1/businesses/{business_id}/branches/{location_id}/inventory/mutations",
+            axum::routing::post(mutate_inventory),
+        )
 }
 
 async fn list_inventory(
@@ -120,9 +121,7 @@ fn inventory_actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, Respon
         .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))
 }
 
-pub(crate) fn parse_inventory_idempotency_key(
-    value: Option<&str>,
-) -> Result<Uuid, &'static str> {
+pub(crate) fn parse_inventory_idempotency_key(value: Option<&str>) -> Result<Uuid, &'static str> {
     let value = value
         .map(str::trim)
         .filter(|value| !value.is_empty())
