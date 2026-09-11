@@ -166,7 +166,9 @@ pub(crate) fn normalize_mutation(
     }
 
     if request.evidence_refs.len() > MAX_EVIDENCE_REFS {
-        return Err(InventoryError::Validation("inventory_evidence_limit_exceeded"));
+        return Err(InventoryError::Validation(
+            "inventory_evidence_limit_exceeded",
+        ));
     }
     let mut evidence_refs = Vec::with_capacity(request.evidence_refs.len());
     for evidence in request.evidence_refs {
@@ -261,7 +263,9 @@ fn validate_nonnegative_quantity(value: Decimal) -> Result<(), InventoryError> {
 fn validate_precision(value: Decimal) -> Result<(), InventoryError> {
     let max = Decimal::from(MAX_QUANTITY_I64);
     if value.scale() > 6 || value > max || value < -max {
-        return Err(InventoryError::Validation("inventory_quantity_out_of_range"));
+        return Err(InventoryError::Validation(
+            "inventory_quantity_out_of_range",
+        ));
     }
     Ok(())
 }
@@ -270,23 +274,23 @@ fn mutation_delta(
     mutation: &NormalizedInventoryMutation,
     quantity_before: Decimal,
 ) -> Result<Decimal, InventoryError> {
-    let delta = match mutation.operation {
-        InventoryOperation::PurchaseReceipt | InventoryOperation::ReturnIn => mutation
-            .requested_quantity
-            .ok_or(InventoryError::Validation("inventory_quantity_required"))?,
-        InventoryOperation::Waste | InventoryOperation::ReturnOut => -mutation
-            .requested_quantity
-            .ok_or(InventoryError::Validation("inventory_quantity_required"))?,
-        InventoryOperation::Adjustment => mutation.requested_delta.ok_or(
-            InventoryError::Validation("inventory_quantity_delta_required"),
-        )?,
-        InventoryOperation::Stocktake => mutation
-            .counted_quantity
-            .ok_or(InventoryError::Validation(
-                "inventory_counted_quantity_required",
-            ))?
-            - quantity_before,
-    };
+    let delta =
+        match mutation.operation {
+            InventoryOperation::PurchaseReceipt | InventoryOperation::ReturnIn => mutation
+                .requested_quantity
+                .ok_or(InventoryError::Validation("inventory_quantity_required"))?,
+            InventoryOperation::Waste | InventoryOperation::ReturnOut => -mutation
+                .requested_quantity
+                .ok_or(InventoryError::Validation("inventory_quantity_required"))?,
+            InventoryOperation::Adjustment => mutation.requested_delta.ok_or(
+                InventoryError::Validation("inventory_quantity_delta_required"),
+            )?,
+            InventoryOperation::Stocktake => {
+                mutation.counted_quantity.ok_or(InventoryError::Validation(
+                    "inventory_counted_quantity_required",
+                ))? - quantity_before
+            }
+        };
     validate_precision(delta)?;
     Ok(delta)
 }
@@ -486,9 +490,12 @@ impl InventoryRepository {
         };
 
         let delta = mutation_delta(&mutation, quantity_before)?;
-        let quantity_after = quantity_before
-            .checked_add(delta)
-            .ok_or(InventoryError::Validation("inventory_quantity_out_of_range"))?;
+        let quantity_after =
+            quantity_before
+                .checked_add(delta)
+                .ok_or(InventoryError::Validation(
+                    "inventory_quantity_out_of_range",
+                ))?;
         if quantity_after < Decimal::ZERO {
             return Err(InventoryError::InsufficientStock);
         }
