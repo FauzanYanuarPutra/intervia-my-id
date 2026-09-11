@@ -38,6 +38,7 @@ pub(crate) mod settlement;
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
         .merge(governance_routes::router())
+        .merge(inventory_routes::router())
         .merge(sales_routes::router())
         .merge(public_commerce_routes::router())
 }
