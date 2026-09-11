@@ -51,7 +51,9 @@ function isNonEmptyString(value: unknown): value is string {
 function isAmount(value: unknown): value is string | number {
   return (
     (typeof value === 'number' && Number.isFinite(value)) ||
-    (typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value)))
+    (typeof value === 'string' &&
+      value.trim().length > 0 &&
+      Number.isFinite(Number(value)))
   );
 }
 
@@ -151,12 +153,10 @@ export function createStorefrontOrderSubmitter(): {
     submit(input) {
       if (inFlight) return inFlight;
 
-      const request = submitStorefrontProductOrder(input);
-      const tracked = request.finally(() => {
-        if (inFlight === tracked) inFlight = null;
+      inFlight = submitStorefrontProductOrder(input).finally(() => {
+        inFlight = null;
       });
-      inFlight = tracked;
-      return tracked;
+      return inFlight;
     },
   };
 }
