@@ -33,7 +33,7 @@ async fn list_inventory(
 ) -> Response {
     let actor_id = match inventory_actor(&state, &headers) {
         Ok(actor_id) => actor_id,
-        Err(response) => return response,
+        Err(error) => return inventory_actor_error_response(error),
     };
     let repository = InventoryRepository::new(state.db.clone());
     let organization_id = match repository.organization_for_business(business_id).await {
@@ -62,7 +62,7 @@ async fn mutate_inventory(
 ) -> Response {
     let actor_id = match inventory_actor(&state, &headers) {
         Ok(actor_id) => actor_id,
-        Err(response) => return response,
+        Err(error) => return inventory_actor_error_response(error),
     };
     let idempotency_key = match parse_inventory_idempotency_key(
         headers
@@ -109,16 +109,25 @@ async fn mutate_inventory(
     }
 }
 
-fn inventory_actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, Response> {
+#[derive(Debug, Clone, Copy)]
+enum InventoryActorError {
+    Missing,
+    Invalid,
+}
+
+fn inventory_actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, InventoryActorError> {
     headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
+        .ok_or(InventoryActorError::Missing)?;
 
-    user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))
+    user_id_from_auth(headers, &state.jwt_secret).ok_or(InventoryActorError::Invalid)
+}
+
+fn inventory_actor_error_response(_error: InventoryActorError) -> Response {
+    api_error(StatusCode::UNAUTHORIZED, "auth_required")
 }
 
 pub(crate) fn parse_inventory_idempotency_key(value: Option<&str>) -> Result<Uuid, &'static str> {
