@@ -304,11 +304,19 @@ async fn rejects_known_insufficient_stock(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn rejects_unavailable_or_online_disabled_products(pool: PgPool) {
     let seeded = seed_public_product(&pool, 1_250_000, Some(10)).await;
-    sqlx::query("UPDATE umkm_products SET is_available=FALSE WHERE id=$1")
+    sqlx::query("UPDATE business_products SET status='archived' WHERE id=$1")
         .bind(seeded.product_id)
         .execute(&pool)
         .await
         .unwrap();
+
+    let projection_available: bool =
+        sqlx::query_scalar("SELECT is_available FROM umkm_products WHERE id=$1")
+            .bind(seeded.product_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(!projection_available);
 
     let repository = PublicCommerceRepository::new(pool.clone());
     let error = repository
@@ -321,7 +329,7 @@ async fn rejects_unavailable_or_online_disabled_products(pool: PgPool) {
         .unwrap_err();
     assert_eq!(error, PublicCommerceError::Unavailable);
 
-    sqlx::query("UPDATE umkm_products SET is_available=TRUE WHERE id=$1")
+    sqlx::query("UPDATE business_products SET status='active' WHERE id=$1")
         .bind(seeded.product_id)
         .execute(&pool)
         .await
