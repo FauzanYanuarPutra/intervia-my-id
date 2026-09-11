@@ -6,7 +6,6 @@ mod identity_client;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;
-#[cfg(test)]
 mod public_commerce;
 #[cfg(test)]
 mod public_commerce_tests;
