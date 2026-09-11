@@ -73,16 +73,22 @@ SELECT
   l.organization_id,
   l.id,
   CASE
-    WHEN l.is_primary THEN 'main'
+    WHEN link.link_type = 'primary' AND l.is_primary THEN 'main'
     ELSE 'branch-' || replace(l.id::text, '-', '')
   END,
   l.name,
   l.status,
-  l.is_primary,
+  link.link_type = 'primary' AND l.is_primary,
   l.timezone,
   l.created_at,
-  jsonb_build_object('source', 'business_location_backfill')
+  jsonb_build_object(
+    'source', 'business_location_backfill',
+    'store_link_type', link.link_type
+  )
 FROM business_locations l
+JOIN business_store_links link
+  ON link.business_id = l.business_id
+ AND link.store_id = l.store_id
 WHERE l.business_id IS NOT NULL
   AND l.organization_id IS NOT NULL
 ON CONFLICT (location_id) DO NOTHING;
