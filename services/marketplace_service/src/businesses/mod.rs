@@ -5,7 +5,6 @@ pub(crate) mod domain;
 mod governance;
 #[cfg(test)]
 mod governance_migration_tests;
-mod governance_provisioning;
 #[cfg(test)]
 mod governance_tests;
 mod identity_client;
