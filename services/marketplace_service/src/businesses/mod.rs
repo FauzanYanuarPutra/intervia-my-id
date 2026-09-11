@@ -11,6 +11,8 @@ mod governance_tests;
 mod identity_client;
 mod inventory;
 #[cfg(test)]
+mod inventory_persistence_tests;
+#[cfg(test)]
 mod inventory_tests;
 mod products;
 #[cfg(test)]
