@@ -1,0 +1,2 @@
+DROP TRIGGER IF EXISTS trg_business_products_refresh_public_availability ON business_products;
+DROP FUNCTION IF EXISTS refresh_umkm_product_from_business_product_status();
