@@ -96,15 +96,9 @@ export function StorefrontProductOrderAction({
   isId,
 }: StorefrontProductOrderActionProps) {
   const [state, setState] = useState<OrderUiState>({ phase: 'idle' });
-  const submitterRef = useRef<ReturnType<typeof createStorefrontOrderSubmitter> | null>(
-    null,
-  );
+  const [submitter] = useState(() => createStorefrontOrderSubmitter());
   const idempotencyKeyRef = useRef<string | null>(null);
   const submittingRef = useRef(false);
-
-  if (!submitterRef.current) {
-    submitterRef.current = createStorefrontOrderSubmitter();
-  }
 
   const canOrder = onlineOrderEnabled && productAvailable;
   const locked = state.phase === 'submitting' || state.phase === 'success';
@@ -118,7 +112,7 @@ export function StorefrontProductOrderAction({
       const idempotencyKey =
         idempotencyKeyRef.current ||
         (idempotencyKeyRef.current = createIdempotencyKey());
-      const bundle = await submitterRef.current!.submit({
+      const bundle = await submitter.submit({
         storeId,
         productId,
         quantity: 1,
@@ -149,9 +143,7 @@ export function StorefrontProductOrderAction({
         type="button"
         onClick={handleOrder}
         disabled={!canOrder || locked}
-        aria-label={
-          isId ? `Pesan ${productName}` : `Order ${productName}`
-        }
+        aria-label={isId ? `Pesan ${productName}` : `Order ${productName}`}
         data-testid="storefront-order-button"
         className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
       >
