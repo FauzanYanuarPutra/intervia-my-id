@@ -255,13 +255,12 @@ async fn sale_uses_effective_recipe_version_for_snapshot_and_consumption(pool: P
         .await
         .unwrap();
 
-    let persisted_version_id: Option<Uuid> = sqlx::query_scalar(
-        "SELECT recipe_version_id FROM business_sale_lines WHERE sale_id=$1",
-    )
-    .bind(created.sale.sale.id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let persisted_version_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT recipe_version_id FROM business_sale_lines WHERE sale_id=$1")
+            .bind(created.sale.sale.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(persisted_version_id, Some(seeded.version_one_id));
 
     assert_eq!(
@@ -272,13 +271,12 @@ async fn sale_uses_effective_recipe_version_for_snapshot_and_consumption(pool: P
         Some(1)
     );
 
-    let stock: Decimal = sqlx::query_scalar(
-        "SELECT stock_quantity FROM business_ingredients WHERE id=$1",
-    )
-    .bind(seeded.ingredient_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(stock, Decimal::from(4_800));
 
     let movement_delta: Decimal = sqlx::query_scalar(
