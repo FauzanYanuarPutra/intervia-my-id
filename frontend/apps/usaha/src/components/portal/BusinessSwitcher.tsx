@@ -24,6 +24,7 @@ export function BusinessSwitcher({ activeBusiness, businesses, currentSection }:
   }
 
   const groups = groupBusinessesByRelationship(businesses);
+  const activeBusinessId = activeBusiness.id;
 
   function businessLink(business: BusinessRecord) {
     return (
@@ -36,7 +37,7 @@ export function BusinessSwitcher({ activeBusiness, businesses, currentSection }:
           </span>
           <span className="block truncate text-[11px] text-portal-soft">{business.city || 'Lokasi belum diatur'} · {business.category}</span>
         </span>
-        {business.id === activeBusiness.id ? <Check className="h-4 w-4 shrink-0 text-portal-forest" /> : null}
+        {business.id === activeBusinessId ? <Check className="h-4 w-4 shrink-0 text-portal-forest" /> : null}
       </Link>
     );
   }
