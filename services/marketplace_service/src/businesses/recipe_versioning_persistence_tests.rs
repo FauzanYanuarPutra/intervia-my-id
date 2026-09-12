@@ -167,6 +167,25 @@ async fn published_recipe_bom_rejects_late_item_insert(pool: PgPool) {
         .unwrap();
     }
 
+    // Published BOMs are assembled child-first inside one transaction. The
+    // deferred FK validates the aggregate at commit; inserting the parent last
+    // seals the BOM against any later item append.
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query(
+        r#"
+        INSERT INTO business_recipe_version_items (
+          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
+        ) VALUES ($1,$2,$3,$4,100,0)
+        "#,
+    )
+    .bind(organization_id)
+    .bind(business_id)
+    .bind(version_id)
+    .bind(first_ingredient_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
     sqlx::query(
         r#"
         INSERT INTO business_recipe_versions (
@@ -180,24 +199,10 @@ async fn published_recipe_bom_rejects_late_item_insert(pool: PgPool) {
     .bind(business_id)
     .bind(product_id)
     .bind(actor_id)
-    .execute(&pool)
+    .execute(&mut *tx)
     .await
     .unwrap();
-
-    sqlx::query(
-        r#"
-        INSERT INTO business_recipe_version_items (
-          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
-        ) VALUES ($1,$2,$3,$4,100,0)
-        "#,
-    )
-    .bind(organization_id)
-    .bind(business_id)
-    .bind(version_id)
-    .bind(first_ingredient_id)
-    .execute(&pool)
-    .await
-    .unwrap();
+    tx.commit().await.unwrap();
 
     let late_insert = sqlx::query(
         r#"
