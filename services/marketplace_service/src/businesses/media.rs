@@ -92,16 +92,23 @@ pub(crate) fn valid_internal_media_url(value: &str) -> bool {
 impl ValidatedBusinessImage {
     pub(crate) fn public_metadata(&self, kind: BusinessImageKind) -> Value {
         match kind {
+            // Keep the logo as a semantic identity image. `image_url` preserves
+            // compatibility with existing storefront readers, but do not claim
+            // `store_photo_url`: when a banner exists it must remain the primary
+            // wide storefront visual regardless of upload order.
             BusinessImageKind::Logo => json!({
                 "logo_url": self.url,
                 "image_url": self.url,
-                "store_photo_url": self.url,
                 "logo_media": self.dimensions_metadata(),
             }),
+            // Existing WWW storefront prioritizes `store_photo_url`, so the
+            // cropped 8:3 banner becomes the stable hero image. The dedicated
+            // cover keys remain for semantic consumers and SEO.
             BusinessImageKind::Banner => json!({
                 "banner_url": self.url,
                 "cover_image_url": self.url,
                 "cover_url": self.url,
+                "store_photo_url": self.url,
                 "banner_media": self.dimensions_metadata(),
             }),
             BusinessImageKind::Product => json!({
@@ -150,5 +157,18 @@ mod tests {
             validate_business_image(image(1600, 900), BusinessImageKind::Banner),
             Err(MediaValidationError::AspectRatio)
         );
+    }
+
+    #[test]
+    fn banner_is_the_primary_storefront_visual_regardless_of_logo_upload_order() {
+        let logo = validate_business_image(image(640, 640), BusinessImageKind::Logo).unwrap();
+        let banner = validate_business_image(image(1600, 600), BusinessImageKind::Banner).unwrap();
+        let logo_metadata = logo.public_metadata(BusinessImageKind::Logo);
+        let banner_metadata = banner.public_metadata(BusinessImageKind::Banner);
+
+        assert!(logo_metadata.get("store_photo_url").is_none());
+        assert_eq!(logo_metadata["image_url"], "/api/forum/media/business-image.webp");
+        assert_eq!(banner_metadata["store_photo_url"], "/api/forum/media/business-image.webp");
+        assert_eq!(banner_metadata["banner_url"], "/api/forum/media/business-image.webp");
     }
 }
