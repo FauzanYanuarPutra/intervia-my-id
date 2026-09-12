@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import {
+  getBusinessTemplatePreset,
+  type BusinessTemplateKey,
+} from '@/lib/business-templates';
 import { normalizeWorkspaceRole } from '@/lib/business-role';
 import { permissionMap } from '@/lib/portal-access';
 import {
@@ -9,6 +13,7 @@ import {
 } from '@/lib/portal-links';
 import type {
   BusinessLocation,
+  BusinessProfileSummary,
   BusinessRecord,
   PortalRole,
   ProductRecord,
@@ -128,8 +133,7 @@ async function requestJson(url: string, init: RequestInit = {}): Promise<unknown
 function parseActor(payload: unknown): PortalAccount | null {
   const root = record(payload) ?? {};
   const data = record(root.data);
-  const user =
-    record(root.user) ?? record(data?.user) ?? data ?? root;
+  const user = record(root.user) ?? record(data?.user) ?? data ?? root;
   const id = stringValue(user.id ?? user.user_id ?? user.sub);
   if (!id) return null;
   const metadata = record(user.metadata) ?? {};
@@ -319,6 +323,27 @@ function mapCanonicalProduct(value: unknown): ProductRecord | null {
   };
 }
 
+function mapCanonicalProfile(value: unknown): BusinessProfileSummary | undefined {
+  const profile = record(value);
+  if (!profile) return undefined;
+  const templateKey = stringValue(profile.template_key ?? profile.templateKey);
+  if (!templateKey) return undefined;
+  return {
+    templateKey,
+    templateVersion: Number(profile.template_version ?? profile.templateVersion) || 1,
+    currency: stringValue(profile.currency) || 'IDR',
+    timezone: stringValue(profile.timezone) || 'Asia/Jakarta',
+    costingPolicy: stringValue(profile.costing_policy ?? profile.costingPolicy),
+    accountingMode: stringValue(profile.accounting_mode ?? profile.accountingMode),
+    approvalPolicy: stringValue(profile.approval_policy ?? profile.approvalPolicy),
+    branchMode: stringValue(profile.branch_mode ?? profile.branchMode) || 'single',
+    negativeStockPolicy:
+      stringValue(profile.negative_stock_policy ?? profile.negativeStockPolicy) || 'deny',
+    documentPrefix: stringValue(profile.document_prefix ?? profile.documentPrefix),
+    version: Number(profile.version) || 1,
+  };
+}
+
 function mapStore(
   store: JsonRecord,
   actor: PortalAccount,
@@ -416,7 +441,7 @@ function mapCanonicalBusiness(
         .map(mapCanonicalProduct)
         .filter((item): item is ProductRecord => Boolean(item))
     : undefined;
-  return mapStore(
+  const mapped = mapStore(
     {
       ...store,
       organization_id: business.organization_id,
@@ -431,6 +456,16 @@ function mapCanonicalBusiness(
     stringValue(business.capability_key) || 'general',
     canonicalProducts,
   );
+  const profile = mapCanonicalProfile(value.profile);
+  const activeCapabilityKeys = arrayValue<JsonRecord>(value.capabilities)
+    .filter(capability => boolValue(capability.enabled, true))
+    .map(capability => stringValue(capability.capability_key ?? capability.capabilityKey))
+    .filter(Boolean);
+  return {
+    ...mapped,
+    ...(profile ? { profile, templateKey: profile.templateKey } : {}),
+    ...(activeCapabilityKeys.length > 0 ? { activeCapabilityKeys } : {}),
+  };
 }
 
 async function getCanonicalAggregate(
@@ -476,6 +511,7 @@ export async function getBusinessForCurrentActor(
 
 export async function createBusiness(input: {
   name: string;
+  templateKey?: BusinessTemplateKey;
   category: string;
   city: string;
   address: string;
@@ -486,14 +522,7 @@ export async function createBusiness(input: {
   idempotencyKey?: string;
 }) {
   const { token } = await requireAuthenticatedActor();
-  const normalizedCategory = input.category.toLowerCase();
-  const capabilityKey = /makanan|minuman|kuliner|kopi|cafe|resto/.test(normalizedCategory)
-    ? 'food_beverage'
-    : /retail|ritel|toko/.test(normalizedCategory)
-      ? 'retail'
-      : /jasa|service|laundry/.test(normalizedCategory)
-        ? 'services'
-        : 'general';
+  const preset = getBusinessTemplatePreset(input.templateKey ?? 'general');
   const payload = await requestJson(`${MARKETPLACE_URL}/v1/businesses/provision`, {
     method: 'POST',
     headers: {
@@ -507,7 +536,11 @@ export async function createBusiness(input: {
         organization_id: null,
         new_organization_name: input.name,
       },
-      business: { name: input.name, capability_key: capabilityKey },
+      business: {
+        name: input.name,
+        capability_key: preset.legacyCapabilityKey,
+        profile: { template_key: preset.key },
+      },
       primary_location: {
         name: 'Lokasi utama',
         address: input.address,
@@ -692,9 +725,6 @@ export async function updateBusiness(
   const primaryLocation = current.locations?.find(item => item.isPrimary)
     ?? current.locations?.[0];
   const category = input.category ?? current.category;
-  const capabilityKey = input.category === undefined
-    ? current.capabilityKey ?? 'general'
-    : capabilityKeyForCategory(category);
   const payload = await requestJson(
     `${MARKETPLACE_URL}/v1/businesses/${encodeURIComponent(current.id)}`,
     {
@@ -706,7 +736,7 @@ export async function updateBusiness(
       body: JSON.stringify({
         expected_version: current.version ?? 1,
         name: input.name ?? current.name,
-        capability_key: capabilityKey,
+        capability_key: current.capabilityKey ?? 'general',
         category,
         description: input.description ?? current.description,
         schedule: input.schedule ?? current.schedule,
@@ -730,17 +760,6 @@ export async function updateBusiness(
     throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
   }
   return updated;
-}
-
-function capabilityKeyForCategory(category: string) {
-  const normalizedCategory = category.toLowerCase();
-  return /makanan|minuman|kuliner|kopi|cafe|resto/.test(normalizedCategory)
-    ? 'food_beverage'
-    : /retail|ritel|toko/.test(normalizedCategory)
-      ? 'retail'
-      : /jasa|service|laundry/.test(normalizedCategory)
-        ? 'services'
-        : 'general';
 }
 
 export async function replaceBusinessLocations(

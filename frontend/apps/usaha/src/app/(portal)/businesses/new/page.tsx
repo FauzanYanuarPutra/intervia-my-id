@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { CheckCircle2, MapPinned, Store } from 'lucide-react';
+import { CheckCircle2, Layers3, MapPinned, Store } from 'lucide-react';
 import { NewBusinessQuickForm } from '@/components/forms/NewBusinessQuickForm';
 import { DataPanel } from '@/components/portal/DataPanel';
 import { PageHeader } from '@/components/portal/PageHeader';
@@ -14,13 +14,18 @@ export default async function NewBusinessPage() {
   return (
     <PortalShell activeBusiness={null} availableBusinesses={businesses} viewerName={account.name} currentSection="home">
       <div className="mx-auto max-w-5xl space-y-5 py-2 sm:py-4">
-        <PageHeader eyebrow="Onboarding usaha" title="Buat workspace usaha baru" description="Isi identitas dasar dan lokasi utama. Setelah tersimpan, kamu langsung masuk ke Business OS untuk melengkapi katalog dan operasional." />
+        <PageHeader
+          eyebrow="Onboarding usaha"
+          title="Buat workspace usaha baru"
+          description="Pilih jenis usaha, isi identitas dan lokasi utama. Lajukan menyiapkan flow awal yang sesuai tanpa memaksa kamu memahami ERP atau akuntansi."
+        />
 
-        <section className="grid gap-3 sm:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-4">
           {[
-            [Store, '1. Identitas usaha', 'Nama, kategori, kontak, dan deskripsi utama.'],
-            [MapPinned, '2. Lokasi utama', 'Alamat dan pin membantu pembeli menemukan usaha.'],
-            [CheckCircle2, '3. Siap dikelola', 'Lanjutkan ke dashboard, produk, order, dan tim.'],
+            [Layers3, '1. Pilih flow', 'Juice/F&B, Laundry, AC/Field Service, Mart/Retail, atau usaha umum.'],
+            [Store, '2. Identitas usaha', 'Nama, kategori tampilan, dan kontak utama.'],
+            [MapPinned, '3. Lokasi utama', 'Alamat dan pin menjadi fondasi cabang pertama.'],
+            [CheckCircle2, '4. Quick Start', 'Masuk ke langkah awal yang relevan dengan jenis usahamu.'],
           ].map(([Icon, title, copy]) => {
             const IconComponent = Icon as typeof Store;
             return (
@@ -33,8 +38,17 @@ export default async function NewBusinessPage() {
           })}
         </section>
 
-        <DataPanel title="Informasi usaha" description="Data ini menjadi fondasi profil usaha dan lokasi utama yang dikelola dari Lajukan Usaha.">
-          <div className="p-4 sm:p-6"><NewBusinessQuickForm initialOwnerName={account.name} initialOwnerPhone={account.phone} initialOwnerEmail={account.email} /></div>
+        <DataPanel
+          title="Setup usaha"
+          description="Jenis usaha menentukan template dan capability awal. Kategori tetap terpisah agar label publik tidak diam-diam mengubah operasional."
+        >
+          <div className="p-4 sm:p-6">
+            <NewBusinessQuickForm
+              initialOwnerName={account.name}
+              initialOwnerPhone={account.phone}
+              initialOwnerEmail={account.email}
+            />
+          </div>
         </DataPanel>
       </div>
     </PortalShell>
