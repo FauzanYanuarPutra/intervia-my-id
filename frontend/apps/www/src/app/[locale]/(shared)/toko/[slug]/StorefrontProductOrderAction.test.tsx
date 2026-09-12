@@ -22,6 +22,17 @@ describe('StorefrontProductOrderAction', () => {
     expect(html).not.toContain('disabled=""');
   });
 
+  it('renders a compact menu-row action without changing canonical ordering behavior', () => {
+    const html = renderToStaticMarkup(
+      <StorefrontProductOrderAction {...BASE_PROPS} variant="compact" />,
+    );
+
+    expect(html).toContain('data-variant="compact"');
+    expect(html).toContain('>Pesan</button>');
+    expect(html).not.toContain('w-full');
+    expect(html).not.toContain('disabled=""');
+  });
+
   it('disables ordering when the store has online ordering turned off', () => {
     const html = renderToStaticMarkup(
       <StorefrontProductOrderAction

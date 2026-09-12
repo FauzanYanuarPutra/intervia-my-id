@@ -117,7 +117,7 @@ function StorePill({
 
   return (
     <span
-      className={`inline-flex min-h-8 items-center rounded-full px-3 text-xs font-bold ring-1 ${toneClass}`}
+      className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-[11px] font-bold ring-1 ${toneClass}`}
     >
       {children}
     </span>
@@ -139,82 +139,76 @@ function ProductCard({
 
   return (
     <article
-      className="group overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_16px_38px_-34px_rgba(15,23,42,0.55)] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_46px_-32px_rgba(5,150,105,0.35)] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-900"
+      className="group py-4 first:pt-0 last:pb-0"
       data-testid="storefront-product-card"
     >
-      <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-800">
-        {image ? (
-          <LajukanImage
-            src={image}
-            alt={product.name}
-            fill
-            sizes="(min-width: 1280px) 260px, (min-width: 640px) 44vw, 92vw"
-            className="object-cover transition duration-300 group-hover:scale-[1.025]"
-          />
-        ) : (
-          <div
-            role="img"
-            aria-label={
-              isId
-                ? `Belum ada foto untuk ${product.name}`
-                : `No photo for ${product.name}`
-            }
-            className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-slate-400 dark:text-slate-500"
-          >
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-400 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-500 dark:ring-slate-700">
-              <ImageOff className="h-5 w-5" />
-            </span>
-            <span className="text-xs font-bold">
-              {isId ? 'Belum ada foto' : 'No photo yet'}
-            </span>
-          </div>
-        )}
-        {stockStatus !== 'in_stock' ? (
-          <span className="absolute left-3 top-3 rounded-full bg-slate-950/78 px-2.5 py-1 text-[11px] font-bold text-white">
-            {stockStatus === 'unknown'
-              ? isId
-                ? 'Stok perlu dikonfirmasi'
-                : 'Stock needs confirmation'
-              : isId
-                ? 'Stok habis'
-                : 'Out of stock'}
-          </span>
-        ) : null}
-      </div>
-      <div className="p-3.5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-          {product.category || (isId ? 'Produk' : 'Product')}
-        </p>
-        <h3 className="mt-1 line-clamp-2 text-base font-bold leading-6 text-slate-950 dark:text-slate-50">
-          {product.name}
-        </h3>
-        {product.description ? (
-          <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
-            {product.description}
-          </p>
-        ) : null}
-        <div className="mt-3 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-          <p className="text-base font-extrabold text-emerald-700 dark:text-emerald-300">
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h4 className="line-clamp-2 text-[15px] font-extrabold leading-5 text-slate-950 dark:text-slate-50 sm:text-base">
+            {product.name}
+          </h4>
+          {product.description ? (
+            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              {product.description}
+            </p>
+          ) : null}
+          <p className="mt-2 text-[15px] font-extrabold text-slate-950 dark:text-slate-100">
             {formatIdr(product.price_cents)}
           </p>
           {inStock ? (
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <p className="mt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500">
               {isId
-                ? `Stok ${product.stock_qty}`
-                : `${product.stock_qty} in stock`}
+                ? `${product.stock_qty} tersedia`
+                : `${product.stock_qty} available`}
             </p>
-          ) : null}
+          ) : stockStatus === 'unknown' ? (
+            <p className="mt-0.5 text-xs font-semibold text-amber-600 dark:text-amber-300">
+              {isId ? 'Stok perlu dikonfirmasi' : 'Confirm stock first'}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {isId ? 'Stok habis' : 'Out of stock'}
+            </p>
+          )}
+          <StorefrontProductOrderAction
+            storeId={product.store_id}
+            productId={product.id}
+            productName={product.name}
+            onlineOrderEnabled={onlineOrderEnabled}
+            productAvailable={
+              product.is_available && stockStatus !== 'out_of_stock'
+            }
+            isId={isId}
+            variant="compact"
+          />
         </div>
-        <StorefrontProductOrderAction
-          storeId={product.store_id}
-          productId={product.id}
-          productName={product.name}
-          onlineOrderEnabled={onlineOrderEnabled}
-          productAvailable={
-            product.is_available && stockStatus !== 'out_of_stock'
-          }
-          isId={isId}
-        />
+
+        <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:ring-slate-700 sm:h-32 sm:w-32">
+          {image ? (
+            <LajukanImage
+              src={image}
+              alt={product.name}
+              fill
+              sizes="128px"
+              className="object-cover transition duration-300 group-hover:scale-[1.025]"
+            />
+          ) : (
+            <div
+              role="img"
+              aria-label={
+                isId
+                  ? `Belum ada foto untuk ${product.name}`
+                  : `No photo for ${product.name}`
+              }
+              className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 text-center text-slate-400 dark:text-slate-500"
+            >
+              <ImageOff className="h-5 w-5" />
+              <span className="text-[10px] font-bold">
+                {isId ? 'Belum ada foto' : 'No photo'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -233,11 +227,11 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-3 py-3">
-      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
         {icon}
       </span>
       <div className="min-w-0">
-        <dt className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+        <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
           {label}
         </dt>
         <dd className="mt-0.5 text-sm font-bold leading-5 text-slate-900 dark:text-slate-100">
@@ -278,7 +272,7 @@ function PrimaryAction({
       href={action.href}
       target={action.external ? '_blank' : undefined}
       rel={action.external ? 'noopener noreferrer' : undefined}
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-bold text-white shadow-[0_16px_28px_-22px_rgba(4,120,87,0.8)] transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${className}`}
       data-testid={testId}
     >
       <Icon className="h-4 w-4" />
@@ -454,7 +448,7 @@ export default async function TokoPage({ params }: PageProps) {
         : products.length > 0
           ? {
               href: '#produk',
-              label: isId ? 'Lihat katalog' : 'View catalog',
+              label: isId ? 'Lihat menu' : 'View menu',
               kind: 'products',
               external: false,
             }
@@ -471,6 +465,21 @@ export default async function TokoPage({ params }: PageProps) {
       : place.statusTone === 'positive'
         ? 'positive'
         : 'warning';
+
+  const fallbackCategory = isId ? 'Menu lainnya' : 'Other items';
+  const menuGroups = Array.from(
+    products.reduce<Map<string, UmkmProduct[]>>((groups, product) => {
+      const label = product.category?.trim() || fallbackCategory;
+      const existing = groups.get(label);
+      if (existing) existing.push(product);
+      else groups.set(label, [product]);
+      return groups;
+    }, new Map()),
+  ).map(([label, items], index) => ({
+    id: `menu-category-${index + 1}`,
+    label,
+    items,
+  }));
 
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -512,7 +521,10 @@ export default async function TokoPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <main className="min-h-screen bg-slate-50 pb-40 pt-3 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:pt-5 lg:pb-10">
+      <main
+        data-layout="compact-food-storefront"
+        className="min-h-screen bg-slate-50 pb-10 pt-3 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:pt-5"
+      >
         <div className="page-shell">
           <nav
             aria-label={isId ? 'Navigasi toko' : 'Business navigation'}
@@ -520,22 +532,22 @@ export default async function TokoPage({ params }: PageProps) {
           >
             <Link
               href={`/${locale}/umkm`}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white px-3.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800"
+              className="inline-flex min-h-9 items-center gap-2 rounded-full bg-white px-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800"
             >
               <ArrowLeft className="h-4 w-4" />
               {isId ? 'Jelajahi UMKM' : 'Explore businesses'}
             </Link>
             <span className="hidden text-xs font-semibold text-slate-500 dark:text-slate-400 sm:inline">
-              {isId ? 'Profil usaha publik' : 'Public business profile'}
+              {isId ? 'Toko di Lajukan' : 'Business on Lajukan'}
             </span>
           </nav>
 
           <section
-            className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_70px_-48px_rgba(15,23,42,0.5)] dark:border-slate-800 dark:bg-slate-900 sm:rounded-[30px]"
+            className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_16px_42px_-36px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-slate-900 sm:rounded-[26px]"
             data-testid="storefront-summary"
           >
             <div
-              className="relative aspect-[8/3] min-h-[190px] max-h-[410px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[260px]"
+              className="relative aspect-[8/3] overflow-hidden bg-slate-100 dark:bg-slate-800"
               data-testid="storefront-media"
               data-media-count={
                 Number(Boolean(brandMedia.coverUrl)) +
@@ -554,177 +566,207 @@ export default async function TokoPage({ params }: PageProps) {
                 />
               ) : (
                 <div
-                  className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,_rgba(16,185,129,0.28),_transparent_35%),radial-gradient(circle_at_82%_24%,_rgba(14,165,233,0.18),_transparent_32%),linear-gradient(135deg,#ecfdf5,#f8fafc_55%,#eff6ff)] dark:bg-[radial-gradient(circle_at_18%_18%,_rgba(16,185,129,0.2),_transparent_35%),radial-gradient(circle_at_82%_24%,_rgba(14,165,233,0.14),_transparent_32%),linear-gradient(135deg,#052e2b,#0f172a_55%,#172554)]"
+                  className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,_rgba(16,185,129,0.24),_transparent_38%),radial-gradient(circle_at_82%_24%,_rgba(14,165,233,0.15),_transparent_34%),linear-gradient(135deg,#ecfdf5,#f8fafc_55%,#eff6ff)] dark:bg-[radial-gradient(circle_at_18%_18%,_rgba(16,185,129,0.18),_transparent_38%),radial-gradient(circle_at_82%_24%,_rgba(14,165,233,0.12),_transparent_34%),linear-gradient(135deg,#052e2b,#0f172a_55%,#172554)]"
                   data-testid="storefront-media-placeholder"
                   role="img"
-                  aria-label={isId ? `Banner ${store.name} belum tersedia` : `No cover for ${store.name}`}
+                  aria-label={
+                    isId
+                      ? `Banner ${store.name} belum tersedia`
+                      : `No cover for ${store.name}`
+                  }
                 />
               )}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-transparent to-slate-950/10" />
-              <div className="absolute left-4 top-4 flex flex-wrap gap-2 sm:left-6 sm:top-6">
-                <StorePill>{place.categoryLabel}</StorePill>
-                <StorePill tone={statusTone}>{statusLabel}</StorePill>
-              </div>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-slate-950/5" />
             </div>
 
-            <div className="relative px-4 pb-5 sm:px-7 sm:pb-7">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex min-w-0 items-end gap-4 sm:gap-5">
-                  <div className="relative -mt-12 h-24 w-24 shrink-0 overflow-hidden rounded-[24px] border-4 border-white bg-white shadow-[0_18px_40px_-22px_rgba(15,23,42,0.6)] dark:border-slate-900 dark:bg-slate-900 sm:-mt-16 sm:h-32 sm:w-32 sm:rounded-[30px]">
-                    {brandMedia.logoUrl ? (
-                      <LajukanImage
-                        src={brandMedia.logoUrl}
-                        alt={isId ? `Logo ${store.name}` : `${store.name} logo`}
-                        fill
-                        sizes="128px"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 grid place-items-center bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-200">
-                        <Store className="h-9 w-9 sm:h-11 sm:w-11" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 pb-1 pt-4 sm:pt-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
-                      {isId ? 'Toko di Lajukan' : 'Business on Lajukan'}
-                    </p>
-                    <h1 className="mt-1 line-clamp-2 text-2xl font-extrabold leading-tight tracking-[-0.035em] text-slate-950 dark:text-slate-50 sm:text-4xl">
-                      {store.name}
-                    </h1>
+            <div className="relative px-4 pb-5 sm:px-6 sm:pb-6">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="relative -mt-8 h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-[0_12px_28px_-18px_rgba(15,23,42,0.65)] dark:border-slate-900 dark:bg-slate-900 sm:-mt-10 sm:h-24 sm:w-24">
+                  {brandMedia.logoUrl ? (
+                    <LajukanImage
+                      src={brandMedia.logoUrl}
+                      alt={isId ? `Logo ${store.name}` : `${store.name} logo`}
+                      fill
+                      sizes="96px"
+                      className="object-contain p-1"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 grid place-items-center bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-200">
+                      <Store className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 pt-3 sm:pt-4">
+                  <h1 className="line-clamp-2 text-xl font-extrabold leading-tight tracking-[-0.025em] text-slate-950 dark:text-slate-50 sm:text-3xl">
+                    {store.name}
+                  </h1>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <StorePill>{place.categoryLabel}</StorePill>
+                    <StorePill tone={statusTone}>{statusLabel}</StorePill>
                   </div>
                 </div>
-                <PrimaryAction
-                  action={primaryAction}
-                  testId="storefront-primary-action-desktop"
-                  className="hidden shrink-0 lg:inline-flex"
-                />
               </div>
 
-              <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:text-sm">
+                {hasRating ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    {ratingLabel}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <PackageCheck className="h-4 w-4 text-emerald-600" />
+                    {availableProductCount} {isId ? 'menu tersedia' : 'items available'}
+                  </span>
+                )}
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="max-w-[280px] truncate">{publicLocationLabel}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock3 className="h-4 w-4 text-slate-400" />
+                  <span className="line-clamp-1">{openHoursLabel}</span>
+                </span>
+              </div>
+
+              <p className="mt-3 line-clamp-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                 {store.description ||
                   (isId
-                    ? `UMKM di ${store.city}. Cek produk dan informasi operasional sebelum berkunjung atau memesan.`
-                    : `A local business in ${store.city}. Check products and operating information before visiting or ordering.`)}
+                    ? `UMKM di ${store.city}. Cek menu dan informasi operasional sebelum berkunjung atau memesan.`
+                    : `A local business in ${store.city}. Check the menu and operating information before visiting or ordering.`)}
               </p>
 
-              <dl className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-2xl bg-slate-50 px-3.5 dark:bg-slate-800/65">
-                  <InfoRow
-                    icon={<MapPin className="h-4 w-4" />}
-                    label={isId ? 'Area usaha' : 'Business area'}
-                    value={publicLocationLabel}
-                    note={locationNote || undefined}
-                  />
-                </div>
-                <div className="rounded-2xl bg-slate-50 px-3.5 dark:bg-slate-800/65">
-                  <InfoRow
-                    icon={<Clock3 className="h-4 w-4" />}
-                    label={isId ? 'Jam operasional' : 'Opening hours'}
-                    value={openHoursLabel}
-                  />
-                </div>
-                <div className="rounded-2xl bg-slate-50 px-3.5 dark:bg-slate-800/65">
-                  <InfoRow
-                    icon={hasRating ? <Star className="h-4 w-4" /> : <PackageCheck className="h-4 w-4" />}
-                    label={hasRating ? (isId ? 'Ulasan pelanggan' : 'Customer reviews') : (isId ? 'Produk tersedia' : 'Available products')}
-                    value={hasRating ? ratingLabel : `${availableProductCount} ${isId ? 'produk' : 'products'}`}
-                  />
-                </div>
-              </dl>
-
               {place.serviceBadges.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap gap-1.5">
                   {place.serviceBadges.map(badge => (
                     <span
                       key={badge}
-                      className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-100 dark:bg-emerald-950/55 dark:text-emerald-200 dark:ring-emerald-900"
+                      className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
                     >
                       {badge}
                     </span>
                   ))}
                 </div>
               ) : null}
+
+              <div className="mt-4">
+                <PrimaryAction
+                  action={primaryAction}
+                  testId="storefront-primary-action"
+                />
+              </div>
             </div>
           </section>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
             <section
               id="produk"
-              className="scroll-mt-24 rounded-[24px] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5"
+              className="scroll-mt-24 overflow-hidden rounded-[22px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               data-testid="storefront-products"
             >
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">
-                    {isId ? 'Katalog' : 'Catalog'}
-                  </p>
-                  <h2 className="mt-1 text-xl font-extrabold text-slate-950 dark:text-slate-50 sm:text-2xl">
-                    {isId
-                      ? 'Produk dari toko ini'
-                      : 'Products from this business'}
-                  </h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {isId
-                      ? 'Harga dan stok mengikuti informasi terakhir dari pemilik toko.'
-                      : 'Prices and stock reflect the latest information from the owner.'}
-                  </p>
+              <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-5">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-slate-50 sm:text-2xl">
+                      {isId ? 'Menu' : 'Menu'}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {isId
+                        ? 'Pilih dari menu yang tersedia.'
+                        : 'Choose from the available menu.'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">
+                    {availableProductCount} {isId ? 'tersedia' : 'available'}
+                  </span>
                 </div>
-                <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                  {availableProductCount} {isId ? 'tersedia' : 'available'}
-                </span>
+
+                {menuGroups.length > 1 ? (
+                  <nav
+                    aria-label={isId ? 'Kategori menu' : 'Menu categories'}
+                    className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {menuGroups.map(group => (
+                      <a
+                        key={group.id}
+                        href={`#${group.id}`}
+                        className="inline-flex min-h-8 shrink-0 items-center rounded-full bg-slate-100 px-3 text-xs font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"
+                      >
+                        {group.label}
+                      </a>
+                    ))}
+                  </nav>
+                ) : null}
               </div>
 
               {catalog.status === 'unavailable' ? (
                 <div
-                  className="mt-5 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-8 text-center dark:border-amber-900/70 dark:bg-amber-950/30"
+                  className="m-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-8 text-center dark:border-amber-900/70 dark:bg-amber-950/30"
                   role="status"
                 >
                   <ShoppingBag className="mx-auto h-7 w-7 text-amber-600 dark:text-amber-300" />
                   <p className="mt-3 font-bold text-amber-950 dark:text-amber-100">
                     {isId
-                      ? 'Katalog belum bisa dimuat'
-                      : 'The catalog could not be loaded'}
+                      ? 'Menu belum bisa dimuat'
+                      : 'The menu could not be loaded'}
                   </p>
                   <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-amber-800 dark:text-amber-200/80">
                     {isId
-                      ? 'Informasi usaha tetap bisa dilihat. Coba muat ulang katalog dalam beberapa saat.'
-                      : 'The business profile is still available. Try loading the catalog again shortly.'}
+                      ? 'Informasi usaha tetap bisa dilihat. Coba muat ulang menu dalam beberapa saat.'
+                      : 'The business profile is still available. Try loading the menu again shortly.'}
                   </p>
                   <Link
                     href={`/${locale}/toko/${encodeURIComponent(store.slug)}`}
-                    className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/50"
+                    className="mt-4 inline-flex min-h-10 items-center justify-center rounded-full border border-amber-300 bg-white px-4 text-sm font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/50"
                   >
                     {isId ? 'Coba lagi' : 'Try again'}
                   </Link>
                 </div>
-              ) : products.length > 0 ? (
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {products.map(product => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      isId={isId}
-                      onlineOrderEnabled={store.online_order_enabled}
-                    />
+              ) : menuGroups.length > 0 ? (
+                <div className="px-4 pb-2 sm:px-5">
+                  {menuGroups.map(group => (
+                    <section
+                      id={group.id}
+                      key={group.id}
+                      data-testid="storefront-menu-group"
+                      className="scroll-mt-24 border-b border-slate-100 py-4 last:border-b-0 dark:border-slate-800"
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h3 className="text-base font-extrabold text-slate-950 dark:text-slate-50 sm:text-lg">
+                          {group.label}
+                        </h3>
+                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                          {group.items.length} {isId ? 'item' : 'items'}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {group.items.map(product => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            isId={isId}
+                            onlineOrderEnabled={store.online_order_enabled}
+                          />
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
               ) : (
-                <div className="mt-5 rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center dark:border-slate-700 dark:bg-slate-950/55">
+                <div className="m-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center dark:border-slate-700 dark:bg-slate-950/55">
                   <ShoppingBag className="mx-auto h-7 w-7 text-slate-400" />
                   <p className="mt-3 font-bold text-slate-800 dark:text-slate-200">
-                    {isId
-                      ? 'Produk belum ditampilkan'
-                      : 'Products are not listed yet'}
+                    {isId ? 'Menu belum ditampilkan' : 'Menu is not listed yet'}
                   </p>
                   <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
                     {publicContact.whatsappHref
                       ? isId
-                        ? 'Gunakan tombol tanya toko untuk meminta katalog atau stok terbaru.'
-                        : 'Use the business contact button to ask for the latest catalog or stock.'
+                        ? 'Gunakan tombol tanya toko untuk meminta menu atau stok terbaru.'
+                        : 'Use the business contact button to ask for the latest menu or stock.'
                       : isId
-                        ? 'Pemilik toko belum mempublikasikan katalog dan kanal kontak.'
-                        : 'The owner has not published a catalog or contact channel.'}
+                        ? 'Pemilik toko belum mempublikasikan menu dan kanal kontak.'
+                        : 'The owner has not published a menu or contact channel.'}
                   </p>
                 </div>
               )}
@@ -733,12 +775,12 @@ export default async function TokoPage({ params }: PageProps) {
             <aside className="space-y-3 lg:sticky lg:top-20">
               <section
                 id="informasi-usaha"
-                className="scroll-mt-24 rounded-[24px] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5"
+                className="scroll-mt-24 rounded-[22px] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
               >
-                <h2 className="text-lg font-extrabold text-slate-950 dark:text-slate-50">
-                  {isId ? 'Informasi usaha' : 'Business information'}
+                <h2 className="text-base font-extrabold text-slate-950 dark:text-slate-50">
+                  {isId ? 'Info toko' : 'Business info'}
                 </h2>
-                <dl className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
+                <dl className="mt-1 divide-y divide-slate-100 dark:divide-slate-800">
                   <InfoRow
                     icon={<MapPin className="h-4 w-4" />}
                     label={isId ? 'Lokasi' : 'Location'}
@@ -768,7 +810,7 @@ export default async function TokoPage({ params }: PageProps) {
                     href={place.googleMapsDirectionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <ExternalLink className="h-4 w-4" />
                     {isId ? 'Buka rute di Maps' : 'Open route in Maps'}
@@ -776,30 +818,20 @@ export default async function TokoPage({ params }: PageProps) {
                 ) : null}
               </section>
 
-              <section className="rounded-[24px] border border-emerald-100 bg-emerald-50 p-4 text-emerald-950 dark:border-emerald-900/70 dark:bg-emerald-950/35 dark:text-emerald-100">
+              <section className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-4 text-emerald-950 dark:border-emerald-900/70 dark:bg-emerald-950/35 dark:text-emerald-100">
                 <p className="text-sm font-extrabold">
                   {isId ? 'Sebelum transaksi' : 'Before transacting'}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-emerald-900/80 dark:text-emerald-100/80">
+                <p className="mt-1.5 text-xs leading-5 text-emerald-900/80 dark:text-emerald-100/80">
                   {isId
-                    ? 'Konfirmasi stok, harga, lokasi, dan cara pengiriman. Jangan kirim data pribadi atau pembayaran sebelum informasinya jelas.'
-                    : 'Confirm stock, price, location, and delivery. Do not send personal data or payment before the details are clear.'}
+                    ? 'Konfirmasi stok, harga, lokasi, dan cara pengiriman sebelum membayar.'
+                    : 'Confirm stock, price, location, and delivery before paying.'}
                 </p>
               </section>
             </aside>
           </div>
         </div>
       </main>
-
-      <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 px-3 lg:hidden">
-        <div className="mx-auto max-w-md rounded-[20px] border border-slate-200 bg-white/96 p-2 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900/96">
-          <PrimaryAction
-            action={primaryAction}
-            testId="storefront-primary-action-mobile"
-            className="w-full"
-          />
-        </div>
-      </div>
     </>
   );
 }
