@@ -53,7 +53,7 @@ export function BusinessImageCropUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const previewUrl = previewOverride?.sourceUrl === currentUrl
+  const previewUrl = previewOverride && previewOverride.sourceUrl === currentUrl
     ? previewOverride.url
     : currentUrl ?? '';
 
