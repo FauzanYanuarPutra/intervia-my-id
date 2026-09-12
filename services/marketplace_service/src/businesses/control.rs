@@ -259,6 +259,7 @@ impl ControlRepository {
         Ok(Some(RecipeAggregate { recipe, items }))
     }
 
+    #[cfg(test)]
     pub(crate) async fn replace_recipe(
         &self,
         business_id: Uuid,
@@ -565,6 +566,7 @@ fn validate_ingredient(request: &CreateIngredientRequest) -> Result<(), ControlR
     Ok(())
 }
 
+#[cfg(test)]
 fn validate_recipe(request: &ReplaceRecipeRequest) -> Result<(), ControlRepositoryError> {
     let name = normalize(&request.name);
     if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
