@@ -3,9 +3,7 @@ use super::domain::{
     ValidatedBusinessProfileUpdate, ValidatedProvisionCommand,
 };
 use super::products::{ProductRepository, ProductRepositoryError};
-use super::profile::{
-    BusinessCapabilityRecord, BusinessProfileRecord, ResolvedBusinessProfile,
-};
+use super::profile::{BusinessCapabilityRecord, BusinessProfileRecord, ResolvedBusinessProfile};
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use sha2::Digest;
