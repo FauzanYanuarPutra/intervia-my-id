@@ -184,6 +184,28 @@ impl RecipeRepository {
         .execute(&mut *tx)
         .await?;
 
+        // Build the immutable BOM first. The parent FK is deferred, and the
+        // parent version is inserted last to seal the aggregate atomically.
+        for (position, item) in request.items.iter().enumerate() {
+            sqlx::query(
+                r#"
+                INSERT INTO business_recipe_version_items (
+                  organization_id, business_id, recipe_version_id, ingredient_id,
+                  quantity, waste_percent_override, position
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+                "#,
+            )
+            .bind(organization_id)
+            .bind(business_id)
+            .bind(version_id)
+            .bind(item.ingredient_id)
+            .bind(item.quantity)
+            .bind(item.waste_percent_override)
+            .bind(position as i32)
+            .execute(&mut *tx)
+            .await?;
+        }
+
         sqlx::query(
             r#"
             INSERT INTO business_recipe_versions (
@@ -206,26 +228,6 @@ impl RecipeRepository {
         .bind(json!({ "source": "legacy_recipe_put" }))
         .execute(&mut *tx)
         .await?;
-
-        for (position, item) in request.items.iter().enumerate() {
-            sqlx::query(
-                r#"
-                INSERT INTO business_recipe_version_items (
-                  organization_id, business_id, recipe_version_id, ingredient_id,
-                  quantity, waste_percent_override, position
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7)
-                "#,
-            )
-            .bind(organization_id)
-            .bind(business_id)
-            .bind(version_id)
-            .bind(item.ingredient_id)
-            .bind(item.quantity)
-            .bind(item.waste_percent_override)
-            .bind(position as i32)
-            .execute(&mut *tx)
-            .await?;
-        }
 
         let legacy_recipe = sqlx::query_as::<_, RecipeRecord>(
             r#"

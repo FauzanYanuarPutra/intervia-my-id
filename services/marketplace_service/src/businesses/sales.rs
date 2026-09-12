@@ -216,6 +216,23 @@ impl SaleRepository {
             });
         }
 
+        // A sale entered for the database's current business date is posted
+        // against the recipe that is effective now. Backdated sales retain
+        // date-granular semantics and resolve at the start of their UTC date.
+        let (database_today, posting_time) =
+            sqlx::query_as::<_, (NaiveDate, DateTime<Utc>)>("SELECT CURRENT_DATE, NOW()")
+                .fetch_one(&mut *tx)
+                .await?;
+        let effective_at = if normalized.occurred_on == database_today {
+            posting_time
+        } else {
+            normalized
+                .occurred_on
+                .and_hms_opt(0, 0, 0)
+                .ok_or(SaleRepositoryError::Database)?
+                .and_utc()
+        };
+
         let mut prepared = Vec::with_capacity(normalized.lines.len());
         let mut gross_amount = 0_i64;
         let mut discount_amount = 0_i64;
@@ -227,7 +244,7 @@ impl SaleRepository {
                 &mut tx,
                 business_id,
                 organization_id,
-                normalized.occurred_on,
+                effective_at,
                 line,
             )
             .await?;
@@ -433,7 +450,7 @@ async fn prepare_line(
     tx: &mut Transaction<'_, Postgres>,
     business_id: Uuid,
     organization_id: Uuid,
-    occurred_on: NaiveDate,
+    effective_at: DateTime<Utc>,
     line: &CreateSaleLineRequest,
 ) -> Result<PreparedSaleLine, SaleRepositoryError> {
     let product_name = sqlx::query_scalar::<_, String>(
@@ -450,13 +467,6 @@ async fn prepare_line(
     .await?
     .ok_or(SaleRepositoryError::NotFound)?;
 
-    // Sales are date-granular today. Resolve evidence at the beginning of the
-    // UTC business date so a recipe published later that day is not silently
-    // applied to an earlier/backdated sale with no recorded time component.
-    let effective_at = occurred_on
-        .and_hms_opt(0, 0, 0)
-        .ok_or(SaleRepositoryError::Database)?
-        .and_utc();
     let recipe = resolve_effective_recipe(
         tx,
         business_id,
