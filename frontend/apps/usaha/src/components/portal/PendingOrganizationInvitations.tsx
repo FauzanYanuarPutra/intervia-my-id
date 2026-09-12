@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, MailCheck, X } from 'lucide-react';
 import { organizationRoleLabel } from '@/lib/business-collaboration';
 import {
+  INVITATIONS_CHANGED_EVENT,
   invitationExpiryLabel,
   parsePendingInvitations,
   type PendingOrganizationInvitation,
@@ -59,6 +60,7 @@ export function PendingOrganizationInvitations({ showEmpty = false }: PendingOrg
           ? 'Undangan diterima. Usaha akan muncul di daftar usahamu setelah akses tersinkron.'
           : 'Undangan ditolak. Akses ke usaha tidak diberikan.',
       );
+      window.dispatchEvent(new Event(INVITATIONS_CHANGED_EVENT));
       startTransition(() => router.refresh());
     } catch (responseError) {
       setError(
