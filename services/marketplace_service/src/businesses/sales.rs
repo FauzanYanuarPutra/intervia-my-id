@@ -7,6 +7,8 @@ use serde_json::Value;
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
+use super::recipes::resolve_effective_recipe;
+
 const MAX_SALE_LINES: usize = 100;
 const MAX_CHANNEL_KEY_LEN: usize = 80;
 
@@ -133,26 +135,6 @@ impl From<sqlx::Error> for SaleRepositoryError {
     }
 }
 
-#[derive(Debug, FromRow)]
-struct RecipeRow {
-    id: Uuid,
-    version: i64,
-    name: String,
-    servings: Decimal,
-}
-
-#[derive(Debug, FromRow)]
-struct IngredientCostRow {
-    ingredient_id: Uuid,
-    ingredient_name: String,
-    recipe_quantity: Decimal,
-    purchase_price_amount: i64,
-    purchase_quantity: Decimal,
-    conversion_factor: Decimal,
-    yield_percent: Decimal,
-    waste_percent: Decimal,
-}
-
 #[derive(Debug, Clone)]
 struct PreparedIngredientConsumption {
     ingredient_id: Uuid,
@@ -161,6 +143,7 @@ struct PreparedIngredientConsumption {
 
 struct PreparedSaleLine {
     product_id: Uuid,
+    recipe_version_id: Option<Uuid>,
     product_name: String,
     quantity: Decimal,
     unit_price_amount: i64,
@@ -240,7 +223,14 @@ impl SaleRepository {
         let mut cogs_amount = 0_i64;
 
         for line in &normalized.lines {
-            let prepared_line = prepare_line(&mut tx, business_id, organization_id, line).await?;
+            let prepared_line = prepare_line(
+                &mut tx,
+                business_id,
+                organization_id,
+                normalized.occurred_on,
+                line,
+            )
+            .await?;
             let line_gross = prepared_line
                 .final_revenue_amount
                 .checked_add(prepared_line.discount_amount)
@@ -315,14 +305,15 @@ impl SaleRepository {
             sqlx::query(
                 r#"
                 INSERT INTO business_sale_lines (
-                  sale_id, product_id, product_name, quantity, unit_price_amount,
-                  discount_amount, final_revenue_amount, unit_cogs_amount,
-                  line_cogs_amount, cost_snapshot
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                  sale_id, product_id, recipe_version_id, product_name, quantity,
+                  unit_price_amount, discount_amount, final_revenue_amount,
+                  unit_cogs_amount, line_cogs_amount, cost_snapshot
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
                 "#,
             )
             .bind(sale_id)
             .bind(line.product_id)
+            .bind(line.recipe_version_id)
             .bind(&line.product_name)
             .bind(line.quantity)
             .bind(line.unit_price_amount)
@@ -442,6 +433,7 @@ async fn prepare_line(
     tx: &mut Transaction<'_, Postgres>,
     business_id: Uuid,
     organization_id: Uuid,
+    occurred_on: NaiveDate,
     line: &CreateSaleLineRequest,
 ) -> Result<PreparedSaleLine, SaleRepositoryError> {
     let product_name = sqlx::query_scalar::<_, String>(
@@ -458,55 +450,32 @@ async fn prepare_line(
     .await?
     .ok_or(SaleRepositoryError::NotFound)?;
 
-    let recipe = sqlx::query_as::<_, RecipeRow>(
-        r#"
-        SELECT id, version, name, servings
-        FROM business_recipes
-        WHERE business_id=$1 AND organization_id=$2 AND product_id=$3 AND status='active'
-        FOR SHARE
-        "#,
+    // Sales are date-granular today. Resolve evidence at the beginning of the
+    // UTC business date so a recipe published later that day is not silently
+    // applied to an earlier/backdated sale with no recorded time component.
+    let effective_at = occurred_on
+        .and_hms_opt(0, 0, 0)
+        .ok_or(SaleRepositoryError::Database)?
+        .and_utc();
+    let recipe = resolve_effective_recipe(
+        tx,
+        business_id,
+        organization_id,
+        line.product_id,
+        effective_at,
     )
-    .bind(business_id)
-    .bind(organization_id)
-    .bind(line.product_id)
-    .fetch_optional(&mut **tx)
     .await?
     .ok_or(SaleRepositoryError::IncompleteCosting)?;
 
-    let ingredient_rows = sqlx::query_as::<_, IngredientCostRow>(
-        r#"
-        SELECT
-          bi.id AS ingredient_id,
-          bi.name AS ingredient_name,
-          ri.quantity AS recipe_quantity,
-          bi.purchase_price_amount,
-          bi.purchase_quantity,
-          bi.conversion_factor,
-          bi.yield_percent,
-          COALESCE(ri.waste_percent_override, bi.waste_percent) AS waste_percent
-        FROM business_recipe_items ri
-        JOIN business_ingredients bi ON bi.id=ri.ingredient_id
-        WHERE ri.recipe_id=$1
-          AND bi.business_id=$2
-          AND bi.organization_id=$3
-          AND bi.status='active'
-        ORDER BY ri.position, ri.id
-        "#,
-    )
-    .bind(recipe.id)
-    .bind(business_id)
-    .bind(organization_id)
-    .fetch_all(&mut **tx)
-    .await?;
-
-    if ingredient_rows.is_empty() {
+    if recipe.items.is_empty() {
         return Err(SaleRepositoryError::IncompleteCosting);
     }
-    let ingredient_inputs = ingredient_rows
-        .into_iter()
+    let ingredient_inputs = recipe
+        .items
+        .iter()
         .map(|row| SnapshotIngredientInput {
             ingredient_id: row.ingredient_id,
-            ingredient_name: row.ingredient_name,
+            ingredient_name: row.ingredient_name.clone(),
             recipe_quantity: row.recipe_quantity,
             purchase_price_amount: row.purchase_price_amount,
             purchase_quantity: row.purchase_quantity,
@@ -515,10 +484,10 @@ async fn prepare_line(
             waste_percent: row.waste_percent,
         })
         .collect::<Vec<_>>();
-
+    let recipe_version_id = recipe.recipe_version_id;
     let snapshot = calculate_line_snapshot(
-        recipe.id,
-        recipe.version,
+        recipe.recipe_id,
+        recipe.version_number,
         recipe.name,
         recipe.servings,
         &ingredient_inputs,
@@ -547,6 +516,7 @@ async fn prepare_line(
 
     Ok(PreparedSaleLine {
         product_id: line.product_id,
+        recipe_version_id,
         product_name,
         quantity: line.quantity,
         unit_price_amount: line.unit_price_amount,
