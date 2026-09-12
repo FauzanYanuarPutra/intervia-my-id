@@ -1,6 +1,4 @@
-use super::sales::{
-    CreateSaleLineRequest, CreateSaleRequest, SaleRepository, SaleRepositoryError,
-};
+use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository, SaleRepositoryError};
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
