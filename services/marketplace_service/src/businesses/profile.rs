@@ -4,83 +4,28 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 const GENERAL_CAPABILITIES: &[&str] = &[
-    "business_core",
-    "catalog",
-    "customers",
-    "finance_basic",
-    "payments",
-    "reporting",
-    "sales",
-    "supporting_documents",
+    "business_core", "catalog", "customers", "finance_basic", "payments", "reporting",
+    "sales", "supporting_documents",
 ];
 const JUICE_FNB_CAPABILITIES: &[&str] = &[
-    "business_core",
-    "catalog",
-    "customers",
-    "suppliers",
-    "sales",
-    "payments",
-    "finance_basic",
-    "reporting",
-    "inventory",
-    "recipes",
-    "procurement",
-    "pos",
-    "settlements",
-    "cashier_shifts",
-    "daily_close",
-    "supporting_documents",
+    "business_core", "catalog", "customers", "suppliers", "sales", "payments",
+    "finance_basic", "reporting", "inventory", "recipes", "procurement", "pos",
+    "settlements", "cashier_shifts", "daily_close", "supporting_documents",
 ];
 const LAUNDRY_CAPABILITIES: &[&str] = &[
-    "business_core",
-    "catalog",
-    "services",
-    "customers",
-    "sales",
-    "payments",
-    "finance_basic",
-    "reporting",
-    "appointments",
-    "work_orders",
-    "laundry_tracking",
-    "daily_close",
-    "supporting_documents",
+    "business_core", "catalog", "services", "customers", "sales", "payments",
+    "finance_basic", "reporting", "appointments", "work_orders", "laundry_tracking",
+    "daily_close", "supporting_documents",
 ];
 const AC_FIELD_SERVICE_CAPABILITIES: &[&str] = &[
-    "business_core",
-    "catalog",
-    "services",
-    "customers",
-    "suppliers",
-    "sales",
-    "payments",
-    "finance_basic",
-    "reporting",
-    "inventory",
-    "procurement",
-    "appointments",
-    "work_orders",
-    "field_service",
-    "assets",
-    "supporting_documents",
+    "business_core", "catalog", "services", "customers", "suppliers", "sales", "payments",
+    "finance_basic", "reporting", "inventory", "procurement", "appointments", "work_orders",
+    "field_service", "assets", "supporting_documents",
 ];
 const MART_RETAIL_CAPABILITIES: &[&str] = &[
-    "business_core",
-    "catalog",
-    "customers",
-    "suppliers",
-    "sales",
-    "payments",
-    "finance_basic",
-    "reporting",
-    "inventory",
-    "procurement",
-    "pos",
-    "barcode",
-    "settlements",
-    "cashier_shifts",
-    "daily_close",
-    "supporting_documents",
+    "business_core", "catalog", "customers", "suppliers", "sales", "payments",
+    "finance_basic", "reporting", "inventory", "procurement", "pos", "barcode",
+    "settlements", "cashier_shifts", "daily_close", "supporting_documents",
 ];
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -213,28 +158,14 @@ pub(crate) fn resolve_template(template_key: &str) -> Option<ResolvedBusinessTem
     match template_key.trim().to_ascii_lowercase().as_str() {
         "general" => Some(template("general", "general", "LJK", GENERAL_CAPABILITIES)),
         "juice_fnb" => Some(template(
-            "juice_fnb",
-            "food_beverage",
-            "FNB",
-            JUICE_FNB_CAPABILITIES,
+            "juice_fnb", "food_beverage", "FNB", JUICE_FNB_CAPABILITIES,
         )),
-        "laundry" => Some(template(
-            "laundry",
-            "services",
-            "LDR",
-            LAUNDRY_CAPABILITIES,
-        )),
+        "laundry" => Some(template("laundry", "services", "LDR", LAUNDRY_CAPABILITIES)),
         "ac_field_service" => Some(template(
-            "ac_field_service",
-            "services",
-            "SVC",
-            AC_FIELD_SERVICE_CAPABILITIES,
+            "ac_field_service", "services", "SVC", AC_FIELD_SERVICE_CAPABILITIES,
         )),
         "mart_retail" => Some(template(
-            "mart_retail",
-            "retail",
-            "RTL",
-            MART_RETAIL_CAPABILITIES,
+            "mart_retail", "retail", "RTL", MART_RETAIL_CAPABILITIES,
         )),
         _ => None,
     }
@@ -264,8 +195,8 @@ pub(crate) fn template_for_legacy_capability(capability_key: &str) -> &'static s
     match capability_key.trim().to_ascii_lowercase().as_str() {
         "food_beverage" => "juice_fnb",
         "retail" => "mart_retail",
-        // Legacy `services` cannot distinguish Laundry from AC/field service.
-        // Fail closed to the neutral template until the owner explicitly selects one.
+        // `services` was historically ambiguous between Laundry and field service.
+        // Keep a neutral typed template until an explicit vertical is selected.
         _ => "general",
     }
 }
@@ -274,11 +205,15 @@ pub(crate) fn validate_profile_input(
     input: Option<&BusinessProfileInput>,
     legacy_capability_key: &str,
 ) -> Result<ResolvedBusinessProfile, ProfileValidationError> {
-    let template_key = input
+    let explicit_template_key = input
         .map(|profile| profile.template_key.trim())
-        .filter(|key| !key.is_empty())
+        .filter(|key| !key.is_empty());
+    let template_key = explicit_template_key
         .unwrap_or_else(|| template_for_legacy_capability(legacy_capability_key));
     let template = resolve_template(template_key).ok_or(ProfileValidationError::InvalidTemplate)?;
+    if template.capabilities.is_empty() {
+        return Err(ProfileValidationError::InvalidTemplate);
+    }
 
     let currency = input
         .and_then(|profile| profile.currency.as_deref())
@@ -338,6 +273,18 @@ pub(crate) fn validate_profile_input(
         return Err(ProfileValidationError::InvalidDocumentPrefix);
     }
 
+    let normalized_legacy_capability = legacy_capability_key.trim().to_ascii_lowercase();
+    let legacy_projection = if explicit_template_key.is_some() {
+        template.legacy_capability_key.to_owned()
+    } else if matches!(
+        normalized_legacy_capability.as_str(),
+        "general" | "food_beverage" | "retail" | "services"
+    ) {
+        normalized_legacy_capability
+    } else {
+        template.legacy_capability_key.to_owned()
+    };
+
     Ok(ResolvedBusinessProfile {
         template_key: template.template_key.to_owned(),
         template_version: template.version,
@@ -349,7 +296,7 @@ pub(crate) fn validate_profile_input(
         branch_mode,
         negative_stock_policy,
         document_prefix,
-        legacy_capability_key: template.legacy_capability_key.to_owned(),
+        legacy_capability_key: legacy_projection,
     })
 }
 
@@ -377,8 +324,7 @@ fn valid_timezone(value: &str) -> bool {
         && !second.is_empty()
         && parts.all(|part| !part.is_empty())
         && value.chars().all(|character| {
-            character.is_ascii_alphanumeric()
-                || matches!(character, '/' | '_' | '-' | '+')
+            character.is_ascii_alphanumeric() || matches!(character, '/' | '_' | '-' | '+')
         })
 }
 
@@ -444,19 +390,18 @@ mod tests {
     }
 
     #[test]
-    fn legacy_callers_keep_safe_deterministic_defaults() {
-        assert_eq!(
-            validate_profile_input(None, "food_beverage").unwrap().template_key,
-            "juice_fnb"
-        );
-        assert_eq!(
-            validate_profile_input(None, "retail").unwrap().template_key,
-            "mart_retail"
-        );
-        assert_eq!(
-            validate_profile_input(None, "services").unwrap().template_key,
-            "general"
-        );
+    fn legacy_callers_keep_safe_profiles_without_changing_their_projection() {
+        let food = validate_profile_input(None, "food_beverage").unwrap();
+        assert_eq!(food.template_key, "juice_fnb");
+        assert_eq!(food.legacy_capability_key, "food_beverage");
+
+        let retail = validate_profile_input(None, "retail").unwrap();
+        assert_eq!(retail.template_key, "mart_retail");
+        assert_eq!(retail.legacy_capability_key, "retail");
+
+        let services = validate_profile_input(None, "services").unwrap();
+        assert_eq!(services.template_key, "general");
+        assert_eq!(services.legacy_capability_key, "services");
     }
 
     #[test]
