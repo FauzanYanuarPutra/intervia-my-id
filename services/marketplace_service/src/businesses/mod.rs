@@ -28,6 +28,8 @@ pub(crate) mod profile;
 mod profile_migration_tests;
 #[cfg(test)]
 mod profile_persistence_tests;
+#[cfg(test)]
+mod public_media_projection_tests;
 mod public_commerce;
 mod public_commerce_routes;
 #[cfg(test)]
