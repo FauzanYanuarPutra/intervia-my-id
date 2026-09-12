@@ -142,6 +142,25 @@ async fn seed_versioned_sale(pool: &PgPool) -> SeededVersionedSale {
     .await
     .unwrap();
 
+    // Build each immutable BOM before inserting its parent version. The
+    // deferred FK permits aggregate assembly inside one transaction, while the
+    // parent insert seals that BOM against later item changes.
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query(
+        r#"
+        INSERT INTO business_recipe_version_items (
+          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
+        ) VALUES ($1,$2,$3,$4,100,0)
+        "#,
+    )
+    .bind(organization_id)
+    .bind(business_id)
+    .bind(version_one_id)
+    .bind(ingredient_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
     sqlx::query(
         r#"
         INSERT INTO business_recipe_versions (
@@ -155,26 +174,10 @@ async fn seed_versioned_sale(pool: &PgPool) -> SeededVersionedSale {
     .bind(business_id)
     .bind(product_id)
     .bind(actor_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .unwrap();
 
-    sqlx::query(
-        r#"
-        INSERT INTO business_recipe_version_items (
-          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
-        ) VALUES ($1,$2,$3,$4,100,0)
-        "#,
-    )
-    .bind(organization_id)
-    .bind(business_id)
-    .bind(version_one_id)
-    .bind(ingredient_id)
-    .execute(pool)
-    .await
-    .unwrap();
-
-    let mut tx = pool.begin().await.unwrap();
     sqlx::query(
         r#"
         UPDATE business_recipe_versions
@@ -185,6 +188,21 @@ async fn seed_versioned_sale(pool: &PgPool) -> SeededVersionedSale {
     )
     .bind(version_one_id)
     .bind(version_two_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_recipe_version_items (
+          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
+        ) VALUES ($1,$2,$3,$4,200,0)
+        "#,
+    )
+    .bind(organization_id)
+    .bind(business_id)
+    .bind(version_two_id)
+    .bind(ingredient_id)
     .execute(&mut *tx)
     .await
     .unwrap();
@@ -202,21 +220,6 @@ async fn seed_versioned_sale(pool: &PgPool) -> SeededVersionedSale {
     .bind(business_id)
     .bind(product_id)
     .bind(actor_id)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-
-    sqlx::query(
-        r#"
-        INSERT INTO business_recipe_version_items (
-          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
-        ) VALUES ($1,$2,$3,$4,200,0)
-        "#,
-    )
-    .bind(organization_id)
-    .bind(business_id)
-    .bind(version_two_id)
-    .bind(ingredient_id)
     .execute(&mut *tx)
     .await
     .unwrap();
@@ -361,6 +364,21 @@ async fn current_day_sale_uses_version_effective_at_posting_time(pool: PgPool) {
 
     sqlx::query(
         r#"
+        INSERT INTO business_recipe_version_items (
+          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
+        ) VALUES ($1,$2,$3,$4,250,0)
+        "#,
+    )
+    .bind(seeded.organization_id)
+    .bind(seeded.business_id)
+    .bind(version_three_id)
+    .bind(seeded.ingredient_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
         INSERT INTO business_recipe_versions (
           id, organization_id, business_id, product_id, version_number,
           name, servings, status, effective_from, published_by_user_id, reason
@@ -373,21 +391,6 @@ async fn current_day_sale_uses_version_effective_at_posting_time(pool: PgPool) {
     .bind(seeded.product_id)
     .bind(effective_from)
     .bind(seeded.actor_id)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-
-    sqlx::query(
-        r#"
-        INSERT INTO business_recipe_version_items (
-          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
-        ) VALUES ($1,$2,$3,$4,250,0)
-        "#,
-    )
-    .bind(seeded.organization_id)
-    .bind(seeded.business_id)
-    .bind(version_three_id)
-    .bind(seeded.ingredient_id)
     .execute(&mut *tx)
     .await
     .unwrap();
