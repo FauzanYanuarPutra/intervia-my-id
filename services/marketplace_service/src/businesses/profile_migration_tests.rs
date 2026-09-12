@@ -3,12 +3,8 @@ use uuid::Uuid;
 
 #[test]
 fn compatibility_migration_does_not_reown_governance_business_scope_constraint() {
-    let up = include_str!(
-        "../../migrations/20260912089900_business_tenant_identity.up.sql"
-    );
-    let down = include_str!(
-        "../../migrations/20260912089900_business_tenant_identity.down.sql"
-    );
+    let up = include_str!("../../migrations/20260912089900_business_tenant_identity.up.sql");
+    let down = include_str!("../../migrations/20260912089900_business_tenant_identity.down.sql");
 
     assert!(
         up.contains("20260911183000_business_governance_foundation"),
