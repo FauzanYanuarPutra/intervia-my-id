@@ -16,7 +16,11 @@ async fn profile_and_capability_tables_exist_with_vertical_templates(pool: PgPoo
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(found.as_deref(), Some(table), "missing profile table {table}");
+        assert_eq!(
+            found.as_deref(),
+            Some(table),
+            "missing profile table {table}"
+        );
     }
 
     let templates: Vec<String> = sqlx::query_scalar(
@@ -140,12 +144,14 @@ async fn profile_scope_cannot_cross_business_or_organization(pool: PgPool) {
     .await
     .unwrap();
 
-    let update = sqlx::query(
-        "UPDATE business_profiles SET organization_id = $1 WHERE business_id = $2",
-    )
-    .bind(second_organization_id)
-    .bind(business_id)
-    .execute(&pool)
-    .await;
-    assert!(update.is_err(), "profile scope must match the owning business");
+    let update =
+        sqlx::query("UPDATE business_profiles SET organization_id = $1 WHERE business_id = $2")
+            .bind(second_organization_id)
+            .bind(business_id)
+            .execute(&pool)
+            .await;
+    assert!(
+        update.is_err(),
+        "profile scope must match the owning business"
+    );
 }
