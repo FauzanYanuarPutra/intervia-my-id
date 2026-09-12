@@ -259,83 +259,6 @@ impl ControlRepository {
         Ok(Some(RecipeAggregate { recipe, items }))
     }
 
-    pub(crate) async fn replace_recipe(
-        &self,
-        business_id: Uuid,
-        organization_id: Uuid,
-        product_id: Uuid,
-        request: ReplaceRecipeRequest,
-    ) -> Result<RecipeAggregate, ControlRepositoryError> {
-        validate_recipe(&request)?;
-        let mut tx = self.db.begin().await?;
-        let product_exists = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM business_products WHERE id=$1 AND business_id=$2 AND organization_id=$3)",
-        )
-        .bind(product_id)
-        .bind(business_id)
-        .bind(organization_id)
-        .fetch_one(&mut *tx)
-        .await?;
-        if !product_exists {
-            return Err(ControlRepositoryError::NotFound);
-        }
-
-        for item in &request.items {
-            let ingredient_exists = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM business_ingredients WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active')",
-            )
-            .bind(item.ingredient_id)
-            .bind(business_id)
-            .bind(organization_id)
-            .fetch_one(&mut *tx)
-            .await?;
-            if !ingredient_exists {
-                return Err(ControlRepositoryError::Validation(
-                    "ingredient_not_in_business",
-                ));
-            }
-        }
-
-        let recipe = sqlx::query_as::<_, RecipeRecord>(
-            r#"
-            INSERT INTO business_recipes (business_id, organization_id, product_id, name, servings)
-            VALUES ($1,$2,$3,$4,$5)
-            ON CONFLICT (business_id, product_id) DO UPDATE SET
-              name=EXCLUDED.name, servings=EXCLUDED.servings, status='active',
-              version=business_recipes.version+1, updated_at=NOW()
-            RETURNING id, business_id, organization_id, product_id, name, servings,
-              status, version, created_at, updated_at
-            "#,
-        )
-        .bind(business_id)
-        .bind(organization_id)
-        .bind(product_id)
-        .bind(normalize(&request.name))
-        .bind(request.servings)
-        .fetch_one(&mut *tx)
-        .await?;
-
-        sqlx::query("DELETE FROM business_recipe_items WHERE recipe_id=$1")
-            .bind(recipe.id)
-            .execute(&mut *tx)
-            .await?;
-        for (position, item) in request.items.iter().enumerate() {
-            sqlx::query(
-                "INSERT INTO business_recipe_items (recipe_id, ingredient_id, quantity, waste_percent_override, position) VALUES ($1,$2,$3,$4,$5)",
-            )
-            .bind(recipe.id)
-            .bind(item.ingredient_id)
-            .bind(item.quantity)
-            .bind(item.waste_percent_override)
-            .bind(position as i32)
-            .execute(&mut *tx)
-            .await?;
-        }
-        tx.commit().await?;
-        let items = self.recipe_items(recipe.id).await?;
-        Ok(RecipeAggregate { recipe, items })
-    }
-
     async fn recipe_items(
         &self,
         recipe_id: Uuid,
@@ -561,39 +484,6 @@ fn validate_ingredient(request: &CreateIngredientRequest) -> Result<(), ControlR
     }
     if request.waste_percent < Decimal::ZERO || request.waste_percent >= Decimal::from(100) {
         return Err(ControlRepositoryError::Validation("invalid_waste_percent"));
-    }
-    Ok(())
-}
-
-fn validate_recipe(request: &ReplaceRecipeRequest) -> Result<(), ControlRepositoryError> {
-    let name = normalize(&request.name);
-    if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
-        return Err(ControlRepositoryError::Validation("invalid_recipe_name"));
-    }
-    if request.servings <= Decimal::ZERO {
-        return Err(ControlRepositoryError::Validation("invalid_servings"));
-    }
-    if request.items.is_empty() {
-        return Err(ControlRepositoryError::Validation("recipe_items_required"));
-    }
-    let mut ids = std::collections::HashSet::new();
-    for item in &request.items {
-        if item.quantity <= Decimal::ZERO {
-            return Err(ControlRepositoryError::Validation(
-                "invalid_recipe_quantity",
-            ));
-        }
-        if !ids.insert(item.ingredient_id) {
-            return Err(ControlRepositoryError::Validation(
-                "duplicate_recipe_ingredient",
-            ));
-        }
-        if item
-            .waste_percent_override
-            .is_some_and(|value| value < Decimal::ZERO || value >= Decimal::from(100))
-        {
-            return Err(ControlRepositoryError::Validation("invalid_waste_percent"));
-        }
     }
     Ok(())
 }
