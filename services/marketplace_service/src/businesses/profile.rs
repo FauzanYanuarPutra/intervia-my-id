@@ -4,28 +4,83 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 const GENERAL_CAPABILITIES: &[&str] = &[
-    "business_core", "catalog", "customers", "finance_basic", "payments", "reporting",
-    "sales", "supporting_documents",
+    "business_core",
+    "catalog",
+    "customers",
+    "finance_basic",
+    "payments",
+    "reporting",
+    "sales",
+    "supporting_documents",
 ];
 const JUICE_FNB_CAPABILITIES: &[&str] = &[
-    "business_core", "catalog", "customers", "suppliers", "sales", "payments",
-    "finance_basic", "reporting", "inventory", "recipes", "procurement", "pos",
-    "settlements", "cashier_shifts", "daily_close", "supporting_documents",
+    "business_core",
+    "catalog",
+    "customers",
+    "suppliers",
+    "sales",
+    "payments",
+    "finance_basic",
+    "reporting",
+    "inventory",
+    "recipes",
+    "procurement",
+    "pos",
+    "settlements",
+    "cashier_shifts",
+    "daily_close",
+    "supporting_documents",
 ];
 const LAUNDRY_CAPABILITIES: &[&str] = &[
-    "business_core", "catalog", "services", "customers", "sales", "payments",
-    "finance_basic", "reporting", "appointments", "work_orders", "laundry_tracking",
-    "daily_close", "supporting_documents",
+    "business_core",
+    "catalog",
+    "services",
+    "customers",
+    "sales",
+    "payments",
+    "finance_basic",
+    "reporting",
+    "appointments",
+    "work_orders",
+    "laundry_tracking",
+    "daily_close",
+    "supporting_documents",
 ];
 const AC_FIELD_SERVICE_CAPABILITIES: &[&str] = &[
-    "business_core", "catalog", "services", "customers", "suppliers", "sales", "payments",
-    "finance_basic", "reporting", "inventory", "procurement", "appointments", "work_orders",
-    "field_service", "assets", "supporting_documents",
+    "business_core",
+    "catalog",
+    "services",
+    "customers",
+    "suppliers",
+    "sales",
+    "payments",
+    "finance_basic",
+    "reporting",
+    "inventory",
+    "procurement",
+    "appointments",
+    "work_orders",
+    "field_service",
+    "assets",
+    "supporting_documents",
 ];
 const MART_RETAIL_CAPABILITIES: &[&str] = &[
-    "business_core", "catalog", "customers", "suppliers", "sales", "payments",
-    "finance_basic", "reporting", "inventory", "procurement", "pos", "barcode",
-    "settlements", "cashier_shifts", "daily_close", "supporting_documents",
+    "business_core",
+    "catalog",
+    "customers",
+    "suppliers",
+    "sales",
+    "payments",
+    "finance_basic",
+    "reporting",
+    "inventory",
+    "procurement",
+    "pos",
+    "barcode",
+    "settlements",
+    "cashier_shifts",
+    "daily_close",
+    "supporting_documents",
 ];
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -158,14 +213,23 @@ pub(crate) fn resolve_template(template_key: &str) -> Option<ResolvedBusinessTem
     match template_key.trim().to_ascii_lowercase().as_str() {
         "general" => Some(template("general", "general", "LJK", GENERAL_CAPABILITIES)),
         "juice_fnb" => Some(template(
-            "juice_fnb", "food_beverage", "FNB", JUICE_FNB_CAPABILITIES,
+            "juice_fnb",
+            "food_beverage",
+            "FNB",
+            JUICE_FNB_CAPABILITIES,
         )),
         "laundry" => Some(template("laundry", "services", "LDR", LAUNDRY_CAPABILITIES)),
         "ac_field_service" => Some(template(
-            "ac_field_service", "services", "SVC", AC_FIELD_SERVICE_CAPABILITIES,
+            "ac_field_service",
+            "services",
+            "SVC",
+            AC_FIELD_SERVICE_CAPABILITIES,
         )),
         "mart_retail" => Some(template(
-            "mart_retail", "retail", "RTL", MART_RETAIL_CAPABILITIES,
+            "mart_retail",
+            "retail",
+            "RTL",
+            MART_RETAIL_CAPABILITIES,
         )),
         _ => None,
     }
@@ -220,7 +284,11 @@ pub(crate) fn validate_profile_input(
         .unwrap_or(template.default_currency)
         .trim()
         .to_ascii_uppercase();
-    if currency.len() != 3 || !currency.chars().all(|character| character.is_ascii_uppercase()) {
+    if currency.len() != 3
+        || !currency
+            .chars()
+            .all(|character| character.is_ascii_uppercase())
+    {
         return Err(ProfileValidationError::InvalidCurrency);
     }
 
@@ -307,7 +375,10 @@ fn normalized_choice(
     error: ProfileValidationError,
 ) -> Result<String, ProfileValidationError> {
     let normalized = value.unwrap_or(default).trim().to_ascii_lowercase();
-    allowed.contains(&normalized.as_str()).then_some(normalized).ok_or(error)
+    allowed
+        .contains(&normalized.as_str())
+        .then_some(normalized)
+        .ok_or(error)
 }
 
 fn valid_timezone(value: &str) -> bool {
