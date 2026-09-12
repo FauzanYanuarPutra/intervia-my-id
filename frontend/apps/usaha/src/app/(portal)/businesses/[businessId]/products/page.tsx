@@ -70,12 +70,20 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                     {business.products.map(product => (
                       <article key={product.id} className="px-4 py-4 transition hover:bg-[#fafbf9] sm:px-5">
                         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.5fr)_minmax(140px,.8fr)_120px_120px_110px] lg:items-center lg:gap-4">
-                          <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div
+                              className="h-12 w-12 shrink-0 rounded-xl border border-portal-line bg-[#f3f5f1] bg-cover bg-center"
+                              style={product.imageUrl ? { backgroundImage: `url(${product.imageUrl})` } : undefined}
+                              role="img"
+                              aria-label={product.imageUrl ? `Foto ${product.name}` : 'Foto produk belum diunggah'}
+                            />
+                            <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="truncate font-bold tracking-[-0.02em] text-portal-ink">{product.name}</h3>
                               {product.sourceType === 'consignment' ? <StatusBadge tone="info">Titipan</StatusBadge> : null}
                             </div>
                             <p className="mt-1 truncate text-xs text-portal-soft">{product.category}{product.notes ? ` · ${product.notes}` : ''}</p>
+                            </div>
                           </div>
                           <div className="text-sm"><p className="font-semibold text-portal-ink">{product.sourceType === 'consignment' ? 'Konsinyasi' : 'Stok sendiri'}</p><p className="mt-1 text-xs text-portal-soft">{product.ownerLabel ?? (product.sourceType === 'consignment' ? 'Pemilik belum dicatat' : 'Milik usaha')}</p></div>
                           <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Harga</p><p className="mt-1 text-sm font-bold text-portal-ink lg:mt-0">{product.priceLabel || 'Belum ada harga'}</p></div>

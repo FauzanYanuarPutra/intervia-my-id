@@ -1,4 +1,5 @@
 import type { BusinessTemplateKey } from './business-templates';
+import type { BusinessImageValue } from './media-crop';
 
 export type PortalRole = 'owner' | 'manager' | 'cashier' | 'viewer';
 
@@ -82,6 +83,7 @@ export type ProductRecord = {
   sourceType?: ProductSourceType; ownerLabel?: string; stockCount?: number | null; stockUnit?: string;
   minStockAlert?: number | null; stockMode?: ProductStockMode; stockHealth?: ProductStockHealth;
   stockUpdatedAt?: string; consignmentTerms?: string; lastSoldAt?: string; notes?: string;
+  imageUrl?: string; image?: BusinessImageValue;
 };
 export type OrderRecord = { id: string; buyer: string; itemSummary: string; amountLabel: string; status: OrderStatus; channel: string };
 export type ReservationRecord = { id: string; guest: string; schedule: string; pax: string; status: ReservationStatus };
@@ -123,6 +125,8 @@ export type BusinessRecord = {
   category: string;
   phone: string;
   description: string;
+  logoUrl?: string;
+  bannerUrl?: string;
   schedule: string;
   infoComplete: boolean;
   productsCount: number;

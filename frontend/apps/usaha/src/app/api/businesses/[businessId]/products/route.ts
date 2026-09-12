@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createBusinessProduct } from '@/lib/business-server';
 import { normalizeBusinessApiError } from '@/lib/business-api-error';
+import { parseBusinessImageValue } from '@/lib/media-crop';
 
 function num(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
@@ -28,6 +29,7 @@ export async function POST(request: Request, context: { params: Promise<{ busine
       stockMode: body.stockMode === 'estimated' ? 'estimated' : 'manual',
       consignmentTerms: typeof body.consignmentTerms === 'string' ? body.consignmentTerms.trim() : '',
       notes: typeof body.notes === 'string' ? body.notes.trim() : '',
+      image: parseBusinessImageValue(body.image),
     });
     return NextResponse.json({ ok: true, business: updated });
   } catch (error) {

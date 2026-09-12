@@ -269,6 +269,14 @@ impl BusinessRepository {
         command: &ValidatedBusinessProfileUpdate,
     ) -> Result<BusinessAggregate, RepositoryError> {
         let mut transaction = self.db.begin().await?;
+        let logo_metadata = command
+            .logo
+            .as_ref()
+            .map(|image| image.public_metadata(super::media::BusinessImageKind::Logo));
+        let banner_metadata = command
+            .banner
+            .as_ref()
+            .map(|image| image.public_metadata(super::media::BusinessImageKind::Banner));
         let updated = sqlx::query(
             r#"
             UPDATE businesses
@@ -313,13 +321,15 @@ impl BusinessRepository {
                         'schedule', $9::text,
                         'locationQuery', $10::text
                       )
+                      || COALESCE($11::jsonb, '{}'::jsonb)
+                      || COALESCE($12::jsonb, '{}'::jsonb)
                   ),
                 updated_at = NOW()
             FROM business_store_links link
             JOIN businesses business ON business.id = link.business_id
             WHERE link.store_id = store.id
-              AND link.business_id = $11
-              AND business.organization_id = $12
+              AND link.business_id = $13
+              AND business.organization_id = $14
               AND link.link_type = 'primary'
             "#,
         )
@@ -333,6 +343,8 @@ impl BusinessRepository {
         .bind(&command.category)
         .bind(&command.schedule)
         .bind(&command.location_query)
+        .bind(&logo_metadata)
+        .bind(&banner_metadata)
         .bind(business_id)
         .bind(organization_id)
         .execute(&mut *transaction)

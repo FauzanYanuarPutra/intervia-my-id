@@ -23,6 +23,7 @@ import type {
   ReservationRecord,
   TeamMember,
 } from '@/lib/portal-types';
+import type { BusinessImageValue } from '@/lib/media-crop';
 
 const IDENTITY_URL =
   process.env.INTERNAL_API_URL ||
@@ -320,6 +321,17 @@ function mapCanonicalProduct(value: unknown): ProductRecord | null {
       item.consignment_terms ?? item.consignmentTerms,
     ),
     notes: stringValue(item.notes),
+    imageUrl: stringValue(item.image_url ?? item.imageUrl) || undefined,
+    ...(stringValue(item.image_url ?? item.imageUrl)
+      ? {
+          image: {
+            url: stringValue(item.image_url ?? item.imageUrl),
+            mimeType: stringValue(item.image_mime_type ?? item.imageMimeType) || 'image/webp',
+            width: Number(item.image_width ?? item.imageWidth) || 1200,
+            height: Number(item.image_height ?? item.imageHeight) || 1200,
+          },
+        }
+      : {}),
   };
 }
 
@@ -400,6 +412,12 @@ function mapStore(
     category: stringValue(metadata.category) || 'Usaha umum',
     phone: stringValue(store.phone),
     description: stringValue(store.description),
+    logoUrl: stringValue(
+      metadata.logo_url ?? metadata.image_url ?? metadata.store_photo_url,
+    ) || undefined,
+    bannerUrl: stringValue(
+      metadata.banner_url ?? metadata.cover_image_url ?? metadata.cover_url,
+    ) || undefined,
     schedule: stringValue(metadata.schedule) || 'Belum diatur',
     infoComplete: Boolean(name && city && stringValue(store.phone)),
     productsCount: products.length,
@@ -605,6 +623,7 @@ export type CreateBusinessProductInput = {
   stockMode: ProductStockMode;
   consignmentTerms?: string;
   notes?: string;
+  image?: BusinessImageValue;
 };
 
 export async function createBusinessProduct(
@@ -633,6 +652,16 @@ export async function createBusinessProduct(
         stock_mode: input.stockMode,
         consignment_terms: stringValue(input.consignmentTerms) || null,
         notes: stringValue(input.notes) || null,
+        ...(input.image
+          ? {
+              image: {
+                url: input.image.url,
+                mime_type: input.image.mimeType,
+                width: input.image.width,
+                height: input.image.height,
+              },
+            }
+          : {}),
       }),
     },
   );
@@ -660,6 +689,8 @@ export async function updateBusiness(
     latitude?: number | null;
     longitude?: number | null;
     metadataPatch?: JsonRecord;
+    logo?: BusinessImageValue;
+    banner?: BusinessImageValue;
   },
 ): Promise<BusinessRecord> {
   const { token, account } = await requireAuthenticatedActor();
@@ -750,6 +781,26 @@ export async function updateBusiness(
           phone: input.phone ?? current.phone,
           public_visibility: primaryLocation?.publicVisibility ?? true,
         },
+        ...(input.logo
+          ? {
+              logo: {
+                url: input.logo.url,
+                mime_type: input.logo.mimeType,
+                width: input.logo.width,
+                height: input.logo.height,
+              },
+            }
+          : {}),
+        ...(input.banner
+          ? {
+              banner: {
+                url: input.banner.url,
+                mime_type: input.banner.mimeType,
+                width: input.banner.width,
+                height: input.banner.height,
+              },
+            }
+          : {}),
       }),
     },
   );
