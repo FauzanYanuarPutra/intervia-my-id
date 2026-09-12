@@ -3,6 +3,8 @@
 import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
+import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
+import type { BusinessImageValue } from '@/lib/media-crop';
 
 type ProductQuickFormProps = {
   businessId: string;
@@ -35,6 +37,8 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
   const [stockMode, setStockMode] = useState<'manual' | 'estimated'>('manual');
   const [consignmentTerms, setConsignmentTerms] = useState('');
   const [notes, setNotes] = useState('');
+  const [image, setImage] = useState<BusinessImageValue>();
+  const [imageInputKey, setImageInputKey] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -75,6 +79,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
           stockMode,
           consignmentTerms: consignmentTerms.trim(),
           notes: notes.trim(),
+          ...(image ? { image } : {}),
         }),
       });
 
@@ -94,6 +99,8 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       setStockMode('manual');
       setConsignmentTerms('');
       setNotes('');
+      setImage(undefined);
+      setImageInputKey(value => value + 1);
       setSuccess('Produk masuk ke katalog.');
       startTransition(() => {
         router.refresh();
@@ -107,6 +114,15 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
+      <BusinessImageCropUpload
+        key={imageInputKey}
+        businessId={businessId}
+        kind="product"
+        label="Foto produk / menu"
+        description="Crop 1:1 agar rapi di katalog, menu digital, Food, dan Mart."
+        onUploaded={setImage}
+      />
+
       <label className="grid gap-2 text-sm font-semibold text-portal-ink">
         Nama produk
         <input

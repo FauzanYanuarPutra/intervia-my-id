@@ -17,6 +17,9 @@ mod inventory_routes;
 mod inventory_routes_tests;
 #[cfg(test)]
 mod inventory_tests;
+mod media;
+#[cfg(test)]
+mod media_migration_tests;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;

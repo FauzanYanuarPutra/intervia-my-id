@@ -3,6 +3,10 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::media::{
+    validate_business_image, BusinessImageInput, BusinessImageKind, ValidatedBusinessImage,
+};
+
 use super::{
     products::BusinessProduct,
     profile::{
@@ -87,6 +91,10 @@ pub(crate) struct BusinessProfileUpdateRequest {
     pub(crate) schedule: String,
     pub(crate) location_query: String,
     pub(crate) primary_location: PrimaryLocationInput,
+    #[serde(default)]
+    pub(crate) logo: Option<BusinessImageInput>,
+    #[serde(default)]
+    pub(crate) banner: Option<BusinessImageInput>,
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +107,8 @@ pub(crate) struct ValidatedBusinessProfileUpdate {
     pub(crate) schedule: String,
     pub(crate) location_query: String,
     pub(crate) primary_location: PrimaryLocationInput,
+    pub(crate) logo: Option<ValidatedBusinessImage>,
+    pub(crate) banner: Option<ValidatedBusinessImage>,
 }
 
 #[derive(Debug, Clone)]
@@ -197,6 +207,8 @@ pub(crate) enum ValidationError {
     InvalidCategory,
     InvalidSchedule,
     InvalidLocationQuery,
+    InvalidBusinessLogo,
+    InvalidBusinessBanner,
 }
 
 impl ValidationError {
@@ -228,6 +240,8 @@ impl ValidationError {
             Self::InvalidCategory => "invalid_business_category",
             Self::InvalidSchedule => "invalid_business_schedule",
             Self::InvalidLocationQuery => "invalid_location_query",
+            Self::InvalidBusinessLogo => "invalid_business_logo",
+            Self::InvalidBusinessBanner => "invalid_business_banner",
         }
     }
 }
@@ -280,6 +294,16 @@ pub(crate) fn validate_business_profile_update(
     validate_coordinates(request.primary_location.lat, request.primary_location.lng)?;
     let phone = normalize_optional_or_empty(request.primary_location.phone, MAX_PHONE_LEN)
         .ok_or(ValidationError::InvalidPhone)?;
+    let logo = request
+        .logo
+        .map(|image| validate_business_image(image, BusinessImageKind::Logo))
+        .transpose()
+        .map_err(|_| ValidationError::InvalidBusinessLogo)?;
+    let banner = request
+        .banner
+        .map(|image| validate_business_image(image, BusinessImageKind::Banner))
+        .transpose()
+        .map_err(|_| ValidationError::InvalidBusinessBanner)?;
 
     Ok(ValidatedBusinessProfileUpdate {
         expected_version: request.expected_version,
@@ -298,6 +322,8 @@ pub(crate) fn validate_business_profile_update(
             phone,
             public_visibility: request.primary_location.public_visibility,
         },
+        logo,
+        banner,
     })
 }
 
@@ -635,6 +661,8 @@ mod tests {
                 phone: Some(" +628123456789 ".to_owned()),
                 public_visibility: true,
             },
+            logo: None,
+            banner: None,
             storefront: StorefrontInput {
                 description: Some(" Minuman segar. ".to_owned()),
                 online_order_enabled: true,
@@ -738,6 +766,8 @@ mod tests {
                 phone: Some(" +628123456789 ".to_owned()),
                 public_visibility: true,
             },
+            logo: None,
+            banner: None,
         };
 
         let command = validate_business_profile_update(request).expect("valid profile update");

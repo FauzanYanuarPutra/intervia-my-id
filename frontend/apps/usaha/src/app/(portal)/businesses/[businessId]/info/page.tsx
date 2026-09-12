@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { ExternalLink, MapPinned, Store } from 'lucide-react';
 import { BusinessInfoQuickForm } from '@/components/forms/BusinessInfoQuickForm';
+import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { BusinessLocationMap } from '@/components/maps/BusinessLocationMap';
 import { DataPanel } from '@/components/portal/DataPanel';
 import { PortalShell } from '@/components/portal/PortalShell';
@@ -27,6 +28,33 @@ export default async function BusinessInfoPage({ params }: PageProps) {
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="info">
       <SectionCard eyebrow="Bisnis" title="Profil usaha" description="Jaga identitas, kontak, lokasi, dan informasi publik tetap akurat agar pembeli melihat bisnis yang sama dengan yang dikelola tim.">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,.78fr)]">
+          <DataPanel title="Identitas visual usaha" description="Logo dan banner ini dipakai konsisten di profil publik, katalog, dan halaman pembeli." className="xl:col-span-2">
+            <div className="grid gap-6 p-4 sm:p-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+              {canManage ? (
+                <BusinessImageCropUpload
+                  businessId={business.id}
+                  kind="logo"
+                  currentUrl={business.logoUrl}
+                  label="Logo / foto usaha"
+                  description="Rasio 1:1 untuk kartu usaha, avatar toko, dan hasil pencarian."
+                />
+              ) : (
+                <div><p className="portal-label">Logo / foto usaha</p><div className="mt-2 aspect-square overflow-hidden rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.logoUrl ? { backgroundImage: `url(${business.logoUrl})` } : undefined} /></div>
+              )}
+              {canManage ? (
+                <BusinessImageCropUpload
+                  businessId={business.id}
+                  kind="banner"
+                  currentUrl={business.bannerUrl}
+                  label="Banner usaha"
+                  description="Rasio 8:3 untuk header profil publik tanpa potongan yang mengejutkan."
+                />
+              ) : (
+                <div><p className="portal-label">Banner usaha</p><div className="mt-2 aspect-[8/3] overflow-hidden rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.bannerUrl ? { backgroundImage: `url(${business.bannerUrl})` } : undefined} /></div>
+              )}
+            </div>
+          </DataPanel>
+
           <DataPanel title={canManage ? 'Informasi utama' : 'Ringkasan profil'} description={canManage ? 'Perubahan disimpan ke profil usaha yang sama.' : 'Peranmu saat ini hanya dapat melihat data profil.'}>
             <div className="p-4 sm:p-5">
               {canManage ? (

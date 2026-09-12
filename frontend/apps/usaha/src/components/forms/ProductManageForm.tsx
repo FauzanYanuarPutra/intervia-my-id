@@ -3,6 +3,7 @@
 import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil, Save, X } from 'lucide-react';
+import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import type { ProductRecord } from '@/lib/portal-types';
 
 type Props = {
@@ -109,6 +110,17 @@ export function ProductManageForm({ businessId, product }: Props) {
         <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 text-portal-soft hover:bg-[#f4f5f2]" aria-label="Tutup form">
           <X className="h-4 w-4" />
         </button>
+      </div>
+
+      <div className="mb-4 border-b border-portal-line pb-4">
+        <BusinessImageCropUpload
+          businessId={businessId}
+          productId={product.id}
+          kind="product"
+          currentUrl={product.imageUrl}
+          label="Foto produk / menu"
+          description="Ganti foto lalu crop 1:1. Perubahan langsung tersimpan ke katalog publik."
+        />
       </div>
 
       <form onSubmit={saveProduct} className="grid gap-3 sm:grid-cols-2">

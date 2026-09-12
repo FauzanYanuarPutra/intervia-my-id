@@ -3,6 +3,7 @@ use super::products::{
     CreateBusinessProductRequest, ProductRepository, ProductRepositoryError, ProductSourceType,
     ProductStockMode, UpdateBusinessProductRequest,
 };
+use super::media::BusinessImageInput;
 use super::repository::BusinessRepository;
 use serde_json::json;
 use sqlx::PgPool;
@@ -21,6 +22,12 @@ fn request() -> CreateBusinessProductRequest {
         stock_mode: ProductStockMode::Manual,
         consignment_terms: None,
         notes: None,
+        image: Some(BusinessImageInput {
+            url: "/api/forum/media/menu-jus-mangga.webp".to_owned(),
+            mime_type: "image/webp".to_owned(),
+            width: 1200,
+            height: 1200,
+        }),
     }
 }
 
@@ -110,6 +117,10 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
     assert_eq!(created.name, "Jus mangga");
     assert_eq!(created.stock_count, Some(2.0));
     assert_eq!(created.stock_health, "tipis");
+    assert_eq!(
+        created.image_url.as_deref(),
+        Some("/api/forum/media/menu-jus-mangga.webp")
+    );
 
     let mine = repository
         .list_for_business(business_id, organization_id)
@@ -118,9 +129,9 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
     assert_eq!(mine.len(), 1);
     assert_eq!(mine[0].id, created.id);
 
-    let public_projection: (Uuid, i64, i32, bool, serde_json::Value) = sqlx::query_as(
+    let public_projection: (Uuid, i64, i32, bool, Option<String>, serde_json::Value) = sqlx::query_as(
         r#"
-        SELECT store_id, price_cents, stock_qty, is_available, metadata
+        SELECT store_id, price_cents, stock_qty, is_available, image_url, metadata
         FROM umkm_products
         WHERE id = $1
         "#,
@@ -134,11 +145,15 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
     assert_eq!(public_projection.2, 2);
     assert!(public_projection.3);
     assert_eq!(
-        public_projection.4["canonical_business_product_id"],
+        public_projection.5["canonical_business_product_id"],
         created.id.to_string()
     );
-    assert_eq!(public_projection.4["stock_known"], true);
-    assert!(public_projection.4.get("notes").is_none());
+    assert_eq!(public_projection.5["stock_known"], true);
+    assert_eq!(
+        public_projection.4.as_deref(),
+        Some("/api/forum/media/menu-jus-mangga.webp")
+    );
+    assert!(public_projection.5.get("notes").is_none());
 
     let aggregate = BusinessRepository::new(pool.clone())
         .get_for_organization(business_id, organization_id)
@@ -205,6 +220,7 @@ async fn product_update_and_inventory_adjustment_keep_public_projection_in_sync(
                 stock_mode: None,
                 consignment_terms: None,
                 notes: Some("internal only".to_owned()),
+                image: None,
             },
         )
         .await
@@ -292,6 +308,7 @@ async fn cross_tenant_product_mutation_is_not_found(pool: PgPool) {
                 stock_mode: None,
                 consignment_terms: None,
                 notes: None,
+                image: None,
             },
         )
         .await

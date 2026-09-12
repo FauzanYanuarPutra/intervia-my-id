@@ -100,6 +100,7 @@ fn product_request() -> CreateBusinessProductRequest {
         stock_mode: ProductStockMode::Manual,
         consignment_terms: None,
         notes: None,
+        image: None,
     }
 }
 

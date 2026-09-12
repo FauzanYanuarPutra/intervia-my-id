@@ -4,6 +4,10 @@ use serde_json::json;
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
+use super::media::{
+    validate_business_image, BusinessImageInput, BusinessImageKind, ValidatedBusinessImage,
+};
+
 const MAX_PRODUCT_NAME_LEN: usize = 160;
 const MAX_CATEGORY_LEN: usize = 120;
 const MAX_PRICE_LABEL_LEN: usize = 80;
@@ -58,6 +62,8 @@ pub(crate) struct CreateBusinessProductRequest {
     pub(crate) stock_mode: ProductStockMode,
     pub(crate) consignment_terms: Option<String>,
     pub(crate) notes: Option<String>,
+    #[serde(default)]
+    pub(crate) image: Option<BusinessImageInput>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -73,6 +79,8 @@ pub(crate) struct UpdateBusinessProductRequest {
     pub(crate) stock_mode: Option<ProductStockMode>,
     pub(crate) consignment_terms: Option<String>,
     pub(crate) notes: Option<String>,
+    #[serde(default)]
+    pub(crate) image: Option<BusinessImageInput>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -94,6 +102,7 @@ pub(crate) struct ValidatedCreateBusinessProduct {
     pub(crate) stock_mode: ProductStockMode,
     pub(crate) consignment_terms: Option<String>,
     pub(crate) notes: Option<String>,
+    pub(crate) image: Option<ValidatedBusinessImage>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -113,6 +122,10 @@ pub(crate) struct BusinessProduct {
     pub(crate) stock_updated_at: DateTime<Utc>,
     pub(crate) consignment_terms: Option<String>,
     pub(crate) notes: Option<String>,
+    pub(crate) image_url: Option<String>,
+    pub(crate) image_mime_type: Option<String>,
+    pub(crate) image_width: Option<i32>,
+    pub(crate) image_height: Option<i32>,
 }
 
 #[derive(Debug)]
@@ -186,13 +199,16 @@ impl ProductRepository {
         .ok_or(ProductRepositoryError::Database)?;
 
         let product_id = Uuid::new_v4();
+        let image = command.image.as_ref();
         sqlx::query(
             r#"
             INSERT INTO business_products (
               id, business_id, organization_id, name, category, price_label,
-              status, source_type, owner_label, consignment_terms, notes
+              status, source_type, owner_label, consignment_terms, notes,
+              image_url, image_mime_type, image_width, image_height
             )
-            VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10,
+                    $11, $12, $13, $14)
             "#,
         )
         .bind(product_id)
@@ -205,6 +221,10 @@ impl ProductRepository {
         .bind(&command.owner_label)
         .bind(&command.consignment_terms)
         .bind(&command.notes)
+        .bind(image.map(|value| &value.url))
+        .bind(image.map(|value| &value.mime_type))
+        .bind(image.map(|value| value.width))
+        .bind(image.map(|value| value.height))
         .execute(&mut *transaction)
         .await?;
 
@@ -216,7 +236,7 @@ impl ProductRepository {
               id, store_id, name, slug, description, category, price_cents,
               stock_qty, is_available, image_url, metadata
             )
-            VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, NULL, $9)
+            VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10)
             "#,
         )
         .bind(product_id)
@@ -231,6 +251,7 @@ impl ProductRepository {
             price_cents,
             command.stock_count,
         ))
+        .bind(image.map(|value| &value.url))
         .bind(public_metadata(
             product_id,
             business_id,
@@ -238,6 +259,9 @@ impl ProductRepository {
             command.source_type.as_str(),
             command.stock_mode.as_str(),
             command.stock_count,
+            image.map(|value| value.mime_type.as_str()),
+            image.map(|value| value.width),
+            image.map(|value| value.height),
         ))
         .execute(&mut *transaction)
         .await?;
@@ -269,7 +293,7 @@ impl ProductRepository {
             organization_id,
             product_id,
             "marketplace.business.product_created",
-            json!({ "version": 1 }),
+            json!({ "version": 2, "image_attached": image.is_some() }),
         )
         .await?;
 
@@ -294,6 +318,7 @@ impl ProductRepository {
 
         let source_type = request.source_type.map(ProductSourceType::as_str);
         let stock_mode = request.stock_mode.map(ProductStockMode::as_str);
+        let image = request.image.as_ref();
         sqlx::query(
             r#"
             UPDATE business_products
@@ -305,6 +330,10 @@ impl ProductRepository {
                 owner_label = COALESCE($9, owner_label),
                 consignment_terms = COALESCE($10, consignment_terms),
                 notes = COALESCE($11, notes),
+                image_url = COALESCE($12, image_url),
+                image_mime_type = COALESCE($13, image_mime_type),
+                image_width = COALESCE($14, image_width),
+                image_height = COALESCE($15, image_height),
                 version = version + 1,
                 updated_at = NOW()
             WHERE id = $1 AND business_id = $2 AND organization_id = $3
@@ -321,6 +350,10 @@ impl ProductRepository {
         .bind(&request.owner_label)
         .bind(&request.consignment_terms)
         .bind(&request.notes)
+        .bind(image.map(|value| &value.url))
+        .bind(image.map(|value| &value.mime_type))
+        .bind(image.map(|value| value.width))
+        .bind(image.map(|value| value.height))
         .execute(&mut *transaction)
         .await?;
 
@@ -356,7 +389,7 @@ impl ProductRepository {
             organization_id,
             product_id,
             "marketplace.business.product_updated",
-            json!({ "version": 1 }),
+            json!({ "version": 2, "image_changed": image.is_some() }),
         )
         .await?;
         transaction.commit().await?;
@@ -490,6 +523,9 @@ async fn sync_public_projection(
         &row.source_type,
         &row.stock_mode,
         row.stock_count,
+        row.image_mime_type.as_deref(),
+        row.image_width,
+        row.image_height,
     );
     let result = sqlx::query(
         r#"
@@ -500,7 +536,8 @@ async fn sync_public_projection(
             price_cents = $5,
             stock_qty = $6,
             is_available = $7,
-            metadata = COALESCE(metadata, '{}'::JSONB) || $8,
+            image_url = $8,
+            metadata = COALESCE(metadata, '{}'::JSONB) || $9,
             updated_at = NOW()
         WHERE id = $1
         "#,
@@ -516,6 +553,7 @@ async fn sync_public_projection(
         price_cents,
         row.stock_count,
     ))
+    .bind(&row.image_url)
     .bind(metadata)
     .execute(&mut **transaction)
     .await?;
@@ -586,6 +624,9 @@ fn public_metadata(
     source_type: &str,
     stock_mode: &str,
     stock_count: Option<f64>,
+    image_mime_type: Option<&str>,
+    image_width: Option<i32>,
+    image_height: Option<i32>,
 ) -> serde_json::Value {
     json!({
         "canonical_business_product_id": product_id,
@@ -594,6 +635,11 @@ fn public_metadata(
         "source_type": source_type,
         "stock_mode": stock_mode,
         "stock_known": stock_count.is_some(),
+        "image_media": image_mime_type.map(|mime_type| json!({
+            "mime_type": mime_type,
+            "width": image_width,
+            "height": image_height,
+        })),
     })
 }
 
@@ -633,7 +679,11 @@ const PRODUCT_SELECT: &str = r#"
       inventory.stock_mode,
       inventory.updated_at AS stock_updated_at,
       product.consignment_terms,
-      product.notes
+      product.notes,
+      product.image_url,
+      product.image_mime_type,
+      product.image_width,
+      product.image_height
     FROM business_products product
     JOIN business_inventory inventory
       ON inventory.product_id = product.id
@@ -658,7 +708,11 @@ const PRODUCT_SELECT_BY_ID: &str = r#"
       inventory.stock_mode,
       inventory.updated_at AS stock_updated_at,
       product.consignment_terms,
-      product.notes
+      product.notes,
+      product.image_url,
+      product.image_mime_type,
+      product.image_width,
+      product.image_height
     FROM business_products product
     JOIN business_inventory inventory
       ON inventory.product_id = product.id
@@ -685,6 +739,10 @@ struct ProductRow {
     stock_updated_at: DateTime<Utc>,
     consignment_terms: Option<String>,
     notes: Option<String>,
+    image_url: Option<String>,
+    image_mime_type: Option<String>,
+    image_width: Option<i32>,
+    image_height: Option<i32>,
 }
 
 impl ProductRow {
@@ -705,6 +763,10 @@ impl ProductRow {
             stock_updated_at: self.stock_updated_at,
             consignment_terms: self.consignment_terms,
             notes: self.notes,
+            image_url: self.image_url,
+            image_mime_type: self.image_mime_type,
+            image_width: self.image_width,
+            image_height: self.image_height,
         }
     }
 }
@@ -722,6 +784,7 @@ pub(crate) enum ProductValidationError {
     ConsignmentTerms,
     Notes,
     InventoryReason,
+    Image,
     EmptyUpdate,
 }
 
@@ -739,6 +802,7 @@ impl ProductValidationError {
             Self::ConsignmentTerms => "invalid_product_consignment_terms",
             Self::Notes => "invalid_product_notes",
             Self::InventoryReason => "invalid_inventory_reason",
+            Self::Image => "invalid_product_image",
             Self::EmptyUpdate => "empty_product_update",
         }
     }
@@ -765,6 +829,11 @@ pub(crate) fn validate_create_request(
             .ok_or(ProductValidationError::ConsignmentTerms)?;
     let notes =
         normalize_optional(request.notes, MAX_NOTES_LEN).ok_or(ProductValidationError::Notes)?;
+    let image = request
+        .image
+        .map(|value| validate_business_image(value, BusinessImageKind::Product))
+        .transpose()
+        .map_err(|_| ProductValidationError::Image)?;
 
     Ok(ValidatedCreateBusinessProduct {
         name,
@@ -778,6 +847,7 @@ pub(crate) fn validate_create_request(
         stock_mode: request.stock_mode,
         consignment_terms,
         notes,
+        image,
     })
 }
 
@@ -794,7 +864,8 @@ fn validate_update_request(
         || request.stock_unit.is_some()
         || request.stock_mode.is_some()
         || request.consignment_terms.is_some()
-        || request.notes.is_some();
+        || request.notes.is_some()
+        || request.image.is_some();
     if !has_update {
         return Err(ProductValidationError::EmptyUpdate);
     }
@@ -844,6 +915,20 @@ fn validate_update_request(
             .ok_or(ProductValidationError::ConsignmentTerms)?;
     request.notes =
         normalize_optional(request.notes, MAX_NOTES_LEN).ok_or(ProductValidationError::Notes)?;
+    request.image = request
+        .image
+        .map(|value| {
+            validate_business_image(value, BusinessImageKind::Product).map(|image| {
+                BusinessImageInput {
+                    url: image.url,
+                    mime_type: image.mime_type,
+                    width: image.width,
+                    height: image.height,
+                }
+            })
+        })
+        .transpose()
+        .map_err(|_| ProductValidationError::Image)?;
     Ok(request)
 }
 
@@ -904,6 +989,7 @@ mod tests {
             stock_mode: ProductStockMode::Manual,
             consignment_terms: None,
             notes: None,
+            image: None,
         }
     }
 
@@ -985,6 +1071,7 @@ mod tests {
             stock_mode: None,
             consignment_terms: None,
             notes: None,
+            image: None,
         };
         assert_eq!(
             validate_update_request(request).unwrap_err(),

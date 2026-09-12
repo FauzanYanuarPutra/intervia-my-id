@@ -4,9 +4,11 @@ use uuid::Uuid;
 
 use super::{
     domain::{
-        validate_provision_request, BusinessInput, OrganizationMode, OrganizationSelection,
+        validate_business_profile_update, validate_provision_request, BusinessInput,
+        BusinessProfileUpdateRequest, OrganizationMode, OrganizationSelection,
         PrimaryLocationInput, ProvisionBusinessRequest, StorefrontInput,
     },
+    media::BusinessImageInput,
     profile::BusinessProfileInput,
     repository::{BusinessRepository, RepositoryError},
 };
@@ -142,4 +144,66 @@ async fn aggregate_loading_is_scoped_to_the_owning_organization(pool: PgPool) {
         .await
         .expect("cross-scope query is handled safely");
     assert!(cross_tenant.is_none());
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn logo_and_banner_updates_are_validated_and_projected_atomically(pool: PgPool) {
+    let repository = BusinessRepository::new(pool.clone());
+    let actor_id = Uuid::new_v4();
+    let organization_id = Uuid::new_v4();
+    let provisioned = repository
+        .provision(
+            actor_id,
+            Uuid::new_v4(),
+            organization_id,
+            &validate_provision_request(request(organization_id, "juice_fnb", "Lajukan Juice"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let current = provisioned.aggregate;
+
+    let command = validate_business_profile_update(BusinessProfileUpdateRequest {
+        expected_version: current.business.version,
+        name: current.business.name.clone(),
+        capability_key: current.business.capability_key.clone(),
+        category: "Minuman".to_owned(),
+        description: current.primary_store.description.clone(),
+        schedule: "08.00 - 20.00".to_owned(),
+        location_query: "Jl. Contoh 1, Jakarta".to_owned(),
+        primary_location: PrimaryLocationInput {
+            name: current.primary_location.name.clone(),
+            address: current.primary_location.address.clone(),
+            city: current.primary_location.city.clone(),
+            lat: current.primary_location.lat,
+            lng: current.primary_location.lng,
+            phone: current.primary_location.phone.clone(),
+            public_visibility: true,
+        },
+        logo: Some(BusinessImageInput {
+            url: "/api/forum/media/logo-lajukan.webp".to_owned(),
+            mime_type: "image/webp".to_owned(),
+            width: 640,
+            height: 640,
+        }),
+        banner: Some(BusinessImageInput {
+            url: "/api/forum/media/banner-lajukan.webp".to_owned(),
+            mime_type: "image/webp".to_owned(),
+            width: 1600,
+            height: 600,
+        }),
+    })
+    .unwrap();
+
+    let updated = repository
+        .update_profile(actor_id, current.business.id, organization_id, &command)
+        .await
+        .unwrap();
+    let public = &updated.primary_store.metadata["public"];
+    assert_eq!(public["logo_url"], "/api/forum/media/logo-lajukan.webp");
+    assert_eq!(public["image_url"], "/api/forum/media/logo-lajukan.webp");
+    assert_eq!(public["banner_url"], "/api/forum/media/banner-lajukan.webp");
+    assert_eq!(public["cover_image_url"], "/api/forum/media/banner-lajukan.webp");
+    assert_eq!(public["logo_media"]["width"], 640);
+    assert_eq!(public["banner_media"]["height"], 600);
 }
