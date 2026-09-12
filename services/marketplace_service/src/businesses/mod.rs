@@ -20,6 +20,8 @@ mod inventory_tests;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;
+#[cfg(test)]
+mod profile_migration_tests;
 mod public_commerce;
 mod public_commerce_routes;
 #[cfg(test)]
