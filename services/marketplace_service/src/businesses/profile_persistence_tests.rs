@@ -203,7 +203,10 @@ async fn logo_and_banner_updates_are_validated_and_projected_atomically(pool: Pg
     assert_eq!(public["logo_url"], "/api/forum/media/logo-lajukan.webp");
     assert_eq!(public["image_url"], "/api/forum/media/logo-lajukan.webp");
     assert_eq!(public["banner_url"], "/api/forum/media/banner-lajukan.webp");
-    assert_eq!(public["cover_image_url"], "/api/forum/media/banner-lajukan.webp");
+    assert_eq!(
+        public["cover_image_url"],
+        "/api/forum/media/banner-lajukan.webp"
+    );
     assert_eq!(public["logo_media"]["width"], 640);
     assert_eq!(public["banner_media"]["height"], 600);
 }
