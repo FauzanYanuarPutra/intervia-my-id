@@ -661,8 +661,6 @@ mod tests {
                 phone: Some(" +628123456789 ".to_owned()),
                 public_visibility: true,
             },
-            logo: None,
-            banner: None,
             storefront: StorefrontInput {
                 description: Some(" Minuman segar. ".to_owned()),
                 online_order_enabled: true,
@@ -800,6 +798,8 @@ mod tests {
                 phone: None,
                 public_visibility: true,
             },
+            logo: None,
+            banner: None,
         };
 
         assert_eq!(
@@ -927,6 +927,10 @@ mod tests {
                 stock_updated_at: now,
                 consignment_terms: None,
                 notes: None,
+                image_url: None,
+                image_mime_type: None,
+                image_width: None,
+                image_height: None,
             }],
         };
 
