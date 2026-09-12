@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
 };
+use chrono::Utc;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
 use serde_json::json;
@@ -13,9 +14,12 @@ use uuid::Uuid;
 
 use crate::config::AppState;
 
-use super::domain::{
-    normalize_invitee_username, validate_invitation_role, CreateOrganizationInvitationRequest,
-    OrganizationInvitationView,
+use super::{
+    domain::{
+        normalize_invitee_username, validate_invitation_role, CreateOrganizationInvitationRequest,
+        OrganizationInvitationView,
+    },
+    invitation_status::effective_invitation_status,
 };
 
 #[derive(Debug, Deserialize)]
@@ -23,6 +27,11 @@ struct AccessClaims {
     sub: String,
     #[allow(dead_code)]
     exp: usize,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct InvitationListQuery {
+    pub organization_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,11 +241,16 @@ pub async fn create_organization_invitation(
 pub async fn list_my_organization_invitations(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    Query(query): Query<InvitationListQuery>,
 ) -> impl IntoResponse {
     let actor_user_id = match authenticate_actor(&state, &headers) {
         Ok(actor) => actor,
         Err(error) => return actor_auth_error_response(error),
     };
+
+    if let Some(organization_id) = query.organization_id {
+        return list_organization_invitation_history(&state, actor_user_id, organization_id).await;
+    }
 
     let items = match sqlx::query_as::<_, OrganizationInvitationView>(
         r#"
@@ -261,6 +275,76 @@ pub async fn list_my_organization_invitations(
         Ok(items) => items,
         Err(_) => return service_unavailable(),
     };
+
+    (
+        StatusCode::OK,
+        Json(json!({ "data": { "count": items.len(), "items": items } })),
+    )
+        .into_response()
+}
+
+async fn list_organization_invitation_history(
+    state: &AppState,
+    actor_user_id: Uuid,
+    organization_id: Uuid,
+) -> axum::response::Response {
+    let can_manage: bool = match sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+          SELECT 1
+          FROM core.organizations o
+          JOIN core.organization_users ou ON ou.org_id = o.id AND ou.user_id = $2
+          LEFT JOIN core.roles r ON r.id = ou.role_id
+          WHERE o.id = $1
+            AND o.deleted_at IS NULL
+            AND COALESCE(ou.status, 'active') = 'active'
+            AND (o.owner_user_id = $2 OR r.name IN ('org_admin', 'org_manager'))
+        )
+        "#,
+    )
+    .bind(organization_id)
+    .bind(actor_user_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(_) => return service_unavailable(),
+    };
+
+    if !can_manage {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "organization invitation history permission required" })),
+        )
+            .into_response();
+    }
+
+    let mut items = match sqlx::query_as::<_, OrganizationInvitationView>(
+        r#"
+        SELECT i.id, i.org_id, o.name::text AS organization_name,
+               i.invitee_user_id, up.username::text AS invitee_username,
+               r.name::text AS role, i.status, i.expires_at, i.created_at
+        FROM core.organization_invitations i
+        JOIN core.organizations o ON o.id = i.org_id
+        JOIN core.roles r ON r.id = i.role_id
+        LEFT JOIN core.user_profiles up ON up.user_id = i.invitee_user_id
+        WHERE i.org_id = $1
+          AND o.deleted_at IS NULL
+        ORDER BY i.created_at DESC
+        "#,
+    )
+    .bind(organization_id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(items) => items,
+        Err(_) => return service_unavailable(),
+    };
+
+    let now = Utc::now();
+    for item in &mut items {
+        item.status = effective_invitation_status(&item.status, item.expires_at, now).to_string();
+    }
 
     (
         StatusCode::OK,
