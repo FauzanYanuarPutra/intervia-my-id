@@ -1,6 +1,25 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+#[test]
+fn compatibility_migration_does_not_reown_governance_business_scope_constraint() {
+    let up = include_str!("../../migrations/20260912089900_business_tenant_identity.up.sql");
+    let down = include_str!("../../migrations/20260912089900_business_tenant_identity.down.sql");
+
+    assert!(
+        up.contains("20260911183000_business_governance_foundation"),
+        "compatibility migration must document the migration that owns the business scope constraint"
+    );
+    assert!(
+        !up.contains("ADD CONSTRAINT uq_businesses_id_organization"),
+        "compatibility migration must not recreate the governance-owned constraint"
+    );
+    assert!(
+        !down.contains("DROP CONSTRAINT"),
+        "rollback must not drop a constraint owned by the governance migration"
+    );
+}
+
 // SQLx embeds the migration directory in this test target at compile time.
 #[sqlx::test(migrations = "./migrations")]
 async fn profile_and_capability_tables_exist_with_vertical_templates(pool: PgPool) {
@@ -16,7 +35,11 @@ async fn profile_and_capability_tables_exist_with_vertical_templates(pool: PgPoo
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(found.as_deref(), Some(table), "missing profile table {table}");
+        assert_eq!(
+            found.as_deref(),
+            Some(table),
+            "missing profile table {table}"
+        );
     }
 
     let templates: Vec<String> = sqlx::query_scalar(
@@ -111,6 +134,7 @@ async fn legacy_business_insert_receives_a_general_profile_and_capabilities(pool
             "payments",
             "reporting",
             "sales",
+            "supporting_documents",
         ]
     );
 }
@@ -139,12 +163,14 @@ async fn profile_scope_cannot_cross_business_or_organization(pool: PgPool) {
     .await
     .unwrap();
 
-    let update = sqlx::query(
-        "UPDATE business_profiles SET organization_id = $1 WHERE business_id = $2",
-    )
-    .bind(second_organization_id)
-    .bind(business_id)
-    .execute(&pool)
-    .await;
-    assert!(update.is_err(), "profile scope must match the owning business");
+    let update =
+        sqlx::query("UPDATE business_profiles SET organization_id = $1 WHERE business_id = $2")
+            .bind(second_organization_id)
+            .bind(business_id)
+            .execute(&pool)
+            .await;
+    assert!(
+        update.is_err(),
+        "profile scope must match the owning business"
+    );
 }

@@ -3,7 +3,13 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use super::products::BusinessProduct;
+use super::{
+    products::BusinessProduct,
+    profile::{
+        validate_profile_input, BusinessCapabilityRecord, BusinessProfileInput,
+        BusinessProfileRecord, ProfileValidationError, ResolvedBusinessProfile,
+    },
+};
 
 const MAX_NAME_LEN: usize = 160;
 const MAX_ADDRESS_LEN: usize = 500;
@@ -31,6 +37,8 @@ pub(crate) struct BusinessInput {
     pub(crate) name: String,
     #[serde(default = "default_capability_key")]
     pub(crate) capability_key: String,
+    #[serde(default)]
+    pub(crate) profile: Option<BusinessProfileInput>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -97,6 +105,7 @@ pub(crate) struct ValidatedBusinessProfileUpdate {
 pub(crate) struct ValidatedProvisionCommand {
     pub(crate) organization: OrganizationSelection,
     pub(crate) business: BusinessInput,
+    pub(crate) profile: ResolvedBusinessProfile,
     pub(crate) primary_location: PrimaryLocationInput,
     pub(crate) storefront: StorefrontInput,
     pub(crate) request_hash: String,
@@ -153,6 +162,8 @@ pub(crate) struct BusinessLocation {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct BusinessAggregate {
     pub(crate) business: BusinessRecord,
+    pub(crate) profile: BusinessProfileRecord,
+    pub(crate) capabilities: Vec<BusinessCapabilityRecord>,
     pub(crate) primary_store: BusinessStore,
     pub(crate) primary_location: BusinessLocation,
     pub(crate) products: Vec<BusinessProduct>,
@@ -166,6 +177,15 @@ pub(crate) enum ValidationError {
     OrganizationNameNotAllowed,
     InvalidBusinessName,
     InvalidCapability,
+    InvalidTemplate,
+    InvalidCurrency,
+    InvalidTimezone,
+    InvalidCostingPolicy,
+    InvalidAccountingMode,
+    InvalidApprovalPolicy,
+    InvalidBranchMode,
+    InvalidNegativeStockPolicy,
+    InvalidDocumentPrefix,
     InvalidLocationName,
     InvalidLocationAddress,
     InvalidLocationCity,
@@ -188,6 +208,15 @@ impl ValidationError {
             Self::OrganizationNameNotAllowed => "organization_name_not_allowed",
             Self::InvalidBusinessName => "invalid_business_name",
             Self::InvalidCapability => "invalid_capability_key",
+            Self::InvalidTemplate => "invalid_business_template",
+            Self::InvalidCurrency => "invalid_business_currency",
+            Self::InvalidTimezone => "invalid_business_timezone",
+            Self::InvalidCostingPolicy => "invalid_costing_policy",
+            Self::InvalidAccountingMode => "invalid_accounting_mode",
+            Self::InvalidApprovalPolicy => "invalid_approval_policy",
+            Self::InvalidBranchMode => "invalid_branch_mode",
+            Self::InvalidNegativeStockPolicy => "invalid_negative_stock_policy",
+            Self::InvalidDocumentPrefix => "invalid_document_prefix",
             Self::InvalidLocationName => "invalid_location_name",
             Self::InvalidLocationAddress => "invalid_location_address",
             Self::InvalidLocationCity => "invalid_location_city",
@@ -199,6 +228,22 @@ impl ValidationError {
             Self::InvalidCategory => "invalid_business_category",
             Self::InvalidSchedule => "invalid_business_schedule",
             Self::InvalidLocationQuery => "invalid_location_query",
+        }
+    }
+}
+
+impl From<ProfileValidationError> for ValidationError {
+    fn from(error: ProfileValidationError) -> Self {
+        match error {
+            ProfileValidationError::InvalidTemplate => Self::InvalidTemplate,
+            ProfileValidationError::InvalidCurrency => Self::InvalidCurrency,
+            ProfileValidationError::InvalidTimezone => Self::InvalidTimezone,
+            ProfileValidationError::InvalidCostingPolicy => Self::InvalidCostingPolicy,
+            ProfileValidationError::InvalidAccountingMode => Self::InvalidAccountingMode,
+            ProfileValidationError::InvalidApprovalPolicy => Self::InvalidApprovalPolicy,
+            ProfileValidationError::InvalidBranchMode => Self::InvalidBranchMode,
+            ProfileValidationError::InvalidNegativeStockPolicy => Self::InvalidNegativeStockPolicy,
+            ProfileValidationError::InvalidDocumentPrefix => Self::InvalidDocumentPrefix,
         }
     }
 }
@@ -261,13 +306,17 @@ pub(crate) fn validate_provision_request(
 ) -> Result<ValidatedProvisionCommand, ValidationError> {
     let business_name = normalize_required(request.business.name, MAX_NAME_LEN)
         .ok_or(ValidationError::InvalidBusinessName)?;
-    let capability_key = request.business.capability_key.trim().to_ascii_lowercase();
+    let requested_capability_key = request.business.capability_key.trim().to_ascii_lowercase();
     if !matches!(
-        capability_key.as_str(),
+        requested_capability_key.as_str(),
         "general" | "food_beverage" | "retail" | "services"
     ) {
         return Err(ValidationError::InvalidCapability);
     }
+    let profile =
+        validate_profile_input(request.business.profile.as_ref(), &requested_capability_key)
+            .map_err(ValidationError::from)?;
+    let capability_key = profile.legacy_capability_key.clone();
 
     let organization_name = request
         .organization
@@ -327,6 +376,7 @@ pub(crate) fn validate_provision_request(
     let business = BusinessInput {
         name: business_name,
         capability_key,
+        profile: Some(profile.as_input()),
     };
     let primary_location = PrimaryLocationInput {
         name: location_name,
@@ -344,9 +394,10 @@ pub(crate) fn validate_provision_request(
         public_metadata: request.storefront.public_metadata,
     };
     let canonical = serde_json::json!({
-        "version": 1,
+        "version": 2,
         "organization": &organization,
         "business": &business,
+        "profile": &profile,
         "primary_location": &primary_location,
         "storefront": &storefront,
     });
@@ -356,6 +407,7 @@ pub(crate) fn validate_provision_request(
     Ok(ValidatedProvisionCommand {
         organization,
         business,
+        profile,
         primary_location,
         storefront,
         request_hash,
@@ -554,7 +606,11 @@ impl<T> TransposeOption<T> for Option<Option<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::businesses::products::BusinessProduct;
+    use crate::businesses::{
+        products::BusinessProduct,
+        profile::{BusinessCapabilityRecord, BusinessProfileRecord},
+    };
+    use chrono::NaiveTime;
     use serde_json::json;
     use uuid::Uuid;
 
@@ -568,6 +624,7 @@ mod tests {
             business: BusinessInput {
                 name: "  Kedai   Cuk  ".to_owned(),
                 capability_key: "FOOD_BEVERAGE".to_owned(),
+                profile: None,
             },
             primary_location: PrimaryLocationInput {
                 name: "  Lokasi   utama ".to_owned(),
@@ -594,9 +651,24 @@ mod tests {
 
         assert_eq!(first.business.name, "Kedai Cuk");
         assert_eq!(first.business.capability_key, "food_beverage");
+        assert_eq!(first.profile.template_key, "juice_fnb");
         assert_eq!(first.primary_location.name, "Lokasi utama");
         assert_eq!(first.request_hash, second.request_hash);
         assert_eq!(first.request_hash.len(), 64);
+    }
+
+    #[test]
+    fn explicit_template_is_authoritative_over_legacy_projection() {
+        let mut request = valid_request();
+        request.business.capability_key = "general".to_owned();
+        request.business.profile = Some(BusinessProfileInput {
+            template_key: "laundry".to_owned(),
+            ..BusinessProfileInput::default()
+        });
+
+        let command = validate_provision_request(request).expect("valid laundry profile");
+        assert_eq!(command.profile.template_key, "laundry");
+        assert_eq!(command.business.capability_key, "services");
     }
 
     #[test]
@@ -734,13 +806,15 @@ mod tests {
     }
 
     #[test]
-    fn business_aggregate_serializes_canonical_products_outside_store_metadata() {
+    fn business_aggregate_serializes_profile_capabilities_and_products() {
         let now = chrono::Utc::now();
         let product_id = Uuid::new_v4();
+        let business_id = Uuid::new_v4();
+        let organization_id = Uuid::new_v4();
         let aggregate = BusinessAggregate {
             business: BusinessRecord {
-                id: Uuid::new_v4(),
-                organization_id: Uuid::new_v4(),
+                id: business_id,
+                organization_id,
                 name: "Kedai Cuk".to_owned(),
                 capability_key: "food_beverage".to_owned(),
                 status: "active".to_owned(),
@@ -748,6 +822,33 @@ mod tests {
                 created_at: now,
                 updated_at: now,
             },
+            profile: BusinessProfileRecord {
+                business_id,
+                organization_id,
+                template_key: "juice_fnb".to_owned(),
+                template_version: 1,
+                currency: "IDR".to_owned(),
+                timezone: "Asia/Jakarta".to_owned(),
+                costing_policy: "weighted_average".to_owned(),
+                accounting_mode: "simple".to_owned(),
+                approval_policy: "owner_managed".to_owned(),
+                branch_mode: "single".to_owned(),
+                negative_stock_policy: "deny".to_owned(),
+                business_day_cutoff: NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
+                document_prefix: "FNB".to_owned(),
+                version: 1,
+                created_at: now,
+                updated_at: now,
+            },
+            capabilities: vec![BusinessCapabilityRecord {
+                business_id,
+                organization_id,
+                capability_key: "recipes".to_owned(),
+                enabled: true,
+                source: "template".to_owned(),
+                created_at: now,
+                updated_at: now,
+            }],
             primary_store: BusinessStore {
                 id: Uuid::new_v4(),
                 name: "Kedai Cuk".to_owned(),
@@ -800,6 +901,8 @@ mod tests {
         };
 
         let serialized = serde_json::to_value(aggregate).expect("serialize business aggregate");
+        assert_eq!(serialized["profile"]["template_key"], "juice_fnb");
+        assert_eq!(serialized["capabilities"][0]["capability_key"], "recipes");
         assert_eq!(serialized["products"][0]["id"], product_id.to_string());
         assert_eq!(
             serialized["primary_store"]["metadata"]["products"][0]["id"],

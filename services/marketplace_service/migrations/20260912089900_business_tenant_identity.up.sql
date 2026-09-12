@@ -1,0 +1,9 @@
+-- Business OS V3 compatibility migration.
+--
+-- The tenant-safe composite uniqueness for businesses is already owned by
+-- 20260911183000_business_governance_foundation.up.sql as
+-- uq_businesses_id_organization UNIQUE (id, organization_id).
+--
+-- Keep this migration as an intentional no-op so the following profile and
+-- capability migration can rely on that existing key without attempting to
+-- recreate a schema object owned by an earlier migration.

@@ -1,3 +1,5 @@
+import type { BusinessTemplateKey } from './business-templates';
+
 export type PortalRole = 'owner' | 'manager' | 'cashier' | 'viewer';
 
 export type PermissionId =
@@ -85,10 +87,28 @@ export type OrderRecord = { id: string; buyer: string; itemSummary: string; amou
 export type ReservationRecord = { id: string; guest: string; schedule: string; pax: string; status: ReservationStatus };
 export type ProgressStep = { id: string; label: string; hint: string; done: boolean };
 
+export type BusinessProfileSummary = {
+  templateKey: BusinessTemplateKey | string;
+  templateVersion: number;
+  currency: string;
+  timezone: string;
+  costingPolicy: string;
+  accountingMode: string;
+  approvalPolicy: string;
+  branchMode: string;
+  negativeStockPolicy: string;
+  documentPrefix: string;
+  version: number;
+};
+
 export type BusinessRecord = {
   id: string;
   version?: number;
   capabilityKey?: string;
+  /** Typed profile is additive while old fixtures and older API payloads remain valid. */
+  profile?: BusinessProfileSummary;
+  templateKey?: BusinessTemplateKey | string;
+  activeCapabilityKeys?: string[];
   slug: string;
   name: string;
   /** Additive during migration so old local fixtures remain type-compatible. */

@@ -5,6 +5,7 @@ import {
   requireAuthenticatedActor,
 } from '@/lib/business-server';
 import { normalizeBusinessApiError } from '@/lib/business-api-error';
+import { isBusinessTemplateKey } from '@/lib/business-templates';
 
 function readText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const name = readText(body.name);
     const category = readText(body.category) || 'Usaha umum';
+    const rawTemplateKey = readText(body.templateKey) || 'general';
     const city = readText(body.city);
     const address = readText(body.address);
     const phone = readText(body.phone);
@@ -47,6 +49,9 @@ export async function POST(request: Request) {
     const longitude = readNumber(body.longitude);
 
     if (name.length < 2) return NextResponse.json({ error: 'Isi nama usaha dulu.' }, { status: 400 });
+    if (!isBusinessTemplateKey(rawTemplateKey)) {
+      return NextResponse.json({ error: 'Pilih jenis usaha yang tersedia.' }, { status: 400 });
+    }
     if (city.length < 2) return NextResponse.json({ error: 'Isi kota usaha.' }, { status: 400 });
     if (phone.replace(/\s+/g, '').length < 9) return NextResponse.json({ error: 'Isi nomor usaha yang aktif.' }, { status: 400 });
     if (latitude === null || longitude === null) {
@@ -55,6 +60,7 @@ export async function POST(request: Request) {
 
     const created = await createBusiness({
       name,
+      templateKey: rawTemplateKey,
       category,
       city,
       address,

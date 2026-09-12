@@ -248,25 +248,29 @@ impl BusinessService {
             .await
             .map_err(map_identity_error)?;
         let organization_id = if let Some(hint) = candidate.organization_id {
-            organizations
-                .iter()
-                .find(|organization| organization.id == hint)
+            management_organization(&organizations, hint)
                 .map(|organization| organization.id)
                 .ok_or(BusinessServiceError::AccessDenied)?
         } else {
             match organizations.len() {
                 0 => {
-                    self.identity
+                    let organization = self
+                        .identity
                         .ensure_organization(
                             authorization,
                             identity_child_key(idempotency_key),
                             &candidate.name,
                         )
                         .await
-                        .map_err(map_identity_error)?
-                        .id
+                        .map_err(map_identity_error)?;
+                    require_business_manager(organization)?.id
                 }
-                1 => organizations[0].id,
+                1 => {
+                    require_business_manager(
+                        organizations.into_iter().next().expect("one organization"),
+                    )?
+                    .id
+                }
                 _ => return Err(BusinessServiceError::ReconciliationSelectionRequired),
             }
         };
@@ -288,12 +292,13 @@ impl BusinessService {
                     .organization
                     .organization_id
                     .ok_or(BusinessServiceError::AccessDenied)?;
-                self.identity
+                let organizations = self
+                    .identity
                     .list_organizations(authorization)
                     .await
-                    .map_err(map_identity_error)?
-                    .into_iter()
-                    .find(|organization| organization.id == expected_id)
+                    .map_err(map_identity_error)?;
+                management_organization(&organizations, expected_id)
+                    .cloned()
                     .ok_or(BusinessServiceError::AccessDenied)
             }
             OrganizationMode::Create => {
@@ -302,10 +307,12 @@ impl BusinessService {
                     .new_organization_name
                     .as_deref()
                     .ok_or(BusinessServiceError::Storage)?;
-                self.identity
+                let organization = self
+                    .identity
                     .ensure_organization(authorization, identity_child_key(idempotency_key), name)
                     .await
-                    .map_err(map_identity_error)
+                    .map_err(map_identity_error)?;
+                require_business_manager(organization)
             }
             OrganizationMode::Auto => {
                 let organizations = self
@@ -320,16 +327,20 @@ impl BusinessService {
                             .new_organization_name
                             .as_deref()
                             .unwrap_or(&command.business.name);
-                        self.identity
+                        let organization = self
+                            .identity
                             .ensure_organization(
                                 authorization,
                                 identity_child_key(idempotency_key),
                                 name,
                             )
                             .await
-                            .map_err(map_identity_error)
+                            .map_err(map_identity_error)?;
+                        require_business_manager(organization)
                     }
-                    1 => Ok(organizations.into_iter().next().expect("one organization")),
+                    1 => require_business_manager(
+                        organizations.into_iter().next().expect("one organization"),
+                    ),
                     _ => Err(BusinessServiceError::OrganizationSelectionRequired),
                 }
             }
@@ -376,6 +387,16 @@ fn identity_child_key(parent: Uuid) -> Uuid {
     Uuid::from_bytes(uuid_bytes)
 }
 
+fn require_business_manager(
+    organization: OrganizationSummary,
+) -> Result<OrganizationSummary, BusinessServiceError> {
+    if organization.can_manage_businesses() {
+        Ok(organization)
+    } else {
+        Err(BusinessServiceError::AccessDenied)
+    }
+}
+
 fn management_organization(
     organizations: &[OrganizationSummary],
     organization_id: Uuid,
@@ -388,6 +409,13 @@ fn management_organization(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn organization(role: &str) -> OrganizationSummary {
+        OrganizationSummary {
+            id: Uuid::new_v4(),
+            current_user_role: role.to_owned(),
+        }
+    }
 
     #[test]
     fn identity_child_key_is_stable_and_distinct() {
@@ -412,5 +440,18 @@ mod tests {
             management_organization(&organizations, organization_id).map(|item| item.id),
             Some(organization_id)
         );
+    }
+
+    #[test]
+    fn provisioning_and_reconciliation_fail_closed_without_business_management_role() {
+        assert!(matches!(
+            require_business_manager(organization("org_member")),
+            Err(BusinessServiceError::AccessDenied)
+        ));
+        assert!(matches!(
+            require_business_manager(organization("org_manager")),
+            Err(BusinessServiceError::AccessDenied)
+        ));
+        assert!(require_business_manager(organization("org_admin")).is_ok());
     }
 }
