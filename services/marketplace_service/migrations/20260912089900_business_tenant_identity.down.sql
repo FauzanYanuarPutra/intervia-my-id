@@ -1,2 +1,6 @@
-ALTER TABLE businesses
-  DROP CONSTRAINT IF EXISTS uq_businesses_id_organization;
+-- Intentional no-op.
+--
+-- 20260912089900_business_tenant_identity.up.sql does not create the
+-- uq_businesses_id_organization constraint. That constraint is owned by
+-- 20260911183000_business_governance_foundation and must survive rollback of
+-- this compatibility migration.
