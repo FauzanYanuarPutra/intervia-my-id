@@ -101,6 +101,33 @@ describe('public UMKM store projection', () => {
     expect(projected.metadata).not.toHaveProperty('internal_note');
   });
 
+  it('keeps owner-uploaded brand media from nested public metadata', () => {
+    const projected = projectPublicUmkmStore(
+      makeStore({
+        metadata: {
+          logo_url: '/api/forum/media/old-logo.webp',
+          private_note: 'do not expose',
+          public: {
+            logo_url: '/api/forum/media/logo-lajukan.webp',
+            banner_url: '/api/forum/media/banner-lajukan.webp',
+            cover_image_url: '/api/forum/media/banner-lajukan.webp',
+            store_photo_url: '/api/forum/media/banner-lajukan.webp',
+            private_note: 'do not expose either',
+          },
+        },
+      }),
+    );
+
+    expect(projected.metadata).toMatchObject({
+      logo_url: '/api/forum/media/logo-lajukan.webp',
+      banner_url: '/api/forum/media/banner-lajukan.webp',
+      cover_image_url: '/api/forum/media/banner-lajukan.webp',
+      store_photo_url: '/api/forum/media/banner-lajukan.webp',
+    });
+    expect(projected.metadata).not.toHaveProperty('public');
+    expect(projected.metadata).not.toHaveProperty('private_note');
+  });
+
   it('keeps an owner-published contact only with explicit consent and source', () => {
     const projected = projectPublicUmkmStore(
       makeStore({

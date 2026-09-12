@@ -236,12 +236,13 @@ function projectPublicMetadata(
   metadata: Record<string, unknown>,
   publicPhone: string | null,
 ): Record<string, unknown> {
-  const projected: Record<string, unknown> = {};
+  const projected = projectPublicMetadataKeys(metadata);
+  const nestedPublic =
+    metadata.public && typeof metadata.public === 'object'
+      ? (metadata.public as Record<string, unknown>)
+      : {};
 
-  for (const key of PUBLIC_METADATA_KEYS) {
-    const value = sanitizeMetadataValue(metadata[key]);
-    if (value !== undefined) projected[key] = value;
-  }
+  Object.assign(projected, projectPublicMetadataKeys(nestedPublic));
 
   if (!publicPhone) return projected;
 
@@ -252,6 +253,19 @@ function projectPublicMetadata(
     ...PUBLIC_CONTACT_POLICY_KEYS,
     ...PUBLIC_CONTACT_MESSAGE_KEYS,
   ]) {
+    const value = sanitizeMetadataValue(metadata[key]);
+    if (value !== undefined) projected[key] = value;
+  }
+
+  return projected;
+}
+
+function projectPublicMetadataKeys(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
+  const projected: Record<string, unknown> = {};
+
+  for (const key of PUBLIC_METADATA_KEYS) {
     const value = sanitizeMetadataValue(metadata[key]);
     if (value !== undefined) projected[key] = value;
   }

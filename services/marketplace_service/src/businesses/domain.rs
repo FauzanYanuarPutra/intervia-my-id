@@ -535,6 +535,16 @@ pub(crate) fn project_public_store_details(raw: &Value) -> serde_json::Map<Strin
     let Some(object) = raw.as_object() else {
         return serde_json::Map::new();
     };
+    let mut projected = project_public_store_detail_fields(object);
+    if let Some(public_object) = object.get("public").and_then(Value::as_object) {
+        projected.extend(project_public_store_detail_fields(public_object));
+    }
+    projected
+}
+
+fn project_public_store_detail_fields(
+    object: &serde_json::Map<String, Value>,
+) -> serde_json::Map<String, Value> {
     PUBLIC_STORE_KEYS
         .iter()
         .filter_map(|key| {
@@ -846,6 +856,26 @@ mod tests {
 
         assert_eq!(projected["logo_url"], "/api/forum/media/logo.webp");
         assert_eq!(projected["banner_url"], "/api/forum/media/banner.webp");
+        assert!(!projected.contains_key("private_note"));
+    }
+
+    #[test]
+    fn public_store_projection_exposes_nested_public_brand_media() {
+        let projected = project_public_store_details(&json!({
+            "private_note": "never expose this",
+            "public": {
+                "logo_url": "/api/forum/media/logo.webp",
+                "banner_url": "/api/forum/media/banner.webp",
+                "cover_image_url": "/api/forum/media/banner.webp",
+                "store_photo_url": "/api/forum/media/banner.webp",
+                "private_note": "never expose this either"
+            }
+        }));
+
+        assert_eq!(projected["logo_url"], "/api/forum/media/logo.webp");
+        assert_eq!(projected["banner_url"], "/api/forum/media/banner.webp");
+        assert_eq!(projected["cover_image_url"], "/api/forum/media/banner.webp");
+        assert_eq!(projected["store_photo_url"], "/api/forum/media/banner.webp");
         assert!(!projected.contains_key("private_note"));
     }
 

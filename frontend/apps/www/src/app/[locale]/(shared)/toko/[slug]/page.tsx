@@ -117,7 +117,7 @@ function StorePill({
 
   return (
     <span
-      className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-[11px] font-bold ring-1 ${toneClass}`}
+      className={`inline-flex min-h-6 items-center rounded-full px-2 text-[10px] font-bold ring-1 sm:text-[11px] ${toneClass}`}
     >
       {children}
     </span>
@@ -139,57 +139,62 @@ function ProductCard({
 
   return (
     <article
-      className="group py-4 first:pt-0 last:pb-0"
+      className="group py-3 first:pt-0 last:pb-0"
       data-testid="storefront-product-card"
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h4 className="line-clamp-2 text-[15px] font-extrabold leading-5 text-slate-950 dark:text-slate-50 sm:text-base">
+          <h4 className="line-clamp-2 text-sm font-extrabold leading-5 text-slate-950 dark:text-slate-50 sm:text-[15px]">
             {product.name}
           </h4>
+
           {product.description ? (
-            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+            <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
               {product.description}
             </p>
           ) : null}
-          <p className="mt-2 text-[15px] font-extrabold text-slate-950 dark:text-slate-100">
-            {formatIdr(product.price_cents)}
-          </p>
-          {inStock ? (
-            <p className="mt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500">
-              {isId
-                ? `${product.stock_qty} tersedia`
-                : `${product.stock_qty} available`}
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <p className="text-sm font-extrabold text-slate-950 dark:text-slate-100 sm:text-[15px]">
+              {formatIdr(product.price_cents)}
             </p>
-          ) : stockStatus === 'unknown' ? (
-            <p className="mt-0.5 text-xs font-semibold text-amber-600 dark:text-amber-300">
-              {isId ? 'Stok perlu dikonfirmasi' : 'Confirm stock first'}
-            </p>
-          ) : (
-            <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {isId ? 'Stok habis' : 'Out of stock'}
-            </p>
-          )}
-          <StorefrontProductOrderAction
-            storeId={product.store_id}
-            productId={product.id}
-            productName={product.name}
-            onlineOrderEnabled={onlineOrderEnabled}
-            productAvailable={
-              product.is_available && stockStatus !== 'out_of_stock'
-            }
-            isId={isId}
-            variant="compact"
-          />
+            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+              {inStock
+                ? isId
+                  ? `${product.stock_qty} tersedia`
+                  : `${product.stock_qty} available`
+                : stockStatus === 'unknown'
+                  ? isId
+                    ? 'Cek stok'
+                    : 'Check stock'
+                  : isId
+                    ? 'Habis'
+                    : 'Out of stock'}
+            </span>
+          </div>
+
+          <div className="mt-2">
+            <StorefrontProductOrderAction
+              storeId={product.store_id}
+              productId={product.id}
+              productName={product.name}
+              onlineOrderEnabled={onlineOrderEnabled}
+              productAvailable={
+                product.is_available && stockStatus !== 'out_of_stock'
+              }
+              isId={isId}
+              variant="compact"
+            />
+          </div>
         </div>
 
-        <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:ring-slate-700 sm:h-32 sm:w-32">
+        <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:ring-slate-700 sm:h-24 sm:w-24">
           {image ? (
             <LajukanImage
               src={image}
               alt={product.name}
               fill
-              sizes="128px"
+              sizes="96px"
               className="object-cover transition duration-300 group-hover:scale-[1.025]"
             />
           ) : (
@@ -200,10 +205,10 @@ function ProductCard({
                   ? `Belum ada foto untuk ${product.name}`
                   : `No photo for ${product.name}`
               }
-              className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 text-center text-slate-400 dark:text-slate-500"
+              className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-2 text-center text-slate-400 dark:text-slate-500"
             >
-              <ImageOff className="h-5 w-5" />
-              <span className="text-[10px] font-bold">
+              <ImageOff className="h-4 w-4" />
+              <span className="text-[9px] font-bold">
                 {isId ? 'Belum ada foto' : 'No photo'}
               </span>
             </div>
@@ -226,19 +231,19 @@ function InfoRow({
   note?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 py-3">
-      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+    <div className="flex items-start gap-2.5 py-2.5">
+      <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
         {icon}
       </span>
       <div className="min-w-0">
-        <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
+        <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
           {label}
         </dt>
         <dd className="mt-0.5 text-sm font-bold leading-5 text-slate-900 dark:text-slate-100">
           {value}
         </dd>
         {note ? (
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          <p className="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
             {note}
           </p>
         ) : null}
@@ -272,7 +277,7 @@ function PrimaryAction({
       href={action.href}
       target={action.external ? '_blank' : undefined}
       rel={action.external ? 'noopener noreferrer' : undefined}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${className}`}
+      className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3.5 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${className}`}
       data-testid={testId}
     >
       <Icon className="h-4 w-4" />
@@ -523,31 +528,31 @@ export default async function TokoPage({ params }: PageProps) {
       />
       <main
         data-layout="compact-food-storefront"
-        className="min-h-screen bg-slate-50 pb-10 pt-3 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:pt-5"
+        className="min-h-screen bg-slate-50 pb-8 pt-2 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:pt-4"
       >
         <div className="page-shell">
           <nav
             aria-label={isId ? 'Navigasi toko' : 'Business navigation'}
-            className="mb-3 flex items-center justify-between gap-3"
+            className="mb-2 flex items-center justify-between gap-2"
           >
             <Link
               href={`/${locale}/umkm`}
-              className="inline-flex min-h-9 items-center gap-2 rounded-full bg-white px-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800"
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-xl bg-white px-2.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800 sm:text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
-              {isId ? 'Jelajahi UMKM' : 'Explore businesses'}
+              {isId ? 'UMKM' : 'Businesses'}
             </Link>
-            <span className="hidden text-xs font-semibold text-slate-500 dark:text-slate-400 sm:inline">
+            <span className="hidden text-xs font-semibold text-slate-400 sm:inline">
               {isId ? 'Toko di Lajukan' : 'Business on Lajukan'}
             </span>
           </nav>
 
           <section
-            className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_16px_42px_-36px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-slate-900 sm:rounded-[26px]"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
             data-testid="storefront-summary"
           >
             <div
-              className="relative aspect-[8/3] overflow-hidden bg-slate-100 dark:bg-slate-800"
+              className="relative h-24 overflow-hidden bg-slate-100 dark:bg-slate-800 sm:h-32 lg:h-36"
               data-testid="storefront-media"
               data-media-count={
                 Number(Boolean(brandMedia.coverUrl)) +
@@ -579,104 +584,105 @@ export default async function TokoPage({ params }: PageProps) {
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-slate-950/5" />
             </div>
 
-            <div className="relative px-4 pb-5 sm:px-6 sm:pb-6">
-              <div className="flex items-start gap-3 sm:gap-4">
-                <div className="relative -mt-8 h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-[0_12px_28px_-18px_rgba(15,23,42,0.65)] dark:border-slate-900 dark:bg-slate-900 sm:-mt-10 sm:h-24 sm:w-24">
+            <div className="relative px-3 pb-3 sm:px-4 sm:pb-4">
+              <div className="flex items-start gap-3">
+                <div className="relative -mt-6 h-16 w-16 shrink-0 overflow-hidden rounded-xl border-[3px] border-white bg-white shadow-sm dark:border-slate-900 dark:bg-slate-900 sm:-mt-7 sm:h-20 sm:w-20">
                   {brandMedia.logoUrl ? (
                     <LajukanImage
                       src={brandMedia.logoUrl}
                       alt={isId ? `Logo ${store.name}` : `${store.name} logo`}
                       fill
-                      sizes="96px"
+                      sizes="80px"
                       className="object-contain p-1"
                     />
                   ) : (
                     <div className="absolute inset-0 grid place-items-center bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-200">
-                      <Store className="h-8 w-8" />
+                      <Store className="h-6 w-6 sm:h-7 sm:w-7" />
                     </div>
                   )}
                 </div>
 
-                <div className="min-w-0 flex-1 pt-3 sm:pt-4">
-                  <h1 className="line-clamp-2 text-xl font-extrabold leading-tight tracking-[-0.025em] text-slate-950 dark:text-slate-50 sm:text-3xl">
+                <div className="min-w-0 flex-1 pt-2.5 sm:pt-3">
+                  <h1 className="line-clamp-2 text-lg font-extrabold leading-tight tracking-[-0.02em] text-slate-950 dark:text-slate-50 sm:text-2xl">
                     {store.name}
                   </h1>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
                     <StorePill>{place.categoryLabel}</StorePill>
                     <StorePill tone={statusTone}>{statusLabel}</StorePill>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:text-sm">
-                {hasRating ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    {ratingLabel}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    <PackageCheck className="h-4 w-4 text-emerald-600" />
-                    {availableProductCount} {isId ? 'menu tersedia' : 'items available'}
-                  </span>
-                )}
+              <div className="mt-3 grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:grid-cols-2 lg:grid-cols-3">
                 <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="max-w-[280px] truncate">{publicLocationLabel}</span>
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <span className="truncate">{publicLocationLabel}</span>
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Clock3 className="h-4 w-4 text-slate-400" />
-                  <span className="line-clamp-1">{openHoursLabel}</span>
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <span className="truncate">{openHoursLabel}</span>
+                </span>
+                <span className="inline-flex min-w-0 items-center gap-1.5 sm:col-span-2 lg:col-span-1">
+                  {hasRating ? (
+                    <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
+                  ) : (
+                    <PackageCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                  )}
+                  <span className="truncate">
+                    {hasRating
+                      ? ratingLabel
+                      : `${availableProductCount} ${isId ? 'menu tersedia' : 'items available'}`}
+                  </span>
                 </span>
               </div>
 
-              <p className="mt-3 line-clamp-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {store.description ||
-                  (isId
-                    ? `UMKM di ${store.city}. Cek menu dan informasi operasional sebelum berkunjung atau memesan.`
-                    : `A local business in ${store.city}. Check the menu and operating information before visiting or ordering.`)}
-              </p>
-
-              {place.serviceBadges.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {place.serviceBadges.map(badge => (
-                    <span
-                      key={badge}
-                      className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
-                    >
-                      {badge}
-                    </span>
-                  ))}
-                </div>
+              {store.description ? (
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
+                  {store.description}
+                </p>
               ) : null}
 
-              <div className="mt-4">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                {place.serviceBadges.length > 0 ? (
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
+                    {place.serviceBadges.slice(0, 3).map(badge => (
+                      <span
+                        key={badge}
+                        className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
+                      >
+                        {badge}
+                      </span>
+                    ))}
+                    {place.serviceBadges.length > 3 ? (
+                      <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700">
+                        +{place.serviceBadges.length - 3}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : (
+                  <span />
+                )}
+
                 <PrimaryAction
                   action={primaryAction}
                   testId="storefront-primary-action"
+                  className="w-full shrink-0 sm:w-auto"
                 />
               </div>
             </div>
           </section>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
             <section
               id="produk"
-              className="scroll-mt-24 overflow-hidden rounded-[22px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+              className="scroll-mt-20 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               data-testid="storefront-products"
             >
-              <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-5">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-slate-50 sm:text-2xl">
-                      {isId ? 'Menu' : 'Menu'}
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {isId
-                        ? 'Pilih dari menu yang tersedia.'
-                        : 'Choose from the available menu.'}
-                    </p>
-                  </div>
+              <div className="border-b border-slate-100 px-3 py-3 dark:border-slate-800 sm:px-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-extrabold tracking-[-0.02em] text-slate-950 dark:text-slate-50 sm:text-xl">
+                    {isId ? 'Menu' : 'Menu'}
+                  </h2>
                   <span className="shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">
                     {availableProductCount} {isId ? 'tersedia' : 'available'}
                   </span>
@@ -685,13 +691,13 @@ export default async function TokoPage({ params }: PageProps) {
                 {menuGroups.length > 1 ? (
                   <nav
                     aria-label={isId ? 'Kategori menu' : 'Menu categories'}
-                    className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="-mx-0.5 mt-2 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {menuGroups.map(group => (
                       <a
                         key={group.id}
                         href={`#${group.id}`}
-                        className="inline-flex min-h-8 shrink-0 items-center rounded-full bg-slate-100 px-3 text-xs font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"
+                        className="inline-flex min-h-7 shrink-0 items-center rounded-full bg-slate-100 px-2.5 text-[11px] font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"
                       >
                         {group.label}
                       </a>
@@ -702,41 +708,41 @@ export default async function TokoPage({ params }: PageProps) {
 
               {catalog.status === 'unavailable' ? (
                 <div
-                  className="m-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-8 text-center dark:border-amber-900/70 dark:bg-amber-950/30"
+                  className="m-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-6 text-center dark:border-amber-900/70 dark:bg-amber-950/30"
                   role="status"
                 >
-                  <ShoppingBag className="mx-auto h-7 w-7 text-amber-600 dark:text-amber-300" />
-                  <p className="mt-3 font-bold text-amber-950 dark:text-amber-100">
+                  <ShoppingBag className="mx-auto h-6 w-6 text-amber-600 dark:text-amber-300" />
+                  <p className="mt-2 text-sm font-bold text-amber-950 dark:text-amber-100">
                     {isId
                       ? 'Menu belum bisa dimuat'
                       : 'The menu could not be loaded'}
                   </p>
-                  <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-amber-800 dark:text-amber-200/80">
+                  <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-amber-800 dark:text-amber-200/80">
                     {isId
-                      ? 'Informasi usaha tetap bisa dilihat. Coba muat ulang menu dalam beberapa saat.'
-                      : 'The business profile is still available. Try loading the menu again shortly.'}
+                      ? 'Informasi toko tetap tersedia. Coba muat ulang.'
+                      : 'Business information is still available. Try again.'}
                   </p>
                   <Link
                     href={`/${locale}/toko/${encodeURIComponent(store.slug)}`}
-                    className="mt-4 inline-flex min-h-10 items-center justify-center rounded-full border border-amber-300 bg-white px-4 text-sm font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/50"
+                    className="mt-3 inline-flex min-h-9 items-center justify-center rounded-xl border border-amber-300 bg-white px-3 text-sm font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/50"
                   >
                     {isId ? 'Coba lagi' : 'Try again'}
                   </Link>
                 </div>
               ) : menuGroups.length > 0 ? (
-                <div className="px-4 pb-2 sm:px-5">
+                <div className="px-3 pb-1 sm:px-4">
                   {menuGroups.map(group => (
                     <section
                       id={group.id}
                       key={group.id}
                       data-testid="storefront-menu-group"
-                      className="scroll-mt-24 border-b border-slate-100 py-4 last:border-b-0 dark:border-slate-800"
+                      className="scroll-mt-20 border-b border-slate-100 py-3 last:border-b-0 dark:border-slate-800"
                     >
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <h3 className="text-base font-extrabold text-slate-950 dark:text-slate-50 sm:text-lg">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-extrabold text-slate-950 dark:text-slate-50 sm:text-base">
                           {group.label}
                         </h3>
-                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
                           {group.items.length} {isId ? 'item' : 'items'}
                         </span>
                       </div>
@@ -754,19 +760,19 @@ export default async function TokoPage({ params }: PageProps) {
                   ))}
                 </div>
               ) : (
-                <div className="m-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center dark:border-slate-700 dark:bg-slate-950/55">
-                  <ShoppingBag className="mx-auto h-7 w-7 text-slate-400" />
-                  <p className="mt-3 font-bold text-slate-800 dark:text-slate-200">
+                <div className="m-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-7 text-center dark:border-slate-700 dark:bg-slate-950/55">
+                  <ShoppingBag className="mx-auto h-6 w-6 text-slate-400" />
+                  <p className="mt-2 text-sm font-bold text-slate-800 dark:text-slate-200">
                     {isId ? 'Menu belum ditampilkan' : 'Menu is not listed yet'}
                   </p>
-                  <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500 dark:text-slate-400">
                     {publicContact.whatsappHref
                       ? isId
-                        ? 'Gunakan tombol tanya toko untuk meminta menu atau stok terbaru.'
-                        : 'Use the business contact button to ask for the latest menu or stock.'
+                        ? 'Tanya toko untuk menu atau stok terbaru.'
+                        : 'Ask the business for the latest menu or stock.'
                       : isId
-                        ? 'Pemilik toko belum mempublikasikan menu dan kanal kontak.'
-                        : 'The owner has not published a menu or contact channel.'}
+                        ? 'Menu dan kanal kontak belum dipublikasikan.'
+                        : 'The menu and contact channel are not published yet.'}
                   </p>
                 </div>
               )}
@@ -775,25 +781,31 @@ export default async function TokoPage({ params }: PageProps) {
             <aside className="space-y-3 lg:sticky lg:top-20">
               <section
                 id="informasi-usaha"
-                className="scroll-mt-24 rounded-[22px] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
               >
-                <h2 className="text-base font-extrabold text-slate-950 dark:text-slate-50">
-                  {isId ? 'Info toko' : 'Business info'}
-                </h2>
-                <dl className="mt-1 divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-50">
+                    {isId ? 'Info toko' : 'Business info'}
+                  </h2>
+                  <span className="text-[10px] font-semibold text-slate-400 lg:hidden">
+                    {isId ? 'Detail' : 'Details'}
+                  </span>
+                </div>
+
+                <dl className="mt-0.5 divide-y divide-slate-100 dark:divide-slate-800">
                   <InfoRow
-                    icon={<MapPin className="h-4 w-4" />}
+                    icon={<MapPin className="h-3.5 w-3.5" />}
                     label={isId ? 'Lokasi' : 'Location'}
                     value={publicLocationLabel}
                     note={locationNote || undefined}
                   />
                   <InfoRow
-                    icon={<Clock3 className="h-4 w-4" />}
+                    icon={<Clock3 className="h-3.5 w-3.5" />}
                     label={isId ? 'Jam buka' : 'Opening hours'}
                     value={openHoursLabel}
                   />
                   <InfoRow
-                    icon={<PackageCheck className="h-4 w-4" />}
+                    icon={<PackageCheck className="h-3.5 w-3.5" />}
                     label={isId ? 'Layanan' : 'Services'}
                     value={
                       place.serviceBadges.length > 0
@@ -810,21 +822,16 @@ export default async function TokoPage({ params }: PageProps) {
                     href={place.googleMapsDirectionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <ExternalLink className="h-4 w-4" />
-                    {isId ? 'Buka rute di Maps' : 'Open route in Maps'}
+                    {isId ? 'Buka Maps' : 'Open Maps'}
                   </a>
                 ) : null}
-              </section>
 
-              <section className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-4 text-emerald-950 dark:border-emerald-900/70 dark:bg-emerald-950/35 dark:text-emerald-100">
-                <p className="text-sm font-extrabold">
-                  {isId ? 'Sebelum transaksi' : 'Before transacting'}
-                </p>
-                <p className="mt-1.5 text-xs leading-5 text-emerald-900/80 dark:text-emerald-100/80">
+                <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] leading-4 text-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-100/80">
                   {isId
-                    ? 'Konfirmasi stok, harga, lokasi, dan cara pengiriman sebelum membayar.'
+                    ? 'Konfirmasi stok, harga, lokasi, dan pengiriman sebelum membayar.'
                     : 'Confirm stock, price, location, and delivery before paying.'}
                 </p>
               </section>
