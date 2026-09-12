@@ -22,6 +22,17 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended(NEW.id::text, 0));
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM business_recipe_version_items item
+    WHERE item.recipe_version_id = NEW.id
+      AND item.business_id = NEW.business_id
+      AND item.organization_id = NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'published recipe BOM must contain at least one item';
+  END IF;
+
   RETURN NEW;
 END;
 $$;
