@@ -223,3 +223,64 @@ async fn published_recipe_bom_rejects_late_item_insert(pool: PgPool) {
         "published BOM must reject ingredients appended after publication"
     );
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn published_recipe_requires_nonempty_bom(pool: PgPool) {
+    let actor_id = Uuid::new_v4();
+    let organization_id = Uuid::new_v4();
+    let business_id = Uuid::new_v4();
+    let product_id = Uuid::new_v4();
+    let version_id = Uuid::new_v4();
+
+    sqlx::query(
+        r#"
+        INSERT INTO businesses (
+          id, organization_id, name, capability_key, status,
+          created_by_user_id, idempotency_key, provisioning_request_hash
+        ) VALUES ($1,$2,'Empty BOM Test','food_beverage','active',$3,$4,$5)
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(actor_id)
+    .bind(Uuid::new_v4())
+    .bind("4".repeat(64))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_products (
+          id, business_id, organization_id, name, category, price_label, status, source_type
+        ) VALUES ($1,$2,$3,'Empty BOM Product','Minuman','Rp10.000','active','owned')
+        "#,
+    )
+    .bind(product_id)
+    .bind(business_id)
+    .bind(organization_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let empty_publish = sqlx::query(
+        r#"
+        INSERT INTO business_recipe_versions (
+          id, organization_id, business_id, product_id, version_number,
+          name, servings, status, effective_from, published_by_user_id, reason
+        ) VALUES ($1,$2,$3,$4,1,'Empty BOM v1',1,'published',NOW(),$5,'must fail')
+        "#,
+    )
+    .bind(version_id)
+    .bind(organization_id)
+    .bind(business_id)
+    .bind(product_id)
+    .bind(actor_id)
+    .execute(&pool)
+    .await;
+
+    assert!(
+        empty_publish.is_err(),
+        "a recipe version cannot be published without immutable BOM items"
+    );
+}
