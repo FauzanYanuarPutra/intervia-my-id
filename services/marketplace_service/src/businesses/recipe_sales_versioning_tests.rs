@@ -338,11 +338,10 @@ async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool
 async fn current_day_sale_uses_version_effective_at_posting_time(pool: PgPool) {
     let seeded = seed_versioned_sale(&pool).await;
     let version_three_id = Uuid::new_v4();
-    let effective_from: DateTime<Utc> =
-        sqlx::query_scalar("SELECT NOW() - INTERVAL '1 second'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let effective_from: DateTime<Utc> = sqlx::query_scalar("SELECT NOW() - INTERVAL '1 second'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
     let mut tx = pool.begin().await.unwrap();
     sqlx::query(
