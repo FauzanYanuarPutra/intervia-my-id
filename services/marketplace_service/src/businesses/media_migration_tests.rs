@@ -18,6 +18,11 @@ async fn canonical_products_have_typed_image_attributes(pool: PgPool) {
 
     assert_eq!(
         columns,
-        vec!["image_height", "image_mime_type", "image_url", "image_width"]
+        vec![
+            "image_height",
+            "image_mime_type",
+            "image_url",
+            "image_width"
+        ]
     );
 }
