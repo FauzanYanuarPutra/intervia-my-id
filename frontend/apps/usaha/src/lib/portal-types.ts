@@ -2,6 +2,7 @@ import type { BusinessTemplateKey } from './business-templates';
 import type { BusinessImageValue } from './media-crop';
 
 export type PortalRole = 'owner' | 'manager' | 'cashier' | 'viewer';
+export type BusinessRelationship = 'owned' | 'joined';
 
 export type PermissionId =
   | 'viewInfo'
@@ -115,6 +116,8 @@ export type BusinessRecord = {
   name: string;
   /** Additive during migration so old local fixtures remain type-compatible. */
   organizationId?: string | null;
+  /** Real backend adapters provide this; optional only for legacy fixtures. */
+  relationship?: BusinessRelationship;
   currentRole: PortalRole;
   city: string;
   address: string;
