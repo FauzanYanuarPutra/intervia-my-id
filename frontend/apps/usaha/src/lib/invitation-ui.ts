@@ -1,3 +1,5 @@
+export const INVITATIONS_CHANGED_EVENT = 'lajukan:invitations-changed';
+
 export type PendingOrganizationInvitation = {
   id: string;
   organizationId: string;
