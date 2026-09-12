@@ -459,9 +459,10 @@ fn validate_publish_request(request: &ReplaceRecipeRequest) -> Result<(), Recipe
         if item.quantity <= Decimal::ZERO {
             return Err(RecipeRepositoryError::Validation("invalid_recipe_quantity"));
         }
-        if item.waste_percent_override.is_some_and(|value| {
-            value < Decimal::ZERO || value >= Decimal::from(100)
-        }) {
+        if item
+            .waste_percent_override
+            .is_some_and(|value| value < Decimal::ZERO || value >= Decimal::from(100))
+        {
             return Err(RecipeRepositoryError::Validation(
                 "invalid_recipe_waste_percent",
             ));
