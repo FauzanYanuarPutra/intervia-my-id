@@ -180,6 +180,7 @@ impl ResolvedBusinessProfile {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProfileValidationError {
     InvalidTemplate,
@@ -193,6 +194,7 @@ pub(crate) enum ProfileValidationError {
     InvalidDocumentPrefix,
 }
 
+#[cfg(test)]
 impl ProfileValidationError {
     pub(crate) const fn code(self) -> &'static str {
         match self {
