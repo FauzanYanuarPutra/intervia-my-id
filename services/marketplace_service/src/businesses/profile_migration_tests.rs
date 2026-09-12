@@ -1,6 +1,29 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+#[test]
+fn compatibility_migration_does_not_reown_governance_business_scope_constraint() {
+    let up = include_str!(
+        "../../migrations/20260912089900_business_tenant_identity.up.sql"
+    );
+    let down = include_str!(
+        "../../migrations/20260912089900_business_tenant_identity.down.sql"
+    );
+
+    assert!(
+        up.contains("20260911183000_business_governance_foundation"),
+        "compatibility migration must document the migration that owns the business scope constraint"
+    );
+    assert!(
+        !up.contains("ADD CONSTRAINT uq_businesses_id_organization"),
+        "compatibility migration must not recreate the governance-owned constraint"
+    );
+    assert!(
+        !down.contains("DROP CONSTRAINT"),
+        "rollback must not drop a constraint owned by the governance migration"
+    );
+}
+
 // SQLx embeds the migration directory in this test target at compile time.
 #[sqlx::test(migrations = "./migrations")]
 async fn profile_and_capability_tables_exist_with_vertical_templates(pool: PgPool) {
