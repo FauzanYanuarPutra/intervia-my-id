@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Building2, Store, UserRound } from 'lucide-react';
+import { Bell, Building2, Store, UserRound } from 'lucide-react';
 import { BusinessSwitcher } from '@/components/portal/BusinessSwitcher';
+import { InvitationIndicator } from '@/components/portal/InvitationIndicator';
 import { LogoutButton } from '@/components/portal/LogoutButton';
 import { MobileNav } from '@/components/portal/MobileNav';
 import { SidebarNav } from '@/components/portal/SidebarNav';
@@ -14,6 +15,8 @@ type PortalShellProps = {
   availableBusinesses: BusinessRecord[];
   viewerName: string | null;
   currentSection: PortalSection;
+  pageTitle?: string;
+  accountPage?: boolean;
   children: ReactNode;
 };
 
@@ -38,9 +41,12 @@ export function PortalShell({
   availableBusinesses,
   viewerName,
   currentSection,
+  pageTitle,
+  accountPage = false,
   children,
 }: PortalShellProps) {
   const status = activeBusiness ? getStatusCopy(activeBusiness) : null;
+  const title = pageTitle ?? sectionTitle[currentSection];
   const businesses = activeBusiness && !availableBusinesses.some(item => item.id === activeBusiness.id)
     ? [activeBusiness, ...availableBusinesses]
     : availableBusinesses;
@@ -66,6 +72,10 @@ export function PortalShell({
         </div>
 
         <div className="mt-3 border-t border-portal-line pt-3">
+          <Link href="/access" className="mb-1 flex min-h-10 items-center gap-3 rounded-xl px-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-forest">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-portal-mist text-portal-forest"><Bell className="h-4 w-4" /></span>
+            <span>Undangan & akses</span>
+          </Link>
           <div className="flex items-center gap-3 rounded-xl px-2 py-2">
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-portal-mist text-portal-forest"><UserRound className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
@@ -83,19 +93,20 @@ export function PortalShell({
             <div className="flex min-w-0 items-center gap-3 lg:hidden">
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-portal-forest text-white"><Store className="h-5 w-5" /></span>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-portal-soft">{activeBusiness ? activeBusiness.name : 'Lajukan Usaha'}</p>
-                <p className="truncate text-sm font-bold text-portal-ink">{sectionTitle[currentSection]}</p>
+                <p className="text-[11px] font-semibold text-portal-soft">{accountPage ? 'Akun Lajukan' : activeBusiness ? activeBusiness.name : 'Lajukan Usaha'}</p>
+                <p className="truncate text-sm font-bold text-portal-ink">{title}</p>
               </div>
             </div>
 
             <div className="hidden min-w-0 lg:block">
-              <p className="text-[11px] font-semibold text-portal-soft">{activeBusiness ? activeBusiness.name : 'Workspace bisnis'}</p>
-              <p className="mt-0.5 text-sm font-bold text-portal-ink">{sectionTitle[currentSection]}</p>
+              <p className="text-[11px] font-semibold text-portal-soft">{accountPage ? 'Akun Lajukan' : activeBusiness ? activeBusiness.name : 'Workspace bisnis'}</p>
+              <p className="mt-0.5 text-sm font-bold text-portal-ink">{title}</p>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              {status ? <StatusBadge tone={activeBusiness?.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge> : null}
-              <Link href="/businesses/new" className="portal-button-secondary hidden sm:inline-flex"><Building2 className="h-4 w-4" /> Tambah usaha</Link>
+              {!accountPage && status ? <StatusBadge tone={activeBusiness?.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge> : null}
+              {viewerName ? <InvitationIndicator /> : null}
+              <Link href="/businesses/new" className="portal-button-secondary hidden sm:inline-flex"><Building2 className="h-4 w-4" /> Buat usaha baru</Link>
               <div className="lg:hidden">{viewerName ? <LogoutButton compact /> : null}</div>
             </div>
           </div>
@@ -106,7 +117,7 @@ export function PortalShell({
         </main>
       </div>
 
-      <MobileNav business={activeBusiness} currentSection={currentSection} />
+      {!accountPage ? <MobileNav business={activeBusiness} currentSection={currentSection} /> : null}
     </div>
   );
 }
