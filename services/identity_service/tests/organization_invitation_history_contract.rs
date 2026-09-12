@@ -1,5 +1,5 @@
 use chrono::{Duration, Utc};
-use identity_service::organizations::domain::effective_invitation_status;
+use identity_service::organizations::invitation_status::effective_invitation_status;
 
 #[test]
 fn pending_invitation_past_expiry_is_exposed_as_expired() {
