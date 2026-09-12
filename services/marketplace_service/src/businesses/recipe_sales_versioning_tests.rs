@@ -1,4 +1,6 @@
-use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository};
+use super::sales::{
+    CreateSaleLineRequest, CreateSaleRequest, SaleRepository, SaleRepositoryError,
+};
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
@@ -288,4 +290,46 @@ async fn sale_uses_effective_recipe_version_for_snapshot_and_consumption(pool: P
     .await
     .unwrap();
     assert_eq!(movement_delta, Decimal::from(-200));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool: PgPool) {
+    let seeded = seed_versioned_sale(&pool).await;
+    let result = SaleRepository::new(pool.clone())
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            CreateSaleRequest {
+                occurred_on: NaiveDate::from_ymd_opt(2026, 8, 31).unwrap(),
+                channel_key: Some("offline".into()),
+                account_key: "cash".into(),
+                lines: vec![CreateSaleLineRequest {
+                    product_id: seeded.product_id,
+                    quantity: Decimal::ONE,
+                    unit_price_amount: 12_000,
+                    discount_amount: 0,
+                }],
+            },
+        )
+        .await;
+
+    assert_eq!(result.unwrap_err(), SaleRepositoryError::IncompleteCosting);
+
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stock, Decimal::from(5_000));
+
+    let sales_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_sales WHERE business_id=$1")
+            .bind(seeded.business_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(sales_count, 0);
 }
