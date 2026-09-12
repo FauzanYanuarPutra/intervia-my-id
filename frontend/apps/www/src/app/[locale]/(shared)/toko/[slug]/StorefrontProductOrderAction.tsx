@@ -15,6 +15,7 @@ type StorefrontProductOrderActionProps = {
   onlineOrderEnabled: boolean;
   productAvailable: boolean;
   isId: boolean;
+  variant?: 'default' | 'compact';
 };
 
 type OrderUiState =
@@ -94,12 +95,14 @@ export function StorefrontProductOrderAction({
   onlineOrderEnabled,
   productAvailable,
   isId,
+  variant = 'default',
 }: StorefrontProductOrderActionProps) {
   const [state, setState] = useState<OrderUiState>({ phase: 'idle' });
   const [submitter] = useState(() => createStorefrontOrderSubmitter());
   const idempotencyKeyRef = useRef<string | null>(null);
   const submittingRef = useRef(false);
 
+  const compact = variant === 'compact';
   const canOrder = onlineOrderEnabled && productAvailable;
   const locked = state.phase === 'submitting' || state.phase === 'success';
 
@@ -137,15 +140,34 @@ export function StorefrontProductOrderAction({
         : 'This product is not currently available to order.'
       : null;
 
+  const idleLabel = compact
+    ? isId
+      ? 'Pesan'
+      : 'Order'
+    : isId
+      ? 'Pesan 1 produk'
+      : 'Order 1 item';
+
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+    <div
+      data-variant={variant}
+      className={
+        compact
+          ? 'mt-2'
+          : 'mt-3 border-t border-slate-100 pt-3 dark:border-slate-800'
+      }
+    >
       <button
         type="button"
         onClick={handleOrder}
         disabled={!canOrder || locked}
         aria-label={isId ? `Pesan ${productName}` : `Order ${productName}`}
         data-testid="storefront-order-button"
-        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
+        className={
+          compact
+            ? 'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-4 text-xs font-extrabold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-300'
+            : 'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300'
+        }
       >
         {state.phase === 'submitting' ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -162,9 +184,7 @@ export function StorefrontProductOrderAction({
             ? isId
               ? 'Pesanan dibuat'
               : 'Order created'
-            : isId
-              ? 'Pesan 1 produk'
-              : 'Order 1 item'}
+            : idleLabel}
       </button>
 
       {disabledReason ? (
