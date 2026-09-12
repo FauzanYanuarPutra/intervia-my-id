@@ -13,6 +13,7 @@ import {
   Phone,
   ShoppingBag,
   Star,
+  Store,
 } from 'lucide-react';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import { getBaseUrl } from '@/lib/server/getBaseUrl';
@@ -36,6 +37,7 @@ import {
 } from '@/lib/super-app/umkm-storefront-products';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import { StorefrontProductOrderAction } from './StorefrontProductOrderAction';
+import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -74,27 +76,6 @@ function formatIdr(valueCents: number): string {
   }).format(Math.max(0, Math.round(valueCents / 100)));
 }
 
-function readMetaTextArray(
-  metadata: Record<string, unknown>,
-  ...keys: string[]
-): string[] {
-  return keys.flatMap(key => {
-    const value = metadata[key];
-    if (Array.isArray(value)) {
-      return value
-        .map(item => (typeof item === 'string' ? item.trim() : ''))
-        .filter(Boolean);
-    }
-    if (typeof value === 'string') {
-      return value
-        .split(/[,\n]/)
-        .map(item => item.trim())
-        .filter(Boolean);
-    }
-    return [];
-  });
-}
-
 function isPlaceholderImage(image: string): boolean {
   return image.includes('/images/placeholders/');
 }
@@ -103,38 +84,6 @@ function productImage(product: UmkmProduct): string | null {
   const image =
     product.image_url || readMetaText(product.metadata, 'image_url') || '';
   return image && !isPlaceholderImage(image) ? image : null;
-}
-
-function uniqueImages(images: string[]): string[] {
-  return Array.from(
-    new Set(images.map(image => image.trim()).filter(Boolean)),
-  ).slice(0, 3);
-}
-
-function getExplicitStoreImages(metadata: Record<string, unknown>): string[] {
-  const singularKeys = [
-    'store_photo_url',
-    'cover_image_url',
-    'cover_url',
-    'banner_url',
-    'image_url',
-    'imageUrl',
-    'image',
-    'menu_photo_url',
-  ];
-
-  return uniqueImages(
-    [
-      ...singularKeys.map(key => readMetaText(metadata, key)),
-      ...readMetaTextArray(
-        metadata,
-        'gallery_images',
-        'gallery',
-        'images',
-        'photos',
-      ),
-    ].filter(image => !isPlaceholderImage(image)),
-  );
 }
 
 function resolvePublicContact(
@@ -190,17 +139,17 @@ function ProductCard({
 
   return (
     <article
-      className="overflow-hidden rounded-[20px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+      className="group overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_16px_38px_-34px_rgba(15,23,42,0.55)] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_46px_-32px_rgba(5,150,105,0.35)] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-900"
       data-testid="storefront-product-card"
     >
-      <div className="relative aspect-[4/3] bg-slate-100 dark:bg-slate-800">
+      <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-800">
         {image ? (
           <LajukanImage
             src={image}
             alt={product.name}
             fill
             sizes="(min-width: 1280px) 260px, (min-width: 640px) 44vw, 92vw"
-            className="object-cover"
+            className="object-cover transition duration-300 group-hover:scale-[1.025]"
           />
         ) : (
           <div
@@ -370,7 +319,7 @@ export async function generateMetadata({
   const publicUrl = `${baseUrl}/${locale}/toko/${store.slug}`;
   const storeMetadata =
     store.metadata && typeof store.metadata === 'object' ? store.metadata : {};
-  const seoImage = getExplicitStoreImages(storeMetadata)[0];
+  const seoImage = resolveStorefrontBrandMedia(storeMetadata).seoImageUrl;
   const description =
     store.description ||
     (isId
@@ -418,8 +367,7 @@ export default async function TokoPage({ params }: PageProps) {
   ).length;
   const place = buildUmkmPlacePresentation(store, isId, null);
   const publicContact = resolvePublicContact(store, place);
-  const gallery = getExplicitStoreImages(metadata);
-  const hasMediaMosaic = gallery.length > 1;
+  const brandMedia = resolveStorefrontBrandMedia(metadata);
 
   const hasValidCoordinates = isCoordinateValid({
     lat: store.lat,
@@ -530,7 +478,7 @@ export default async function TokoPage({ params }: PageProps) {
     name: store.name,
     description: store.description || undefined,
     url: publicUrl,
-    ...(gallery[0] ? { image: gallery[0] } : {}),
+    ...(brandMedia.seoImageUrl ? { image: brandMedia.seoImageUrl } : {}),
     address: {
       '@type': 'PostalAddress',
       ...(place.locationMode === 'fixed' && store.address
@@ -583,124 +531,106 @@ export default async function TokoPage({ params }: PageProps) {
           </nav>
 
           <section
-            className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_20px_50px_-42px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900 sm:rounded-[28px] lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]"
+            className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_70px_-48px_rgba(15,23,42,0.5)] dark:border-slate-800 dark:bg-slate-900 sm:rounded-[30px]"
             data-testid="storefront-summary"
           >
             <div
-              className={
-                hasMediaMosaic
-                  ? 'grid aspect-[16/10] min-h-[250px] grid-cols-[minmax(0,2fr)_minmax(100px,1fr)] grid-rows-2 gap-1 bg-slate-100 dark:bg-slate-800 sm:min-h-[340px] lg:aspect-auto lg:min-h-[440px]'
-                  : 'relative aspect-[16/10] min-h-[250px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[340px] lg:aspect-auto lg:min-h-[440px]'
-              }
+              className="relative aspect-[8/3] min-h-[190px] max-h-[410px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[260px]"
               data-testid="storefront-media"
-              data-media-count={gallery.length}
+              data-media-count={
+                Number(Boolean(brandMedia.coverUrl)) +
+                Number(Boolean(brandMedia.logoUrl)) +
+                brandMedia.galleryUrls.length
+              }
             >
-              {gallery.length > 0 ? (
-                hasMediaMosaic ? (
-                  <>
-                    <div className="relative row-span-2 overflow-hidden bg-slate-200 dark:bg-slate-800">
-                      <LajukanImage
-                        src={gallery[0]}
-                        alt={store.name}
-                        fill
-                        priority
-                        sizes="(min-width: 1024px) 38vw, 67vw"
-                        className="object-cover"
-                      />
-                    </div>
-                    {gallery.slice(1, 3).map((image, index) => (
-                      <div
-                        key={image}
-                        className={`relative overflow-hidden bg-slate-200 dark:bg-slate-800 ${
-                          gallery.length === 2 ? 'row-span-2' : ''
-                        }`}
-                      >
-                        <LajukanImage
-                          src={image}
-                          alt={
-                            isId
-                              ? `Galeri ${store.name} ${index + 2}`
-                              : `${store.name} gallery ${index + 2}`
-                          }
-                          fill
-                          sizes="(min-width: 1024px) 18vw, 33vw"
-                          className="object-cover"
-                        />
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <LajukanImage
-                    src={gallery[0]}
-                    alt={store.name}
-                    fill
-                    priority
-                    sizes="(min-width: 1024px) 55vw, 100vw"
-                    className="object-cover"
-                  />
-                )
+              {brandMedia.coverUrl ? (
+                <LajukanImage
+                  src={brandMedia.coverUrl}
+                  alt={isId ? `Banner ${store.name}` : `${store.name} cover`}
+                  fill
+                  priority
+                  sizes="(min-width: 1280px) 1200px, 100vw"
+                  className="object-cover"
+                />
               ) : (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_48%),linear-gradient(145deg,#f8fafc,#eef2f7)] px-6 text-center dark:bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_48%),linear-gradient(145deg,#0f172a,#111827)]"
+                  className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,_rgba(16,185,129,0.28),_transparent_35%),radial-gradient(circle_at_82%_24%,_rgba(14,165,233,0.18),_transparent_32%),linear-gradient(135deg,#ecfdf5,#f8fafc_55%,#eff6ff)] dark:bg-[radial-gradient(circle_at_18%_18%,_rgba(16,185,129,0.2),_transparent_35%),radial-gradient(circle_at_82%_24%,_rgba(14,165,233,0.14),_transparent_32%),linear-gradient(135deg,#052e2b,#0f172a_55%,#172554)]"
                   data-testid="storefront-media-placeholder"
                   role="img"
-                  aria-label={
-                    isId
-                      ? `Foto usaha ${store.name} belum tersedia`
-                      : `No business photo available for ${store.name}`
-                  }
-                >
-                  <span className="inline-flex h-16 w-16 items-center justify-center rounded-[22px] bg-white text-slate-400 ring-1 ring-slate-200 shadow-sm dark:bg-slate-900 dark:text-slate-500 dark:ring-slate-700">
-                    <ImageOff className="h-7 w-7" />
-                  </span>
-                  <p className="mt-4 text-base font-extrabold text-slate-700 dark:text-slate-200">
-                    {isId
-                      ? 'Foto usaha belum tersedia'
-                      : 'Business photo not available'}
-                  </p>
-                  <p className="mt-1 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {isId
-                      ? 'Gunakan nama, kategori, dan alamat di samping untuk memastikan usaha yang Anda cari.'
-                      : 'Use the name, category, and address beside this panel to confirm the business.'}
-                  </p>
-                </div>
+                  aria-label={isId ? `Banner ${store.name} belum tersedia` : `No cover for ${store.name}`}
+                />
               )}
-            </div>
-
-            <div className="flex flex-col p-4 sm:p-6 lg:p-7">
-              <div className="flex flex-wrap gap-2">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/45 via-transparent to-slate-950/10" />
+              <div className="absolute left-4 top-4 flex flex-wrap gap-2 sm:left-6 sm:top-6">
                 <StorePill>{place.categoryLabel}</StorePill>
                 <StorePill tone={statusTone}>{statusLabel}</StorePill>
               </div>
-              <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-[-0.035em] text-slate-950 dark:text-slate-50 sm:text-4xl">
-                {store.name}
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
+            </div>
+
+            <div className="relative px-4 pb-5 sm:px-7 sm:pb-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex min-w-0 items-end gap-4 sm:gap-5">
+                  <div className="relative -mt-12 h-24 w-24 shrink-0 overflow-hidden rounded-[24px] border-4 border-white bg-white shadow-[0_18px_40px_-22px_rgba(15,23,42,0.6)] dark:border-slate-900 dark:bg-slate-900 sm:-mt-16 sm:h-32 sm:w-32 sm:rounded-[30px]">
+                    {brandMedia.logoUrl ? (
+                      <LajukanImage
+                        src={brandMedia.logoUrl}
+                        alt={isId ? `Logo ${store.name}` : `${store.name} logo`}
+                        fill
+                        sizes="128px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 grid place-items-center bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-200">
+                        <Store className="h-9 w-9 sm:h-11 sm:w-11" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 pb-1 pt-4 sm:pt-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                      {isId ? 'Toko di Lajukan' : 'Business on Lajukan'}
+                    </p>
+                    <h1 className="mt-1 line-clamp-2 text-2xl font-extrabold leading-tight tracking-[-0.035em] text-slate-950 dark:text-slate-50 sm:text-4xl">
+                      {store.name}
+                    </h1>
+                  </div>
+                </div>
+                <PrimaryAction
+                  action={primaryAction}
+                  testId="storefront-primary-action-desktop"
+                  className="hidden shrink-0 lg:inline-flex"
+                />
+              </div>
+
+              <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
                 {store.description ||
                   (isId
                     ? `UMKM di ${store.city}. Cek produk dan informasi operasional sebelum berkunjung atau memesan.`
                     : `A local business in ${store.city}. Check products and operating information before visiting or ordering.`)}
               </p>
 
-              <dl className="mt-5 divide-y divide-slate-100 border-y border-slate-100 dark:divide-slate-800 dark:border-slate-800">
-                <InfoRow
-                  icon={<MapPin className="h-4 w-4" />}
-                  label={isId ? 'Area usaha' : 'Business area'}
-                  value={publicLocationLabel}
-                  note={locationNote || undefined}
-                />
-                <InfoRow
-                  icon={<Clock3 className="h-4 w-4" />}
-                  label={isId ? 'Jam operasional' : 'Opening hours'}
-                  value={openHoursLabel}
-                />
-                {hasRating ? (
+              <dl className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-2xl bg-slate-50 px-3.5 dark:bg-slate-800/65">
                   <InfoRow
-                    icon={<Star className="h-4 w-4" />}
-                    label={isId ? 'Ulasan pelanggan' : 'Customer reviews'}
-                    value={ratingLabel}
+                    icon={<MapPin className="h-4 w-4" />}
+                    label={isId ? 'Area usaha' : 'Business area'}
+                    value={publicLocationLabel}
+                    note={locationNote || undefined}
                   />
-                ) : null}
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3.5 dark:bg-slate-800/65">
+                  <InfoRow
+                    icon={<Clock3 className="h-4 w-4" />}
+                    label={isId ? 'Jam operasional' : 'Opening hours'}
+                    value={openHoursLabel}
+                  />
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3.5 dark:bg-slate-800/65">
+                  <InfoRow
+                    icon={hasRating ? <Star className="h-4 w-4" /> : <PackageCheck className="h-4 w-4" />}
+                    label={hasRating ? (isId ? 'Ulasan pelanggan' : 'Customer reviews') : (isId ? 'Produk tersedia' : 'Available products')}
+                    value={hasRating ? ratingLabel : `${availableProductCount} ${isId ? 'produk' : 'products'}`}
+                  />
+                </div>
               </dl>
 
               {place.serviceBadges.length > 0 ? (
@@ -708,19 +638,13 @@ export default async function TokoPage({ params }: PageProps) {
                   {place.serviceBadges.map(badge => (
                     <span
                       key={badge}
-                      className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                      className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-100 dark:bg-emerald-950/55 dark:text-emerald-200 dark:ring-emerald-900"
                     >
                       {badge}
                     </span>
                   ))}
                 </div>
               ) : null}
-
-              <PrimaryAction
-                action={primaryAction}
-                testId="storefront-primary-action-desktop"
-                className="mt-auto hidden lg:inline-flex"
-              />
             </div>
           </section>
 

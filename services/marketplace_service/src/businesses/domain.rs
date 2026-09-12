@@ -483,13 +483,14 @@ fn validate_coordinates(lat: Option<f64>, lng: Option<f64>) -> Result<(), Valida
     }
 }
 
-const PUBLIC_STORE_KEYS: [&str; 44] = [
+const PUBLIC_STORE_KEYS: [&str; 45] = [
     "source",
     "portal_public_url",
     "store_photo_url",
     "cover_image_url",
     "cover_url",
     "banner_url",
+    "logo_url",
     "image_url",
     "imageUrl",
     "image",
@@ -833,6 +834,19 @@ mod tests {
         let serialized = serde_json::to_value(dto).expect("serialize public store");
         let object = serialized.as_object().expect("public store object");
         assert_eq!(object.len(), 15);
+    }
+
+    #[test]
+    fn public_store_projection_exposes_brand_media_without_private_metadata() {
+        let projected = project_public_store_details(&json!({
+            "logo_url": "/api/forum/media/logo.webp",
+            "banner_url": "/api/forum/media/banner.webp",
+            "private_note": "never expose this",
+        }));
+
+        assert_eq!(projected["logo_url"], "/api/forum/media/logo.webp");
+        assert_eq!(projected["banner_url"], "/api/forum/media/banner.webp");
+        assert!(!projected.contains_key("private_note"));
     }
 
     #[test]
