@@ -249,7 +249,8 @@ async fn get_recipe(
     headers: HeaderMap,
     Path((business_id, product_id)): Path<(Uuid, Uuid)>,
 ) -> Response {
-    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -279,18 +280,13 @@ async fn replace_recipe(
     Path((business_id, product_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ReplaceRecipeRequest>,
 ) -> Response {
-    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
     match RecipeRepository::new(state.db.clone())
-        .publish_legacy(
-            actor_id,
-            business_id,
-            organization_id,
-            product_id,
-            payload,
-        )
+        .publish_legacy(actor_id, business_id, organization_id, product_id, payload)
         .await
     {
         Ok(recipe) => (
