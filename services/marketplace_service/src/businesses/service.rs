@@ -248,25 +248,30 @@ impl BusinessService {
             .await
             .map_err(map_identity_error)?;
         let organization_id = if let Some(hint) = candidate.organization_id {
-            organizations
-                .iter()
-                .find(|organization| organization.id == hint)
+            management_organization(&organizations, hint)
                 .map(|organization| organization.id)
                 .ok_or(BusinessServiceError::AccessDenied)?
         } else {
             match organizations.len() {
                 0 => {
-                    self.identity
+                    let organization = self
+                        .identity
                         .ensure_organization(
                             authorization,
                             identity_child_key(idempotency_key),
                             &candidate.name,
                         )
                         .await
-                        .map_err(map_identity_error)?
-                        .id
+                        .map_err(map_identity_error)?;
+                    require_business_manager(organization)?.id
                 }
-                1 => organizations[0].id,
+                1 => require_business_manager(
+                    organizations
+                        .into_iter()
+                        .next()
+                        .expect("one organization"),
+                )?
+                .id,
                 _ => return Err(BusinessServiceError::ReconciliationSelectionRequired),
             }
         };
@@ -442,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn provisioning_fails_closed_without_business_management_role() {
+    fn provisioning_and_reconciliation_fail_closed_without_business_management_role() {
         assert!(matches!(
             require_business_manager(organization("org_member")),
             Err(BusinessServiceError::AccessDenied)
