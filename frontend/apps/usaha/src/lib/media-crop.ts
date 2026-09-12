@@ -14,6 +14,24 @@ export type CropRect = {
   height: number;
 };
 
+export type CropPosition = {
+  horizontal: number;
+  vertical: number;
+};
+
+export type DragCropPositionInput = {
+  sourceWidth: number;
+  sourceHeight: number;
+  targetAspect: number;
+  zoom: number;
+  horizontalPosition: number;
+  verticalPosition: number;
+  deltaX: number;
+  deltaY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+};
+
 const PRESETS = {
   logo: { aspect: 1, width: 640, height: 640, label: 'Logo usaha (1:1)' },
   banner: { aspect: 8 / 3, width: 1600, height: 600, label: 'Banner usaha (8:3)' },
@@ -38,6 +56,10 @@ export function parseBusinessImageValue(value: unknown): BusinessImageValue | un
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function safeUnitPosition(value: number) {
+  return clamp(Number.isFinite(value) ? value : 0, -1, 1);
 }
 
 export function computeCoverCrop(
@@ -69,9 +91,61 @@ export function computeCoverCrop(
   const yRange = (sourceHeight - height) / 2;
 
   return {
-    x: sourceWidth / 2 - width / 2 + clamp(horizontalPosition, -1, 1) * xRange,
-    y: sourceHeight / 2 - height / 2 + clamp(verticalPosition, -1, 1) * yRange,
+    x: sourceWidth / 2 - width / 2 + safeUnitPosition(horizontalPosition) * xRange,
+    y: sourceHeight / 2 - height / 2 + safeUnitPosition(verticalPosition) * yRange,
     width,
     height,
   };
+}
+
+/**
+ * Converts a pointer drag inside the rendered crop viewport into the normalized
+ * crop positions consumed by computeCoverCrop. The image follows the pointer,
+ * so dragging right/down moves the sampled source window left/up.
+ */
+export function dragCropPosition({
+  sourceWidth,
+  sourceHeight,
+  targetAspect,
+  zoom,
+  horizontalPosition,
+  verticalPosition,
+  deltaX,
+  deltaY,
+  viewportWidth,
+  viewportHeight,
+}: DragCropPositionInput): CropPosition {
+  const currentHorizontal = safeUnitPosition(horizontalPosition);
+  const currentVertical = safeUnitPosition(verticalPosition);
+
+  if (
+    !Number.isFinite(deltaX) ||
+    !Number.isFinite(deltaY) ||
+    !Number.isFinite(viewportWidth) ||
+    !Number.isFinite(viewportHeight) ||
+    viewportWidth <= 0 ||
+    viewportHeight <= 0
+  ) {
+    return { horizontal: currentHorizontal, vertical: currentVertical };
+  }
+
+  const crop = computeCoverCrop(
+    sourceWidth,
+    sourceHeight,
+    targetAspect,
+    zoom,
+    currentHorizontal,
+    currentVertical,
+  );
+  const horizontalRange = Math.max(0, (sourceWidth - crop.width) / 2);
+  const verticalRange = Math.max(0, (sourceHeight - crop.height) / 2);
+
+  const horizontal = horizontalRange > Number.EPSILON
+    ? safeUnitPosition(currentHorizontal - (deltaX * crop.width / viewportWidth) / horizontalRange)
+    : 0;
+  const vertical = verticalRange > Number.EPSILON
+    ? safeUnitPosition(currentVertical - (deltaY * crop.height / viewportHeight) / verticalRange)
+    : 0;
+
+  return { horizontal, vertical };
 }

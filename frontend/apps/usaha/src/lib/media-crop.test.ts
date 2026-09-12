@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeCoverCrop, mediaCropPreset } from './media-crop';
+import { computeCoverCrop, dragCropPosition, mediaCropPreset } from './media-crop';
 
 describe('business media crop geometry', () => {
   it('uses fixed production ratios and output dimensions', () => {
@@ -30,5 +30,50 @@ describe('business media crop geometry', () => {
       width: 600,
       height: 225,
     });
+  });
+
+  it('translates direct canvas dragging into crop position changes', () => {
+    expect(dragCropPosition({
+      sourceWidth: 2400,
+      sourceHeight: 1200,
+      targetAspect: 1,
+      zoom: 1,
+      horizontalPosition: 0,
+      verticalPosition: 0,
+      deltaX: 100,
+      deltaY: 100,
+      viewportWidth: 400,
+      viewportHeight: 400,
+    })).toEqual({ horizontal: -0.5, vertical: 0 });
+  });
+
+  it('clamps direct dragging at the available image edges', () => {
+    expect(dragCropPosition({
+      sourceWidth: 2400,
+      sourceHeight: 1200,
+      targetAspect: 1,
+      zoom: 2,
+      horizontalPosition: 0.9,
+      verticalPosition: -0.9,
+      deltaX: -1000,
+      deltaY: 1000,
+      viewportWidth: 400,
+      viewportHeight: 400,
+    })).toEqual({ horizontal: 1, vertical: -1 });
+  });
+
+  it('ignores invalid viewport deltas instead of creating non-finite positions', () => {
+    expect(dragCropPosition({
+      sourceWidth: 1200,
+      sourceHeight: 1200,
+      targetAspect: 1,
+      zoom: 1,
+      horizontalPosition: 0.25,
+      verticalPosition: -0.25,
+      deltaX: 50,
+      deltaY: 50,
+      viewportWidth: 0,
+      viewportHeight: Number.NaN,
+    })).toEqual({ horizontal: 0.25, vertical: -0.25 });
   });
 });
