@@ -1,6 +1,5 @@
-import type { BusinessRecord, PortalRole } from './portal-types';
+import type { BusinessRecord, BusinessRelationship, PortalRole } from './portal-types';
 
-export type BusinessRelationship = 'owned' | 'joined';
 export type CollaborationInvitationStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | string;
 
 export type OrganizationMember = {
