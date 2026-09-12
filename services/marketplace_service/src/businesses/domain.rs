@@ -313,8 +313,9 @@ pub(crate) fn validate_provision_request(
     ) {
         return Err(ValidationError::InvalidCapability);
     }
-    let profile = validate_profile_input(request.business.profile.as_ref(), &requested_capability_key)
-        .map_err(ValidationError::from)?;
+    let profile =
+        validate_profile_input(request.business.profile.as_ref(), &requested_capability_key)
+            .map_err(ValidationError::from)?;
     let capability_key = profile.legacy_capability_key.clone();
 
     let organization_name = request
