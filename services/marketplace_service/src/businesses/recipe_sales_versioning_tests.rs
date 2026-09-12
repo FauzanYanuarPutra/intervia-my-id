@@ -1,5 +1,5 @@
 use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository, SaleRepositoryError};
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -11,6 +11,7 @@ struct SeededVersionedSale {
     product_id: Uuid,
     ingredient_id: Uuid,
     version_one_id: Uuid,
+    version_two_id: Uuid,
 }
 
 async fn seed_versioned_sale(pool: &PgPool) -> SeededVersionedSale {
@@ -228,6 +229,7 @@ async fn seed_versioned_sale(pool: &PgPool) -> SeededVersionedSale {
         product_id,
         ingredient_id,
         version_one_id,
+        version_two_id,
     }
 }
 
@@ -330,4 +332,106 @@ async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool
             .await
             .unwrap();
     assert_eq!(sales_count, 0);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn current_day_sale_uses_version_effective_at_posting_time(pool: PgPool) {
+    let seeded = seed_versioned_sale(&pool).await;
+    let version_three_id = Uuid::new_v4();
+    let effective_from: DateTime<Utc> =
+        sqlx::query_scalar("SELECT NOW() - INTERVAL '1 second'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query(
+        r#"
+        UPDATE business_recipe_versions
+        SET status='superseded', effective_until=$3,
+            superseded_by_version_id=$2, updated_at=NOW()
+        WHERE id=$1
+        "#,
+    )
+    .bind(seeded.version_two_id)
+    .bind(version_three_id)
+    .bind(effective_from)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_recipe_versions (
+          id, organization_id, business_id, product_id, version_number,
+          name, servings, status, effective_from, published_by_user_id, reason
+        ) VALUES ($1,$2,$3,$4,3,'Immutable v3',1,'published',$5,$6,'same-day publish')
+        "#,
+    )
+    .bind(version_three_id)
+    .bind(seeded.organization_id)
+    .bind(seeded.business_id)
+    .bind(seeded.product_id)
+    .bind(effective_from)
+    .bind(seeded.actor_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_recipe_version_items (
+          organization_id, business_id, recipe_version_id, ingredient_id, quantity, position
+        ) VALUES ($1,$2,$3,$4,250,0)
+        "#,
+    )
+    .bind(seeded.organization_id)
+    .bind(seeded.business_id)
+    .bind(version_three_id)
+    .bind(seeded.ingredient_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let occurred_on: NaiveDate = sqlx::query_scalar("SELECT CURRENT_DATE")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let created = SaleRepository::new(pool.clone())
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            CreateSaleRequest {
+                occurred_on,
+                channel_key: Some("offline".into()),
+                account_key: "cash".into(),
+                lines: vec![CreateSaleLineRequest {
+                    product_id: seeded.product_id,
+                    quantity: Decimal::ONE,
+                    unit_price_amount: 12_000,
+                    discount_amount: 0,
+                }],
+            },
+        )
+        .await
+        .unwrap();
+
+    let persisted_version_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT recipe_version_id FROM business_sale_lines WHERE sale_id=$1")
+            .bind(created.sale.sale.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(persisted_version_id, Some(version_three_id));
+
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stock, Decimal::from(4_750));
 }
