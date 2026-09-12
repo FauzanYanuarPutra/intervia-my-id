@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { organizationRoleLabel } from '@/lib/business-collaboration';
 import {
   activeInvitationCount,
+  INVITATIONS_CHANGED_EVENT,
   invitationExpiryLabel,
   parsePendingInvitations,
   type PendingOrganizationInvitation,
@@ -17,22 +18,48 @@ export function InvitationIndicator() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch('/api/team/invitations', { signal: controller.signal, cache: 'no-store' })
-      .then(async response => {
+    let active = true;
+    let controller: AbortController | null = null;
+
+    async function loadInvitations() {
+      controller?.abort();
+      const nextController = new AbortController();
+      controller = nextController;
+      try {
+        const response = await fetch('/api/team/invitations', {
+          signal: nextController.signal,
+          cache: 'no-store',
+        });
         if (!response.ok) throw new Error('Undangan belum bisa dimuat.');
-        return response.json();
-      })
-      .then(payload => setItems(parsePendingInvitations(payload)))
-      .catch(fetchError => {
-        if (!(fetchError instanceof DOMException && fetchError.name === 'AbortError')) {
+        const payload = await response.json();
+        if (!active || nextController.signal.aborted) return;
+        setItems(parsePendingInvitations(payload));
+        setError('');
+      } catch (fetchError) {
+        if (
+          active &&
+          !(fetchError instanceof DOMException && fetchError.name === 'AbortError')
+        ) {
           setError(fetchError instanceof Error ? fetchError.message : 'Undangan belum bisa dimuat.');
         }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
+      } finally {
+        if (active && !nextController.signal.aborted) setLoading(false);
+      }
+    }
+
+    const refresh = () => void loadInvitations();
+    void loadInvitations();
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener(INVITATIONS_CHANGED_EVENT, refresh);
+
+    return () => {
+      active = false;
+      controller?.abort();
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener(INVITATIONS_CHANGED_EVENT, refresh);
+    };
   }, []);
 
   const count = activeInvitationCount(items);
