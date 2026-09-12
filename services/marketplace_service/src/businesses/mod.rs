@@ -24,11 +24,11 @@ mod public_commerce;
 mod public_commerce_routes;
 #[cfg(test)]
 mod public_commerce_tests;
-mod recipes;
 #[cfg(test)]
 mod recipe_sales_versioning_tests;
 #[cfg(test)]
 mod recipe_versioning_persistence_tests;
+mod recipes;
 mod repository;
 mod routes;
 pub(crate) mod sales;
