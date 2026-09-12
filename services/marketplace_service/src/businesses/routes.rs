@@ -23,6 +23,7 @@ use super::{
         AdjustBusinessInventoryRequest, CreateBusinessProductRequest, ProductRepository,
         UpdateBusinessProductRequest,
     },
+    recipes::{RecipeRepository, RecipeRepositoryError},
     repository::BusinessRepository,
     service::{BusinessService, BusinessServiceError},
     settlement::{CreateSettlementRequest, SettlementRepository, SettlementRepositoryError},
@@ -248,10 +249,16 @@ async fn get_recipe(
     headers: HeaderMap,
     Path((business_id, product_id)): Path<(Uuid, Uuid)>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await {
         Ok(value) => value,
         Err(response) => return response,
     };
+    if let Err(error) = RecipeRepository::new(state.db.clone())
+        .authorize_view(actor_id, business_id, organization_id)
+        .await
+    {
+        return recipe_error_response(error);
+    }
     match ControlRepository::new(state.db.clone())
         .get_recipe(business_id, organization_id, product_id)
         .await
@@ -272,12 +279,18 @@ async fn replace_recipe(
     Path((business_id, product_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ReplaceRecipeRequest>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await {
         Ok(value) => value,
         Err(response) => return response,
     };
-    match ControlRepository::new(state.db.clone())
-        .replace_recipe(business_id, organization_id, product_id, payload)
+    match RecipeRepository::new(state.db.clone())
+        .publish_legacy(
+            actor_id,
+            business_id,
+            organization_id,
+            product_id,
+            payload,
+        )
         .await
     {
         Ok(recipe) => (
@@ -285,7 +298,7 @@ async fn replace_recipe(
             Json(json!({ "data": { "recipe": recipe } })),
         )
             .into_response(),
-        Err(error) => control_error_response(error),
+        Err(error) => recipe_error_response(error),
     }
 }
 
@@ -560,6 +573,25 @@ fn control_error_response(error: ControlRepositoryError) -> Response {
     }
 }
 
+fn recipe_error_response(error: RecipeRepositoryError) -> Response {
+    match error {
+        RecipeRepositoryError::NotFound => {
+            api_error(StatusCode::NOT_FOUND, "business_recipe_not_found")
+        }
+        RecipeRepositoryError::Validation(code) => api_error(StatusCode::BAD_REQUEST, code),
+        RecipeRepositoryError::Forbidden => {
+            api_error(StatusCode::FORBIDDEN, "business_recipe_access_denied")
+        }
+        RecipeRepositoryError::Conflict => {
+            api_error(StatusCode::CONFLICT, "business_recipe_conflict")
+        }
+        RecipeRepositoryError::Database => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_recipe_storage_unavailable",
+        ),
+    }
+}
+
 fn settlement_error_response(error: SettlementRepositoryError) -> Response {
     match error {
         SettlementRepositoryError::Validation(error) => {
@@ -644,6 +676,12 @@ mod tests {
         let response =
             control_error_response(ControlRepositoryError::Validation("invalid_finance_amount"));
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn recipe_permission_errors_use_stable_forbidden_responses() {
+        let response = recipe_error_response(RecipeRepositoryError::Forbidden);
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     #[test]
