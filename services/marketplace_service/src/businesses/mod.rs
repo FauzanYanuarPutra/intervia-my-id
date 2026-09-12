@@ -33,6 +33,8 @@ mod public_commerce_routes;
 #[cfg(test)]
 mod public_commerce_tests;
 #[cfg(test)]
+mod public_media_projection_tests;
+#[cfg(test)]
 mod recipe_sales_versioning_tests;
 #[cfg(test)]
 mod recipe_versioning_persistence_tests;
