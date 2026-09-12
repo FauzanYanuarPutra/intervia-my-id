@@ -1,9 +1,9 @@
+use super::media::BusinessImageInput;
 use super::products::{
     stock_health, validate_create_request, AdjustBusinessInventoryRequest,
     CreateBusinessProductRequest, ProductRepository, ProductRepositoryError, ProductSourceType,
     ProductStockMode, UpdateBusinessProductRequest,
 };
-use super::media::BusinessImageInput;
 use super::repository::BusinessRepository;
 use serde_json::json;
 use sqlx::PgPool;
@@ -129,17 +129,18 @@ async fn canonical_product_is_persisted_and_tenant_scoped(pool: PgPool) {
     assert_eq!(mine.len(), 1);
     assert_eq!(mine[0].id, created.id);
 
-    let public_projection: (Uuid, i64, i32, bool, Option<String>, serde_json::Value) = sqlx::query_as(
-        r#"
+    let public_projection: (Uuid, i64, i32, bool, Option<String>, serde_json::Value) =
+        sqlx::query_as(
+            r#"
         SELECT store_id, price_cents, stock_qty, is_available, image_url, metadata
         FROM umkm_products
         WHERE id = $1
         "#,
-    )
-    .bind(created.id)
-    .fetch_one(&pool)
-    .await
-    .expect("public storefront product projection");
+        )
+        .bind(created.id)
+        .fetch_one(&pool)
+        .await
+        .expect("public storefront product projection");
     assert_eq!(public_projection.0, store_id);
     assert_eq!(public_projection.1, 1_000_000);
     assert_eq!(public_projection.2, 2);
