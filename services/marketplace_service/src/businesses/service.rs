@@ -265,13 +265,12 @@ impl BusinessService {
                         .map_err(map_identity_error)?;
                     require_business_manager(organization)?.id
                 }
-                1 => require_business_manager(
-                    organizations
-                        .into_iter()
-                        .next()
-                        .expect("one organization"),
-                )?
-                .id,
+                1 => {
+                    require_business_manager(
+                        organizations.into_iter().next().expect("one organization"),
+                    )?
+                    .id
+                }
                 _ => return Err(BusinessServiceError::ReconciliationSelectionRequired),
             }
         };
@@ -340,10 +339,7 @@ impl BusinessService {
                         require_business_manager(organization)
                     }
                     1 => require_business_manager(
-                        organizations
-                            .into_iter()
-                            .next()
-                            .expect("one organization"),
+                        organizations.into_iter().next().expect("one organization"),
                     ),
                     _ => Err(BusinessServiceError::OrganizationSelectionRequired),
                 }
