@@ -46,17 +46,16 @@ export function BusinessImageCropUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [source, setSource] = useState<{ image: HTMLImageElement; url: string; name: string } | null>(null);
-  const [previewUrl, setPreviewUrl] = useState(currentUrl ?? '');
+  const [previewOverride, setPreviewOverride] = useState<{ sourceUrl?: string; url: string } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [horizontal, setHorizontal] = useState(0);
   const [vertical, setVertical] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    setPreviewUrl(currentUrl ?? '');
-  }, [currentUrl]);
+  const previewUrl = previewOverride?.sourceUrl === currentUrl
+    ? previewOverride.url
+    : currentUrl ?? '';
 
   useEffect(() => {
     if (!source || !canvasRef.current) return;
@@ -155,7 +154,7 @@ export function BusinessImageCropUpload({
       if (!response.ok || !result.media) {
         throw new Error(result.error || 'Foto belum berhasil diunggah.');
       }
-      setPreviewUrl(result.media.url);
+      setPreviewOverride({ sourceUrl: currentUrl, url: result.media.url });
       setSuccess(productId || kind !== 'product' ? 'Foto tersimpan.' : 'Foto siap disimpan bersama produk.');
       onUploaded?.(result.media);
       if (kind !== 'product' || productId) {
