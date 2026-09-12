@@ -2,147 +2,145 @@
 
 ## Goal
 
-Make collaboration in Lajukan Usaha obvious and reliable: a user can own businesses, join other people's businesses, receive invitations from anywhere in the portal, accept or reject them, and always understand which business they own versus which business they joined and what role they hold.
+Make collaboration in Lajukan Usaha obvious and reliable: one account can own businesses, join businesses owned by other people, receive invitations from anywhere in the portal, accept or reject them, and always understand its role and access boundary.
 
 ## Product principles
 
 1. One Lajukan account may own multiple businesses and join multiple businesses owned by other people.
-2. Pending invitations never grant business access. Access starts only after acceptance.
+2. A pending invitation never grants access. Membership starts only after acceptance.
 3. Identity Service is the source of truth for organization membership, roles, and invitations.
 4. Marketplace Service remains the source of truth for canonical business/store data.
-5. Usaha combines those sources for presentation; it must not maintain a second membership or invitation store in Marketplace metadata.
-6. Users should not need to understand technical terms such as organization, tenant, or workspace.
-7. All permission-sensitive menus and actions continue to derive from the user's canonical role.
-8. The feature must work across desktop and mobile portal layouts and remain understandable with one or many businesses.
-
-## Current gaps
-
-- Identity already supports creating, listing received, accepting, and rejecting organization invitations, but the recipient invitation UI is only surfaced on the home page.
-- PortalShell has no global invitation indicator, so recipients can navigate elsewhere without seeing an invitation.
-- BusinessSwitcher and PortfolioPanel flatten all accessible businesses into one list, making ownership versus membership ambiguous.
-- Team page reads `teamMembers` and `invites` from Marketplace metadata, which can be empty or stale even when Identity has canonical membership/invitation records.
-- There is no dedicated account-level place to inspect pending collaboration access.
+5. Usaha composes those sources for presentation; it does not create a second member/invitation store in Marketplace metadata.
+6. Users see human language such as `Milik saya`, `Saya ikuti`, `Pemilik`, `Manager`, `Kasir`, and `Pantau`, not organization/tenant implementation details.
+7. Relationship labels are presentation only. Authorization continues to use the canonical normalized role and permission map.
+8. Failures in invitation UI must not crash normal portal navigation.
 
 ## Canonical model
 
 ### Business relationship
 
-Expose a presentation-safe relationship on each `BusinessRecord`:
+Presentation helpers classify each accessible business as:
 
-- `owned`: the authenticated actor is the organization owner.
-- `joined`: the actor has active organization membership but is not the owner.
+- `owned`: the authenticated actor is the owner; normalized `currentRole` is `owner`.
+- `joined`: the actor has active access through organization membership but does not own the business.
 
-`currentRole` remains the authority for feature permissions (`owner`, `manager`, `cashier`, `viewer`). Relationship is for user comprehension, not authorization.
+`BusinessRecord.relationship` is additive for typed callers; legacy records safely fall back to the normalized role so existing fixtures and older payloads remain compatible.
 
 ### Invitation states
 
-Use canonical Identity invitation states. The recipient-facing API exposes pending invitations that have not expired. Team-facing organization invitation history exposes `pending`, `accepted`, `rejected`, and `expired` for display. UI copy maps them to Indonesian labels: `Menunggu`, `Diterima`, `Ditolak`, `Kedaluwarsa`.
+Identity remains authoritative for invitation lifecycle. Recipient-facing reads return pending, unexpired invitations. Manager-facing history exposes existing statuses and projects an expired pending invitation as `expired` for display.
+
+UI labels are:
+
+- `pending` → `Menunggu`
+- `accepted` → `Diterima`
+- `rejected`/`declined` → `Ditolak`
+- `expired` → `Kedaluwarsa`
 
 ### Membership and invitation ownership
 
-- Identity Service stores and returns organization members and organization invitations.
-- Usaha Team page queries Identity through Usaha server/API helpers using `business.organizationId` after checking the current actor can view the business.
-- No new Marketplace metadata fields are added for team membership or invitations.
+- Identity stores organization users and organization invitations.
+- Usaha Team reads canonical members from `GET /organizations/{id}/members`.
+- Usaha Team reads canonical invitation history from the existing invitation collection endpoint using an authorized organization scope.
+- Marketplace metadata is no longer treated as the canonical Team directory.
 
 ## User experience
 
 ### Global invitation awareness
 
-Every authenticated PortalShell shows an invitation button using a bell/mail icon. It fetches pending invitations from `/api/team/invitations` and displays a numeric badge when count > 0. Opening it shows a compact list of pending invitations with business name, role, expiry, and a link to the dedicated access page.
+Every authenticated `PortalShell` shows an invitation bell. It reads `/api/team/invitations`, displays a numeric badge, and previews pending invitations with business name, role, and expiry.
 
-The control must not block normal navigation if the invitation endpoint temporarily fails. Errors appear inside the invitation surface, not as a portal-wide crash.
+The indicator refreshes:
+
+- on initial mount;
+- when the browser window regains focus;
+- every 60 seconds while the page remains open;
+- immediately after an invitation is accepted or rejected through the shared `lajukan:invitations-changed` browser event.
+
+An invitation endpoint failure stays inside the indicator and does not block the portal.
 
 ### Dedicated `Undangan & akses` page
 
-Add `/access` as an account-level page, not business-scoped. It shows:
+`/access` is account-scoped rather than business-scoped. It shows pending invitations with `Terima & ikut usaha` and `Tolak`, explains that pending invitations do not grant access, and shows the account's currently accessible businesses.
 
-- pending invitations with business name, role, expiry, `Terima` and `Tolak` actions;
-- a short explanation that an accepted business will appear automatically in the user's business list;
-- after acceptance, refresh business data and offer `Buka usaha` when the newly accessible business can be resolved;
-- empty state when there is no pending invitation.
+After accept/reject the local invitation disappears, the global badge refreshes immediately, and `router.refresh()` asks the server for the latest accessible-business portfolio. If downstream business projection is not immediate, the success message explicitly says access may appear after synchronization instead of inventing a business URL.
 
-The existing home invitation component may be replaced by a compact callout or reuse the same invitation list logic to avoid duplicate behavior.
+### Business switcher and portfolio
 
-### Business switcher
-
-BusinessSwitcher groups accessible businesses into:
+Both components use the same grouping helper and present two sections:
 
 - `Milik saya`
 - `Saya ikuti`
 
-Each business item shows its role badge. Owned businesses show `Pemilik`; joined businesses show the normalized role (`Manager`, `Kasir`, `Pantau`). The create CTA is renamed to `Buat usaha baru` so it is not confused with joining an existing business.
-
-### Portfolio / home
-
-Rename `Usaha yang kamu kelola` to `Usaha saya`. Group cards under `Milik saya` and `Saya ikuti`. Preserve the active-business indicator and role information.
+Each business displays a normalized role badge. Creation uses the wording `Buat usaha baru` so creating a business is not confused with joining someone else's business.
 
 ### Team page
 
-Team page displays canonical Identity members and sent invitation history for the active business organization. Owner/manager permissions remain enforced by backend and portal permission checks. The page distinguishes active members from invitation history and uses human-readable invitation states.
+The Team page keeps invite creation permission-gated, but member and invitation display comes from Identity canonical data. It shows:
 
-## Backend/API changes
+- active-member count;
+- pending-invitation count;
+- canonical member identity and role;
+- sent-invitation history with human status labels;
+- a repair-oriented synchronization error instead of a fabricated empty directory when Identity/linkage is unavailable.
 
-### Identity Service
+## Identity API
 
-Extend organization invitation routes with a manager-authorized organization-scoped listing endpoint:
-
-`GET /organizations/{organization_id}/invitations`
-
-Response fields include invitation id, organization id/name, invitee user id/username, role, status, expires_at, created_at, and responded_at where available. Expired pending rows are exposed as `expired` in the view without granting access.
-
-Authorization: organization owner, `org_admin`, or `org_manager` may list invitations for that organization. Other members receive 403.
-
-Existing recipient endpoints remain:
+Existing recipient endpoints remain unchanged:
 
 - `GET /organization-invitations`
 - `POST /organization-invitations/{id}/accept`
 - `POST /organization-invitations/{id}/reject`
 
-### Usaha API/server layer
+The existing list endpoint also supports manager history mode:
 
-Add typed helpers/proxies for:
+`GET /organization-invitations?organization_id=<uuid>`
 
-- current user's pending invitations;
-- organization members;
-- organization invitation history.
+When `organization_id` is present, Identity requires an active organization member who is the owner, `org_admin`, or `org_manager`. Unauthorized roles receive 403. The query returns invitation history for that organization only and converts pending rows past their expiry to the display status `expired`.
 
-All proxies forward the existing bearer token and use `no-store`. Business-scoped Team APIs first resolve the business for the current actor and require its canonical `organizationId` before contacting Identity.
+This reuses one invitation collection contract instead of adding a duplicate organization-invitation route.
 
-## Error handling
+## Usaha server layer
 
-- Invalid/expired invitation response: surface a friendly message and refresh the pending list.
-- Invitation endpoint unavailable: show a localized inline error; do not hide existing businesses or crash PortalShell.
-- Business has no organization linkage: Team page shows a repair-oriented state instead of fake empty members.
-- Accepted invitation whose business projection is not immediately available: show acceptance success and advise refresh; do not fabricate a business URL.
+`business-collaboration-server.ts` first resolves the business for the authenticated actor, requires a canonical `organizationId`, forwards the current bearer token to Identity with `no-store`, and parses typed member/invitation responses.
+
+The browser continues to use the existing same-origin invitation proxy for the current user's incoming invitations and accept/reject actions. No Identity bearer token is exposed to client code.
 
 ## Security and rights
 
-- Accept/reject operations remain limited to the invitation's invitee user id.
-- Sent-invitation history requires owner/admin/manager authorization in Identity.
+- Accept/reject remains limited to the invitation's `invitee_user_id`.
+- Organization invitation history is limited to owner/admin/manager in Identity.
+- Team page remains hidden from cashier/viewer by the Usaha permission map, while Identity still enforces its own boundary.
 - Relationship labels never grant permissions.
-- Business membership remains tenant-scoped by organization id.
-- No user may see another organization's invitation history without canonical membership and management rights.
-- Pending invitations never appear in the business switcher.
+- Membership remains scoped by organization id.
+- Pending invitations never appear in the accessible-business switcher.
+- No Marketplace metadata field can independently grant Team access.
 
-## Testing
+## Error handling
+
+- Expired/already-processed invitation: display the upstream failure and refresh on the next normal invitation load.
+- Invitation list unavailable: show an inline notification error, not a portal crash.
+- Missing business/organization link: canonical Team reader fails closed and the Team page renders a synchronization-repair state.
+- Business projection lag after acceptance: report successful acceptance and synchronization delay honestly.
+
+## Verification requirements
 
 ### Identity
 
-- authorized owner/admin/manager can list organization invitations;
-- cashier/viewer cannot list organization invitation history;
-- expired pending invitations render as expired;
-- accept creates/activates organization membership and updates invitation status;
-- reject does not create membership.
+- invitation status contract covers pending, accepted, rejected, and expired projection;
+- `cargo fmt --check` passes;
+- Clippy passes with warnings denied;
+- full Identity tests pass.
 
 ### Usaha
 
-- relationship derivation returns `owned` for owner and `joined` for non-owner member;
-- BusinessSwitcher separates owned and joined businesses;
-- PortfolioPanel separates owned and joined businesses;
-- invitation badge/list parses pending invitation payloads and role labels;
-- access page acceptance/rejection refresh behavior is covered by pure helpers/component tests where practical;
-- Team page adapters map canonical Identity member/invitation payloads without relying on Marketplace metadata.
+- collaboration grouping and Indonesian labels are unit-tested;
+- invitation parsing, badge counting, and expiry presentation are unit-tested;
+- all existing Usaha tests remain green;
+- TypeScript typecheck passes;
+- production build passes;
+- Business OS architecture/gate passes.
 
 ## Rollout
 
-Implement on an isolated feature branch. Run focused Rust and Usaha tests first, then Usaha typecheck/build and repository CI. Merge only after inspecting the exact branch head and reconciling any conflict with newer `main`.
+Implement on `feat/usaha-collaboration-ux`, review the exact PR head, reconcile if `main` moves, and squash-merge to `main`. Known infrastructure-only workflow failures may be handled separately only if feature-specific Identity/Usaha checks remain green and the repository owner explicitly authorizes merging despite the unrelated gate.
