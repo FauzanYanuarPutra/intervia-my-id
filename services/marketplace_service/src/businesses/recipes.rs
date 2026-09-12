@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use serde::Serialize;
 use serde_json::json;
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -40,23 +39,6 @@ impl From<GovernanceError> for RecipeRepositoryError {
             GovernanceError::Database => Self::Database,
         }
     }
-}
-
-#[derive(Debug, Clone, FromRow, Serialize)]
-pub(crate) struct RecipeVersionRecord {
-    pub(crate) id: Uuid,
-    pub(crate) organization_id: Uuid,
-    pub(crate) business_id: Uuid,
-    pub(crate) product_id: Uuid,
-    pub(crate) version_number: i64,
-    pub(crate) name: String,
-    pub(crate) servings: Decimal,
-    pub(crate) status: String,
-    pub(crate) effective_from: DateTime<Utc>,
-    pub(crate) effective_until: Option<DateTime<Utc>>,
-    pub(crate) published_by_user_id: Uuid,
-    pub(crate) superseded_by_version_id: Option<Uuid>,
-    pub(crate) reason: String,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -379,6 +361,27 @@ pub(crate) async fn resolve_effective_recipe(
             servings,
             items,
         }));
+    }
+
+    // Once immutable history exists, a timestamp that does not match any
+    // published interval must fail closed. Falling back to the mutable legacy
+    // projection here would fabricate historical evidence for that date.
+    let has_immutable_history = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS(
+          SELECT 1
+          FROM business_recipe_versions
+          WHERE business_id=$1 AND organization_id=$2 AND product_id=$3
+        )
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(product_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if has_immutable_history {
+        return Ok(None);
     }
 
     let legacy = sqlx::query_as::<_, (Uuid, i64, String, Decimal)>(
