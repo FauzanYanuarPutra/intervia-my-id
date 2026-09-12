@@ -46,7 +46,10 @@ pub(crate) fn validate_business_image(
     }
 
     let mime_type = input.mime_type.trim().to_ascii_lowercase();
-    if !matches!(mime_type.as_str(), "image/webp" | "image/jpeg" | "image/png") {
+    if !matches!(
+        mime_type.as_str(),
+        "image/webp" | "image/jpeg" | "image/png"
+    ) {
         return Err(MediaValidationError::MimeType);
     }
     if !(MIN_IMAGE_DIMENSION..=MAX_IMAGE_DIMENSION).contains(&input.width)
@@ -57,7 +60,9 @@ pub(crate) fn validate_business_image(
 
     let valid_ratio = match kind {
         BusinessImageKind::Logo | BusinessImageKind::Product => input.width == input.height,
-        BusinessImageKind::Banner => input.width.saturating_mul(3) == input.height.saturating_mul(8),
+        BusinessImageKind::Banner => {
+            input.width.saturating_mul(3) == input.height.saturating_mul(8)
+        }
     };
     if !valid_ratio {
         return Err(MediaValidationError::AspectRatio);
@@ -84,9 +89,9 @@ pub(crate) fn valid_internal_media_url(value: &str) -> bool {
             .chars()
             .next()
             .is_some_and(|character| character.is_ascii_alphanumeric())
-        && filename
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-'))
+        && filename.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+        })
 }
 
 impl ValidatedBusinessImage {
@@ -167,8 +172,17 @@ mod tests {
         let banner_metadata = banner.public_metadata(BusinessImageKind::Banner);
 
         assert!(logo_metadata.get("store_photo_url").is_none());
-        assert_eq!(logo_metadata["image_url"], "/api/forum/media/business-image.webp");
-        assert_eq!(banner_metadata["store_photo_url"], "/api/forum/media/business-image.webp");
-        assert_eq!(banner_metadata["banner_url"], "/api/forum/media/business-image.webp");
+        assert_eq!(
+            logo_metadata["image_url"],
+            "/api/forum/media/business-image.webp"
+        );
+        assert_eq!(
+            banner_metadata["store_photo_url"],
+            "/api/forum/media/business-image.webp"
+        );
+        assert_eq!(
+            banner_metadata["banner_url"],
+            "/api/forum/media/business-image.webp"
+        );
     }
 }
