@@ -3,6 +3,9 @@ use super::domain::{
     ValidatedBusinessProfileUpdate, ValidatedProvisionCommand,
 };
 use super::products::{ProductRepository, ProductRepositoryError};
+use super::profile::{
+    BusinessCapabilityRecord, BusinessProfileRecord, ResolvedBusinessProfile,
+};
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use sha2::Digest;
@@ -117,6 +120,18 @@ impl BusinessRepository {
         .execute(&mut *transaction)
         .await?;
 
+        // The compatibility trigger creates a safe legacy profile for callers that do not
+        // know about templates. Canonical provisioning immediately replaces that snapshot
+        // with the fully validated profile inside this same transaction.
+        apply_profile_in_transaction(
+            &mut transaction,
+            business_id,
+            organization_id,
+            actor_id,
+            &command.profile,
+        )
+        .await?;
+
         sqlx::query(
             r#"
             INSERT INTO umkm_stores (
@@ -191,10 +206,12 @@ impl BusinessRepository {
         )
         .bind(business_id.to_string())
         .bind(json!({
-            "event_version": 1,
+            "event_version": 2,
             "business_id": business_id,
             "organization_id": organization_id,
             "store_id": store_id,
+            "template_key": command.profile.template_key,
+            "template_version": command.profile.template_version,
             "version": 1
         }))
         .execute(&mut *transaction)
@@ -301,8 +318,10 @@ impl BusinessRepository {
                   ),
                 updated_at = NOW()
             FROM business_store_links link
+            JOIN businesses business ON business.id = link.business_id
             WHERE link.store_id = store.id
               AND link.business_id = $11
+              AND business.organization_id = $12
               AND link.link_type = 'primary'
             "#,
         )
@@ -317,6 +336,7 @@ impl BusinessRepository {
         .bind(&command.schedule)
         .bind(&command.location_query)
         .bind(business_id)
+        .bind(organization_id)
         .execute(&mut *transaction)
         .await?
         .rows_affected();
@@ -336,7 +356,7 @@ impl BusinessRepository {
                 whatsapp = $6,
                 public_visibility = $7,
                 updated_at = NOW()
-            WHERE business_id = $8 AND is_primary
+            WHERE business_id = $8 AND organization_id = $9 AND is_primary
             "#,
         )
         .bind(&command.primary_location.name)
@@ -347,6 +367,7 @@ impl BusinessRepository {
         .bind(&command.primary_location.phone)
         .bind(command.primary_location.public_visibility)
         .bind(business_id)
+        .bind(organization_id)
         .execute(&mut *transaction)
         .await?
         .rows_affected();
@@ -583,6 +604,88 @@ impl BusinessRepository {
     }
 }
 
+async fn apply_profile_in_transaction(
+    transaction: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    actor_id: Uuid,
+    profile: &ResolvedBusinessProfile,
+) -> Result<(), RepositoryError> {
+    let profile_updated = sqlx::query(
+        r#"
+        UPDATE business_profiles
+        SET template_key = $3,
+            template_version = $4,
+            currency = $5,
+            timezone = $6,
+            costing_policy = $7,
+            accounting_mode = $8,
+            approval_policy = $9,
+            branch_mode = $10,
+            negative_stock_policy = $11,
+            document_prefix = $12,
+            updated_by_user_id = $13,
+            version = 1,
+            updated_at = NOW()
+        WHERE business_id = $1 AND organization_id = $2
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(&profile.template_key)
+    .bind(profile.template_version)
+    .bind(&profile.currency)
+    .bind(&profile.timezone)
+    .bind(&profile.costing_policy)
+    .bind(&profile.accounting_mode)
+    .bind(&profile.approval_policy)
+    .bind(&profile.branch_mode)
+    .bind(&profile.negative_stock_policy)
+    .bind(&profile.document_prefix)
+    .bind(actor_id)
+    .execute(&mut **transaction)
+    .await?
+    .rows_affected();
+    if profile_updated != 1 {
+        return Err(RepositoryError::IncompleteAggregate);
+    }
+
+    sqlx::query(
+        "DELETE FROM business_capabilities WHERE business_id = $1 AND organization_id = $2",
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .execute(&mut **transaction)
+    .await?;
+
+    let inserted = sqlx::query(
+        r#"
+        INSERT INTO business_capabilities (
+          business_id, organization_id, capability_key, enabled, source,
+          created_by_user_id, updated_by_user_id
+        )
+        SELECT $1, $2, mapping.capability_key, TRUE, 'template', $5, $5
+        FROM business_template_capabilities mapping
+        WHERE mapping.template_key = $3
+          AND mapping.template_version = $4
+          AND mapping.enabled_by_default
+        ORDER BY mapping.capability_key
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(&profile.template_key)
+    .bind(profile.template_version)
+    .bind(actor_id)
+    .execute(&mut **transaction)
+    .await?
+    .rows_affected();
+    if inserted == 0 {
+        return Err(RepositoryError::IncompleteAggregate);
+    }
+    Ok(())
+}
+
 #[derive(Debug, FromRow)]
 struct ExistingProvisionRow {
     id: Uuid,
@@ -650,13 +753,15 @@ async fn load_aggregate(
     organization_id: Uuid,
 ) -> Result<BusinessAggregate, RepositoryError> {
     let business = fetch_business(db, business_id, organization_id).await?;
-    let store = fetch_store(db, business_id).await?;
-    let location = fetch_location(db, business_id).await?;
+    let profile = fetch_profile(db, business_id, organization_id).await?;
+    let capabilities = fetch_capabilities(db, business_id, organization_id).await?;
+    let store = fetch_store(db, business_id, organization_id).await?;
+    let location = fetch_location(db, business_id, organization_id).await?;
     let products = ProductRepository::new(db.clone())
         .list_for_business(business_id, organization_id)
         .await
         .map_err(map_product_repository_error)?;
-    build_aggregate(business, store, location, products)
+    build_aggregate(business, profile, capabilities, store, location, products)
 }
 
 async fn load_aggregate_in_transaction(
@@ -669,12 +774,24 @@ async fn load_aggregate_in_transaction(
         .bind(organization_id)
         .fetch_optional(&mut **transaction)
         .await?;
+    let profile = sqlx::query_as::<_, BusinessProfileRecord>(PROFILE_QUERY)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut **transaction)
+        .await?;
+    let capabilities = sqlx::query_as::<_, BusinessCapabilityRecord>(CAPABILITIES_QUERY)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_all(&mut **transaction)
+        .await?;
     let store = sqlx::query_as::<_, StoreRow>(STORE_QUERY)
         .bind(business_id)
+        .bind(organization_id)
         .fetch_optional(&mut **transaction)
         .await?;
     let location = sqlx::query_as::<_, LocationRow>(LOCATION_QUERY)
         .bind(business_id)
+        .bind(organization_id)
         .fetch_optional(&mut **transaction)
         .await?;
     let products = ProductRepository::list_for_business_in_transaction(
@@ -684,7 +801,7 @@ async fn load_aggregate_in_transaction(
     )
     .await
     .map_err(map_product_repository_error)?;
-    build_aggregate(business, store, location, products)
+    build_aggregate(business, profile, capabilities, store, location, products)
 }
 
 async fn fetch_business(
@@ -699,9 +816,38 @@ async fn fetch_business(
         .await
 }
 
-async fn fetch_store(db: &PgPool, business_id: Uuid) -> Result<Option<StoreRow>, sqlx::Error> {
+async fn fetch_profile(
+    db: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Result<Option<BusinessProfileRecord>, sqlx::Error> {
+    sqlx::query_as(PROFILE_QUERY)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(db)
+        .await
+}
+
+async fn fetch_capabilities(
+    db: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Result<Vec<BusinessCapabilityRecord>, sqlx::Error> {
+    sqlx::query_as(CAPABILITIES_QUERY)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_all(db)
+        .await
+}
+
+async fn fetch_store(
+    db: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+) -> Result<Option<StoreRow>, sqlx::Error> {
     sqlx::query_as(STORE_QUERY)
         .bind(business_id)
+        .bind(organization_id)
         .fetch_optional(db)
         .await
 }
@@ -709,20 +855,25 @@ async fn fetch_store(db: &PgPool, business_id: Uuid) -> Result<Option<StoreRow>,
 async fn fetch_location(
     db: &PgPool,
     business_id: Uuid,
+    organization_id: Uuid,
 ) -> Result<Option<LocationRow>, sqlx::Error> {
     sqlx::query_as(LOCATION_QUERY)
         .bind(business_id)
+        .bind(organization_id)
         .fetch_optional(db)
         .await
 }
 
 fn build_aggregate(
     business: Option<BusinessRow>,
+    profile: Option<BusinessProfileRecord>,
+    capabilities: Vec<BusinessCapabilityRecord>,
     store: Option<StoreRow>,
     location: Option<LocationRow>,
     products: Vec<super::products::BusinessProduct>,
 ) -> Result<BusinessAggregate, RepositoryError> {
     let business = business.ok_or(RepositoryError::IncompleteAggregate)?;
+    let profile = profile.ok_or(RepositoryError::IncompleteAggregate)?;
     let store = store.ok_or(RepositoryError::IncompleteAggregate)?;
     let location = location.ok_or(RepositoryError::IncompleteAggregate)?;
     Ok(BusinessAggregate {
@@ -736,6 +887,8 @@ fn build_aggregate(
             created_at: business.created_at,
             updated_at: business.updated_at,
         },
+        profile,
+        capabilities,
         primary_store: BusinessStore {
             id: store.id,
             name: store.name,
@@ -783,18 +936,38 @@ const BUSINESS_QUERY: &str = r#"
     WHERE id = $1 AND organization_id = $2 AND status <> 'archived'
 "#;
 
+const PROFILE_QUERY: &str = r#"
+    SELECT business_id, organization_id, template_key, template_version,
+           currency, timezone, costing_policy, accounting_mode, approval_policy,
+           branch_mode, negative_stock_policy, business_day_cutoff,
+           document_prefix, version, created_at, updated_at
+    FROM business_profiles
+    WHERE business_id = $1 AND organization_id = $2
+"#;
+
+const CAPABILITIES_QUERY: &str = r#"
+    SELECT business_id, organization_id, capability_key, enabled, source,
+           created_at, updated_at
+    FROM business_capabilities
+    WHERE business_id = $1 AND organization_id = $2
+    ORDER BY capability_key
+"#;
+
 const STORE_QUERY: &str = r#"
     SELECT s.id, s.name, s.slug, s.description, s.city, s.address, s.lat, s.lng,
            s.phone, s.is_active, s.online_order_enabled, s.offline_order_enabled, s.metadata,
            s.created_at, s.updated_at
     FROM umkm_stores s
     JOIN business_store_links l ON l.store_id = s.id
-    WHERE l.business_id = $1 AND l.link_type = 'primary'
+    JOIN businesses b ON b.id = l.business_id
+    WHERE l.business_id = $1
+      AND b.organization_id = $2
+      AND l.link_type = 'primary'
 "#;
 
 const LOCATION_QUERY: &str = r#"
     SELECT id, store_id, name, address, city, lat, lng, phone, status,
            is_primary, public_visibility, created_at, updated_at
     FROM business_locations
-    WHERE business_id = $1 AND is_primary
+    WHERE business_id = $1 AND organization_id = $2 AND is_primary
 "#;

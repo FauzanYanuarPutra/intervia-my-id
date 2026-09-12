@@ -111,6 +111,7 @@ async fn legacy_business_insert_receives_a_general_profile_and_capabilities(pool
             "payments",
             "reporting",
             "sales",
+            "supporting_documents",
         ]
     );
 }
