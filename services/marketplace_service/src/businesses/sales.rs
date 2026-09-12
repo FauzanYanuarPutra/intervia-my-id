@@ -240,14 +240,8 @@ impl SaleRepository {
         let mut cogs_amount = 0_i64;
 
         for line in &normalized.lines {
-            let prepared_line = prepare_line(
-                &mut tx,
-                business_id,
-                organization_id,
-                effective_at,
-                line,
-            )
-            .await?;
+            let prepared_line =
+                prepare_line(&mut tx, business_id, organization_id, effective_at, line).await?;
             let line_gross = prepared_line
                 .final_revenue_amount
                 .checked_add(prepared_line.discount_amount)
