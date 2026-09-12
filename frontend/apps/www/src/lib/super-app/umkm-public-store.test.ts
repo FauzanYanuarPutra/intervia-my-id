@@ -79,6 +79,28 @@ describe('public UMKM store projection', () => {
     expect(projected.metadata).not.toHaveProperty('selected_location');
   });
 
+  it('keeps owner-uploaded brand media public for storefront rendering', () => {
+    const projected = projectPublicUmkmStore(
+      makeStore({
+        metadata: {
+          logo_url: '/api/forum/media/logo-lajukan.webp',
+          banner_url: '/api/forum/media/banner-lajukan.webp',
+          cover_image_url: '/api/forum/media/banner-lajukan.webp',
+          store_photo_url: '/api/forum/media/banner-lajukan.webp',
+          internal_note: 'do not expose',
+        },
+      }),
+    );
+
+    expect(projected.metadata).toMatchObject({
+      logo_url: '/api/forum/media/logo-lajukan.webp',
+      banner_url: '/api/forum/media/banner-lajukan.webp',
+      cover_image_url: '/api/forum/media/banner-lajukan.webp',
+      store_photo_url: '/api/forum/media/banner-lajukan.webp',
+    });
+    expect(projected.metadata).not.toHaveProperty('internal_note');
+  });
+
   it('keeps an owner-published contact only with explicit consent and source', () => {
     const projected = projectPublicUmkmStore(
       makeStore({

@@ -7,6 +7,7 @@ const PUBLIC_METADATA_KEYS = [
   'cover_image_url',
   'cover_url',
   'banner_url',
+  'logo_url',
   'image_url',
   'imageUrl',
   'image',
