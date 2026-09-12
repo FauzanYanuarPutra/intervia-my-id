@@ -252,17 +252,17 @@ impl ProductRepository {
             command.stock_count,
         ))
         .bind(image.map(|value| &value.url))
-        .bind(public_metadata(
+        .bind(public_metadata(PublicProductMetadata {
             product_id,
             business_id,
-            &command.price_label,
-            command.source_type.as_str(),
-            command.stock_mode.as_str(),
-            command.stock_count,
-            image.map(|value| value.mime_type.as_str()),
-            image.map(|value| value.width),
-            image.map(|value| value.height),
-        ))
+            price_label: &command.price_label,
+            source_type: command.source_type.as_str(),
+            stock_mode: command.stock_mode.as_str(),
+            stock_count: command.stock_count,
+            image_mime_type: image.map(|value| value.mime_type.as_str()),
+            image_width: image.map(|value| value.width),
+            image_height: image.map(|value| value.height),
+        }))
         .execute(&mut *transaction)
         .await?;
 
@@ -516,17 +516,17 @@ async fn sync_public_projection(
 ) -> Result<(), ProductRepositoryError> {
     let price_cents = price_label_to_cents(&row.price_label);
     let stock_qty = storefront_stock_quantity(row.stock_count);
-    let metadata = public_metadata(
-        row.id,
+    let metadata = public_metadata(PublicProductMetadata {
+        product_id: row.id,
         business_id,
-        &row.price_label,
-        &row.source_type,
-        &row.stock_mode,
-        row.stock_count,
-        row.image_mime_type.as_deref(),
-        row.image_width,
-        row.image_height,
-    );
+        price_label: &row.price_label,
+        source_type: &row.source_type,
+        stock_mode: &row.stock_mode,
+        stock_count: row.stock_count,
+        image_mime_type: row.image_mime_type.as_deref(),
+        image_width: row.image_width,
+        image_height: row.image_height,
+    });
     let result = sqlx::query(
         r#"
         UPDATE umkm_products
@@ -617,28 +617,30 @@ fn storefront_is_available(status: &str, price_cents: i64, stock_count: Option<f
     status == "active" && price_cents > 0 && stock_count != Some(0.0)
 }
 
-fn public_metadata(
+struct PublicProductMetadata<'a> {
     product_id: Uuid,
     business_id: Uuid,
-    price_label: &str,
-    source_type: &str,
-    stock_mode: &str,
+    price_label: &'a str,
+    source_type: &'a str,
+    stock_mode: &'a str,
     stock_count: Option<f64>,
-    image_mime_type: Option<&str>,
+    image_mime_type: Option<&'a str>,
     image_width: Option<i32>,
     image_height: Option<i32>,
-) -> serde_json::Value {
+}
+
+fn public_metadata(input: PublicProductMetadata<'_>) -> serde_json::Value {
     json!({
-        "canonical_business_product_id": product_id,
-        "canonical_business_id": business_id,
-        "price_label": price_label,
-        "source_type": source_type,
-        "stock_mode": stock_mode,
-        "stock_known": stock_count.is_some(),
-        "image_media": image_mime_type.map(|mime_type| json!({
+        "canonical_business_product_id": input.product_id,
+        "canonical_business_id": input.business_id,
+        "price_label": input.price_label,
+        "source_type": input.source_type,
+        "stock_mode": input.stock_mode,
+        "stock_known": input.stock_count.is_some(),
+        "image_media": input.image_mime_type.map(|mime_type| json!({
             "mime_type": mime_type,
-            "width": image_width,
-            "height": image_height,
+            "width": input.image_width,
+            "height": input.image_height,
         })),
     })
 }
