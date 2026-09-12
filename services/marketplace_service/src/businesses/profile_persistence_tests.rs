@@ -11,11 +11,7 @@ use super::{
     repository::{BusinessRepository, RepositoryError},
 };
 
-fn request(
-    organization_id: Uuid,
-    template_key: &str,
-    name: &str,
-) -> ProvisionBusinessRequest {
+fn request(organization_id: Uuid, template_key: &str, name: &str) -> ProvisionBusinessRequest {
     ProvisionBusinessRequest {
         organization: OrganizationSelection {
             mode: OrganizationMode::Existing,
@@ -126,20 +122,12 @@ async fn aggregate_loading_is_scoped_to_the_owning_organization(pool: PgPool) {
     let actor_id = Uuid::new_v4();
     let organization_id = Uuid::new_v4();
     let other_organization_id = Uuid::new_v4();
-    let command = validate_provision_request(request(
-        organization_id,
-        "ac_field_service",
-        "Lajukan AC",
-    ))
-    .expect("valid AC command");
+    let command =
+        validate_provision_request(request(organization_id, "ac_field_service", "Lajukan AC"))
+            .expect("valid AC command");
 
     let provisioned = repository
-        .provision(
-            actor_id,
-            Uuid::new_v4(),
-            organization_id,
-            &command,
-        )
+        .provision(actor_id, Uuid::new_v4(), organization_id, &command)
         .await
         .expect("provision succeeds");
 
