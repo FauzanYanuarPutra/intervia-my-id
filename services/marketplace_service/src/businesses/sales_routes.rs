@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{user_id_from_auth, AppState};
 
 use super::{
-    identity_client::{IdentityClient, IdentityClientError},
+    identity_client::{IdentityClient, IdentityClientError, OrganizationSummary},
     repository::{BusinessRepository, RepositoryError},
     sales::{CreateSaleRequest, SaleAggregate, SaleRepository, SaleRepositoryError},
 };
@@ -30,7 +30,14 @@ async fn list_sales(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let access = match sales_access_context(&state, &headers, business_id).await {
+    let access = match sales_access_context(
+        &state,
+        &headers,
+        business_id,
+        SalesAccessKind::View,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -60,7 +67,14 @@ async fn create_sale(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateSaleRequest>,
 ) -> Response {
-    let access = match sales_access_context(&state, &headers, business_id).await {
+    let access = match sales_access_context(
+        &state,
+        &headers,
+        business_id,
+        SalesAccessKind::Record,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -104,6 +118,21 @@ async fn create_sale(
 }
 
 #[derive(Debug, Clone, Copy)]
+enum SalesAccessKind {
+    View,
+    Record,
+}
+
+impl SalesAccessKind {
+    fn allows(self, organization: &OrganizationSummary) -> bool {
+        match self {
+            Self::View => organization.can_view_sales(),
+            Self::Record => organization.can_record_sales(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 struct SalesAccessContext {
     actor_id: Uuid,
     organization_id: Uuid,
@@ -114,6 +143,7 @@ async fn sales_access_context(
     state: &AppState,
     headers: &HeaderMap,
     business_id: Uuid,
+    kind: SalesAccessKind,
 ) -> Result<SalesAccessContext, Response> {
     let (actor_id, authorization) =
         actor_and_authorization(state, headers).map_err(actor_auth_error_response)?;
@@ -135,7 +165,7 @@ async fn sales_access_context(
         if business.is_none() {
             continue;
         }
-        if !organization.can_record_sales() {
+        if !kind.allows(&organization) {
             return Err(api_error(
                 StatusCode::FORBIDDEN,
                 "business_sales_access_denied",
@@ -243,6 +273,13 @@ mod tests {
     use chrono::{NaiveDate, Utc};
     use rust_decimal::Decimal;
 
+    fn organization(role: &str) -> OrganizationSummary {
+        OrganizationSummary {
+            id: Uuid::new_v4(),
+            current_user_role: role.to_owned(),
+        }
+    }
+
     #[test]
     fn sale_idempotency_key_is_required_and_must_be_uuid() {
         assert_eq!(parse_idempotency_key(None), Err("missing_idempotency_key"));
@@ -251,6 +288,15 @@ mod tests {
             Err("invalid_idempotency_key")
         );
         assert!(parse_idempotency_key(Some("3d69acb2-aed8-4c48-b62d-30034e0440eb")).is_ok());
+    }
+
+    #[test]
+    fn sale_read_and_write_access_are_intentionally_distinct() {
+        assert!(SalesAccessKind::View.allows(&organization("org_viewer")));
+        assert!(!SalesAccessKind::Record.allows(&organization("org_viewer")));
+        assert!(SalesAccessKind::View.allows(&organization("org_accounting")));
+        assert!(!SalesAccessKind::Record.allows(&organization("org_accounting")));
+        assert!(SalesAccessKind::Record.allows(&organization("org_cashier")));
     }
 
     #[test]
