@@ -212,6 +212,77 @@ async fn active_recipe_blocks_archive(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn effective_published_recipe_version_blocks_archive_even_without_legacy_recipe(pool: PgPool) {
+    let seeded = seed_context(&pool).await;
+    let product_id = Uuid::new_v4();
+    let version_id = Uuid::new_v4();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_products (
+          id, business_id, organization_id, name, category, price_label, status, source_type
+        ) VALUES ($1,$2,$3,'Jus Alpukat V2','Minuman','Rp16.000','active','owned')
+        "#,
+    )
+    .bind(product_id)
+    .bind(seeded.business_id)
+    .bind(seeded.organization_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query(
+        r#"
+        INSERT INTO business_recipe_version_items (
+          organization_id, business_id, recipe_version_id, ingredient_id,
+          quantity, position
+        ) VALUES ($1,$2,$3,$4,120,0)
+        "#,
+    )
+    .bind(seeded.organization_id)
+    .bind(seeded.business_id)
+    .bind(version_id)
+    .bind(seeded.ingredient_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_recipe_versions (
+          id, organization_id, business_id, product_id, version_number,
+          name, servings, status, effective_from, published_by_user_id, reason
+        ) VALUES ($1,$2,$3,$4,1,'Jus Alpukat V2',1,'published',NOW() - INTERVAL '1 minute',$5,'test')
+        "#,
+    )
+    .bind(version_id)
+    .bind(seeded.organization_id)
+    .bind(seeded.business_id)
+    .bind(product_id)
+    .bind(seeded.owner_id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let error = IngredientManagementRepository::new(pool)
+        .archive(
+            seeded.owner_id,
+            seeded.business_id,
+            seeded.organization_id,
+            seeded.ingredient_id,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        IngredientManagementError::Conflict("ingredient_in_active_recipe")
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn unused_ingredient_can_be_archived_without_deleting_history(pool: PgPool) {
     let seeded = seed_context(&pool).await;
     let repository = IngredientManagementRepository::new(pool.clone());
