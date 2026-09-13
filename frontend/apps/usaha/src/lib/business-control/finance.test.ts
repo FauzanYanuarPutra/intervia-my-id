@@ -125,3 +125,77 @@ describe('recurring obligations and safe-to-spend', () => {
     })).toBe(0);
   });
 });
+
+describe('deterministic price health', () => {
+  it('classifies loss, thin, safe and good from deterministic contribution margin', () => {
+    expect(api.buildPriceHealth).toBeTypeOf('function');
+    const buildPriceHealth = api.buildPriceHealth as (input: {
+      sellingPrice: number;
+      unitCost: number | null;
+      feeRateBps?: number;
+      merchantPromoAmount?: number;
+    }) => { status: string; minimumNonLossPrice: number | null };
+
+    expect(buildPriceHealth({ sellingPrice: 9_000, unitCost: 10_000 }).status).toBe('loss');
+    expect(buildPriceHealth({ sellingPrice: 11_000, unitCost: 10_000 }).status).toBe('thin');
+    expect(buildPriceHealth({ sellingPrice: 12_500, unitCost: 10_000 }).status).toBe('safe');
+    expect(buildPriceHealth({ sellingPrice: 15_000, unitCost: 10_000 }).status).toBe('good');
+  });
+
+  it('computes non-loss price after fees and never invents certainty without cost', () => {
+    expect(api.buildPriceHealth).toBeTypeOf('function');
+    const buildPriceHealth = api.buildPriceHealth as (input: {
+      sellingPrice: number;
+      unitCost: number | null;
+      feeRateBps?: number;
+      merchantPromoAmount?: number;
+    }) => { status: string; minimumNonLossPrice: number | null; confidence: string };
+
+    const priced = buildPriceHealth({
+      sellingPrice: 20_000,
+      unitCost: 10_000,
+      feeRateBps: 2000,
+      merchantPromoAmount: 2_000,
+    });
+    expect(priced.minimumNonLossPrice).toBe(15_000);
+
+    const unknown = buildPriceHealth({ sellingPrice: 20_000, unitCost: null });
+    expect(unknown.status).toBe('unknown');
+    expect(unknown.minimumNonLossPrice).toBeNull();
+    expect(unknown.confidence).toBe('low');
+  });
+});
+
+describe('observed material yield', () => {
+  it('uses weighted real observations and reports evidence confidence', () => {
+    expect(api.summarizeObservedYield).toBeTypeOf('function');
+    const summarizeObservedYield = api.summarizeObservedYield as (rows: Array<{
+      inputQuantity: number;
+      outputUnits: number;
+    }>) => { outputPerInput: number | null; evidenceCount: number; confidence: string };
+
+    expect(summarizeObservedYield([
+      { inputQuantity: 1, outputUnits: 6 },
+      { inputQuantity: 2, outputUnits: 13 },
+      { inputQuantity: 1, outputUnits: 7 },
+    ])).toEqual({
+      outputPerInput: 6.5,
+      evidenceCount: 3,
+      confidence: 'medium',
+    });
+  });
+
+  it('does not produce a fake yield when no valid observation exists', () => {
+    expect(api.summarizeObservedYield).toBeTypeOf('function');
+    const summarizeObservedYield = api.summarizeObservedYield as (rows: Array<{
+      inputQuantity: number;
+      outputUnits: number;
+    }>) => { outputPerInput: number | null; evidenceCount: number; confidence: string };
+
+    expect(summarizeObservedYield([])).toEqual({
+      outputPerInput: null,
+      evidenceCount: 0,
+      confidence: 'low',
+    });
+  });
+});
