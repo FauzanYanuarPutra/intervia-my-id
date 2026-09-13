@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-const APP_ROOT = resolve(__dirname, '../..');
+const APP_ROOT = resolve(__dirname, '../../..');
 
 function readSource(relativePath: string) {
   return readFileSync(resolve(APP_ROOT, relativePath), 'utf8');
