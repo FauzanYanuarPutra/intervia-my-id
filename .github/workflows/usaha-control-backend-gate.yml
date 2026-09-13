@@ -32,6 +32,10 @@ jobs:
         run: cargo check --locked
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
+      - name: Incomplete-cost sale integrity tests
+        run: cargo test --locked businesses::sales_incomplete_cost_persistence_tests
+      - name: Sale persistence regression tests
+        run: cargo test --locked businesses::sales_persistence_tests
       - name: Settlement domain tests
         run: cargo test --locked businesses::settlement::tests
       - name: Business route tests
