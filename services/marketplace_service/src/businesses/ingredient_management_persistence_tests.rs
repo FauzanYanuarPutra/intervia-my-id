@@ -212,7 +212,9 @@ async fn active_recipe_blocks_archive(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn effective_published_recipe_version_blocks_archive_even_without_legacy_recipe(pool: PgPool) {
+async fn effective_published_recipe_version_blocks_archive_even_without_legacy_recipe(
+    pool: PgPool,
+) {
     let seeded = seed_context(&pool).await;
     let product_id = Uuid::new_v4();
     let version_id = Uuid::new_v4();
