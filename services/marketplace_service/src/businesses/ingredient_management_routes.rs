@@ -164,10 +164,9 @@ fn error_response(error: IngredientManagementError) -> Response {
             StatusCode::FORBIDDEN,
             "business_ingredient_permission_denied",
         ),
-        IngredientManagementError::NotFound => api_error(
-            StatusCode::NOT_FOUND,
-            "business_ingredient_not_found",
-        ),
+        IngredientManagementError::NotFound => {
+            api_error(StatusCode::NOT_FOUND, "business_ingredient_not_found")
+        }
         IngredientManagementError::Conflict(code) => api_error(StatusCode::CONFLICT, code),
         IngredientManagementError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -182,8 +181,8 @@ fn api_error(status: StatusCode, code: &'static str) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::inventory::InventoryError;
+    use super::*;
 
     #[test]
     fn active_recipe_conflict_is_http_conflict() {
