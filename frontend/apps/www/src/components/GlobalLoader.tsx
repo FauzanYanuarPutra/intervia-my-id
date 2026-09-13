@@ -113,7 +113,9 @@ export default function GlobalLoader() {
     if (nextRoute === currentRouteRef.current) return;
 
     currentRouteRef.current = nextRoute;
-    hideLoader();
+    const clearAfterNavigation = setTimeout(hideLoader, 0);
+
+    return () => clearTimeout(clearAfterNavigation);
   }, [hideLoader, pathname, search]);
 
   if (!showLoader) return null;
