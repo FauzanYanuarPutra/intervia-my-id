@@ -175,15 +175,30 @@ impl IngredientManagementRepository {
 
         let used_by_active_recipe = sqlx::query_scalar::<_, bool>(
             r#"
-            SELECT EXISTS(
-              SELECT 1
-              FROM business_recipe_items item
-              JOIN business_recipes recipe ON recipe.id=item.recipe_id
-              WHERE item.ingredient_id=$1
-                AND recipe.business_id=$2
-                AND recipe.organization_id=$3
-                AND recipe.status='active'
-            )
+            SELECT
+              EXISTS(
+                SELECT 1
+                FROM business_recipe_items item
+                JOIN business_recipes recipe ON recipe.id=item.recipe_id
+                WHERE item.ingredient_id=$1
+                  AND recipe.business_id=$2
+                  AND recipe.organization_id=$3
+                  AND recipe.status='active'
+              )
+              OR EXISTS(
+                SELECT 1
+                FROM business_recipe_version_items item
+                JOIN business_recipe_versions version
+                  ON version.id=item.recipe_version_id
+                 AND version.business_id=item.business_id
+                 AND version.organization_id=item.organization_id
+                WHERE item.ingredient_id=$1
+                  AND item.business_id=$2
+                  AND item.organization_id=$3
+                  AND version.status='published'
+                  AND version.effective_from <= NOW()
+                  AND (version.effective_until IS NULL OR version.effective_until > NOW())
+              )
             "#,
         )
         .bind(ingredient_id)
