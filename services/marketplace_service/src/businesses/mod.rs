@@ -55,6 +55,7 @@ mod sales_routes;
 mod sales_schema_tests;
 mod service;
 pub(crate) mod settlement;
+mod wave2;
 #[cfg(test)]
 mod wave2_migration_tests;
 
