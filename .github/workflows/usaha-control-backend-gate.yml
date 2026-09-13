@@ -48,6 +48,8 @@ jobs:
         run: cargo check --locked
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
+      - name: Ingredient management integrity tests
+        run: cargo test --locked businesses::ingredient_management
       - name: Incomplete-cost sale integrity tests
         run: cargo test --locked businesses::sales_incomplete_cost_persistence_tests
       - name: Sale persistence regression tests
