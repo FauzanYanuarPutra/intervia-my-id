@@ -8,6 +8,7 @@ import {
   type OrganizationMember,
 } from '@/lib/business-collaboration';
 import { getBusinessForCurrentActor, UpstreamHttpError } from '@/lib/business-server';
+import type { PermissionId } from '@/lib/portal-types';
 
 const IDENTITY_URL =
   process.env.INTERNAL_API_URL ||
@@ -41,12 +42,18 @@ async function requestIdentity(path: string, token: string): Promise<unknown> {
   return payload;
 }
 
-async function resolveCollaborationContext(businessId: string) {
+async function resolveCollaborationContext(
+  businessId: string,
+  requiredPermission: PermissionId = 'viewTeam',
+) {
   const token = await readAccessToken();
   if (!token) throw new UpstreamHttpError(401, 'auth_required');
 
   const business = await getBusinessForCurrentActor(businessId);
   if (!business) throw new UpstreamHttpError(404, 'business_not_found');
+  if (!business.permissions.includes(requiredPermission)) {
+    throw new UpstreamHttpError(403, 'business_permission_denied');
+  }
   if (!business.organizationId) {
     throw new UpstreamHttpError(409, 'business_organization_not_linked');
   }
@@ -56,7 +63,7 @@ async function resolveCollaborationContext(businessId: string) {
 export async function listOrganizationMembersForBusiness(
   businessId: string,
 ): Promise<OrganizationMember[]> {
-  const { token, business } = await resolveCollaborationContext(businessId);
+  const { token, business } = await resolveCollaborationContext(businessId, 'viewTeam');
   const payload = await requestIdentity(
     `/organizations/${encodeURIComponent(business.organizationId as string)}/members`,
     token,
@@ -67,7 +74,7 @@ export async function listOrganizationMembersForBusiness(
 export async function listOrganizationInvitationsForBusiness(
   businessId: string,
 ): Promise<OrganizationInvitation[]> {
-  const { token, business } = await resolveCollaborationContext(businessId);
+  const { token, business } = await resolveCollaborationContext(businessId, 'viewTeam');
   const payload = await requestIdentity(
     `/organization-invitations?organization_id=${encodeURIComponent(business.organizationId as string)}`,
     token,
