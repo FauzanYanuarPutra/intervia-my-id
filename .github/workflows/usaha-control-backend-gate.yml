@@ -20,6 +20,22 @@ jobs:
     name: Marketplace control compile and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     defaults:
       run:
         working-directory: services/marketplace_service
@@ -32,6 +48,10 @@ jobs:
         run: cargo check --locked
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
+      - name: Incomplete-cost sale integrity tests
+        run: cargo test --locked businesses::sales_incomplete_cost_persistence_tests
+      - name: Sale persistence regression tests
+        run: cargo test --locked businesses::sales_persistence_tests
       - name: Settlement domain tests
         run: cargo test --locked businesses::settlement::tests
       - name: Business route tests

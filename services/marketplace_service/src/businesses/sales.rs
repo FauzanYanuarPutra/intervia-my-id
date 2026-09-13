@@ -149,8 +149,8 @@ struct PreparedSaleLine {
     unit_price_amount: i64,
     discount_amount: i64,
     final_revenue_amount: i64,
-    unit_cogs_amount: i64,
-    line_cogs_amount: i64,
+    unit_cogs_amount: Option<i64>,
+    line_cogs_amount: Option<i64>,
     cost_snapshot: Value,
     ingredient_consumptions: Vec<PreparedIngredientConsumption>,
 }
@@ -237,7 +237,7 @@ impl SaleRepository {
         let mut gross_amount = 0_i64;
         let mut discount_amount = 0_i64;
         let mut final_amount = 0_i64;
-        let mut cogs_amount = 0_i64;
+        let mut cogs_amount = Some(0_i64);
 
         for line in &normalized.lines {
             let prepared_line =
@@ -255,9 +255,14 @@ impl SaleRepository {
             final_amount = final_amount
                 .checked_add(prepared_line.final_revenue_amount)
                 .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
-            cogs_amount = cogs_amount
-                .checked_add(prepared_line.line_cogs_amount)
-                .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+            cogs_amount = match (cogs_amount, prepared_line.line_cogs_amount) {
+                (Some(current), Some(line_cogs)) => Some(
+                    current
+                        .checked_add(line_cogs)
+                        .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?,
+                ),
+                _ => None,
+            };
             prepared.push(prepared_line);
         }
 
@@ -267,6 +272,7 @@ impl SaleRepository {
             ));
         }
 
+        let cost_complete = cogs_amount.is_some();
         let sale_id = Uuid::new_v4();
         let inserted_id = sqlx::query_scalar::<_, Uuid>(
             r#"
@@ -274,7 +280,7 @@ impl SaleRepository {
               id, business_id, organization_id, idempotency_key, occurred_on,
               channel_key, account_key, status, gross_amount, discount_amount,
               final_amount, cogs_amount, cost_complete, created_by_user_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8,$9,$10,$11,TRUE,$12)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8,$9,$10,$11,$12,$13)
             ON CONFLICT (business_id, idempotency_key) DO NOTHING
             RETURNING id
             "#,
@@ -290,6 +296,7 @@ impl SaleRepository {
         .bind(discount_amount)
         .bind(final_amount)
         .bind(cogs_amount)
+        .bind(cost_complete)
         .bind(actor_id)
         .fetch_optional(&mut *tx)
         .await?;
@@ -461,6 +468,14 @@ async fn prepare_line(
     .await?
     .ok_or(SaleRepositoryError::NotFound)?;
 
+    let gross = decimal_money(Decimal::from(line.unit_price_amount) * line.quantity)?;
+    if line.discount_amount > gross {
+        return Err(SaleRepositoryError::Validation(
+            "sale_discount_exceeds_line_total",
+        ));
+    }
+    let final_revenue_amount = gross - line.discount_amount;
+
     let recipe = resolve_effective_recipe(
         tx,
         business_id,
@@ -468,8 +483,26 @@ async fn prepare_line(
         line.product_id,
         effective_at,
     )
-    .await?
-    .ok_or(SaleRepositoryError::IncompleteCosting)?;
+    .await?;
+
+    let Some(recipe) = recipe else {
+        return Ok(PreparedSaleLine {
+            product_id: line.product_id,
+            recipe_version_id: None,
+            product_name,
+            quantity: line.quantity,
+            unit_price_amount: line.unit_price_amount,
+            discount_amount: line.discount_amount,
+            final_revenue_amount,
+            unit_cogs_amount: None,
+            line_cogs_amount: None,
+            cost_snapshot: serde_json::json!({
+                "status": "incomplete",
+                "reason": "recipe_missing"
+            }),
+            ingredient_consumptions: Vec::new(),
+        });
+    };
 
     if recipe.items.is_empty() {
         return Err(SaleRepositoryError::IncompleteCosting);
@@ -498,15 +531,10 @@ async fn prepare_line(
     )
     .map_err(|_| SaleRepositoryError::IncompleteCosting)?;
 
-    let gross = decimal_money(Decimal::from(line.unit_price_amount) * line.quantity)?;
-    if line.discount_amount > gross {
-        return Err(SaleRepositoryError::Validation(
-            "sale_discount_exceeds_line_total",
-        ));
-    }
-    let final_revenue_amount = gross - line.discount_amount;
-    let unit_cogs_amount = decimal_money(snapshot.production_hpp_per_unit)?;
-    let line_cogs_amount = decimal_money(snapshot.production_hpp_per_unit * line.quantity)?;
+    let unit_cogs_amount = Some(decimal_money(snapshot.production_hpp_per_unit)?);
+    let line_cogs_amount = Some(decimal_money(
+        snapshot.production_hpp_per_unit * line.quantity,
+    )?);
     let ingredient_consumptions = snapshot
         .items
         .iter()

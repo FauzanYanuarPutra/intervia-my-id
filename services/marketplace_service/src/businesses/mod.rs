@@ -41,6 +41,8 @@ mod repository;
 mod routes;
 pub(crate) mod sales;
 #[cfg(test)]
+mod sales_incomplete_cost_persistence_tests;
+#[cfg(test)]
 mod sales_persistence_tests;
 mod sales_routes;
 #[cfg(test)]

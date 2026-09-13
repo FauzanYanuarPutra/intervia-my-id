@@ -26,8 +26,21 @@ def main() -> int:
         require(legacy_auth, 'LEGACY_USAHA_AUTH_RETIRED')
         forbid(legacy_auth, 'portal-store', 'portal-session', 'writePortalSession')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/locations/page.tsx', 'Lokasi', 'BusinessLocation')
-    require('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Lajukan Usaha', 'Lokasi & Outlet', 'Produk & HPP', 'Kanal Jual')
-    forbid('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Usaha Portal')
+
+    require(
+        'frontend/apps/usaha/src/lib/portal-navigation.ts',
+        'Beranda', 'Jualan', 'Produk', 'Stok', 'Uang', 'Laporan',
+        'Jual Online', 'Pengaturan Usaha', 'Lokasi & Outlet', 'Tim & Akses',
+        'Tampilan Toko', 'desktopPrimaryNavigation', 'mobilePrimaryNavigation',
+        'portalMenuNavigation',
+    )
+    require(
+        'frontend/apps/usaha/src/components/portal/PortalShell.tsx',
+        'Lajukan Usaha', 'portalSectionLabel', '<SidebarNav', '<MobileNav',
+        'Tim & Akses', 'Keamanan akun', 'Tambah usaha',
+    )
+    forbid('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Usaha Portal', 'Workspace bisnis')
+
     require('services/marketplace_service/migrations/20260823001000_usaha_business_os.up.sql', 'organization_id', 'business_locations', 'business_hours', 'public_visibility')
     require('services/marketplace_service/migrations/20260823001000_usaha_business_os.down.sql', 'business_locations')
     require('services/marketplace_service/migrations/20260906002000_usaha_business_control_center.up.sql', 'business_ingredients', 'business_recipes', 'business_channel_settings', 'business_finance_entries')
@@ -35,12 +48,9 @@ def main() -> int:
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
 
-    # Action-first Home: one primary decision engine fed only by durable, permission-aware reads.
-    # Recipe readiness deliberately remains unknown until an aggregate/list endpoint exists;
-    # Home must not fan out one recipe request per product.
-    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'listControlSettlements', 'const recipeCount = null')
-    require('frontend/apps/usaha/src/app/page.tsx', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: null')
-    forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000', 'getControlRecipe', 'business.products.map')
+    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'buildHomeDashboard', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'const recipeCount = null')
+    require('frontend/apps/usaha/src/app/page.tsx', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: null', 'unreconciledSettlementCount: 0')
+    forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000', 'getControlRecipe', 'business.products.map', 'listControlSettlements', 'PortfolioPanel')
     require('frontend/apps/usaha/src/lib/business-control/next-actions.ts', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: number | null')
     require('frontend/apps/usaha/src/lib/business-control/progressive-disclosure.ts', 'sortStockAttentionFirst', 'productPrimaryMode', 'shouldShowSettlementWorkspace', 'channelSimulationReadiness')
 
@@ -53,9 +63,13 @@ def main() -> int:
     require('frontend/apps/usaha/src/components/business-control/DurableHppWorkspace.tsx', 'Simpan resep', '/recipe', 'calculateRecipeCost')
     require('frontend/apps/usaha/src/components/business-control/IngredientWorkspace.tsx', 'Simpan bahan', '/ingredients')
     require('frontend/apps/usaha/src/components/business-control/FinanceLedger.tsx', 'Simpan transaksi', '/finance-entries')
-    require('frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx', 'GoFood', 'GrabFood', 'ShopeeFood', 'Simpan kanal')
+    require(
+        'frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx',
+        'GoFood', 'GrabFood', 'ShopeeFood', 'Hitung harga online',
+        'Potongan aplikasi', 'Promo ditanggung toko', 'Harga online aman', 'Simpan'
+    )
     forbid('frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx', 'defaultPrice ?? 15000', 'defaultPrice || 15000')
-    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack', 'parseRecordedProductPrice')
+    require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack', 'parseRecordedProductPrice', 'Jual Online')
     forbid('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', '|| 15000', '|| 15_000')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/products/hpp/page.tsx', 'DurableHppWorkspace', 'listControlIngredients')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/finance/page.tsx', 'FinanceLedger', 'listControlFinanceEntries')
