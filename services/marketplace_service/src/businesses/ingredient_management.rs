@@ -212,13 +212,8 @@ impl IngredientManagementRepository {
             ));
         }
 
-        let archived = archive_ingredient_tx(
-            &mut tx,
-            business_id,
-            organization_id,
-            ingredient_id,
-        )
-        .await?;
+        let archived =
+            archive_ingredient_tx(&mut tx, business_id, organization_id, ingredient_id).await?;
         tx.commit().await?;
         Ok(archived)
     }
@@ -351,10 +346,14 @@ fn validate_update(request: &UpdateIngredientRequest) -> Result<(), IngredientMa
         ));
     }
     if request.yield_percent <= Decimal::ZERO || request.yield_percent > Decimal::from(100) {
-        return Err(IngredientManagementError::Validation("invalid_yield_percent"));
+        return Err(IngredientManagementError::Validation(
+            "invalid_yield_percent",
+        ));
     }
     if request.waste_percent < Decimal::ZERO || request.waste_percent >= Decimal::from(100) {
-        return Err(IngredientManagementError::Validation("invalid_waste_percent"));
+        return Err(IngredientManagementError::Validation(
+            "invalid_waste_percent",
+        ));
     }
     if request
         .supplier_name
@@ -399,7 +398,9 @@ mod tests {
         request.yield_percent = Decimal::ZERO;
         assert_eq!(
             validate_update(&request),
-            Err(IngredientManagementError::Validation("invalid_yield_percent"))
+            Err(IngredientManagementError::Validation(
+                "invalid_yield_percent"
+            ))
         );
     }
 }
