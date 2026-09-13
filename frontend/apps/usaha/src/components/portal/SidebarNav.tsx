@@ -42,10 +42,11 @@ const iconMap: Record<PortalSection, typeof Store> = {
 
 export function SidebarNav({ business, currentSection }: SidebarNavProps) {
   if (!business) return null;
+  const activeBusiness = business;
 
-  const primary = desktopPrimaryNavigation(business.permissions);
+  const primary = desktopPrimaryNavigation(activeBusiness.permissions);
   const primaryIds = new Set(primary.map(item => item.id));
-  const secondary = portalMenuNavigation(business.permissions).filter(
+  const secondary = portalMenuNavigation(activeBusiness.permissions).filter(
     item => !primaryIds.has(item.id) && item.id !== 'security',
   );
 
@@ -55,7 +56,7 @@ export function SidebarNav({ business, currentSection }: SidebarNavProps) {
     return (
       <Link
         key={item.id}
-        href={buildSectionHref(business.id, item.id)}
+        href={buildSectionHref(activeBusiness.id, item.id)}
         aria-current={active ? 'page' : undefined}
         className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
           active
