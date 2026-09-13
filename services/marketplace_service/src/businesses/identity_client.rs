@@ -23,6 +23,38 @@ impl OrganizationSummary {
     pub(crate) fn can_view_sale_costs(&self) -> bool {
         matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
     }
+
+    pub(crate) fn can_manage_finance_controls(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "org_accounting"
+        )
+    }
+
+    pub(crate) fn can_manage_inventory_controls(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "org_inventory"
+        )
+    }
+
+    pub(crate) fn can_manage_cash_shifts(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "org_cashier"
+        )
+    }
+
+    pub(crate) fn can_record_purchases(&self) -> bool {
+        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+    }
+
+    pub(crate) fn can_use_business_advisor(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "org_accounting"
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -208,6 +240,16 @@ mod tests {
         assert!(!organization("org_inventory").can_manage_cash_shifts());
         assert!(!organization("org_accounting").can_manage_cash_shifts());
         assert!(!organization("org_viewer").can_manage_cash_shifts());
+    }
+
+    #[test]
+    fn purchase_controls_require_a_role_that_can_change_money_and_stock_together() {
+        assert!(organization("org_admin").can_record_purchases());
+        assert!(organization("org_manager").can_record_purchases());
+        assert!(!organization("org_cashier").can_record_purchases());
+        assert!(!organization("org_inventory").can_record_purchases());
+        assert!(!organization("org_accounting").can_record_purchases());
+        assert!(!organization("org_viewer").can_record_purchases());
     }
 
     #[test]
