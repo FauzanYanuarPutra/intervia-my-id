@@ -25,7 +25,12 @@ impl AdvisorConfig {
     }
 
     fn from_values(provider: Option<&str>, base_url: Option<&str>, model: Option<&str>) -> Self {
-        let provider = match provider.unwrap_or("disabled").trim().to_ascii_lowercase().as_str() {
+        let provider = match provider
+            .unwrap_or("disabled")
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
             "ollama" => AdvisorProvider::Ollama,
             "openai" | "openai_compatible" | "openai-compatible" => {
                 AdvisorProvider::OpenAiCompatible
@@ -125,8 +130,12 @@ mod tests {
             AdvisorProvider::Ollama
         );
         assert_eq!(
-            AdvisorConfig::from_values(Some("openai-compatible"), Some("http://gateway"), Some("model"))
-                .provider,
+            AdvisorConfig::from_values(
+                Some("openai-compatible"),
+                Some("http://gateway"),
+                Some("model")
+            )
+            .provider,
             AdvisorProvider::OpenAiCompatible
         );
     }
@@ -143,9 +152,18 @@ mod tests {
         });
 
         assert_eq!(summary.mode, "read_only_deterministic");
-        assert!(summary.signals.iter().any(|item| item.contains("modal produknya belum lengkap")));
-        assert!(summary.signals.iter().any(|item| item.contains("jatuh tempo")));
+        assert!(summary
+            .signals
+            .iter()
+            .any(|item| item.contains("modal produknya belum lengkap")));
+        assert!(summary
+            .signals
+            .iter()
+            .any(|item| item.contains("jatuh tempo")));
         assert!(summary.signals.iter().any(|item| item.contains("stok")));
-        assert!(!summary.signals.iter().any(|item| item.contains("laba bersih")));
+        assert!(!summary
+            .signals
+            .iter()
+            .any(|item| item.contains("laba bersih")));
     }
 }

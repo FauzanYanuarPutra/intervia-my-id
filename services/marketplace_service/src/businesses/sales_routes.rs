@@ -30,17 +30,11 @@ async fn list_sales(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let access = match sales_access_context(
-        &state,
-        &headers,
-        business_id,
-        SalesAccessKind::View,
-    )
-    .await
-    {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match sales_access_context(&state, &headers, business_id, SalesAccessKind::View).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     match SaleRepository::new(state.db.clone())
         .list(business_id, access.organization_id, 200)
         .await
@@ -67,17 +61,11 @@ async fn create_sale(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateSaleRequest>,
 ) -> Response {
-    let access = match sales_access_context(
-        &state,
-        &headers,
-        business_id,
-        SalesAccessKind::Record,
-    )
-    .await
-    {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match sales_access_context(&state, &headers, business_id, SalesAccessKind::Record).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     let idempotency_key = match parse_idempotency_key(
         headers
             .get("idempotency-key")

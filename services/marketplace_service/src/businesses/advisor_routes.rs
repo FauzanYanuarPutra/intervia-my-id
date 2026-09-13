@@ -91,7 +91,12 @@ async fn get_advisor_summary(
     .await;
 
     match (sales, due_14d, low_stock, yield_evidence) {
-        (Ok((sales_30d_amount, sales_30d_count, incomplete_cost_sales_30d)), Ok(due_14d_amount), Ok(low_stock_count), Ok(yield_evidence_count)) => {
+        (
+            Ok((sales_30d_amount, sales_30d_count, incomplete_cost_sales_30d)),
+            Ok(due_14d_amount),
+            Ok(low_stock_count),
+            Ok(yield_evidence_count),
+        ) => {
             let summary = build_advisor_summary(AdvisorMetrics {
                 sales_30d_amount,
                 sales_30d_count,
@@ -100,7 +105,11 @@ async fn get_advisor_summary(
                 low_stock_count,
                 yield_evidence_count,
             });
-            (StatusCode::OK, Json(json!({ "data": { "advisor": summary } }))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({ "data": { "advisor": summary } })),
+            )
+                .into_response()
         }
         _ => api_error(
             StatusCode::SERVICE_UNAVAILABLE,

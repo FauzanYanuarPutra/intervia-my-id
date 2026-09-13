@@ -109,14 +109,19 @@ export const roleSummaryMap: Record<PortalRole, RoleSummary> = {
     label: 'Manager',
     shortLabel: 'Pengelola harian',
     description:
-      'Mengelola penjualan, HPP, stok, kanal, dan keuangan operasional tanpa mengambil alih kepemilikan akun.',
+      'Mengelola penjualan, HPP, stok, kanal, keuangan operasional, dan undangan tim tanpa mengambil alih kepemilikan akun.',
     can: [
       'Jalankan kasir dan koreksi transaksi',
       'Atur produk, HPP dan stok',
       'Catat keuangan operasional',
       'Atur kanal jual dan operasional harian',
+      'Lihat tim dan undang anggota baru',
     ],
-    cannot: ['Pindah kepemilikan usaha', 'Atur akses keamanan paling sensitif'],
+    cannot: [
+      'Pindah kepemilikan usaha',
+      'Ubah peran anggota yang sudah aktif',
+      'Atur akses keamanan paling sensitif',
+    ],
   },
   cashier: {
     label: 'Kasir',

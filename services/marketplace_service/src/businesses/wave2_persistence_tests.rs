@@ -143,13 +143,12 @@ async fn purchase_writes_stock_and_finance_exactly_once(pool: PgPool) {
     assert!(replay.replayed);
     assert_eq!(replay.purchase.id, first.purchase.id);
 
-    let stock: Decimal = sqlx::query_scalar(
-        "SELECT stock_quantity FROM business_ingredients WHERE id=$1",
-    )
-    .bind(seeded.ingredient_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(stock, Decimal::from(5));
 
     let movement_count: i64 = sqlx::query_scalar(
@@ -214,12 +213,14 @@ async fn allocation_plan_never_creates_ledger_effect(pool: PgPool) {
         .await
         .unwrap();
 
-    let finance_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1",
-    )
-    .bind(seeded.business_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(finance_count, 0, "planning targets must not move real money");
+    let finance_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1")
+            .bind(seeded.business_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        finance_count, 0,
+        "planning targets must not move real money"
+    );
 }

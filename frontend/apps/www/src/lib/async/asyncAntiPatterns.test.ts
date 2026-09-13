@@ -14,7 +14,9 @@ describe('async UX anti-pattern guards', () => {
     const source = readSource('src/components/explore/ExploreSearchResults.tsx');
 
     expect(source).not.toContain('animate-pulse');
-    expect(source).toContain("import { Skeleton, SkeletonStack }");
+    expect(source).toMatch(
+      /import\s*{\s*Skeleton,\s*SkeletonStack\s*}\s*from\s*['"]@\/components\/ui\/Skeleton['"]/,
+    );
     expect(source).toContain('data-testid="explore-search-skeleton"');
     expect(source).toContain('data-skeleton-kind={kind}');
   });

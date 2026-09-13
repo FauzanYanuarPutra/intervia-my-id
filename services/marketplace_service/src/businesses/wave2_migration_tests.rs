@@ -16,7 +16,11 @@ async fn wave2_operating_tables_exist(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(found.as_deref(), Some(table), "missing Wave 2 table {table}");
+        assert_eq!(
+            found.as_deref(),
+            Some(table),
+            "missing Wave 2 table {table}"
+        );
     }
 }
 
@@ -34,7 +38,10 @@ async fn finance_plan_rejects_allocation_above_one_hundred_percent(pool: PgPool)
     )
     .execute(&pool)
     .await;
-    assert!(result.is_err(), "allocation above 100% must fail at storage boundary");
+    assert!(
+        result.is_err(),
+        "allocation above 100% must fail at storage boundary"
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -60,7 +67,12 @@ async fn finance_entry_constraint_accepts_canonical_and_historical_vocabulary(po
     .await
     .unwrap();
 
-    for entry_type in ["inventory_expense", "ingredient_purchase", "owner_draw", "owner_drawing"] {
+    for entry_type in [
+        "inventory_expense",
+        "ingredient_purchase",
+        "owner_draw",
+        "owner_drawing",
+    ] {
         sqlx::query(
             r#"
             INSERT INTO business_finance_entries (
@@ -91,5 +103,8 @@ async fn finance_entry_constraint_accepts_canonical_and_historical_vocabulary(po
     .bind(actor_id)
     .execute(&pool)
     .await;
-    assert!(invalid.is_err(), "unknown finance vocabulary must still fail closed");
+    assert!(
+        invalid.is_err(),
+        "unknown finance vocabulary must still fail closed"
+    );
 }

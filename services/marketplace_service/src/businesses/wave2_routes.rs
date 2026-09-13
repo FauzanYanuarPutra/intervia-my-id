@@ -99,7 +99,8 @@ async fn get_finance_plan(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await {
+    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -118,7 +119,8 @@ async fn put_finance_plan(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<FinancePlanRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await {
+    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -136,7 +138,8 @@ async fn list_obligations(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await {
+    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -159,12 +162,18 @@ async fn create_obligation(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateObligationRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await {
+    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
     match Wave2Repository::new(state.db.clone())
-        .create_obligation(access.actor_id, business_id, access.organization_id, payload)
+        .create_obligation(
+            access.actor_id,
+            business_id,
+            access.organization_id,
+            payload,
+        )
         .await
     {
         Ok(obligation) => (
@@ -182,7 +191,8 @@ async fn pay_obligation(
     Path((business_id, obligation_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<PayObligationRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await {
+    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Finance).await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -202,7 +212,11 @@ async fn pay_obligation(
         .await
     {
         Ok(outcome) => (
-            if outcome.replayed { StatusCode::OK } else { StatusCode::CREATED },
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
             Json(json!({ "data": { "payment": outcome.payment, "replayed": outcome.replayed } })),
         )
             .into_response(),
@@ -216,10 +230,11 @@ async fn create_purchase(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreatePurchaseRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Purchase).await {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match access_context(&state, &headers, business_id, Wave2AccessKind::Purchase).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     let idempotency_key = match parse_idempotency_key(&headers) {
         Ok(value) => value,
         Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
@@ -235,7 +250,11 @@ async fn create_purchase(
         .await
     {
         Ok(outcome) => (
-            if outcome.replayed { StatusCode::OK } else { StatusCode::CREATED },
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
             Json(json!({ "data": { "purchase": outcome.purchase, "replayed": outcome.replayed } })),
         )
             .into_response(),
@@ -248,10 +267,11 @@ async fn get_current_cash_shift(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::CashShift).await {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match access_context(&state, &headers, business_id, Wave2AccessKind::CashShift).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     let result = sqlx::query_as::<_, CashShiftRecord>(
         r#"
         SELECT id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,
@@ -267,7 +287,10 @@ async fn get_current_cash_shift(
     .await;
     match result {
         Ok(shift) => (StatusCode::OK, Json(json!({ "data": { "shift": shift } }))).into_response(),
-        Err(_) => api_error(StatusCode::SERVICE_UNAVAILABLE, "business_cash_shift_storage_unavailable"),
+        Err(_) => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_cash_shift_storage_unavailable",
+        ),
     }
 }
 
@@ -277,15 +300,25 @@ async fn open_cash_shift(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<OpenCashShiftRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::CashShift).await {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match access_context(&state, &headers, business_id, Wave2AccessKind::CashShift).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     match Wave2Repository::new(state.db.clone())
-        .open_cash_shift(access.actor_id, business_id, access.organization_id, payload)
+        .open_cash_shift(
+            access.actor_id,
+            business_id,
+            access.organization_id,
+            payload,
+        )
         .await
     {
-        Ok(shift) => (StatusCode::CREATED, Json(json!({ "data": { "shift": shift } }))).into_response(),
+        Ok(shift) => (
+            StatusCode::CREATED,
+            Json(json!({ "data": { "shift": shift } })),
+        )
+            .into_response(),
         Err(error) => wave2_error_response(error),
     }
 }
@@ -296,10 +329,11 @@ async fn close_cash_shift(
     Path((business_id, shift_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<CloseCashShiftRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::CashShift).await {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match access_context(&state, &headers, business_id, Wave2AccessKind::CashShift).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     match Wave2Repository::new(state.db.clone())
         .close_cash_shift(
             access.actor_id,
@@ -321,10 +355,11 @@ async fn set_primary_material(
     Path((business_id, product_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<SetPrimaryMaterialRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Inventory).await {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match access_context(&state, &headers, business_id, Wave2AccessKind::Inventory).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     match Wave2Repository::new(state.db.clone())
         .set_primary_material(
             access.actor_id,
@@ -349,10 +384,11 @@ async fn list_yield_observations(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Inventory).await {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match access_context(&state, &headers, business_id, Wave2AccessKind::Inventory).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     let result = sqlx::query_as::<_, YieldObservationRecord>(
         r#"
         SELECT id,business_id,organization_id,product_id,ingredient_id,input_quantity,
@@ -373,7 +409,10 @@ async fn list_yield_observations(
             Json(json!({ "data": { "count": items.len(), "items": items } })),
         )
             .into_response(),
-        Err(_) => api_error(StatusCode::SERVICE_UNAVAILABLE, "business_yield_storage_unavailable"),
+        Err(_) => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_yield_storage_unavailable",
+        ),
     }
 }
 
@@ -383,12 +422,18 @@ async fn create_yield_observation(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateYieldObservationRequest>,
 ) -> Response {
-    let access = match access_context(&state, &headers, business_id, Wave2AccessKind::Inventory).await {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let access =
+        match access_context(&state, &headers, business_id, Wave2AccessKind::Inventory).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
     match Wave2Repository::new(state.db.clone())
-        .create_yield_observation(access.actor_id, business_id, access.organization_id, payload)
+        .create_yield_observation(
+            access.actor_id,
+            business_id,
+            access.organization_id,
+            payload,
+        )
         .await
     {
         Ok(observation) => (
@@ -406,7 +451,8 @@ async fn access_context(
     business_id: Uuid,
     kind: Wave2AccessKind,
 ) -> Result<Wave2AccessContext, Response> {
-    let (actor_id, authorization) = actor_and_authorization(state, headers)?;
+    let (actor_id, authorization) = actor_and_authorization(state, headers)
+        .map_err(|status| api_error(status, "auth_required"))?;
     let identity = IdentityClient::new(
         state.http_client.clone(),
         state.identity_service_url.clone(),
@@ -426,7 +472,10 @@ async fn access_context(
             continue;
         }
         if !kind.allows(&organization) {
-            return Err(api_error(StatusCode::FORBIDDEN, "business_wave2_access_denied"));
+            return Err(api_error(
+                StatusCode::FORBIDDEN,
+                "business_wave2_access_denied",
+            ));
         }
         return Ok(Wave2AccessContext {
             actor_id,
@@ -440,15 +489,14 @@ async fn access_context(
 fn actor_and_authorization(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<(Uuid, String), Response> {
+) -> Result<(Uuid, String), StatusCode> {
     let authorization = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
-    let actor_id = user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let actor_id = user_id_from_auth(headers, &state.jwt_secret).ok_or(StatusCode::UNAUTHORIZED)?;
     Ok((actor_id, authorization.to_owned()))
 }
 
@@ -486,7 +534,9 @@ fn wave2_error_response(error: Wave2RepositoryError) -> Response {
         Wave2RepositoryError::NotFound => {
             api_error(StatusCode::NOT_FOUND, "business_wave2_resource_not_found")
         }
-        Wave2RepositoryError::Conflict => api_error(StatusCode::CONFLICT, "business_wave2_conflict"),
+        Wave2RepositoryError::Conflict => {
+            api_error(StatusCode::CONFLICT, "business_wave2_conflict")
+        }
         Wave2RepositoryError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_wave2_storage_unavailable",
@@ -522,11 +572,17 @@ mod tests {
     #[test]
     fn idempotency_header_is_required_for_money_stock_effects() {
         let headers = HeaderMap::new();
-        assert_eq!(parse_idempotency_key(&headers), Err("missing_idempotency_key"));
+        assert_eq!(
+            parse_idempotency_key(&headers),
+            Err("missing_idempotency_key")
+        );
 
         let mut headers = HeaderMap::new();
         headers.insert("idempotency-key", "not-a-uuid".parse().unwrap());
-        assert_eq!(parse_idempotency_key(&headers), Err("invalid_idempotency_key"));
+        assert_eq!(
+            parse_idempotency_key(&headers),
+            Err("invalid_idempotency_key")
+        );
 
         let mut headers = HeaderMap::new();
         headers.insert(

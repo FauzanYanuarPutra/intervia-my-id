@@ -4,7 +4,9 @@ use super::control::{canonical_manual_finance_entry_type, ControlRepositoryError
 fn manual_sale_income_is_rejected_because_sales_own_that_ledger_effect() {
     assert!(matches!(
         canonical_manual_finance_entry_type("sale_income"),
-        Err(ControlRepositoryError::Validation("manual_sale_income_not_allowed"))
+        Err(ControlRepositoryError::Validation(
+            "manual_sale_income_not_allowed"
+        ))
     ));
 }
 
