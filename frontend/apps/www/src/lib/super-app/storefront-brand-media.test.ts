@@ -33,6 +33,35 @@ describe('public storefront brand media', () => {
     });
   });
 
+  it('does not reuse a banner-like store photo as the logo', () => {
+    expect(
+      resolveStorefrontBrandMedia({
+        store_photo_url: '/api/forum/media/banner-lajukan-juice.webp',
+        cover_image_url: '/api/forum/media/banner-lajukan-juice.webp',
+      }),
+    ).toMatchObject({
+      logoUrl: null,
+      coverUrl: '/api/forum/media/banner-lajukan-juice.webp',
+      seoImageUrl: '/api/forum/media/banner-lajukan-juice.webp',
+    });
+  });
+
+  it('reads owner media from nested public metadata', () => {
+    expect(
+      resolveStorefrontBrandMedia({
+        logo_url: '/api/forum/media/old-logo.webp',
+        public: {
+          logo_url: '/api/forum/media/logo-lajukan-juice.webp',
+          banner_url: '/api/forum/media/banner-lajukan-juice.webp',
+        },
+      }),
+    ).toMatchObject({
+      logoUrl: '/api/forum/media/logo-lajukan-juice.webp',
+      coverUrl: '/api/forum/media/banner-lajukan-juice.webp',
+      seoImageUrl: '/api/forum/media/banner-lajukan-juice.webp',
+    });
+  });
+
   it('ignores placeholders and removes cover/logo duplicates from the gallery', () => {
     expect(
       resolveStorefrontBrandMedia({
