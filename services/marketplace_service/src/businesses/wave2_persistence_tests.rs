@@ -162,6 +162,16 @@ async fn purchase_writes_stock_and_finance_exactly_once(pool: PgPool) {
     .unwrap();
     assert_eq!(movement_count, 1);
 
+    let movement_type: String = sqlx::query_scalar(
+        "SELECT movement_type FROM business_inventory_movements WHERE business_id=$1 AND source_type='business_purchase' AND source_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(first.purchase.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(movement_type, "purchase_receipt");
+
     let finance: (i64, String) = sqlx::query_as(
         "SELECT amount, entry_type FROM business_finance_entries WHERE business_id=$1 AND source_type='business_purchase' AND source_id=$2",
     )
