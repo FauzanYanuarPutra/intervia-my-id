@@ -4,6 +4,16 @@ export type FinanceEntryLike = {
 };
 
 const operatingExpenseTypes = new Set([
+  // Canonical Wave 2 vocabulary.
+  'inventory_expense',
+  'payroll_expense',
+  'rent_expense',
+  'utilities_expense',
+  'transport_expense',
+  'marketing_expense',
+  'equipment_expense',
+  'other_expense',
+  // Historical values stay readable so old ledger rows retain meaning.
   'ingredient_purchase',
   'packaging_purchase',
   'rent',
@@ -12,7 +22,16 @@ const operatingExpenseTypes = new Set([
   'transport',
   'marketing',
   'equipment',
-  'other_expense',
+]);
+
+const capitalIncomeTypes = new Set(['capital_income', 'owner_capital']);
+const ownerDrawTypes = new Set(['owner_draw', 'owner_drawing']);
+const cashInTypes = new Set([
+  'sale_income',
+  'other_income',
+  'capital_income',
+  'owner_capital',
+  'receivable_payment',
 ]);
 
 export function summarizeFinanceEntries(entries: FinanceEntryLike[]) {
@@ -28,8 +47,8 @@ export function summarizeFinanceEntries(entries: FinanceEntryLike[]) {
 
     if (entry.entry_type === 'sale_income') revenue += amount;
     else if (entry.entry_type === 'other_income') otherIncome += amount;
-    else if (entry.entry_type === 'owner_capital') ownerCapital += amount;
-    else if (entry.entry_type === 'owner_drawing') ownerDrawing += amount;
+    else if (capitalIncomeTypes.has(entry.entry_type)) ownerCapital += amount;
+    else if (ownerDrawTypes.has(entry.entry_type)) ownerDrawing += amount;
     else if (operatingExpenseTypes.has(entry.entry_type)) operatingExpenses += amount;
   }
 
@@ -49,9 +68,5 @@ export function summarizeFinanceEntries(entries: FinanceEntryLike[]) {
 }
 
 export function financeEntryDirection(entryType: string) {
-  return ['sale_income', 'other_income', 'owner_capital', 'receivable_payment'].includes(
-    entryType,
-  )
-    ? 'in'
-    : 'out';
+  return cashInTypes.has(entryType) ? 'in' : 'out';
 }
