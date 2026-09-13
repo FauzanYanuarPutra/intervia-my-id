@@ -309,7 +309,7 @@ async fn unused_ingredient_can_be_archived_without_deleting_history(pool: PgPool
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn primary_history_combines_location_movements_and_legacy_sale_consumption(pool: PgPool) {
+async fn primary_history_combines_location_movements_and_sale_consumption(pool: PgPool) {
     let seeded = seed_context(&pool).await;
     let inventory = InventoryRepository::new(pool.clone());
 
@@ -365,6 +365,7 @@ async fn primary_history_combines_location_movements_and_legacy_sale_consumption
     assert_eq!(movements.len(), 2);
     assert!(movements.iter().any(|item| item.location_id.is_some()));
     assert!(movements.iter().any(|item| {
-        item.location_id.is_none() && item.movement_type == "sale_consumption"
+        item.movement_type == "sale_consumption"
+            && item.source_type.as_deref() == Some("business_sale")
     }));
 }
