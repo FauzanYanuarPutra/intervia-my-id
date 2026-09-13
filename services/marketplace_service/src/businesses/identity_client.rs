@@ -205,6 +205,18 @@ mod tests {
     }
 
     #[test]
+    fn sales_history_read_allows_viewer_and_accounting_without_granting_write() {
+        assert!(organization("org_admin").can_view_sales());
+        assert!(organization("org_manager").can_view_sales());
+        assert!(organization("org_cashier").can_view_sales());
+        assert!(organization("org_accounting").can_view_sales());
+        assert!(organization("org_viewer").can_view_sales());
+        assert!(!organization("org_inventory").can_view_sales());
+        assert!(!organization("org_viewer").can_record_sales());
+        assert!(!organization("org_accounting").can_record_sales());
+    }
+
+    #[test]
     fn sales_cost_visibility_excludes_cashiers() {
         assert!(organization("org_admin").can_view_sale_costs());
         assert!(organization("org_manager").can_view_sale_costs());
