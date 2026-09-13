@@ -39,10 +39,13 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
         self.assertNotIn("<RoleAccessCard", source)
         self.assertNotIn("<TeamSnapshot", source)
 
-    def test_dashboard_consumes_shared_page_primitives(self) -> None:
+    def test_dashboard_is_task_first_without_forcing_card_soup(self) -> None:
         source = (USAHA / "app/page.tsx").read_text(encoding="utf-8")
-        for component in ("PageHeader", "ActionCard", "StatCard", "DataPanel"):
-            self.assertIn(component, source)
+        for marker in ("PageHeader", "DataPanel", "buildHomeDashboard", "Prioritas utama", "Catat jualan", "Catat pengeluaran", "Cek stok"):
+            self.assertIn(marker, source)
+        self.assertNotIn("PortfolioPanel", source)
+        self.assertNotIn("ActionCard", source)
+        self.assertNotIn("StatCard", source)
 
     def test_dashboard_avoids_per_product_recipe_fanout(self) -> None:
         source = (USAHA / "app/page.tsx").read_text(encoding="utf-8")
