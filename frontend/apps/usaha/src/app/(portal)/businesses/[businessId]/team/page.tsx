@@ -41,6 +41,8 @@ export default async function BusinessTeamPage({ params }: PageProps) {
   if (!business) notFound();
 
   const canViewTeam = hasPermission(business, 'viewTeam');
+  if (!canViewTeam) notFound();
+
   const canInvite = hasPermission(business, 'inviteMembers');
   const canManageRoles = hasPermission(business, 'manageRoles');
 
@@ -48,17 +50,15 @@ export default async function BusinessTeamPage({ params }: PageProps) {
   let invitations: OrganizationInvitation[] = [];
   let collaborationError = '';
 
-  if (canViewTeam) {
-    try {
-      [members, invitations] = await Promise.all([
-        listOrganizationMembersForBusiness(business.id),
-        listOrganizationInvitationsForBusiness(business.id),
-      ]);
-    } catch (error) {
-      collaborationError = error instanceof Error
-        ? error.message
-        : 'Data akses tim belum bisa dimuat.';
-    }
+  try {
+    [members, invitations] = await Promise.all([
+      listOrganizationMembersForBusiness(business.id),
+      listOrganizationInvitationsForBusiness(business.id),
+    ]);
+  } catch (error) {
+    collaborationError = error instanceof Error
+      ? error.message
+      : 'Data akses tim belum bisa dimuat.';
   }
 
   const activeMembers = members.filter(member => member.status === 'active').length;
@@ -67,9 +67,7 @@ export default async function BusinessTeamPage({ params }: PageProps) {
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="team">
       <SectionCard eyebrow="Tim & keamanan" title="Tim" description="Kelola siapa yang punya akses ke usaha ini, perannya, dan undangan yang masih menunggu jawaban.">
-        {!canViewTeam ? (
-          <DataPanel><EmptyState title="Akses tim dibatasi" description="Peran ini tidak memiliki izin untuk melihat data anggota dan undangan usaha." icon={ShieldCheck} /></DataPanel>
-        ) : collaborationError ? (
+        {collaborationError ? (
           <DataPanel>
             <EmptyState
               title="Data akses tim belum tersinkron"
