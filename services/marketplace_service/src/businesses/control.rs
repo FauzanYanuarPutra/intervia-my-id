@@ -438,6 +438,7 @@ impl ControlRepository {
         request: CreateFinanceEntryRequest,
     ) -> Result<FinanceEntryRecord, ControlRepositoryError> {
         validate_finance(&request)?;
+        let entry_type = canonical_manual_finance_entry_type(&request.entry_type)?;
         ensure_business(&self.db, business_id, organization_id).await?;
         sqlx::query_as::<_, FinanceEntryRecord>(
             r#"
@@ -452,7 +453,7 @@ impl ControlRepository {
         )
         .bind(business_id)
         .bind(organization_id)
-        .bind(request.entry_type.trim().to_ascii_lowercase())
+        .bind(entry_type)
         .bind(normalize(&request.account_key))
         .bind(request.amount)
         .bind(request.occurred_on)
@@ -640,29 +641,36 @@ fn validate_channel(
     Ok(key)
 }
 
-fn validate_finance(request: &CreateFinanceEntryRequest) -> Result<(), ControlRepositoryError> {
-    if !matches!(
-        request.entry_type.trim(),
-        "sale_income"
-            | "other_income"
-            | "ingredient_purchase"
-            | "packaging_purchase"
-            | "rent"
-            | "utilities"
-            | "salary"
-            | "transport"
-            | "marketing"
-            | "equipment"
-            | "owner_capital"
-            | "owner_drawing"
-            | "receivable_payment"
-            | "payable_payment"
-            | "other_expense"
-    ) {
-        return Err(ControlRepositoryError::Validation(
-            "invalid_finance_entry_type",
-        ));
+pub(crate) fn canonical_manual_finance_entry_type(
+    input: &str,
+) -> Result<&'static str, ControlRepositoryError> {
+    match input.trim().to_ascii_lowercase().as_str() {
+        "sale_income" => Err(ControlRepositoryError::Validation(
+            "manual_sale_income_not_allowed",
+        )),
+        "other_income" => Ok("other_income"),
+        "inventory_expense" | "ingredient_purchase" | "packaging_purchase" => {
+            Ok("inventory_expense")
+        }
+        "payroll_expense" | "salary" => Ok("payroll_expense"),
+        "rent_expense" | "rent" => Ok("rent_expense"),
+        "utilities_expense" | "utilities" => Ok("utilities_expense"),
+        "transport_expense" | "transport" => Ok("transport_expense"),
+        "marketing_expense" | "marketing" => Ok("marketing_expense"),
+        "equipment_expense" | "equipment" => Ok("equipment_expense"),
+        "capital_income" | "owner_capital" => Ok("capital_income"),
+        "owner_draw" | "owner_drawing" => Ok("owner_draw"),
+        "receivable_payment" => Ok("receivable_payment"),
+        "payable_payment" => Ok("payable_payment"),
+        "other_expense" => Ok("other_expense"),
+        _ => Err(ControlRepositoryError::Validation(
+            "finance_entry_type_invalid",
+        )),
     }
+}
+
+fn validate_finance(request: &CreateFinanceEntryRequest) -> Result<(), ControlRepositoryError> {
+    canonical_manual_finance_entry_type(&request.entry_type)?;
     if request.amount <= 0 {
         return Err(ControlRepositoryError::Validation("invalid_finance_amount"));
     }
@@ -755,5 +763,9 @@ mod tests {
             channel_key: None,
         };
         assert!(validate_finance(&request).is_ok());
+        assert_eq!(
+            canonical_manual_finance_entry_type(&request.entry_type).unwrap(),
+            "owner_draw"
+        );
     }
 }
