@@ -55,6 +55,8 @@ mod sales_routes;
 mod sales_schema_tests;
 mod service;
 pub(crate) mod settlement;
+#[cfg(test)]
+mod wave2_migration_tests;
 
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
