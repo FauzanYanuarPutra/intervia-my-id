@@ -16,7 +16,7 @@ use super::{
     ingredient_management::{
         IngredientManagementError, IngredientManagementRepository, UpdateIngredientRequest,
     },
-    inventory::{InventoryError, InventoryRepository},
+    inventory::InventoryRepository,
     inventory_routes::inventory_error_response,
 };
 
@@ -183,6 +183,7 @@ fn api_error(status: StatusCode, code: &'static str) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::inventory::InventoryError;
 
     #[test]
     fn active_recipe_conflict_is_http_conflict() {
