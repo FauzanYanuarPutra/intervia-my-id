@@ -7,7 +7,7 @@
 
 ## 1. Problem statement
 
-Lajukan Usaha already has strong business-system foundations: role-aware access, business setup, products, stock, costing/HPP, sales, finance, channels, reporting, team access, and public storefront controls. The primary usability problem is not missing capability. The problem is that the UI exposes too much of the system model to the operator.
+Lajukan Usaha already has strong business-system foundations: role-aware access, business setup, products, stock, costing/HPP, sales, finance, selling platforms, reporting, team access, and public storefront controls. The primary usability problem is not missing capability. The problem is that the UI exposes too much of the system model to the operator.
 
 Today, a beginner may encounter concepts such as `workspace`, `flow`, `capability`, `canonical`, `durable`, `snapshot`, `backend`, `costing`, `settlement`, `merchant`, `hard-code fee`, `channel`, and `HPP` before they can complete a normal business task. The information architecture also exposes too many first-class destinations, creating decision overload.
 
@@ -27,7 +27,7 @@ A beginner should be able to use Lajukan Usaha with the mental model:
 4. I want to record money in/out.
 5. I want to know whether the business is doing well.
 
-The user must not need to understand how ledgers, snapshots, canonical records, backend persistence, channel assumptions, or costing internals work.
+The user must not need to understand how ledgers, snapshots, canonical records, backend persistence, platform assumptions, or costing internals work.
 
 ## 3. Design principles
 
@@ -37,13 +37,13 @@ Navigation and page hierarchy are organized around jobs the user wants to comple
 
 ### 3.2 Progressive disclosure
 
-Show only the minimum information needed for the current task. Advanced costing, recipes, channel assumptions, supplier details, consignment terms, and technical explanations stay behind expandable sections, detail views, or contextual help.
+Show only the minimum information needed for the current task. Advanced costing, recipes, platform assumptions, supplier details, consignment terms, and technical explanations stay behind expandable sections, detail views, or contextual help.
 
 ### 3.3 Real operations must continue
 
 Missing secondary/master data must not block a real transaction that happened in the field unless accepting it would create an invalid transaction itself.
 
-In particular, a completed sale must still be recordable when HPP/costing is incomplete. The sale records quantity, product, selling price, payment destination, date/time, and available source/channel data. Profit/HPP-dependent metrics remain explicitly incomplete until valid costing exists.
+In particular, a completed sale must still be recordable when HPP/costing is incomplete. The sale records quantity, product, selling price, payment destination, date/time, and available source/platform data. Profit/HPP-dependent metrics remain explicitly incomplete until valid costing exists.
 
 The system must never silently convert unknown HPP to `Rp0`.
 
@@ -51,7 +51,7 @@ The system must never silently convert unknown HPP to `Rp0`.
 
 Users should not have to understand separate Sales vs Finance ledgers to avoid double entry.
 
-A normal sale recorded through Jualan must produce the appropriate downstream financial effect automatically. The standard Uang flow should not ask the user to record the same sale again.
+A normal sale recorded through Jualan must produce the appropriate downstream financial effect automatically. The standard Uang flow must not ask the user to record the same sale again.
 
 ### 3.5 Indonesian everyday language first
 
@@ -100,10 +100,11 @@ The goal is not merely fewer routes. Existing capabilities are regrouped under d
   - current open/closed status -> Beranda quick control
   - business schedule -> Pengaturan Usaha
   - stock alerts -> Stok and Beranda alerts
-- `Halaman pembeli` becomes **Tampilan Toko** under Jual Online or Pengaturan Usaha.
-- `Tim` and `Undangan & akses` become **Tim & Akses**.
-- `Keamanan` moves to account-level settings unless the control is truly business-specific.
-- `Lokasi & Outlet` lives under Pengaturan Usaha, with outlet-aware shortcuts when multiple locations materially affect daily work.
+- `Halaman pembeli` becomes **Tampilan Toko** and lives under **Jual Online**.
+- `Tim` and `Undangan & akses` become **Tim & Akses** under **Pengaturan Usaha**.
+- account authentication/security controls move to **Akun**.
+- business-specific roles, invitations, and access rules live under **Pengaturan Usaha -> Tim & Akses**.
+- `Lokasi & Outlet` lives under **Pengaturan Usaha -> Lokasi**, with outlet-aware shortcuts when multiple locations materially affect daily work.
 
 ### 5.3 Mobile bottom navigation
 
@@ -121,7 +122,7 @@ Labels should be readable at approximately 11–12 px minimum rather than relyin
 
 ### 5.4 Permission behavior
 
-Permission-aware hiding remains. If a user cannot access a primary destination, the remaining navigation should still preserve a coherent order instead of exposing technical placeholders.
+Permission-aware hiding remains. If a user cannot access a primary destination, the remaining navigation preserves the canonical order above and omits inaccessible items. `Menu` remains the mobile overflow destination.
 
 ## 6. Language system
 
@@ -134,15 +135,15 @@ Permission-aware hiding remains. If a user cannot access a primary destination, 
 | Onboarding usaha | Mulai usaha |
 | Setup inti | Data utama |
 | Pilih flow | Pilih jenis usaha |
-| Flow | Cara kerja, or omit |
+| Flow | Cara kerja when explanation is required; otherwise omit |
 | Quick Start | Langkah berikutnya |
 | Template | Omit from normal UI |
 | Capability | Never expose |
 | ERP | Omit from normal UI |
 | Produk & HPP | Produk / Produk & Modal |
 | Costing | Hitung modal |
-| HPP | Modal produk (HPP) on first explanation, then HPP where useful |
-| Kanal Jual | Jual Online / Tempat Jualan |
+| HPP | Modal produk (HPP) on first explanation, then HPP only where useful |
+| Kanal Jual | Jual Online |
 | Kanal | Dijual lewat |
 | Fee | Potongan aplikasi |
 | Promo merchant | Promo yang ditanggung toko |
@@ -150,8 +151,8 @@ Permission-aware hiding remains. If a user cannot access a primary destination, 
 | Settlement | Transfer dari aplikasi |
 | Canonical | Never expose |
 | Durable | Never expose |
-| Snapshot historis | Biaya saat transaksi dibuat, only when explanation is needed |
-| Backend | Sistem, or omit |
+| Snapshot historis | Biaya saat transaksi dibuat, only inside contextual explanation |
+| Backend | Sistem when unavoidable; otherwise omit |
 | Hard-code fee | Never expose |
 | Halaman pembeli | Tampilan Toko |
 | Undangan & akses | Tim & Akses |
@@ -170,7 +171,7 @@ Permission-aware hiding remains. If a user cannot access a primary destination, 
 - Technical integrity explanations move to contextual `Tentang angka ini`, help text, or advanced sections.
 - Prefer short action verbs: `Catat`, `Tambah`, `Cek`, `Bayar`, `Isi`, `Lihat`, `Atur`.
 - Avoid English when a common Indonesian term exists.
-- Do not use reassuring technical copy as permanent visual noise. Example: data-truth explanations should be available contextually, not repeated on every visit.
+- Do not use reassuring technical copy as permanent visual noise. Data-truth explanations should be available contextually, not repeated on every visit.
 
 ## 7. Shared visual hierarchy and density
 
@@ -219,7 +220,7 @@ Replace software-centric onboarding with a three-step beginner flow.
 Beginner labels:
 
 - **Makanan & Minuman** — jus, kopi, warung, restoran, katering
-- **Laundry** — kiloan, satuan, sepatu, related services
+- **Laundry** — kiloan, satuan, sepatu, and related laundry services
 - **Servis & Jasa Lapangan** — AC, teknisi, reparasi, home services
 - **Toko & Retail** — warung, minimarket, product retail
 - **Usaha Lainnya**
@@ -252,7 +253,7 @@ Success state:
 > `<Nama usaha> sudah siap.`  
 > Sekarang tambahkan produk atau layanan pertama yang kamu jual.
 
-Primary CTA: **Tambah produk** or template-appropriate equivalent.
+Primary CTA is **Tambah produk** for product-selling templates and **Tambah layanan** for service-oriented templates.
 
 Do not show `workspace`, `flow`, `capability`, or ERP explanations in the normal onboarding path.
 
@@ -293,9 +294,9 @@ If nothing requires attention, say so directly:
 
 Do not fill the screen with zero-value or irrelevant cards.
 
-### Remove duplicate business portfolio surface
+### Multi-business handling
 
-If BusinessSwitcher already gives persistent access to other businesses, do not also render a large always-visible `Usaha yang kamu kelola` panel on the daily home unless there is a specific multi-business task to surface.
+Business switching stays available in the shell. Do not render a large always-visible `Usaha yang kamu kelola` panel on the daily home. Multi-business portfolio information belongs in the business switcher or a dedicated account/portfolio surface.
 
 ## 10. Jualan
 
@@ -317,7 +318,7 @@ Automatic/defaulted data:
 - price defaults from product
 - last/default sales source may be remembered when safe
 
-Optional controls such as discount and source/channel stay behind `+ Diskon` / `Detail lainnya` unless required.
+Optional controls such as discount and sales source stay behind `+ Diskon` / `Detail lainnya` unless required.
 
 ### 10.2 Example mental model
 
@@ -347,11 +348,11 @@ Persist what is known. Mark cost-dependent fields as unavailable/incomplete. Rep
 
 Do not backfill unknown cost as zero. Do not silently recompute historical cost in a way that changes previously locked valid cost without an explicit accounting rule.
 
-The implementation plan must inspect the current backend contract before selecting the exact persistence model for incomplete-cost sales.
+The implementation plan must inspect the current backend contract before selecting the exact persistence representation for incomplete-cost sales, while preserving this required user-visible behavior.
 
 ### 10.4 Orders vs direct sales
 
-If external orders and direct cashier sales remain separate operational concepts, explain them using user language and tabs/segments such as:
+External orders and direct cashier sales remain distinct operational concepts but share the Jualan destination. Present them using user language, for example:
 
 - **Kasir / Penjualan langsung**
 - **Pesanan masuk**
@@ -388,11 +389,11 @@ Uang keluar examples:
 
 A normal sale recorded in Jualan must appear in financial summaries without asking the user to manually create another `Penjualan` finance entry.
 
-If a manual sale correction or exceptional entry is necessary, place it in an advanced/exception path such as `Lainnya -> Koreksi transaksi`, with clear semantics.
+Manual sale correction is an advanced exception path under `Lainnya -> Koreksi transaksi`, not a normal Uang category.
 
-The implementation plan must verify current backend/source-of-truth behavior before removing or transforming existing finance entry types.
+The implementation plan must verify current backend/source-of-truth behavior before removing or transforming existing finance entry types. The final behavior must maintain a single user action for a normal sale and prevent double-counting.
 
-### 11.3 Sales source/channel control
+### 11.3 Sales source/platform control
 
 Do not use free-text input for a known set of active selling platforms. Select from the business's configured selling sources when the field is relevant.
 
@@ -475,7 +476,9 @@ Use action wording such as `Tambah stok`, `Cek stok`, `Catat belanja` rather tha
 
 ## 14. Jual Online
 
-Rename/reframe current channel management around the user's outcome: selling outside the physical counter and understanding platform deductions.
+Rename/reframe current selling-platform management around the user's outcome: selling outside the physical counter and understanding platform deductions.
+
+**Tampilan Toko** is a section within Jual Online, not a separate first-class destination.
 
 For a configured platform show, where data exists:
 
@@ -519,17 +522,21 @@ Default reports answer business questions, not database questions.
 
 Where data/permissions allow:
 
-- Omzet
-- Laba kotor
-- Pengeluaran
-- Hasil/perkiraan hasil with a precise definition
+- **Omzet** = recorded completed sales for the selected period
+- **Laba kotor** = omzet minus valid recorded HPP/cost of sold products for the selected period
+- **Pengeluaran usaha** = recorded operating expenses for the selected period
+- **Hasil usaha tercatat** = laba kotor minus recorded operating expenses for the selected period
+
+`Hasil usaha tercatat` must not be labeled `Laba bersih` because taxes, depreciation, accruals, inventory/accounting adjustments, and other final-accounting items may not be represented.
+
+Owner capital, owner drawings, debt principal movements, and transfer reconciliation must not be converted into revenue or operating expense merely to populate these numbers.
 
 ### Supporting information
 
 - top products/services
 - sales count
 - relevant stock warnings
-- trend comparison when valid comparable data exists
+- trend comparison only when valid comparable data exists
 
 ### Incomplete-data behavior
 
@@ -545,18 +552,19 @@ Do not show backend/snapshot/canonical explanations in the primary report surfac
 
 Group lower-frequency configuration into one coherent area.
 
-Suggested sections/tabs:
+Required sections/tabs:
 
 - **Info**
 - **Lokasi**
-- **Tampilan Toko**
 - **Tim & Akses**
 
-Business hours belong here, with a quick open/close control also available from Beranda where operationally useful.
+`Tampilan Toko` is intentionally not duplicated here; it lives under Jual Online.
+
+Business hours belong in **Info**, with a quick open/close control also available from Beranda where operationally useful.
 
 Latitude/longitude and other debug-oriented fields should not be visible in normal owner/staff UI unless there is a direct user task requiring them.
 
-Account-level security remains separate from business settings where appropriate.
+Account authentication/security settings live under **Akun**. Business role/invitation/access controls live under **Tim & Akses**.
 
 ## 17. Adaptive templates
 
@@ -580,7 +588,7 @@ Priority concepts: kasir, produk, stok, pembelian, uang.
 
 ### General
 
-Use generic product/service, sales, stock (if enabled), and money language.
+Use generic product/service, sales, stock when enabled, and money language.
 
 Adaptive templates must not create disconnected apps or incompatible data models.
 
@@ -645,7 +653,7 @@ Required guardrails:
 - role restrictions remain enforced server-side; hiding UI is not authorization
 - historical cost behavior must be explicit and tested
 - stock changes must have clear source events and avoid silent double mutation
-- currency values use integer minor/business units according to the existing backend contract; UI formatting does not change stored semantics
+- currency values use integer/minor/business units according to the existing backend contract; UI formatting does not change stored semantics
 
 ## 22. Analytics and usability validation
 
@@ -702,7 +710,7 @@ The implementation plan must inspect current APIs/tests before changing these co
 
 - reduce desktop first-class navigation
 - mobile bottom nav becomes Beranda / Jualan / Stok / Uang / Menu
-- regroup Operasional, Tampilan Toko, Tim & Akses, Keamanan, Lokasi
+- regroup Operasional, Tampilan Toko, Tim & Akses, account security, and Lokasi as specified above
 
 ### P1 — daily core
 
@@ -770,6 +778,8 @@ This design is considered implemented when all of the following are true:
 10. Reports show outcome-oriented numbers and simple incomplete-data explanations.
 11. Common mobile tasks do not require horizontal scrolling and retain comfortable touch targets.
 12. Permission and data-integrity guarantees remain server-enforced.
+13. Tampilan Toko exists under Jual Online and is not duplicated as a first-class navigation destination.
+14. Account security and business access management are separated as specified.
 
 ## 27. Out of scope
 
