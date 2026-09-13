@@ -12,6 +12,26 @@ export type QuickSaleDraft = {
   lines: QuickSaleLineDraft[];
 };
 
+export type CheckoutPaymentMethod = QuickSaleDraft['accountKey'];
+
+export type ReceiptLine = {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type ReceiptView = {
+  receiptNumber: string;
+  occurredAt: string;
+  cashierName: string;
+  paymentLabel: string;
+  total: number;
+  tenderedAmount: number | null;
+  changeAmount: number;
+  itemCount: number;
+  lines: ReceiptLine[];
+};
+
 function finiteNumber(value: number | string) {
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
@@ -65,6 +85,50 @@ export function quickSaleTotal(lines: QuickSaleLineDraft[]) {
       )
     );
   }, 0);
+}
+
+export function calculateCashChange(total: number, tenderedAmount: number) {
+  const safeTotal = Number.isFinite(total) ? Math.max(0, Math.round(total)) : 0;
+  const safeTendered = Number.isFinite(tenderedAmount)
+    ? Math.max(0, Math.round(tenderedAmount))
+    : 0;
+  return Math.max(0, safeTendered - safeTotal);
+}
+
+export function canCompleteCheckout(input: {
+  total: number;
+  paymentMethod: CheckoutPaymentMethod | string;
+  tenderedAmount?: number;
+  lineCount: number;
+}) {
+  if (!Number.isFinite(input.total) || input.total <= 0 || input.lineCount <= 0) return false;
+  if (input.paymentMethod !== 'cash') return true;
+  return Number.isFinite(input.tenderedAmount) && (input.tenderedAmount ?? 0) >= input.total;
+}
+
+export function buildReceiptView(input: {
+  receiptNumber: string;
+  occurredAt: string;
+  cashierName: string;
+  paymentLabel: string;
+  total: number;
+  tenderedAmount?: number;
+  lines: ReceiptLine[];
+}): ReceiptView {
+  const tenderedAmount = Number.isFinite(input.tenderedAmount)
+    ? Math.max(0, Math.round(input.tenderedAmount ?? 0))
+    : null;
+  return {
+    receiptNumber: input.receiptNumber,
+    occurredAt: input.occurredAt,
+    cashierName: input.cashierName,
+    paymentLabel: input.paymentLabel,
+    total: Math.max(0, Math.round(input.total)),
+    tenderedAmount,
+    changeAmount: tenderedAmount === null ? 0 : calculateCashChange(input.total, tenderedAmount),
+    itemCount: input.lines.reduce((total, line) => total + Math.max(0, Number(line.quantity) || 0), 0),
+    lines: input.lines,
+  };
 }
 
 export function priceLabelToAmount(label: string) {
