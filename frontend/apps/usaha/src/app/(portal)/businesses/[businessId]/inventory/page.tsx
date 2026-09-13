@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Boxes, PackagePlus, TriangleAlert } from 'lucide-react';
 import { IngredientWorkspace } from '@/components/business-control/IngredientWorkspace';
+import { StockPurchaseYieldWorkspace } from '@/components/business-control/StockPurchaseYieldWorkspace';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { SectionCard } from '@/components/portal/SectionCard';
 import { StatusBadge } from '@/components/portal/StatusBadge';
+import { listWave2YieldObservations } from '@/lib/business-wave2-server';
 import { listControlIngredients } from '@/lib/business-control-server';
 import { sortStockAttentionFirst } from '@/lib/business-control/progressive-disclosure';
 import { hasPermission } from '@/lib/portal-logic';
@@ -24,9 +26,12 @@ export default async function BusinessInventoryPage({ params }: PageProps) {
   const canManageIngredients =
     hasPermission(business, 'manageInventory') ||
     hasPermission(business, 'manageCosting');
-  const ingredients = canViewIngredientCosts
-    ? await listControlIngredients(business.id)
-    : [];
+  const [ingredients, observations] = canViewIngredientCosts
+    ? await Promise.all([
+        listControlIngredients(business.id),
+        listWave2YieldObservations(business.id),
+      ])
+    : [[], []];
   const sortedProducts = sortStockAttentionFirst(business.products);
   const attention = sortedProducts.filter(
     item => item.stockHealth && item.stockHealth !== 'aman',
@@ -46,7 +51,7 @@ export default async function BusinessInventoryPage({ params }: PageProps) {
       <SectionCard
         eyebrow="Stok"
         title="Cek yang hampir habis dulu"
-        description="Barang yang habis, tipis, atau belum cocok jumlahnya tampil paling atas. Detail bahan dan modal tetap dibuka hanya saat diperlukan."
+        description="Barang yang habis, tipis, atau belum cocok jumlahnya tampil paling atas. Belanja dapat menambah stok dan mencatat uang keluar dalam satu kejadian."
       >
         {canView ? (
           <div className="space-y-4">
@@ -129,13 +134,27 @@ export default async function BusinessInventoryPage({ params }: PageProps) {
             </section>
 
             {canViewIngredientCosts ? (
-              <details className="portal-panel group" open>
+              <StockPurchaseYieldWorkspace
+                businessId={business.id}
+                ingredients={ingredients.map(item => ({
+                  id: item.id,
+                  name: item.name,
+                  purchase_unit: item.purchase_unit,
+                }))}
+                products={business.products.map(product => ({ id: product.id, name: product.name }))}
+                observations={observations}
+                canManage={canManageIngredients}
+              />
+            ) : null}
+
+            {canViewIngredientCosts ? (
+              <details className="portal-panel group">
                 <summary className="cursor-pointer list-none p-4 sm:p-5">
                   <span className="font-bold text-portal-ink">
-                    Bahan & Kemasan
+                    Detail Bahan & Kemasan
                   </span>
                   <span className="ml-2 text-xs font-semibold text-portal-soft">
-                    Kelola stok, harga beli, yield, supplier, dan riwayat
+                    Harga beli, stok minimum, supplier, dan penyesuaian lanjutan
                   </span>
                 </summary>
                 <div className="border-t border-portal-line p-3 sm:p-4">
@@ -154,11 +173,10 @@ export default async function BusinessInventoryPage({ params }: PageProps) {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-portal-line bg-white p-4 sm:p-5">
                 <div>
                   <p className="font-bold text-portal-ink">
-                    Ingin menghitung modal produk?
+                    Ingin menghitung modal produk lebih rinci?
                   </p>
                   <p className="mt-1 text-sm text-portal-soft">
-                    Isi bahan terlebih dahulu, lalu hubungkan pemakaian bahan ke
-                    produk.
+                    HPP tetap opsional untuk mulai jualan. Isi bahan saat datanya sudah tersedia.
                   </p>
                 </div>
                 <Link
