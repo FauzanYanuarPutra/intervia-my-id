@@ -44,7 +44,7 @@ async fn update_ingredient(
 ) -> Response {
     let actor_id = match actor(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(status) => return api_error(status, "auth_required"),
     };
     let organization_id = match InventoryRepository::new(state.db.clone())
         .organization_for_business(business_id)
@@ -80,7 +80,7 @@ async fn archive_ingredient(
 ) -> Response {
     let actor_id = match actor(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(status) => return api_error(status, "auth_required"),
     };
     let organization_id = match InventoryRepository::new(state.db.clone())
         .organization_for_business(business_id)
@@ -110,7 +110,7 @@ async fn list_ingredient_movements(
 ) -> Response {
     let actor_id = match actor(&state, &headers) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(status) => return api_error(status, "auth_required"),
     };
     let inventory = InventoryRepository::new(state.db.clone());
     let organization_id = match inventory.organization_for_business(business_id).await {
@@ -146,15 +146,14 @@ async fn list_ingredient_movements(
     }
 }
 
-fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, Response> {
+fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, StatusCode> {
     headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
-    user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    user_id_from_auth(headers, &state.jwt_secret).ok_or(StatusCode::UNAUTHORIZED)
 }
 
 fn error_response(error: IngredientManagementError) -> Response {

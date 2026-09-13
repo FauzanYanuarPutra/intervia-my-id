@@ -451,7 +451,8 @@ async fn access_context(
     business_id: Uuid,
     kind: Wave2AccessKind,
 ) -> Result<Wave2AccessContext, Response> {
-    let (actor_id, authorization) = actor_and_authorization(state, headers)?;
+    let (actor_id, authorization) = actor_and_authorization(state, headers)
+        .map_err(|status| api_error(status, "auth_required"))?;
     let identity = IdentityClient::new(
         state.http_client.clone(),
         state.identity_service_url.clone(),
@@ -488,15 +489,14 @@ async fn access_context(
 fn actor_and_authorization(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<(Uuid, String), Response> {
+) -> Result<(Uuid, String), StatusCode> {
     let authorization = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
-    let actor_id = user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let actor_id = user_id_from_auth(headers, &state.jwt_secret).ok_or(StatusCode::UNAUTHORIZED)?;
     Ok((actor_id, authorization.to_owned()))
 }
 
