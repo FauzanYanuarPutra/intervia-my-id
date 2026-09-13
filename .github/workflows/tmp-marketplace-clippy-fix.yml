@@ -16,78 +16,53 @@ jobs:
         with:
           ref: feat/business-os-wave-2-1d-team-access-hardening
       - name: Apply behavior-preserving clippy fixes
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
 
-          ingredient = Path('services/marketplace_service/src/businesses/ingredient_management_routes.rs')
+          ingredient = Path("services/marketplace_service/src/businesses/ingredient_management_routes.rs")
           text = ingredient.read_text()
-          old_calls = '''        Err(response) => return response,'''
-          if text.count(old_calls) != 3:
-              raise SystemExit(f'expected 3 ingredient actor call sites, found {text.count(old_calls)}')
-          text = text.replace(old_calls, '''        Err(status) => return api_error(status, "auth_required"),''')
-          old_actor = '''fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, Response> {
-    headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
-    user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))
-}'''
-          new_actor = '''fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, StatusCode> {
-    headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-    user_id_from_auth(headers, &state.jwt_secret).ok_or(StatusCode::UNAUTHORIZED)
-}'''
-          if old_actor not in text:
-              raise SystemExit('ingredient actor helper did not match expected source')
-          ingredient.write_text(text.replace(old_actor, new_actor))
+          old_call = '        Err(response) => return response,'
+          if text.count(old_call) != 3:
+              raise SystemExit(f"expected 3 ingredient actor call sites, found {text.count(old_call)}")
+          text = text.replace(old_call, '        Err(status) => return api_error(status, "auth_required"),')
+          old_sig = 'fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, Response> {'
+          new_sig = 'fn actor(state: &AppState, headers: &HeaderMap) -> Result<Uuid, StatusCode> {'
+          if text.count(old_sig) != 1:
+              raise SystemExit("ingredient actor signature mismatch")
+          text = text.replace(old_sig, new_sig, 1)
+          old_guard = '.ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;'
+          if text.count(old_guard) != 1:
+              raise SystemExit("ingredient auth guard mismatch")
+          text = text.replace(old_guard, '.ok_or(StatusCode::UNAUTHORIZED)?;', 1)
+          old_user = 'user_id_from_auth(headers, &state.jwt_secret)\n        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))'
+          new_user = 'user_id_from_auth(headers, &state.jwt_secret).ok_or(StatusCode::UNAUTHORIZED)'
+          if text.count(old_user) != 1:
+              raise SystemExit("ingredient user auth mismatch")
+          ingredient.write_text(text.replace(old_user, new_user, 1))
 
-          wave2 = Path('services/marketplace_service/src/businesses/wave2_routes.rs')
+          wave2 = Path("services/marketplace_service/src/businesses/wave2_routes.rs")
           text = wave2.read_text()
-          old_access = '''    let (actor_id, authorization) = actor_and_authorization(state, headers)?;'''
-          new_access = '''    let (actor_id, authorization) = actor_and_authorization(state, headers)
-        .map_err(|status| api_error(status, "auth_required"))?;'''
+          old_access = '    let (actor_id, authorization) = actor_and_authorization(state, headers)?;'
+          new_access = '    let (actor_id, authorization) = actor_and_authorization(state, headers)\n        .map_err(|status| api_error(status, "auth_required"))?;'
           if text.count(old_access) != 1:
-              raise SystemExit(f'expected 1 wave2 actor call site, found {text.count(old_access)}')
-          text = text.replace(old_access, new_access)
-          old_actor_auth = '''fn actor_and_authorization(
-    state: &AppState,
-    headers: &HeaderMap,
-) -> Result<(Uuid, String), Response> {
-    let authorization = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
-    let actor_id = user_id_from_auth(headers, &state.jwt_secret)
-        .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;
-    Ok((actor_id, authorization.to_owned()))
-}'''
-          new_actor_auth = '''fn actor_and_authorization(
-    state: &AppState,
-    headers: &HeaderMap,
-) -> Result<(Uuid, String), StatusCode> {
-    let authorization = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| value.starts_with("Bearer ") && value.len() > 7)
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-    let actor_id =
-        user_id_from_auth(headers, &state.jwt_secret).ok_or(StatusCode::UNAUTHORIZED)?;
-    Ok((actor_id, authorization.to_owned()))
-}'''
-          if old_actor_auth not in text:
-              raise SystemExit('wave2 actor helper did not match expected source')
-          wave2.write_text(text.replace(old_actor_auth, new_actor_auth))
+              raise SystemExit("wave2 actor call mismatch")
+          text = text.replace(old_access, new_access, 1)
+          marker = 'fn actor_and_authorization('
+          if text.count(marker) != 1:
+              raise SystemExit("wave2 actor helper marker mismatch")
+          prefix, tail = text.split(marker, 1)
+          old_tail_sig = ') -> Result<(Uuid, String), Response> {'
+          new_tail_sig = ') -> Result<(Uuid, String), StatusCode> {'
+          if tail.count(old_tail_sig) < 1:
+              raise SystemExit("wave2 actor signature mismatch")
+          tail = tail.replace(old_tail_sig, new_tail_sig, 1)
+          old_auth = '.ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "auth_required"))?;'
+          if tail.count(old_auth) < 2:
+              raise SystemExit(f"wave2 auth guard mismatch: {tail.count(old_auth)}")
+          tail = tail.replace(old_auth, '.ok_or(StatusCode::UNAUTHORIZED)?;', 2)
+          wave2.write_text(prefix + marker + tail)
+          PY
       - name: Format marketplace
         run: cargo fmt --manifest-path services/marketplace_service/Cargo.toml
       - name: Verify clippy
