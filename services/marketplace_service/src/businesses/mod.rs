@@ -58,6 +58,8 @@ pub(crate) mod settlement;
 mod wave2;
 #[cfg(test)]
 mod wave2_migration_tests;
+#[cfg(test)]
+mod wave2_persistence_tests;
 
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
