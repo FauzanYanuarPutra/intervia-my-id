@@ -17,11 +17,15 @@ import {
 } from 'lucide-react';
 import {
   buildQuickSaleRequest,
+  buildReceiptShareText,
   buildReceiptView,
   calculateCashChange,
   canCompleteCheckout,
+  filterQuickSaleProducts,
   priceLabelToAmount,
+  quickSaleItemCount,
   quickSaleTotal,
+  quickTenderAmounts,
   type CheckoutPaymentMethod,
   type QuickSaleLineDraft,
   type ReceiptView,
@@ -66,18 +70,78 @@ function makeLine(product: ProductOption): DraftLine {
   };
 }
 
-function quickTenderAmounts(total: number) {
-  if (total <= 0) return [];
-  const rounded10k = Math.ceil(total / 10_000) * 10_000;
-  return Array.from(new Set([total, rounded10k, 50_000, 100_000])).filter(
-    value => value >= total,
-  );
-}
-
 function receiptNumberFromSaleId(saleId: string, date: string) {
   const compactDate = date.replaceAll('-', '').slice(2);
   const suffix = saleId.replaceAll('-', '').slice(-6).toUpperCase() || 'SALE';
   return `LJ-${compactDate}-${suffix}`;
+}
+
+function CartLines({
+  lines,
+  onQuantity,
+}: {
+  lines: DraftLine[];
+  onQuantity: (key: string, quantity: number) => void;
+}) {
+  if (!lines.length) {
+    return (
+      <div className="grid min-h-28 place-items-center text-center">
+        <div>
+          <p className="text-sm font-bold text-portal-ink">Belum ada pesanan</p>
+          <p className="mt-1 text-xs text-portal-soft">Tekan menu untuk menambah.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {lines.map(line => (
+        <div key={line.key} className="rounded-xl bg-[#fafbf9] p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-portal-ink">{line.productName}</p>
+              <p className="mt-0.5 text-xs text-portal-soft">
+                {money.format(Number(line.unitPriceAmount))}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label={`Hapus ${line.productName}`}
+              className="p-1 text-portal-soft hover:text-red-700"
+              onClick={() => onQuantity(line.key, 0)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1 rounded-lg border border-portal-line bg-white p-1">
+              <button
+                type="button"
+                aria-label={`Kurangi ${line.productName}`}
+                className="grid h-7 w-7 place-items-center rounded-md hover:bg-[#f2f4f1]"
+                onClick={() => onQuantity(line.key, Number(line.quantity) - 1)}
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <span className="min-w-8 text-center text-sm font-black">{line.quantity}</span>
+              <button
+                type="button"
+                aria-label={`Tambah ${line.productName}`}
+                className="grid h-7 w-7 place-items-center rounded-md hover:bg-[#f2f4f1]"
+                onClick={() => onQuantity(line.key, Number(line.quantity) + 1)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p className="text-sm font-black text-portal-ink">
+              {money.format(Number(line.quantity) * Number(line.unitPriceAmount))}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props) {
@@ -87,6 +151,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   const [accountKey, setAccountKey] = useState<CheckoutPaymentMethod>('cash');
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [search, setSearch] = useState('');
+  const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [tenderedAmount, setTenderedAmount] = useState(0);
@@ -99,15 +164,11 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   const attemptKey = useRef<string | null>(null);
 
   const total = useMemo(() => quickSaleTotal(lines), [lines]);
-  const itemCount = useMemo(
-    () => lines.reduce((sum, line) => sum + Math.max(0, Number(line.quantity) || 0), 0),
-    [lines],
+  const itemCount = useMemo(() => quickSaleItemCount(lines), [lines]);
+  const filteredProducts = useMemo(
+    () => filterQuickSaleProducts(products, search),
+    [products, search],
   );
-  const filteredProducts = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('id-ID');
-    if (!query) return products;
-    return products.filter(product => product.name.toLocaleLowerCase('id-ID').includes(query));
-  }, [products, search]);
   const cashChange = calculateCashChange(total, tenderedAmount);
   const canPay = canCompleteCheckout({
     total,
@@ -149,6 +210,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   function resetOrder() {
     attemptKey.current = null;
     setLines([]);
+    setCartOpen(false);
     setCheckoutOpen(false);
     setTenderedAmount(0);
     setReceipt(null);
@@ -161,6 +223,13 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
     changed();
     setAccountKey(method);
     if (method !== 'cash') setTenderedAmount(0);
+  }
+
+  function openCheckout() {
+    if (!lines.length || total <= 0) return;
+    setCartOpen(false);
+    setCheckoutOpen(true);
+    setTenderedAmount(total);
   }
 
   async function submit() {
@@ -223,6 +292,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
         }),
       );
       attemptKey.current = null;
+      setCartOpen(false);
       setCheckoutOpen(false);
       setFeedback({
         tone: 'success',
@@ -310,7 +380,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
             type="button"
             className="portal-button-secondary"
             onClick={async () => {
-              const text = `${receipt.receiptNumber}\nTotal ${money.format(receipt.total)}\n${receipt.paymentLabel}`;
+              const text = buildReceiptShareText(receipt);
               if (navigator.share) await navigator.share({ text }).catch(() => undefined);
               else await navigator.clipboard?.writeText(text).catch(() => undefined);
             }}
@@ -326,9 +396,9 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   }
 
   return (
-    <div className="grid min-h-[520px] gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section className="min-w-0 space-y-3">
-        <label className="relative block">
+    <div className="relative grid min-h-[520px] gap-3 pb-24 lg:grid-cols-[minmax(0,1fr)_320px] lg:pb-0">
+      <section className="min-w-0 space-y-2.5">
+        <label className="sticky top-0 z-10 block bg-white/95 py-1 backdrop-blur">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-soft" />
           <input
             className="portal-input w-full pl-9"
@@ -347,15 +417,15 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
                 key={product.id}
                 type="button"
                 onClick={() => addProduct(product)}
-                className="relative min-h-24 rounded-xl border border-portal-line bg-white p-3 text-left transition hover:border-portal-ink/30 hover:bg-[#fafbf9] active:scale-[0.99]"
+                className="relative min-h-20 rounded-xl border border-portal-line bg-white p-2.5 text-left transition hover:border-portal-ink/30 hover:bg-[#fafbf9] active:scale-[0.99]"
               >
                 {quantity > 0 ? (
                   <span className="absolute right-2 top-2 grid h-6 min-w-6 place-items-center rounded-full bg-portal-ink px-1.5 text-xs font-black text-white">
                     {quantity}
                   </span>
                 ) : null}
-                <p className="pr-6 text-sm font-bold leading-5 text-portal-ink">{product.name}</p>
-                <p className="mt-3 text-sm font-black text-portal-ink">{product.priceLabel}</p>
+                <p className="pr-7 text-sm font-bold leading-5 text-portal-ink">{product.name}</p>
+                <p className="mt-2 text-sm font-black text-portal-ink">{product.priceLabel}</p>
               </button>
             );
           })}
@@ -368,56 +438,28 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
         ) : null}
       </section>
 
-      <aside className="flex min-h-0 flex-col rounded-2xl border border-portal-line bg-white lg:sticky lg:top-3 lg:max-h-[calc(100vh-9rem)]">
+      <aside className="hidden min-h-0 flex-col rounded-2xl border border-portal-line bg-white lg:sticky lg:top-3 lg:flex lg:max-h-[calc(100vh-9rem)]">
         <div className="flex items-center justify-between border-b border-portal-line px-4 py-3">
           <div>
             <p className="font-bold text-portal-ink">Pesanan</p>
             <p className="text-xs text-portal-soft">{itemCount} item</p>
           </div>
           {lines.length ? (
-            <button type="button" className="text-xs font-bold text-portal-soft hover:text-red-700" onClick={() => { changed(); setLines([]); }}>
+            <button
+              type="button"
+              className="text-xs font-bold text-portal-soft hover:text-red-700"
+              onClick={() => {
+                changed();
+                setLines([]);
+              }}
+            >
               Kosongkan
             </button>
           ) : null}
         </div>
 
         <div className="min-h-32 flex-1 overflow-y-auto p-3">
-          {lines.length ? (
-            <div className="space-y-2">
-              {lines.map(line => (
-                <div key={line.key} className="rounded-xl bg-[#fafbf9] p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-portal-ink">{line.productName}</p>
-                      <p className="mt-0.5 text-xs text-portal-soft">{money.format(Number(line.unitPriceAmount))}</p>
-                    </div>
-                    <button type="button" aria-label={`Hapus ${line.productName}`} className="p-1 text-portal-soft hover:text-red-700" onClick={() => setQuantity(line.key, 0)}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-1 rounded-lg border border-portal-line bg-white p-1">
-                      <button type="button" aria-label={`Kurangi ${line.productName}`} className="grid h-7 w-7 place-items-center rounded-md hover:bg-[#f2f4f1]" onClick={() => setQuantity(line.key, Number(line.quantity) - 1)}>
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="min-w-8 text-center text-sm font-black">{line.quantity}</span>
-                      <button type="button" aria-label={`Tambah ${line.productName}`} className="grid h-7 w-7 place-items-center rounded-md hover:bg-[#f2f4f1]" onClick={() => setQuantity(line.key, Number(line.quantity) + 1)}>
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <p className="text-sm font-black text-portal-ink">{money.format(Number(line.quantity) * Number(line.unitPriceAmount))}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid min-h-32 place-items-center text-center">
-              <div>
-                <p className="text-sm font-bold text-portal-ink">Belum ada pesanan</p>
-                <p className="mt-1 text-xs text-portal-soft">Tekan menu untuk menambah.</p>
-              </div>
-            </div>
-          )}
+          <CartLines lines={lines} onQuantity={setQuantity} />
         </div>
 
         <div className="space-y-3 border-t border-portal-line p-3">
@@ -428,11 +470,71 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
             </div>
             <span className="text-xs text-portal-soft">{itemCount} item</span>
           </div>
-          <button type="button" className="portal-button-primary w-full justify-center py-3" disabled={!lines.length || total <= 0} onClick={() => { setCheckoutOpen(true); setTenderedAmount(total); }}>
+          <button
+            type="button"
+            className="portal-button-primary w-full justify-center py-3"
+            disabled={!lines.length || total <= 0}
+            onClick={openCheckout}
+          >
             Bayar
           </button>
         </div>
       </aside>
+
+      {lines.length ? (
+        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-2xl border border-portal-line bg-white p-2 shadow-xl lg:hidden">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="min-w-0 flex-1 rounded-xl px-2 py-1.5 text-left"
+              onClick={() => setCartOpen(true)}
+            >
+              <p className="truncate text-xs font-semibold text-portal-soft">{itemCount} item · Lihat pesanan</p>
+              <p className="truncate text-lg font-black text-portal-ink">{money.format(total)}</p>
+            </button>
+            <button
+              type="button"
+              className="portal-button-primary shrink-0 justify-center px-5 py-3"
+              onClick={openCheckout}
+            >
+              Bayar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {cartOpen ? (
+        <div
+          className="fixed inset-0 z-40 grid place-items-end bg-black/35 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pesanan"
+        >
+          <div className="max-h-[82vh] w-full rounded-t-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-portal-line px-4 py-3">
+              <div>
+                <p className="font-bold text-portal-ink">Pesanan</p>
+                <p className="text-xs text-portal-soft">{itemCount} item</p>
+              </div>
+              <button type="button" className="portal-button-secondary" onClick={() => setCartOpen(false)}>
+                Tutup
+              </button>
+            </div>
+            <div className="max-h-[52vh] overflow-y-auto p-3">
+              <CartLines lines={lines} onQuantity={setQuantity} />
+            </div>
+            <div className="border-t border-portal-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <span className="text-sm font-semibold text-portal-soft">Total</span>
+                <span className="text-2xl font-black text-portal-ink">{money.format(total)}</span>
+              </div>
+              <button type="button" className="portal-button-primary w-full justify-center py-3" onClick={openCheckout}>
+                Bayar · {money.format(total)}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {checkoutOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-end bg-black/35 p-0 sm:place-items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Pembayaran">
