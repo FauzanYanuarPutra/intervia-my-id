@@ -1,4 +1,4 @@
-use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository, SaleRepositoryError};
+use super::sales::{CreateSaleLineRequest, CreateSaleRequest, SaleRepository};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
@@ -298,7 +298,7 @@ async fn sale_uses_effective_recipe_version_for_snapshot_and_consumption(pool: P
 #[sqlx::test(migrations = "./migrations")]
 async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool: PgPool) {
     let seeded = seed_versioned_sale(&pool).await;
-    let result = SaleRepository::new(pool.clone())
+    let created = SaleRepository::new(pool.clone())
         .create(
             seeded.actor_id,
             seeded.business_id,
@@ -316,9 +316,35 @@ async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool
                 }],
             },
         )
-        .await;
+        .await
+        .unwrap();
 
-    assert_eq!(result.unwrap_err(), SaleRepositoryError::IncompleteCosting);
+    assert_eq!(created.sale.sale.cogs_amount, None);
+    assert!(!created.sale.sale.cost_complete);
+    assert_eq!(created.sale.lines[0].unit_cogs_amount, None);
+    assert_eq!(created.sale.lines[0].line_cogs_amount, None);
+    assert_eq!(
+        created.sale.lines[0]
+            .cost_snapshot
+            .get("status")
+            .and_then(|value| value.as_str()),
+        Some("incomplete")
+    );
+    assert_eq!(
+        created.sale.lines[0]
+            .cost_snapshot
+            .get("reason")
+            .and_then(|value| value.as_str()),
+        Some("recipe_missing")
+    );
+
+    let persisted_version_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT recipe_version_id FROM business_sale_lines WHERE sale_id=$1")
+            .bind(created.sale.sale.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(persisted_version_id, None);
 
     let stock: Decimal =
         sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
@@ -328,13 +354,25 @@ async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool
             .unwrap();
     assert_eq!(stock, Decimal::from(5_000));
 
-    let sales_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM business_sales WHERE business_id=$1")
-            .bind(seeded.business_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(sales_count, 0);
+    let movement_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_inventory_movements WHERE source_type='business_sale' AND source_id=$1",
+    )
+    .bind(created.sale.sale.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(movement_count, 0);
+
+    let finance: (String, i64) = sqlx::query_as(
+        "SELECT entry_type, amount FROM business_finance_entries WHERE business_id=$1 AND source_type='business_sale' AND source_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(created.sale.sale.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(finance.0, "sale_income");
+    assert_eq!(finance.1, 12_000);
 }
 
 #[sqlx::test(migrations = "./migrations")]
