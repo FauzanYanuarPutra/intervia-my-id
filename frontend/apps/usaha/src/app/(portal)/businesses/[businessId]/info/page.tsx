@@ -37,7 +37,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
           </nav>
 
           <section id="info-usaha" className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,.7fr)]">
-            <DataPanel title={canManage ? 'Info usaha' : 'Info usaha'} description={canManage ? 'Ubah hanya data yang memang berubah.' : 'Aksesmu saat ini hanya dapat melihat data.'}>
+            <DataPanel title="Info usaha" description={canManage ? 'Ubah hanya data yang memang berubah.' : 'Aksesmu saat ini hanya dapat melihat data.'}>
               <div className="p-4 sm:p-5">
                 {canManage ? (
                   <BusinessInfoQuickForm business={business} />
@@ -77,7 +77,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
             </div>
           </details>
 
-          <DataPanel id={undefined} title="Lokasi" description="Pastikan alamat dan titik peta sesuai kondisi nyata.">
+          <DataPanel title="Lokasi" description="Pastikan alamat dan titik peta sesuai kondisi nyata.">
             <div id="lokasi-usaha" className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_300px]">
               <BusinessLocationMap value={businessPoint} searchQuery={businessLocationQuery} markerLabel={business.name} heightClassName="h-[260px] w-full" />
               <div className="space-y-3">
