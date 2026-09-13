@@ -60,6 +60,7 @@ mod wave2;
 mod wave2_migration_tests;
 #[cfg(test)]
 mod wave2_persistence_tests;
+mod wave2_routes;
 
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
@@ -68,4 +69,5 @@ pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
         .merge(inventory_routes::router())
         .merge(sales_routes::router())
         .merge(public_commerce_routes::router())
+        .merge(wave2_routes::router())
 }
