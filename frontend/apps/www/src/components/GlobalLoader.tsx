@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from '@/i18n/navigation';
+import { ROUTE_LOADER_DELAY_MS } from '@/lib/async/loadingTimings';
 import { useSearchParams } from 'next/navigation';
 import { Z_INDEX } from './constants/z-index';
 
 type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
 
-export const ROUTE_LOADER_DELAY_MS = 160;
 const FAIL_SAFE_HIDE_MS = 8000;
 
 function clearTimer(timer: TimerRef) {
