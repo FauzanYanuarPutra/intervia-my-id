@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BarChart3, Calculator, PackageSearch, Store, WalletCards } from 'lucide-react';
+import { BarChart3, Calculator, PackageSearch, Sparkles, Store, WalletCards } from 'lucide-react';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { SectionCard } from '@/components/portal/SectionCard';
+import { getBusinessAdvisorSummary } from '@/lib/business-advisor-server';
 import {
   listControlChannels,
   listControlFinanceEntries,
@@ -47,6 +48,9 @@ export default async function BusinessReportsPage({ params }: PageProps) {
         listControlSales(business.id),
       ])
     : [[], [], [], []];
+  const advisor = canView && canViewFinance
+    ? await getBusinessAdvisorSummary(business.id)
+    : null;
   const summary = summarizeControlCenter({
     ingredients,
     financeEntries,
@@ -103,13 +107,33 @@ export default async function BusinessReportsPage({ params }: PageProps) {
                 <div className="portal-icon-tile"><Store className="h-4 w-4" /></div>
                 <p className="mt-3 portal-label">Biaya operasional hari ini</p>
                 <p className="mt-1 text-2xl font-bold text-portal-ink">{canViewFinance && summary.todayEntryCount ? money.format(summary.financeToday.operatingExpenses) : canViewFinance ? 'Belum ada data' : '—'}</p>
-                <p className="mt-1 text-xs leading-5 text-portal-soft">Modal pemilik, ambil pribadi, dan settlement tidak diubah menjadi omzet/laba.</p>
+                <p className="mt-1 text-xs leading-5 text-portal-soft">Modal pemilik, Ambil owner, dan transfer aplikasi tidak diubah menjadi omzet/laba.</p>
               </div>
             </section>
 
+            {advisor ? (
+              <section className="portal-panel p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="portal-kicker"><Sparkles className="mr-1 inline h-3.5 w-3.5" /> Saran hari ini</p>
+                    <h2 className="mt-1 font-bold text-portal-ink">Berdasarkan angka deterministic, bukan tebakan AI</h2>
+                  </div>
+                  <span className="rounded-full border border-portal-line px-3 py-1 text-xs font-semibold text-portal-soft">
+                    {advisor.provider.provider === 'disabled' ? 'Deterministic' : `Advisor: ${advisor.provider.provider}`}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                  {advisor.signals.map(signal => (
+                    <p key={signal} className="rounded-xl border border-portal-line bg-white px-4 py-3 text-sm leading-6 text-portal-ink">{signal}</p>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs leading-5 text-portal-soft">Advisor hanya membaca ringkasan terstruktur. Ia tidak punya endpoint untuk memindahkan uang, mengubah stok, harga, void, atau refund.</p>
+              </section>
+            ) : null}
+
             {!salesSummary.costComplete && hasSalesToday && canViewCosting ? (
               <div className="portal-panel flex flex-wrap items-center justify-between gap-3 p-4">
-                <div><p className="font-bold text-portal-ink">HPP belum lengkap</p><p className="mt-1 text-sm text-portal-soft">Lengkapi resep/bahan. Penjualan lama tetap memakai snapshot yang tersimpan dan tidak dihitung ulang diam-diam.</p></div>
+                <div><p className="font-bold text-portal-ink">HPP belum lengkap</p><p className="mt-1 text-sm text-portal-soft">Lengkapi resep/bahan saat datanya tersedia. Penjualan lama tetap memakai snapshot yang tersimpan dan tidak dihitung ulang diam-diam.</p></div>
                 <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-primary">Buka HPP</Link>
               </div>
             ) : null}
@@ -117,12 +141,12 @@ export default async function BusinessReportsPage({ params }: PageProps) {
             <section className="grid gap-4 lg:grid-cols-3">
               <div className="portal-panel p-5">
                 <p className="portal-kicker">HPP & stok</p>
-                <h2 className="mt-1 font-bold text-portal-ink">{canViewCosting && summary.lowIngredientCount ? `${summary.lowIngredientCount} bahan mencapai batas minimum` : canViewCosting && ingredients.length ? 'Bahan belum menunjukkan batas minimum kritis' : 'Lengkapi bahan untuk mulai costing'}</h2>
-                <p className="mt-2 text-sm leading-6 text-portal-soft">{canViewCosting && summary.lowIngredients.length ? `Prioritas: ${summary.lowIngredients.slice(0, 4).map(item => item.name).join(', ')}.` : 'Harga beli, yield, susut, dan stok bahan menjadi dasar HPP. Phase 1 belum mengurangi stok bahan saat sale diposting.'}</p>
+                <h2 className="mt-1 font-bold text-portal-ink">{canViewCosting && summary.lowIngredientCount ? `${summary.lowIngredientCount} bahan mencapai batas minimum` : canViewCosting && ingredients.length ? 'Bahan belum menunjukkan batas minimum kritis' : 'Lengkapi bahan jika ingin menghitung HPP'}</h2>
+                <p className="mt-2 text-sm leading-6 text-portal-soft">{canViewCosting && summary.lowIngredients.length ? `Prioritas: ${summary.lowIngredients.slice(0, 4).map(item => item.name).join(', ')}.` : 'Penjualan dengan resep/HPP lengkap mengurangi bahan sesuai snapshot resep. Jika HPP belum lengkap, konsumsi bahan tidak ditebak.'}</p>
                 <div className="mt-4 flex flex-wrap gap-2"><Link href={`/businesses/${business.id}/inventory`} className="portal-button-primary">Buka stok</Link>{canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-secondary"><Calculator className="h-4 w-4" /> Buka HPP</Link> : null}</div>
               </div>
               <div className="portal-panel p-5">
-                <p className="portal-kicker">Hasil operasional tercatat</p>
+                <p className="portal-kicker">Hasil usaha tercatat</p>
                 <h2 className="mt-1 font-bold text-portal-ink">{recordedOperatingResult === null ? 'Belum dapat dihitung lengkap' : money.format(recordedOperatingResult)}</h2>
                 <p className="mt-2 text-sm leading-6 text-portal-soft">Ini laba kotor canonical dikurangi biaya operasional yang benar-benar tercatat hari ini. Bukan laba bersih final dan tidak memasukkan modal/drawing sebagai pendapatan atau biaya.</p>
                 {canViewFinance ? <Link href={`/businesses/${business.id}/finance`} className="portal-button-primary mt-4">Buka Uang</Link> : null}
@@ -130,8 +154,8 @@ export default async function BusinessReportsPage({ params }: PageProps) {
               <div className="portal-panel p-5">
                 <p className="portal-kicker">Kanal jual</p>
                 <h2 className="mt-1 font-bold text-portal-ink">{canViewChannels && summary.configuredChannelCount ? `${summary.enabledChannelCount} dari ${summary.configuredChannelCount} kanal aktif` : 'Belum ada asumsi kanal tersimpan'}</h2>
-                <p className="mt-2 text-sm leading-6 text-portal-soft">Fee dan promo tidak di-hard-code. Gunakan angka sesuai kontrak merchant lalu bandingkan margin sebelum mengubah harga.</p>
-                {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="portal-button-primary mt-4">Buka Kanal Jual</Link> : null}
+                <p className="mt-2 text-sm leading-6 text-portal-soft">Potongan aplikasi dan promo tidak di-hard-code. Gunakan angka sesuai kontrak toko lalu bandingkan margin sebelum mengubah harga.</p>
+                {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="portal-button-primary mt-4">Buka Jual Online</Link> : null}
               </div>
             </section>
 
