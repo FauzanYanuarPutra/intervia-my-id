@@ -11,7 +11,7 @@ function readSource(relativePath: string) {
 
 describe('async UX anti-pattern guards', () => {
   it('keeps migrated Explore loading UI on shared skeleton primitives', () => {
-    const source = readSource('components/explore/ExploreSearchResults.tsx');
+    const source = readSource('src/components/explore/ExploreSearchResults.tsx');
 
     expect(source).not.toContain('animate-pulse');
     expect(source).toContain("import { Skeleton, SkeletonStack }");
@@ -19,10 +19,16 @@ describe('async UX anti-pattern guards', () => {
     expect(source).toContain('data-skeleton-kind={kind}');
   });
 
-  it('documents Home full-page auth hydration as a remaining P0 migration', () => {
-    const source = readSource('components/home/HomeResponsiveMarketplace.tsx');
+  it('keeps auth bootstrap non-blocking on public routes at the context boundary', () => {
+    const contextSource = readSource('src/context/AuthContext.tsx');
+    const policySource = readSource('src/lib/auth/authLoadingPolicy.ts');
 
-    expect(source).toContain('if (authLoading)');
-    expect(source).toContain('return <HomeLoadingState isId={isId} />');
+    expect(contextSource).toContain(
+      'const consumerLoading = shouldBlockForAuthLoading(pathname, loading);',
+    );
+    expect(contextSource).toContain('loading: consumerLoading');
+    expect(policySource).toContain(
+      'return authLoading && isProtectedRoutePath(pathname);',
+    );
   });
 });
