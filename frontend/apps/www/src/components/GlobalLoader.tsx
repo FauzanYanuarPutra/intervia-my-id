@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
 import { Z_INDEX } from './constants/z-index';
@@ -9,6 +9,12 @@ type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
 
 export const ROUTE_LOADER_DELAY_MS = 160;
 const FAIL_SAFE_HIDE_MS = 8000;
+
+function clearTimer(timer: TimerRef) {
+  if (timer.current === null) return;
+  clearTimeout(timer.current);
+  timer.current = null;
+}
 
 export default function GlobalLoader() {
   const pathname = usePathname();
@@ -23,18 +29,12 @@ export default function GlobalLoader() {
   const loaderVisibleRef = useRef(false);
   const currentRouteRef = useRef('');
 
-  const clearTimer = (timer: TimerRef) => {
-    if (timer.current === null) return;
-    clearTimeout(timer.current);
-    timer.current = null;
-  };
-
-  const hideLoader = () => {
+  const hideLoader = useCallback(() => {
     clearTimer(delayTimer);
     clearTimer(failSafeTimer);
     loaderVisibleRef.current = false;
     setShowLoader(false);
-  };
+  }, []);
 
   useEffect(() => {
     currentRouteRef.current = window.location.pathname + window.location.search;
@@ -100,7 +100,7 @@ export default function GlobalLoader() {
       clearTimer(delayTimer);
       clearTimer(failSafeTimer);
     };
-  }, []);
+  }, [hideLoader]);
 
   useEffect(() => {
     const nextRoute = pathname + (search ? `?${search}` : '');
@@ -114,7 +114,7 @@ export default function GlobalLoader() {
 
     currentRouteRef.current = nextRoute;
     hideLoader();
-  }, [pathname, search]);
+  }, [hideLoader, pathname, search]);
 
   if (!showLoader) return null;
 
