@@ -39,18 +39,19 @@ describe('business role permission matrix', () => {
         'closeCashShift',
       ]),
     );
-    expect(permissionMap.cashier).not.toEqual(
-      expect.arrayContaining([
-        'viewCosting',
-        'viewFinance',
-        'viewTeam',
-        'inviteMembers',
-        'manageRoles',
-        'manageInventory',
-        'voidSales',
-        'refundSales',
-      ]),
-    );
+
+    for (const permission of [
+      'viewCosting',
+      'viewFinance',
+      'viewTeam',
+      'inviteMembers',
+      'manageRoles',
+      'manageInventory',
+      'voidSales',
+      'refundSales',
+    ] as const) {
+      expect(permissionMap.cashier).not.toContain(permission);
+    }
   });
 
   it('keeps viewer read-only and away from sensitive finance, costing and team data', () => {
@@ -65,19 +66,20 @@ describe('business role permission matrix', () => {
         'viewBuyerPage',
       ]),
     );
-    expect(permissionMap.viewer).not.toEqual(
-      expect.arrayContaining([
-        'manageInfo',
-        'manageProducts',
-        'manageInventory',
-        'manageOrders',
-        'createSales',
-        'viewCosting',
-        'viewFinance',
-        'viewTeam',
-        'inviteMembers',
-      ]),
-    );
+
+    for (const permission of [
+      'manageInfo',
+      'manageProducts',
+      'manageInventory',
+      'manageOrders',
+      'createSales',
+      'viewCosting',
+      'viewFinance',
+      'viewTeam',
+      'inviteMembers',
+    ] as const) {
+      expect(permissionMap.viewer).not.toContain(permission);
+    }
   });
 
   it('has plain-language role previews that explain allowed and blocked access', () => {
@@ -88,6 +90,8 @@ describe('business role permission matrix', () => {
       expect(roleSummaryMap[role].cannot.length).toBeGreaterThan(0);
     }
 
+    expect(roleSummaryMap.manager.can.join(' ')).toMatch(/undang/i);
+    expect(roleSummaryMap.manager.cannot.join(' ')).toMatch(/peran|keamanan/i);
     expect(roleSummaryMap.cashier.cannot.join(' ')).toMatch(/HPP|laba/i);
     expect(roleSummaryMap.viewer.cannot.join(' ')).toMatch(/undang/i);
   });
