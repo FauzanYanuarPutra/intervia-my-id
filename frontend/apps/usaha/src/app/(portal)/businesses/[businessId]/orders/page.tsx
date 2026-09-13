@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { ClipboardCheck, Clock3, PackageCheck, ShoppingBag } from 'lucide-react';
+import { CashShiftWorkspace } from '@/components/business-control/CashShiftWorkspace';
 import { QuickSaleWorkspace } from '@/components/business-control/QuickSaleWorkspace';
 import { DataPanel } from '@/components/portal/DataPanel';
 import { EmptyState } from '@/components/portal/EmptyState';
@@ -7,6 +8,7 @@ import { PortalShell } from '@/components/portal/PortalShell';
 import { SectionCard } from '@/components/portal/SectionCard';
 import { StatCard } from '@/components/portal/StatCard';
 import { StatusBadge } from '@/components/portal/StatusBadge';
+import { getCurrentWave2CashShift } from '@/lib/business-wave2-server';
 import { listControlSales } from '@/lib/business-control-server';
 import { jakartaDateKey } from '@/lib/business-control/insights';
 import { hasPermission } from '@/lib/portal-logic';
@@ -34,9 +36,15 @@ export default async function BusinessOrdersPage({ params }: PageProps) {
   const business = activeBusiness;
   if (!business) notFound();
 
-  const canManage = hasPermission(business, 'manageOrders');
+  const canManageOrders = hasPermission(business, 'manageOrders');
+  const canCreateSales = hasPermission(business, 'createSales');
+  const canViewTransactions = hasPermission(business, 'viewTransactions');
+  const canCloseCashShift = hasPermission(business, 'closeCashShift');
   const canViewCosting = hasPermission(business, 'viewCosting');
-  const sales = canManage ? await listControlSales(business.id) : [];
+  const [sales, currentShift] = await Promise.all([
+    canViewTransactions ? listControlSales(business.id) : Promise.resolve([]),
+    canCloseCashShift ? getCurrentWave2CashShift(business.id) : Promise.resolve(null),
+  ]);
   const saleProducts = business.products
     .filter(product => product.status === 'live')
     .map(product => ({
@@ -60,15 +68,19 @@ export default async function BusinessOrdersPage({ params }: PageProps) {
       currentSection="orders"
     >
       <SectionCard
-        eyebrow="Penjualan"
-        title="Pesanan & penjualan"
-        description="Catat penjualan langsung lebih dulu, lalu pantau antrean order dari kanal lain tanpa mencampurkan keduanya."
+        eyebrow="Kasir"
+        title="Jual cepat, catatan tetap rapi"
+        description="Tap produk, pilih jumlah, Bayar, lalu lanjut transaksi berikutnya. HPP membantu analisis jika tersedia, tetapi tidak pernah menghalangi jualan."
       >
         <div className="space-y-4">
-          {canManage ? (
+          {canCloseCashShift ? (
+            <CashShiftWorkspace businessId={business.id} initialShift={currentShift} />
+          ) : null}
+
+          {canCreateSales ? (
             <DataPanel
-              title="Catat penjualan"
-              description="Simpan transaksi nyata. HPP dihitung dari resep aktif dan dikunci sebagai snapshot historis oleh backend."
+              title="Kasir"
+              description="Penjualan tersimpan sebagai transaksi canonical dan pendapatan dibuat otomatis sekali."
             >
               <div className="p-3 sm:p-4">
                 <QuickSaleWorkspace
@@ -80,75 +92,77 @@ export default async function BusinessOrdersPage({ params }: PageProps) {
             </DataPanel>
           ) : null}
 
-          <DataPanel
-            title="Penjualan tercatat"
-            description={`${sales.length} transaksi canonical tersimpan.`}
-          >
-            {sales.length ? (
-              <div className="divide-y divide-portal-line">
-                {sales.map(({ sale, lines }) => {
-                  const itemSummary = lines
-                    .map(
-                      line =>
-                        `${line.product_name} × ${Number(line.quantity).toLocaleString('id-ID')}`,
-                    )
-                    .join(', ');
-                  const grossProfit =
-                    sale.cost_complete && sale.cogs_amount !== null
-                      ? sale.final_amount - sale.cogs_amount
-                      : null;
-                  return (
-                    <article
-                      key={sale.id}
-                      className="grid gap-2 px-4 py-3 sm:grid-cols-[110px_minmax(180px,1fr)_120px_150px] sm:items-center sm:px-5"
-                    >
-                      <div>
-                        <p className="text-[11px] font-semibold text-portal-soft">Tanggal</p>
-                        <p className="text-sm font-bold text-portal-ink">{sale.occurred_on}</p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-portal-ink">{itemSummary}</p>
-                        <p className="mt-1 text-xs text-portal-soft">{sale.channel_key || 'Tanpa kanal'} · {sale.account_key}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-portal-soft">Omzet</p>
-                        <p className="text-sm font-bold text-portal-ink">{money.format(sale.final_amount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-portal-soft">{canViewCosting ? 'Laba kotor' : 'Status biaya'}</p>
-                        <p className="text-sm font-bold text-portal-ink">
-                          {canViewCosting
-                            ? grossProfit === null
-                              ? 'HPP belum lengkap'
-                              : money.format(grossProfit)
-                            : sale.cost_complete
-                              ? 'Terkunci'
-                              : 'Belum lengkap'}
-                        </p>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                title="Belum ada penjualan tercatat"
-                description="Penjualan yang dibuat dari form di atas akan muncul di sini dengan snapshot HPP historis."
-                icon={ShoppingBag}
-              />
-            )}
-          </DataPanel>
+          {canViewTransactions ? (
+            <DataPanel
+              title="Transaksi tercatat"
+              description={`${sales.length} transaksi tersimpan. Biaya tetap jujur: jika HPP belum ada, laba tidak ditebak.`}
+            >
+              {sales.length ? (
+                <div className="divide-y divide-portal-line">
+                  {sales.map(({ sale, lines }) => {
+                    const itemSummary = lines
+                      .map(
+                        line =>
+                          `${line.product_name} × ${Number(line.quantity).toLocaleString('id-ID')}`,
+                      )
+                      .join(', ');
+                    const grossProfit =
+                      sale.cost_complete && sale.cogs_amount !== null
+                        ? sale.final_amount - sale.cogs_amount
+                        : null;
+                    return (
+                      <article
+                        key={sale.id}
+                        className="grid gap-2 px-4 py-3 sm:grid-cols-[110px_minmax(180px,1fr)_120px_150px] sm:items-center sm:px-5"
+                      >
+                        <div>
+                          <p className="text-[11px] font-semibold text-portal-soft">Tanggal</p>
+                          <p className="text-sm font-bold text-portal-ink">{sale.occurred_on}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-portal-ink">{itemSummary}</p>
+                          <p className="mt-1 text-xs text-portal-soft">{sale.channel_key || 'Offline / langsung'} · {sale.account_key}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold text-portal-soft">Omzet</p>
+                          <p className="text-sm font-bold text-portal-ink">{money.format(sale.final_amount)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold text-portal-soft">{canViewCosting ? 'Laba kotor' : 'Status biaya'}</p>
+                          <p className="text-sm font-bold text-portal-ink">
+                            {canViewCosting
+                              ? grossProfit === null
+                                ? 'HPP belum lengkap'
+                                : money.format(grossProfit)
+                              : sale.cost_complete
+                                ? 'Terkunci'
+                                : 'Belum lengkap'}
+                          </p>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState
+                  title="Belum ada transaksi"
+                  description="Jualan dari Kasir akan muncul di sini. Produk tanpa HPP tetap boleh dijual dan ditandai belum lengkap biayanya."
+                  icon={ShoppingBag}
+                />
+              )}
+            </DataPanel>
+          ) : null}
 
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Baru masuk" value={newOrders} icon={ShoppingBag} note="Belum mulai diproses" />
             <StatCard label="Sedang berjalan" value={processingOrders} icon={Clock3} note="Diproses atau siap kirim" />
             <StatCard label="Selesai" value={completedOrders} icon={PackageCheck} note="Tercatat pada data workspace" />
-            <StatCard label="Akses" value={canManage ? 'Kelola' : 'Pantau'} icon={ClipboardCheck} note={canManage ? 'Dapat memproses pesanan' : 'Mode lihat saja'} />
+            <StatCard label="Akses" value={canManageOrders ? 'Kelola order' : canCreateSales ? 'Kasir' : 'Pantau'} icon={ClipboardCheck} note={canManageOrders ? 'Dapat memproses pesanan eksternal' : canCreateSales ? 'Dapat membuat transaksi penjualan' : 'Mode lihat saja'} />
           </section>
 
           <DataPanel
             title="Antrean pesanan"
-            description={`${business.orders.length} pesanan eksternal/operasional tercatat untuk usaha ini.`}
+            description={`${business.orders.length} pesanan kanal/operasional tercatat terpisah dari transaksi Kasir.`}
           >
             {business.orders.length ? (
               <div>
@@ -170,7 +184,7 @@ export default async function BusinessOrdersPage({ params }: PageProps) {
             ) : (
               <EmptyState
                 title="Belum ada pesanan"
-                description="Begitu pesanan dari kanal order masuk, antreannya tampil di sini terpisah dari penjualan kasir."
+                description="Pesanan dari kanal order tampil di sini dan tidak dicampur dengan transaksi Kasir."
                 icon={ShoppingBag}
               />
             )}
