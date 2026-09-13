@@ -1,13 +1,12 @@
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use serde::Deserialize;
-use sqlx::{PgPool, Postgres, Transaction};
+use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
     control::IngredientRecord,
     governance::{GovernanceError, GovernanceRepository},
-    inventory::InventoryMovementRecord,
 };
 
 const MAX_NAME_LEN: usize = 160;
@@ -28,6 +27,25 @@ pub(crate) struct UpdateIngredientRequest {
     pub(crate) waste_percent: Decimal,
     pub(crate) minimum_stock: Decimal,
     pub(crate) supplier_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub(crate) struct IngredientMovementRecord {
+    pub(crate) id: Uuid,
+    pub(crate) organization_id: Uuid,
+    pub(crate) business_id: Uuid,
+    pub(crate) location_id: Option<Uuid>,
+    pub(crate) ingredient_id: Uuid,
+    pub(crate) command_id: Option<Uuid>,
+    pub(crate) movement_type: String,
+    pub(crate) quantity_delta: Decimal,
+    pub(crate) quantity_before: Decimal,
+    pub(crate) quantity_after: Decimal,
+    pub(crate) source_type: Option<String>,
+    pub(crate) source_id: Option<Uuid>,
+    pub(crate) note: String,
+    pub(crate) created_by_user_id: Uuid,
+    pub(crate) created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,17 +106,17 @@ impl IngredientManagementRepository {
         sqlx::query_as::<_, IngredientRecord>(
             r#"
             UPDATE business_ingredients
-            SET name=$5,
-                kind=$6,
-                purchase_unit=$7,
-                recipe_unit=$8,
-                conversion_factor=$9,
-                purchase_price_amount=$10,
-                purchase_quantity=$11,
-                yield_percent=$12,
-                waste_percent=$13,
-                minimum_stock=$14,
-                supplier_name=$15,
+            SET name=$4,
+                kind=$5,
+                purchase_unit=$6,
+                recipe_unit=$7,
+                conversion_factor=$8,
+                purchase_price_amount=$9,
+                purchase_quantity=$10,
+                yield_percent=$11,
+                waste_percent=$12,
+                minimum_stock=$13,
+                supplier_name=$14,
                 updated_at=NOW()
             WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'
             RETURNING id, business_id, organization_id, name, kind, purchase_unit, recipe_unit,
@@ -110,7 +128,6 @@ impl IngredientManagementRepository {
         .bind(ingredient_id)
         .bind(business_id)
         .bind(organization_id)
-        .bind(actor_id)
         .bind(normalize(&request.name))
         .bind(request.kind.trim().to_ascii_lowercase())
         .bind(normalize(&request.purchase_unit))
@@ -198,7 +215,7 @@ impl IngredientManagementRepository {
         location_id: Uuid,
         ingredient_id: Uuid,
         limit: i64,
-    ) -> Result<Vec<InventoryMovementRecord>, IngredientManagementError> {
+    ) -> Result<Vec<IngredientMovementRecord>, IngredientManagementError> {
         let is_primary = sqlx::query_scalar::<_, bool>(
             r#"
             SELECT is_primary
@@ -230,7 +247,7 @@ impl IngredientManagementRepository {
             return Err(IngredientManagementError::NotFound);
         }
 
-        sqlx::query_as::<_, InventoryMovementRecord>(
+        sqlx::query_as::<_, IngredientMovementRecord>(
             r#"
             SELECT id, organization_id, business_id, location_id, ingredient_id,
               command_id, movement_type, quantity_delta, quantity_before,
