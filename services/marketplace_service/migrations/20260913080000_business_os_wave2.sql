@@ -1,3 +1,18 @@
+ALTER TABLE business_finance_entries
+  DROP CONSTRAINT IF EXISTS business_finance_entries_entry_type_check;
+
+ALTER TABLE business_finance_entries
+  ADD CONSTRAINT business_finance_entries_entry_type_check CHECK (entry_type IN (
+    -- Canonical Business OS vocabulary.
+    'sale_income','other_income','capital_income',
+    'inventory_expense','payroll_expense','rent_expense','utilities_expense',
+    'transport_expense','marketing_expense','equipment_expense','owner_draw',
+    'receivable_payment','payable_payment','other_expense',
+    -- Historical values remain valid so existing ledgers are not broken by the migration.
+    'ingredient_purchase','packaging_purchase','rent','utilities','salary','transport',
+    'marketing','equipment','owner_capital','owner_drawing'
+  ));
+
 CREATE TABLE IF NOT EXISTS business_finance_plans (
   business_id UUID PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,
   organization_id UUID NOT NULL,
