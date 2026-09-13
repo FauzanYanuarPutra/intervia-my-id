@@ -10,6 +10,8 @@ mod governance_routes;
 mod governance_tests;
 mod identity_client;
 mod ingredient_management;
+#[cfg(test)]
+mod ingredient_management_persistence_tests;
 mod ingredient_management_routes;
 mod inventory;
 #[cfg(test)]
