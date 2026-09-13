@@ -26,8 +26,23 @@ def main() -> int:
         require(legacy_auth, 'LEGACY_USAHA_AUTH_RETIRED')
         forbid(legacy_auth, 'portal-store', 'portal-session', 'writePortalSession')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/locations/page.tsx', 'Lokasi', 'BusinessLocation')
-    require('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Lajukan Usaha', 'Lokasi & Outlet', 'Produk & HPP', 'Kanal Jual')
-    forbid('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Usaha Portal')
+
+    # Navigation labels live in one shared configuration instead of being duplicated
+    # inside PortalShell/Sidebar/MobileNav. The compatibility route IDs remain intact.
+    require(
+        'frontend/apps/usaha/src/lib/portal-navigation.ts',
+        'Beranda', 'Jualan', 'Produk', 'Stok', 'Uang', 'Laporan',
+        'Jual Online', 'Pengaturan Usaha', 'Lokasi & Outlet', 'Tim & Akses',
+        'Tampilan Toko', 'desktopPrimaryNavigation', 'mobilePrimaryNavigation',
+        'portalMenuNavigation',
+    )
+    require(
+        'frontend/apps/usaha/src/components/portal/PortalShell.tsx',
+        'Lajukan Usaha', 'portalSectionLabel', '<SidebarNav', '<MobileNav',
+        'Tim & Akses', 'Keamanan akun', 'Tambah usaha',
+    )
+    forbid('frontend/apps/usaha/src/components/portal/PortalShell.tsx', 'Usaha Portal', 'Workspace bisnis')
+
     require('services/marketplace_service/migrations/20260823001000_usaha_business_os.up.sql', 'organization_id', 'business_locations', 'business_hours', 'public_visibility')
     require('services/marketplace_service/migrations/20260823001000_usaha_business_os.down.sql', 'business_locations')
     require('services/marketplace_service/migrations/20260906002000_usaha_business_control_center.up.sql', 'business_ingredients', 'business_recipes', 'business_channel_settings', 'business_finance_entries')
