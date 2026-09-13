@@ -32,9 +32,18 @@ export type ReceiptView = {
   lines: ReceiptLine[];
 };
 
+type ProductLike = {
+  name: string;
+};
+
 function finiteNumber(value: number | string) {
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function compactRupiah(amount: number) {
+  const safeAmount = Number.isFinite(amount) ? Math.max(0, Math.round(amount)) : 0;
+  return `Rp${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(safeAmount)}`;
 }
 
 export function buildQuickSaleRequest(draft: QuickSaleDraft) {
@@ -87,6 +96,28 @@ export function quickSaleTotal(lines: QuickSaleLineDraft[]) {
   }, 0);
 }
 
+export function quickSaleItemCount(lines: QuickSaleLineDraft[]) {
+  return lines.reduce((total, line) => {
+    const quantity = finiteNumber(line.quantity);
+    return total + (Number.isFinite(quantity) ? Math.max(0, quantity) : 0);
+  }, 0);
+}
+
+export function quickTenderAmounts(total: number) {
+  const safeTotal = Number.isFinite(total) ? Math.max(0, Math.round(total)) : 0;
+  if (safeTotal <= 0) return [];
+  const rounded10k = Math.ceil(safeTotal / 10_000) * 10_000;
+  return Array.from(new Set([safeTotal, rounded10k, 50_000, 100_000])).filter(
+    value => value >= safeTotal,
+  );
+}
+
+export function filterQuickSaleProducts<T extends ProductLike>(products: T[], query: string): T[] {
+  const normalized = query.trim().toLocaleLowerCase('id-ID');
+  if (!normalized) return products;
+  return products.filter(product => product.name.toLocaleLowerCase('id-ID').includes(normalized));
+}
+
 export function calculateCashChange(total: number, tenderedAmount: number) {
   const safeTotal = Number.isFinite(total) ? Math.max(0, Math.round(total)) : 0;
   const safeTendered = Number.isFinite(tenderedAmount)
@@ -129,6 +160,22 @@ export function buildReceiptView(input: {
     itemCount: input.lines.reduce((total, line) => total + Math.max(0, Number(line.quantity) || 0), 0),
     lines: input.lines,
   };
+}
+
+export function buildReceiptShareText(receipt: ReceiptView) {
+  const lines = [
+    receipt.receiptNumber,
+    ...receipt.lines.map(
+      line => `${line.name} ×${line.quantity}  ${compactRupiah(line.quantity * line.unitPrice)}`,
+    ),
+    `Total ${compactRupiah(receipt.total)}`,
+    receipt.paymentLabel,
+  ];
+  if (receipt.tenderedAmount !== null) {
+    lines.push(`Diterima ${compactRupiah(receipt.tenderedAmount)}`);
+    lines.push(`Kembalian ${compactRupiah(receipt.changeAmount)}`);
+  }
+  return lines.join('\n');
 }
 
 export function priceLabelToAmount(label: string) {

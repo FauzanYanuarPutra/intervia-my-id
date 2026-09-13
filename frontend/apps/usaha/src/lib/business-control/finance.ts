@@ -222,3 +222,36 @@ export function summarizeObservedYield(rows: ObservedYieldInput[]) {
 
   return { outputPerInput, evidenceCount, confidence };
 }
+
+export function summarizeStockPurchase(input: {
+  quantity: number;
+  totalAmount: number;
+}) {
+  const quantity = Number.isFinite(input.quantity) ? Math.max(0, input.quantity) : 0;
+  const totalAmount = Number.isFinite(input.totalAmount)
+    ? Math.max(0, Math.round(input.totalAmount))
+    : 0;
+
+  return {
+    quantity,
+    totalAmount,
+    amountPerUnit: quantity > 0 && totalAmount > 0
+      ? Math.round(totalAmount / quantity)
+      : null,
+  };
+}
+
+export function previewObservedYield(input: ObservedYieldInput) {
+  const valid =
+    Number.isFinite(input.inputQuantity) &&
+    Number.isFinite(input.outputUnits) &&
+    input.inputQuantity > 0 &&
+    input.outputUnits > 0;
+
+  return {
+    outputPerInput: valid
+      ? Math.round((input.outputUnits / input.inputQuantity) * 100) / 100
+      : null,
+    valid,
+  };
+}

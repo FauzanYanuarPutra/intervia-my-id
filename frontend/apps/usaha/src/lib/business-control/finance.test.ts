@@ -199,3 +199,37 @@ describe('observed material yield', () => {
     });
   });
 });
+
+describe('simple stock purchase previews', () => {
+  it('turns one purchase into practical per-unit context without asking for recipe costing', () => {
+    expect(api.summarizeStockPurchase).toBeTypeOf('function');
+    const summarizeStockPurchase = api.summarizeStockPurchase as (input: {
+      quantity: number;
+      totalAmount: number;
+    }) => { quantity: number; totalAmount: number; amountPerUnit: number | null };
+
+    expect(summarizeStockPurchase({ quantity: 2, totalAmount: 70_000 })).toEqual({
+      quantity: 2,
+      totalAmount: 70_000,
+      amountPerUnit: 35_000,
+    });
+    expect(summarizeStockPurchase({ quantity: 0, totalAmount: 70_000 }).amountPerUnit).toBeNull();
+  });
+
+  it('previews real-world yield as input to output rather than forcing skin, seed, or waste weights', () => {
+    expect(api.previewObservedYield).toBeTypeOf('function');
+    const previewObservedYield = api.previewObservedYield as (input: {
+      inputQuantity: number;
+      outputUnits: number;
+    }) => { outputPerInput: number | null; valid: boolean };
+
+    expect(previewObservedYield({ inputQuantity: 1, outputUnits: 6 })).toEqual({
+      outputPerInput: 6,
+      valid: true,
+    });
+    expect(previewObservedYield({ inputQuantity: 0, outputUnits: 6 })).toEqual({
+      outputPerInput: null,
+      valid: false,
+    });
+  });
+});
