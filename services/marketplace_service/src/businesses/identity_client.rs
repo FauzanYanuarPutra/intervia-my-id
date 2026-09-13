@@ -20,6 +20,13 @@ impl OrganizationSummary {
         )
     }
 
+    pub(crate) fn can_view_sales(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "org_cashier" | "org_accounting" | "org_viewer"
+        )
+    }
+
     pub(crate) fn can_view_sale_costs(&self) -> bool {
         matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
     }
