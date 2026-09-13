@@ -50,12 +50,10 @@ def main() -> int:
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
 
-    # Action-first Home: one primary decision engine fed only by durable, permission-aware reads.
-    # Recipe readiness deliberately remains unknown until an aggregate/list endpoint exists;
-    # Home must not fan out one recipe request per product.
-    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'listControlSettlements', 'const recipeCount = null')
-    require('frontend/apps/usaha/src/app/page.tsx', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: null')
-    forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000', 'getControlRecipe', 'business.products.map')
+    # Daily Home keeps one task-first priority and avoids expensive/advanced fanout.
+    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'buildHomeDashboard', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'const recipeCount = null')
+    require('frontend/apps/usaha/src/app/page.tsx', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: null', 'unreconciledSettlementCount: 0')
+    forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000', 'getControlRecipe', 'business.products.map', 'listControlSettlements', 'PortfolioPanel')
     require('frontend/apps/usaha/src/lib/business-control/next-actions.ts', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: number | null')
     require('frontend/apps/usaha/src/lib/business-control/progressive-disclosure.ts', 'sortStockAttentionFirst', 'productPrimaryMode', 'shouldShowSettlementWorkspace', 'channelSimulationReadiness')
 
