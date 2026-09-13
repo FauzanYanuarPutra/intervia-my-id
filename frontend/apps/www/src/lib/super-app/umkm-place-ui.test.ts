@@ -100,6 +100,42 @@ describe('umkm place distance presentation', () => {
     ]);
   });
 
+  it('uses an owner-uploaded logo as the place thumbnail when no banner exists', () => {
+    const ui = buildUmkmPlacePresentation(
+      buildPlace({
+        metadata: {
+          logo_url: '/api/forum/media/logo-lajukan-juice.webp',
+        },
+      }),
+      true,
+      null,
+    );
+
+    expect(ui.coverImage).toBe('/api/forum/media/logo-lajukan-juice.webp');
+    expect(ui.gallery).toEqual(['/api/forum/media/logo-lajukan-juice.webp']);
+  });
+
+  it('reads owner-provided media from nested public metadata', () => {
+    const ui = buildUmkmPlacePresentation(
+      buildPlace({
+        metadata: {
+          public: {
+            logo_url: '/api/forum/media/logo-lajukan-juice.webp',
+            banner_url: '/api/forum/media/banner-lajukan-juice.webp',
+          },
+        },
+      }),
+      true,
+      null,
+    );
+
+    expect(ui.coverImage).toBe('/api/forum/media/banner-lajukan-juice.webp');
+    expect(ui.gallery).toEqual([
+      '/api/forum/media/banner-lajukan-juice.webp',
+      '/api/forum/media/logo-lajukan-juice.webp',
+    ]);
+  });
+
   it('presents a public map reference without store or transaction claims', () => {
     const ui = buildUmkmPlacePresentation(
       buildPlace({
