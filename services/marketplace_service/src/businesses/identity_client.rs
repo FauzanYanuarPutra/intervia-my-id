@@ -179,4 +179,44 @@ mod tests {
         assert!(!organization("org_cashier").can_view_sale_costs());
         assert!(!organization("org_viewer").can_view_sale_costs());
     }
+
+    #[test]
+    fn wave2_finance_controls_allow_accounting_but_not_cashier_or_inventory() {
+        assert!(organization("org_admin").can_manage_finance_controls());
+        assert!(organization("org_manager").can_manage_finance_controls());
+        assert!(organization("org_accounting").can_manage_finance_controls());
+        assert!(!organization("org_cashier").can_manage_finance_controls());
+        assert!(!organization("org_inventory").can_manage_finance_controls());
+        assert!(!organization("org_viewer").can_manage_finance_controls());
+    }
+
+    #[test]
+    fn wave2_inventory_controls_allow_inventory_role_but_not_cashier_or_accounting() {
+        assert!(organization("org_admin").can_manage_inventory_controls());
+        assert!(organization("org_manager").can_manage_inventory_controls());
+        assert!(organization("org_inventory").can_manage_inventory_controls());
+        assert!(!organization("org_cashier").can_manage_inventory_controls());
+        assert!(!organization("org_accounting").can_manage_inventory_controls());
+        assert!(!organization("org_viewer").can_manage_inventory_controls());
+    }
+
+    #[test]
+    fn cash_shift_controls_allow_cashier_but_not_inventory_accounting_or_viewer() {
+        assert!(organization("org_admin").can_manage_cash_shifts());
+        assert!(organization("org_manager").can_manage_cash_shifts());
+        assert!(organization("org_cashier").can_manage_cash_shifts());
+        assert!(!organization("org_inventory").can_manage_cash_shifts());
+        assert!(!organization("org_accounting").can_manage_cash_shifts());
+        assert!(!organization("org_viewer").can_manage_cash_shifts());
+    }
+
+    #[test]
+    fn advisor_access_is_read_only_and_kept_to_business_decision_roles() {
+        assert!(organization("org_admin").can_use_business_advisor());
+        assert!(organization("org_manager").can_use_business_advisor());
+        assert!(organization("org_accounting").can_use_business_advisor());
+        assert!(!organization("org_cashier").can_use_business_advisor());
+        assert!(!organization("org_inventory").can_use_business_advisor());
+        assert!(!organization("org_viewer").can_use_business_advisor());
+    }
 }
