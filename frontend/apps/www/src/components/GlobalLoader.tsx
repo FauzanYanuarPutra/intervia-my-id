@@ -1,11 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
 import { Z_INDEX } from './constants/z-index';
 
 type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+
+export const ROUTE_LOADER_DELAY_MS = 160;
+const FAIL_SAFE_HIDE_MS = 8000;
+
+function clearTimer(timer: TimerRef) {
+  if (timer.current === null) return;
+  clearTimeout(timer.current);
+  timer.current = null;
+}
 
 export default function GlobalLoader() {
   const pathname = usePathname();
@@ -15,21 +24,17 @@ export default function GlobalLoader() {
   const [showLoader, setShowLoader] = useState(false);
 
   const delayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const minDisplayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failSafeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loaderVisibleRef = useRef(false);
   const currentRouteRef = useRef('');
 
-  const DEBOUNCE_DELAY = 500;
-  const MIN_DISPLAY = 200;
-  const FAIL_SAFE_HIDE = 8000;
-
-  const clearTimer = (timer: TimerRef) => {
-    if (timer.current === null) return;
-    clearTimeout(timer.current);
-    timer.current = null;
-  };
+  const hideLoader = useCallback(() => {
+    clearTimer(delayTimer);
+    clearTimer(failSafeTimer);
+    loaderVisibleRef.current = false;
+    setShowLoader(false);
+  }, []);
 
   useEffect(() => {
     currentRouteRef.current = window.location.pathname + window.location.search;
@@ -42,16 +47,12 @@ export default function GlobalLoader() {
       delayTimer.current = setTimeout(() => {
         setShowLoader(true);
         loaderVisibleRef.current = true;
-      }, DEBOUNCE_DELAY);
+      }, ROUTE_LOADER_DELAY_MS);
 
       clearTimer(failSafeTimer);
-
       failSafeTimer.current = setTimeout(() => {
-        clearTimer(delayTimer);
-        clearTimer(minDisplayTimer);
-        loaderVisibleRef.current = false;
-        setShowLoader(false);
-      }, FAIL_SAFE_HIDE);
+        hideLoader();
+      }, FAIL_SAFE_HIDE_MS);
     };
 
     const handleClick = (e: MouseEvent) => {
@@ -97,10 +98,9 @@ export default function GlobalLoader() {
     return () => {
       document.removeEventListener('click', handleClick);
       clearTimer(delayTimer);
-      clearTimer(minDisplayTimer);
       clearTimer(failSafeTimer);
     };
-  }, []);
+  }, [hideLoader]);
 
   useEffect(() => {
     const nextRoute = pathname + (search ? `?${search}` : '');
@@ -113,34 +113,23 @@ export default function GlobalLoader() {
     if (nextRoute === currentRouteRef.current) return;
 
     currentRouteRef.current = nextRoute;
+    const clearAfterNavigation = setTimeout(hideLoader, 0);
 
-    clearTimer(delayTimer);
-    clearTimer(failSafeTimer);
+    return () => clearTimeout(clearAfterNavigation);
+  }, [hideLoader, pathname, search]);
 
-    if (!loaderVisibleRef.current) return;
-
-    clearTimer(minDisplayTimer);
-
-    minDisplayTimer.current = setTimeout(() => {
-      loaderVisibleRef.current = false;
-      setShowLoader(false);
-    }, MIN_DISPLAY);
-
-    return () => {
-      clearTimer(minDisplayTimer);
-    };
-  }, [pathname, search]);
+  if (!showLoader) return null;
 
   return (
-    showLoader ? (
-      <div
-        role="status"
-        aria-label="Loading"
-        className="fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)]"
-        style={{ zIndex: Z_INDEX.loading }}
-      >
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[color:var(--app-accent-border)] border-t-transparent motion-reduce:animate-none" />
-      </div>
-    ) : null
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Loading page"
+      className="pointer-events-none fixed inset-x-0 top-0 h-0.5 overflow-hidden bg-[color:var(--app-border)]"
+      style={{ zIndex: Z_INDEX.loading }}
+    >
+      <span className="sr-only">Loading page</span>
+      <span className="block h-full w-2/3 animate-pulse rounded-full bg-[color:var(--app-accent)] motion-reduce:animate-none" />
+    </div>
   );
 }
