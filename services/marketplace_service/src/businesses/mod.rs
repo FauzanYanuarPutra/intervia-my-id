@@ -2,6 +2,8 @@
 mod availability_persistence_tests;
 pub(crate) mod control;
 pub(crate) mod domain;
+#[cfg(test)]
+mod finance_semantics_tests;
 mod governance;
 #[cfg(test)]
 mod governance_migration_tests;
