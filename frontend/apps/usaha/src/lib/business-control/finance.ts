@@ -23,6 +23,23 @@ export type RecurringForecastInput = {
   days?: number;
 };
 
+export type PriceHealthStatus = 'unknown' | 'loss' | 'thin' | 'safe' | 'good';
+export type MetricConfidence = 'low' | 'medium' | 'high';
+
+export type PriceHealthInput = {
+  sellingPrice: number;
+  unitCost: number | null;
+  feeRateBps?: number;
+  merchantPromoAmount?: number;
+  targetMarginBps?: number;
+  costEstimated?: boolean;
+};
+
+export type ObservedYieldInput = {
+  inputQuantity: number;
+  outputUnits: number;
+};
+
 function amount(value: number | undefined, field: string) {
   const resolved = value ?? 0;
   if (!Number.isFinite(resolved) || resolved < 0) {
@@ -36,6 +53,14 @@ function percentage(value: number, field: string) {
     throw new Error(`${field}_must_be_between_0_and_100`);
   }
   return value;
+}
+
+function basisPoints(value: number | undefined, field: string) {
+  const resolved = value ?? 0;
+  if (!Number.isFinite(resolved) || resolved < 0 || resolved >= 10_000) {
+    throw new Error(`${field}_must_be_between_0_and_9999`);
+  }
+  return resolved;
 }
 
 export function summarizeBusinessDay(input: BusinessDayInput) {
@@ -115,4 +140,85 @@ export function calculateSafeToSpend(input: {
   const protectedPayroll = amount(input.protectedPayroll, 'protected_payroll');
 
   return Math.max(0, Math.round(liquidCash - dueSoonObligations - reserveFloor - protectedPayroll));
+}
+
+export function buildPriceHealth(input: PriceHealthInput) {
+  const sellingPrice = amount(input.sellingPrice, 'selling_price');
+  const feeRateBps = basisPoints(input.feeRateBps, 'fee_rate_bps');
+  const merchantPromoAmount = amount(input.merchantPromoAmount, 'merchant_promo_amount');
+  const targetMarginBps = basisPoints(input.targetMarginBps ?? 2_000, 'target_margin_bps');
+
+  if (input.unitCost === null || input.unitCost === undefined) {
+    return {
+      status: 'unknown' as const,
+      confidence: 'low' as const,
+      contributionAmount: null,
+      contributionMarginBps: null,
+      minimumNonLossPrice: null,
+      healthyPrice: null,
+    };
+  }
+
+  const unitCost = amount(input.unitCost, 'unit_cost');
+  const feeAmount = Math.round(sellingPrice * feeRateBps / 10_000);
+  const contributionAmount = sellingPrice - feeAmount - merchantPromoAmount - unitCost;
+  const contributionMarginBps = sellingPrice > 0
+    ? Math.round(contributionAmount * 10_000 / sellingPrice)
+    : contributionAmount < 0
+      ? -10_000
+      : 0;
+
+  const retainedRate = 1 - feeRateBps / 10_000;
+  const healthyRetainedRate = retainedRate - targetMarginBps / 10_000;
+  const requiredBase = unitCost + merchantPromoAmount;
+  const minimumNonLossPrice = retainedRate > 0
+    ? Math.ceil(requiredBase / retainedRate)
+    : null;
+  const healthyPrice = healthyRetainedRate > 0
+    ? Math.ceil(requiredBase / healthyRetainedRate)
+    : null;
+
+  let status: PriceHealthStatus;
+  if (contributionAmount < 0) status = 'loss';
+  else if (contributionMarginBps < 1_000) status = 'thin';
+  else if (contributionMarginBps < 2_500) status = 'safe';
+  else status = 'good';
+
+  return {
+    status,
+    confidence: (input.costEstimated ? 'medium' : 'high') as MetricConfidence,
+    contributionAmount,
+    contributionMarginBps,
+    minimumNonLossPrice,
+    healthyPrice,
+  };
+}
+
+export function summarizeObservedYield(rows: ObservedYieldInput[]) {
+  const validRows = rows.filter(row =>
+    Number.isFinite(row.inputQuantity) &&
+    Number.isFinite(row.outputUnits) &&
+    row.inputQuantity > 0 &&
+    row.outputUnits > 0,
+  );
+
+  if (!validRows.length) {
+    return {
+      outputPerInput: null,
+      evidenceCount: 0,
+      confidence: 'low' as const,
+    };
+  }
+
+  const totalInput = validRows.reduce((sum, row) => sum + row.inputQuantity, 0);
+  const totalOutput = validRows.reduce((sum, row) => sum + row.outputUnits, 0);
+  const outputPerInput = Math.round((totalOutput / totalInput) * 100) / 100;
+  const evidenceCount = validRows.length;
+  const confidence: MetricConfidence = evidenceCount >= 5
+    ? 'high'
+    : evidenceCount >= 2
+      ? 'medium'
+      : 'low';
+
+  return { outputPerInput, evidenceCount, confidence };
 }
