@@ -48,6 +48,16 @@ jobs:
         run: cargo check --locked
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
+      - name: Identity business access tests
+        run: cargo test --locked businesses::identity_client::tests
+      - name: Wave 2 domain and route tests
+        run: |
+          cargo test --locked businesses::wave2::tests
+          cargo test --locked businesses::wave2_routes::tests
+      - name: Wave 2 migration tests
+        run: cargo test --locked businesses::wave2_migration_tests
+      - name: Wave 2 persistence tests
+        run: cargo test --locked businesses::wave2_persistence_tests
       - name: Ingredient management integrity tests
         run: cargo test --locked businesses::ingredient_management
       - name: Incomplete-cost sale integrity tests
@@ -77,3 +87,10 @@ jobs:
           grep -q 'expected_transfer_amount' migrations/20260906003000_usaha_business_settlements.up.sql
           grep -q 'difference_amount' migrations/20260906003000_usaha_business_settlements.up.sql
           grep -q 'DROP TABLE IF EXISTS business_settlements' migrations/20260906003000_usaha_business_settlements.down.sql
+          test -s migrations/20260913080000_business_os_wave2.sql
+          grep -q 'business_finance_plans' migrations/20260913080000_business_os_wave2.sql
+          grep -q 'business_recurring_obligations' migrations/20260913080000_business_os_wave2.sql
+          grep -q 'business_purchases' migrations/20260913080000_business_os_wave2.sql
+          grep -q 'business_cash_shifts' migrations/20260913080000_business_os_wave2.sql
+          grep -q 'business_product_primary_materials' migrations/20260913080000_business_os_wave2.sql
+          grep -q 'business_material_yield_observations' migrations/20260913080000_business_os_wave2.sql
