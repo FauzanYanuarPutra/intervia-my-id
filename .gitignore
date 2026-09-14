@@ -32,6 +32,9 @@ Desktop.ini
 **/.cache/
 **/.npm-cache/
 
+# Local browser profiles can contain cookies, sessions and cached credentials.
+/.codex-chrome-*/
+
 # Historical root database dumps: migrations remain allowed elsewhere.
 /community.sql
 /community_utf8.sql
