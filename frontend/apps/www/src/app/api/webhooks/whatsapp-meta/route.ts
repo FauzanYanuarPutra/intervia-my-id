@@ -10,8 +10,6 @@ const IS_PRODUCTION = APP_ENV === 'production';
 const CONFIGURED_VERIFY_TOKEN = (
   process.env.WHATSAPP_META_WEBHOOK_VERIFY_TOKEN || ''
 ).trim();
-const PRIMARY_VERIFY_TOKEN = 'lajukan_verify_22012005';
-const DEV_VERIFY_TOKEN = 'lajukan-dev-whatsapp-meta-webhook';
 const APP_SECRET = (process.env.WHATSAPP_META_APP_SECRET || '').trim();
 const REQUIRE_SIGNATURE_SETTING = (
   process.env.WHATSAPP_META_WEBHOOK_REQUIRE_SIGNATURE || ''
@@ -131,22 +129,9 @@ function isProductionRequest(req: NextRequest): boolean {
   return IS_PRODUCTION || isPublicLajukanHost(req);
 }
 
-function verifyTokensForRequest(req: NextRequest): string[] {
-  const tokens = new Set<string>();
-  if (CONFIGURED_VERIFY_TOKEN) tokens.add(CONFIGURED_VERIFY_TOKEN);
-  tokens.add(PRIMARY_VERIFY_TOKEN);
-
-  if (!isProductionRequest(req)) {
-    tokens.add(DEV_VERIFY_TOKEN);
-  }
-
-  return Array.from(tokens).filter(Boolean);
-}
-
-function matchesVerifyToken(req: NextRequest, token: string): boolean {
-  return verifyTokensForRequest(req).some(expected =>
-    timingSafeEqual(token, expected),
-  );
+function matchesVerifyToken(token: string): boolean {
+  return Boolean(CONFIGURED_VERIFY_TOKEN) &&
+    timingSafeEqual(token, CONFIGURED_VERIFY_TOKEN);
 }
 
 function shouldRequireSignature(req: NextRequest): boolean {
@@ -289,7 +274,7 @@ export async function GET(req: NextRequest) {
   if (
     mode === 'subscribe' &&
     challenge &&
-    matchesVerifyToken(req, token)
+    matchesVerifyToken(token)
   ) {
     return new NextResponse(challenge, {
       status: 200,
