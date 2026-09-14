@@ -28,6 +28,17 @@ describe('WhatsApp Meta webhook verification config', () => {
     ).toEqual({ token: null, required: false });
   });
 
+  it('requires verification when a public request forces it', () => {
+    expect(
+      getWhatsAppMetaVerificationConfig(
+        {
+          NODE_ENV: 'development',
+        },
+        true,
+      ),
+    ).toEqual({ token: null, required: true });
+  });
+
   it('can require verification explicitly outside production', () => {
     expect(
       getWhatsAppMetaVerificationConfig({
