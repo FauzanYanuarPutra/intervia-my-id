@@ -1,0 +1,45 @@
+name: Temporary identity rustls lock refresh
+
+on:
+  push:
+    branches:
+      - fix/security-history-hygiene-20260915
+    paths:
+      - .github/workflows/tmp-identity-rustls-lock-refresh.yml
+      - services/identity_service/Cargo.toml
+      - services/identity_service/Cargo.lock
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-identity-rustls-lock-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/security-history-hygiene-20260915
+      - name: Refresh only rustls to the patched release
+        working-directory: services/identity_service
+        run: cargo update -p rustls --precise 0.23.45
+      - name: Verify the refreshed lockfile compiles
+        working-directory: services/identity_service
+        run: cargo check --locked
+      - name: Commit generated lockfile when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- services/identity_service/Cargo.lock; then
+            echo "Cargo.lock already resolves rustls 0.23.45; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/identity_service/Cargo.lock
+          git commit -m "fix(identity): update rustls for RUSTSEC-2026-0285"
+          git push origin HEAD:fix/security-history-hygiene-20260915
