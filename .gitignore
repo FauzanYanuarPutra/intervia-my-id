@@ -17,6 +17,7 @@ Desktop.ini
 # Environment / secrets
 .env
 .env.*
+/.envpalsu.example
 !.env.example
 !.env.development.example
 !.env.staging.example
@@ -27,7 +28,7 @@ Desktop.ini
 /.runtime/
 /.cache/
 /.backups/
-/audit_output/
+audit_output/
 **/.runtime/
 **/.cache/
 **/.npm-cache/
