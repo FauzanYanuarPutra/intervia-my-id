@@ -28,6 +28,32 @@ describe('portal role access matrix', () => {
     }
   });
 
+  it('keeps accounting focused on money and reports without granting catalog or team mutation', () => {
+    const accounting = permissions('accounting');
+    for (const section of ['home', 'orders', 'products', 'finance', 'reports', 'buyerPage'] as const) {
+      expect(canAccessPortalSection(accounting, section)).toBe(true);
+    }
+    for (const section of ['inventory', 'channels', 'info', 'locations', 'operations', 'team', 'security'] as const) {
+      expect(canAccessPortalSection(accounting, section)).toBe(false);
+    }
+    expect(accounting).toContain('manageFinance');
+    expect(accounting).not.toContain('manageProducts');
+    expect(accounting).not.toContain('manageInventory');
+  });
+
+  it('keeps inventory specialist on stock controls without granting finance or sales', () => {
+    const inventory = permissions('inventory');
+    for (const section of ['home', 'products', 'inventory', 'buyerPage'] as const) {
+      expect(canAccessPortalSection(inventory, section)).toBe(true);
+    }
+    for (const section of ['orders', 'finance', 'reports', 'channels', 'info', 'locations', 'operations', 'team', 'security'] as const) {
+      expect(canAccessPortalSection(inventory, section)).toBe(false);
+    }
+    expect(inventory).toContain('viewCosting');
+    expect(inventory).toContain('manageInventory');
+    expect(inventory).not.toContain('manageFinance');
+  });
+
   it('allows manager operational management but reserves security for owner', () => {
     const manager = permissions('manager');
     for (const section of ['home', 'orders', 'products', 'inventory', 'finance', 'reports', 'channels', 'info', 'locations', 'operations', 'team', 'buyerPage'] as const) {
