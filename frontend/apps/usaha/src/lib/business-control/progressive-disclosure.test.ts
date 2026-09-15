@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   channelSimulationReadiness,
   productPrimaryMode,
+  resolveInventoryTab,
   sortStockAttentionFirst,
   shouldShowSettlementWorkspace,
 } from './progressive-disclosure';
@@ -35,5 +36,14 @@ describe('merchant progressive disclosure', () => {
     expect(channelSimulationReadiness({ recordedPrice: 15000, hpp: null, canViewCosting: true })).toBe('missing-hpp');
     expect(channelSimulationReadiness({ recordedPrice: 15000, hpp: 8000, canViewCosting: true })).toBe('ready');
     expect(channelSimulationReadiness({ recordedPrice: 15000, hpp: 8000, canViewCosting: false })).toBe('price-only');
+  });
+
+  it('keeps inventory navigation on a small safe set of URL tabs', () => {
+    expect(resolveInventoryTab(undefined)).toBe('stock');
+    expect(resolveInventoryTab('stock')).toBe('stock');
+    expect(resolveInventoryTab('purchase')).toBe('purchase');
+    expect(resolveInventoryTab('ingredients')).toBe('ingredients');
+    expect(resolveInventoryTab('anything-else')).toBe('stock');
+    expect(resolveInventoryTab(['ingredients', 'purchase'])).toBe('ingredients');
   });
 });
