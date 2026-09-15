@@ -64,7 +64,12 @@ def main() -> int:
     require('frontend/apps/usaha/src/components/business-control/IngredientWorkspace.tsx', 'Simpan bahan', '/ingredients')
     require(
         'frontend/apps/usaha/src/components/business-control/FinanceLedger.tsx',
-        'Catat transaksi', '/finance-entries', "method: 'POST'", 'Simpan'
+        'FinanceLedgerV2'
+    )
+    require(
+        'frontend/apps/usaha/src/components/business-control/FinanceLedgerV2.tsx',
+        'Catat transaksi', '/finance-core/entries', '/finance-core/allocations/move',
+        "method: 'POST'", 'Idempotency-Key', 'Koreksi', 'Batalkan'
     )
     require(
         'frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx',
