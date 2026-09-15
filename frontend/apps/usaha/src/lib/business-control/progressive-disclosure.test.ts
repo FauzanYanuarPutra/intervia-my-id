@@ -40,6 +40,7 @@ describe('merchant progressive disclosure', () => {
 
   it('keeps inventory navigation on a small safe set of URL tabs', () => {
     expect(resolveInventoryTab(undefined)).toBe('stock');
+    expect(resolveInventoryTab([])).toBe('stock');
     expect(resolveInventoryTab('stock')).toBe('stock');
     expect(resolveInventoryTab('purchase')).toBe('purchase');
     expect(resolveInventoryTab('ingredients')).toBe('ingredients');
