@@ -26,13 +26,21 @@ export type StorefrontCanonicalOrderBundle = {
   replayed: boolean;
 };
 
-export type StorefrontProductOrderInput = {
-  storeId: string;
+export type StorefrontOrderLineInput = {
   productId: string;
   quantity: number;
-  idempotencyKey: string;
   selectedOptions?: StorefrontModifierSelection[];
   note?: string;
+};
+
+export type StorefrontProductOrderInput = {
+  storeId: string;
+  idempotencyKey: string;
+  productId?: string;
+  quantity?: number;
+  selectedOptions?: StorefrontModifierSelection[];
+  note?: string;
+  items?: StorefrontOrderLineInput[];
   fulfillmentMode?: StorefrontOrderFulfillmentMode;
 };
 
@@ -97,10 +105,23 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+function normalizedLines(input: StorefrontProductOrderInput): StorefrontOrderLineInput[] {
+  if (input.items?.length) return input.items;
+  if (!input.productId || !input.quantity) return [];
+  return [{
+    productId: input.productId,
+    quantity: input.quantity,
+    selectedOptions: input.selectedOptions,
+    note: input.note,
+  }];
+}
+
 export async function submitStorefrontProductOrder(
   input: StorefrontProductOrderInput,
 ): Promise<StorefrontCanonicalOrderBundle> {
-  const note = input.note?.trim();
+  const lines = normalizedLines(input);
+  if (!lines.length) throw new StorefrontOrderClientError(400, 'items_required');
+
   const response = await fetch('/api/super-app/umkm/orders', {
     method: 'POST',
     credentials: 'same-origin',
@@ -113,16 +134,17 @@ export async function submitStorefrontProductOrder(
     body: JSON.stringify({
       store_id: input.storeId,
       channel: 'online',
-      items: [
-        {
-          product_id: input.productId,
-          quantity: input.quantity,
+      items: lines.map(line => {
+        const note = line.note?.trim();
+        return {
+          product_id: line.productId,
+          quantity: line.quantity,
           ...(note ? { notes: note } : {}),
-          ...(input.selectedOptions?.length
-            ? { selected_options: input.selectedOptions }
+          ...(line.selectedOptions?.length
+            ? { selected_options: line.selectedOptions }
             : {}),
-        },
-      ],
+        };
+      }),
       fulfillment_mode: input.fulfillmentMode ?? 'pickup',
     }),
   });
