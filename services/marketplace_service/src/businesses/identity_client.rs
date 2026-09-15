@@ -263,7 +263,13 @@ mod tests {
 
     #[test]
     fn sales_recording_allows_admin_manager_and_cashier_only() {
-        for role in ["org_admin", "org_manager", "manager", "org_cashier", "cashier"] {
+        for role in [
+            "org_admin",
+            "org_manager",
+            "manager",
+            "org_cashier",
+            "cashier",
+        ] {
             assert!(organization(role).can_record_sales());
         }
         assert!(!organization("org_inventory").can_record_sales());
