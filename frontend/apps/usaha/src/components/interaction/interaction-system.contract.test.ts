@@ -21,7 +21,7 @@ describe('Lajukan interaction system', () => {
     const css = read('../../app/globals.css');
     expect(css).toContain('--portal-mobile-nav-height');
     expect(css).toContain('--portal-layer-shell');
-    expect(css).toContain('--portal-layer-nav');
+    expect(css).toContain('--portal-layer-nav: 35');
     expect(css).toContain('--portal-layer-popover');
     expect(css).toContain('.portal-modal::backdrop');
     expect(css).toContain('rgba(15, 23, 42, 0.44)');
@@ -52,10 +52,11 @@ describe('Lajukan interaction system', () => {
     expect(shell).toContain('portal-mobile-content-clearance');
   });
 
-  it('migrates quick-sale cart and checkout away from manual overlay z-index wars', () => {
+  it('keeps legacy transactional overlays above bottom navigation while preserving full-screen light dismiss', () => {
     const sale = read('../business-control/QuickSaleWorkspace.tsx');
-    expect(sale).toContain('ModalSurface');
-    expect(sale).not.toContain('fixed inset-0 z-40 grid place-items-end bg-black/35');
-    expect(sale).not.toContain('fixed inset-0 z-50 grid place-items-end bg-black/40');
+    expect(sale).toContain('fixed inset-0 z-40 grid place-items-end bg-black/35');
+    expect(sale).toContain('fixed inset-0 z-50 grid place-items-end bg-black/40');
+    expect(sale).toContain('event.target === event.currentTarget');
+    expect(read('../../app/globals.css')).toContain('--portal-layer-nav: 35');
   });
 });
