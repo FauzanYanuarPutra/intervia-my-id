@@ -11,6 +11,10 @@ export type PublicCommerceOrderIntent = {
     product_id: string;
     quantity: number;
     note?: string;
+    selected_options?: Array<{
+      group_id: string;
+      option_ids: string[];
+    }>;
   }>;
   fulfillment_mode?: 'courier' | 'pickup' | 'digital';
   note?: string;
