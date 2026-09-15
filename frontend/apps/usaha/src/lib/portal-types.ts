@@ -1,7 +1,7 @@
 import type { BusinessTemplateKey } from './business-templates';
 import type { BusinessImageValue } from './media-crop';
 
-export type PortalRole = 'owner' | 'manager' | 'cashier' | 'viewer';
+export type PortalRole = 'owner' | 'manager' | 'cashier' | 'accounting' | 'inventory' | 'viewer';
 export type BusinessRelationship = 'owned' | 'joined';
 
 export type PermissionId =
