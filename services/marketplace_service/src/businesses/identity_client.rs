@@ -13,6 +13,14 @@ impl OrganizationSummary {
         self.current_user_role == "org_admin"
     }
 
+    pub(crate) fn can_manage_business_profile(&self) -> bool {
+        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+    }
+
+    pub(crate) fn can_manage_catalog(&self) -> bool {
+        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+    }
+
     pub(crate) fn can_record_sales(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
@@ -31,6 +39,13 @@ impl OrganizationSummary {
         matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
     }
 
+    pub(crate) fn can_view_inventory_controls(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "org_cashier" | "org_inventory" | "org_viewer"
+        )
+    }
+
     pub(crate) fn can_manage_finance_controls(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
@@ -38,11 +53,19 @@ impl OrganizationSummary {
         )
     }
 
+    pub(crate) fn can_view_finance_controls(&self) -> bool {
+        self.can_manage_finance_controls()
+    }
+
     pub(crate) fn can_manage_inventory_controls(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
             "org_admin" | "org_manager" | "org_inventory"
         )
+    }
+
+    pub(crate) fn can_manage_channels(&self) -> bool {
+        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
     }
 
     pub(crate) fn can_manage_cash_shifts(&self) -> bool {
@@ -197,8 +220,22 @@ mod tests {
     }
 
     #[test]
-    fn ordinary_organization_members_cannot_mutate_businesses() {
+    fn organization_level_business_creation_stays_admin_only() {
         assert!(!organization("org_member").can_manage_businesses());
+        assert!(!organization("org_manager").can_manage_businesses());
+        assert!(organization("org_admin").can_manage_businesses());
+    }
+
+    #[test]
+    fn profile_and_catalog_management_allow_admin_and_manager_only() {
+        for role in ["org_admin", "org_manager"] {
+            assert!(organization(role).can_manage_business_profile());
+            assert!(organization(role).can_manage_catalog());
+        }
+        for role in ["org_cashier", "org_inventory", "org_accounting", "org_viewer"] {
+            assert!(!organization(role).can_manage_business_profile());
+            assert!(!organization(role).can_manage_catalog());
+        }
     }
 
     #[test]
@@ -232,10 +269,21 @@ mod tests {
     }
 
     #[test]
+    fn inventory_read_access_includes_cashier_viewer_and_inventory_specialist() {
+        for role in ["org_admin", "org_manager", "org_cashier", "org_inventory", "org_viewer"] {
+            assert!(organization(role).can_view_inventory_controls());
+        }
+        assert!(!organization("org_accounting").can_view_inventory_controls());
+    }
+
+    #[test]
     fn wave2_finance_controls_allow_accounting_but_not_cashier_or_inventory() {
         assert!(organization("org_admin").can_manage_finance_controls());
         assert!(organization("org_manager").can_manage_finance_controls());
         assert!(organization("org_accounting").can_manage_finance_controls());
+        assert!(organization("org_admin").can_view_finance_controls());
+        assert!(organization("org_manager").can_view_finance_controls());
+        assert!(organization("org_accounting").can_view_finance_controls());
         assert!(!organization("org_cashier").can_manage_finance_controls());
         assert!(!organization("org_inventory").can_manage_finance_controls());
         assert!(!organization("org_viewer").can_manage_finance_controls());
@@ -249,6 +297,16 @@ mod tests {
         assert!(!organization("org_cashier").can_manage_inventory_controls());
         assert!(!organization("org_accounting").can_manage_inventory_controls());
         assert!(!organization("org_viewer").can_manage_inventory_controls());
+    }
+
+    #[test]
+    fn channel_management_excludes_cashier_viewer_inventory_and_accounting() {
+        assert!(organization("org_admin").can_manage_channels());
+        assert!(organization("org_manager").can_manage_channels());
+        assert!(!organization("org_cashier").can_manage_channels());
+        assert!(!organization("org_viewer").can_manage_channels());
+        assert!(!organization("org_inventory").can_manage_channels());
+        assert!(!organization("org_accounting").can_manage_channels());
     }
 
     #[test]
