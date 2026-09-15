@@ -13,13 +13,13 @@
 
   html {
     font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-    background: #f6f7f4;
+    background: #f7f8f6;
   }
 
   body {
     margin: 0;
     color: #17211c;
-    background: #f6f7f4;
+    background: #f7f8f6;
   }
 
   a {
@@ -56,28 +56,60 @@
 }
 
 @layer components {
+  .merchant-surface {
+    @apply rounded-[18px] bg-white;
+  }
+
+  .merchant-surface-bordered {
+    @apply rounded-[18px] border border-portal-line bg-white;
+  }
+
+  .merchant-section {
+    @apply border-b border-portal-line/70 py-4 last:border-b-0;
+  }
+
+  .merchant-chip {
+    @apply inline-flex min-h-9 shrink-0 items-center justify-center rounded-full border border-portal-line bg-white px-3 text-xs font-bold text-portal-soft transition hover:border-portal-forest/25 hover:text-portal-ink;
+  }
+
+  .merchant-chip-active {
+    @apply border-portal-forest bg-portal-mist text-portal-forest;
+  }
+
+  .merchant-action-row {
+    @apply flex min-h-12 items-center justify-between gap-3 border-b border-portal-line/70 px-4 py-3 last:border-b-0;
+  }
+
+  .merchant-list {
+    @apply overflow-hidden rounded-[18px] bg-white;
+  }
+
+  .merchant-kpi {
+    @apply min-w-0 px-4 py-3.5;
+  }
+
   .portal-panel {
-    @apply rounded-[20px] border border-portal-line bg-white shadow-card;
+    @apply rounded-[18px] border border-portal-line bg-white;
   }
 
   .portal-panel-muted {
-    @apply rounded-[18px] border border-portal-line bg-white/80;
+    @apply rounded-[16px] border border-portal-line bg-white/80;
   }
 
   .portal-panel-soft {
-    @apply rounded-[18px] border border-portal-line bg-portal-mist;
+    @apply rounded-[16px] border border-portal-line bg-portal-mist;
   }
 
   .portal-stat-card {
-    @apply rounded-[18px] border border-portal-line bg-white p-4 shadow-card;
+    @apply rounded-[16px] border border-portal-line bg-white p-4;
   }
 
   .portal-icon-tile {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-portal-mist text-portal-forest;
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-[11px] bg-portal-mist text-portal-forest;
   }
 
   .portal-kicker {
-    @apply text-[11px] font-bold tracking-[0.08em] text-portal-forest;
+    @apply text-[11px] font-bold tracking-[0.06em] text-portal-forest;
   }
 
   .portal-label {
@@ -85,23 +117,23 @@
   }
 
   .portal-input {
-    @apply min-h-11 rounded-[13px] border border-portal-line bg-white px-3.5 py-2.5 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft/80 focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
+    @apply min-h-11 rounded-[12px] border border-portal-line bg-white px-3.5 py-2.5 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft/80 focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
   }
 
   .portal-textarea {
-    @apply rounded-[13px] border border-portal-line bg-white px-3.5 py-2.5 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft/80 focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
+    @apply rounded-[12px] border border-portal-line bg-white px-3.5 py-2.5 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft/80 focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
   }
 
   .portal-button-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[13px] bg-portal-forest px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-portal-forestDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-portal-forest px-4 py-2.5 text-sm font-bold text-white transition hover:bg-portal-forestDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .portal-button-secondary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[13px] border border-portal-line bg-white px-4 py-2.5 text-sm font-semibold text-portal-ink transition hover:border-portal-forest/25 hover:bg-portal-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] border border-portal-line bg-white px-4 py-2.5 text-sm font-semibold text-portal-ink transition hover:border-portal-forest/25 hover:bg-portal-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .portal-button-ghost {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[12px] px-3 py-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[11px] px-3 py-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20;
   }
 
   .portal-skip-link {

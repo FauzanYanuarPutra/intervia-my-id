@@ -115,7 +115,7 @@ describe('umkm-commerce offline table flow', () => {
     expect(second.table_code).toBe('T01');
   });
 
-  it('snapshots product photos on order items so cashier cards can show the ordered products', async () => {
+  it('snapshots product display metadata on order items for cashier cards', async () => {
     const created = await createUmkmOrder({
       storeId: '50000000-0000-0000-0000-000000000001',
       channel: 'offline',
@@ -128,8 +128,11 @@ describe('umkm-commerce offline table flow', () => {
       ],
     });
 
-    expect(created.items[0]?.metadata.product_image_url).toMatch(/^\/images\//);
-    expect(created.items[0]?.metadata.product_category).toBe('main_course');
+    expect(created.items[0]?.metadata).toMatchObject({
+      product_image_url: null,
+      product_category: 'main_course',
+      product_slug: 'nasi-bakar-ayam-kemangi',
+    });
 
     const [listed] = await listUmkmOrderBundlesByStore({
       storeId: '50000000-0000-0000-0000-000000000001',

@@ -62,11 +62,14 @@ def main() -> int:
     require('frontend/apps/usaha/src/lib/business-control-server.ts', '/ingredients', '/channels', '/finance-entries', '/recipe', '/settlements')
     require('frontend/apps/usaha/src/components/business-control/DurableHppWorkspace.tsx', 'Simpan resep', '/recipe', 'calculateRecipeCost')
     require('frontend/apps/usaha/src/components/business-control/IngredientWorkspace.tsx', 'Simpan bahan', '/ingredients')
-    require('frontend/apps/usaha/src/components/business-control/FinanceLedger.tsx', 'Simpan transaksi', '/finance-entries')
+    require(
+        'frontend/apps/usaha/src/components/business-control/FinanceLedger.tsx',
+        'Catat transaksi', '/finance-entries', "method: 'POST'", 'Simpan'
+    )
     require(
         'frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx',
-        'GoFood', 'GrabFood', 'ShopeeFood', 'Hitung harga online',
-        'Potongan aplikasi', 'Promo ditanggung toko', 'Harga online aman', 'Simpan'
+        'GoFood', 'GrabFood', 'ShopeeFood', 'Pengaturan harga online',
+        'Potongan %', 'Promo dari toko', 'recommendChannelPrice', 'Simpan'
     )
     forbid('frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx', 'defaultPrice ?? 15000', 'defaultPrice || 15000')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack', 'parseRecordedProductPrice', 'Jual Online')

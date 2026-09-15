@@ -4,7 +4,7 @@ import * as finance from './finance';
 const api = finance as unknown as Record<string, unknown>;
 
 describe('usaha finance summary', () => {
-  it('separates operating profit from owner drawing', () => {
+  it('separates operating profit from owner drawing without treating COGS as same-day cash out', () => {
     const result = finance.summarizeBusinessDay({
       revenue: 240_000,
       cogs: 140_000,
@@ -16,7 +16,7 @@ describe('usaha finance summary', () => {
 
     expect(result.grossProfit).toBe(100_000);
     expect(result.operatingProfit).toBe(65_000);
-    expect(result.cashMovement).toBe(15_000);
+    expect(result.cashMovement).toBe(155_000);
   });
 
   it('treats owner capital as cash movement but not profit', () => {

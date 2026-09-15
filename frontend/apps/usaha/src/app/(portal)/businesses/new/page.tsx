@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
-import { CheckCircle2, Layers3, MapPinned, Store } from 'lucide-react';
+import { CheckCircle2, MapPinned, Store } from 'lucide-react';
 import { NewBusinessQuickForm } from '@/components/forms/NewBusinessQuickForm';
-import { DataPanel } from '@/components/portal/DataPanel';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { getPortalAccount, getPortalBusinesses } from '@/lib/portal-server';
@@ -12,36 +11,20 @@ export default async function NewBusinessPage() {
   const businesses = await getPortalBusinesses();
 
   return (
-    <PortalShell activeBusiness={null} availableBusinesses={businesses} viewerName={account.name} currentSection="home">
-      <div className="mx-auto max-w-5xl space-y-5 py-2 sm:py-4">
+    <PortalShell activeBusiness={null} availableBusinesses={businesses} viewerName={account.name} currentSection="home" pageTitle="Tambah usaha">
+      <div className="mx-auto max-w-3xl space-y-4 py-1 sm:py-3">
         <PageHeader
-          eyebrow="Onboarding usaha"
-          title="Buat workspace usaha baru"
-          description="Pilih jenis usaha, isi identitas dan lokasi utama. Lajukan menyiapkan flow awal yang sesuai tanpa memaksa kamu memahami ERP atau akuntansi."
+          eyebrow="Mulai"
+          title="Tambah usaha"
+          description="Isi yang penting dulu. Produk, stok, uang, dan pengaturan lain bisa dilengkapi setelah usaha dibuat."
         />
 
-        <section className="grid gap-3 sm:grid-cols-4">
-          {[
-            [Layers3, '1. Pilih flow', 'Juice/F&B, Laundry, AC/Field Service, Mart/Retail, atau usaha umum.'],
-            [Store, '2. Identitas usaha', 'Nama, kategori tampilan, dan kontak utama.'],
-            [MapPinned, '3. Lokasi utama', 'Alamat dan pin menjadi fondasi cabang pertama.'],
-            [CheckCircle2, '4. Quick Start', 'Masuk ke langkah awal yang relevan dengan jenis usahamu.'],
-          ].map(([Icon, title, copy]) => {
-            const IconComponent = Icon as typeof Store;
-            return (
-              <article key={String(title)} className="portal-panel p-4 sm:p-5">
-                <span className="portal-icon-tile"><IconComponent className="h-4 w-4" /></span>
-                <h2 className="mt-4 text-sm font-bold text-portal-ink">{String(title)}</h2>
-                <p className="mt-1.5 text-xs leading-5 text-portal-soft">{String(copy)}</p>
-              </article>
-            );
-          })}
-        </section>
-
-        <DataPanel
-          title="Setup usaha"
-          description="Jenis usaha menentukan template dan capability awal. Kategori tetap terpisah agar label publik tidak diam-diam mengubah operasional."
-        >
+        <section className="merchant-surface-bordered overflow-hidden">
+          <div className="grid grid-cols-3 divide-x divide-portal-line/70 border-b border-portal-line/70 bg-[#fafbf9]">
+            <div className="px-3 py-3 text-center"><Store className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Info usaha</p></div>
+            <div className="px-3 py-3 text-center"><MapPinned className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Lokasi</p></div>
+            <div className="px-3 py-3 text-center"><CheckCircle2 className="mx-auto h-4 w-4 text-portal-forest" /><p className="mt-1 text-[11px] font-bold text-portal-ink">Siap dipakai</p></div>
+          </div>
           <div className="p-4 sm:p-6">
             <NewBusinessQuickForm
               initialOwnerName={account.name}
@@ -49,7 +32,9 @@ export default async function NewBusinessPage() {
               initialOwnerEmail={account.email}
             />
           </div>
-        </DataPanel>
+        </section>
+
+        <p className="px-1 text-xs leading-5 text-portal-soft">Tidak perlu menyiapkan semua data sekarang. Setelah usaha tersimpan, Lajukan akan menampilkan pekerjaan berikutnya yang paling relevan.</p>
       </div>
     </PortalShell>
   );
