@@ -50,6 +50,11 @@ export default async function BusinessInventoryPage({ params, searchParams }: Pa
     : [[], []];
   const sortedProducts = sortStockAttentionFirst(business.products);
   const attention = sortedProducts.filter(item => item.stockHealth && item.stockHealth !== 'aman');
+  const lowIngredients = ingredients.filter(item => {
+    const minimum = Number(item.minimum_stock ?? 0);
+    const stock = Number(item.stock_quantity ?? 0);
+    return minimum > 0 && Number.isFinite(stock) && stock <= minimum;
+  });
   const primaryLocation = business.locations?.find(location => location.isPrimary) ?? business.locations?.[0] ?? null;
   const requestedView = query.view;
   const defaultView = attention.length ? 'attention' : 'all';
@@ -103,7 +108,7 @@ export default async function BusinessInventoryPage({ params, searchParams }: Pa
           {activeView === 'materials' && canViewIngredientCosts ? (
             <div className="space-y-3">
               <section className="grid gap-2 sm:grid-cols-3">
-                <div className="merchant-surface-bordered p-4"><TriangleAlert className="h-4 w-4 text-portal-forest" /><p className="mt-2 text-2xl font-black text-portal-ink">{ingredients.filter(item => item.stock_status === 'low' || item.stock_status === 'out').length}</p><p className="mt-1 text-xs text-portal-soft">Bahan perlu perhatian</p></div>
+                <div className="merchant-surface-bordered p-4"><TriangleAlert className="h-4 w-4 text-portal-forest" /><p className="mt-2 text-2xl font-black text-portal-ink">{lowIngredients.length}</p><p className="mt-1 text-xs text-portal-soft">Bahan perlu perhatian</p></div>
                 <div className="merchant-surface-bordered p-4"><PackagePlus className="h-4 w-4 text-portal-forest" /><p className="mt-2 text-2xl font-black text-portal-ink">{ingredients.length}</p><p className="mt-1 text-xs text-portal-soft">Bahan tercatat</p></div>
                 <div className="merchant-surface-bordered p-4"><Boxes className="h-4 w-4 text-portal-forest" /><p className="mt-2 text-sm font-black text-portal-ink">HPP tetap opsional</p><p className="mt-1 text-xs leading-5 text-portal-soft">Kelola bahan hanya saat usaha membutuhkan perhitungan modal lebih rinci.</p></div>
               </section>
