@@ -29,10 +29,19 @@ def main() -> int:
 
     require(
         'frontend/apps/usaha/src/lib/portal-navigation.ts',
-        'Beranda', 'Jualan', 'Produk', 'Stok', 'Uang', 'Laporan',
+        'Beranda', 'Jual', 'Barang', 'Stok', 'Uang', 'Laporan',
         'Jual Online', 'Pengaturan Usaha', 'Lokasi & Outlet', 'Tim & Akses',
         'Tampilan Toko', 'desktopPrimaryNavigation', 'mobilePrimaryNavigation',
         'portalMenuNavigation',
+    )
+    forbid(
+        'frontend/apps/usaha/src/lib/portal-navigation.ts',
+        "orders: 'Jualan'", "products: 'Produk'",
+    )
+    require(
+        'frontend/apps/usaha/src/lib/portal-visual.ts',
+        'portalSectionVisual', 'ShoppingBag', 'Package', 'PackageSearch',
+        'WalletCards', 'LockKeyhole', 'activeNavClass', 'iconClass',
     )
     require(
         'frontend/apps/usaha/src/components/portal/PortalShell.tsx',
@@ -48,7 +57,13 @@ def main() -> int:
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
 
-    require('frontend/apps/usaha/src/app/page.tsx', 'Prioritas utama', 'Kerjakan sekarang', 'buildMerchantNextActions', 'buildHomeDashboard', 'listControlIngredients', 'listControlFinanceEntries', 'listControlChannels', 'const recipeCount = null')
+    require(
+        'frontend/apps/usaha/src/app/page.tsx',
+        'Perlu perhatian', 'Kondisi usaha', 'Kerjakan',
+        'merchant-action-sale', 'merchant-action-money', 'merchant-action-stock',
+        'buildMerchantNextActions', 'buildHomeDashboard', 'listControlIngredients',
+        'listControlFinanceEntries', 'listControlChannels', 'const recipeCount = null',
+    )
     require('frontend/apps/usaha/src/app/page.tsx', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: null', 'unreconciledSettlementCount: 0')
     forbid('frontend/apps/usaha/src/app/page.tsx', 'Yang perlu ditangani sekarang', '|| 15000', '|| 15_000', 'getControlRecipe', 'business.products.map', 'listControlSettlements', 'PortfolioPanel')
     require('frontend/apps/usaha/src/lib/business-control/next-actions.ts', 'canViewCosting', 'canViewFinance', 'canViewChannels', 'productsMissingChannelPriceCount: number | null')
