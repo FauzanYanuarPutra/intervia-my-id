@@ -8,8 +8,8 @@ export type PortalNavigationItem = {
 
 const labels: Record<PortalSection, string> = {
   home: 'Beranda',
-  orders: 'Jualan',
-  products: 'Produk',
+  orders: 'Jual',
+  products: 'Barang',
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
@@ -30,10 +30,10 @@ const desktopPrimaryOrder: PortalSection[] = [
   'finance',
 ];
 
-const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'inventory'];
+const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];
 
 const menuOrder: PortalSection[] = [
-  'finance',
+  'inventory',
   'reports',
   'channels',
   'info',
