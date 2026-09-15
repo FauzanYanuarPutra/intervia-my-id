@@ -9,6 +9,13 @@ describe('normalizeWorkspaceRole', () => {
     expect(normalizeWorkspaceRole('org_viewer', false)).toBe('viewer');
   });
 
+  it('preserves specialist Identity roles instead of degrading them to viewer', () => {
+    expect(normalizeWorkspaceRole('org_accounting', false)).toBe('accounting');
+    expect(normalizeWorkspaceRole('accounting', false)).toBe('accounting');
+    expect(normalizeWorkspaceRole('org_inventory', false)).toBe('inventory');
+    expect(normalizeWorkspaceRole('inventory', false)).toBe('inventory');
+  });
+
   it('keeps the organization owner as owner', () => {
     expect(normalizeWorkspaceRole('org_viewer', true)).toBe('owner');
   });
