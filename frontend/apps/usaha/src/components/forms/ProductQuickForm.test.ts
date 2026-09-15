@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(
-  fileURLToPath(new URL('./ProductQuickForm.tsx', import.meta.url)),
+  fileURLToPath(new URL('./ProductQuickFormSimple.tsx', import.meta.url)),
   'utf8',
 );
 
