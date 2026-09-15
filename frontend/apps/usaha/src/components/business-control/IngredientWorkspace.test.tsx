@@ -47,4 +47,19 @@ describe('IngredientWorkspace existing ingredient management', () => {
     expect(html).toContain('Modal belum bisa dihitung');
     expect(html).not.toContain('minimum 0');
   });
+
+  it('guides new ingredient setup in three simple steps and previews automatic unit conversion', () => {
+    const html = renderToStaticMarkup(
+      <IngredientWorkspace
+        businessId="22222222-2222-4222-8222-222222222222"
+        initialIngredients={[]}
+      />,
+    );
+
+    expect(html).toContain('1. Bahan');
+    expect(html).toContain('2. Harga &amp; satuan');
+    expect(html).toContain('3. Stok &amp; supplier');
+    expect(html).toContain('1 kg = 1.000 gram');
+    expect(html).toContain('otomatis');
+  });
 });
