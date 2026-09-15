@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import {
   Archive,
-  ChevronDown,
   History,
   Loader2,
   PackagePlus,
@@ -18,6 +17,7 @@ import {
   ingredientNumber,
   isIngredientIncomplete,
   needsIngredientPurchase,
+  suggestIngredientUnits,
   type IngredientFilter,
 } from '@/lib/business-control/ingredient-management';
 
@@ -85,6 +85,10 @@ const unitMoney = new Intl.NumberFormat('id-ID', {
   currency: 'IDR',
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
+});
+
+const quantityNumber = new Intl.NumberFormat('id-ID', {
+  maximumFractionDigits: 4,
 });
 
 const kindLabels: Record<string, string> = {
@@ -181,6 +185,7 @@ export function IngredientWorkspace({
   const [supplier, setSupplier] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<IngredientFilter>('all');
@@ -212,6 +217,13 @@ export function IngredientWorkspace({
     () => filterIngredients(ingredients, filter, query),
     [ingredients, filter, query],
   );
+
+  function updatePurchaseUnit(value: string) {
+    setPurchaseUnit(value);
+    const suggestion = suggestIngredientUnits(value);
+    setRecipeUnit(suggestion.recipeUnit);
+    setConversionFactor(String(suggestion.conversionFactor));
+  }
 
   async function reload() {
     const response = await fetch(`/api/businesses/${businessId}/ingredients`, {
@@ -252,8 +264,18 @@ export function IngredientWorkspace({
       if (!response.ok) throw new Error(responseError(payload, 'Gagal menyimpan bahan.'));
       await reload();
       setName('');
+      setKind('ingredient');
+      setPurchaseUnit('kg');
+      setRecipeUnit('gram');
+      setConversionFactor('1000');
       setPurchasePrice('');
+      setPurchaseQuantity('1');
+      setYieldPercent('100');
+      setWastePercent('0');
+      setStockQuantity('0');
+      setMinimumStock('0');
       setSupplier('');
+      setCreateStep(1);
       setMessage('Tersimpan. Bahan ini sekarang bisa dipakai di resep HPP.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan bahan.');
@@ -761,64 +783,273 @@ export function IngredientWorkspace({
         </div>
       </section>
 
-      <details className="rounded-xl border border-portal-line bg-white group">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5">
-          <div>
-            <p className="font-bold text-portal-ink">Tambah bahan atau kemasan baru</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Input sekali, lalu gunakan di stok dan resep HPP.</p>
+      <section className="overflow-hidden rounded-xl border border-portal-line bg-white">
+        <div className="border-b border-portal-line p-4 sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="font-bold text-portal-ink">Tambah bahan atau kemasan baru</p>
+              <p className="mt-0.5 text-xs text-portal-soft">
+                Isi yang penting dulu. Satuan resep dan konversi umum dihitung otomatis.
+              </p>
+            </div>
+            <p className="rounded-full bg-portal-mist px-3 py-1.5 text-xs font-semibold text-portal-forest">
+              1 {purchaseUnit || 'unit'} = {quantityNumber.format(n(conversionFactor) || 1)} {recipeUnit || 'unit'} · otomatis
+            </p>
           </div>
-          <ChevronDown className="h-4 w-4 text-portal-soft transition group-open:rotate-180" />
-        </summary>
-        <div className="border-t border-portal-line p-4 sm:p-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="text-xs font-semibold text-portal-soft">Nama
-              <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" placeholder="Contoh: Alpukat" value={name} onChange={event => setName(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Jenis
-              <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={kind} onChange={event => setKind(event.target.value)}>
-                {Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Harga beli
-              <input type="number" min="0" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" placeholder="34000" value={purchasePrice} onChange={event => setPurchasePrice(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Jumlah beli
-              <input type="number" step="any" min="0.0001" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Unit beli
-              <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={purchaseUnit} onChange={event => setPurchaseUnit(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Unit resep
-              <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={recipeUnit} onChange={event => setRecipeUnit(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Konversi
-              <input type="number" step="any" min="0.0001" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={conversionFactor} onChange={event => setConversionFactor(event.target.value)} />
-              <span className="mt-1 block font-normal">Contoh 1 kg = 1000 gram.</span>
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Hasil terpakai %
-              <input type="number" min="1" max="100" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={yieldPercent} onChange={event => setYieldPercent(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Susut %
-              <input type="number" min="0" max="99" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={wastePercent} onChange={event => setWastePercent(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Stok awal ({recipeUnit || 'unit resep'})
-              <input type="number" min="0" step="any" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={stockQuantity} onChange={event => setStockQuantity(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Batas minimum
-              <input type="number" min="0" step="any" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={minimumStock} onChange={event => setMinimumStock(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Supplier <span className="font-normal">(opsional)</span>
-              <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={supplier} onChange={event => setSupplier(event.target.value)} />
-            </label>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button type="button" disabled={saving || !canManage} onClick={() => void save()} className="portal-button-primary min-h-11 disabled:opacity-60">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan bahan
-            </button>
-            {message ? <p className="text-xs text-portal-soft" role="status">{message}</p> : null}
+
+          <div className="mt-4 grid grid-cols-3 gap-2" aria-label="Langkah tambah bahan">
+            {([
+              [1, '1. Bahan'],
+              [2, '2. Harga & satuan'],
+              [3, '3. Stok & supplier'],
+            ] as const).map(([step, label]) => (
+              <button
+                key={step}
+                type="button"
+                onClick={() => setCreateStep(step)}
+                className={`min-h-10 rounded-xl border px-2 text-[11px] font-bold sm:text-xs ${
+                  createStep === step
+                    ? 'border-portal-forest bg-portal-forest text-white'
+                    : 'border-portal-line bg-white text-portal-soft'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
-      </details>
+
+        <div className="p-4 sm:p-5">
+          {createStep === 1 ? (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+              <label className="text-xs font-semibold text-portal-soft">
+                Nama bahan / kemasan
+                <input
+                  className="mt-1 min-h-12 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                  placeholder="Contoh: Alpukat, Cup 16 oz"
+                  value={name}
+                  onChange={event => setName(event.target.value)}
+                  autoFocus
+                />
+              </label>
+              <div>
+                <p className="text-xs font-semibold text-portal-soft">Jenis</p>
+                <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+                  {([
+                    ['ingredient', 'Bahan'],
+                    ['packaging', 'Kemasan'],
+                    ['semi_finished', 'Bahan olahan'],
+                    ['utility', 'Utilitas'],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setKind(value)}
+                      className={`min-h-11 rounded-xl border px-3 text-sm font-semibold ${
+                        kind === value
+                          ? 'border-portal-forest bg-portal-mist text-portal-forest'
+                          : 'border-portal-line bg-white text-portal-soft'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKind('labor')}
+                  className={`mt-2 text-xs font-semibold ${kind === 'labor' ? 'text-portal-forest' : 'text-portal-soft'}`}
+                >
+                  {kind === 'labor' ? '✓ ' : ''}Tenaga langsung
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {createStep === 2 ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="text-xs font-semibold text-portal-soft">
+                  Harga beli
+                  <input
+                    type="number"
+                    min="0"
+                    className="mt-1 min-h-12 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                    placeholder="34000"
+                    value={purchasePrice}
+                    onChange={event => setPurchasePrice(event.target.value)}
+                  />
+                </label>
+                <label className="text-xs font-semibold text-portal-soft">
+                  Jumlah dibeli
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.0001"
+                    className="mt-1 min-h-12 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                    value={purchaseQuantity}
+                    onChange={event => setPurchaseQuantity(event.target.value)}
+                  />
+                </label>
+                <label className="text-xs font-semibold text-portal-soft">
+                  Satuan beli
+                  <input
+                    className="mt-1 min-h-12 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                    value={purchaseUnit}
+                    onChange={event => updatePurchaseUnit(event.target.value)}
+                    placeholder="kg, liter, pcs, lusin"
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                <p className="font-bold">Konversi otomatis</p>
+                <p className="mt-1 text-xs leading-5">
+                  1 {purchaseUnit || 'unit'} = {quantityNumber.format(n(conversionFactor) || 1)} {recipeUnit || 'unit'}.
+                  Angka ini dipakai untuk stok dan HPP supaya kamu tidak perlu menghitung manual.
+                </p>
+              </div>
+
+              <details className="rounded-xl border border-portal-line bg-white p-3">
+                <summary className="cursor-pointer text-xs font-bold text-portal-soft">
+                  Atur satuan manual
+                </summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-portal-soft">
+                    Satuan resep / stok
+                    <input
+                      className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                      value={recipeUnit}
+                      onChange={event => setRecipeUnit(event.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-portal-soft">
+                    Isi per 1 satuan beli
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.0001"
+                      className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                      value={conversionFactor}
+                      onChange={event => setConversionFactor(event.target.value)}
+                    />
+                  </label>
+                </div>
+              </details>
+            </div>
+          ) : null}
+
+          {createStep === 3 ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="text-xs font-semibold text-portal-soft">
+                  Stok awal ({recipeUnit || 'unit'})
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    className="mt-1 min-h-12 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                    value={stockQuantity}
+                    onChange={event => setStockQuantity(event.target.value)}
+                  />
+                </label>
+                <label className="text-xs font-semibold text-portal-soft">
+                  Ingatkan kalau stok tinggal
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    className="mt-1 min-h-12 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                    value={minimumStock}
+                    onChange={event => setMinimumStock(event.target.value)}
+                    placeholder="Contoh: 500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-portal-soft">
+                  Supplier <span className="font-normal">(opsional)</span>
+                  <input
+                    className="mt-1 min-h-12 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                    value={supplier}
+                    onChange={event => setSupplier(event.target.value)}
+                    placeholder="Contoh: Pasar Induk"
+                  />
+                </label>
+              </div>
+
+              <details className="rounded-xl border border-portal-line bg-white p-3">
+                <summary className="cursor-pointer text-xs font-bold text-portal-soft">
+                  Hasil terpakai & susut (opsional)
+                </summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-portal-soft">
+                    Hasil terpakai %
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                      value={yieldPercent}
+                      onChange={event => setYieldPercent(event.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-portal-soft">
+                    Susut %
+                    <input
+                      type="number"
+                      min="0"
+                      max="99"
+                      className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+                      value={wastePercent}
+                      onChange={event => setWastePercent(event.target.value)}
+                    />
+                  </label>
+                </div>
+              </details>
+            </div>
+          ) : null}
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-portal-line pt-4">
+            <div className="flex gap-2">
+              {createStep > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setCreateStep(current => (current - 1) as 1 | 2 | 3)}
+                  className="portal-button-secondary min-h-11"
+                >
+                  Kembali
+                </button>
+              ) : null}
+              {createStep < 3 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (createStep === 1 && name.trim().length < 2) {
+                      setMessage('Isi nama bahan atau kemasan terlebih dahulu.');
+                      return;
+                    }
+                    setMessage('');
+                    setCreateStep(current => (current + 1) as 1 | 2 | 3);
+                  }}
+                  className="portal-button-primary min-h-11"
+                >
+                  Lanjut
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={saving || !canManage}
+                  onClick={() => void save()}
+                  className="portal-button-primary min-h-11 disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Simpan bahan
+                </button>
+              )}
+            </div>
+            {message ? <p className="text-xs font-semibold text-portal-soft" role="status">{message}</p> : null}
+          </div>
+        </div>
+      </section>
 
       {!canManage ? (
         <p className="rounded-xl border border-portal-line bg-white p-4 text-sm text-portal-soft">
