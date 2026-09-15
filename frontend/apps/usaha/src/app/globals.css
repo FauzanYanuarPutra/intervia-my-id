@@ -12,7 +12,7 @@
   }
 
   html {
-    font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
     background: #f7f8f6;
   }
 
@@ -78,6 +78,18 @@
 
   .merchant-action-row {
     @apply flex min-h-12 items-center justify-between gap-3 border-b border-portal-line/70 px-4 py-3 last:border-b-0;
+  }
+
+  .merchant-action-sale {
+    @apply inline-flex items-center justify-center rounded-[14px] bg-portal-sale px-4 py-2.5 font-bold text-white shadow-[0_12px_28px_-20px_rgba(22,122,74,.9)] transition hover:bg-portal-forest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-sale/30 focus-visible:ring-offset-2;
+  }
+
+  .merchant-action-money {
+    @apply inline-flex items-center justify-center rounded-[14px] border border-portal-money/15 bg-portal-moneyTint px-4 py-2.5 font-bold text-portal-money transition hover:border-portal-money/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-money/25 focus-visible:ring-offset-2;
+  }
+
+  .merchant-action-stock {
+    @apply inline-flex items-center justify-center rounded-[14px] border border-portal-stock/15 bg-portal-stockTint px-4 py-2.5 font-bold text-portal-stock transition hover:border-portal-stock/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-stock/25 focus-visible:ring-offset-2;
   }
 
   .merchant-list {
