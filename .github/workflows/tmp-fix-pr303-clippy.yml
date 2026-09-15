@@ -34,7 +34,7 @@ jobs:
         with:
           ref: feat/usaha-storefront-interaction-system
           fetch-depth: 0
-      - name: Apply targeted Clippy fixes
+      - name: Apply final marketplace fixes
         shell: python
         run: |
           from pathlib import Path
@@ -76,6 +76,14 @@ jobs:
               '''                let invalid_bounds = minimum > maximum || maximum == 0;\n                let invalid_defaults =\n                    default_count > 0 && (default_count < minimum || default_count > maximum);\n                if invalid_bounds || invalid_defaults {\n                    return Err("invalid_modifier_selection_bounds");\n                }''',
           )
 
+          migration = 'services/marketplace_service/migrations/20260915140000_finance_core_v2.up.sql'
+          audit_table = '''CREATE TABLE IF NOT EXISTS business_audit_events (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  organization_id UUID NOT NULL,\n  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,\n  actor_user_id UUID NOT NULL,\n  event_key TEXT NOT NULL CHECK (char_length(btrim(event_key)) BETWEEN 1 AND 120),\n  subject_type TEXT NOT NULL CHECK (char_length(btrim(subject_type)) BETWEEN 1 AND 120),\n  subject_id UUID NOT NULL,\n  reason TEXT NOT NULL DEFAULT '',\n  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);\nCREATE INDEX IF NOT EXISTS business_audit_events_business_created_idx\n  ON business_audit_events (business_id, organization_id, created_at DESC, id);\n\n'''
+          anchor = '''CREATE INDEX IF NOT EXISTS business_allocation_movements_entry_idx\n  ON business_allocation_movements (finance_entry_id)\n  WHERE finance_entry_id IS NOT NULL;\n\n'''
+          replace_once(migration, anchor, anchor + audit_table)
+          trigger_anchor = '''DROP TRIGGER IF EXISTS business_allocation_movements_append_only ON business_allocation_movements;\nCREATE TRIGGER business_allocation_movements_append_only\nBEFORE UPDATE OR DELETE ON business_allocation_movements\nFOR EACH ROW EXECUTE FUNCTION reject_business_finance_core_mutation();\n\n'''
+          audit_trigger = '''DROP TRIGGER IF EXISTS business_audit_events_append_only ON business_audit_events;\nCREATE TRIGGER business_audit_events_append_only\nBEFORE UPDATE OR DELETE ON business_audit_events\nFOR EACH ROW EXECUTE FUNCTION reject_business_finance_core_mutation();\n\n'''
+          replace_once(migration, trigger_anchor, trigger_anchor + audit_trigger)
+
       - name: Verify marketplace formatting, Clippy and focused tests
         working-directory: services/marketplace_service
         run: |
@@ -90,6 +98,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add services/marketplace_service/src/businesses/finance_core.rs \
                   services/marketplace_service/src/businesses/finance_core_routes.rs \
-                  services/marketplace_service/src/businesses/product_modifiers.rs
-          git commit -m "fix(marketplace): satisfy strict Clippy checks"
+                  services/marketplace_service/src/businesses/product_modifiers.rs \
+                  services/marketplace_service/migrations/20260915140000_finance_core_v2.up.sql
+          git commit -m "fix(marketplace): complete finance audit migration and strict checks"
           git push origin HEAD:feat/usaha-storefront-interaction-system
