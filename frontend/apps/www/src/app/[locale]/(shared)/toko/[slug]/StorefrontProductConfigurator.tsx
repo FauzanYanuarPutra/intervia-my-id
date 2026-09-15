@@ -61,14 +61,6 @@ export function StorefrontProductConfigurator({
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    setSelections(defaultStorefrontSelections(groups));
-    setQuantity(1);
-    setNote('');
-    setSelectionErrors({});
-    setConfiguredLines([]);
-  }, [groups, productId]);
-
-  useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) dialog.showModal();
@@ -151,9 +143,12 @@ export function StorefrontProductConfigurator({
   async function submitConfigured() {
     const draft = buildDraftLine();
     if (!draft) return;
-    const lines = addLine(configuredLines, draft).map(
-      ({ signature: _signature, optionSummary: _summary, estimatedUnitPriceCents: _estimated, ...line }) => line,
-    );
+    const lines: StorefrontOrderLineInput[] = addLine(configuredLines, draft).map(line => ({
+      productId: line.productId,
+      quantity: line.quantity,
+      selectedOptions: line.selectedOptions,
+      note: line.note,
+    }));
     await onSubmit(lines);
   }
 
