@@ -13,11 +13,12 @@ describe('merchant OS foundation', () => {
   });
 
   it('uses merchant-friendly mobile navigation', () => {
-    const source = read('./MobileNav.tsx');
-    expect(source).toContain('Jual');
-    expect(source).toContain('Produk');
-    expect(source).toContain('Stok');
-    expect(source).toContain('Menu');
+    const mobile = read('./MobileNav.tsx');
+    const navigation = read('../../lib/portal-navigation.ts');
+    expect(mobile).toContain("orders: 'Jual'");
+    expect(mobile).toContain('Menu');
+    expect(navigation).toContain("products: 'Produk'");
+    expect(navigation).toContain("inventory: 'Stok'");
   });
 
   it('uses the compact merchant shell and shared primitives', () => {
