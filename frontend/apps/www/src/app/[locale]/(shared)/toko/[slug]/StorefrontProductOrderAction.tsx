@@ -196,6 +196,7 @@ export function StorefrontProductOrderAction({
 
       {resolvedProduct && groups.length ? (
         <StorefrontProductConfigurator
+          key={`${productId}:${configOpen ? 'open' : 'closed'}`}
           open={configOpen}
           onOpenChange={setConfigOpen}
           productId={productId}
