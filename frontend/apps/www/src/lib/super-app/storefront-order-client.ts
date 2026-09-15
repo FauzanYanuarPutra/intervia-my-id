@@ -1,5 +1,17 @@
 export type StorefrontOrderFulfillmentMode = 'courier' | 'pickup' | 'digital';
 
+export type StorefrontOrderSelectionInput = {
+  groupId: string;
+  optionIds: string[];
+};
+
+export type StorefrontOrderLineInput = {
+  productId: string;
+  quantity: number;
+  note?: string | null;
+  selections?: StorefrontOrderSelectionInput[];
+};
+
 export type StorefrontCanonicalOrderBundle = {
   order: {
     id: string;
@@ -20,14 +32,17 @@ export type StorefrontCanonicalOrderBundle = {
     quantity: string | number;
     unit_price: string | number;
     line_total: string | number;
+    metadata?: Record<string, unknown>;
   }>;
   replayed: boolean;
 };
 
 export type StorefrontProductOrderInput = {
   storeId: string;
-  productId: string;
-  quantity: number;
+  /** Backward-compatible single-line fields. Prefer items for configured carts. */
+  productId?: string;
+  quantity?: number;
+  items?: StorefrontOrderLineInput[];
   idempotencyKey: string;
   fulfillmentMode?: StorefrontOrderFulfillmentMode;
 };
@@ -93,9 +108,18 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+function normalizedLines(input: StorefrontProductOrderInput): StorefrontOrderLineInput[] {
+  if (input.items?.length) return input.items;
+  if (input.productId && Number.isInteger(input.quantity) && Number(input.quantity) > 0) {
+    return [{ productId: input.productId, quantity: Number(input.quantity) }];
+  }
+  throw new StorefrontOrderClientError(400, 'items_required');
+}
+
 export async function submitStorefrontProductOrder(
   input: StorefrontProductOrderInput,
 ): Promise<StorefrontCanonicalOrderBundle> {
+  const items = normalizedLines(input);
   const response = await fetch('/api/super-app/umkm/orders', {
     method: 'POST',
     credentials: 'same-origin',
@@ -108,12 +132,15 @@ export async function submitStorefrontProductOrder(
     body: JSON.stringify({
       store_id: input.storeId,
       channel: 'online',
-      items: [
-        {
-          product_id: input.productId,
-          quantity: input.quantity,
-        },
-      ],
+      items: items.map(item => ({
+        product_id: item.productId,
+        quantity: item.quantity,
+        ...(item.note?.trim() ? { notes: item.note.trim() } : {}),
+        selections: (item.selections ?? []).map(selection => ({
+          group_id: selection.groupId,
+          option_ids: selection.optionIds,
+        })),
+      })),
       fulfillment_mode: input.fulfillmentMode ?? 'pickup',
     }),
   });
@@ -152,7 +179,6 @@ export function createStorefrontOrderSubmitter(): {
   return {
     submit(input) {
       if (inFlight) return inFlight;
-
       inFlight = submitStorefrontProductOrder(input).finally(() => {
         inFlight = null;
       });
