@@ -4,6 +4,9 @@ mod advisor_routes;
 mod availability_persistence_tests;
 pub(crate) mod control;
 pub(crate) mod domain;
+mod finance_core;
+#[cfg(test)]
+mod finance_core_tests;
 #[cfg(test)]
 mod finance_semantics_tests;
 mod governance;
