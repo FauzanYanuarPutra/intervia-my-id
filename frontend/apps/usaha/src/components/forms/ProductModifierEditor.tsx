@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, Plus, Save, Trash2 } from 'lucide-react';
 
 type ModifierMode = 'single' | 'multiple';
@@ -72,28 +72,33 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!expanded || loaded || loading) return;
-    let alive = true;
+  async function loadGroups() {
+    if (loaded || loading) return;
     setLoading(true);
-    fetch(`/api/businesses/${businessId}/products/${productId}/modifiers`, { cache: 'no-store' })
-      .then(async response => {
-        const body = (await response.json().catch(() => ({}))) as {
-          data?: { groups?: ModifierGroup[] };
-          error?: string;
-        };
-        if (!response.ok) throw new Error(body.error || 'Pilihan produk belum bisa dimuat.');
-        if (alive) {
-          setGroups(Array.isArray(body.data?.groups) ? body.data.groups : []);
-          setLoaded(true);
-        }
-      })
-      .catch(value => alive && setError(value instanceof Error ? value.message : 'Pilihan produk belum bisa dimuat.'))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [businessId, expanded, loaded, loading, productId]);
+    setError('');
+    try {
+      const response = await fetch(`/api/businesses/${businessId}/products/${productId}/modifiers`, {
+        cache: 'no-store',
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        data?: { groups?: ModifierGroup[] };
+        error?: string;
+      };
+      if (!response.ok) throw new Error(body.error || 'Pilihan produk belum bisa dimuat.');
+      setGroups(Array.isArray(body.data?.groups) ? body.data.groups : []);
+      setLoaded(true);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Pilihan produk belum bisa dimuat.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleExpanded() {
+    const nextExpanded = !expanded;
+    setExpanded(nextExpanded);
+    if (nextExpanded && !loaded && !loading) void loadGroups();
+  }
 
   const optionCount = useMemo(
     () => groups.reduce((total, group) => total + group.options.length, 0),
@@ -179,7 +184,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
         type="button"
         className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-1 text-left"
         aria-expanded={expanded}
-        onClick={() => setExpanded(value => !value)}
+        onClick={toggleExpanded}
       >
         <span>
           <span className="block text-sm font-black text-portal-ink">Pilihan produk</span>

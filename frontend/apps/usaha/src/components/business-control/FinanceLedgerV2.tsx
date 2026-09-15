@@ -227,11 +227,28 @@ export function FinanceLedgerV2({ businessId, initialEntries, channels = [] }: P
   }
 
   useEffect(() => {
-    reloadAll(true).catch(() => {
-      // Initial server data remains a safe fallback if Finance Core is temporarily unavailable.
-    });
-    // businessId is stable for this page instance.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+
+    async function loadInitialSnapshot() {
+      try {
+        const [historyResponse, summaryResponse] = await Promise.all([
+          fetch(`/api/businesses/${businessId}/finance-core/entries`, { cache: 'no-store' }),
+          fetch(`/api/businesses/${businessId}/finance-core/summary`, { cache: 'no-store' }),
+        ]);
+        const historyPayload = await historyResponse.json().catch(() => ({}));
+        const summaryPayload = await summaryResponse.json().catch(() => ({}));
+        if (!historyResponse.ok || !summaryResponse.ok || cancelled) return;
+        setEntries(Array.isArray(historyPayload?.data?.items) ? historyPayload.data.items : []);
+        setSummary(summaryPayload?.data?.summary ?? null);
+      } catch {
+        // Initial server data remains a safe fallback if Finance Core is temporarily unavailable.
+      }
+    }
+
+    void loadInitialSnapshot();
+    return () => {
+      cancelled = true;
+    };
   }, [businessId]);
 
   function chooseDirection(next: 'in' | 'out') {
