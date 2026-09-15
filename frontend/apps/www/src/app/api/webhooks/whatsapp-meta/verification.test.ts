@@ -20,15 +20,15 @@ describe('WhatsApp Meta webhook verification config', () => {
     ).toEqual({ token: 'configured-token', required: true });
   });
 
-  it('keeps local development permissive when verification is not required', () => {
+  it('requires a token in local development so public dev tunnels cannot bypass verification', () => {
     expect(
       getWhatsAppMetaVerificationConfig({
         NODE_ENV: 'development',
       }),
-    ).toEqual({ token: null, required: false });
+    ).toEqual({ token: null, required: true });
   });
 
-  it('requires verification when a public request forces it', () => {
+  it('keeps verification required when a public request forces it', () => {
     expect(
       getWhatsAppMetaVerificationConfig(
         {
@@ -39,11 +39,11 @@ describe('WhatsApp Meta webhook verification config', () => {
     ).toEqual({ token: null, required: true });
   });
 
-  it('can require verification explicitly outside production', () => {
+  it('does not allow an environment setting to disable the webhook verify token', () => {
     expect(
       getWhatsAppMetaVerificationConfig({
         NODE_ENV: 'development',
-        WHATSAPP_META_WEBHOOK_VERIFY_TOKEN_REQUIRED: 'TrUe',
+        WHATSAPP_META_WEBHOOK_VERIFY_TOKEN_REQUIRED: 'false',
       }),
     ).toEqual({ token: null, required: true });
   });
