@@ -7,22 +7,22 @@ function permissions(role: keyof typeof roleTemplates) {
 }
 
 describe('portal role access matrix', () => {
-  it('allows cashier daily work without exposing sensitive management pages', () => {
+  it('allows cashier daily work and read-only business info without sensitive management pages', () => {
     const cashier = permissions('cashier');
-    for (const section of ['home', 'orders', 'products', 'inventory', 'operations', 'buyerPage'] as const) {
+    for (const section of ['home', 'orders', 'products', 'inventory', 'info', 'locations', 'operations', 'buyerPage'] as const) {
       expect(canAccessPortalSection(cashier, section)).toBe(true);
     }
-    for (const section of ['finance', 'reports', 'channels', 'info', 'locations', 'team', 'security'] as const) {
+    for (const section of ['finance', 'reports', 'channels', 'team', 'security'] as const) {
       expect(canAccessPortalSection(cashier, section)).toBe(false);
     }
   });
 
   it('keeps viewer read-only surfaces available', () => {
     const viewer = permissions('viewer');
-    for (const section of ['home', 'orders', 'products', 'inventory', 'operations', 'buyerPage'] as const) {
+    for (const section of ['home', 'orders', 'products', 'inventory', 'info', 'locations', 'operations', 'buyerPage'] as const) {
       expect(canAccessPortalSection(viewer, section)).toBe(true);
     }
-    for (const section of ['finance', 'reports', 'channels', 'info', 'locations', 'team', 'security'] as const) {
+    for (const section of ['finance', 'reports', 'channels', 'team', 'security'] as const) {
       expect(canAccessPortalSection(viewer, section)).toBe(false);
     }
   });
