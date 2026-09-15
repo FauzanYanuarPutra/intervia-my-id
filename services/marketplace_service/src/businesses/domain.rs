@@ -825,6 +825,8 @@ mod tests {
     fn public_store_serialization_is_allowlist_only() {
         let dto = PublicStore {
             id: Uuid::new_v4(),
+            owner_user_id: Uuid::new_v4(),
+            organization_id: Some(Uuid::new_v4()),
             name: "Kedai Cuk".to_owned(),
             slug: "kedai-cuk".to_owned(),
             description: Some("Minuman segar".to_owned()),
@@ -843,7 +845,7 @@ mod tests {
 
         let serialized = serde_json::to_value(dto).expect("serialize public store");
         let object = serialized.as_object().expect("public store object");
-        assert_eq!(object.len(), 15);
+        assert_eq!(object.len(), 17);
     }
 
     #[test]
@@ -1003,6 +1005,8 @@ mod tests {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct PublicStore {
     pub(crate) id: Uuid,
+    pub(crate) owner_user_id: Uuid,
+    pub(crate) organization_id: Option<Uuid>,
     pub(crate) name: String,
     pub(crate) slug: String,
     pub(crate) description: Option<String>,

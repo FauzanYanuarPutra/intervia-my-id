@@ -1518,6 +1518,7 @@ struct ListLajukanRequestsQuery {
 struct UmkmStoreRow {
     id: Uuid,
     owner_user_id: Uuid,
+    organization_id: Option<Uuid>,
     name: String,
     slug: String,
     description: Option<String>,
@@ -1537,6 +1538,8 @@ struct UmkmStoreRow {
 #[derive(Debug, FromRow)]
 struct PublicUmkmStoreRow {
     id: Uuid,
+    owner_user_id: Uuid,
+    organization_id: Option<Uuid>,
     name: String,
     slug: String,
     description: Option<String>,
@@ -1558,6 +1561,8 @@ impl PublicUmkmStoreRow {
         let phone = businesses::domain::project_public_phone(self.phone, &self.metadata);
         businesses::domain::PublicStore {
             id: self.id,
+            owner_user_id: self.owner_user_id,
+            organization_id: self.organization_id,
             name: self.name,
             slug: self.slug,
             description: self.description,
@@ -8935,7 +8940,7 @@ async fn find_umkm_store_row(
     sqlx::query_as::<_, UmkmStoreRow>(
         r#"
         SELECT
-          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
           is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
         FROM umkm_stores
         WHERE (($1::uuid IS NOT NULL AND id = $1) OR lower(slug) = $2)
@@ -8958,7 +8963,7 @@ async fn find_public_umkm_store_row(
     sqlx::query_as::<_, PublicUmkmStoreRow>(
         r#"
         SELECT
-          s.id, s.name, s.slug, s.description, s.city, s.address, s.lat, s.lng, s.phone,
+          s.id, s.owner_user_id, s.organization_id, s.name, s.slug, s.description, s.city, s.address, s.lat, s.lng, s.phone,
           s.is_active, s.online_order_enabled, s.offline_order_enabled, s.metadata,
           s.created_at, s.updated_at
         FROM umkm_stores s
@@ -9332,7 +9337,7 @@ async fn list_umkm_stores(
     let store_sql = format!(
         r#"
         SELECT
-          id, name, slug, description, city, address, lat, lng, phone,
+          id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
           is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
         FROM umkm_stores
         WHERE ($1::uuid IS NULL OR id = $1)
@@ -9477,7 +9482,7 @@ async fn create_umkm_store(
           $10, $11, $12, $13
         )
         RETURNING
-          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
           is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
         "#,
     )
@@ -9605,7 +9610,7 @@ async fn update_umkm_store(
           updated_at = NOW()
         WHERE id = $1
         RETURNING
-          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          id, owner_user_id, organization_id, name, slug, description, city, address, lat, lng, phone,
           is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
         "#,
     )

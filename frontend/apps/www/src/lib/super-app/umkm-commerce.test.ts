@@ -5,6 +5,7 @@ import {
   confirmUmkmOrderBill,
   createUmkmOrder,
   createUmkmReservation,
+  listUmkmOrderBundlesByStore,
   listUmkmTables,
   updateUmkmOrderStatus,
 } from '@/lib/super-app/umkm-commerce';
@@ -112,5 +113,33 @@ describe('umkm-commerce offline table flow', () => {
     });
 
     expect(second.table_code).toBe('T01');
+  });
+
+  it('snapshots product photos on order items so cashier cards can show the ordered products', async () => {
+    const created = await createUmkmOrder({
+      storeId: '50000000-0000-0000-0000-000000000001',
+      channel: 'offline',
+      tableId: '52000000-0000-0000-0000-000000000001',
+      items: [
+        {
+          product_id: '51000000-0000-0000-0000-000000000001',
+          quantity: 2,
+        },
+      ],
+    });
+
+    expect(created.items[0]?.metadata.product_image_url).toMatch(/^\/images\//);
+    expect(created.items[0]?.metadata.product_category).toBe('main_course');
+
+    const [listed] = await listUmkmOrderBundlesByStore({
+      storeId: '50000000-0000-0000-0000-000000000001',
+      limit: 1,
+    });
+
+    expect(listed?.order.id).toBe(created.order.id);
+    expect(listed?.items[0]?.product_name).toBe('Nasi Bakar Ayam Kemangi');
+    expect(listed?.items[0]?.metadata.product_image_url).toBe(
+      created.items[0]?.metadata.product_image_url,
+    );
   });
 });

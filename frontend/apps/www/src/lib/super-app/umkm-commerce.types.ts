@@ -27,6 +27,7 @@ export type UmkmStorePermission =
 export type UmkmStore = {
   id: string;
   owner_user_id: string;
+  organization_id?: string | null;
   name: string;
   slug: string;
   description: string | null;

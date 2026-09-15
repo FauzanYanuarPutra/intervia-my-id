@@ -7,14 +7,14 @@ import { enforceRateLimit } from '@/lib/rateLimit';
 import { createPublicCommerceOrder } from '@/lib/server/publicCommerceOrder';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
-import { hasUmkmStorePermission } from '@/lib/super-app/umkm-authorization';
 import {
   createUmkmOrder,
   getUmkmOrderById,
   getUmkmStoreById,
-  listUmkmOrdersByStore,
+  listUmkmOrderBundlesByStore,
 } from '@/lib/super-app/umkm-commerce';
 import { superAppEntityIdSchema } from '@/lib/super-app/idSchema';
+import { hasUmkmStoreRequestPermission } from '@/lib/super-app/umkm-request-access';
 
 const CreateOrderSchema = z.object({
   store_id: superAppEntityIdSchema,
@@ -84,24 +84,18 @@ export async function GET(req: NextRequest) {
       if (!bundle) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
       const store = await getUmkmStoreById(bundle.order.store_id);
       if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
-      if (
-        !hasUmkmStorePermission({
-          storeId: store.id,
-          ownerUserId: store.owner_user_id,
-          actorUserId: auth.ctx.userId,
-          actorEmail: auth.ctx.email,
-          roles: auth.ctx.roles,
+      const canReadOrder =
+        (await hasUmkmStoreRequestPermission({
+          store,
+          authCtx: auth.ctx,
           permission: 'order:manage',
-        }) &&
-        !hasUmkmStorePermission({
-          storeId: store.id,
-          ownerUserId: store.owner_user_id,
-          actorUserId: auth.ctx.userId,
-          actorEmail: auth.ctx.email,
-          roles: auth.ctx.roles,
+        })) ||
+        (await hasUmkmStoreRequestPermission({
+          store,
+          authCtx: auth.ctx,
           permission: 'payment:manage',
-        })
-      ) {
+        }));
+      if (!canReadOrder) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       return NextResponse.json({ data: { store, ...bundle } }, { status: 200 });
@@ -114,31 +108,25 @@ export async function GET(req: NextRequest) {
 
     const store = await getUmkmStoreById(storeId);
     if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
-    if (
-      !hasUmkmStorePermission({
-        storeId: store.id,
-        ownerUserId: store.owner_user_id,
-        actorUserId: auth.ctx.userId,
-        actorEmail: auth.ctx.email,
-        roles: auth.ctx.roles,
+    const canListOrders =
+      (await hasUmkmStoreRequestPermission({
+        store,
+        authCtx: auth.ctx,
         permission: 'order:manage',
-      }) &&
-      !hasUmkmStorePermission({
-        storeId: store.id,
-        ownerUserId: store.owner_user_id,
-        actorUserId: auth.ctx.userId,
-        actorEmail: auth.ctx.email,
-        roles: auth.ctx.roles,
+      })) ||
+      (await hasUmkmStoreRequestPermission({
+        store,
+        authCtx: auth.ctx,
         permission: 'payment:manage',
-      })
-    ) {
+      }));
+    if (!canListOrders) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const status = (url.searchParams.get('status') || '').trim();
     const paymentStatus = (url.searchParams.get('payment_status') || '').trim();
     const limit = Number.parseInt(url.searchParams.get('limit') || '100', 10) || 100;
-    const items = await listUmkmOrdersByStore({
+    const bundles = await listUmkmOrderBundlesByStore({
       storeId: store.id,
       status:
         status === 'pending' ||
@@ -156,6 +144,10 @@ export async function GET(req: NextRequest) {
           : undefined,
       limit,
     });
+    const items = bundles.map(bundle => ({
+      ...bundle.order,
+      items: bundle.items,
+    }));
 
     return NextResponse.json(
       {
@@ -260,6 +252,19 @@ export async function POST(req: NextRequest) {
     if (auth && !auth.ok) return auth.res;
     const authCtx = auth && auth.ok ? auth.ctx : null;
 
+    if (authCtx) {
+      const store = await getUmkmStoreById(payload.store_id);
+      if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
+      const canCreateOfflineOrder = await hasUmkmStoreRequestPermission({
+        store,
+        authCtx,
+        permission: 'order:manage',
+      });
+      if (!canCreateOfflineOrder) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     const metadata = {
       ...payload.metadata,
       ...(payload.delivery_address ? { delivery_address: payload.delivery_address } : {}),
@@ -273,7 +278,15 @@ export async function POST(req: NextRequest) {
         ? { address_confirmed: true, address_confirmed_at: new Date().toISOString() }
         : {}),
       ...(payload.payment_timing ? { payment_timing: payload.payment_timing } : {}),
-      ...(authCtx ? { customer_user_id: authCtx.userId } : {}),
+      ...(authCtx && payload.payment_method === 'wallet'
+        ? { customer_user_id: authCtx.userId }
+        : {}),
+      ...(authCtx
+        ? {
+            created_by_user_id: authCtx.userId,
+            ...(authCtx.email ? { created_by_email: authCtx.email } : {}),
+          }
+        : {}),
       fulfillment_mode: 'dine_in',
     };
 
