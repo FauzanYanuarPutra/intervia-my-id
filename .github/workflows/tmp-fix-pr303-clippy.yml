@@ -1,0 +1,95 @@
+name: Temporary PR 303 Clippy fixes
+
+on:
+  push:
+    branches:
+      - feat/usaha-storefront-interaction-system
+    paths:
+      - '.github/workflows/tmp-fix-pr303-clippy.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/usaha-storefront-interaction-system
+          fetch-depth: 0
+      - name: Apply targeted Clippy fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly 1 match, found {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          finance = 'services/marketplace_service/src/businesses/finance_core.rs'
+          replace_once(
+              finance,
+              '''#[derive(Debug, Clone, Copy)]\npub(crate) struct FinanceEntrySemantic {''',
+              '''#[derive(Debug, Clone, Copy)]\n#[cfg_attr(not(test), allow(dead_code))]\npub(crate) struct FinanceEntrySemantic {''',
+          )
+
+          routes = 'services/marketplace_service/src/businesses/finance_core_routes.rs'
+          old_call = '''    let key = match idempotency_key(&headers) {\n        Ok(value) => value,\n        Err(response) => return response,\n    };'''
+          new_call = '''    let key = match idempotency_key(&headers) {\n        Ok(value) => value,\n        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),\n    };'''
+          p = Path(routes)
+          text = p.read_text()
+          count = text.count(old_call)
+          if count != 3:
+              raise SystemExit(f'{routes}: expected 3 idempotency callsites, found {count}')
+          text = text.replace(old_call, new_call)
+          old_fn = '''fn idempotency_key(headers: &HeaderMap) -> Result<Uuid, Response> {\n    let value = headers\n        .get("idempotency-key")\n        .and_then(|value| value.to_str().ok())\n        .map(str::trim)\n        .filter(|value| !value.is_empty())\n        .ok_or_else(|| api_error(StatusCode::BAD_REQUEST, "missing_idempotency_key"))?;\n    Uuid::parse_str(value)\n        .map_err(|_| api_error(StatusCode::BAD_REQUEST, "invalid_idempotency_key"))\n}'''
+          new_fn = '''fn idempotency_key(headers: &HeaderMap) -> Result<Uuid, &'static str> {\n    let value = headers\n        .get("idempotency-key")\n        .and_then(|value| value.to_str().ok())\n        .map(str::trim)\n        .filter(|value| !value.is_empty())\n        .ok_or("missing_idempotency_key")?;\n    Uuid::parse_str(value).map_err(|_| "invalid_idempotency_key")\n}'''
+          if text.count(old_fn) != 1:
+              raise SystemExit(f'{routes}: idempotency helper did not match exactly once')
+          p.write_text(text.replace(old_fn, new_fn, 1))
+
+          modifiers = 'services/marketplace_service/src/businesses/product_modifiers.rs'
+          replace_once(
+              modifiers,
+              '''                if minimum > maximum\n                    || maximum == 0\n                    || default_count < minimum\n                    || default_count > maximum\n                {\n                    if default_count > 0 || minimum > maximum || maximum == 0 {\n                        return Err("invalid_modifier_selection_bounds");\n                    }\n                }''',
+              '''                let invalid_bounds = minimum > maximum || maximum == 0;\n                let invalid_defaults =\n                    default_count > 0 && (default_count < minimum || default_count > maximum);\n                if invalid_bounds || invalid_defaults {\n                    return Err("invalid_modifier_selection_bounds");\n                }''',
+          )
+
+      - name: Verify marketplace formatting, Clippy and focused tests
+        working-directory: services/marketplace_service
+        run: |
+          cargo fmt --all
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked businesses::finance_core_tests
+          cargo test --locked businesses::product_modifiers::tests
+          cargo test --locked businesses::public_commerce_tests
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service/src/businesses/finance_core.rs \
+                  services/marketplace_service/src/businesses/finance_core_routes.rs \
+                  services/marketplace_service/src/businesses/product_modifiers.rs
+          git commit -m "fix(marketplace): satisfy strict Clippy checks"
+          git push origin HEAD:feat/usaha-storefront-interaction-system
