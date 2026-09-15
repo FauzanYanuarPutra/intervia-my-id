@@ -28,4 +28,12 @@ describe('merchant OS foundation', () => {
     expect(read('./WorkspaceTabs.tsx')).toContain('export function WorkspaceTabs');
     expect(read('./ProductThumb.tsx')).toContain('export function ProductThumb');
   });
+
+  it('keeps home actions permission-aware instead of sending read-only roles into editors', () => {
+    const home = read('../../app/page.tsx');
+    expect(home).toContain("const canManageInfo = hasPermission(business, 'manageInfo');");
+    expect(home).toContain("const canManageInventory = hasPermission(business, 'manageInventory');");
+    expect(home).toContain('const foundationAction = canManageInfo');
+    expect(home).toContain("{canManageInventory ? 'Tambah stok' : 'Stok'}");
+  });
 });
