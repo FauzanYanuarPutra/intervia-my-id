@@ -39,11 +39,41 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
 
     def test_navigation_prioritizes_daily_merchant_jobs(self) -> None:
         navigation = (USAHA / "lib/portal-navigation.ts").read_text(encoding="utf-8")
-        for marker in ("'home'", "'orders'", "'products'", "'inventory'", "'finance'", "products: 'Produk'", "inventory: 'Stok'"):
+        for marker in (
+            "'home'",
+            "'orders'",
+            "'products'",
+            "'inventory'",
+            "'finance'",
+            "orders: 'Jual'",
+            "products: 'Barang'",
+            "inventory: 'Stok'",
+            "finance: 'Uang'",
+            "const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];",
+        ):
             self.assertIn(marker, navigation)
+        self.assertNotIn("orders: 'Jualan'", navigation)
+        self.assertNotIn("products: 'Produk'", navigation)
+
         mobile = (PORTAL / "MobileNav.tsx").read_text(encoding="utf-8")
-        for marker in ("orders: 'Jual'", "Menu"):
+        for marker in ("from '@/lib/portal-visual'", "Menu"):
             self.assertIn(marker, mobile)
+        self.assertNotIn("const iconMap", mobile)
+
+        sidebar = (PORTAL / "SidebarNav.tsx").read_text(encoding="utf-8")
+        self.assertIn("from '@/lib/portal-visual'", sidebar)
+        self.assertNotIn("const iconMap", sidebar)
+
+        visual = (USAHA / "lib/portal-visual.ts").read_text(encoding="utf-8")
+        for marker in (
+            "portalSectionVisual",
+            "ShoppingBag",
+            "Package",
+            "PackageSearch",
+            "WalletCards",
+            "LockKeyhole",
+        ):
+            self.assertIn(marker, visual)
 
     def test_dashboard_is_action_first_without_card_soup(self) -> None:
         source = (USAHA / "app/page.tsx").read_text(encoding="utf-8")
@@ -51,13 +81,18 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
             "PageHeader",
             "MetricStrip",
             "buildHomeDashboard",
-            "Prioritas utama",
-            "Kerjakan sekarang",
+            "Perlu perhatian",
+            "Kondisi usaha",
+            "merchant-action-sale",
+            "merchant-action-money",
+            "merchant-action-stock",
             " Jual",
             "Catat pengeluaran",
             "Tambah stok",
         ):
             self.assertIn(marker, source)
+        self.assertNotIn("Prioritas utama · Perlu dilakukan", source)
+        self.assertNotIn("Kerjakan sekarang", source)
         self.assertNotIn("PortfolioPanel", source)
         self.assertNotIn("StatCard", source)
         self.assertNotIn("grid gap-3 sm:grid-cols-3", source)
