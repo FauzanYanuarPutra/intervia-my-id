@@ -1,6 +1,6 @@
 use super::public_commerce::{
     CreatePublicOrderRequest, PublicCommerceError, PublicCommerceRepository, PublicFulfillmentMode,
-    PublicOrderItemInput,
+    PublicModifierSelectionInput, PublicOrderItemInput,
 };
 use rust_decimal::Decimal;
 use sqlx::PgPool;
@@ -134,12 +134,56 @@ fn order_request(items: Vec<(Uuid, i32)>) -> CreatePublicOrderRequest {
                 product_id,
                 quantity,
                 note: None,
+                selections: vec![],
             })
             .collect(),
         fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
         note: Some("Tolong dikemas rapi".into()),
         source_surface: Some("www_umkm_storefront".into()),
     }
+}
+
+async fn seed_sugar_choices(pool: &PgPool, seeded: &SeededPublicProduct) -> (Uuid, Uuid, Uuid) {
+    let organization_id: Uuid = sqlx::query_scalar("SELECT organization_id FROM businesses WHERE id=$1")
+        .bind(seeded.business_id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let group_id = Uuid::new_v4();
+    let less_id = Uuid::new_v4();
+    let normal_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO business_product_modifier_groups (
+          id, product_id, business_id, organization_id, name, selection_type,
+          is_required, min_select, max_select, sort_order, is_active
+        ) VALUES ($1,$2,$3,$4,'Tingkat gula','single',TRUE,1,1,0,TRUE)
+        "#,
+    )
+    .bind(group_id)
+    .bind(seeded.product_id)
+    .bind(seeded.business_id)
+    .bind(organization_id)
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"
+        INSERT INTO business_product_modifier_options (
+          id, group_id, product_id, name, price_delta_cents, is_default, sort_order, is_active
+        ) VALUES
+          ($1,$3,$4,'Less Sugar',0,FALSE,0,TRUE),
+          ($2,$3,$4,'Normal',200000,TRUE,1,TRUE)
+        "#,
+    )
+    .bind(less_id)
+    .bind(normal_id)
+    .bind(group_id)
+    .bind(seeded.product_id)
+    .execute(pool)
+    .await
+    .unwrap();
+    (group_id, less_id, normal_id)
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -160,10 +204,7 @@ async fn creates_server_authoritative_canonical_order(pool: PgPool) {
     assert!(!created.replayed);
     assert_eq!(created.order.business_id, seeded.business_id);
     assert_eq!(created.order.source_type, "www");
-    assert_eq!(
-        created.order.source_surface.as_deref(),
-        Some("www_umkm_storefront")
-    );
+    assert_eq!(created.order.source_surface.as_deref(), Some("www_umkm_storefront"));
     assert_eq!(created.order.currency, "IDR");
     assert_eq!(created.order.subtotal_amount, Decimal::from(25_000));
     assert_eq!(created.order.total_amount, Decimal::from(25_000));
@@ -187,6 +228,75 @@ async fn creates_server_authoritative_canonical_order(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn same_product_with_two_configurations_creates_two_lines(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(2)).await;
+    let (group_id, less_id, normal_id) = seed_sugar_choices(&pool, &seeded).await;
+    let request = CreatePublicOrderRequest {
+        items: vec![
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selections: vec![PublicModifierSelectionInput { group_id, option_ids: vec![less_id] }],
+            },
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selections: vec![PublicModifierSelectionInput { group_id, option_ids: vec![normal_id] }],
+            },
+        ],
+        fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
+        note: None,
+        source_surface: Some("www_umkm_storefront".into()),
+    };
+
+    let created = PublicCommerceRepository::new(pool.clone())
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), request)
+        .await
+        .unwrap();
+
+    assert_eq!(created.items.len(), 2);
+    assert_eq!(created.items[0].unit_price, Decimal::from(12_500));
+    assert_eq!(created.items[1].unit_price, Decimal::from(14_500));
+    assert_ne!(
+        created.items[0].metadata["configuration_key"],
+        created.items[1].metadata["configuration_key"]
+    );
+    assert_eq!(created.items[0].metadata["modifiers"][0]["group_name"], "Tingkat gula");
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn configured_lines_share_one_stock_pool(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(1)).await;
+    let (group_id, less_id, normal_id) = seed_sugar_choices(&pool, &seeded).await;
+    let request = CreatePublicOrderRequest {
+        items: vec![
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selections: vec![PublicModifierSelectionInput { group_id, option_ids: vec![less_id] }],
+            },
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selections: vec![PublicModifierSelectionInput { group_id, option_ids: vec![normal_id] }],
+            },
+        ],
+        fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
+        note: None,
+        source_surface: None,
+    };
+    let error = PublicCommerceRepository::new(pool)
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), request)
+        .await
+        .unwrap_err();
+    assert_eq!(error, PublicCommerceError::InsufficientStock);
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn idempotent_retry_reuses_order_items_and_outbox(pool: PgPool) {
     let seeded = seed_public_product(&pool, 1_250_000, Some(10)).await;
     let buyer_id = Uuid::new_v4();
@@ -194,19 +304,11 @@ async fn idempotent_retry_reuses_order_items_and_outbox(pool: PgPool) {
     let repository = PublicCommerceRepository::new(pool.clone());
 
     let first = repository
-        .create_product_order(
-            buyer_id,
-            idempotency_key,
-            order_request(vec![(seeded.product_id, 2)]),
-        )
+        .create_product_order(buyer_id, idempotency_key, order_request(vec![(seeded.product_id, 2)]))
         .await
         .unwrap();
     let replay = repository
-        .create_product_order(
-            buyer_id,
-            idempotency_key,
-            order_request(vec![(seeded.product_id, 2)]),
-        )
+        .create_product_order(buyer_id, idempotency_key, order_request(vec![(seeded.product_id, 2)]))
         .await
         .unwrap();
 
@@ -214,13 +316,12 @@ async fn idempotent_retry_reuses_order_items_and_outbox(pool: PgPool) {
     assert!(replay.replayed);
     assert_eq!(replay.order.id, first.order.id);
 
-    let order_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM orders WHERE user_id=$1 AND idempotency_key=$2")
-            .bind(buyer_id)
-            .bind(idempotency_key.to_string())
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let order_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM orders WHERE user_id=$1 AND idempotency_key=$2")
+        .bind(buyer_id)
+        .bind(idempotency_key.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     let item_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM order_items WHERE order_id=$1")
         .bind(first.order.id)
         .fetch_one(&pool)
@@ -253,11 +354,7 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
     .unwrap();
 
     repository
-        .create_product_order(
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            order_request(vec![(seeded.product_id, 2)]),
-        )
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), order_request(vec![(seeded.product_id, 2)]))
         .await
         .unwrap();
 
@@ -269,18 +366,16 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
     .fetch_one(&pool)
     .await
     .unwrap();
-    let sale_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM business_sales WHERE business_id=$1")
-            .bind(seeded.business_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    let finance_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1")
-            .bind(seeded.business_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let sale_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM business_sales WHERE business_id=$1")
+        .bind(seeded.business_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let finance_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM business_finance_entries WHERE business_id=$1")
+        .bind(seeded.business_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
     assert_eq!(before, after);
     assert_eq!(sale_count, 0);
@@ -291,11 +386,7 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
 async fn rejects_known_insufficient_stock(pool: PgPool) {
     let seeded = seed_public_product(&pool, 1_250_000, Some(1)).await;
     let error = PublicCommerceRepository::new(pool)
-        .create_product_order(
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            order_request(vec![(seeded.product_id, 2)]),
-        )
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), order_request(vec![(seeded.product_id, 2)]))
         .await
         .unwrap_err();
     assert_eq!(error, PublicCommerceError::InsufficientStock);
@@ -310,21 +401,16 @@ async fn rejects_unavailable_or_online_disabled_products(pool: PgPool) {
         .await
         .unwrap();
 
-    let projection_available: bool =
-        sqlx::query_scalar("SELECT is_available FROM umkm_products WHERE id=$1")
-            .bind(seeded.product_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let projection_available: bool = sqlx::query_scalar("SELECT is_available FROM umkm_products WHERE id=$1")
+        .bind(seeded.product_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert!(!projection_available);
 
     let repository = PublicCommerceRepository::new(pool.clone());
     let error = repository
-        .create_product_order(
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            order_request(vec![(seeded.product_id, 1)]),
-        )
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), order_request(vec![(seeded.product_id, 1)]))
         .await
         .unwrap_err();
     assert_eq!(error, PublicCommerceError::Unavailable);
@@ -341,11 +427,7 @@ async fn rejects_unavailable_or_online_disabled_products(pool: PgPool) {
         .unwrap();
 
     let error = repository
-        .create_product_order(
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            order_request(vec![(seeded.product_id, 1)]),
-        )
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), order_request(vec![(seeded.product_id, 1)]))
         .await
         .unwrap_err();
     assert_eq!(error, PublicCommerceError::Unavailable);
@@ -369,11 +451,7 @@ async fn rejects_cross_business_cart(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn missing_product_fails_closed(pool: PgPool) {
     let error = PublicCommerceRepository::new(pool)
-        .create_product_order(
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            order_request(vec![(Uuid::new_v4(), 1)]),
-        )
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), order_request(vec![(Uuid::new_v4(), 1)]))
         .await
         .unwrap_err();
     assert_eq!(error, PublicCommerceError::NotFound);
