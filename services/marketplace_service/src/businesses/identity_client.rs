@@ -14,42 +14,60 @@ impl OrganizationSummary {
     }
 
     pub(crate) fn can_manage_business_profile(&self) -> bool {
-        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager"
+        )
     }
 
     pub(crate) fn can_manage_catalog(&self) -> bool {
-        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager"
+        )
     }
 
     pub(crate) fn can_record_sales(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
-            "org_admin" | "org_manager" | "org_cashier"
+            "org_admin" | "org_manager" | "manager" | "org_cashier" | "cashier"
         )
     }
 
     pub(crate) fn can_view_sales(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
-            "org_admin" | "org_manager" | "org_cashier" | "org_accounting" | "org_viewer"
+            "org_admin"
+                | "org_manager"
+                | "manager"
+                | "org_cashier"
+                | "cashier"
+                | "org_accounting"
+                | "org_viewer"
+                | "viewer"
         )
     }
 
     pub(crate) fn can_view_sale_costs(&self) -> bool {
-        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager"
+        )
     }
 
+    /// Access to detailed ingredient/control records, including supplier/cost fields.
+    /// Product stock visible to cashiers/viewers comes from the safe business aggregate instead.
     pub(crate) fn can_view_inventory_controls(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
-            "org_admin" | "org_manager" | "org_cashier" | "org_inventory" | "org_viewer"
+            "org_admin" | "org_manager" | "manager" | "org_inventory"
         )
     }
 
     pub(crate) fn can_manage_finance_controls(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
-            "org_admin" | "org_manager" | "org_accounting"
+            "org_admin" | "org_manager" | "manager" | "org_accounting"
         )
     }
 
@@ -60,29 +78,35 @@ impl OrganizationSummary {
     pub(crate) fn can_manage_inventory_controls(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
-            "org_admin" | "org_manager" | "org_inventory"
+            "org_admin" | "org_manager" | "manager" | "org_inventory"
         )
     }
 
     pub(crate) fn can_manage_channels(&self) -> bool {
-        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager"
+        )
     }
 
     pub(crate) fn can_manage_cash_shifts(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
-            "org_admin" | "org_manager" | "org_cashier"
+            "org_admin" | "org_manager" | "manager" | "org_cashier" | "cashier"
         )
     }
 
     pub(crate) fn can_record_purchases(&self) -> bool {
-        matches!(self.current_user_role.as_str(), "org_admin" | "org_manager")
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager"
+        )
     }
 
     pub(crate) fn can_use_business_advisor(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
-            "org_admin" | "org_manager" | "org_accounting"
+            "org_admin" | "org_manager" | "manager" | "org_accounting"
         )
     }
 }
@@ -206,33 +230,32 @@ mod tests {
     }
 
     #[test]
-    fn organization_list_parses_the_identity_envelope() {
-        let body = r#"{"data":{"count":1,"items":[{"id":"76b836f4-3032-433f-8ac7-04a88f1a8511","name":"Cuk","slug":"cuk","owner_user_id":"44444444-4444-4444-8444-444444444444","current_user_role":"org_admin"}]}}"#;
+    fn organization_list_parses_identity_public_role_values() {
+        let body = r#"{"data":{"count":3,"items":[{"id":"76b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"manager"},{"id":"86b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"cashier"},{"id":"96b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"viewer"}]}}"#;
         let organizations = parse_organization_list(body).expect("identity response");
 
-        assert_eq!(organizations.len(), 1);
-        assert_eq!(
-            organizations[0].id,
-            Uuid::parse_str("76b836f4-3032-433f-8ac7-04a88f1a8511").unwrap()
-        );
-        assert_eq!(organizations[0].current_user_role, "org_admin");
-        assert!(organizations[0].can_manage_businesses());
+        assert_eq!(organizations.len(), 3);
+        assert!(organizations[0].can_manage_catalog());
+        assert!(organizations[1].can_record_sales());
+        assert!(organizations[1].can_manage_cash_shifts());
+        assert!(organizations[2].can_view_sales());
+        assert!(!organizations[2].can_record_sales());
     }
 
     #[test]
     fn organization_level_business_creation_stays_admin_only() {
         assert!(!organization("org_member").can_manage_businesses());
-        assert!(!organization("org_manager").can_manage_businesses());
+        assert!(!organization("manager").can_manage_businesses());
         assert!(organization("org_admin").can_manage_businesses());
     }
 
     #[test]
     fn profile_and_catalog_management_allow_admin_and_manager_only() {
-        for role in ["org_admin", "org_manager"] {
+        for role in ["org_admin", "org_manager", "manager"] {
             assert!(organization(role).can_manage_business_profile());
             assert!(organization(role).can_manage_catalog());
         }
-        for role in ["org_cashier", "org_inventory", "org_accounting", "org_viewer"] {
+        for role in ["cashier", "org_inventory", "org_accounting", "viewer"] {
             assert!(!organization(role).can_manage_business_profile());
             assert!(!organization(role).can_manage_catalog());
         }
@@ -240,71 +263,75 @@ mod tests {
 
     #[test]
     fn sales_recording_allows_admin_manager_and_cashier_only() {
-        assert!(organization("org_admin").can_record_sales());
-        assert!(organization("org_manager").can_record_sales());
-        assert!(organization("org_cashier").can_record_sales());
+        for role in ["org_admin", "org_manager", "manager", "org_cashier", "cashier"] {
+            assert!(organization(role).can_record_sales());
+        }
         assert!(!organization("org_inventory").can_record_sales());
         assert!(!organization("org_accounting").can_record_sales());
-        assert!(!organization("org_viewer").can_record_sales());
+        assert!(!organization("viewer").can_record_sales());
     }
 
     #[test]
     fn sales_history_read_allows_viewer_and_accounting_without_granting_write() {
-        assert!(organization("org_admin").can_view_sales());
-        assert!(organization("org_manager").can_view_sales());
-        assert!(organization("org_cashier").can_view_sales());
-        assert!(organization("org_accounting").can_view_sales());
-        assert!(organization("org_viewer").can_view_sales());
+        for role in [
+            "org_admin",
+            "manager",
+            "cashier",
+            "org_accounting",
+            "viewer",
+        ] {
+            assert!(organization(role).can_view_sales());
+        }
         assert!(!organization("org_inventory").can_view_sales());
-        assert!(!organization("org_viewer").can_record_sales());
+        assert!(!organization("viewer").can_record_sales());
         assert!(!organization("org_accounting").can_record_sales());
     }
 
     #[test]
-    fn sales_cost_visibility_excludes_cashiers() {
+    fn sales_cost_visibility_excludes_cashiers_and_viewers() {
         assert!(organization("org_admin").can_view_sale_costs());
-        assert!(organization("org_manager").can_view_sale_costs());
-        assert!(!organization("org_cashier").can_view_sale_costs());
-        assert!(!organization("org_viewer").can_view_sale_costs());
+        assert!(organization("manager").can_view_sale_costs());
+        assert!(!organization("cashier").can_view_sale_costs());
+        assert!(!organization("viewer").can_view_sale_costs());
     }
 
     #[test]
-    fn inventory_read_access_includes_cashier_viewer_and_inventory_specialist() {
-        for role in ["org_admin", "org_manager", "org_cashier", "org_inventory", "org_viewer"] {
+    fn detailed_inventory_control_access_does_not_leak_costs_to_cashier_or_viewer() {
+        for role in ["org_admin", "manager", "org_inventory"] {
             assert!(organization(role).can_view_inventory_controls());
         }
-        assert!(!organization("org_accounting").can_view_inventory_controls());
+        for role in ["cashier", "viewer", "org_accounting"] {
+            assert!(!organization(role).can_view_inventory_controls());
+        }
     }
 
     #[test]
-    fn wave2_finance_controls_allow_accounting_but_not_cashier_or_inventory() {
-        assert!(organization("org_admin").can_manage_finance_controls());
-        assert!(organization("org_manager").can_manage_finance_controls());
-        assert!(organization("org_accounting").can_manage_finance_controls());
-        assert!(organization("org_admin").can_view_finance_controls());
-        assert!(organization("org_manager").can_view_finance_controls());
-        assert!(organization("org_accounting").can_view_finance_controls());
-        assert!(!organization("org_cashier").can_manage_finance_controls());
+    fn finance_controls_allow_accounting_but_not_cashier_or_inventory() {
+        for role in ["org_admin", "manager", "org_accounting"] {
+            assert!(organization(role).can_manage_finance_controls());
+            assert!(organization(role).can_view_finance_controls());
+        }
+        assert!(!organization("cashier").can_manage_finance_controls());
         assert!(!organization("org_inventory").can_manage_finance_controls());
-        assert!(!organization("org_viewer").can_manage_finance_controls());
+        assert!(!organization("viewer").can_manage_finance_controls());
     }
 
     #[test]
-    fn wave2_inventory_controls_allow_inventory_role_but_not_cashier_or_accounting() {
+    fn inventory_controls_allow_inventory_role_but_not_cashier_or_accounting() {
         assert!(organization("org_admin").can_manage_inventory_controls());
-        assert!(organization("org_manager").can_manage_inventory_controls());
+        assert!(organization("manager").can_manage_inventory_controls());
         assert!(organization("org_inventory").can_manage_inventory_controls());
-        assert!(!organization("org_cashier").can_manage_inventory_controls());
+        assert!(!organization("cashier").can_manage_inventory_controls());
         assert!(!organization("org_accounting").can_manage_inventory_controls());
-        assert!(!organization("org_viewer").can_manage_inventory_controls());
+        assert!(!organization("viewer").can_manage_inventory_controls());
     }
 
     #[test]
     fn channel_management_excludes_cashier_viewer_inventory_and_accounting() {
         assert!(organization("org_admin").can_manage_channels());
-        assert!(organization("org_manager").can_manage_channels());
-        assert!(!organization("org_cashier").can_manage_channels());
-        assert!(!organization("org_viewer").can_manage_channels());
+        assert!(organization("manager").can_manage_channels());
+        assert!(!organization("cashier").can_manage_channels());
+        assert!(!organization("viewer").can_manage_channels());
         assert!(!organization("org_inventory").can_manage_channels());
         assert!(!organization("org_accounting").can_manage_channels());
     }
@@ -312,30 +339,30 @@ mod tests {
     #[test]
     fn cash_shift_controls_allow_cashier_but_not_inventory_accounting_or_viewer() {
         assert!(organization("org_admin").can_manage_cash_shifts());
-        assert!(organization("org_manager").can_manage_cash_shifts());
-        assert!(organization("org_cashier").can_manage_cash_shifts());
+        assert!(organization("manager").can_manage_cash_shifts());
+        assert!(organization("cashier").can_manage_cash_shifts());
         assert!(!organization("org_inventory").can_manage_cash_shifts());
         assert!(!organization("org_accounting").can_manage_cash_shifts());
-        assert!(!organization("org_viewer").can_manage_cash_shifts());
+        assert!(!organization("viewer").can_manage_cash_shifts());
     }
 
     #[test]
     fn purchase_controls_require_a_role_that_can_change_money_and_stock_together() {
         assert!(organization("org_admin").can_record_purchases());
-        assert!(organization("org_manager").can_record_purchases());
-        assert!(!organization("org_cashier").can_record_purchases());
+        assert!(organization("manager").can_record_purchases());
+        assert!(!organization("cashier").can_record_purchases());
         assert!(!organization("org_inventory").can_record_purchases());
         assert!(!organization("org_accounting").can_record_purchases());
-        assert!(!organization("org_viewer").can_record_purchases());
+        assert!(!organization("viewer").can_record_purchases());
     }
 
     #[test]
-    fn advisor_access_is_read_only_and_kept_to_business_decision_roles() {
+    fn advisor_access_is_kept_to_business_decision_roles() {
         assert!(organization("org_admin").can_use_business_advisor());
-        assert!(organization("org_manager").can_use_business_advisor());
+        assert!(organization("manager").can_use_business_advisor());
         assert!(organization("org_accounting").can_use_business_advisor());
-        assert!(!organization("org_cashier").can_use_business_advisor());
+        assert!(!organization("cashier").can_use_business_advisor());
         assert!(!organization("org_inventory").can_use_business_advisor());
-        assert!(!organization("org_viewer").can_use_business_advisor());
+        assert!(!organization("viewer").can_use_business_advisor());
     }
 }
