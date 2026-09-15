@@ -120,7 +120,7 @@ export async function submitStorefrontProductOrder(
   input: StorefrontProductOrderInput,
 ): Promise<StorefrontCanonicalOrderBundle> {
   const items = normalizedLines(input);
-  const response = await fetch('/api/super-app/umkm/orders', {
+  const response = await fetch('/api/storefront/orders', {
     method: 'POST',
     credentials: 'same-origin',
     cache: 'no-store',
@@ -131,17 +131,17 @@ export async function submitStorefrontProductOrder(
     },
     body: JSON.stringify({
       store_id: input.storeId,
-      channel: 'online',
       items: items.map(item => ({
         product_id: item.productId,
         quantity: item.quantity,
-        ...(item.note?.trim() ? { notes: item.note.trim() } : {}),
+        ...(item.note?.trim() ? { note: item.note.trim() } : {}),
         selections: (item.selections ?? []).map(selection => ({
           group_id: selection.groupId,
           option_ids: selection.optionIds,
         })),
       })),
       fulfillment_mode: input.fulfillmentMode ?? 'pickup',
+      source_surface: 'www_umkm_storefront',
     }),
   });
 
