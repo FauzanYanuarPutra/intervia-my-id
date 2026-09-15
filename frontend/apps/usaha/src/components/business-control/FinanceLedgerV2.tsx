@@ -227,9 +227,12 @@ export function FinanceLedgerV2({ businessId, initialEntries, channels = [] }: P
   }
 
   useEffect(() => {
-    reloadAll(true).catch(() => {
-      // Initial server data remains a safe fallback if Finance Core is temporarily unavailable.
-    });
+    const timer = window.setTimeout(() => {
+      void reloadAll(true).catch(() => {
+        // Initial server data remains a safe fallback if Finance Core is temporarily unavailable.
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
     // businessId is stable for this page instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);

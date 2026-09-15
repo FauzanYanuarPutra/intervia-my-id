@@ -45,16 +45,12 @@ impl FinanceEntrySemantic {
             "capital_income" | "owner_capital" => {
                 Self::new("capital_income", 1, false, false, false)
             }
-            "receivable_payment" => {
-                Self::new("receivable_payment", 1, false, false, false)
-            }
-            "inventory_purchase" | "inventory_expense" | "ingredient_purchase"
-            | "packaging_purchase" => {
-                Self::new("inventory_purchase", -1, true, false, false)
-            }
-            "payroll_expense" | "salary" => {
-                Self::new("payroll_expense", -1, false, true, false)
-            }
+            "receivable_payment" => Self::new("receivable_payment", 1, false, false, false),
+            "inventory_purchase"
+            | "inventory_expense"
+            | "ingredient_purchase"
+            | "packaging_purchase" => Self::new("inventory_purchase", -1, true, false, false),
+            "payroll_expense" | "salary" => Self::new("payroll_expense", -1, false, true, false),
             "rent_expense" | "rent" => Self::new("rent_expense", -1, false, true, false),
             "utilities_expense" | "utilities" => {
                 Self::new("utilities_expense", -1, false, true, false)
@@ -68,9 +64,7 @@ impl FinanceEntrySemantic {
             "equipment_expense" | "equipment" => {
                 Self::new("equipment_expense", -1, false, true, false)
             }
-            "owner_draw" | "owner_drawing" => {
-                Self::new("owner_draw", -1, false, false, false)
-            }
+            "owner_draw" | "owner_drawing" => Self::new("owner_draw", -1, false, false, false),
             "payable_payment" => Self::new("payable_payment", -1, false, false, false),
             "other_expense" => Self::new("other_expense", -1, false, true, false),
             "sale_refund" => Self::new("sale_refund", -1, false, false, false),
@@ -120,9 +114,7 @@ pub(crate) fn cash_effect_for(
     }
 }
 
-pub(crate) fn normalize_allocation_bucket(
-    value: &str,
-) -> Result<&'static str, FinanceCoreError> {
+pub(crate) fn normalize_allocation_bucket(value: &str) -> Result<&'static str, FinanceCoreError> {
     match value.trim().to_ascii_lowercase().as_str() {
         "owner" | "owner_payroll" => Ok("owner"),
         "team" | "gaji_tim" | "staff" | "staff_payroll" => Ok("team"),
@@ -352,7 +344,9 @@ impl FinanceCoreRepository {
     ) -> Result<CreateFinanceEntryOutcome, FinanceCoreError> {
         let semantic = FinanceEntrySemantic::for_entry(&request.entry_type)?;
         if semantic.canonical_type == "sale_income" {
-            return Err(FinanceCoreError::Validation("manual_sale_income_not_allowed"));
+            return Err(FinanceCoreError::Validation(
+                "manual_sale_income_not_allowed",
+            ));
         }
         validate_amount(request.amount)?;
         let account_key = normalize_account(&request.account_key)?;
@@ -369,15 +363,9 @@ impl FinanceCoreRepository {
                 return Err(FinanceCoreError::Conflict);
             }
             let entry_id = result_entry_id.ok_or(FinanceCoreError::Database)?;
-            let entry = load_entry_tx(
-                &mut tx,
-                business_id,
-                organization_id,
-                entry_id,
-                false,
-            )
-            .await?
-            .ok_or(FinanceCoreError::Database)?;
+            let entry = load_entry_tx(&mut tx, business_id, organization_id, entry_id, false)
+                .await?
+                .ok_or(FinanceCoreError::Database)?;
             tx.commit().await?;
             return Ok(CreateFinanceEntryOutcome {
                 entry,
@@ -459,18 +447,16 @@ impl FinanceCoreRepository {
         let mut tx = self.db.begin().await?;
         lock_idempotency(&mut tx, business_id, idempotency_key).await?;
 
-        if let Some((existing_hash, _)) = load_command(&mut tx, business_id, idempotency_key).await? {
+        if let Some((existing_hash, _)) =
+            load_command(&mut tx, business_id, idempotency_key).await?
+        {
             if existing_hash != hash {
                 return Err(FinanceCoreError::Conflict);
             }
-            let outcome = load_correction_by_key(
-                &mut tx,
-                business_id,
-                organization_id,
-                idempotency_key,
-            )
-            .await?
-            .ok_or(FinanceCoreError::Database)?;
+            let outcome =
+                load_correction_by_key(&mut tx, business_id, organization_id, idempotency_key)
+                    .await?
+                    .ok_or(FinanceCoreError::Database)?;
             tx.commit().await?;
             return Ok(CorrectFinanceEntryOutcome {
                 replayed: true,
@@ -478,17 +464,13 @@ impl FinanceCoreRepository {
             });
         }
 
-        let original = load_entry_tx(
-            &mut tx,
-            business_id,
-            organization_id,
-            entry_id,
-            true,
-        )
-        .await?
-        .ok_or(FinanceCoreError::NotFound)?;
+        let original = load_entry_tx(&mut tx, business_id, organization_id, entry_id, true)
+            .await?
+            .ok_or(FinanceCoreError::NotFound)?;
         if original.reversal_of_entry_id.is_some() {
-            return Err(FinanceCoreError::Validation("cannot_correct_reversal_entry"));
+            return Err(FinanceCoreError::Validation(
+                "cannot_correct_reversal_entry",
+            ));
         }
         if original.entry_type == "sale_income"
             || original.source_type.as_deref() == Some("business_sale")
@@ -660,7 +642,9 @@ impl FinanceCoreRepository {
         let hash = request_hash(&request)?;
         let mut tx = self.db.begin().await?;
         lock_idempotency(&mut tx, business_id, idempotency_key).await?;
-        if let Some((existing_hash, _)) = load_command(&mut tx, business_id, idempotency_key).await? {
+        if let Some((existing_hash, _)) =
+            load_command(&mut tx, business_id, idempotency_key).await?
+        {
             if existing_hash != hash {
                 return Err(FinanceCoreError::Conflict);
             }
@@ -787,7 +771,9 @@ fn prepare_replacement(
 ) -> Result<PreparedReplacement, FinanceCoreError> {
     let semantic = FinanceEntrySemantic::for_entry(&request.entry_type)?;
     if semantic.canonical_type == "sale_income" {
-        return Err(FinanceCoreError::Validation("manual_sale_income_not_allowed"));
+        return Err(FinanceCoreError::Validation(
+            "manual_sale_income_not_allowed",
+        ));
     }
     validate_amount(request.amount)?;
     Ok(PreparedReplacement {
@@ -1207,24 +1193,12 @@ async fn load_correction_by_key(
     let Some((original_id, reversal_id, replacement_id)) = row else {
         return Ok(None);
     };
-    let original = load_entry_tx(
-        tx,
-        business_id,
-        organization_id,
-        original_id,
-        false,
-    )
-    .await?
-    .ok_or(FinanceCoreError::Database)?;
-    let reversal = load_entry_tx(
-        tx,
-        business_id,
-        organization_id,
-        reversal_id,
-        false,
-    )
-    .await?
-    .ok_or(FinanceCoreError::Database)?;
+    let original = load_entry_tx(tx, business_id, organization_id, original_id, false)
+        .await?
+        .ok_or(FinanceCoreError::Database)?;
+    let reversal = load_entry_tx(tx, business_id, organization_id, reversal_id, false)
+        .await?
+        .ok_or(FinanceCoreError::Database)?;
     let replacement = match replacement_id {
         Some(id) => load_entry_tx(tx, business_id, organization_id, id, false).await?,
         None => None,

@@ -90,7 +90,9 @@ async fn summary(
         .summary(business_id, organization_id)
         .await
     {
-        Ok(summary) => (StatusCode::OK, Json(json!({"data": {"summary": summary}}))).into_response(),
+        Ok(summary) => {
+            (StatusCode::OK, Json(json!({"data": {"summary": summary}}))).into_response()
+        }
         Err(error) => finance_error_response(error),
     }
 }
@@ -158,7 +160,11 @@ async fn create_entry(
         .await
     {
         Ok(outcome) => (
-            if outcome.replayed { StatusCode::OK } else { StatusCode::CREATED },
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
             Json(json!({"data": outcome})),
         )
             .into_response(),
@@ -229,13 +235,7 @@ async fn move_allocation(
         Err(response) => return response,
     };
     match FinanceCoreRepository::new(state.db.clone())
-        .move_allocation(
-            actor_id,
-            business_id,
-            organization_id,
-            key,
-            payload,
-        )
+        .move_allocation(actor_id, business_id, organization_id, key, payload)
         .await
     {
         Ok(outcome) => (StatusCode::OK, Json(json!({"data": outcome}))).into_response(),
@@ -302,9 +302,14 @@ fn finance_error_response(error: FinanceCoreError) -> Response {
 
 fn service_error_response(error: BusinessServiceError) -> Response {
     match error {
-        BusinessServiceError::AccessDenied => api_error(StatusCode::FORBIDDEN, "business_access_denied"),
+        BusinessServiceError::AccessDenied => {
+            api_error(StatusCode::FORBIDDEN, "business_access_denied")
+        }
         BusinessServiceError::NotFound => api_error(StatusCode::NOT_FOUND, "business_not_found"),
-        _ => api_error(StatusCode::SERVICE_UNAVAILABLE, "business_context_unavailable"),
+        _ => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_context_unavailable",
+        ),
     }
 }
 

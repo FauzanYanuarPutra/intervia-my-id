@@ -115,9 +115,8 @@ export function FinancePlanningWorkspaceV2({
     .reduce((sum, item) => sum + item.amount, 0);
   const unallocatedCash = Math.max(0, summary?.unallocated_cash ?? 0);
   const freeAfterNearBills = Math.max(0, unallocatedCash - dueSoonAmount);
-  const sortedObligations = useMemo(
-    () => [...activeObligations].sort((a, b) => a.next_due_on.localeCompare(b.next_due_on)),
-    [activeObligations],
+  const sortedObligations = [...activeObligations].sort((a, b) =>
+    a.next_due_on.localeCompare(b.next_due_on),
   );
 
   async function reloadFinanceCore() {
@@ -140,9 +139,12 @@ export function FinancePlanningWorkspaceV2({
   }
 
   useEffect(() => {
-    reloadFinanceCore().catch(() => {
-      // Page stays usable for planning if the authoritative summary is temporarily unavailable.
-    });
+    const timer = window.setTimeout(() => {
+      void reloadFinanceCore().catch(() => {
+        // Page stays usable for planning if the authoritative summary is temporarily unavailable.
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
 

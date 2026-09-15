@@ -19,7 +19,10 @@ fn finance_core_migration_is_append_only_and_idempotent() {
         "business_audit_events",
         "reject_business_finance_core_mutation",
     ] {
-        assert!(migration.contains(required), "missing finance-core invariant: {required}");
+        assert!(
+            migration.contains(required),
+            "missing finance-core invariant: {required}"
+        );
     }
 
     assert!(migration.contains("BEFORE UPDATE OR DELETE"));
@@ -31,26 +34,37 @@ fn inventory_purchase_moves_cash_but_is_not_operating_expense() {
     let semantic = FinanceEntrySemantic::for_entry("inventory_purchase").unwrap();
     assert!(semantic.affects_inventory_asset);
     assert!(!semantic.is_operating_expense);
-    assert_eq!(cash_effect_for("inventory_purchase", "cash", 125_000).unwrap(), -125_000);
+    assert_eq!(
+        cash_effect_for("inventory_purchase", "cash", 125_000).unwrap(),
+        -125_000
+    );
 }
 
 #[test]
 fn receivable_payment_moves_cash_without_creating_revenue_again() {
     let semantic = FinanceEntrySemantic::for_entry("receivable_payment").unwrap();
     assert!(!semantic.is_revenue);
-    assert_eq!(cash_effect_for("receivable_payment", "bank", 250_000).unwrap(), 250_000);
+    assert_eq!(
+        cash_effect_for("receivable_payment", "bank", 250_000).unwrap(),
+        250_000
+    );
 }
 
 #[test]
 fn receivable_sale_is_not_liquid_cash() {
-    assert_eq!(cash_effect_for("sale_income", "receivable", 100_000).unwrap(), 0);
+    assert_eq!(
+        cash_effect_for("sale_income", "receivable", 100_000).unwrap(),
+        0
+    );
 }
 
 #[test]
 fn unknown_entry_type_or_account_fails_closed() {
     assert!(matches!(
         cash_effect_for("future_magic", "cash", 10_000),
-        Err(FinanceCoreError::Validation("unsupported_finance_entry_type"))
+        Err(FinanceCoreError::Validation(
+            "unsupported_finance_entry_type"
+        ))
     ));
     assert!(matches!(
         cash_effect_for("other_income", "typo-wallet", 10_000),
@@ -62,8 +76,14 @@ fn unknown_entry_type_or_account_fails_closed() {
 fn allocation_bucket_names_are_canonical_and_closed_set() {
     assert_eq!(normalize_allocation_bucket("owner").unwrap(), "owner");
     assert_eq!(normalize_allocation_bucket("gaji_tim").unwrap(), "team");
-    assert_eq!(normalize_allocation_bucket("diputar_lagi").unwrap(), "reinvest");
-    assert_eq!(normalize_allocation_bucket("operasional").unwrap(), "operations");
+    assert_eq!(
+        normalize_allocation_bucket("diputar_lagi").unwrap(),
+        "reinvest"
+    );
+    assert_eq!(
+        normalize_allocation_bucket("operasional").unwrap(),
+        "operations"
+    );
     assert_eq!(normalize_allocation_bucket("cadangan").unwrap(), "reserve");
     assert!(normalize_allocation_bucket("random").is_err());
 }
