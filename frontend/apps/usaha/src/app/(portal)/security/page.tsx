@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { KeyRound, ShieldCheck, Smartphone, UserRoundCheck } from 'lucide-react';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { StatusBadge } from '@/components/portal/StatusBadge';
-import { readSingleParam } from '@/lib/portal-logic';
+import { hasPermission, readSingleParam } from '@/lib/portal-logic';
 import { resolvePortalHomeState } from '@/lib/portal-server';
 
 type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -43,6 +44,10 @@ export default async function SecurityPage({ searchParams }: PageProps) {
     ? { account: null, businesses: [], activeBusiness: null }
     : await resolvePortalHomeState(resolvedSearchParams);
   const scopeBusiness = activeBusiness;
+
+  if (scopeBusiness && !hasPermission(scopeBusiness, 'manageSecurity')) {
+    redirect(`/?business=${encodeURIComponent(scopeBusiness.id)}`);
+  }
 
   return (
     <PortalShell
