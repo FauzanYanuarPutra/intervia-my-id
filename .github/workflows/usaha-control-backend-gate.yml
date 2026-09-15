@@ -9,81 +9,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: usaha-control-backend-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  finalize-role-contract:
-    name: Temporary finalize safe invited-role contract
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/usaha-merchant-os-redesign-20260915'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - name: Checkout feature branch
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-      - name: Fix stale service capability assertions and restore workflow
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('services/marketplace_service/src/businesses/service.rs')
-          text = path.read_text()
-          old = '''        let cashier = organization("org_cashier");
-        assert!(cashier.can_view_inventory_controls());
-        assert!(cashier.can_record_sales());
-        assert!(cashier.can_manage_cash_shifts());
-        assert!(!cashier.can_manage_catalog());
-        assert!(!cashier.can_manage_finance_controls());
-
-        let viewer = organization("org_viewer");
-        assert!(viewer.can_view_inventory_controls());
-        assert!(viewer.can_view_sales());
-        assert!(!viewer.can_manage_inventory_controls());
-        assert!(!viewer.can_record_sales());
-'''
-          new = '''        let cashier = organization("org_cashier");
-        assert!(!cashier.can_view_inventory_controls());
-        assert!(cashier.can_record_sales());
-        assert!(cashier.can_view_sales());
-        assert!(cashier.can_manage_cash_shifts());
-        assert!(!cashier.can_manage_catalog());
-        assert!(!cashier.can_manage_finance_controls());
-
-        let viewer = organization("org_viewer");
-        assert!(!viewer.can_view_inventory_controls());
-        assert!(viewer.can_view_sales());
-        assert!(!viewer.can_manage_inventory_controls());
-        assert!(!viewer.can_record_sales());
-'''
-          if old not in text:
-              raise SystemExit('stale role assertion block not found exactly')
-          path.write_text(text.replace(old, new, 1))
-          PY
-          git fetch origin main:refs/remotes/origin/main
-          git show origin/main:.github/workflows/usaha-control-backend-gate.yml > .github/workflows/usaha-control-backend-gate.yml
-          unexpected="$(git diff --name-only | grep -vE '^(services/marketplace_service/src/businesses/service\.rs|\.github/workflows/usaha-control-backend-gate\.yml)$' || true)"
-          if [ -n "$unexpected" ]; then
-            echo "Unexpected files changed:"
-            echo "$unexpected"
-            exit 1
-          fi
-          grep -q 'assert!(!cashier.can_view_inventory_controls())' services/marketplace_service/src/businesses/service.rs
-          grep -q 'assert!(!viewer.can_view_inventory_controls())' services/marketplace_service/src/businesses/service.rs
-          grep -q '^permissions:$' .github/workflows/usaha-control-backend-gate.yml
-          grep -q '^  contents: read$' .github/workflows/usaha-control-backend-gate.yml
-          git add services/marketplace_service/src/businesses/service.rs .github/workflows/usaha-control-backend-gate.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "test(usaha): align invited-role service contract"
-          git push origin HEAD:${{ github.head_ref }}
-
   marketplace-control:
     name: Marketplace control compile and tests
     runs-on: ubuntu-24.04
