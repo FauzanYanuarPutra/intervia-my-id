@@ -965,7 +965,10 @@ async fn load_entry_tx(
     if for_update {
         query.push_str(" FOR UPDATE");
     }
-    sqlx::query_as::<_, FinanceCoreEntryRecord>(&query)
+    // The only dynamic fragment is the internal literal ` FOR UPDATE`; all
+    // request-derived values remain bind parameters. SQLx 0.9 intentionally
+    // requires an explicit audit marker for this safe owned query string.
+    sqlx::query_as::<_, FinanceCoreEntryRecord>(sqlx::AssertSqlSafe(query))
         .bind(entry_id)
         .bind(business_id)
         .bind(organization_id)
