@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { roleTemplates } from './portal-access';
+import { permissionMap } from './portal-access';
 import { canAccessPortalSection } from './portal-navigation';
+import type { PortalRole } from './portal-types';
 
-function permissions(role: keyof typeof roleTemplates) {
-  return roleTemplates[role].permissions;
+function permissions(role: PortalRole) {
+  return permissionMap[role];
 }
 
 describe('portal role access matrix', () => {
-  it('allows cashier daily work and read-only business info without sensitive management pages', () => {
+  it('allows cashier daily work without exposing profile or sensitive management pages', () => {
     const cashier = permissions('cashier');
-    for (const section of ['home', 'orders', 'products', 'inventory', 'info', 'locations', 'operations', 'buyerPage'] as const) {
+    for (const section of ['home', 'orders', 'products', 'inventory', 'operations', 'buyerPage'] as const) {
       expect(canAccessPortalSection(cashier, section)).toBe(true);
     }
-    for (const section of ['finance', 'reports', 'channels', 'team', 'security'] as const) {
+    for (const section of ['finance', 'reports', 'channels', 'info', 'locations', 'team', 'security'] as const) {
       expect(canAccessPortalSection(cashier, section)).toBe(false);
     }
   });
