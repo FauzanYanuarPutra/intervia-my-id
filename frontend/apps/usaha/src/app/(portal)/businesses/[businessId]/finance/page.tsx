@@ -40,7 +40,7 @@ export default async function BusinessFinancePage({ params, searchParams }: Page
   const activeView = requested === 'plan' ? 'plan' : requested === 'transfers' && showSettlement ? 'transfers' : 'activity';
   const tabs = [
     { id: 'activity', label: 'Aktivitas', href: `/businesses/${business.id}/finance?view=activity` },
-    { id: 'plan', label: 'Rencana', badge: obligations.filter(item => item.status !== 'paid').length, href: `/businesses/${business.id}/finance?view=plan` },
+    { id: 'plan', label: 'Rencana', badge: obligations.filter(item => item.active).length, href: `/businesses/${business.id}/finance?view=plan` },
     ...(showSettlement ? [{ id: 'transfers', label: 'Transfer aplikasi', badge: enabledChannels.length, href: `/businesses/${business.id}/finance?view=transfers` }] : []),
   ];
 
