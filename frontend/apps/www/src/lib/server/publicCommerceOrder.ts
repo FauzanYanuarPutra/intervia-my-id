@@ -11,6 +11,10 @@ export type PublicCommerceOrderIntent = {
     product_id: string;
     quantity: number;
     note?: string;
+    selections?: Array<{
+      group_id: string;
+      option_ids: string[];
+    }>;
   }>;
   fulfillment_mode?: 'courier' | 'pickup' | 'digital';
   note?: string;
@@ -37,6 +41,7 @@ type PublicCommerceOrderBundle = {
     quantity: string | number;
     unit_price: string | number;
     line_total: string | number;
+    metadata?: Record<string, unknown>;
   }>;
   replayed: boolean;
 };
