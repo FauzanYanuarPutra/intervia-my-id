@@ -38,11 +38,11 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
         self.assertNotIn("<TeamSnapshot", source)
 
     def test_navigation_prioritizes_daily_merchant_jobs(self) -> None:
-        source = (USAHA / "lib/portal-navigation.ts").read_text(encoding="utf-8")
-        for marker in ("'home'", "'orders'", "'products'", "'inventory'", "'finance'"):
-            self.assertIn(marker, source)
+        navigation = (USAHA / "lib/portal-navigation.ts").read_text(encoding="utf-8")
+        for marker in ("'home'", "'orders'", "'products'", "'inventory'", "'finance'", "products: 'Produk'", "inventory: 'Stok'"):
+            self.assertIn(marker, navigation)
         mobile = (PORTAL / "MobileNav.tsx").read_text(encoding="utf-8")
-        for marker in ("Jual", "Produk", "Stok", "Menu"):
+        for marker in ("orders: 'Jual'", "Menu"):
             self.assertIn(marker, mobile)
 
     def test_dashboard_is_action_first_without_card_soup(self) -> None:
@@ -53,7 +53,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
             "buildHomeDashboard",
             "Prioritas utama",
             "Kerjakan sekarang",
-            "> Jual<",
+            " Jual",
             "Catat pengeluaran",
             "Tambah stok",
         ):
