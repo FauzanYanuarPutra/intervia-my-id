@@ -9,13 +9,61 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: usaha-control-backend-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  update-rustls-lockfiles:
+    name: Temporary patched rustls lockfile update
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/usaha-merchant-os-redesign-20260915'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Update rustls to patched release
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in ai_service community_service identity_service marketplace_service; do
+            (
+              cd "services/$service"
+              cargo update -p rustls --precise 0.23.45
+            )
+          done
+      - name: Verify and commit only lockfiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in ai_service community_service identity_service marketplace_service; do
+            grep -A3 '^name = "rustls"$' "services/$service/Cargo.lock" | grep -q 'version = "0.23.45"'
+          done
+          unexpected="$(git diff --name-only | grep -vE '^services/(ai_service|community_service|identity_service|marketplace_service)/Cargo\.lock$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected files changed:"
+            echo "$unexpected"
+            exit 1
+          fi
+          git add \
+            services/ai_service/Cargo.lock \
+            services/community_service/Cargo.lock \
+            services/identity_service/Cargo.lock \
+            services/marketplace_service/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Lockfiles already patched"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(security): update rustls to 0.23.45"
+          git push origin HEAD:${{ github.head_ref }}
+
   marketplace-control:
     name: Marketplace control compile and tests
     runs-on: ubuntu-24.04
