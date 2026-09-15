@@ -6,20 +6,14 @@ export type WhatsAppMetaVerificationEnv = {
   WHATSAPP_META_WEBHOOK_VERIFY_TOKEN_REQUIRED?: string;
 };
 
-function isTrue(value: string | undefined): boolean {
-  return /^true$/i.test((value ?? '').trim());
-}
-
 export function getWhatsAppMetaVerificationConfig(
   env: WhatsAppMetaVerificationEnv = process.env,
-  requireForRequest = false,
+  _requireForRequest = true,
 ) {
-  const appEnv = env.ENV || env.APP_ENV || env.NODE_ENV;
   const token = env.WHATSAPP_META_WEBHOOK_VERIFY_TOKEN?.trim() || null;
-  const required =
-    requireForRequest ||
-    appEnv === 'production' ||
-    isTrue(env.WHATSAPP_META_WEBHOOK_VERIFY_TOKEN_REQUIRED);
 
-  return { token, required };
+  // Meta's webhook handshake is authenticated by the verify token. Require it
+  // in every environment: development endpoints are often exposed through
+  // public tunnels, so a local/dev runtime must not silently become unauthenticated.
+  return { token, required: true };
 }
