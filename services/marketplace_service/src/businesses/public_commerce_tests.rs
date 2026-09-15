@@ -216,13 +216,19 @@ async fn same_product_with_different_configurations_stays_separate(pool: PgPool)
                 product_id: seeded.product_id,
                 quantity: 1,
                 note: None,
-                selected_options: vec![PublicModifierSelectionInput { group_id: "sugar".into(), option_ids: vec!["less".into()] }],
+                selected_options: vec![PublicModifierSelectionInput {
+                    group_id: "sugar".into(),
+                    option_ids: vec!["less".into()],
+                }],
             },
             PublicOrderItemInput {
                 product_id: seeded.product_id,
                 quantity: 1,
                 note: None,
-                selected_options: vec![PublicModifierSelectionInput { group_id: "sugar".into(), option_ids: vec!["normal".into()] }],
+                selected_options: vec![PublicModifierSelectionInput {
+                    group_id: "sugar".into(),
+                    option_ids: vec!["normal".into()],
+                }],
             },
         ],
         fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
@@ -251,8 +257,18 @@ async fn stock_is_checked_across_all_configurations_of_same_product(pool: PgPool
     let seeded = seed_public_product(&pool, 1_250_000, Some(1)).await;
     let request = CreatePublicOrderRequest {
         items: vec![
-            PublicOrderItemInput { product_id: seeded.product_id, quantity: 1, note: None, selected_options: Vec::new() },
-            PublicOrderItemInput { product_id: seeded.product_id, quantity: 1, note: None, selected_options: Vec::new() },
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selected_options: Vec::new(),
+            },
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selected_options: Vec::new(),
+            },
         ],
         fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
         note: None,

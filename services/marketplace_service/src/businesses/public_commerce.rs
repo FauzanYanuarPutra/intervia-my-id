@@ -638,7 +638,9 @@ fn unique_product_ids(items: &[PublicOrderItemInput]) -> Vec<Uuid> {
         .collect()
 }
 
-fn requested_quantity_by_product(items: &[PublicOrderItemInput]) -> Result<HashMap<Uuid, i32>, PublicCommerceError> {
+fn requested_quantity_by_product(
+    items: &[PublicOrderItemInput],
+) -> Result<HashMap<Uuid, i32>, PublicCommerceError> {
     let mut totals = HashMap::new();
     for item in items {
         let entry = totals.entry(item.product_id).or_insert(0i32);
@@ -657,7 +659,9 @@ fn validate_aggregate_stock(
     products: &HashMap<Uuid, CheckoutProductRow>,
 ) -> Result<(), PublicCommerceError> {
     for (product_id, requested) in requested_quantity_by_product(items)? {
-        let product = products.get(&product_id).ok_or(PublicCommerceError::NotFound)?;
+        let product = products
+            .get(&product_id)
+            .ok_or(PublicCommerceError::NotFound)?;
         if let Some(stock_count) = product.stock_count {
             if !stock_count.is_finite() || stock_count < f64::from(requested) {
                 return Err(PublicCommerceError::InsufficientStock);
@@ -680,7 +684,9 @@ fn ensure_product_available(product: &CheckoutProductRow) -> Result<(), PublicCo
     }
 }
 
-fn modifier_groups_from_metadata(metadata: &Value) -> Result<Vec<ProductModifierGroup>, PublicCommerceError> {
+fn modifier_groups_from_metadata(
+    metadata: &Value,
+) -> Result<Vec<ProductModifierGroup>, PublicCommerceError> {
     match metadata.get("modifier_groups") {
         None | Some(Value::Null) => Ok(Vec::new()),
         Some(value) => serde_json::from_value(value.clone())
@@ -695,8 +701,14 @@ fn resolve_modifier_selection(
     let mut incoming = HashMap::<String, Vec<String>>::new();
     for selection in input {
         let group_id = selection.group_id.trim().to_ascii_lowercase();
-        if group_id.is_empty() || incoming.insert(group_id, selection.option_ids.clone()).is_some() {
-            return Err(PublicCommerceError::Validation("duplicate_modifier_group_selection"));
+        if group_id.is_empty()
+            || incoming
+                .insert(group_id, selection.option_ids.clone())
+                .is_some()
+        {
+            return Err(PublicCommerceError::Validation(
+                "duplicate_modifier_group_selection",
+            ));
         }
     }
 
@@ -712,18 +724,29 @@ fn resolve_modifier_selection(
             .map(|value| value.trim().to_ascii_lowercase())
             .filter(|value| !value.is_empty())
             .collect::<Vec<_>>();
-        if selected_ids.iter().any(|value| !unique.insert(value.clone())) {
-            return Err(PublicCommerceError::Validation("duplicate_modifier_option_selection"));
+        if selected_ids
+            .iter()
+            .any(|value| !unique.insert(value.clone()))
+        {
+            return Err(PublicCommerceError::Validation(
+                "duplicate_modifier_option_selection",
+            ));
         }
         selected_ids.sort();
 
-        let minimum = if group.required { group.min_selections.max(1) } else { group.min_selections };
+        let minimum = if group.required {
+            group.min_selections.max(1)
+        } else {
+            group.min_selections
+        };
         let maximum = match group.selection_mode {
             ModifierSelectionMode::Single => 1,
             ModifierSelectionMode::Multiple => group.max_selections.unwrap_or(group.options.len()),
         };
         if selected_ids.len() < minimum || selected_ids.len() > maximum {
-            return Err(PublicCommerceError::Validation("invalid_modifier_selection_count"));
+            return Err(PublicCommerceError::Validation(
+                "invalid_modifier_selection_count",
+            ));
         }
 
         if !selected_ids.is_empty() {
@@ -786,8 +809,8 @@ fn storage_error(error: sqlx::Error) -> PublicCommerceError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::product_modifiers::{ProductModifierGroup, ProductModifierOption};
+    use super::*;
 
     fn request(quantity: i32) -> CreatePublicOrderRequest {
         CreatePublicOrderRequest {
@@ -846,7 +869,10 @@ mod tests {
         };
         assert!(validate_request(&request).is_ok());
         assert_eq!(unique_product_ids(&request.items), vec![product_id]);
-        assert_eq!(requested_quantity_by_product(&request.items).unwrap()[&product_id], 2);
+        assert_eq!(
+            requested_quantity_by_product(&request.items).unwrap()[&product_id],
+            2
+        );
     }
 
     #[test]
@@ -859,12 +885,38 @@ mod tests {
             min_selections: 1,
             max_selections: Some(1),
             options: vec![
-                ProductModifierOption { id: "normal".into(), label: "Normal".into(), price_delta_cents: 0, is_default: true, enabled: true },
-                ProductModifierOption { id: "less".into(), label: "Less Sugar".into(), price_delta_cents: 0, is_default: false, enabled: true },
+                ProductModifierOption {
+                    id: "normal".into(),
+                    label: "Normal".into(),
+                    price_delta_cents: 0,
+                    is_default: true,
+                    enabled: true,
+                },
+                ProductModifierOption {
+                    id: "less".into(),
+                    label: "Less Sugar".into(),
+                    price_delta_cents: 0,
+                    is_default: false,
+                    enabled: true,
+                },
             ],
         }];
-        let less = resolve_modifier_selection(&groups, &[PublicModifierSelectionInput { group_id: "sugar".into(), option_ids: vec!["less".into()] }]).unwrap();
-        let normal = resolve_modifier_selection(&groups, &[PublicModifierSelectionInput { group_id: "sugar".into(), option_ids: vec!["normal".into()] }]).unwrap();
+        let less = resolve_modifier_selection(
+            &groups,
+            &[PublicModifierSelectionInput {
+                group_id: "sugar".into(),
+                option_ids: vec!["less".into()],
+            }],
+        )
+        .unwrap();
+        let normal = resolve_modifier_selection(
+            &groups,
+            &[PublicModifierSelectionInput {
+                group_id: "sugar".into(),
+                option_ids: vec!["normal".into()],
+            }],
+        )
+        .unwrap();
         assert_eq!(less.signature, "sugar=less");
         assert_eq!(normal.signature, "sugar=normal");
         assert_ne!(less.signature, normal.signature);
@@ -879,11 +931,19 @@ mod tests {
             required: true,
             min_selections: 1,
             max_selections: Some(1),
-            options: vec![ProductModifierOption { id: "normal".into(), label: "Normal".into(), price_delta_cents: 0, is_default: true, enabled: true }],
+            options: vec![ProductModifierOption {
+                id: "normal".into(),
+                label: "Normal".into(),
+                price_delta_cents: 0,
+                is_default: true,
+                enabled: true,
+            }],
         }];
         assert_eq!(
             resolve_modifier_selection(&groups, &[]),
-            Err(PublicCommerceError::Validation("invalid_modifier_selection_count"))
+            Err(PublicCommerceError::Validation(
+                "invalid_modifier_selection_count"
+            ))
         );
     }
 
