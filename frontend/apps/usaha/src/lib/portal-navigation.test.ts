@@ -43,13 +43,14 @@ describe('portal navigation', () => {
     ]);
   });
 
-  it('keeps mobile daily work focused on home, sales, products, and stock', () => {
+  it('keeps mobile daily work focused on home, sales, goods, and money', () => {
     expect(mobilePrimaryNavigation(ownerPermissions).map(item => item.id)).toEqual([
       'home',
       'orders',
       'products',
-      'inventory',
+      'finance',
     ]);
+    expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('inventory');
   });
 
   it('preserves primary order when permissions hide destinations', () => {
@@ -70,8 +71,8 @@ describe('portal navigation', () => {
     );
 
     expect(labels.home).toBe('Beranda');
-    expect(labels.orders).toBe('Jualan');
-    expect(labels.products).toBe('Produk');
+    expect(labels.orders).toBe('Jual');
+    expect(labels.products).toBe('Barang');
     expect(labels.inventory).toBe('Stok');
     expect(labels.finance).toBe('Uang');
     expect(labels.reports).toBe('Laporan');
