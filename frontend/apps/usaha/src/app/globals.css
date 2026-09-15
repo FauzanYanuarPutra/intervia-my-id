@@ -5,6 +5,13 @@
 @layer base {
   :root {
     color-scheme: light;
+    --portal-mobile-nav-height: 66px;
+    --portal-layer-sticky: 10;
+    --portal-layer-floating: 20;
+    --portal-layer-shell: 30;
+    --portal-layer-navigation: 40;
+    --portal-layer-popover: 60;
+    --portal-layer-toast: 80;
   }
 
   * {
@@ -148,7 +155,71 @@
     @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[11px] px-3 py-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20;
   }
 
+  .portal-dialog {
+    width: min(100%, 48rem);
+    max-width: calc(100vw - 2rem);
+    max-height: min(92dvh, 860px);
+    margin: auto;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+    background: transparent;
+    color: inherit;
+  }
+
+  .portal-dialog::backdrop {
+    background: rgba(10, 18, 14, 0.46);
+    backdrop-filter: blur(1.5px);
+  }
+
+  .portal-dialog-surface {
+    display: flex;
+    max-height: min(92dvh, 860px);
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(220, 228, 222, 0.9);
+    border-radius: 24px;
+    background: white;
+    box-shadow: 0 32px 90px -30px rgba(10, 18, 14, 0.58);
+  }
+
+  .portal-dialog-header {
+    @apply flex shrink-0 items-start justify-between gap-3 border-b border-portal-line/70 px-4 py-3.5 sm:px-5 sm:py-4;
+  }
+
+  .portal-dialog-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    @apply px-4 py-4 sm:px-5;
+  }
+
+  .portal-dialog-footer {
+    @apply shrink-0 border-t border-portal-line/70 bg-white px-4 py-3 sm:px-5;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .portal-dialog-handle {
+    @apply mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-slate-200;
+  }
+
   .portal-skip-link {
-    @apply fixed left-4 top-3 z-[100] -translate-y-20 rounded-xl bg-portal-forest px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-portal-forest;
+    @apply fixed left-4 top-3 z-[80] -translate-y-20 rounded-xl bg-portal-forest px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-portal-forest;
+  }
+
+  @media (max-width: 639px) {
+    .portal-dialog-sheet {
+      width: 100%;
+      max-width: none;
+      max-height: 96dvh;
+      margin: auto 0 0;
+    }
+
+    .portal-dialog-sheet .portal-dialog-surface {
+      max-height: 96dvh;
+      border-width: 1px 0 0;
+      border-radius: 26px 26px 0 0;
+    }
   }
 }
