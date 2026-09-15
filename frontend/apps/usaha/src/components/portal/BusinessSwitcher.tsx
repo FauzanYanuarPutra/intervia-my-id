@@ -65,19 +65,20 @@ export function BusinessSwitcher({
     );
   }
 
+  const business = activeBusiness;
   const groups = groupBusinessesByRelationship(businesses);
-  const activeBusinessId = activeBusiness.id;
+  const activeBusinessId = business.id;
 
   function closeAll() {
     setDesktopOpen(false);
     setMobileOpen(false);
   }
 
-  function businessLink(business: BusinessRecord) {
+  function businessLink(item: BusinessRecord) {
     return (
       <Link
-        key={business.id}
-        href={buildSectionHref(business.id, currentSection)}
+        key={item.id}
+        href={buildSectionHref(item.id, currentSection)}
         onClick={closeAll}
         className="flex min-h-12 items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm transition hover:bg-portal-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20"
       >
@@ -86,16 +87,16 @@ export function BusinessSwitcher({
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 flex-1 truncate font-semibold text-portal-ink">{business.name}</span>
+            <span className="min-w-0 flex-1 truncate font-semibold text-portal-ink">{item.name}</span>
             <span className="shrink-0 rounded-full bg-portal-mist px-2 py-0.5 text-[10px] font-bold text-portal-forest">
-              {portalRoleRelationshipLabel(business.currentRole)}
+              {portalRoleRelationshipLabel(item.currentRole)}
             </span>
           </span>
           <span className="block truncate text-[11px] text-portal-soft">
-            {business.city || 'Lokasi belum diatur'} · {business.category}
+            {item.city || 'Lokasi belum diatur'} · {item.category}
           </span>
         </span>
-        {business.id === activeBusinessId ? <Check className="h-4 w-4 shrink-0 text-portal-forest" /> : null}
+        {item.id === activeBusinessId ? <Check className="h-4 w-4 shrink-0 text-portal-forest" /> : null}
       </Link>
     );
   }
@@ -139,10 +140,10 @@ export function BusinessSwitcher({
         <span className="min-w-0 flex-1 text-left">
           {!compact ? (
             <span className="block truncate text-[10px] font-semibold text-portal-soft">
-              Usaha aktif · {portalRoleRelationshipLabel(activeBusiness.currentRole)}
+              Usaha aktif · {portalRoleRelationshipLabel(business.currentRole)}
             </span>
           ) : null}
-          <span className="block truncate text-sm font-bold text-portal-ink">{activeBusiness.name}</span>
+          <span className="block truncate text-sm font-bold text-portal-ink">{business.name}</span>
         </span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-portal-soft transition ${expanded ? 'rotate-180' : ''}`} />
       </>
