@@ -13,7 +13,11 @@ import type {
 const ORG_ROLE_TO_UMKM_ROLE: Record<string, UmkmStoreMemberRole> = {
   org_admin: 'owner',
   org_manager: 'manager',
+  manager: 'manager',
   org_cashier: 'cashier',
+  cashier: 'cashier',
+  org_viewer: 'viewer',
+  viewer: 'viewer',
   org_inventory: 'stock',
   org_accounting: 'finance',
 };
