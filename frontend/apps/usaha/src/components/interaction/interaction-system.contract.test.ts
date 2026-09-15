@@ -52,11 +52,12 @@ describe('Lajukan interaction system', () => {
     expect(shell).toContain('portal-mobile-content-clearance');
   });
 
-  it('keeps legacy transactional overlays above bottom navigation while preserving full-screen light dismiss', () => {
+  it('migrates transactional overlays to the shared top-layer modal system', () => {
     const sale = read('../business-control/QuickSaleWorkspace.tsx');
-    expect(sale).toContain('fixed inset-0 z-40 grid place-items-end bg-black/35');
-    expect(sale).toContain('fixed inset-0 z-50 grid place-items-end bg-black/40');
-    expect(sale).toContain('event.target === event.currentTarget');
-    expect(read('../../app/globals.css')).toContain('--portal-layer-nav: 35');
+    expect(sale).toContain('ModalSurface');
+    expect(sale).toContain('dismissible={!saving}');
+    expect(sale).toContain('var(--portal-mobile-nav-height)');
+    expect(sale).not.toContain('fixed inset-0 z-40 grid place-items-end bg-black/35');
+    expect(sale).not.toContain('fixed inset-0 z-50 grid place-items-end bg-black/40');
   });
 });
