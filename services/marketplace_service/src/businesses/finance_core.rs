@@ -28,6 +28,7 @@ impl From<sqlx::Error> for FinanceCoreError {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct FinanceEntrySemantic {
     pub(crate) canonical_type: &'static str,
     pub(crate) cash_sign: i64,

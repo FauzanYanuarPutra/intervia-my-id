@@ -290,14 +290,11 @@ pub(crate) fn validate_groups(
                     .max_selections
                     .unwrap_or(enabled_count)
                     .min(enabled_count);
-                if minimum > maximum
-                    || maximum == 0
-                    || default_count < minimum
-                    || default_count > maximum
-                {
-                    if default_count > 0 || minimum > maximum || maximum == 0 {
-                        return Err("invalid_modifier_selection_bounds");
-                    }
+                let invalid_bounds = minimum > maximum || maximum == 0;
+                let invalid_defaults =
+                    default_count > 0 && (default_count < minimum || default_count > maximum);
+                if invalid_bounds || invalid_defaults {
+                    return Err("invalid_modifier_selection_bounds");
                 }
                 group.min_selections = minimum;
                 group.max_selections = Some(maximum);
