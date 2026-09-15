@@ -71,6 +71,8 @@ export default async function HomePage({
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewFinance = hasPermission(business, 'viewFinance');
   const canViewChannels = hasPermission(business, 'viewChannels');
+  const canManageInfo = hasPermission(business, 'manageInfo');
+  const canManageInventory = hasPermission(business, 'manageInventory');
 
   const [ingredients, financeEntries, channels] = await Promise.all([
     canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
@@ -102,21 +104,23 @@ export default async function HomePage({
     financeEntryCount: financeEntries.length,
   });
 
-  const foundationAction = !business.infoComplete
-    ? {
-        title: 'Lengkapi data utama usaha',
-        description: 'Pastikan nama, kategori, dan kontak usaha sudah benar.',
-        href: `/businesses/${business.id}/info`,
-        priority: 1_000,
-      }
-    : !locations.some(item => item.isPrimary)
+  const foundationAction = canManageInfo
+    ? !business.infoComplete
       ? {
-          title: 'Pastikan lokasi utama',
-          description: 'Alamat utama membantu operasional dan pelanggan menemukan usaha.',
-          href: `/businesses/${business.id}/locations`,
+          title: 'Lengkapi data utama usaha',
+          description: 'Pastikan nama, kategori, dan kontak usaha sudah benar.',
+          href: `/businesses/${business.id}/info`,
           priority: 1_000,
         }
-      : null;
+      : !locations.some(item => item.isPrimary)
+        ? {
+            title: 'Pastikan lokasi utama',
+            description: 'Alamat utama membantu operasional dan pelanggan menemukan usaha.',
+            href: `/businesses/${business.id}/locations`,
+            priority: 1_000,
+          }
+        : null
+    : null;
 
   const dashboard = buildHomeDashboard({
     foundationAction,
@@ -142,7 +146,7 @@ export default async function HomePage({
 
       <PendingOrganizationInvitations />
 
-      <section className="grid grid-cols-3 gap-2" aria-label="Aksi cepat">
+      <section className={`grid gap-2 ${canViewFinance ? 'grid-cols-3' : 'grid-cols-2'}`} aria-label="Aksi cepat">
         <Link href={`/businesses/${business.id}/orders`} className="portal-button-primary min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
           <ShoppingBag className="h-5 w-5 sm:h-4 sm:w-4" /> Jual
         </Link>
@@ -150,9 +154,9 @@ export default async function HomePage({
           <Link href={`/businesses/${business.id}/finance`} className="portal-button-secondary min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
             <BanknoteArrowDown className="h-5 w-5 sm:h-4 sm:w-4" /> Catat pengeluaran
           </Link>
-        ) : <span />}
+        ) : null}
         <Link href={`/businesses/${business.id}/inventory`} className="portal-button-secondary min-h-14 flex-col gap-1 px-2 text-xs sm:flex-row sm:text-sm">
-          <PackagePlus className="h-5 w-5 sm:h-4 sm:w-4" /> Tambah stok
+          <PackagePlus className="h-5 w-5 sm:h-4 sm:w-4" /> {canManageInventory ? 'Tambah stok' : 'Stok'}
         </Link>
       </section>
 
