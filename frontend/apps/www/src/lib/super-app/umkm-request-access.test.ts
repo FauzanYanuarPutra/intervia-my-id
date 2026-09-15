@@ -27,36 +27,43 @@ function authCtx() {
   };
 }
 
+function organizationFetch(role: string) {
+  return vi.fn<typeof fetch>().mockImplementation(async () =>
+    jsonResponse({
+      data: {
+        items: [
+          {
+            id: ORGANIZATION_ID,
+            name: 'Kedai Cuk',
+            current_user_role: role,
+          },
+        ],
+      },
+    }),
+  );
+}
+
 describe('mapOrganizationRoleToUmkmRole', () => {
-  it('maps Identity organization roles into UMKM workspace roles', () => {
+  it('maps both public Identity roles and legacy organization aliases', () => {
+    expect(mapOrganizationRoleToUmkmRole('cashier')).toBe('cashier');
+    expect(mapOrganizationRoleToUmkmRole('manager')).toBe('manager');
+    expect(mapOrganizationRoleToUmkmRole('viewer')).toBe('viewer');
     expect(mapOrganizationRoleToUmkmRole('org_cashier')).toBe('cashier');
     expect(mapOrganizationRoleToUmkmRole('org_admin')).toBe('owner');
     expect(mapOrganizationRoleToUmkmRole('ORG_ACCOUNTING')).toBe('finance');
-    expect(mapOrganizationRoleToUmkmRole('org_viewer')).toBeNull();
+    expect(mapOrganizationRoleToUmkmRole('org_viewer')).toBe('viewer');
   });
 });
 
 describe('hasUmkmStoreRequestPermission', () => {
-  it('allows an accepted organization cashier to manage orders and payments', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      jsonResponse({
-        data: {
-          items: [
-            {
-              id: ORGANIZATION_ID,
-              name: 'Kedai Cuk',
-              current_user_role: 'org_cashier',
-            },
-          ],
-        },
-      }),
-    );
+  const store = {
+    id: STORE_ID,
+    owner_user_id: OWNER_ID,
+    organization_id: ORGANIZATION_ID,
+  };
 
-    const store = {
-      id: STORE_ID,
-      owner_user_id: OWNER_ID,
-      organization_id: ORGANIZATION_ID,
-    };
+  it('allows an accepted organization cashier to manage orders and payments only', async () => {
+    const fetchImpl = organizationFetch('cashier');
 
     await expect(
       hasUmkmStoreRequestPermission({
@@ -84,16 +91,41 @@ describe('hasUmkmStoreRequestPermission', () => {
     ).resolves.toBe(false);
   });
 
+  it('keeps an accepted viewer read-only', async () => {
+    const fetchImpl = organizationFetch('viewer');
+
+    await expect(
+      hasUmkmStoreRequestPermission({
+        store,
+        authCtx: authCtx(),
+        permission: 'store:view',
+        fetchImpl,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      hasUmkmStoreRequestPermission({
+        store,
+        authCtx: authCtx(),
+        permission: 'order:manage',
+        fetchImpl,
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      hasUmkmStoreRequestPermission({
+        store,
+        authCtx: authCtx(),
+        permission: 'product:manage',
+        fetchImpl,
+      }),
+    ).resolves.toBe(false);
+  });
+
   it('fails closed when Identity cannot confirm organization membership', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('fetch failed'));
 
     await expect(
       hasUmkmStoreRequestPermission({
-        store: {
-          id: STORE_ID,
-          owner_user_id: OWNER_ID,
-          organization_id: ORGANIZATION_ID,
-        },
+        store,
         authCtx: authCtx(),
         permission: 'order:manage',
         fetchImpl,
