@@ -89,7 +89,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
         inventory = (
             USAHA / "app/(portal)/businesses/[businessId]/inventory/page.tsx"
         ).read_text(encoding="utf-8")
-        for marker in ("WorkspaceTabs", "Perlu tindakan", "Semua stok", "Bahan"):
+        for marker in ("WorkspaceTabs", "Stok produk", "Perlu dicek", "Bahan & kemasan"):
             self.assertIn(marker, inventory)
         finance = (
             USAHA / "app/(portal)/businesses/[businessId]/finance/page.tsx"
