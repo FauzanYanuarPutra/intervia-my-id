@@ -6,6 +6,7 @@ export type FinanceEntryLike = {
 };
 
 const inventoryPurchaseTypes = new Set([
+  'inventory_purchase',
   'inventory_expense',
   'ingredient_purchase',
   'packaging_purchase',
