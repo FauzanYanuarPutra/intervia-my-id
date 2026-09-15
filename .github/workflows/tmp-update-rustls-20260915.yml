@@ -1,0 +1,59 @@
+name: Temporary rustls lockfile update
+
+on:
+  push:
+    branches:
+      - feat/usaha-merchant-os-redesign-20260915
+    paths:
+      - .github/workflows/tmp-update-rustls-20260915.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-lockfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: feat/usaha-merchant-os-redesign-20260915
+          fetch-depth: 0
+
+      - name: Update rustls to patched release
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in ai_service community_service identity_service marketplace_service; do
+            echo "Updating $service"
+            (
+              cd "services/$service"
+              cargo update -p rustls --precise 0.23.45
+            )
+          done
+
+      - name: Verify patched version
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in ai_service community_service identity_service marketplace_service; do
+            grep -A3 '^name = "rustls"$' "services/$service/Cargo.lock" | grep -q 'version = "0.23.45"'
+          done
+
+      - name: Commit lockfiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            services/ai_service/Cargo.lock \
+            services/community_service/Cargo.lock \
+            services/identity_service/Cargo.lock \
+            services/marketplace_service/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Lockfiles already use rustls 0.23.45"
+            exit 0
+          fi
+          git commit -m "chore(security): update rustls to 0.23.45"
+          git push origin HEAD:feat/usaha-merchant-os-redesign-20260915
