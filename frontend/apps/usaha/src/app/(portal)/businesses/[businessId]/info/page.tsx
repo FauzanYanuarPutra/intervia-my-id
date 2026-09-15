@@ -21,12 +21,13 @@ export default async function BusinessInfoPage({ params }: PageProps) {
   if (!business) notFound();
 
   const canManage = hasPermission(business, 'manageInfo');
+  const canViewTeam = hasPermission(business, 'viewTeam');
   const businessPoint = toLatLng(business.latitude, business.longitude);
   const businessLocationQuery = buildBusinessLocationQuery({ name: business.name, address: business.address, city: business.city, locationQuery: business.locationQuery });
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="info">
-      <PageHeader eyebrow="Pengaturan Usaha" title="Kelola usaha" description="Ubah yang perlu saja. Data teknis tetap tersedia tanpa memenuhi layar utama." />
+      <PageHeader eyebrow="Pengaturan Usaha" title={canManage ? 'Kelola usaha' : 'Info usaha'} description={canManage ? 'Ubah yang perlu saja. Data teknis tetap tersedia tanpa memenuhi layar utama.' : 'Lihat informasi usaha yang dibagikan sesuai aksesmu.'} />
 
       <section className="merchant-list border border-portal-line/80">
         <details className="group border-b border-portal-line/70">
@@ -40,7 +41,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
               <dl className="grid gap-4 sm:grid-cols-2">
                 <div><dt className="portal-label">Nama usaha</dt><dd className="mt-1 text-sm font-semibold text-portal-ink">{business.name}</dd></div>
                 <div><dt className="portal-label">Kategori</dt><dd className="mt-1 text-sm font-semibold text-portal-ink">{business.category}</dd></div>
-                <div className="sm:col-span-2"><dt className="portal-label">Deskripsi</dt><dd className="mt-1 text-sm leading-6 text-portal-soft">{business.description}</dd></div>
+                <div className="sm:col-span-2"><dt className="portal-label">Deskripsi</dt><dd className="mt-1 text-sm leading-6 text-portal-soft">{business.description || 'Belum ada deskripsi.'}</dd></div>
               </dl>
             )}
           </div>
@@ -50,7 +51,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
           <summary className="merchant-action-row cursor-pointer list-none">
             <span className="portal-icon-tile"><ImageIcon className="h-4 w-4" /></span>
             <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Foto & logo</span><span className="mt-0.5 block text-xs text-portal-soft">Logo dan banner tampilan toko</span></span>
-            <span className="text-xs font-black text-portal-forest">Atur</span>
+            <span className="text-xs font-black text-portal-forest">{canManage ? 'Atur' : 'Lihat'}</span>
           </summary>
           <div className="grid gap-6 border-t border-portal-line/70 p-4 sm:p-5 lg:grid-cols-[220px_minmax(0,1fr)]">
             {canManage ? <BusinessImageCropUpload businessId={business.id} kind="logo" currentUrl={business.logoUrl} label="Logo / foto usaha" description="Rasio 1:1 untuk kartu usaha dan foto toko." /> : <div className="aspect-square rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.logoUrl ? { backgroundImage: `url(${business.logoUrl})` } : undefined} />}
@@ -67,7 +68,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
           <div className="grid gap-4 border-t border-portal-line/70 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_280px]">
             <BusinessLocationMap value={businessPoint} searchQuery={businessLocationQuery} markerLabel={business.name} heightClassName="h-[250px] w-full" />
             <div className="space-y-2">
-              <Link href={`/businesses/${business.id}/locations`} className="portal-button-secondary w-full"><MapPinned className="h-4 w-4" /> Atur lokasi</Link>
+              {canManage ? <Link href={`/businesses/${business.id}/locations`} className="portal-button-secondary w-full"><MapPinned className="h-4 w-4" /> Atur lokasi</Link> : null}
               <a href={business.googleMapsUrl} target="_blank" rel="noreferrer" className="portal-button-secondary w-full"><ExternalLink className="h-4 w-4" /> Google Maps</a>
               <a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary w-full"><Store className="h-4 w-4" /> Lihat Tampilan Toko</a>
             </div>
@@ -80,11 +81,13 @@ export default async function BusinessInfoPage({ params }: PageProps) {
           <span className="text-xs font-black text-portal-forest">Buka</span>
         </Link>
 
-        <Link href={`/businesses/${business.id}/team`} className="merchant-action-row">
-          <span className="portal-icon-tile"><UsersRound className="h-4 w-4" /></span>
-          <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Tim & akses</span><span className="mt-0.5 block text-xs text-portal-soft">Atur siapa yang boleh mengelola usaha.</span></span>
-          <span className="text-xs font-black text-portal-forest">Buka</span>
-        </Link>
+        {canViewTeam ? (
+          <Link href={`/businesses/${business.id}/team`} className="merchant-action-row">
+            <span className="portal-icon-tile"><UsersRound className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Tim & akses</span><span className="mt-0.5 block text-xs text-portal-soft">Atur siapa yang boleh mengelola usaha.</span></span>
+            <span className="text-xs font-black text-portal-forest">Buka</span>
+          </Link>
+        ) : null}
       </section>
     </PortalShell>
   );
