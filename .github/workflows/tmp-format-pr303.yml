@@ -1,0 +1,36 @@
+name: Temporary PR 303 Rustfmt
+
+on:
+  push:
+    branches:
+      - feat/usaha-storefront-interaction-system
+    paths:
+      - '.github/workflows/tmp-format-pr303.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/usaha-storefront-interaction-system
+          fetch-depth: 0
+      - name: Install repository Rust toolchain
+        run: rustup show
+      - name: Format marketplace service
+        working-directory: services/marketplace_service
+        run: cargo fmt --all
+      - name: Commit formatting when needed
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service
+          git commit -m "style(marketplace): apply rustfmt"
+          git push origin HEAD:feat/usaha-storefront-interaction-system
