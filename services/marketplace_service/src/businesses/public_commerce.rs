@@ -17,6 +17,8 @@ use uuid::Uuid;
 
 use crate::{auth_claims_from_headers, AppState};
 
+use super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup};
+
 const MAX_PUBLIC_ORDER_ITEMS: usize = 120;
 const MAX_PUBLIC_ORDER_QUANTITY: i32 = 200;
 const MAX_PUBLIC_ORDER_NOTE_LEN: usize = 500;
@@ -41,11 +43,20 @@ impl PublicFulfillmentMode {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub(crate) struct PublicModifierSelectionInput {
+    pub(crate) group_id: String,
+    #[serde(default)]
+    pub(crate) option_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct PublicOrderItemInput {
     pub(crate) product_id: Uuid,
     pub(crate) quantity: i32,
     pub(crate) note: Option<String>,
+    #[serde(default)]
+    pub(crate) selected_options: Vec<PublicModifierSelectionInput>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -126,6 +137,7 @@ struct CheckoutProductRow {
     online_order_enabled: bool,
     business_status: String,
     stock_count: Option<f64>,
+    product_metadata: Value,
 }
 
 #[derive(Debug, FromRow)]
@@ -191,6 +203,22 @@ struct ResolvedOrderItem {
     metadata: Value,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct ModifierSnapshot {
+    group_id: String,
+    group_name: String,
+    option_id: String,
+    option_label: String,
+    price_delta_cents: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolvedModifierSelection {
+    signature: String,
+    price_delta_cents: i64,
+    snapshots: Vec<ModifierSnapshot>,
+}
+
 #[derive(Clone)]
 pub(crate) struct PublicCommerceRepository {
     db: PgPool,
@@ -230,11 +258,7 @@ impl PublicCommerceRepository {
             return load_public_order_bundle(&self.db, existing_id, true).await;
         }
 
-        let product_ids = request
-            .items
-            .iter()
-            .map(|item| item.product_id)
-            .collect::<Vec<_>>();
+        let product_ids = unique_product_ids(&request.items);
         let product_rows = sqlx::query_as::<_, CheckoutProductRow>(
             r#"
             SELECT
@@ -248,7 +272,8 @@ impl PublicCommerceRepository {
               s.is_active AS store_active,
               s.online_order_enabled,
               b.status AS business_status,
-              bi.stock_count
+              bi.stock_count,
+              COALESCE(p.metadata, '{}'::jsonb) AS product_metadata
             FROM umkm_products p
             JOIN umkm_stores s
               ON s.id = p.store_id
@@ -288,34 +313,35 @@ impl PublicCommerceRepository {
         let business_id = first.business_id;
         let merchant_id = first.merchant_id;
 
-        let mut resolved_items = Vec::with_capacity(request.items.len());
-        let mut subtotal = Decimal::ZERO;
-        for item in &request.items {
-            let product = products
-                .get(&item.product_id)
-                .ok_or(PublicCommerceError::NotFound)?;
+        for product in products.values() {
             if product.store_id != store_id
                 || product.business_id != business_id
                 || product.merchant_id != merchant_id
             {
                 return Err(PublicCommerceError::MixedBusiness);
             }
-            if !product.product_available
-                || !product.store_active
-                || !product.online_order_enabled
-                || product.business_status != "active"
-                || product.price_cents <= 0
-            {
-                return Err(PublicCommerceError::Unavailable);
-            }
-            if let Some(stock_count) = product.stock_count {
-                if !stock_count.is_finite() || stock_count < f64::from(item.quantity) {
-                    return Err(PublicCommerceError::InsufficientStock);
-                }
+            ensure_product_available(product)?;
+        }
+        validate_aggregate_stock(&request.items, &products)?;
+
+        let mut resolved_items = Vec::with_capacity(request.items.len());
+        let mut subtotal = Decimal::ZERO;
+        for item in &request.items {
+            let product = products
+                .get(&item.product_id)
+                .ok_or(PublicCommerceError::NotFound)?;
+            let groups = modifier_groups_from_metadata(&product.product_metadata)?;
+            let modifier_selection = resolve_modifier_selection(&groups, &item.selected_options)?;
+            let resolved_price_cents = product
+                .price_cents
+                .checked_add(modifier_selection.price_delta_cents)
+                .ok_or(PublicCommerceError::Validation("invalid_configured_price"))?;
+            if resolved_price_cents <= 0 {
+                return Err(PublicCommerceError::Validation("invalid_configured_price"));
             }
 
             let quantity = Decimal::from(item.quantity);
-            let unit_price = Decimal::new(product.price_cents, 2);
+            let unit_price = Decimal::new(resolved_price_cents, 2);
             let line_total = (quantity * unit_price).round_dp(2);
             subtotal += line_total;
             resolved_items.push(ResolvedOrderItem {
@@ -324,7 +350,11 @@ impl PublicCommerceRepository {
                 quantity,
                 unit_price,
                 line_total,
-                metadata: item_metadata(item.note.as_deref()),
+                metadata: item_metadata(
+                    item.note.as_deref(),
+                    &modifier_selection.signature,
+                    &modifier_selection.snapshots,
+                ),
             });
         }
         subtotal = subtotal.round_dp(2);
@@ -343,7 +373,7 @@ impl PublicCommerceRepository {
         let metadata = json!({
             "fulfillment_mode": fulfillment_mode.as_str(),
             "note": order_note,
-            "public_commerce_version": 1
+            "public_commerce_version": 2
         });
 
         let inserted_id = sqlx::query_scalar::<_, Uuid>(
@@ -573,15 +603,6 @@ fn validate_request(request: &CreatePublicOrderRequest) -> Result<(), PublicComm
     {
         return Err(PublicCommerceError::Validation("quantity_too_large"));
     }
-
-    let mut product_ids = HashSet::with_capacity(request.items.len());
-    if request
-        .items
-        .iter()
-        .any(|item| !product_ids.insert(item.product_id))
-    {
-        return Err(PublicCommerceError::Validation("duplicate_product"));
-    }
     if request.items.iter().any(|item| item.product_id.is_nil()) {
         return Err(PublicCommerceError::Validation("invalid_product_id"));
     }
@@ -609,6 +630,139 @@ fn validate_request(request: &CreatePublicOrderRequest) -> Result<(), PublicComm
     Ok(())
 }
 
+fn unique_product_ids(items: &[PublicOrderItemInput]) -> Vec<Uuid> {
+    let mut seen = HashSet::with_capacity(items.len());
+    items
+        .iter()
+        .filter_map(|item| seen.insert(item.product_id).then_some(item.product_id))
+        .collect()
+}
+
+fn requested_quantity_by_product(items: &[PublicOrderItemInput]) -> Result<HashMap<Uuid, i32>, PublicCommerceError> {
+    let mut totals = HashMap::new();
+    for item in items {
+        let entry = totals.entry(item.product_id).or_insert(0i32);
+        *entry = entry
+            .checked_add(item.quantity)
+            .ok_or(PublicCommerceError::Validation("quantity_too_large"))?;
+        if *entry > MAX_PUBLIC_ORDER_QUANTITY {
+            return Err(PublicCommerceError::Validation("quantity_too_large"));
+        }
+    }
+    Ok(totals)
+}
+
+fn validate_aggregate_stock(
+    items: &[PublicOrderItemInput],
+    products: &HashMap<Uuid, CheckoutProductRow>,
+) -> Result<(), PublicCommerceError> {
+    for (product_id, requested) in requested_quantity_by_product(items)? {
+        let product = products.get(&product_id).ok_or(PublicCommerceError::NotFound)?;
+        if let Some(stock_count) = product.stock_count {
+            if !stock_count.is_finite() || stock_count < f64::from(requested) {
+                return Err(PublicCommerceError::InsufficientStock);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn ensure_product_available(product: &CheckoutProductRow) -> Result<(), PublicCommerceError> {
+    if !product.product_available
+        || !product.store_active
+        || !product.online_order_enabled
+        || product.business_status != "active"
+        || product.price_cents <= 0
+    {
+        Err(PublicCommerceError::Unavailable)
+    } else {
+        Ok(())
+    }
+}
+
+fn modifier_groups_from_metadata(metadata: &Value) -> Result<Vec<ProductModifierGroup>, PublicCommerceError> {
+    match metadata.get("modifier_groups") {
+        None | Some(Value::Null) => Ok(Vec::new()),
+        Some(value) => serde_json::from_value(value.clone())
+            .map_err(|_| PublicCommerceError::Validation("invalid_modifier_catalog")),
+    }
+}
+
+fn resolve_modifier_selection(
+    groups: &[ProductModifierGroup],
+    input: &[PublicModifierSelectionInput],
+) -> Result<ResolvedModifierSelection, PublicCommerceError> {
+    let mut incoming = HashMap::<String, Vec<String>>::new();
+    for selection in input {
+        let group_id = selection.group_id.trim().to_ascii_lowercase();
+        if group_id.is_empty() || incoming.insert(group_id, selection.option_ids.clone()).is_some() {
+            return Err(PublicCommerceError::Validation("duplicate_modifier_group_selection"));
+        }
+    }
+
+    let mut snapshots = Vec::new();
+    let mut signature_parts = Vec::new();
+    let mut delta = 0i64;
+
+    for group in groups {
+        let selected = incoming.remove(&group.id).unwrap_or_default();
+        let mut unique = HashSet::with_capacity(selected.len());
+        let mut selected_ids = selected
+            .into_iter()
+            .map(|value| value.trim().to_ascii_lowercase())
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>();
+        if selected_ids.iter().any(|value| !unique.insert(value.clone())) {
+            return Err(PublicCommerceError::Validation("duplicate_modifier_option_selection"));
+        }
+        selected_ids.sort();
+
+        let minimum = if group.required { group.min_selections.max(1) } else { group.min_selections };
+        let maximum = match group.selection_mode {
+            ModifierSelectionMode::Single => 1,
+            ModifierSelectionMode::Multiple => group.max_selections.unwrap_or(group.options.len()),
+        };
+        if selected_ids.len() < minimum || selected_ids.len() > maximum {
+            return Err(PublicCommerceError::Validation("invalid_modifier_selection_count"));
+        }
+
+        if !selected_ids.is_empty() {
+            let mut resolved_ids = Vec::with_capacity(selected_ids.len());
+            for option_id in selected_ids {
+                let option = group
+                    .options
+                    .iter()
+                    .find(|option| option.id == option_id && option.enabled)
+                    .ok_or(PublicCommerceError::Validation("invalid_modifier_option"))?;
+                delta = delta
+                    .checked_add(option.price_delta_cents)
+                    .ok_or(PublicCommerceError::Validation("invalid_configured_price"))?;
+                snapshots.push(ModifierSnapshot {
+                    group_id: group.id.clone(),
+                    group_name: group.name.clone(),
+                    option_id: option.id.clone(),
+                    option_label: option.label.clone(),
+                    price_delta_cents: option.price_delta_cents,
+                });
+                resolved_ids.push(option.id.clone());
+            }
+            signature_parts.push(format!("{}={}", group.id, resolved_ids.join(",")));
+        } else {
+            signature_parts.push(format!("{}=", group.id));
+        }
+    }
+
+    if !incoming.is_empty() {
+        return Err(PublicCommerceError::Validation("unknown_modifier_group"));
+    }
+
+    Ok(ResolvedModifierSelection {
+        signature: signature_parts.join("|"),
+        price_delta_cents: delta,
+        snapshots,
+    })
+}
+
 fn normalize_optional_text(value: Option<&str>) -> Option<String> {
     value
         .map(str::trim)
@@ -616,11 +770,13 @@ fn normalize_optional_text(value: Option<&str>) -> Option<String> {
         .map(str::to_string)
 }
 
-fn item_metadata(note: Option<&str>) -> Value {
-    match normalize_optional_text(note) {
-        Some(note) => json!({ "note": note }),
-        None => json!({}),
-    }
+fn item_metadata(note: Option<&str>, signature: &str, modifiers: &[ModifierSnapshot]) -> Value {
+    json!({
+        "note": normalize_optional_text(note),
+        "configuration_signature": signature,
+        "modifiers": modifiers,
+        "modifier_snapshot_version": 1
+    })
 }
 
 fn storage_error(error: sqlx::Error) -> PublicCommerceError {
@@ -631,6 +787,7 @@ fn storage_error(error: sqlx::Error) -> PublicCommerceError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::product_modifiers::{ProductModifierGroup, ProductModifierOption};
 
     fn request(quantity: i32) -> CreatePublicOrderRequest {
         CreatePublicOrderRequest {
@@ -638,6 +795,7 @@ mod tests {
                 product_id: Uuid::new_v4(),
                 quantity,
                 note: None,
+                selected_options: Vec::new(),
             }],
             fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
             note: None,
@@ -655,15 +813,11 @@ mod tests {
             validate_request(&request(201)),
             Err(PublicCommerceError::Validation("quantity_too_large"))
         );
-
-        let valid = request(1);
-        assert_ne!(valid.items[0].product_id, Uuid::nil());
-        assert_eq!(valid.fulfillment_mode, Some(PublicFulfillmentMode::Pickup));
-        assert!(validate_request(&valid).is_ok());
+        assert!(validate_request(&request(1)).is_ok());
     }
 
     #[test]
-    fn rejects_duplicate_products() {
+    fn allows_same_product_as_separate_configured_lines() {
         let product_id = Uuid::new_v4();
         let request = CreatePublicOrderRequest {
             items: vec![
@@ -671,20 +825,65 @@ mod tests {
                     product_id,
                     quantity: 1,
                     note: None,
+                    selected_options: vec![PublicModifierSelectionInput {
+                        group_id: "sugar".into(),
+                        option_ids: vec!["less".into()],
+                    }],
                 },
                 PublicOrderItemInput {
                     product_id,
-                    quantity: 2,
+                    quantity: 1,
                     note: None,
+                    selected_options: vec![PublicModifierSelectionInput {
+                        group_id: "sugar".into(),
+                        option_ids: vec!["normal".into()],
+                    }],
                 },
             ],
             fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
             note: None,
             source_surface: None,
         };
+        assert!(validate_request(&request).is_ok());
+        assert_eq!(unique_product_ids(&request.items), vec![product_id]);
+        assert_eq!(requested_quantity_by_product(&request.items).unwrap()[&product_id], 2);
+    }
+
+    #[test]
+    fn modifier_selection_is_server_resolved_and_signature_is_stable() {
+        let groups = vec![ProductModifierGroup {
+            id: "sugar".into(),
+            name: "Tingkat gula".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: true,
+            min_selections: 1,
+            max_selections: Some(1),
+            options: vec![
+                ProductModifierOption { id: "normal".into(), label: "Normal".into(), price_delta_cents: 0, is_default: true, enabled: true },
+                ProductModifierOption { id: "less".into(), label: "Less Sugar".into(), price_delta_cents: 0, is_default: false, enabled: true },
+            ],
+        }];
+        let less = resolve_modifier_selection(&groups, &[PublicModifierSelectionInput { group_id: "sugar".into(), option_ids: vec!["less".into()] }]).unwrap();
+        let normal = resolve_modifier_selection(&groups, &[PublicModifierSelectionInput { group_id: "sugar".into(), option_ids: vec!["normal".into()] }]).unwrap();
+        assert_eq!(less.signature, "sugar=less");
+        assert_eq!(normal.signature, "sugar=normal");
+        assert_ne!(less.signature, normal.signature);
+    }
+
+    #[test]
+    fn required_radio_rejects_empty_selection() {
+        let groups = vec![ProductModifierGroup {
+            id: "sugar".into(),
+            name: "Tingkat gula".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: true,
+            min_selections: 1,
+            max_selections: Some(1),
+            options: vec![ProductModifierOption { id: "normal".into(), label: "Normal".into(), price_delta_cents: 0, is_default: true, enabled: true }],
+        }];
         assert_eq!(
-            validate_request(&request),
-            Err(PublicCommerceError::Validation("duplicate_product"))
+            resolve_modifier_selection(&groups, &[]),
+            Err(PublicCommerceError::Validation("invalid_modifier_selection_count"))
         );
     }
 
