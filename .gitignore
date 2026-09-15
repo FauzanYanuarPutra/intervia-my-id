@@ -17,6 +17,7 @@ Desktop.ini
 # Environment / secrets
 .env
 .env.*
+/.envpalsu.example
 !.env.example
 !.env.development.example
 !.env.staging.example
@@ -28,10 +29,16 @@ Desktop.ini
 /.cache/
 /.backups/
 /.worktrees/
-/audit_output/
+audit_output/
 **/.runtime/
 **/.cache/
 **/.npm-cache/
+
+# Local browser profiles created by Codex/computer-use sessions.
+# These directories may contain generated browser state, tokens, and high-entropy
+# internal values and must never be versioned.
+.codex-chrome-home-scroll*/
+**/.codex-chrome-home-scroll*/
 
 # Historical root database dumps: migrations remain allowed elsewhere.
 /community.sql
