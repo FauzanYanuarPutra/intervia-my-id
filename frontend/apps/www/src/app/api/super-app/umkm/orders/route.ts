@@ -16,6 +16,11 @@ import {
 import { superAppEntityIdSchema } from '@/lib/super-app/idSchema';
 import { hasUmkmStoreRequestPermission } from '@/lib/super-app/umkm-request-access';
 
+const ModifierSelectionSchema = z.object({
+  group_id: z.string().trim().min(1).max(80),
+  option_ids: z.array(z.string().trim().min(1).max(80)).max(30),
+});
+
 const CreateOrderSchema = z.object({
   store_id: superAppEntityIdSchema,
   channel: z.enum(['online', 'offline']),
@@ -31,6 +36,7 @@ const CreateOrderSchema = z.object({
         product_id: superAppEntityIdSchema,
         quantity: z.number().int().min(1).max(200),
         notes: z.string().max(200).optional(),
+        selected_options: z.array(ModifierSelectionSchema).max(12).optional(),
       }),
     )
     .min(1)
@@ -207,6 +213,9 @@ export async function POST(req: NextRequest) {
               product_id: item.product_id,
               quantity: item.quantity,
               ...(note ? { note } : {}),
+              ...(item.selected_options?.length
+                ? { selected_options: item.selected_options }
+                : {}),
             };
           }),
           ...(payload.fulfillment_mode
