@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CalendarClock, Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
+import { Loader2, Plus, ShieldCheck } from 'lucide-react';
 import type {
   Wave2FinancePlan,
   Wave2Obligation,
@@ -231,29 +231,17 @@ export function FinancePlanningWorkspace({
 
   return (
     <div className="space-y-3">
-      <section className="grid gap-2 sm:grid-cols-3">
-        <div className="portal-panel p-4 sm:col-span-1">
-          <div className="flex items-center gap-2 text-portal-forest">
-            <ShieldCheck className="h-4 w-4" />
-            <p className="text-xs font-bold">Aman dipakai</p>
+      <section className="portal-panel p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-portal-forest"><ShieldCheck className="h-4 w-4" /><p className="text-xs font-bold">Aman dipakai</p></div>
+            <p className="mt-1 text-3xl font-black text-portal-ink">{money.format(safeToSpend)}</p>
+            <p className="mt-1 text-[11px] text-portal-soft">Setelah tagihan dekat, gaji, dan cadangan.</p>
           </div>
-          <p className="mt-2 text-2xl font-black text-portal-ink">{money.format(safeToSpend)}</p>
-          <p className="mt-1 text-[11px] leading-4 text-portal-soft">Sudah menyisihkan tagihan dekat, gaji, dan cadangan.</p>
-        </div>
-        <div className="portal-panel p-4">
-          <WalletCards className="h-4 w-4 text-portal-forest" />
-          <p className="mt-2 text-xs font-semibold text-portal-soft">Kas sekarang</p>
-          <p className="mt-1 text-xl font-black text-portal-ink">{money.format(liquidCash)}</p>
-          <p className="mt-1 text-[11px] text-portal-soft">Kas + bank + e-wallet tercatat.</p>
-        </div>
-        <div className="portal-panel p-4">
-          <CalendarClock className="h-4 w-4 text-portal-forest" />
-          <p className="mt-2 text-xs font-semibold text-portal-soft">Tagihan dekat</p>
-          <p className="mt-1 text-xl font-black text-portal-ink">{money.format(obligationSummary.dueSoonAmount)}</p>
-          <p className="mt-1 text-[11px] text-portal-soft">
-            {obligationSummary.dueSoonCount} tagihan ≤14 hari
-            {obligationSummary.overdueCount ? ` · ${obligationSummary.overdueCount} terlambat` : ''}
-          </p>
+          <div className="grid grid-cols-2 gap-5 border-t border-portal-line pt-3 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <div><p className="text-[11px] font-semibold text-portal-soft">Kas sekarang</p><p className="mt-1 text-base font-black text-portal-ink">{money.format(liquidCash)}</p></div>
+            <div><p className="text-[11px] font-semibold text-portal-soft">Tagihan dekat</p><p className="mt-1 text-base font-black text-portal-ink">{money.format(obligationSummary.dueSoonAmount)}</p><p className="mt-0.5 text-[10px] text-portal-soft">{obligationSummary.dueSoonCount} tagihan{obligationSummary.overdueCount ? ` · ${obligationSummary.overdueCount} terlambat` : ''}</p></div>
+          </div>
         </div>
       </section>
 
@@ -266,7 +254,7 @@ export function FinancePlanningWorkspace({
 
       <details className="portal-panel group">
         <summary className="cursor-pointer list-none p-4 sm:p-5">
-          <span className="font-bold text-portal-ink">Atur pembagian uang</span>
+          <span className="font-bold text-portal-ink">Atur pembagian</span>
           <span className="ml-2 text-xs font-semibold text-portal-soft">
             {(totalBps / 100).toLocaleString('id-ID')}% direncanakan · {Math.max(0, (10_000 - totalBps) / 100).toLocaleString('id-ID')}% bebas
           </span>

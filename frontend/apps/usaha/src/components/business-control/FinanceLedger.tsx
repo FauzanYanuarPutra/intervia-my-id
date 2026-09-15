@@ -76,6 +76,8 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   const [message, setMessage] = useState('');
 
   const summary = useMemo(() => summarizeFinanceEntries(entries), [entries]);
+  const cashIn = useMemo(() => entries.reduce((sum, entry) => financeEntryDirection(entry.entry_type) === 'in' ? sum + Number(entry.amount || 0) : sum, 0), [entries]);
+  const cashOut = useMemo(() => entries.reduce((sum, entry) => financeEntryDirection(entry.entry_type) === 'out' ? sum + Number(entry.amount || 0) : sum, 0), [entries]);
   const choices = financeEntryOptions(direction);
   const channelChoices = financeChannelOptions(channels);
 
@@ -130,100 +132,86 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   }
 
   return (
-    <div className="space-y-4">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="portal-panel p-4">
-          <p className="portal-label">Omzet tercatat</p>
-          <p className="mt-2 text-2xl font-bold text-portal-ink">{money.format(summary.revenue)}</p>
-          <p className="mt-1 text-xs text-portal-soft">Penjualan masuk otomatis dari Kasir, tidak diinput ulang di sini.</p>
-        </div>
-        <div className="portal-panel p-4">
-          <p className="portal-label">Biaya usaha tercatat</p>
-          <p className="mt-2 text-2xl font-bold text-portal-ink">{money.format(summary.operatingExpenses)}</p>
-          <p className="mt-1 text-xs text-portal-soft">Belanja, sewa, utilitas, gaji, transport, promosi, dan biaya usaha lain.</p>
-        </div>
-        <div className="portal-panel p-4">
-          <p className="portal-label">Hasil sementara sebelum HPP</p>
-          <p className={`mt-2 text-2xl font-bold ${summary.operatingProfitBeforeCogs >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>
-            {money.format(summary.operatingProfitBeforeCogs)}
-          </p>
-          <p className="mt-1 text-xs text-portal-soft">Tidak disebut laba bersih; HPP yang belum lengkap tetap ditandai terpisah.</p>
-        </div>
-        <div className="portal-panel p-4">
-          <p className="portal-label">Perubahan kas tercatat</p>
-          <p className={`mt-2 text-2xl font-bold ${summary.cashMovement >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>
-            {money.format(summary.cashMovement)}
-          </p>
-          <p className="mt-1 text-xs text-portal-soft">Termasuk modal masuk dan Ambil owner; keduanya tidak mengubah hasil operasi.</p>
-        </div>
-      </section>
-
+    <div className="space-y-3">
       <section className="portal-panel p-4 sm:p-5">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => chooseDirection('in')} className={direction === 'in' ? 'portal-button-primary' : 'portal-button-secondary'}>
-            <ArrowDownLeft className="h-4 w-4" /> Uang masuk lain
-          </button>
-          <button type="button" onClick={() => chooseDirection('out')} className={direction === 'out' ? 'portal-button-primary' : 'portal-button-secondary'}>
-            <ArrowUpRight className="h-4 w-4" /> Uang keluar
-          </button>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[11px] font-semibold text-portal-soft">Uang masuk</p>
+            <p className="mt-1 text-lg font-black text-portal-ink">{money.format(cashIn)}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-portal-soft">Uang keluar</p>
+            <p className="mt-1 text-lg font-black text-portal-ink">{money.format(cashOut)}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-portal-soft">Saldo arus</p>
+            <p className={`mt-1 text-lg font-black ${summary.cashMovement >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(summary.cashMovement)}</p>
+          </div>
         </div>
-        <p className="mt-3 text-xs leading-5 text-portal-soft">Penjualan dibuat dari Kasir agar omzet tidak pernah tercatat dua kali.</p>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <label className="text-xs font-semibold text-portal-soft">Kategori
-            <select className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink" value={entryType} onChange={event => setEntryType(event.target.value)}>
-              {choices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">Nominal
-            <input inputMode="numeric" type="number" min="1" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" placeholder="Contoh: 120000" value={entryAmount} onChange={event => setEntryAmount(event.target.value)} />
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">Tanggal
-            <input type="date" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" value={occurredOn} onChange={event => setOccurredOn(event.target.value)} />
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">Dibayar lewat
-            <select className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink" value={accountKey} onChange={event => setAccountKey(event.target.value)}>
-              <option value="cash">Kas</option>
-              <option value="bank">Bank</option>
-              <option value="ewallet">E-wallet</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">Tempat jualan <span className="font-normal">(opsional)</span>
-            <select className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink" value={channelKey} onChange={event => setChannelKey(event.target.value)}>
-              {channelChoices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">Catatan
-            <input className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" placeholder="Singkat saja" value={note} onChange={event => setNote(event.target.value)} />
-          </label>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" disabled={saving} onClick={save} className="portal-button-primary disabled:opacity-60">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan transaksi
-          </button>
-          {message ? <p className="text-xs text-portal-soft">{message}</p> : null}
-        </div>
+        <p className="mt-3 border-t border-portal-line pt-3 text-xs text-portal-soft">Penjualan dari Kasir masuk otomatis dan tidak perlu dicatat ulang.</p>
       </section>
+
+      <details className="portal-panel group">
+        <summary className="flex cursor-pointer list-none items-center justify-between p-4 sm:p-5">
+          <span className="flex items-center gap-2 font-bold text-portal-ink"><Plus className="h-4 w-4" /> Catat transaksi</span>
+          <span className="text-xs font-semibold text-portal-soft">Selain penjualan kasir</span>
+        </summary>
+        <div className="border-t border-portal-line p-4 sm:p-5">
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => chooseDirection('in')} className={direction === 'in' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}>
+              <ArrowDownLeft className="h-4 w-4" /> Uang masuk
+            </button>
+            <button type="button" onClick={() => chooseDirection('out')} className={direction === 'out' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}>
+              <ArrowUpRight className="h-4 w-4" /> Uang keluar
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-semibold text-portal-soft">Kategori
+              <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={entryType} onChange={event => setEntryType(event.target.value)}>
+                {choices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-portal-soft">Nominal
+              <input inputMode="numeric" type="number" min="1" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink" placeholder="Contoh: 120000" value={entryAmount} onChange={event => setEntryAmount(event.target.value)} />
+            </label>
+          </div>
+
+          <details className="mt-3 rounded-xl bg-[#fafbf9] p-3">
+            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail transaksi</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={occurredOn} onChange={event => setOccurredOn(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Dibayar lewat<select className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={accountKey} onChange={event => setAccountKey(event.target.value)}><option value="cash">Kas</option><option value="bank">Bank</option><option value="ewallet">E-wallet</option></select></label>
+              <label className="text-xs font-semibold text-portal-soft">Kanal<select className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={channelKey} onChange={event => setChannelKey(event.target.value)}>{channelChoices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>
+              <label className="text-xs font-semibold text-portal-soft">Catatan<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={note} onChange={event => setNote(event.target.value)} placeholder="Opsional" /></label>
+            </div>
+          </details>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" disabled={saving} onClick={save} className="portal-button-primary disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan</button>
+            {message ? <p role="status" className="text-xs text-portal-soft">{message}</p> : null}
+          </div>
+        </div>
+      </details>
 
       <section className="portal-panel overflow-hidden">
-        <div className="border-b border-portal-line p-4 sm:p-5">
+        <div className="flex items-center justify-between border-b border-portal-line px-4 py-3 sm:px-5">
           <h2 className="font-bold text-portal-ink">Transaksi terbaru</h2>
-          <p className="mt-1 text-sm text-portal-soft">Catatan tersimpan di backend usaha dan sumber otomatis tetap diberi penanda.</p>
+          <span className="text-xs font-semibold text-portal-soft">{entries.length} catatan</span>
         </div>
         <div className="divide-y divide-portal-line">
           {entries.length ? entries.map(entry => {
             const incoming = financeEntryDirection(entry.entry_type) === 'in';
             return (
-              <div key={entry.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <div>
-                  <p className="font-semibold text-portal-ink">{historyLabels[entry.entry_type] ?? entry.entry_type}</p>
-                  <p className="mt-1 text-xs text-portal-soft">{entry.occurred_on} · {entry.account_key}{entry.channel_key ? ` · ${entry.channel_key}` : ''}{entry.note ? ` · ${entry.note}` : ''}</p>
+              <div key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-portal-ink">{historyLabels[entry.entry_type] ?? entry.entry_type}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-portal-soft">{entry.occurred_on} · {entry.account_key}{entry.note ? ` · ${entry.note}` : ''}</p>
                 </div>
-                <strong className={incoming ? 'text-portal-forest' : 'text-red-700'}>{incoming ? '+' : '-'}{money.format(entry.amount)}</strong>
+                <strong className={`shrink-0 text-sm ${incoming ? 'text-portal-forest' : 'text-red-700'}`}>{incoming ? '+' : '-'}{money.format(entry.amount)}</strong>
               </div>
             );
-          }) : <div className="p-5 text-sm text-portal-soft">Belum ada transaksi. Penjualan dari Kasir atau catatan uang lain akan muncul di sini.</div>}
+          }) : <div className="p-5 text-sm text-portal-soft">Belum ada transaksi.</div>}
         </div>
       </section>
     </div>

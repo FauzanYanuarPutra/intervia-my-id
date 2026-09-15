@@ -210,77 +210,84 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <section className="portal-panel p-4 sm:p-5">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-end">
           <label className="text-xs font-semibold text-portal-soft">Produk
-            <select className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink" value={productId} onChange={event => selectProduct(event.target.value)}>
+            <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={productId} onChange={event => selectProduct(event.target.value)}>
               {products.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </label>
-          <label className="text-xs font-semibold text-portal-soft">Nama resep
-            <input className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" value={recipeName} onChange={event => setRecipeName(event.target.value)} />
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">Resep menghasilkan berapa porsi?
-            <input type="number" min="0.0001" step="any" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" value={servings} onChange={event => setServings(Math.max(n(event.target.value), 0.0001))} />
+          <label className="text-xs font-semibold text-portal-soft">Harga jual
+            <input type="number" min="0" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink" value={sellingPrice} onChange={event => setSellingPrice(n(event.target.value))} />
           </label>
         </div>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="portal-panel p-4"><p className="portal-label">HPP / produk</p><p className="mt-2 text-2xl font-bold text-portal-ink">{money.format(recipeCost.totalCost)}</p><p className="mt-1 text-xs text-portal-soft">Bahan + kemasan sesuai resep tersimpan.</p></div>
-        <div className="portal-panel p-4"><p className="portal-label">Sisa setelah HPP</p><p className={`mt-2 text-2xl font-bold ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p><p className="mt-1 text-xs text-portal-soft">Margin kotor {number.format(margin)}%.</p></div>
-        <div className="portal-panel p-4"><p className="portal-label">Bisa dibuat</p><p className="mt-2 text-2xl font-bold text-portal-ink">{capacity.capacity}</p><p className="mt-1 text-xs text-portal-soft">Pembatas: <strong>{capacity.bottleneck?.name ?? 'Belum dapat dihitung'}</strong></p></div>
+        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-portal-line pt-3">
+          <div><p className="text-[11px] text-portal-soft">HPP / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{money.format(recipeCost.totalCost)}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Untung kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Bisa dibuat</p><p className="mt-0.5 text-lg font-black text-portal-ink">{capacity.capacity}</p></div>
+        </div>
+        <p className="mt-2 text-[11px] text-portal-soft">Margin {number.format(margin)}%{capacity.bottleneck ? ` · pembatas ${capacity.bottleneck.name}` : ''}</p>
       </section>
 
       <section className="portal-panel overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-portal-line p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div><p className="portal-kicker">Komposisi resep</p><h2 className="mt-1 text-lg font-bold text-portal-ink">{product?.name}</h2><p className="mt-1 text-sm text-portal-soft">Pilih bahan yang sudah tersimpan. Harga beli, yield, susut, dan stok diambil otomatis dari Stok & Belanja.</p></div>
-          <button type="button" onClick={addIngredient} className="portal-button-secondary"><Plus className="h-4 w-4" /> Tambah bahan</button>
+        <div className="flex items-center justify-between gap-3 border-b border-portal-line px-4 py-3 sm:px-5">
+          <div><h2 className="font-bold text-portal-ink">Resep {product?.name}</h2><p className="text-xs text-portal-soft">{items.length} bahan · data harga dan stok diambil otomatis</p></div>
+          <button type="button" onClick={addIngredient} className="portal-button-secondary"><Plus className="h-4 w-4" /> Bahan</button>
         </div>
+
         {loading ? <div className="flex items-center gap-2 p-5 text-sm text-portal-soft"><Loader2 className="h-4 w-4 animate-spin" /> Memuat resep...</div> : (
           <div className="divide-y divide-portal-line">
             {items.length ? items.map((item, index) => {
               const ingredient = ingredientMap.get(item.ingredientId);
               const cost = recipeCost.breakdown[index];
-              return <div key={`${item.ingredientId}-${index}`} className="p-4 sm:p-5">
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_180px_auto] md:items-end">
-                  <label className="text-xs font-semibold text-portal-soft">Bahan / kemasan
-                    <select className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink" value={item.ingredientId} onChange={event => patch(index, { ingredientId: event.target.value })}>
-                      {ingredients.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-                    </select>
-                  </label>
-                  <label className="text-xs font-semibold text-portal-soft">Jumlah dipakai ({ingredient?.recipe_unit ?? 'unit'})
-                    <input type="number" min="0.0001" step="any" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" value={item.quantity} onChange={event => patch(index, { quantity: Math.max(n(event.target.value), 0) })} />
-                  </label>
-                  <label className="text-xs font-semibold text-portal-soft">Susut khusus % <span className="font-normal">(opsional)</span>
-                    <input type="number" min="0" max="99" step="any" placeholder={String(n(ingredient?.waste_percent))} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" value={item.wastePercentOverride ?? ''} onChange={event => patch(index, { wastePercentOverride: event.target.value === '' ? null : n(event.target.value) })} />
-                  </label>
-                  <button type="button" aria-label="Hapus bahan" onClick={() => setItems(current => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded-xl border border-portal-line p-2.5 text-portal-soft hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+              return (
+                <div key={`${item.ingredientId}-${index}`} className="px-4 py-3 sm:px-5">
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-end">
+                    <label className="text-xs font-semibold text-portal-soft">Bahan
+                      <select className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm text-portal-ink" value={item.ingredientId} onChange={event => patch(index, { ingredientId: event.target.value })}>
+                        {ingredients.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-xs font-semibold text-portal-soft">Dipakai ({ingredient?.recipe_unit ?? 'unit'})
+                      <input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm text-portal-ink" value={item.quantity} onChange={event => patch(index, { quantity: Math.max(n(event.target.value), 0) })} />
+                    </label>
+                    <button type="button" aria-label="Hapus bahan" onClick={() => setItems(current => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-10 w-10 place-items-center rounded-lg text-portal-soft hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft">
+                    <span>Biaya <strong className="text-portal-ink">{money.format(cost?.itemCost ?? 0)}</strong></span>
+                    <span>Stok {n(ingredient?.stock_quantity)} {ingredient?.recipe_unit}</span>
+                  </div>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-[11px] font-bold text-portal-soft">Rincian bahan</summary>
+                    <div className="mt-2 grid gap-3 rounded-lg bg-[#fafbf9] p-3 sm:grid-cols-3">
+                      <label className="text-xs font-semibold text-portal-soft">Susut khusus %
+                        <input type="number" min="0" max="99" step="any" placeholder={String(n(ingredient?.waste_percent))} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={item.wastePercentOverride ?? ''} onChange={event => patch(index, { wastePercentOverride: event.target.value === '' ? null : n(event.target.value) })} />
+                      </label>
+                      <div><p className="text-xs font-semibold text-portal-soft">Harga beli</p><p className="mt-2 text-sm font-bold text-portal-ink">{money.format(ingredient?.purchase_price_amount ?? 0)} / {n(ingredient?.purchase_quantity)} {ingredient?.purchase_unit}</p></div>
+                      <div><p className="text-xs font-semibold text-portal-soft">Yield</p><p className="mt-2 text-sm font-bold text-portal-ink">{n(ingredient?.yield_percent)}%</p></div>
+                    </div>
+                  </details>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft">
-                  <span>Biaya: <strong className="text-portal-ink">{money.format(cost?.itemCost ?? 0)}</strong></span>
-                  <span>Harga beli {money.format(ingredient?.purchase_price_amount ?? 0)} / {n(ingredient?.purchase_quantity)} {ingredient?.purchase_unit}</span>
-                  <span>Yield {n(ingredient?.yield_percent)}%</span>
-                  <span>Stok {n(ingredient?.stock_quantity)} {ingredient?.recipe_unit}</span>
-                </div>
-              </div>;
-            }) : <div className="p-5 text-sm text-portal-soft">Resep belum punya bahan. Klik <strong>Tambah bahan</strong> untuk mulai.</div>}
+              );
+            }) : <div className="p-5 text-sm text-portal-soft">Belum ada bahan. Tekan <strong>+ Bahan</strong> untuk mulai.</div>}
           </div>
         )}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="portal-panel p-4 sm:p-5">
-          {capacity.bottleneck ? <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p><strong>{capacity.bottleneck.name}</strong> menjadi pembatas. Dengan stok sekarang, resep ini kira-kira bisa dibuat <strong>{capacity.capacity} kali</strong>.</p></div> : <p className="text-sm text-portal-soft">Kapasitas produksi muncul setelah resep memiliki bahan dengan stok yang valid.</p>}
+      <section className="portal-panel p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <details className="group">
+            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Pengaturan resep</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-portal-soft">Nama resep<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={recipeName} onChange={event => setRecipeName(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Jumlah porsi<input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={servings} onChange={event => setServings(Math.max(n(event.target.value), 0.0001))} /></label>
+            </div>
+          </details>
+          <button type="button" disabled={saving || loading} onClick={save} className="portal-button-primary justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan resep</button>
         </div>
-        <div className="portal-panel p-4 sm:p-5">
-          <label className="text-xs font-semibold text-portal-soft">Harga jual untuk cek margin
-            <input type="number" min="0" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-base font-bold text-portal-ink" value={sellingPrice} onChange={event => setSellingPrice(n(event.target.value))} />
-          </label>
-          <button type="button" disabled={saving || loading} onClick={save} className="portal-button-primary mt-4 w-full justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan resep</button>
-          {message ? <p className="mt-3 text-xs leading-5 text-portal-soft">{message}</p> : null}
-        </div>
+        {capacity.bottleneck ? <p className="mt-3 flex gap-2 text-xs text-amber-800"><TriangleAlert className="h-4 w-4 shrink-0" /> Stok <strong>{capacity.bottleneck.name}</strong> membatasi produksi sekitar {capacity.capacity} porsi.</p> : null}
+        {message ? <p role="status" className="mt-3 text-xs text-portal-soft">{message}</p> : null}
       </section>
     </div>
   );
