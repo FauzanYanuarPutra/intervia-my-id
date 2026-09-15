@@ -1,3 +1,5 @@
+import type { StorefrontModifierSelection } from './storefront-product-modifiers';
+
 export type StorefrontOrderFulfillmentMode = 'courier' | 'pickup' | 'digital';
 
 export type StorefrontCanonicalOrderBundle = {
@@ -29,6 +31,8 @@ export type StorefrontProductOrderInput = {
   productId: string;
   quantity: number;
   idempotencyKey: string;
+  selectedOptions?: StorefrontModifierSelection[];
+  note?: string;
   fulfillmentMode?: StorefrontOrderFulfillmentMode;
 };
 
@@ -96,6 +100,7 @@ async function readJson(response: Response): Promise<unknown> {
 export async function submitStorefrontProductOrder(
   input: StorefrontProductOrderInput,
 ): Promise<StorefrontCanonicalOrderBundle> {
+  const note = input.note?.trim();
   const response = await fetch('/api/super-app/umkm/orders', {
     method: 'POST',
     credentials: 'same-origin',
@@ -112,6 +117,10 @@ export async function submitStorefrontProductOrder(
         {
           product_id: input.productId,
           quantity: input.quantity,
+          ...(note ? { notes: note } : {}),
+          ...(input.selectedOptions?.length
+            ? { selected_options: input.selectedOptions }
+            : {}),
         },
       ],
       fulfillment_mode: input.fulfillmentMode ?? 'pickup',
