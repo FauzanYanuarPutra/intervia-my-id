@@ -747,24 +747,30 @@ mod tests {
 
     #[test]
     fn invited_role_control_access_is_operation_specific() {
-        let cashier = organization("org_cashier");
-        assert!(BusinessControlAccess::ViewInventory.allows(&cashier));
+        let cashier = organization("cashier");
+        assert!(!BusinessControlAccess::ViewInventory.allows(&cashier));
         assert!(!BusinessControlAccess::ManageInventory.allows(&cashier));
         assert!(!BusinessControlAccess::ViewCosting.allows(&cashier));
         assert!(!BusinessControlAccess::Finance.allows(&cashier));
 
-        let viewer = organization("org_viewer");
-        assert!(BusinessControlAccess::ViewInventory.allows(&viewer));
+        let viewer = organization("viewer");
+        assert!(!BusinessControlAccess::ViewInventory.allows(&viewer));
         assert!(!BusinessControlAccess::ManageInventory.allows(&viewer));
         assert!(!BusinessControlAccess::Channels.allows(&viewer));
 
-        let manager = organization("org_manager");
+        let manager = organization("manager");
         assert!(BusinessControlAccess::ViewInventory.allows(&manager));
         assert!(BusinessControlAccess::ManageInventory.allows(&manager));
         assert!(BusinessControlAccess::ViewCosting.allows(&manager));
         assert!(BusinessControlAccess::ManageCosting.allows(&manager));
         assert!(BusinessControlAccess::Channels.allows(&manager));
         assert!(BusinessControlAccess::Finance.allows(&manager));
+
+        let inventory = organization("org_inventory");
+        assert!(BusinessControlAccess::ViewInventory.allows(&inventory));
+        assert!(BusinessControlAccess::ManageInventory.allows(&inventory));
+        assert!(!BusinessControlAccess::ViewCosting.allows(&inventory));
+        assert!(!BusinessControlAccess::Finance.allows(&inventory));
 
         let accounting = organization("org_accounting");
         assert!(BusinessControlAccess::Finance.allows(&accounting));
