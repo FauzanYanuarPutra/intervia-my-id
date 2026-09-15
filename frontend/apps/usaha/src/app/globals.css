@@ -5,6 +5,15 @@
 @layer base {
   :root {
     color-scheme: light;
+    --portal-mobile-nav-height: 4.5rem;
+    --portal-layer-content: 0;
+    --portal-layer-sticky: 10;
+    --portal-layer-action: 20;
+    --portal-layer-shell: 30;
+    --portal-layer-nav: 35;
+    --portal-layer-popover: 60;
+    --portal-layer-toast: 80;
+    --portal-layer-skip: 100;
   }
 
   * {
@@ -149,6 +158,80 @@
   }
 
   .portal-skip-link {
-    @apply fixed left-4 top-3 z-[100] -translate-y-20 rounded-xl bg-portal-forest px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-portal-forest;
+    @apply fixed left-4 top-3 z-[var(--portal-layer-skip)] -translate-y-20 rounded-xl bg-portal-forest px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-portal-forest;
+  }
+
+  .portal-layer-popover {
+    z-index: var(--portal-layer-popover);
+  }
+
+  .portal-mobile-content-clearance {
+    padding-bottom: calc(var(--portal-mobile-nav-height) + env(safe-area-inset-bottom) + 1rem);
+  }
+
+  .portal-modal {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+    color: inherit;
+  }
+
+  .portal-modal::backdrop {
+    background: rgba(15, 23, 42, 0.44);
+    backdrop-filter: blur(1.5px);
+  }
+
+  .portal-modal-panel {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    display: flex;
+    max-height: min(92dvh, 56rem);
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 24px 24px 0 0;
+    background: white;
+    box-shadow: 0 -18px 64px -28px rgba(15, 23, 42, 0.55);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .portal-modal-panel--sm { max-width: 28rem; }
+  .portal-modal-panel--md { max-width: 34rem; }
+  .portal-modal-panel--lg { max-width: 46rem; }
+
+  .portal-modal--sheet .portal-modal-panel {
+    margin-inline: auto;
+  }
+
+  @media (min-width: 640px) {
+    .portal-modal--adaptive,
+    .portal-modal--dialog {
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+
+    .portal-modal--adaptive .portal-modal-panel,
+    .portal-modal--dialog .portal-modal-panel {
+      position: relative;
+      inset: auto;
+      width: min(100%, 34rem);
+      max-height: min(90dvh, 50rem);
+      margin: auto;
+      border-radius: 24px;
+      padding-bottom: 0;
+      box-shadow: 0 28px 90px -34px rgba(15, 23, 42, 0.6);
+    }
+
+    .portal-modal--adaptive .portal-modal-panel--sm,
+    .portal-modal--dialog .portal-modal-panel--sm { width: min(100%, 28rem); }
+    .portal-modal--adaptive .portal-modal-panel--lg,
+    .portal-modal--dialog .portal-modal-panel--lg { width: min(100%, 46rem); }
   }
 }
