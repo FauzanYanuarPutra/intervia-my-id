@@ -83,17 +83,30 @@ export function PortalShell({
 
       <div className="min-h-screen lg:pl-[224px]">
         <header className="sticky top-0 z-[var(--portal-layer-shell)] border-b border-portal-line/80 bg-white/95 backdrop-blur-xl">
-          <div className="mx-auto flex min-h-14 w-full max-w-[1600px] items-center justify-between gap-3 px-3 sm:px-5 lg:px-6">
-            <div className="min-w-0 py-1.5">
+          <div className="mx-auto flex min-h-14 w-full max-w-[1600px] items-center justify-between gap-2 px-2 sm:px-5 lg:px-6">
+            {!accountPage && activeBusiness ? (
+              <div className="min-w-0 flex-1 lg:hidden">
+                <BusinessSwitcher
+                  activeBusiness={activeBusiness}
+                  businesses={businesses}
+                  currentSection={currentSection}
+                  compact
+                />
+              </div>
+            ) : null}
+
+            <div className={`${!accountPage && activeBusiness ? 'hidden lg:block' : 'min-w-0'} py-1.5`}>
               <p className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-portal-soft">
                 {accountPage ? 'Akun Lajukan' : activeBusiness?.name ?? 'Lajukan Usaha'}
               </p>
               <p className="truncate text-sm font-bold text-portal-ink">{title}</p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               {!accountPage && status ? (
-                <StatusBadge tone={activeBusiness?.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge>
+                <span className="hidden sm:inline-flex">
+                  <StatusBadge tone={activeBusiness?.isOpen ? 'success' : 'neutral'}>{status.label}</StatusBadge>
+                </span>
               ) : null}
               {viewerName ? <InvitationIndicator /> : null}
               <Link href="/businesses/new" className="portal-button-ghost hidden sm:inline-flex">
