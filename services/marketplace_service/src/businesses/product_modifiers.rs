@@ -95,7 +95,10 @@ async fn get_product_modifiers(
         Ok(None) => api_error(StatusCode::NOT_FOUND, "product_not_found"),
         Err(error) => {
             tracing::error!(?error, "failed to load product modifiers");
-            api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable")
+            api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "product_modifier_storage_unavailable",
+            )
         }
     }
 }
@@ -127,7 +130,10 @@ async fn put_product_modifiers(
         Ok(value) => value,
         Err(error) => {
             tracing::error!(?error, "failed to begin modifier update");
-            return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable");
+            return api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "product_modifier_storage_unavailable",
+            );
         }
     };
 
@@ -147,7 +153,10 @@ async fn put_product_modifiers(
         Ok(value) => value,
         Err(error) => {
             tracing::error!(?error, "failed to update product modifiers");
-            return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable");
+            return api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "product_modifier_storage_unavailable",
+            );
         }
     };
     if updated.rows_affected() != 1 {
@@ -173,12 +182,18 @@ async fn put_product_modifiers(
     .await
     {
         tracing::error!(?error, "failed to update public modifier projection");
-        return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable");
+        return api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "product_modifier_storage_unavailable",
+        );
     }
 
     if let Err(error) = tx.commit().await {
         tracing::error!(?error, "failed to commit modifier update");
-        return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable");
+        return api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "product_modifier_storage_unavailable",
+        );
     }
 
     (
@@ -226,7 +241,8 @@ pub(crate) fn validate_groups(
 
     for mut group in groups {
         group.id = normalize_id(&group.id).ok_or("invalid_modifier_group_id")?;
-        group.name = normalize_text(&group.name, MAX_GROUP_NAME).ok_or("invalid_modifier_group_name")?;
+        group.name =
+            normalize_text(&group.name, MAX_GROUP_NAME).ok_or("invalid_modifier_group_name")?;
         if !group_ids.insert(group.id.clone()) {
             return Err("duplicate_modifier_group_id");
         }
@@ -238,7 +254,8 @@ pub(crate) fn validate_groups(
         let mut default_count = 0usize;
         for option in &mut group.options {
             option.id = normalize_id(&option.id).ok_or("invalid_modifier_option_id")?;
-            option.label = normalize_text(&option.label, MAX_OPTION_LABEL).ok_or("invalid_modifier_option_label")?;
+            option.label = normalize_text(&option.label, MAX_OPTION_LABEL)
+                .ok_or("invalid_modifier_option_label")?;
             if !option_ids.insert(option.id.clone()) {
                 return Err("duplicate_modifier_option_id");
             }
@@ -264,9 +281,20 @@ pub(crate) fn validate_groups(
                 }
             }
             ModifierSelectionMode::Multiple => {
-                let minimum = if group.required { group.min_selections.max(1) } else { group.min_selections };
-                let maximum = group.max_selections.unwrap_or(enabled_count).min(enabled_count);
-                if minimum > maximum || maximum == 0 || default_count < minimum || default_count > maximum {
+                let minimum = if group.required {
+                    group.min_selections.max(1)
+                } else {
+                    group.min_selections
+                };
+                let maximum = group
+                    .max_selections
+                    .unwrap_or(enabled_count)
+                    .min(enabled_count);
+                if minimum > maximum
+                    || maximum == 0
+                    || default_count < minimum
+                    || default_count > maximum
+                {
                     if default_count > 0 || minimum > maximum || maximum == 0 {
                         return Err("invalid_modifier_selection_bounds");
                     }
@@ -327,7 +355,10 @@ mod tests {
             required: true,
             min_selections: 0,
             max_selections: None,
-            options: vec![option("less", "Less Sugar", false), option("normal", "Normal", true)],
+            options: vec![
+                option("less", "Less Sugar", false),
+                option("normal", "Normal", true),
+            ],
         }])
         .unwrap();
         assert_eq!(groups[0].id, "sugar");
@@ -345,7 +376,10 @@ mod tests {
             required: true,
             min_selections: 1,
             max_selections: Some(1),
-            options: vec![option("less", "Less", true), option("normal", "Normal", true)],
+            options: vec![
+                option("less", "Less", true),
+                option("normal", "Normal", true),
+            ],
         }]);
         assert_eq!(result, Err("single_modifier_has_multiple_defaults"));
     }
@@ -359,7 +393,11 @@ mod tests {
             required: false,
             min_selections: 0,
             max_selections: Some(2),
-            options: vec![option("oreo", "Oreo", false), option("jelly", "Jelly", false), option("cheese", "Keju", false)],
+            options: vec![
+                option("oreo", "Oreo", false),
+                option("jelly", "Jelly", false),
+                option("cheese", "Keju", false),
+            ],
         }])
         .unwrap();
         assert_eq!(groups[0].min_selections, 0);
