@@ -20,6 +20,11 @@ type ModalSurfaceProps = {
   returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
+function isVisibleFocusTarget(element: HTMLElement | null | undefined) {
+  if (!element || !element.isConnected) return false;
+  return element.getClientRects().length > 0;
+}
+
 export function ModalSurface({
   open,
   onOpenChange,
@@ -39,9 +44,13 @@ export function ModalSurface({
     if (!dialog) return;
 
     if (open && !dialog.open) {
+      const explicitTarget = returnFocusRef?.current;
       capturedFocusRef.current =
-        returnFocusRef?.current ??
-        (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        isVisibleFocusTarget(explicitTarget)
+          ? explicitTarget ?? null
+          : document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
       dialog.showModal();
       return;
     }
@@ -63,7 +72,8 @@ export function ModalSurface({
       if (event.key === 'Escape' && !dismissible) event.preventDefault();
     };
     const handleClose = () => {
-      capturedFocusRef.current?.focus({ preventScroll: true });
+      const target = capturedFocusRef.current;
+      if (isVisibleFocusTarget(target)) target?.focus({ preventScroll: true });
       capturedFocusRef.current = null;
     };
 
