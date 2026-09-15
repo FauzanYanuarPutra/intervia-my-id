@@ -32,9 +32,11 @@ mod inventory_tests;
 mod media;
 #[cfg(test)]
 mod media_migration_tests;
-mod products;
+mod product_modifier_routes;
+mod product_modifiers;
 #[cfg(test)]
 mod product_modifiers_migration_tests;
+mod products;
 #[cfg(test)]
 mod products_persistence_tests;
 pub(crate) mod profile;
@@ -78,6 +80,7 @@ pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
         .merge(inventory_routes::router())
         .merge(sales_routes::router())
         .merge(public_commerce_routes::router())
+        .merge(product_modifier_routes::router())
         .merge(wave2_routes::router())
         .merge(advisor_routes::router())
 }
