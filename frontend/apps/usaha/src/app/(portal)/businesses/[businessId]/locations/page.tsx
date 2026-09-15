@@ -3,6 +3,7 @@ import { BusinessLocationsManager } from '@/components/forms/BusinessLocationsMa
 import { MetricStrip } from '@/components/portal/MetricStrip';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
+import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
 export default async function BusinessLocationsPage({ params }: { params: Promise<{ businessId: string }> }) {
@@ -10,6 +11,9 @@ export default async function BusinessLocationsPage({ params }: { params: Promis
   const state = await resolvePortalBusinessPageState(businessId);
   if (!state.isAuthenticated) redirect(`/login?callbackUrl=${encodeURIComponent(`/businesses/${businessId}/locations`)}`);
   if (!state.activeBusiness) notFound();
+  if (!hasPermission(state.activeBusiness, 'manageInfo')) {
+    redirect(`/?business=${encodeURIComponent(state.activeBusiness.id)}`);
+  }
 
   const locations = state.activeBusiness.locations ?? [];
   const primary = locations.find(item => item.isPrimary);
