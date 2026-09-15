@@ -44,10 +44,16 @@ const menuOrder: PortalSection[] = [
   'security',
 ];
 
+export function canAccessPortalSection(
+  permissions: PermissionId[],
+  section: PortalSection,
+) {
+  return visiblePortalSections(permissions).includes(section);
+}
+
 function selectNavigation(order: PortalSection[], permissions: PermissionId[]) {
-  const visible = new Set(visiblePortalSections(permissions));
   return order
-    .filter(id => visible.has(id))
+    .filter(id => canAccessPortalSection(permissions, id))
     .map(id => ({ id, label: labels[id] } satisfies PortalNavigationItem));
 }
 
