@@ -34,6 +34,8 @@ mod media;
 mod media_migration_tests;
 mod products;
 #[cfg(test)]
+mod product_modifiers_migration_tests;
+#[cfg(test)]
 mod products_persistence_tests;
 pub(crate) mod profile;
 #[cfg(test)]
