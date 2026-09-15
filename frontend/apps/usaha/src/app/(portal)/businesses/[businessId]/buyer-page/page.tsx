@@ -8,6 +8,7 @@ import { PortalShell } from '@/components/portal/PortalShell';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { toLatLng } from '@/lib/maps';
 import { buildBusinessLocationQuery } from '@/lib/portal-links';
+import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
 type PageProps = { params: Promise<{ businessId: string }> };
@@ -18,6 +19,9 @@ export default async function BuyerPagePreview({ params }: PageProps) {
   const business = activeBusiness;
   if (!business) notFound();
 
+  const canManageInfo = hasPermission(business, 'manageInfo');
+  const canManageProducts = hasPermission(business, 'manageProducts');
+  const canManageBuyerPage = canManageInfo || canManageProducts;
   const businessPoint = toLatLng(business.latitude, business.longitude);
   const businessLocationQuery = buildBusinessLocationQuery({ name: business.name, address: business.address, city: business.city, locationQuery: business.locationQuery });
 
@@ -57,13 +61,17 @@ export default async function BuyerPagePreview({ params }: PageProps) {
         </div>
 
         <aside className="merchant-surface-bordered p-4 sm:p-5">
-          <p className="font-black text-portal-ink">Kelola tampilan</p>
-          <p className="mt-1 text-xs leading-5 text-portal-soft">Ubah profil atau produk dari sumbernya, bukan dari preview.</p>
+          <p className="font-black text-portal-ink">{canManageBuyerPage ? 'Kelola tampilan' : 'Tampilan toko'}</p>
+          <p className="mt-1 text-xs leading-5 text-portal-soft">
+            {canManageBuyerPage
+              ? 'Ubah profil atau produk dari sumbernya, bukan dari preview.'
+              : 'Kamu bisa melihat storefront dan lokasinya. Perubahan profil atau produk membutuhkan akses pengelolaan.'}
+          </p>
           <div className="mt-4 grid gap-2">
             <a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary"><Store className="h-4 w-4" /> Buka storefront</a>
             <a href={business.googleMapsUrl} target="_blank" rel="noreferrer" className="portal-button-secondary"><MapPinned className="h-4 w-4" /> Google Maps</a>
-            <Link href={`/businesses/${business.id}/info`} className="portal-button-secondary">Edit profil</Link>
-            <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary">Kelola produk</Link>
+            {canManageInfo ? <Link href={`/businesses/${business.id}/info`} className="portal-button-secondary">Edit profil</Link> : null}
+            {canManageProducts ? <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary">Kelola produk</Link> : null}
           </div>
         </aside>
       </section>
