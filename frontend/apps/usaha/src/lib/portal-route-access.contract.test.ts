@@ -9,14 +9,14 @@ function read(relative: string) {
 describe('portal direct route access contract', () => {
   it('keeps the location editor behind manageInfo even when business info is readable', () => {
     const source = read('../app/(portal)/businesses/[businessId]/locations/page.tsx');
-    expect(source).toContain("hasPermission(state.activeBusiness, 'manageInfo')");
-    expect(source).toContain('notFound()');
+    expect(source).toContain("if (!hasPermission(state.activeBusiness, 'manageInfo'))");
+    expect(source).toContain("redirect(`/?business=${encodeURIComponent(state.activeBusiness.id)}`)");
   });
 
   it('keeps business security events owner-only on direct URL access', () => {
     const source = read('../app/(portal)/security/page.tsx');
-    expect(source).toContain("hasPermission(scopeBusiness, 'manageSecurity')");
-    expect(source).toContain('notFound()');
+    expect(source).toContain("if (scopeBusiness && !hasPermission(scopeBusiness, 'manageSecurity'))");
+    expect(source).toContain("redirect(`/?business=${encodeURIComponent(scopeBusiness.id)}`)");
   });
 
   it('does not offer edit actions from buyer preview to read-only roles', () => {
