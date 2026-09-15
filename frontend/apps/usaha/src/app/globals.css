@@ -10,7 +10,7 @@
     --portal-layer-sticky: 10;
     --portal-layer-action: 20;
     --portal-layer-shell: 30;
-    --portal-layer-nav: 40;
+    --portal-layer-nav: 35;
     --portal-layer-popover: 60;
     --portal-layer-toast: 80;
     --portal-layer-skip: 100;
@@ -159,6 +159,10 @@
 
   .portal-skip-link {
     @apply fixed left-4 top-3 z-[var(--portal-layer-skip)] -translate-y-20 rounded-xl bg-portal-forest px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-portal-forest;
+  }
+
+  .portal-layer-popover {
+    z-index: var(--portal-layer-popover);
   }
 
   .portal-mobile-content-clearance {
