@@ -475,14 +475,15 @@ mod tests {
         assert!(!manager.can_manage_businesses());
 
         let cashier = organization("org_cashier");
-        assert!(cashier.can_view_inventory_controls());
+        assert!(!cashier.can_view_inventory_controls());
         assert!(cashier.can_record_sales());
+        assert!(cashier.can_view_sales());
         assert!(cashier.can_manage_cash_shifts());
         assert!(!cashier.can_manage_catalog());
         assert!(!cashier.can_manage_finance_controls());
 
         let viewer = organization("org_viewer");
-        assert!(viewer.can_view_inventory_controls());
+        assert!(!viewer.can_view_inventory_controls());
         assert!(viewer.can_view_sales());
         assert!(!viewer.can_manage_inventory_controls());
         assert!(!viewer.can_record_sales());
