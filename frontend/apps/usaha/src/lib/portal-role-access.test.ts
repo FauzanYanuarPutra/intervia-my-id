@@ -18,12 +18,12 @@ describe('portal role access matrix', () => {
     }
   });
 
-  it('keeps viewer read-only surfaces available', () => {
+  it('keeps viewer read-only surfaces available without exposing editors', () => {
     const viewer = permissions('viewer');
-    for (const section of ['home', 'orders', 'products', 'inventory', 'info', 'locations', 'operations', 'buyerPage'] as const) {
+    for (const section of ['home', 'orders', 'products', 'inventory', 'info', 'operations', 'buyerPage'] as const) {
       expect(canAccessPortalSection(viewer, section)).toBe(true);
     }
-    for (const section of ['finance', 'reports', 'channels', 'team', 'security'] as const) {
+    for (const section of ['finance', 'reports', 'channels', 'locations', 'team', 'security'] as const) {
       expect(canAccessPortalSection(viewer, section)).toBe(false);
     }
   });
