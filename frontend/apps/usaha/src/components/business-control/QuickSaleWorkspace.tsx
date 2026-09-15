@@ -17,6 +17,7 @@ import {
   WalletCards,
   X,
 } from 'lucide-react';
+import { ModalSurface } from '@/components/interaction/ModalSurface';
 import {
   buildQuickSaleRequest,
   buildReceiptShareText,
@@ -135,23 +136,17 @@ function ProductCard({
       className="group relative min-w-0 rounded-2xl border border-portal-line bg-white p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-portal-ink/20 hover:shadow-md active:translate-y-0 active:scale-[0.985]"
     >
       <ProductArtwork product={product} />
-
       {quantity > 0 ? (
         <span className="absolute right-3 top-3 grid h-7 min-w-7 place-items-center rounded-full bg-portal-ink px-2 text-xs font-black text-white shadow-md">
           {quantity}
         </span>
       ) : null}
-
       <div className="px-1 pb-1 pt-2.5">
-        <p className="min-h-10 overflow-hidden text-sm font-bold leading-5 text-portal-ink">
-          {product.name}
-        </p>
+        <p className="min-h-10 overflow-hidden text-sm font-bold leading-5 text-portal-ink">{product.name}</p>
         <div className="mt-1.5 flex items-end justify-between gap-2">
           <p className="truncate text-sm font-black text-portal-ink">{product.priceLabel}</p>
           {product.category ? (
-            <span className="max-w-[45%] truncate text-[10px] font-semibold text-portal-soft">
-              {product.category}
-            </span>
+            <span className="max-w-[45%] truncate text-[10px] font-semibold text-portal-soft">{product.category}</span>
           ) : null}
         </div>
       </div>
@@ -159,19 +154,13 @@ function ProductCard({
   );
 }
 
-function QuantityControl({
-  line,
-  onQuantity,
-}: {
-  line: DraftLine;
-  onQuantity: (key: string, quantity: number) => void;
-}) {
+function QuantityControl({ line, onQuantity }: { line: DraftLine; onQuantity: (key: string, quantity: number) => void }) {
   return (
     <div className="inline-flex items-center rounded-xl border border-portal-line bg-white p-0.5">
       <button
         type="button"
         aria-label={`Kurangi ${line.productName}`}
-        className="grid h-8 w-8 place-items-center rounded-lg transition hover:bg-[#f2f4f1] active:scale-95"
+        className="grid h-10 w-10 place-items-center rounded-lg transition hover:bg-[#f2f4f1] active:scale-95"
         onClick={() => onQuantity(line.key, Number(line.quantity) - 1)}
       >
         <Minus className="h-3.5 w-3.5" />
@@ -180,7 +169,7 @@ function QuantityControl({
       <button
         type="button"
         aria-label={`Tambah ${line.productName}`}
-        className="grid h-8 w-8 place-items-center rounded-lg transition hover:bg-[#f2f4f1] active:scale-95"
+        className="grid h-10 w-10 place-items-center rounded-lg transition hover:bg-[#f2f4f1] active:scale-95"
         onClick={() => onQuantity(line.key, Number(line.quantity) + 1)}
       >
         <Plus className="h-3.5 w-3.5" />
@@ -189,22 +178,14 @@ function QuantityControl({
   );
 }
 
-function CartLines({
-  lines,
-  onQuantity,
-}: {
-  lines: DraftLine[];
-  onQuantity: (key: string, quantity: number) => void;
-}) {
+function CartLines({ lines, onQuantity }: { lines: DraftLine[]; onQuantity: (key: string, quantity: number) => void }) {
   if (!lines.length) {
     return (
       <div className="grid min-h-40 place-items-center px-6 text-center">
         <div>
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f3f5f1] text-portal-soft">
-            <ReceiptText className="h-5 w-5" />
-          </div>
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f3f5f1] text-portal-soft"><ReceiptText className="h-5 w-5" /></div>
           <p className="mt-3 text-sm font-bold text-portal-ink">Belum ada pesanan</p>
-          <p className="mt-1 text-xs leading-5 text-portal-soft">Tap produk di sebelah kiri untuk mulai transaksi.</p>
+          <p className="mt-1 text-xs leading-5 text-portal-soft">Tap produk untuk mulai transaksi.</p>
         </div>
       </div>
     );
@@ -219,21 +200,16 @@ function CartLines({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-portal-ink">{line.productName}</p>
-                <p className="mt-0.5 text-xs text-portal-soft">
-                  {money.format(Number(line.unitPriceAmount))} × {line.quantity}
-                </p>
+                <p className="mt-0.5 text-xs text-portal-soft">{money.format(Number(line.unitPriceAmount))} × {line.quantity}</p>
               </div>
-              <p className="shrink-0 text-sm font-black tabular-nums text-portal-ink">
-                {money.format(subtotal)}
-              </p>
+              <p className="shrink-0 text-sm font-black tabular-nums text-portal-ink">{money.format(subtotal)}</p>
             </div>
-
             <div className="mt-2.5 flex items-center justify-between gap-2">
               <QuantityControl line={line} onQuantity={onQuantity} />
               <button
                 type="button"
                 aria-label={`Hapus ${line.productName}`}
-                className="grid h-9 w-9 place-items-center rounded-xl text-portal-soft transition hover:bg-red-50 hover:text-red-700"
+                className="grid h-11 w-11 place-items-center rounded-xl text-portal-soft transition hover:bg-red-50 hover:text-red-700"
                 onClick={() => onQuantity(line.key, 0)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -260,11 +236,10 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   const [tenderedAmount, setTenderedAmount] = useState(0);
   const [receipt, setReceipt] = useState<ReceiptView | null>(null);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{
-    tone: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const attemptKey = useRef<string | null>(null);
+  const cartTriggerRef = useRef<HTMLButtonElement>(null);
+  const checkoutTriggerRef = useRef<HTMLButtonElement>(null);
 
   const total = useMemo(() => quickSaleTotal(lines), [lines]);
   const itemCount = useMemo(() => quickSaleItemCount(lines), [lines]);
@@ -273,17 +248,9 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
     () => filterQuickSaleProducts(products, search).filter(product => productMatchesFilter(product, filterKey)),
     [products, search, filterKey],
   );
-  const cashPresets = useMemo(
-    () => buildCashTenderPresets(total, quickTenderAmounts(total)),
-    [total],
-  );
+  const cashPresets = useMemo(() => buildCashTenderPresets(total, quickTenderAmounts(total)), [total]);
   const cashChange = calculateCashChange(total, tenderedAmount);
-  const canPay = canCompleteCheckout({
-    total,
-    paymentMethod: accountKey,
-    tenderedAmount,
-    lineCount: lines.length,
-  });
+  const canPay = canCompleteCheckout({ total, paymentMethod: accountKey, tenderedAmount, lineCount: lines.length });
 
   function changed() {
     attemptKey.current = null;
@@ -296,11 +263,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
     setLines(current => {
       const existing = current.find(line => line.productId === product.id);
       if (!existing) return [...current, makeLine(product)];
-      return current.map(line =>
-        line.key === existing.key
-          ? { ...line, quantity: Number(line.quantity) + 1 }
-          : line,
-      );
+      return current.map(line => line.key === existing.key ? { ...line, quantity: Number(line.quantity) + 1 } : line);
     });
   }
 
@@ -310,9 +273,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
       setLines(current => current.filter(line => line.key !== key));
       return;
     }
-    setLines(current =>
-      current.map(line => (line.key === key ? { ...line, quantity } : line)),
-    );
+    setLines(current => current.map(line => line.key === key ? { ...line, quantity } : line));
   }
 
   function resetOrder() {
@@ -344,67 +305,38 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   }
 
   async function submit() {
-    if (!canPay) return;
+    if (!canPay || saving) return;
     try {
-      const payload = buildQuickSaleRequest({
-        occurredOn,
-        channelKey,
-        accountKey,
-        lines,
-      });
+      const payload = buildQuickSaleRequest({ occurredOn, channelKey, accountKey, lines });
       const idempotencyKey = attemptKey.current ?? crypto.randomUUID();
       attemptKey.current = idempotencyKey;
       setSaving(true);
       setFeedback(null);
 
-      const response = await fetch(
-        `/api/businesses/${encodeURIComponent(businessId)}/sales`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-
+      const response = await fetch(`/api/businesses/${encodeURIComponent(businessId)}/sales`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(payload),
+      });
       const body = (await response.json().catch(() => ({}))) as {
         error?: string;
-        data?: {
-          sale?: {
-            sale?: {
-              id?: string;
-              created_at?: string;
-              final_amount?: number;
-            };
-          };
-        };
+        data?: { sale?: { sale?: { id?: string; created_at?: string; final_amount?: number } } };
       };
-
       if (!response.ok) throw new Error(body.error || 'sale_save_failed');
 
       const saleId = body.data?.sale?.sale?.id ?? idempotencyKey;
       const createdAt = body.data?.sale?.sale?.created_at ?? new Date().toISOString();
-      const paymentLabel =
-        paymentOptions.find(option => option.value === accountKey)?.label ?? 'Pembayaran';
+      const paymentLabel = paymentOptions.find(option => option.value === accountKey)?.label ?? 'Pembayaran';
       const settledTotal = body.data?.sale?.sale?.final_amount ?? total;
-
-      setReceipt(
-        buildReceiptView({
-          receiptNumber: receiptNumberFromSaleId(saleId, occurredOn),
-          occurredAt: createdAt,
-          cashierName: 'Kasir',
-          paymentLabel,
-          total: settledTotal,
-          tenderedAmount: accountKey === 'cash' ? tenderedAmount : undefined,
-          lines: lines.map(line => ({
-            name: line.productName,
-            quantity: Number(line.quantity),
-            unitPrice: Number(line.unitPriceAmount),
-          })),
-        }),
-      );
+      setReceipt(buildReceiptView({
+        receiptNumber: receiptNumberFromSaleId(saleId, occurredOn),
+        occurredAt: createdAt,
+        cashierName: 'Kasir',
+        paymentLabel,
+        total: settledTotal,
+        tenderedAmount: accountKey === 'cash' ? tenderedAmount : undefined,
+        lines: lines.map(line => ({ name: line.productName, quantity: Number(line.quantity), unitPrice: Number(line.unitPriceAmount) })),
+      }));
       attemptKey.current = null;
       setCartOpen(false);
       setCheckoutOpen(false);
@@ -412,12 +344,11 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
       router.refresh();
     } catch (error) {
       const code = error instanceof Error ? error.message : 'sale_save_failed';
-      const message =
-        code === 'sale_discount_exceeds_line_total'
-          ? 'Diskon tidak boleh melebihi subtotal produk.'
-          : code === 'sale_inventory_insufficient'
-            ? 'Stok produk tidak cukup untuk jumlah ini.'
-            : 'Transaksi belum tersimpan. Coba lagi.';
+      const message = code === 'sale_discount_exceeds_line_total'
+        ? 'Diskon tidak boleh melebihi subtotal produk.'
+        : code === 'sale_inventory_insufficient'
+          ? 'Stok produk tidak cukup untuk jumlah ini.'
+          : 'Transaksi belum tersimpan. Coba lagi.';
       setFeedback({ tone: 'error', text: message });
     } finally {
       setSaving(false);
@@ -427,121 +358,63 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   if (!products.length) {
     return (
       <div className="rounded-2xl border border-dashed border-portal-line bg-white p-6 text-center">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f3f5f1] text-portal-soft">
-          <Package className="h-5 w-5" />
-        </div>
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f3f5f1] text-portal-soft"><Package className="h-5 w-5" /></div>
         <p className="mt-3 text-sm font-bold text-portal-ink">Belum ada produk untuk dijual</p>
-        <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-portal-soft">
-          Tambahkan produk atau jasa beserta harga. Foto produk bersifat opsional, tetapi membantu kasir mengenali menu lebih cepat.
-        </p>
+        <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-portal-soft">Tambahkan produk atau jasa beserta harga. Foto produk bersifat opsional, tetapi membantu kasir mengenali menu lebih cepat.</p>
       </div>
     );
   }
 
   if (receipt) {
     const hasCashChange = receipt.tenderedAmount !== null;
-
     return (
       <div className="mx-auto max-w-xl space-y-3">
         <div className="rounded-3xl border border-portal-line bg-white p-5 shadow-sm sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-6 w-6" /></div>
             <div className="min-w-0 flex-1">
               <p className="text-lg font-black text-portal-ink">Transaksi berhasil</p>
               <p className="mt-0.5 text-xs text-portal-soft">{receipt.receiptNumber}</p>
             </div>
           </div>
-
           {hasCashChange ? (
             <div className="mt-5 rounded-2xl bg-[#f5f7f3] p-4 text-center">
               <p className="text-xs font-bold uppercase tracking-wide text-portal-soft">Kembalian</p>
-              <p className="mt-1 text-3xl font-black tabular-nums text-portal-ink">
-                {money.format(receipt.changeAmount)}
-              </p>
+              <p className="mt-1 text-3xl font-black tabular-nums text-portal-ink">{money.format(receipt.changeAmount)}</p>
             </div>
           ) : (
             <div className="mt-5 flex items-center justify-between rounded-2xl bg-[#f5f7f3] p-4">
               <span className="text-sm font-semibold text-portal-soft">Total</span>
-              <span className="text-2xl font-black tabular-nums text-portal-ink">
-                {money.format(receipt.total)}
-              </span>
+              <span className="text-2xl font-black tabular-nums text-portal-ink">{money.format(receipt.total)}</span>
             </div>
           )}
-
-          <button
-            type="button"
-            className="portal-button-primary mt-4 w-full justify-center py-3.5 text-base"
-            onClick={resetOrder}
-          >
-            <Plus className="h-4 w-4" /> Transaksi baru
-          </button>
-
+          <button type="button" className="portal-button-primary mt-4 w-full justify-center py-3.5 text-base" onClick={resetOrder}><Plus className="h-4 w-4" /> Transaksi baru</button>
           <details className="mt-4 rounded-2xl border border-portal-line">
-            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-portal-ink">
-              Lihat detail struk
-            </summary>
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-portal-ink">Lihat detail struk</summary>
             <div className="border-t border-portal-line px-4 pb-4">
               <div className="divide-y divide-portal-line">
                 {receipt.lines.map((line, index) => (
                   <div key={`${line.name}-${index}`} className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-portal-ink">{line.name}</p>
-                      <p className="text-xs text-portal-soft">
-                        {line.quantity} × {money.format(line.unitPrice)}
-                      </p>
-                    </div>
-                    <p className="font-bold tabular-nums text-portal-ink">
-                      {money.format(line.quantity * line.unitPrice)}
-                    </p>
+                    <div className="min-w-0"><p className="truncate font-semibold text-portal-ink">{line.name}</p><p className="text-xs text-portal-soft">{line.quantity} × {money.format(line.unitPrice)}</p></div>
+                    <p className="font-bold tabular-nums text-portal-ink">{money.format(line.quantity * line.unitPrice)}</p>
                   </div>
                 ))}
               </div>
-
               <div className="space-y-2 border-t border-portal-line pt-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-portal-soft">Pembayaran</span>
-                  <span className="font-semibold text-portal-ink">{receipt.paymentLabel}</span>
-                </div>
-                {receipt.tenderedAmount !== null ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-portal-soft">Diterima</span>
-                      <span>{money.format(receipt.tenderedAmount)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-portal-soft">Kembalian</span>
-                      <span className="font-bold">{money.format(receipt.changeAmount)}</span>
-                    </div>
-                  </>
-                ) : null}
-                <div className="flex items-end justify-between border-t border-portal-line pt-3">
-                  <span className="font-bold text-portal-ink">Total</span>
-                  <span className="text-xl font-black tabular-nums text-portal-ink">
-                    {money.format(receipt.total)}
-                  </span>
-                </div>
+                <div className="flex items-center justify-between"><span className="text-portal-soft">Pembayaran</span><span className="font-semibold text-portal-ink">{receipt.paymentLabel}</span></div>
+                {receipt.tenderedAmount !== null ? <><div className="flex items-center justify-between"><span className="text-portal-soft">Diterima</span><span>{money.format(receipt.tenderedAmount)}</span></div><div className="flex items-center justify-between"><span className="text-portal-soft">Kembalian</span><span className="font-bold">{money.format(receipt.changeAmount)}</span></div></> : null}
+                <div className="flex items-end justify-between border-t border-portal-line pt-3"><span className="font-bold text-portal-ink">Total</span><span className="text-xl font-black tabular-nums text-portal-ink">{money.format(receipt.total)}</span></div>
               </div>
             </div>
           </details>
         </div>
-
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="portal-button-secondary justify-center" onClick={() => window.print()}>
-            <Printer className="h-4 w-4" /> Cetak
-          </button>
-          <button
-            type="button"
-            className="portal-button-secondary justify-center"
-            onClick={async () => {
-              const text = buildReceiptShareText(receipt);
-              if (navigator.share) await navigator.share({ text }).catch(() => undefined);
-              else await navigator.clipboard?.writeText(text).catch(() => undefined);
-            }}
-          >
-            Bagikan struk
-          </button>
+          <button type="button" className="portal-button-secondary justify-center" onClick={() => window.print()}><Printer className="h-4 w-4" /> Cetak</button>
+          <button type="button" className="portal-button-secondary justify-center" onClick={async () => {
+            const text = buildReceiptShareText(receipt);
+            if (navigator.share) await navigator.share({ text }).catch(() => undefined);
+            else await navigator.clipboard?.writeText(text).catch(() => undefined);
+          }}>Bagikan struk</button>
         </div>
       </div>
     );
@@ -550,370 +423,121 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   return (
     <div className="relative grid min-h-[560px] gap-4 pb-28 lg:grid-cols-[minmax(0,1fr)_360px] lg:pb-0">
       <section className="min-w-0">
-        <div className="sticky top-0 z-20 -mx-1 space-y-2 bg-white/95 px-1 pb-2 backdrop-blur">
+        <div className="sticky top-0 z-[var(--portal-layer-sticky)] -mx-1 space-y-2 bg-white/95 px-1 pb-2 backdrop-blur">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-soft" />
-            <input
-              className="portal-input h-11 w-full rounded-xl pl-10 pr-10 text-sm"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Cari produk…"
-              aria-label="Cari produk"
-              autoComplete="off"
-            />
-            {search ? (
-              <button
-                type="button"
-                aria-label="Hapus pencarian"
-                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-portal-soft hover:bg-[#f2f4f1] hover:text-portal-ink"
-                onClick={() => setSearch('')}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            ) : null}
+            <input className="portal-input h-11 w-full rounded-xl pl-10 pr-10 text-sm" value={search} onChange={event => setSearch(event.target.value)} placeholder="Cari produk…" aria-label="Cari produk" autoComplete="off" />
+            {search ? <button type="button" aria-label="Hapus pencarian" className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-portal-soft hover:bg-[#f2f4f1] hover:text-portal-ink" onClick={() => setSearch('')}><X className="h-4 w-4" /></button> : null}
           </div>
-
           {filters.length > 1 ? (
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {filters.map(filter => {
                 const active = filter.key === filterKey;
-                return (
-                  <button
-                    key={filter.key}
-                    type="button"
-                    onClick={() => setFilterKey(filter.key)}
-                    className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-bold transition active:scale-95 ${
-                      active
-                        ? 'border-portal-ink bg-portal-ink text-white'
-                        : 'border-portal-line bg-white text-portal-ink hover:bg-[#f7f8f5]'
-                    }`}
-                  >
-                    {filter.label}
-                  </button>
-                );
+                return <button key={filter.key} type="button" onClick={() => setFilterKey(filter.key)} className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-bold transition active:scale-95 ${active ? 'border-portal-ink bg-portal-ink text-white' : 'border-portal-line bg-white text-portal-ink hover:bg-[#f7f8f5]'}`}>{filter.label}</button>;
               })}
             </div>
           ) : null}
         </div>
 
         <div className="mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {filteredProducts.map(product => {
-            const quantity = Number(lines.find(line => line.productId === product.id)?.quantity ?? 0);
-            return (
-              <ProductCard
-                key={product.id}
-                product={product}
-                quantity={quantity}
-                onAdd={() => addProduct(product)}
-              />
-            );
-          })}
+          {filteredProducts.map(product => <ProductCard key={product.id} product={product} quantity={Number(lines.find(line => line.productId === product.id)?.quantity ?? 0)} onAdd={() => addProduct(product)} />)}
         </div>
-
         {!filteredProducts.length ? (
           <div className="mt-3 rounded-2xl border border-dashed border-portal-line p-6 text-center">
             <p className="text-sm font-bold text-portal-ink">Produk tidak ditemukan</p>
             <p className="mt-1 text-xs text-portal-soft">Coba kata lain atau pilih kategori Semua.</p>
-            <button
-              type="button"
-              className="portal-button-secondary mt-3"
-              onClick={() => {
-                setSearch('');
-                setFilterKey('all');
-              }}
-            >
-              Reset pencarian
-            </button>
+            <button type="button" className="portal-button-secondary mt-3" onClick={() => { setSearch(''); setFilterKey('all'); }}>Reset pencarian</button>
           </div>
         ) : null}
       </section>
 
       <aside className="hidden min-h-0 flex-col overflow-hidden rounded-3xl border border-portal-line bg-white shadow-sm lg:sticky lg:top-3 lg:flex lg:max-h-[calc(100vh-7rem)]">
         <div className="flex items-center justify-between border-b border-portal-line px-4 py-3.5">
-          <div>
-            <p className="font-black text-portal-ink">Pesanan</p>
-            <p className="mt-0.5 text-xs text-portal-soft">{itemCount} item</p>
-          </div>
-          {lines.length ? (
-            <button
-              type="button"
-              className="rounded-lg px-2 py-1 text-xs font-bold text-portal-soft transition hover:bg-red-50 hover:text-red-700"
-              onClick={() => {
-                changed();
-                setLines([]);
-              }}
-            >
-              Kosongkan
-            </button>
-          ) : null}
+          <div><p className="font-black text-portal-ink">Pesanan</p><p className="mt-0.5 text-xs text-portal-soft">{itemCount} item</p></div>
+          {lines.length ? <button type="button" className="rounded-lg px-2 py-1 text-xs font-bold text-portal-soft transition hover:bg-red-50 hover:text-red-700" onClick={() => { changed(); setLines([]); }}>Kosongkan</button> : null}
         </div>
-
-        <div className="min-h-32 flex-1 overflow-y-auto p-4">
-          <CartLines lines={lines} onQuantity={setQuantity} />
-        </div>
-
+        <div className="min-h-32 flex-1 overflow-y-auto p-4"><CartLines lines={lines} onQuantity={setQuantity} /></div>
         <div className="space-y-3 border-t border-portal-line bg-white p-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-portal-soft">Total bayar</p>
-              <p className="mt-0.5 text-2xl font-black tabular-nums text-portal-ink">{money.format(total)}</p>
-            </div>
-            <span className="pb-1 text-xs font-semibold text-portal-soft">{itemCount} item</span>
-          </div>
-          <button
-            type="button"
-            className="portal-button-primary w-full justify-center py-3.5 text-base"
-            disabled={!lines.length || total <= 0}
-            onClick={openCheckout}
-          >
-            Bayar
-          </button>
+          <div className="flex items-end justify-between gap-3"><div><p className="text-xs font-semibold text-portal-soft">Total bayar</p><p className="mt-0.5 text-2xl font-black tabular-nums text-portal-ink">{money.format(total)}</p></div><span className="pb-1 text-xs font-semibold text-portal-soft">{itemCount} item</span></div>
+          <button ref={checkoutTriggerRef} type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={!lines.length || total <= 0} onClick={openCheckout}>Bayar</button>
         </div>
       </aside>
 
       {lines.length ? (
-        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-2xl border border-portal-line bg-white p-2 shadow-2xl lg:hidden">
+        <div className="fixed inset-x-3 bottom-[calc(var(--portal-mobile-nav-height)+env(safe-area-inset-bottom)+.75rem)] z-[var(--portal-layer-action)] rounded-2xl border border-portal-line bg-white p-2 shadow-2xl lg:hidden">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="min-w-0 flex-1 rounded-xl px-2.5 py-1.5 text-left active:bg-[#f7f8f5]"
-              onClick={() => setCartOpen(true)}
-            >
-              <p className="truncate text-xs font-semibold text-portal-soft">{itemCount} item · Lihat pesanan</p>
-              <p className="truncate text-lg font-black tabular-nums text-portal-ink">{money.format(total)}</p>
-            </button>
-            <button
-              type="button"
-              className="portal-button-primary shrink-0 justify-center px-6 py-3.5"
-              onClick={openCheckout}
-            >
-              Bayar
-            </button>
+            <button ref={cartTriggerRef} type="button" className="min-w-0 flex-1 rounded-xl px-2.5 py-1.5 text-left active:bg-[#f7f8f5]" onClick={() => setCartOpen(true)}><p className="truncate text-xs font-semibold text-portal-soft">{itemCount} item · Lihat pesanan</p><p className="truncate text-lg font-black tabular-nums text-portal-ink">{money.format(total)}</p></button>
+            <button ref={checkoutTriggerRef} type="button" className="portal-button-primary shrink-0 justify-center px-6 py-3.5" onClick={openCheckout}>Bayar</button>
           </div>
         </div>
       ) : null}
 
-      {cartOpen ? (
-        <div
-          className="fixed inset-0 z-40 grid place-items-end bg-black/35 lg:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Pesanan"
-          onMouseDown={event => {
-            if (event.target === event.currentTarget) setCartOpen(false);
-          }}
-        >
-          <div className="max-h-[86vh] w-full rounded-t-3xl bg-white shadow-2xl">
-            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-200" />
-            <div className="flex items-center justify-between border-b border-portal-line px-4 py-3">
-              <div>
-                <p className="font-black text-portal-ink">Pesanan</p>
-                <p className="text-xs text-portal-soft">{itemCount} item</p>
-              </div>
-              <button type="button" className="portal-button-secondary" onClick={() => setCartOpen(false)}>
-                Tutup
-              </button>
-            </div>
-            <div className="max-h-[55vh] overflow-y-auto p-4">
-              <CartLines lines={lines} onQuantity={setQuantity} />
-            </div>
-            <div className="border-t border-portal-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <div className="mb-3 flex items-end justify-between gap-3 px-1">
-                <span className="text-sm font-semibold text-portal-soft">Total</span>
-                <span className="text-2xl font-black tabular-nums text-portal-ink">{money.format(total)}</span>
-              </div>
-              <button type="button" className="portal-button-primary w-full justify-center py-3.5" onClick={openCheckout}>
-                Bayar · {money.format(total)}
-              </button>
-            </div>
+      <ModalSurface open={cartOpen} onOpenChange={setCartOpen} ariaLabel="Pesanan" presentation="sheet" size="md" returnFocusRef={cartTriggerRef} panelClassName="lg:hidden">
+        <div className="flex min-h-0 max-h-[88dvh] flex-col">
+          <div className="shrink-0 border-b border-portal-line px-4 pb-3 pt-2">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200" />
+            <div className="flex items-center justify-between gap-3"><div><p className="font-black text-portal-ink">Pesanan</p><p className="text-xs text-portal-soft">{itemCount} item</p></div><button type="button" className="portal-button-ghost" onClick={() => setCartOpen(false)}>Tutup</button></div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"><CartLines lines={lines} onQuantity={setQuantity} /></div>
+          <div className="shrink-0 border-t border-portal-line bg-white p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
+            <div className="mb-3 flex items-end justify-between gap-3 px-1"><span className="text-sm font-semibold text-portal-soft">Total</span><span className="text-2xl font-black tabular-nums text-portal-ink">{money.format(total)}</span></div>
+            <button type="button" className="portal-button-primary w-full justify-center py-3.5" onClick={openCheckout}>Bayar · {money.format(total)}</button>
           </div>
         </div>
-      ) : null}
+      </ModalSurface>
 
-      {checkoutOpen ? (
-        <div
-          className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-0 sm:place-items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Pembayaran"
-          onMouseDown={event => {
-            if (event.target === event.currentTarget && !saving) setCheckoutOpen(false);
-          }}
-        >
-          <div className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:rounded-3xl sm:p-5">
+      <ModalSurface open={checkoutOpen} onOpenChange={setCheckoutOpen} ariaLabel="Pembayaran" dismissible={!saving} presentation="adaptive" size="md" returnFocusRef={checkoutTriggerRef}>
+        <div className="flex min-h-0 max-h-[92dvh] flex-col">
+          <div className="shrink-0 border-b border-portal-line px-4 py-3.5 sm:px-5">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-portal-soft">Total bayar</p>
-                <p className="mt-1 text-3xl font-black tabular-nums text-portal-ink">{money.format(total)}</p>
-              </div>
-              <button
-                type="button"
-                className="portal-button-secondary"
-                disabled={saving}
-                onClick={() => setCheckoutOpen(false)}
-              >
-                Tutup
-              </button>
+              <div><p className="text-xs font-bold uppercase tracking-wide text-portal-soft">Total bayar</p><p className="mt-1 text-3xl font-black tabular-nums text-portal-ink">{money.format(total)}</p></div>
+              <button type="button" className="portal-button-ghost" disabled={saving} onClick={() => setCheckoutOpen(false)}>Tutup</button>
             </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-2">
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+            <div className="grid grid-cols-2 gap-2">
               {paymentOptions.map(option => {
                 const Icon = option.icon;
                 const active = accountKey === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => choosePayment(option.value)}
-                    className={`flex min-h-12 items-center gap-2.5 rounded-2xl border px-3 py-3 text-left text-sm font-bold transition active:scale-[0.98] ${
-                      active
-                        ? 'border-portal-ink bg-portal-ink text-white shadow-sm'
-                        : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" /> {option.label}
-                  </button>
-                );
+                return <button key={option.value} type="button" onClick={() => choosePayment(option.value)} className={`flex min-h-12 items-center gap-2.5 rounded-2xl border px-3 py-3 text-left text-sm font-bold transition active:scale-[0.98] ${active ? 'border-portal-ink bg-portal-ink text-white shadow-sm' : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'}`}><Icon className="h-4 w-4 shrink-0" /> {option.label}</button>;
               })}
             </div>
 
             {accountKey === 'cash' ? (
               <div className="mt-4 rounded-2xl bg-[#f5f7f3] p-3.5">
-                <div className="flex items-center justify-between gap-3">
-                  <label htmlFor="cash-tendered" className="text-sm font-bold text-portal-ink">
-                    Uang diterima
-                  </label>
-                  {tenderedAmount >= total ? (
-                    <span className="text-xs font-bold text-emerald-700">Cukup</span>
-                  ) : null}
-                </div>
-
-                <div className="relative mt-2">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-portal-soft">Rp</span>
-                  <input
-                    id="cash-tendered"
-                    className="portal-input h-12 w-full bg-white pl-9 text-lg font-black tabular-nums"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    step="1000"
-                    value={tenderedAmount || ''}
-                    onFocus={event => event.currentTarget.select()}
-                    onChange={event => setTenderedAmount(Number(event.target.value) || 0)}
-                  />
-                </div>
-
+                <div className="flex items-center justify-between gap-3"><label htmlFor="cash-tendered" className="text-sm font-bold text-portal-ink">Uang diterima</label>{tenderedAmount >= total ? <span className="text-xs font-bold text-emerald-700">Cukup</span> : null}</div>
+                <div className="relative mt-2"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-portal-soft">Rp</span><input id="cash-tendered" className="portal-input h-12 w-full bg-white pl-9 text-lg font-black tabular-nums" type="number" inputMode="numeric" min={0} step="1000" value={tenderedAmount || ''} onFocus={event => event.currentTarget.select()} onChange={event => setTenderedAmount(Number(event.target.value) || 0)} /></div>
                 <div className="mt-2.5 grid grid-cols-3 gap-2">
                   {cashPresets.slice(0, 6).map(amount => {
                     const exact = amount === total;
                     const active = tenderedAmount === amount;
-                    return (
-                      <button
-                        key={amount}
-                        type="button"
-                        className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-black transition active:scale-95 ${
-                          active
-                            ? 'border-portal-ink bg-portal-ink text-white'
-                            : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'
-                        }`}
-                        onClick={() => setTenderedAmount(amount)}
-                      >
-                        {exact ? 'Uang pas' : money.format(amount).replace(',00', '')}
-                      </button>
-                    );
+                    return <button key={amount} type="button" className={`min-h-11 rounded-xl border px-2 py-2 text-xs font-black transition active:scale-95 ${active ? 'border-portal-ink bg-portal-ink text-white' : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'}`} onClick={() => setTenderedAmount(amount)}>{exact ? 'Uang pas' : money.format(amount).replace(',00', '')}</button>;
                   })}
                 </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-portal-line pt-3">
-                  <span className="text-sm font-semibold text-portal-soft">Kembalian</span>
-                  <span className="text-2xl font-black tabular-nums text-portal-ink">{money.format(cashChange)}</span>
-                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-portal-line pt-3"><span className="text-sm font-semibold text-portal-soft">Kembalian</span><span className="text-2xl font-black tabular-nums text-portal-ink">{money.format(cashChange)}</span></div>
               </div>
             ) : (
-              <div className="mt-4 rounded-2xl bg-[#f5f7f3] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold text-portal-ink">
-                      {paymentOptions.find(option => option.value === accountKey)?.label}
-                    </p>
-                    <p className="mt-0.5 text-xs leading-5 text-portal-soft">
-                      Pastikan pembayaran sudah diterima sebelum menyelesaikan transaksi.
-                    </p>
-                  </div>
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-portal-soft" />
-                </div>
-              </div>
+              <div className="mt-4 rounded-2xl bg-[#f5f7f3] p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-portal-ink">{paymentOptions.find(option => option.value === accountKey)?.label}</p><p className="mt-0.5 text-xs leading-5 text-portal-soft">Pastikan pembayaran sudah diterima sebelum menyelesaikan transaksi.</p></div><CheckCircle2 className="h-5 w-5 shrink-0 text-portal-soft" /></div></div>
             )}
 
             <details className="mt-4" open={advancedOpen} onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
               <summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail transaksi</summary>
               <div className="mt-3 grid gap-3 rounded-2xl border border-portal-line p-3 sm:grid-cols-2">
-                <label className="grid gap-1 text-xs font-semibold text-portal-soft">
-                  Kanal
-                  <select
-                    className="portal-input"
-                    value={channelKey}
-                    onChange={event => {
-                      changed();
-                      setChannelKey(event.target.value);
-                    }}
-                  >
-                    <option value="offline">Di tempat</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="gofood">GoFood</option>
-                    <option value="grabfood">GrabFood</option>
-                    <option value="other">Lainnya</option>
-                  </select>
-                </label>
-                <label className="grid gap-1 text-xs font-semibold text-portal-soft">
-                  Tanggal
-                  <input
-                    className="portal-input"
-                    type="date"
-                    value={occurredOn}
-                    onChange={event => {
-                      changed();
-                      setOccurredOn(event.target.value);
-                    }}
-                  />
-                </label>
+                <label className="grid gap-1 text-xs font-semibold text-portal-soft">Kanal<select className="portal-input" value={channelKey} onChange={event => { changed(); setChannelKey(event.target.value); }}><option value="offline">Di tempat</option><option value="whatsapp">WhatsApp</option><option value="gofood">GoFood</option><option value="grabfood">GrabFood</option><option value="other">Lainnya</option></select></label>
+                <label className="grid gap-1 text-xs font-semibold text-portal-soft">Tanggal<input className="portal-input" type="date" value={occurredOn} onChange={event => { changed(); setOccurredOn(event.target.value); }} /></label>
               </div>
             </details>
-
-            {accountKey === 'cash' && tenderedAmount < total ? (
-              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                Uang diterima masih kurang {money.format(total - tenderedAmount)}.
-              </p>
-            ) : null}
-
-            {feedback?.tone === 'error' ? (
-              <p role="status" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-                {feedback.text}
-              </p>
-            ) : null}
-
-            <button
-              type="button"
-              className="portal-button-primary mt-4 w-full justify-center py-3.5 text-base"
-              disabled={saving || !canPay}
-              onClick={submit}
-            >
-              {saving
-                ? 'Menyimpan…'
-                : accountKey === 'cash'
-                  ? `Terima · ${money.format(total)}`
-                  : `Selesaikan ${paymentOptions.find(option => option.value === accountKey)?.label ?? ''}`}
-            </button>
+            {accountKey === 'cash' && tenderedAmount < total ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Uang diterima masih kurang {money.format(total - tenderedAmount)}.</p> : null}
+            {feedback?.tone === 'error' ? <p role="status" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{feedback.text}</p> : null}
+          </div>
+          <div className="shrink-0 border-t border-portal-line bg-white px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-4">
+            <button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={saving || !canPay} onClick={submit}>{saving ? 'Menyimpan…' : accountKey === 'cash' ? `Terima · ${money.format(total)}` : `Selesaikan ${paymentOptions.find(option => option.value === accountKey)?.label ?? ''}`}</button>
           </div>
         </div>
-      ) : null}
+      </ModalSurface>
 
-      {feedback && feedback.tone === 'success' ? (
-        <p role="status" className="lg:col-span-2 text-sm font-semibold text-emerald-700">
-          {feedback.text}
-        </p>
-      ) : null}
+      {feedback && feedback.tone === 'success' ? <p role="status" className="lg:col-span-2 text-sm font-semibold text-emerald-700">{feedback.text}</p> : null}
     </div>
   );
 }
