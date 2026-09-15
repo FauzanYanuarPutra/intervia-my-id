@@ -17,28 +17,34 @@ jobs:
         with:
           ref: fix/inventory-simplify-20260915
           fetch-depth: 0
-      - name: Run branch-owned deterministic patch
+      - name: Extract and run deterministic Python patch
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          import textwrap
 
-          workflow = Path('.github/workflows/tmp-inventory-workspace-refactor.yml')
-          content = workflow.read_text()
-          marker = '        run: |\n'
-          if content.count(marker) != 1:
-              raise SystemExit('unexpected temporary workflow format')
-          Path('/tmp/apply-inventory-refactor.sh').write_text(
-              textwrap.dedent(content.split(marker, 1)[1])
-          )
+          workflow = Path('.github/workflows/tmp-inventory-workspace-refactor.yml').read_text().splitlines()
+          start = workflow.index("          python - <<'PY'") + 1
+          end = workflow.index('          PY', start)
+          lines = workflow[start:end]
+          result = []
+          inside_segment = False
+          for line in lines:
+              if not inside_segment and line.startswith('          '):
+                  line = line[10:]
+              result.append(line)
+              if not inside_segment and "new_segment = r'''" in line:
+                  inside_segment = True
+              elif inside_segment and line.strip() == "'''":
+                  inside_segment = False
+          Path('/tmp/apply-inventory-refactor.py').write_text('\n'.join(result) + '\n')
           PY
-          bash /tmp/apply-inventory-refactor.sh
-      - name: Remove this temporary runner
-        shell: bash
-        run: |
-          git rm .github/workflows/tmp-run-branch-inventory-refactor.yml
+          python /tmp/apply-inventory-refactor.py
+          rm .github/workflows/tmp-inventory-workspace-refactor.yml
+          rm .github/workflows/tmp-run-branch-inventory-refactor.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore(ci): remove temporary inventory refactor runner"
+          git add frontend/apps/usaha/src/components/business-control/IngredientWorkspace.tsx .github/workflows/tmp-inventory-workspace-refactor.yml .github/workflows/tmp-run-branch-inventory-refactor.yml
+          git diff --cached --check
+          git commit -m "feat(inventory): simplify ingredient setup flow"
           git push origin HEAD:fix/inventory-simplify-20260915
