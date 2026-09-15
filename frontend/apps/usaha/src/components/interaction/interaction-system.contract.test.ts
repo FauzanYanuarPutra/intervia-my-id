@@ -11,7 +11,7 @@ describe('Lajukan interaction system', () => {
     const modal = read('./ModalSurface.tsx');
     expect(modal).toContain('<dialog');
     expect(modal).toContain('showModal()');
-    expect(modal).toContain('event.key === \'Escape\'');
+    expect(modal).toContain("event.key === 'Escape'");
     expect(modal).toContain('dismissible');
     expect(modal).toContain('returnFocusRef');
     expect(modal).toContain('event.target === event.currentTarget');
@@ -35,6 +35,15 @@ describe('Lajukan interaction system', () => {
     expect(mobile).toContain('ModalSurface');
     expect(mobile).not.toContain('<details');
     expect(mobile).not.toContain('absolute bottom-[calc(100%+.55rem)]');
+  });
+
+  it('uses a dismissible popover on desktop and the shared modal sheet on mobile for business switching', () => {
+    const switcher = read('../portal/BusinessSwitcher.tsx');
+    expect(switcher).toContain('ModalSurface');
+    expect(switcher).toContain('portal-layer-popover');
+    expect(switcher).toContain("document.addEventListener('pointerdown'");
+    expect(switcher).toContain("event.key === 'Escape'");
+    expect(switcher).not.toContain('<details');
   });
 
   it('keeps shell layers below modal top layer and derives mobile content clearance from one token', () => {
