@@ -154,3 +154,7 @@
 - [ ] Verify PR head is still based on current `main`; update if required.
 - [ ] Merge PR to `main` only after green checks.
 - [ ] Verify main contains the merge commit and report exact pull command.
+
+## Delivery stacking note
+
+This hardening work is intentionally validated on top of `feat/usaha-merchant-os-redesign-20260915`. The Merchant OS branch owns the final delivery to `main`; finance changes must pass the redesign application/UI contracts together before they are merged into that branch.
