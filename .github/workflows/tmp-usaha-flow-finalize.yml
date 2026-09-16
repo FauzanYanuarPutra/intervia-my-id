@@ -1,0 +1,190 @@
+name: Temporary Usaha Flow Finalize
+
+on:
+  push:
+    branches: [feat/usaha-flow-system]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/usaha-flow-system
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/apps/usaha/package-lock.json
+      - name: Patch POS, authoritative sales, and Modal Produk
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              if actual != count:
+                  raise SystemExit(f'{path}: expected {count} occurrence(s), got {actual}: {old[:100]!r}')
+              p.write_text(text.replace(old, new, count))
+
+          # POS workspace: expose canonical modifier groups, configure before adding, preserve line identity.
+          path = 'frontend/apps/usaha/src/components/business-control/QuickSaleWorkspace.tsx'
+          replace(path,
+          "import { ModalSurface } from '@/components/interaction/ModalSurface';\n",
+          "import type { ProductModifierGroup, ProductModifierSelection } from 'lajukan-ui';\nimport { ModalSurface } from '@/components/interaction/ModalSurface';\nimport { QuickSaleProductConfigurator } from './QuickSaleProductConfigurator';\n")
+          replace(path,
+          "  filterQuickSaleProducts,\n",
+          "  filterQuickSaleProducts,\n  mergeQuickSaleLine,\n")
+          replace(path,
+          "  isFavorite?: boolean;\n};\n\ntype DraftLine = QuickSaleLineDraft & { key: string; productName: string };\n",
+          "  isFavorite?: boolean;\n  modifierGroups?: ProductModifierGroup[];\n};\n\ntype DraftLine = QuickSaleLineDraft & {\n  key: string;\n  productName: string;\n  configurationSummary?: string;\n};\n\ntype ConfiguredProductInput = {\n  quantity: number;\n  selectedOptions: ProductModifierSelection[];\n  note: string;\n  previewUnitPriceAmount: number;\n  configurationSummary: string;\n};\n")
+          replace(path,
+          "function makeLine(product: ProductOption): DraftLine {\n  return {\n    key: crypto.randomUUID(),\n    productId: product.id,\n    productName: product.name,\n    quantity: 1,\n    unitPriceAmount: priceLabelToAmount(product.priceLabel),\n    discountAmount: 0,\n  };\n}\n",
+          "function makeLine(product: ProductOption, configured?: ConfiguredProductInput): DraftLine {\n  const basePriceAmount = priceLabelToAmount(product.priceLabel);\n  return {\n    key: crypto.randomUUID(),\n    productId: product.id,\n    productName: product.name,\n    quantity: configured?.quantity ?? 1,\n    basePriceAmount,\n    unitPricePreviewAmount: configured?.previewUnitPriceAmount ?? basePriceAmount,\n    discountAmount: 0,\n    selectedOptions: configured?.selectedOptions ?? [],\n    note: configured?.note || undefined,\n    configurationSummary: configured?.configurationSummary || undefined,\n  };\n}\n")
+          replace(path,
+          "                <p className=\"truncate text-sm font-bold text-portal-ink\">{line.productName}</p>\n                <p className=\"mt-0.5 text-xs text-portal-soft\">{money.format(Number(line.unitPriceAmount))} × {line.quantity}</p>\n",
+          "                <p className=\"truncate text-sm font-bold text-portal-ink\">{line.productName}</p>\n                {line.configurationSummary ? <p className=\"mt-0.5 text-xs font-semibold text-portal-forest\">{line.configurationSummary}</p> : null}\n                {line.note ? <p className=\"mt-0.5 text-[11px] text-portal-soft\">Catatan: {line.note}</p> : null}\n                <p className=\"mt-0.5 text-xs text-portal-soft\">{money.format(Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0))} × {line.quantity}</p>\n")
+          replace(path,
+          "        const subtotal = Number(line.quantity) * Number(line.unitPriceAmount);\n",
+          "        const subtotal = Number(line.quantity) * Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0);\n")
+          replace(path,
+          "  const [checkoutOpen, setCheckoutOpen] = useState(false);\n",
+          "  const [checkoutOpen, setCheckoutOpen] = useState(false);\n  const [configuringProduct, setConfiguringProduct] = useState<ProductOption | null>(null);\n")
+          replace(path,
+          "  function addProduct(product: ProductOption) {\n    changed();\n    setReceipt(null);\n    setLines(current => {\n      const existing = current.find(line => line.productId === product.id);\n      if (!existing) return [...current, makeLine(product)];\n      return current.map(line => line.key === existing.key ? { ...line, quantity: Number(line.quantity) + 1 } : line);\n    });\n  }\n",
+          "  function addProduct(product: ProductOption) {\n    if (product.modifierGroups?.length) {\n      setConfiguringProduct(product);\n      return;\n    }\n    changed();\n    setReceipt(null);\n    setLines(current => mergeQuickSaleLine(current, makeLine(product)) as DraftLine[]);\n  }\n\n  function addConfiguredProduct(input: ConfiguredProductInput) {\n    const product = configuringProduct;\n    if (!product) return;\n    changed();\n    setReceipt(null);\n    setLines(current => mergeQuickSaleLine(current, makeLine(product, input)) as DraftLine[]);\n  }\n")
+          replace(path,
+          "    setCheckoutOpen(false);\n    setTenderedAmount(0);\n",
+          "    setCheckoutOpen(false);\n    setConfiguringProduct(null);\n    setTenderedAmount(0);\n")
+          replace(path,
+          "        data?: { sale?: { sale?: { id?: string; created_at?: string; final_amount?: number } } };\n",
+          "        data?: { sale?: { sale?: { id?: string; created_at?: string; final_amount?: number }; lines?: Array<{ unit_price_amount?: number }> } };\n")
+          replace(path,
+          "        lines: lines.map(line => ({ name: line.productName, quantity: Number(line.quantity), unitPrice: Number(line.unitPriceAmount) })),\n",
+          "        lines: lines.map((line, index) => ({\n          name: line.productName,\n          quantity: Number(line.quantity),\n          unitPrice: body.data?.sale?.lines?.[index]?.unit_price_amount ?? Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0),\n          configurationSummary: line.configurationSummary,\n          note: line.note,\n        })),\n")
+          replace(path,
+          "                  <div key={`${line.name}-${index}`} className=\"flex items-center justify-between gap-3 py-3 text-sm\">\n                    <div className=\"min-w-0\"><p className=\"truncate font-semibold text-portal-ink\">{line.name}</p><p className=\"text-xs text-portal-soft\">{line.quantity} × {money.format(line.unitPrice)}</p></div>\n",
+          "                  <div key={`${line.name}-${index}`} className=\"flex items-center justify-between gap-3 py-3 text-sm\">\n                    <div className=\"min-w-0\"><p className=\"truncate font-semibold text-portal-ink\">{line.name}</p>{line.configurationSummary ? <p className=\"text-xs font-semibold text-portal-forest\">{line.configurationSummary}</p> : null}{line.note ? <p className=\"text-[11px] text-portal-soft\">Catatan: {line.note}</p> : null}<p className=\"text-xs text-portal-soft\">{line.quantity} × {money.format(line.unitPrice)}</p></div>\n")
+          replace(path,
+          "          {filteredProducts.map(product => <ProductCard key={product.id} product={product} quantity={Number(lines.find(line => line.productId === product.id)?.quantity ?? 0)} onAdd={() => addProduct(product)} />)}\n",
+          "          {filteredProducts.map(product => <ProductCard key={product.id} product={product} quantity={lines.filter(line => line.productId === product.id).reduce((total, line) => total + Number(line.quantity), 0)} onAdd={() => addProduct(product)} />)}\n")
+          replace(path,
+          "      <ModalSurface open={cartOpen} onOpenChange={setCartOpen} ariaLabel=\"Pesanan\" presentation=\"sheet\" size=\"md\" returnFocusRef={cartTriggerRef} panelClassName=\"lg:hidden\">\n",
+          "      {configuringProduct ? (\n        <QuickSaleProductConfigurator\n          key={configuringProduct.id}\n          open\n          onOpenChange={open => { if (!open) setConfiguringProduct(null); }}\n          productName={configuringProduct.name}\n          basePriceAmount={priceLabelToAmount(configuringProduct.priceLabel)}\n          groups={configuringProduct.modifierGroups ?? []}\n          onConfirm={addConfiguredProduct}\n        />\n      ) : null}\n\n      <ModalSurface open={cartOpen} onOpenChange={setCartOpen} ariaLabel=\"Pesanan\" presentation=\"sheet\" size=\"md\" returnFocusRef={cartTriggerRef} panelClassName=\"lg:hidden\">\n")
+
+          # Kasir product payload carries choices.
+          path = 'frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/orders/page.tsx'
+          replace(path,
+          "    category: product.category,\n  }));\n",
+          "    category: product.category,\n    modifierGroups: product.modifierGroups ?? [],\n  }));\n")
+          replace(path,
+          "            const itemSummary = lines.map(line => `${line.product_name} × ${Number(line.quantity).toLocaleString('id-ID')}`).join(', ');\n",
+          "            const itemSummary = lines.map(line => {\n              const configuration = line.cost_snapshot?.configuration as { choices?: Array<{ option_label?: string }> } | undefined;\n              const choices = configuration?.choices?.map(choice => choice.option_label).filter(Boolean).join(' · ');\n              return `${line.product_name}${choices ? ` (${choices})` : ''} × ${Number(line.quantity).toLocaleString('id-ID')}`;\n            }).join(', ');\n")
+
+          # Human-friendly Modal Produk copy and summary.
+          path = 'frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/products/hpp/page.tsx'
+          replace(path,
+          "      <SectionCard eyebrow=\"Produk & HPP\" title=\"Hitung modal per produk\" description=\"Bahan, kemasan, yield, susut, stok, dan resep tersimpan per usaha. Lajukan menghitung HPP dari sumber yang sama agar angka tidak perlu diketik ulang.\">\n",
+          "      <SectionCard eyebrow=\"Barang\" title=\"Modal produk\" description=\"Pilih produk dan isi bahan yang dipakai. Lajukan menghitung modal per porsi, perkiraan untung, margin, dan berapa banyak yang masih bisa dibuat.\">\n")
+          replace(path,
+          "<p>Harga beli dan stok berasal dari <strong>Stok & Belanja</strong>. Perubahan resep disimpan ke backend canonical. HPP penjualan historis tetap perlu cost snapshot saat transaksi jual terhubung penuh.</p>",
+          "<p>Harga beli dan stok diambil otomatis dari <strong>Stok & Belanja</strong>. Kamu cukup mengatur bahan yang dipakai untuk satu produk.</p>")
+          replace(path,
+          "Peranmu tidak memiliki akses melihat HPP, biaya supplier, dan margin produk.",
+          "Peranmu tidak memiliki akses melihat modal, biaya bahan, dan margin produk.")
+
+          path = 'frontend/apps/usaha/src/components/business-control/DurableHppWorkspace.tsx'
+          replace(path, "setMessage('Resep tersimpan. HPP sekarang dihitung dari bahan canonical usaha.');", "setMessage('Bahan produk tersimpan. Modal per porsi sekarang dihitung otomatis dari harga dan stok bahan.');")
+          replace(path, "Belum ada produk. Tambahkan produk terlebih dahulu sebelum membuat resep HPP.", "Belum ada produk. Tambahkan produk terlebih dahulu sebelum menghitung modal produk.")
+          replace(path,
+          "        <div className=\"mt-4 grid grid-cols-3 gap-2 border-t border-portal-line pt-3\">\n          <div><p className=\"text-[11px] text-portal-soft\">HPP / porsi</p><p className=\"mt-0.5 text-lg font-black text-portal-ink\">{money.format(recipeCost.totalCost)}</p></div>\n          <div><p className=\"text-[11px] text-portal-soft\">Untung kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>\n          <div><p className=\"text-[11px] text-portal-soft\">Bisa dibuat</p><p className=\"mt-0.5 text-lg font-black text-portal-ink\">{capacity.capacity}</p></div>\n        </div>\n        <p className=\"mt-2 text-[11px] text-portal-soft\">Margin {number.format(margin)}%{capacity.bottleneck ? ` · pembatas ${capacity.bottleneck.name}` : ''}</p>\n",
+          "        <div className=\"mt-4 grid grid-cols-2 gap-2 border-t border-portal-line pt-3 sm:grid-cols-4\">\n          <div><p className=\"text-[11px] text-portal-soft\">Modal / porsi</p><p className=\"mt-0.5 text-lg font-black text-portal-ink\">{money.format(recipeCost.totalCost)}</p></div>\n          <div><p className=\"text-[11px] text-portal-soft\">Untung kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>\n          <div><p className=\"text-[11px] text-portal-soft\">Margin</p><p className=\"mt-0.5 text-lg font-black text-portal-ink\">{number.format(margin)}%</p></div>\n          <div><p className=\"text-[11px] text-portal-soft\">Bisa dibuat</p><p className=\"mt-0.5 text-lg font-black text-portal-ink\">{capacity.capacity}</p></div>\n        </div>\n        {capacity.bottleneck ? <p className=\"mt-2 text-[11px] font-semibold text-amber-800\">Terbatas oleh: {capacity.bottleneck.name}</p> : null}\n")
+          replace(path, "<div><h2 className=\"font-bold text-portal-ink\">Resep {product?.name}</h2><p className=\"text-xs text-portal-soft\">{items.length} bahan · data harga dan stok diambil otomatis</p></div>", "<div><h2 className=\"font-bold text-portal-ink\">Bahan yang dipakai</h2><p className=\"text-xs text-portal-soft\">{product?.name} · {items.length} bahan · harga dan stok diambil otomatis</p></div>")
+          replace(path, ">Rincian bahan</summary>", ">Detail perhitungan</summary>")
+          replace(path, ">Pengaturan resep</summary>", ">Pengaturan lanjutan</summary>")
+
+          # Marketplace POS: client sends IDs only; price, modifier snapshot, recipe effects and stock are authoritative here.
+          path = 'services/marketplace_service/src/businesses/sales.rs'
+          replace(path, "use serde_json::Value;", "use serde_json::{json, Value};")
+          replace(path,
+          "use super::recipes::resolve_effective_recipe;",
+          "use super::{\n    modifier_resolution::{resolve_modifier_selection, ModifierSelectionInput, ResolvedModifierSelection},\n    product_modifiers::{ModifierRecipeEffect, ModifierRecipeOperation, ProductModifierGroup},\n    recipes::resolve_effective_recipe,\n};")
+          replace(path,
+          "pub(crate) struct CreateSaleLineRequest {\n    pub(crate) product_id: Uuid,\n    pub(crate) quantity: Decimal,\n    pub(crate) unit_price_amount: i64,\n    #[serde(default)]\n    pub(crate) discount_amount: i64,\n}\n",
+          "pub(crate) struct CreateSaleLineRequest {\n    pub(crate) product_id: Uuid,\n    pub(crate) quantity: Decimal,\n    /// Compatibility only. The server always recomputes canonical product + modifier price.\n    #[serde(default)]\n    pub(crate) unit_price_amount: i64,\n    #[serde(default)]\n    pub(crate) discount_amount: i64,\n    #[serde(default)]\n    pub(crate) selected_options: Vec<ModifierSelectionInput>,\n    #[serde(default)]\n    pub(crate) note: Option<String>,\n}\n")
+          replace(path,
+          "        if line.unit_price_amount < 0 || line.discount_amount < 0 {\n            return Err(SaleRepositoryError::Validation(\"invalid_sale_amount\"));\n        }\n",
+          "        if line.discount_amount < 0 {\n            return Err(SaleRepositoryError::Validation(\"invalid_sale_amount\"));\n        }\n        normalize_sale_note(line.note.as_deref())?;\n")
+          old = '''    let product_name = sqlx::query_scalar::<_, String>(\n        r#"\n        SELECT name FROM business_products\n        WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'\n        FOR SHARE\n        "#,\n    )\n    .bind(line.product_id)\n    .bind(business_id)\n    .bind(organization_id)\n    .fetch_optional(&mut **tx)\n    .await?\n    .ok_or(SaleRepositoryError::NotFound)?;\n\n    let gross = decimal_money(Decimal::from(line.unit_price_amount) * line.quantity)?;\n    if line.discount_amount > gross {\n        return Err(SaleRepositoryError::Validation(\n            "sale_discount_exceeds_line_total",\n        ));\n    }\n    let final_revenue_amount = gross - line.discount_amount;\n'''
+          new = '''    let (product_name, price_label, modifier_groups) = sqlx::query_as::<_, (String, String, Value)>(\n        r#"\n        SELECT name, price_label, modifier_groups FROM business_products\n        WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'\n        FOR SHARE\n        "#,\n    )\n    .bind(line.product_id)\n    .bind(business_id)\n    .bind(organization_id)\n    .fetch_optional(&mut **tx)\n    .await?\n    .ok_or(SaleRepositoryError::NotFound)?;\n\n    let groups = serde_json::from_value::<Vec<ProductModifierGroup>>(modifier_groups)\n        .map_err(|_| SaleRepositoryError::Validation("invalid_sale_product_options"))?;\n    let resolved = resolve_modifier_selection(&groups, &line.selected_options)\n        .map_err(|_| SaleRepositoryError::Validation("invalid_sale_product_options"))?;\n    let unit_price_amount = authoritative_unit_price_amount(&price_label, resolved.price_delta_cents)?;\n    let note = normalize_sale_note(line.note.as_deref())?;\n    let configuration_snapshot = modifier_configuration_snapshot(&resolved, note.as_deref());\n\n    let gross = decimal_money(Decimal::from(unit_price_amount) * line.quantity)?;\n    if line.discount_amount > gross {\n        return Err(SaleRepositoryError::Validation(\n            "sale_discount_exceeds_line_total",\n        ));\n    }\n    let final_revenue_amount = gross - line.discount_amount;\n'''
+          replace(path, old, new)
+          replace(path,
+          "            unit_price_amount: line.unit_price_amount,\n            discount_amount: line.discount_amount,\n            final_revenue_amount,\n            unit_cogs_amount: None,\n            line_cogs_amount: None,\n            cost_snapshot: serde_json::json!({\n                \"status\": \"incomplete\",\n                \"reason\": \"recipe_missing\"\n            }),\n",
+          "            unit_price_amount,\n            discount_amount: line.discount_amount,\n            final_revenue_amount,\n            unit_cogs_amount: None,\n            line_cogs_amount: None,\n            cost_snapshot: json!({\n                \"status\": \"incomplete\",\n                \"reason\": \"recipe_missing\",\n                \"configuration\": configuration_snapshot\n            }),\n")
+          replace(path, "    let ingredient_inputs = recipe\n", "    let mut ingredient_inputs = recipe\n")
+          replace(path,
+          "        .collect::<Vec<_>>();\n    let recipe_version_id = recipe.recipe_version_id;\n",
+          "        .collect::<Vec<_>>();\n    apply_modifier_recipe_effects(\n        tx,\n        business_id,\n        organization_id,\n        recipe.servings,\n        &resolved.recipe_effects,\n        &mut ingredient_inputs,\n    )\n    .await?;\n    let recipe_version_id = recipe.recipe_version_id;\n",
+          1)
+          replace(path,
+          "    let cost_snapshot =\n        serde_json::to_value(&snapshot).map_err(|_| SaleRepositoryError::Database)?;\n\n    Ok(PreparedSaleLine {\n",
+          "    let mut cost_snapshot =\n        serde_json::to_value(&snapshot).map_err(|_| SaleRepositoryError::Database)?;\n    attach_configuration_snapshot(&mut cost_snapshot, configuration_snapshot);\n\n    Ok(PreparedSaleLine {\n")
+          replace(path, "        unit_price_amount: line.unit_price_amount,\n", "        unit_price_amount,\n", 1)
+          replace(path,
+          "        if let Err(error) = consume_ingredient_inventory(\n",
+          "        if let Err(error) = consume_product_inventory(\n            &mut tx,\n            business_id,\n            organization_id,\n            &prepared,\n        )\n        .await\n        {\n            tx.rollback().await?;\n            return Err(error);\n        }\n\n        if let Err(error) = consume_ingredient_inventory(\n")
+
+          insert_before = "async fn consume_ingredient_inventory(\n"
+          helpers = r'''fn authoritative_unit_price_amount(\n    price_label: &str,\n    modifier_delta_cents: i64,\n) -> Result<i64, SaleRepositoryError> {\n    let digits = price_label\n        .chars()\n        .filter(|character| character.is_ascii_digit())\n        .collect::<String>();\n    if digits.is_empty() {\n        return Err(SaleRepositoryError::Validation("invalid_product_price"));\n    }\n    let base = digits\n        .parse::<i64>()\n        .map_err(|_| SaleRepositoryError::Validation("invalid_product_price"))?;\n    let delta = (Decimal::from(modifier_delta_cents) / Decimal::from(100))\n        .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero)\n        .to_i64()\n        .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;\n    let total = base\n        .checked_add(delta)\n        .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;\n    if total < 0 {\n        return Err(SaleRepositoryError::Validation("invalid_sale_amount"));\n    }\n    Ok(total)\n}\n\nfn normalize_sale_note(note: Option<&str>) -> Result<Option<String>, SaleRepositoryError> {\n    let Some(note) = note else { return Ok(None); };\n    let normalized = note.split_whitespace().collect::<Vec<_>>().join(" ");\n    if normalized.is_empty() {\n        return Ok(None);\n    }\n    if normalized.chars().count() > 200 {\n        return Err(SaleRepositoryError::Validation("invalid_sale_note"));\n    }\n    Ok(Some(normalized))\n}\n\nfn modifier_configuration_snapshot(\n    resolved: &ResolvedModifierSelection,\n    note: Option<&str>,\n) -> Value {\n    json!({\n        "signature": resolved.signature,\n        "choices": &resolved.snapshots,\n        "note": note,\n    })\n}\n\nfn attach_configuration_snapshot(snapshot: &mut Value, configuration: Value) {\n    if let Value::Object(object) = snapshot {\n        object.insert("configuration".to_owned(), configuration);\n    }\n}\n\nasync fn apply_modifier_recipe_effects(\n    tx: &mut Transaction<'_, Postgres>,\n    business_id: Uuid,\n    organization_id: Uuid,\n    servings: Decimal,\n    effects: &[ModifierRecipeEffect],\n    ingredients: &mut Vec<SnapshotIngredientInput>,\n) -> Result<(), SaleRepositoryError> {\n    for effect in effects {\n        let recipe_quantity = effect.quantity * servings;\n        if let Some(item) = ingredients\n            .iter_mut()\n            .find(|item| item.ingredient_id == effect.ingredient_id)\n        {\n            match effect.operation {\n                ModifierRecipeOperation::Add => item.recipe_quantity += recipe_quantity,\n                ModifierRecipeOperation::Set => item.recipe_quantity = recipe_quantity,\n            }\n            continue;\n        }\n\n        if recipe_quantity <= Decimal::ZERO {\n            continue;\n        }\n        let row = sqlx::query_as::<_, (String, i64, Decimal, Decimal, Decimal, Decimal)>(\n            r#"\n            SELECT name, purchase_price_amount, purchase_quantity, conversion_factor,\n              yield_percent, waste_percent\n            FROM business_ingredients\n            WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'\n            FOR SHARE\n            "#,\n        )\n        .bind(effect.ingredient_id)\n        .bind(business_id)\n        .bind(organization_id)\n        .fetch_optional(&mut **tx)\n        .await?\n        .ok_or(SaleRepositoryError::Validation("invalid_modifier_recipe_ingredient"))?;\n        ingredients.push(SnapshotIngredientInput {\n            ingredient_id: effect.ingredient_id,\n            ingredient_name: row.0,\n            recipe_quantity,\n            purchase_price_amount: row.1,\n            purchase_quantity: row.2,\n            conversion_factor: row.3,\n            yield_percent: row.4,\n            waste_percent: row.5,\n        });\n    }\n    ingredients.retain(|item| item.recipe_quantity > Decimal::ZERO);\n    Ok(())\n}\n\nasync fn consume_product_inventory(\n    tx: &mut Transaction<'_, Postgres>,\n    business_id: Uuid,\n    organization_id: Uuid,\n    prepared_lines: &[PreparedSaleLine],\n) -> Result<(), SaleRepositoryError> {\n    let mut required_by_product = BTreeMap::<Uuid, Decimal>::new();\n    for line in prepared_lines {\n        *required_by_product.entry(line.product_id).or_insert(Decimal::ZERO) += line.quantity;\n    }\n\n    for (product_id, required_quantity) in required_by_product {\n        let inventory = sqlx::query_as::<_, (String, Option<f64>)>(\n            r#"\n            SELECT stock_mode, stock_count\n            FROM business_inventory\n            WHERE product_id=$1 AND business_id=$2 AND organization_id=$3\n            FOR UPDATE\n            "#,\n        )\n        .bind(product_id)\n        .bind(business_id)\n        .bind(organization_id)\n        .fetch_optional(&mut **tx)\n        .await?;\n\n        let Some((stock_mode, Some(stock_count))) = inventory else { continue; };\n        if stock_mode != "manual" {\n            continue;\n        }\n        let required = required_quantity\n            .to_f64()\n            .ok_or(SaleRepositoryError::Validation("invalid_sale_quantity"))?;\n        if required <= 0.0 || stock_count + f64::EPSILON < required {\n            return Err(SaleRepositoryError::InsufficientStock);\n        }\n        let updated = sqlx::query(\n            r#"\n            UPDATE business_inventory\n            SET stock_count = stock_count - $4, updated_at = NOW()\n            WHERE product_id=$1 AND business_id=$2 AND organization_id=$3\n              AND stock_mode='manual' AND stock_count >= $4\n            "#,\n        )\n        .bind(product_id)\n        .bind(business_id)\n        .bind(organization_id)\n        .bind(required)\n        .execute(&mut **tx)\n        .await?;\n        if updated.rows_affected() != 1 {\n            return Err(SaleRepositoryError::InsufficientStock);\n        }\n    }\n    Ok(())\n}\n\n'''
+          p = Path(path)
+          text = p.read_text()
+          if insert_before not in text:
+              raise SystemExit('sales.rs: consume inventory insertion point missing')
+          text = text.replace(insert_before, helpers + insert_before, 1)
+          p.write_text(text)
+
+          # Update old unit test fixture and add boundary tests.
+          replace(path,
+          "                unit_price_amount: 12_000,\n                discount_amount: 0,\n",
+          "                unit_price_amount: 12_000,\n                discount_amount: 0,\n                selected_options: Vec::new(),\n                note: None,\n",
+          1)
+          replace(path,
+          "    #[test]\n    fn sale_request_validation_rejects_invalid_account_and_quantity() {",
+          "    #[test]\n    fn canonical_pos_price_converts_modifier_cents_to_rupiah() {\n        assert_eq!(authoritative_unit_price_amount(\"Rp12.000\", 300_000).unwrap(), 15_000);\n        assert_eq!(authoritative_unit_price_amount(\"Rp12.000\", -200_000).unwrap(), 10_000);\n    }\n\n    #[test]\n    fn sale_note_is_normalized_for_snapshot_identity() {\n        assert_eq!(normalize_sale_note(Some(\"  es   sedikit  \" )).unwrap().as_deref(), Some(\"es sedikit\"));\n    }\n\n    #[test]\n    fn sale_request_validation_rejects_invalid_account_and_quantity() {")
+          PY
+      - name: Verify Marketplace
+        working-directory: services/marketplace_service
+        run: |
+          cargo fmt
+          cargo check --all-targets
+          cargo test businesses::modifier_resolution::tests --lib
+          cargo test businesses::sales::tests --lib
+      - name: Verify Usaha
+        working-directory: frontend/apps/usaha
+        run: |
+          npm ci
+          npm test -- --run
+          npm run typecheck
+          npm run lint
+          npm run build
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/apps/usaha services/marketplace_service
+          if git diff --cached --quiet; then
+            echo "No implementation changes to commit"
+            exit 1
+          fi
+          git commit -m "feat(usaha): complete configured POS and product costing flow"
+          git push origin HEAD:feat/usaha-flow-system
