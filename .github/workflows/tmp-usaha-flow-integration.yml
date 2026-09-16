@@ -29,7 +29,6 @@ jobs:
           # Public commerce delegates modifier semantics to one shared Marketplace resolver.
           path = Path('services/marketplace_service/src/businesses/public_commerce.rs')
           s = path.read_text()
-          s = s.replace('collections::{HashMap, HashSet},', 'collections::HashMap,')
           old_import = 'use super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup};'
           new_import = '''use super::{
               modifier_resolution::{
@@ -97,7 +96,6 @@ jobs:
               'use super::super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup, ProductModifierOption};',
               1,
           )
-          # Existing public-commerce test fixtures predate recipe effects.
           s = re.sub(
               r'(ProductModifierOption \{.*?enabled: true,)(\n\s*\})',
               r'\1\n                    recipe_effects: Vec::new(),\2',
@@ -110,23 +108,25 @@ jobs:
           path = Path('services/marketplace_service/src/businesses/products.rs')
           s = path.read_text()
           s = s.replace('use serde_json::json;', 'use serde_json::{json, Value};', 1)
-          marker = '    pub(crate) image_height: Option<i32>,\n}'
-          assert marker in s, 'BusinessProduct end marker not found'
-          s = s.replace(marker, '    pub(crate) image_height: Option<i32>,\n    pub(crate) modifier_groups: Value,\n}', 1)
 
-          select_pattern = re.compile(r'(?m)^(\s*)product\.image_height,?\n(\s*)FROM business_products product$')
-          def add_modifier_projection(match):
+          business_pattern = re.compile(r'(pub\(crate\) struct BusinessProduct \{.*?\n    pub\(crate\) image_height: Option<i32>,)(\n\})', re.S)
+          s, count = business_pattern.subn(r'\1\n    pub(crate) modifier_groups: Value,\2', s, count=1)
+          assert count == 1, f'BusinessProduct patch count {count}'
+
+          select_pattern = re.compile(r'(?m)^(\s*)product\.image_height\n(\s*)FROM business_products product$')
+          def add_projection(match):
               return (
                   f"{match.group(1)}product.image_height,\n"
                   f"{match.group(1)}COALESCE(product.modifier_groups, '[]'::jsonb) AS modifier_groups\n"
                   f"{match.group(2)}FROM business_products product"
               )
-          s, count = select_pattern.subn(add_modifier_projection, s)
-          assert count == 2, f'expected two product SELECT projections, found {count}'
+          s, count = select_pattern.subn(add_projection, s)
+          assert count == 2, f'product SELECT projection count {count}'
 
-          row_marker = '    image_height: Option<i32>,\n}'
-          assert row_marker in s, 'ProductRow end marker not found'
-          s = s.replace(row_marker, '    image_height: Option<i32>,\n    modifier_groups: Value,\n}', 1)
+          row_pattern = re.compile(r'(struct ProductRow \{.*?\n    image_height: Option<i32>,)(\n\})', re.S)
+          s, count = row_pattern.subn(r'\1\n    modifier_groups: Value,\2', s, count=1)
+          assert count == 1, f'ProductRow patch count {count}'
+
           map_marker = '            image_height: self.image_height,\n        }'
           assert map_marker in s, 'ProductRow mapper marker not found'
           s = s.replace(map_marker, '            image_height: self.image_height,\n            modifier_groups: self.modifier_groups,\n        }', 1)
@@ -139,7 +139,7 @@ jobs:
               s = "import type { ProductModifierGroup } from 'lajukan-ui';\n" + s
           marker = '  imageUrl?: string; image?: BusinessImageValue;\n};'
           assert marker in s, 'ProductRecord end marker not found'
-          s = s.replace(marker, '  imageUrl?: string; image?: BusinessImageValue; modifierGroups: ProductModifierGroup[];\n};', 1)
+          s = s.replace(marker, '  imageUrl?: string; image?: BusinessImageValue; modifierGroups?: ProductModifierGroup[];\n};', 1)
           path.write_text(s)
 
           path = Path('frontend/apps/usaha/src/lib/business-server.ts')
@@ -155,7 +155,6 @@ jobs:
           )
           path.write_text(s)
 
-          # Add local shared package dependency; npm generates the lockfile deterministically.
           package_path = Path('frontend/apps/usaha/package.json')
           package = json.loads(package_path.read_text())
           package.setdefault('dependencies', {})['lajukan-ui'] = 'file:../../packages'
