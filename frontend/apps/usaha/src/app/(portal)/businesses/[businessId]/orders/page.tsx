@@ -53,6 +53,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
     priceLabel: product.priceLabel,
     imageUrl: product.imageUrl,
     category: product.category,
+    modifierGroups: product.modifierGroups ?? [],
   }));
 
   const availableViews = [
@@ -93,7 +94,11 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
       {activeView === 'transaksi' && canViewTransactions ? (
         <section className="merchant-list border border-portal-line/80">
           {sales.length ? sales.map(({ sale, lines }) => {
-            const itemSummary = lines.map(line => `${line.product_name} × ${Number(line.quantity).toLocaleString('id-ID')}`).join(', ');
+            const itemSummary = lines.map(line => {
+              const configuration = line.cost_snapshot?.configuration as { choices?: Array<{ option_label?: string }> } | undefined;
+              const choices = configuration?.choices?.map(choice => choice.option_label).filter(Boolean).join(' · ');
+              return `${line.product_name}${choices ? ` (${choices})` : ''} × ${Number(line.quantity).toLocaleString('id-ID')}`;
+            }).join(', ');
             const grossProfit = sale.cost_complete && sale.cogs_amount !== null ? sale.final_amount - sale.cogs_amount : null;
             return (
               <article key={sale.id} className="merchant-action-row sm:grid sm:grid-cols-[minmax(0,1fr)_130px_150px] sm:items-center">

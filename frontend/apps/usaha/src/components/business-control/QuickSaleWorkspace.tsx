@@ -17,7 +17,9 @@ import {
   WalletCards,
   X,
 } from 'lucide-react';
+import type { ProductModifierGroup, ProductModifierSelection } from 'lajukan-ui';
 import { ModalSurface } from '@/components/interaction/ModalSurface';
+import { QuickSaleProductConfigurator } from './QuickSaleProductConfigurator';
 import {
   buildQuickSaleRequest,
   buildReceiptShareText,
@@ -25,6 +27,7 @@ import {
   calculateCashChange,
   canCompleteCheckout,
   filterQuickSaleProducts,
+  mergeQuickSaleLine,
   priceLabelToAmount,
   quickSaleItemCount,
   quickSaleTotal,
@@ -47,9 +50,22 @@ export type ProductOption = {
   imageUrl?: string | null;
   category?: string | null;
   isFavorite?: boolean;
+  modifierGroups?: ProductModifierGroup[];
 };
 
-type DraftLine = QuickSaleLineDraft & { key: string; productName: string };
+type DraftLine = QuickSaleLineDraft & {
+  key: string;
+  productName: string;
+  configurationSummary?: string;
+};
+
+type ConfiguredProductInput = {
+  quantity: number;
+  selectedOptions: ProductModifierSelection[];
+  note: string;
+  previewUnitPriceAmount: number;
+  configurationSummary: string;
+};
 
 type Props = {
   businessId: string;
@@ -76,14 +92,19 @@ const money = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 0,
 });
 
-function makeLine(product: ProductOption): DraftLine {
+function makeLine(product: ProductOption, configured?: ConfiguredProductInput): DraftLine {
+  const basePriceAmount = priceLabelToAmount(product.priceLabel);
   return {
     key: crypto.randomUUID(),
     productId: product.id,
     productName: product.name,
-    quantity: 1,
-    unitPriceAmount: priceLabelToAmount(product.priceLabel),
+    quantity: configured?.quantity ?? 1,
+    basePriceAmount,
+    unitPricePreviewAmount: configured?.previewUnitPriceAmount ?? basePriceAmount,
     discountAmount: 0,
+    selectedOptions: configured?.selectedOptions ?? [],
+    note: configured?.note || undefined,
+    configurationSummary: configured?.configurationSummary || undefined,
   };
 }
 
@@ -194,13 +215,15 @@ function CartLines({ lines, onQuantity }: { lines: DraftLine[]; onQuantity: (key
   return (
     <div className="divide-y divide-portal-line">
       {lines.map(line => {
-        const subtotal = Number(line.quantity) * Number(line.unitPriceAmount);
+        const subtotal = Number(line.quantity) * Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0);
         return (
           <div key={line.key} className="py-3 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-portal-ink">{line.productName}</p>
-                <p className="mt-0.5 text-xs text-portal-soft">{money.format(Number(line.unitPriceAmount))} × {line.quantity}</p>
+                {line.configurationSummary ? <p className="mt-0.5 text-xs font-semibold text-portal-forest">{line.configurationSummary}</p> : null}
+                {line.note ? <p className="mt-0.5 text-[11px] text-portal-soft">Catatan: {line.note}</p> : null}
+                <p className="mt-0.5 text-xs text-portal-soft">{money.format(Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0))} × {line.quantity}</p>
               </div>
               <p className="shrink-0 text-sm font-black tabular-nums text-portal-ink">{money.format(subtotal)}</p>
             </div>
@@ -232,6 +255,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   const [filterKey, setFilterKey] = useState('all');
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [configuringProduct, setConfiguringProduct] = useState<ProductOption | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [tenderedAmount, setTenderedAmount] = useState(0);
   const [receipt, setReceipt] = useState<ReceiptView | null>(null);
@@ -258,13 +282,21 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   }
 
   function addProduct(product: ProductOption) {
+    if (product.modifierGroups?.length) {
+      setConfiguringProduct(product);
+      return;
+    }
     changed();
     setReceipt(null);
-    setLines(current => {
-      const existing = current.find(line => line.productId === product.id);
-      if (!existing) return [...current, makeLine(product)];
-      return current.map(line => line.key === existing.key ? { ...line, quantity: Number(line.quantity) + 1 } : line);
-    });
+    setLines(current => mergeQuickSaleLine(current, makeLine(product)) as DraftLine[]);
+  }
+
+  function addConfiguredProduct(input: ConfiguredProductInput) {
+    const product = configuringProduct;
+    if (!product) return;
+    changed();
+    setReceipt(null);
+    setLines(current => mergeQuickSaleLine(current, makeLine(product, input)) as DraftLine[]);
   }
 
   function setQuantity(key: string, quantity: number) {
@@ -281,6 +313,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
     setLines([]);
     setCartOpen(false);
     setCheckoutOpen(false);
+    setConfiguringProduct(null);
     setTenderedAmount(0);
     setReceipt(null);
     setFeedback(null);
@@ -320,7 +353,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
       });
       const body = (await response.json().catch(() => ({}))) as {
         error?: string;
-        data?: { sale?: { sale?: { id?: string; created_at?: string; final_amount?: number } } };
+        data?: { sale?: { sale?: { id?: string; created_at?: string; final_amount?: number }; lines?: Array<{ unit_price_amount?: number }> } };
       };
       if (!response.ok) throw new Error(body.error || 'sale_save_failed');
 
@@ -335,7 +368,13 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
         paymentLabel,
         total: settledTotal,
         tenderedAmount: accountKey === 'cash' ? tenderedAmount : undefined,
-        lines: lines.map(line => ({ name: line.productName, quantity: Number(line.quantity), unitPrice: Number(line.unitPriceAmount) })),
+        lines: lines.map((line, index) => ({
+          name: line.productName,
+          quantity: Number(line.quantity),
+          unitPrice: body.data?.sale?.lines?.[index]?.unit_price_amount ?? Number(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount ?? 0),
+          configurationSummary: line.configurationSummary,
+          note: line.note,
+        })),
       }));
       attemptKey.current = null;
       setCartOpen(false);
@@ -395,7 +434,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
               <div className="divide-y divide-portal-line">
                 {receipt.lines.map((line, index) => (
                   <div key={`${line.name}-${index}`} className="flex items-center justify-between gap-3 py-3 text-sm">
-                    <div className="min-w-0"><p className="truncate font-semibold text-portal-ink">{line.name}</p><p className="text-xs text-portal-soft">{line.quantity} × {money.format(line.unitPrice)}</p></div>
+                    <div className="min-w-0"><p className="truncate font-semibold text-portal-ink">{line.name}</p>{line.configurationSummary ? <p className="text-xs font-semibold text-portal-forest">{line.configurationSummary}</p> : null}{line.note ? <p className="text-[11px] text-portal-soft">Catatan: {line.note}</p> : null}<p className="text-xs text-portal-soft">{line.quantity} × {money.format(line.unitPrice)}</p></div>
                     <p className="font-bold tabular-nums text-portal-ink">{money.format(line.quantity * line.unitPrice)}</p>
                   </div>
                 ))}
@@ -440,7 +479,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
         </div>
 
         <div className="mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {filteredProducts.map(product => <ProductCard key={product.id} product={product} quantity={Number(lines.find(line => line.productId === product.id)?.quantity ?? 0)} onAdd={() => addProduct(product)} />)}
+          {filteredProducts.map(product => <ProductCard key={product.id} product={product} quantity={lines.filter(line => line.productId === product.id).reduce((total, line) => total + Number(line.quantity), 0)} onAdd={() => addProduct(product)} />)}
         </div>
         {!filteredProducts.length ? (
           <div className="mt-3 rounded-2xl border border-dashed border-portal-line p-6 text-center">
@@ -470,6 +509,18 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
             <button ref={checkoutTriggerRef} type="button" className="portal-button-primary shrink-0 justify-center px-6 py-3.5" onClick={openCheckout}>Bayar</button>
           </div>
         </div>
+      ) : null}
+
+      {configuringProduct ? (
+        <QuickSaleProductConfigurator
+          key={configuringProduct.id}
+          open
+          onOpenChange={open => { if (!open) setConfiguringProduct(null); }}
+          productName={configuringProduct.name}
+          basePriceAmount={priceLabelToAmount(configuringProduct.priceLabel)}
+          groups={configuringProduct.modifierGroups ?? []}
+          onConfirm={addConfiguredProduct}
+        />
       ) : null}
 
       <ModalSurface open={cartOpen} onOpenChange={setCartOpen} ariaLabel="Pesanan" presentation="sheet" size="md" returnFocusRef={cartTriggerRef} panelClassName="lg:hidden">

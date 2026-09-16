@@ -254,6 +254,8 @@ async fn sale_uses_effective_recipe_version_for_snapshot_and_consumption(pool: P
                     quantity: Decimal::from(2),
                     unit_price_amount: 12_000,
                     discount_amount: 0,
+                    selected_options: Vec::new(),
+                    note: None,
                 }],
             },
         )
@@ -313,6 +315,8 @@ async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool
                     quantity: Decimal::ONE,
                     unit_price_amount: 12_000,
                     discount_amount: 0,
+                    selected_options: Vec::new(),
+                    note: None,
                 }],
             },
         )
@@ -453,6 +457,8 @@ async fn current_day_sale_uses_version_effective_at_posting_time(pool: PgPool) {
                     quantity: Decimal::ONE,
                     unit_price_amount: 12_000,
                     discount_amount: 0,
+                    selected_options: Vec::new(),
+                    note: None,
                 }],
             },
         )
