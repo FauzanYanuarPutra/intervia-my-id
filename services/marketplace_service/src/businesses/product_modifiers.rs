@@ -259,8 +259,8 @@ pub(crate) fn validate_groups(
 
     for mut group in groups {
         group.id = normalize_id(&group.id).ok_or("invalid_modifier_group_id")?;
-        group.name =
-            normalize_text(&group.name, MAX_GROUP_NAME).ok_or("invalid_modifier_group_name")?;
+        group.name = normalize_text(&group.name, MAX_GROUP_NAME)
+            .ok_or("invalid_modifier_group_name")?;
         if !group_ids.insert(group.id.clone()) {
             return Err("duplicate_modifier_group_id");
         }
@@ -280,6 +280,9 @@ pub(crate) fn validate_groups(
             if option.price_delta_cents.abs() > MAX_PRICE_DELTA_CENTS {
                 return Err("invalid_modifier_price_delta");
             }
+            if option.price_delta_cents % 100 != 0 {
+                return Err("modifier_option_price_delta_must_be_whole_rupiah");
+            }
             if option.recipe_effects.len() > MAX_RECIPE_EFFECTS_PER_OPTION {
                 return Err("too_many_modifier_recipe_effects");
             }
@@ -288,7 +291,7 @@ pub(crate) fn validate_groups(
                 if effect.ingredient_id.is_nil() {
                     return Err("invalid_modifier_recipe_ingredient");
                 }
-                if effect.quantity < Decimal::ZERO {
+                if effect.quantity <= Decimal::ZERO {
                     return Err("invalid_modifier_recipe_quantity");
                 }
                 if !recipe_effect_keys.insert((effect.ingredient_id, effect.operation)) {
@@ -433,5 +436,24 @@ mod tests {
         .unwrap();
         assert_eq!(groups[0].min_selections, 0);
         assert_eq!(groups[0].max_selections, Some(2));
+    }
+
+    #[test]
+    fn modifier_price_delta_must_convert_exactly_to_integer_rupiah() {
+        let mut invalid = option("boba", "Boba", false);
+        invalid.price_delta_cents = 300_001;
+        let result = validate_groups(vec![ProductModifierGroup {
+            id: "topping".into(),
+            name: "Topping".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: false,
+            min_selections: 0,
+            max_selections: Some(1),
+            options: vec![invalid],
+        }]);
+        assert_eq!(
+            result,
+            Err("modifier_option_price_delta_must_be_whole_rupiah")
+        );
     }
 }
