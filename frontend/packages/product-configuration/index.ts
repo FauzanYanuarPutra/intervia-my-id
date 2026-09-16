@@ -192,16 +192,15 @@ export function validateProductModifierSelections(
       group.options.filter(option => option.enabled).map(option => option.id),
     );
     const requested = selected.get(group.id) ?? [];
-    const ids = requested.filter(id => validOptions.has(id));
 
-    if (ids.length !== requested.length) {
-      errors[group.id] = 'Pilihan tidak tersedia.';
-    } else if (ids.length < group.min_selections) {
+    if (requested.length < group.min_selections) {
       errors[group.id] = group.required
         ? 'Pilihan ini wajib diisi.'
         : `Pilih minimal ${group.min_selections}.`;
-    } else if (ids.length > group.max_selections) {
+    } else if (requested.length > group.max_selections) {
       errors[group.id] = `Pilih maksimal ${group.max_selections}.`;
+    } else if (requested.some(id => !validOptions.has(id))) {
+      errors[group.id] = 'Pilihan tidak tersedia.';
     }
   }
 
