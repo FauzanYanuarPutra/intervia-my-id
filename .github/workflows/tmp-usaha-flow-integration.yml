@@ -132,6 +132,18 @@ jobs:
           s = s.replace(map_marker, '            image_height: self.image_height,\n            modifier_groups: self.modifier_groups,\n        }', 1)
           path.write_text(s)
 
+          # Existing aggregate serialization fixture gets the additive field.
+          path = Path('services/marketplace_service/src/businesses/domain.rs')
+          s = path.read_text()
+          fixture_marker = '                image_height: None,\n            }],'
+          assert fixture_marker in s, 'BusinessProduct fixture marker not found'
+          s = s.replace(
+              fixture_marker,
+              '                image_height: None,\n                modifier_groups: serde_json::json!([]),\n            }],',
+              1,
+          )
+          path.write_text(s)
+
           # Usaha consumes the same shared frontend domain as WWW.
           path = Path('frontend/apps/usaha/src/lib/portal-types.ts')
           s = path.read_text()
@@ -174,8 +186,9 @@ jobs:
           cargo test --locked businesses::modifier_resolution::tests
           cargo test --locked businesses::modifier_recipe_effect_tests
           cargo test --locked businesses::public_commerce::tests
+          cargo test --locked businesses::domain::tests
 
-      - name: Build shared package and typecheck Usaha
+      - name: Build shared package and verify Usaha
         shell: bash
         run: |
           cd frontend/packages
@@ -184,6 +197,7 @@ jobs:
           npm test
           cd ../apps/usaha
           npm ci --legacy-peer-deps --include=dev --no-audit --no-fund
+          npm run test -- --run
           npm run typecheck
 
       - name: Commit verified integration
@@ -191,7 +205,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add services/marketplace_service/src/businesses/public_commerce.rs services/marketplace_service/src/businesses/products.rs services/marketplace_service/src/businesses/product_modifiers.rs services/marketplace_service/src/businesses/modifier_resolution.rs frontend/apps/usaha/package.json frontend/apps/usaha/package-lock.json frontend/apps/usaha/src/lib/portal-types.ts frontend/apps/usaha/src/lib/business-server.ts
+          git add services/marketplace_service/src/businesses/public_commerce.rs services/marketplace_service/src/businesses/products.rs services/marketplace_service/src/businesses/domain.rs services/marketplace_service/src/businesses/product_modifiers.rs services/marketplace_service/src/businesses/modifier_resolution.rs frontend/apps/usaha/package.json frontend/apps/usaha/package-lock.json frontend/apps/usaha/src/lib/portal-types.ts frontend/apps/usaha/src/lib/business-server.ts
           if git diff --cached --quiet; then
             echo "No integration changes to commit"
           else
