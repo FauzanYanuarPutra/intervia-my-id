@@ -1,0 +1,198 @@
+name: Temporary Usaha Flow Integration
+
+on:
+  push:
+    branches: [feat/usaha-flow-system]
+    paths:
+      - .github/workflows/tmp-usaha-flow-integration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/usaha-flow-system
+          fetch-depth: 0
+
+      - name: Patch shared backend and Usaha product flow
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, re
+
+          # Public commerce: delegate modifier semantics to the shared Marketplace resolver.
+          path = Path('services/marketplace_service/src/businesses/public_commerce.rs')
+          s = path.read_text()
+          s = s.replace('collections::{HashMap, HashSet},', 'collections::HashMap,')
+          old_import = 'use super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup};'
+          new_import = '''use super::{
+              modifier_resolution::{
+                  resolve_modifier_selection as resolve_shared_modifier_selection, ModifierResolutionError,
+                  ModifierSelectionInput, ModifierSnapshot, ResolvedModifierSelection,
+              },
+              product_modifiers::ProductModifierGroup,
+          };'''
+          assert old_import in s
+          s = s.replace(old_import, new_import, 1)
+
+          old_structs = '''#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+          struct ModifierSnapshot {
+              group_id: String,
+              group_name: String,
+              option_id: String,
+              option_label: String,
+              price_delta_cents: i64,
+          }
+
+          #[derive(Debug, Clone, PartialEq, Eq)]
+          struct ResolvedModifierSelection {
+              signature: String,
+              price_delta_cents: i64,
+              snapshots: Vec<ModifierSnapshot>,
+          }
+
+          '''
+          assert old_structs in s
+          s = s.replace(old_structs, '', 1)
+
+          pattern = re.compile(r'''fn resolve_modifier_selection\(
+              groups: &\[ProductModifierGroup\],
+              input: &\[PublicModifierSelectionInput\],
+          \) -> Result<ResolvedModifierSelection, PublicCommerceError> \{.*?\n\}\n\nfn normalize_optional_text''', re.S | re.X)
+          replacement = '''fn resolve_modifier_selection(
+              groups: &[ProductModifierGroup],
+              input: &[PublicModifierSelectionInput],
+          ) -> Result<ResolvedModifierSelection, PublicCommerceError> {
+              let selections = input
+                  .iter()
+                  .map(|selection| ModifierSelectionInput {
+                      group_id: selection.group_id.clone(),
+                      option_ids: selection.option_ids.clone(),
+                  })
+                  .collect::<Vec<_>>();
+              resolve_shared_modifier_selection(groups, &selections).map_err(|error| {
+                  PublicCommerceError::Validation(match error {
+                      ModifierResolutionError::DuplicateGroup => "duplicate_modifier_group_selection",
+                      ModifierResolutionError::DuplicateOption => "duplicate_modifier_option_selection",
+                      ModifierResolutionError::InvalidSelectionCount => "invalid_modifier_selection_count",
+                      ModifierResolutionError::InvalidOption => "invalid_modifier_option",
+                      ModifierResolutionError::UnknownGroup => "unknown_modifier_group",
+                      ModifierResolutionError::PriceOverflow => "invalid_configured_price",
+                      ModifierResolutionError::ConflictingRecipeSetEffect => "conflicting_modifier_recipe_effect",
+                  })
+              })
+          }
+
+          fn normalize_optional_text'''
+          s, n = pattern.subn(replacement, s, count=1)
+          assert n == 1, n
+          s = s.replace(
+              'use super::super::product_modifiers::{ProductModifierGroup, ProductModifierOption};',
+              'use super::super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup, ProductModifierOption};',
+              1,
+          )
+          # Every test-only literal predating recipe effects gets an empty list.
+          s = re.sub(
+              r'(ProductModifierOption \{.*?enabled: true,)(\n\s*\})',
+              r'\1\n                    recipe_effects: Vec::new(),\2',
+              s,
+              flags=re.S,
+          )
+          path.write_text(s)
+
+          # Canonical business product payload must carry modifier_groups to Usaha/POS.
+          path = Path('services/marketplace_service/src/businesses/products.rs')
+          s = path.read_text()
+          s = s.replace('use serde_json::json;', 'use serde_json::{json, Value};', 1)
+          marker = '    pub(crate) image_height: Option<i32>,\n}'
+          assert marker in s
+          s = s.replace(marker, '    pub(crate) image_height: Option<i32>,\n    pub(crate) modifier_groups: Value,\n}', 1)
+          for select_marker in [
+              '      product.image_height\n    FROM business_products product',
+          ]:
+              count = s.count(select_marker)
+              assert count == 2, count
+              s = s.replace(select_marker, "      product.image_height,\n      COALESCE(product.modifier_groups, '[]'::jsonb) AS modifier_groups\n    FROM business_products product")
+          row_marker = '    image_height: Option<i32>,\n}'
+          assert row_marker in s
+          s = s.replace(row_marker, '    image_height: Option<i32>,\n    modifier_groups: Value,\n}', 1)
+          map_marker = '            image_height: self.image_height,\n        }'
+          assert map_marker in s
+          s = s.replace(map_marker, '            image_height: self.image_height,\n            modifier_groups: self.modifier_groups,\n        }', 1)
+          path.write_text(s)
+
+          # Usaha consumes the same shared frontend domain as WWW.
+          path = Path('frontend/apps/usaha/src/lib/portal-types.ts')
+          s = path.read_text()
+          if "from 'lajukan-ui'" not in s:
+              s = "import type { ProductModifierGroup } from 'lajukan-ui';\n" + s
+          marker = '  imageUrl?: string; image?: BusinessImageValue;\n};'
+          assert marker in s
+          s = s.replace(marker, '  imageUrl?: string; image?: BusinessImageValue; modifierGroups: ProductModifierGroup[];\n};', 1)
+          path.write_text(s)
+
+          path = Path('frontend/apps/usaha/src/lib/business-server.ts')
+          s = path.read_text()
+          if "parseProductModifierGroups" not in s.split('\n', 8)[0:8]:
+              s = "import { parseProductModifierGroups } from 'lajukan-ui';\n" + s
+          marker = "    imageUrl: stringValue(item.image_url ?? item.imageUrl) || undefined,\n"
+          assert marker in s
+          s = s.replace(
+              marker,
+              marker + "    modifierGroups: parseProductModifierGroups({\n      modifier_groups: item.modifier_groups ?? item.modifierGroups,\n    }),\n",
+              1,
+          )
+          path.write_text(s)
+
+          # Add local shared package dependency; npm will generate the lock deterministically.
+          package_path = Path('frontend/apps/usaha/package.json')
+          package = json.loads(package_path.read_text())
+          package.setdefault('dependencies', {})['lajukan-ui'] = 'file:../../packages'
+          package['dependencies'] = dict(sorted(package['dependencies'].items()))
+          package_path.write_text(json.dumps(package, indent=2) + '\n')
+          PY
+
+      - name: Generate Usaha lockfile
+        working-directory: frontend/apps/usaha
+        run: npm install --package-lock-only --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+
+      - name: Format and verify Marketplace
+        working-directory: services/marketplace_service
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          cargo fmt --all -- --check || cargo fmt --all
+          cargo check --locked
+          cargo test --locked businesses::modifier_resolution::tests
+          cargo test --locked businesses::modifier_recipe_effect_tests
+          cargo test --locked businesses::public_commerce::tests
+
+      - name: Build shared package and typecheck Usaha
+        shell: bash
+        run: |
+          cd frontend/packages
+          npm ci --legacy-peer-deps --include=dev --no-audit --no-fund
+          npm run build
+          npm test
+          cd ../apps/usaha
+          npm ci --legacy-peer-deps --include=dev --no-audit --no-fund
+          npm run typecheck
+
+      - name: Commit verified integration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service/src/businesses/public_commerce.rs services/marketplace_service/src/businesses/products.rs frontend/apps/usaha/package.json frontend/apps/usaha/package-lock.json frontend/apps/usaha/src/lib/portal-types.ts frontend/apps/usaha/src/lib/business-server.ts
+          if git diff --cached --quiet; then
+            echo "No integration changes to commit"
+          else
+            git commit -m "feat(usaha): expose customer choices to merchant flow"
+            git push origin HEAD:feat/usaha-flow-system
+          fi
