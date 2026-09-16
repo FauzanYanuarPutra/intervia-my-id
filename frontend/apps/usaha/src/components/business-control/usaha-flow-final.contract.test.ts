@@ -1,0 +1,41 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+function source(path: string) {
+  return readFileSync(resolve(process.cwd(), path), 'utf8');
+}
+
+describe('Flow Usaha final contracts', () => {
+  it('uses Pilihan pelanggan vocabulary with templates and ingredient effects', () => {
+    const editor = source('src/components/forms/ProductModifierEditor.tsx');
+    expect(editor).toContain('Pilihan pelanggan');
+    expect(editor).toContain('Tingkat gula');
+    expect(editor).toContain('Topping');
+    expect(editor).toContain('Pengaruh ke bahan');
+    expect(editor).toContain('recipe_effects');
+    expect(editor).not.toContain('Pilihan produk');
+  });
+
+  it('keeps selling price read-only in Modal produk', () => {
+    const hpp = source('src/components/business-control/DurableHppWorkspace.tsx');
+    expect(hpp).not.toContain('setSellingPrice');
+    expect(hpp).not.toContain('onChange={event => setSellingPrice');
+    expect(hpp).toContain('Harga jual dari Barang');
+  });
+
+  it('lets cashier reopen and edit a configured cart line', () => {
+    const workspace = source('src/components/business-control/QuickSaleWorkspace.tsx');
+    const configurator = source('src/components/business-control/QuickSaleProductConfigurator.tsx');
+    expect(workspace).toContain('editingLineKey');
+    expect(workspace).toContain('onEdit');
+    expect(workspace).toContain('Edit racikan');
+    expect(configurator).toContain('initialSelection');
+    expect(configurator).toContain('Simpan perubahan');
+  });
+
+  it('renders negative storefront price deltas with a minus sign', () => {
+    const configurator = source('../www/src/app/[locale]/(shared)/toko/[slug]/StorefrontProductConfigurator.tsx');
+    expect(configurator).toContain("option.price_delta_cents > 0 ? '+' : '-'");
+  });
+});

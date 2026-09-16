@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Clock3, PackageCheck, ShoppingBag } from 'lucide-react';
+import { Clock3, ShoppingBag } from 'lucide-react';
 import { CashShiftWorkspace } from '@/components/business-control/CashShiftWorkspace';
 import { QuickSaleWorkspace } from '@/components/business-control/QuickSaleWorkspace';
 import { EmptyState } from '@/components/portal/EmptyState';
@@ -9,7 +9,7 @@ import { PortalShell } from '@/components/portal/PortalShell';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getCurrentWave2CashShift } from '@/lib/business-wave2-server';
-import { listControlSales } from '@/lib/business-control-server';
+import { listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
 import { jakartaDateKey } from '@/lib/business-control/insights';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -17,6 +17,16 @@ import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 type PageProps = {
   params: Promise<{ businessId: string }>;
   searchParams: Promise<{ view?: string }>;
+};
+
+type ConfigurationSnapshot = {
+  choices?: Array<{ option_label?: string }>;
+  note?: string | null;
+};
+
+type SnapshotAwareSaleLine = ControlSaleLine & {
+  configuration_snapshot?: ConfigurationSnapshot | null;
+  line_note?: string | null;
 };
 
 const money = new Intl.NumberFormat('id-ID', {
@@ -28,6 +38,31 @@ function orderTone(status: string): 'info' | 'warning' | 'success' | 'neutral' {
   if (status === 'diproses' || status === 'siap kirim') return 'warning';
   if (status === 'selesai') return 'success';
   return 'neutral';
+}
+
+function saleLineConfiguration(line: ControlSaleLine): ConfigurationSnapshot | null {
+  const snapshotLine = line as SnapshotAwareSaleLine;
+  if (snapshotLine.configuration_snapshot && typeof snapshotLine.configuration_snapshot === 'object') {
+    return snapshotLine.configuration_snapshot;
+  }
+  const configuration = line.cost_snapshot?.configuration;
+  return configuration && typeof configuration === 'object'
+    ? configuration as ConfigurationSnapshot
+    : null;
+}
+
+function saleLineChoiceSummary(line: ControlSaleLine) {
+  return saleLineConfiguration(line)?.choices
+    ?.map(choice => choice.option_label?.trim())
+    .filter(Boolean)
+    .join(' · ') ?? '';
+}
+
+function saleLineNote(line: ControlSaleLine) {
+  const snapshotLine = line as SnapshotAwareSaleLine;
+  const direct = snapshotLine.line_note?.trim();
+  if (direct) return direct;
+  return saleLineConfiguration(line)?.note?.trim() || '';
 }
 
 export default async function BusinessOrdersPage({ params, searchParams }: PageProps) {
@@ -53,6 +88,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
     priceLabel: product.priceLabel,
     imageUrl: product.imageUrl,
     category: product.category,
+    modifierGroups: product.modifierGroups ?? [],
   }));
 
   const availableViews = [
@@ -93,12 +129,17 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
       {activeView === 'transaksi' && canViewTransactions ? (
         <section className="merchant-list border border-portal-line/80">
           {sales.length ? sales.map(({ sale, lines }) => {
-            const itemSummary = lines.map(line => `${line.product_name} × ${Number(line.quantity).toLocaleString('id-ID')}`).join(', ');
+            const itemSummary = lines.map(line => {
+              const choices = saleLineChoiceSummary(line);
+              return `${line.product_name}${choices ? ` (${choices})` : ''} × ${Number(line.quantity).toLocaleString('id-ID')}`;
+            }).join(', ');
+            const notes = lines.map(line => saleLineNote(line)).filter(Boolean);
             const grossProfit = sale.cost_complete && sale.cogs_amount !== null ? sale.final_amount - sale.cogs_amount : null;
             return (
               <article key={sale.id} className="merchant-action-row sm:grid sm:grid-cols-[minmax(0,1fr)_130px_150px] sm:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-portal-ink">{itemSummary}</p>
+                  {notes.length ? <p className="mt-1 truncate text-[11px] font-medium text-portal-forest">Catatan: {notes.join(' · ')}</p> : null}
                   <p className="mt-1 text-[11px] text-portal-soft">{sale.occurred_on} · {sale.channel_key || 'Langsung'} · {sale.account_key}</p>
                 </div>
                 <div className="text-right"><p className="text-[10px] font-semibold text-portal-soft">Total</p><p className="text-sm font-black text-portal-ink">{money.format(sale.final_amount)}</p></div>

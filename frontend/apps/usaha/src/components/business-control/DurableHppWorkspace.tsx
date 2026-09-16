@@ -73,12 +73,12 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const [recipeName, setRecipeName] = useState(products[0]?.name ?? 'Resep utama');
   const [servings, setServings] = useState(1);
   const [items, setItems] = useState<RecipeItem[]>([]);
-  const [sellingPrice, setSellingPrice] = useState(priceFromLabel(products[0]?.priceLabel));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   const product = products.find(item => item.id === productId) ?? products[0];
+  const sellingPrice = priceFromLabel(product?.priceLabel);
   const ingredientMap = useMemo(() => new Map(ingredients.map(item => [item.id, item])), [ingredients]);
 
   useEffect(() => {
@@ -95,7 +95,6 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             setRecipeName(selected?.name ?? 'Resep utama');
             setServings(1);
             setItems([]);
-            setSellingPrice(priceFromLabel(selected?.priceLabel));
           }
           return;
         }
@@ -110,8 +109,6 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             quantity: n(item.quantity),
             wastePercentOverride: item.waste_percent_override === null || item.waste_percent_override === undefined ? null : n(item.waste_percent_override),
           })).filter(item => item.ingredientId) : []);
-          const selected = products.find(item => item.id === productId);
-          setSellingPrice(priceFromLabel(selected?.priceLabel));
         }
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : 'Gagal memuat resep.');
@@ -194,7 +191,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan resep.');
-      setMessage('Resep tersimpan. HPP sekarang dihitung dari bahan canonical usaha.');
+      setMessage('Bahan produk tersimpan. Modal per porsi sekarang dihitung otomatis dari harga dan stok bahan.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan resep.');
     } finally {
@@ -203,7 +200,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   }
 
   if (!products.length) {
-    return <div className="portal-panel p-5 text-sm text-portal-soft">Belum ada produk. Tambahkan produk terlebih dahulu sebelum membuat resep HPP.</div>;
+    return <div className="portal-panel p-5 text-sm text-portal-soft">Belum ada produk. Tambahkan produk terlebih dahulu sebelum menghitung modal produk.</div>;
   }
   if (!ingredients.length) {
     return <div className="portal-panel p-5"><p className="font-bold text-portal-ink">Belum ada bahan atau kemasan.</p><p className="mt-1 text-sm text-portal-soft">Simpan bahan utama, cup, seal, atau kemasan dulu. Setelah itu bahan tersebut langsung bisa dipilih di resep.</p><Link href={`/businesses/${businessId}/inventory`} className="portal-button-primary mt-4">Isi bahan & stok</Link></div>;
@@ -212,27 +209,32 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   return (
     <div className="space-y-3">
       <section className="portal-panel p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-end">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end">
           <label className="text-xs font-semibold text-portal-soft">Produk
             <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={productId} onChange={event => selectProduct(event.target.value)}>
               {products.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </label>
-          <label className="text-xs font-semibold text-portal-soft">Harga jual
-            <input type="number" min="0" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink" value={sellingPrice} onChange={event => setSellingPrice(n(event.target.value))} />
-          </label>
+          <div className="rounded-xl border border-portal-line bg-[#fafbf9] px-3 py-2.5">
+            <p className="text-[11px] font-semibold text-portal-soft">Harga jual dari Barang</p>
+            <div className="mt-0.5 flex items-center justify-between gap-3">
+              <strong className="text-base text-portal-ink">{money.format(sellingPrice)}</strong>
+              <Link href={`/businesses/${businessId}/products`} className="text-[11px] font-bold text-portal-forest hover:underline">Ubah di Barang</Link>
+            </div>
+          </div>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-portal-line pt-3">
-          <div><p className="text-[11px] text-portal-soft">HPP / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{money.format(recipeCost.totalCost)}</p></div>
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-portal-line pt-3 sm:grid-cols-4">
+          <div><p className="text-[11px] text-portal-soft">Modal / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{money.format(recipeCost.totalCost)}</p></div>
           <div><p className="text-[11px] text-portal-soft">Untung kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Margin</p><p className="mt-0.5 text-lg font-black text-portal-ink">{number.format(margin)}%</p></div>
           <div><p className="text-[11px] text-portal-soft">Bisa dibuat</p><p className="mt-0.5 text-lg font-black text-portal-ink">{capacity.capacity}</p></div>
         </div>
-        <p className="mt-2 text-[11px] text-portal-soft">Margin {number.format(margin)}%{capacity.bottleneck ? ` · pembatas ${capacity.bottleneck.name}` : ''}</p>
+        {capacity.bottleneck ? <p className="mt-2 text-[11px] font-semibold text-amber-800">Terbatas oleh: {capacity.bottleneck.name}</p> : null}
       </section>
 
       <section className="portal-panel overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-portal-line px-4 py-3 sm:px-5">
-          <div><h2 className="font-bold text-portal-ink">Resep {product?.name}</h2><p className="text-xs text-portal-soft">{items.length} bahan · data harga dan stok diambil otomatis</p></div>
+          <div><h2 className="font-bold text-portal-ink">Bahan yang dipakai</h2><p className="text-xs text-portal-soft">{product?.name} · {items.length} bahan · harga dan stok diambil otomatis</p></div>
           <button type="button" onClick={addIngredient} className="portal-button-secondary"><Plus className="h-4 w-4" /> Bahan</button>
         </div>
 
@@ -259,7 +261,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
                     <span>Stok {n(ingredient?.stock_quantity)} {ingredient?.recipe_unit}</span>
                   </div>
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-[11px] font-bold text-portal-soft">Rincian bahan</summary>
+                    <summary className="cursor-pointer text-[11px] font-bold text-portal-soft">Detail perhitungan</summary>
                     <div className="mt-2 grid gap-3 rounded-lg bg-[#fafbf9] p-3 sm:grid-cols-3">
                       <label className="text-xs font-semibold text-portal-soft">Susut khusus %
                         <input type="number" min="0" max="99" step="any" placeholder={String(n(ingredient?.waste_percent))} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={item.wastePercentOverride ?? ''} onChange={event => patch(index, { wastePercentOverride: event.target.value === '' ? null : n(event.target.value) })} />
@@ -278,7 +280,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       <section className="portal-panel p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <details className="group">
-            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Pengaturan resep</summary>
+            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Pengaturan lanjutan</summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-portal-soft">Nama resep<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={recipeName} onChange={event => setRecipeName(event.target.value)} /></label>
               <label className="text-xs font-semibold text-portal-soft">Jumlah porsi<input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={servings} onChange={event => setServings(Math.max(n(event.target.value), 0.0001))} /></label>

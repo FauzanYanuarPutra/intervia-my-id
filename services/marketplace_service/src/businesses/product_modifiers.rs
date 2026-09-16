@@ -7,6 +7,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -15,6 +16,7 @@ use crate::{user_id_from_auth, AppState};
 
 const MAX_GROUPS: usize = 12;
 const MAX_OPTIONS_PER_GROUP: usize = 30;
+const MAX_RECIPE_EFFECTS_PER_OPTION: usize = 20;
 const MAX_GROUP_NAME: usize = 80;
 const MAX_OPTION_LABEL: usize = 100;
 const MAX_ID_LEN: usize = 80;
@@ -27,6 +29,20 @@ pub(crate) enum ModifierSelectionMode {
     Multiple,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ModifierRecipeOperation {
+    Add,
+    Set,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub(crate) struct ModifierRecipeEffect {
+    pub(crate) ingredient_id: Uuid,
+    pub(crate) operation: ModifierRecipeOperation,
+    pub(crate) quantity: Decimal,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct ProductModifierOption {
     pub(crate) id: String,
@@ -37,6 +53,8 @@ pub(crate) struct ProductModifierOption {
     pub(crate) is_default: bool,
     #[serde(default = "default_true")]
     pub(crate) enabled: bool,
+    #[serde(default)]
+    pub(crate) recipe_effects: Vec<ModifierRecipeEffect>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -241,8 +259,8 @@ pub(crate) fn validate_groups(
 
     for mut group in groups {
         group.id = normalize_id(&group.id).ok_or("invalid_modifier_group_id")?;
-        group.name =
-            normalize_text(&group.name, MAX_GROUP_NAME).ok_or("invalid_modifier_group_name")?;
+        group.name = normalize_text(&group.name, MAX_GROUP_NAME)
+            .ok_or("invalid_modifier_group_name")?;
         if !group_ids.insert(group.id.clone()) {
             return Err("duplicate_modifier_group_id");
         }
@@ -261,6 +279,27 @@ pub(crate) fn validate_groups(
             }
             if option.price_delta_cents.abs() > MAX_PRICE_DELTA_CENTS {
                 return Err("invalid_modifier_price_delta");
+            }
+            if option.price_delta_cents % 100 != 0 {
+                return Err("modifier_option_price_delta_must_be_whole_rupiah");
+            }
+            if option.recipe_effects.len() > MAX_RECIPE_EFFECTS_PER_OPTION {
+                return Err("too_many_modifier_recipe_effects");
+            }
+            let mut recipe_effect_keys = HashSet::with_capacity(option.recipe_effects.len());
+            for effect in &option.recipe_effects {
+                if effect.ingredient_id.is_nil() {
+                    return Err("invalid_modifier_recipe_ingredient");
+                }
+                let invalid_quantity = effect.quantity < Decimal::ZERO
+                    || (effect.operation == ModifierRecipeOperation::Add
+                        && effect.quantity == Decimal::ZERO);
+                if invalid_quantity {
+                    return Err("invalid_modifier_recipe_quantity");
+                }
+                if !recipe_effect_keys.insert((effect.ingredient_id, effect.operation)) {
+                    return Err("duplicate_modifier_recipe_effect");
+                }
             }
             if option.is_default && option.enabled {
                 default_count += 1;
@@ -340,6 +379,7 @@ mod tests {
             price_delta_cents: 0,
             is_default: default,
             enabled: true,
+            recipe_effects: Vec::new(),
         }
     }
 
@@ -399,5 +439,62 @@ mod tests {
         .unwrap();
         assert_eq!(groups[0].min_selections, 0);
         assert_eq!(groups[0].max_selections, Some(2));
+    }
+
+    #[test]
+    fn modifier_price_delta_must_convert_exactly_to_integer_rupiah() {
+        let mut invalid = option("boba", "Boba", false);
+        invalid.price_delta_cents = 300_001;
+        let result = validate_groups(vec![ProductModifierGroup {
+            id: "topping".into(),
+            name: "Topping".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: false,
+            min_selections: 0,
+            max_selections: Some(1),
+            options: vec![invalid],
+        }]);
+        assert_eq!(
+            result,
+            Err("modifier_option_price_delta_must_be_whole_rupiah")
+        );
+    }
+
+    #[test]
+    fn set_zero_recipe_effect_is_valid_but_add_zero_is_not() {
+        let ingredient_id = Uuid::new_v4();
+        let mut set_zero = option("none", "Tanpa Gula", false);
+        set_zero.recipe_effects = vec![ModifierRecipeEffect {
+            ingredient_id,
+            operation: ModifierRecipeOperation::Set,
+            quantity: Decimal::ZERO,
+        }];
+        let valid = validate_groups(vec![ProductModifierGroup {
+            id: "sugar".into(),
+            name: "Gula".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: false,
+            min_selections: 0,
+            max_selections: Some(1),
+            options: vec![set_zero],
+        }]);
+        assert!(valid.is_ok());
+
+        let mut add_zero = option("extra", "Tambah Gula", false);
+        add_zero.recipe_effects = vec![ModifierRecipeEffect {
+            ingredient_id,
+            operation: ModifierRecipeOperation::Add,
+            quantity: Decimal::ZERO,
+        }];
+        let invalid = validate_groups(vec![ProductModifierGroup {
+            id: "sugar".into(),
+            name: "Gula".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: false,
+            min_selections: 0,
+            max_selections: Some(1),
+            options: vec![add_zero],
+        }]);
+        assert_eq!(invalid, Err("invalid_modifier_recipe_quantity"));
     }
 }

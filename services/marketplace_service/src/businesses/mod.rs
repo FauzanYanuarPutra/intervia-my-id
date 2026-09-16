@@ -32,6 +32,9 @@ mod inventory_tests;
 mod media;
 #[cfg(test)]
 mod media_migration_tests;
+#[cfg(test)]
+mod modifier_recipe_effect_tests;
+mod modifier_resolution;
 mod product_modifiers;
 mod products;
 #[cfg(test)]
