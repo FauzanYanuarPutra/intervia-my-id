@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
 import type {
   Wave2FinancePlan,
@@ -115,9 +115,8 @@ export function FinancePlanningWorkspaceV2({
     .reduce((sum, item) => sum + item.amount, 0);
   const unallocatedCash = Math.max(0, summary?.unallocated_cash ?? 0);
   const freeAfterNearBills = Math.max(0, unallocatedCash - dueSoonAmount);
-  const sortedObligations = useMemo(
-    () => [...activeObligations].sort((a, b) => a.next_due_on.localeCompare(b.next_due_on)),
-    [activeObligations],
+  const sortedObligations = [...activeObligations].sort((a, b) =>
+    a.next_due_on.localeCompare(b.next_due_on),
   );
 
   async function reloadFinanceCore() {
@@ -140,10 +139,24 @@ export function FinancePlanningWorkspaceV2({
   }
 
   useEffect(() => {
-    reloadFinanceCore().catch(() => {
-      // Page stays usable for planning if the authoritative summary is temporarily unavailable.
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+
+    fetch(`/api/businesses/${businessId}/finance-core/summary`, { cache: 'no-store' })
+      .then(async response => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || 'Gagal memuat saldo authoritative.');
+        return payload?.data?.summary ?? null;
+      })
+      .then(nextSummary => {
+        if (!cancelled) setSummary(nextSummary);
+      })
+      .catch(() => {
+        // Page stays usable for planning if the authoritative summary is temporarily unavailable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [businessId]);
 
   async function savePlan() {

@@ -20,7 +20,8 @@ describe('merchant OS foundation', () => {
     const navigation = read('../../lib/portal-navigation.ts');
     const mobile = read('./MobileNav.tsx');
     expect(navigation).toContain("const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];");
-    expect(mobile).toContain('Menu');
+    expect(mobile).toContain('Lainnya');
+    expect(mobile).toContain('ModalSurface');
     expect(mobile).not.toContain("orders: 'Jual'");
   });
 
