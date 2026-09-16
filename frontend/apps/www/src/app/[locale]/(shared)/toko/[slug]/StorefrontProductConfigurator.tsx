@@ -37,7 +37,7 @@ function formatIdrCents(value: number) {
     style: 'currency',
     currency: 'IDR',
     maximumFractionDigits: 0,
-  }).format(Math.max(0, Math.round(value / 100)));
+  }).format(Math.round(Math.abs(value) / 100));
 }
 
 export function StorefrontProductConfigurator({
@@ -203,7 +203,7 @@ export function StorefrontProductConfigurator({
                         <label key={option.id} className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition ${checked ? 'border-emerald-600 bg-emerald-50/70 dark:border-emerald-500 dark:bg-emerald-950/30' : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800'} ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}>
                           <input type={group.selection_mode === 'single' ? 'radio' : 'checkbox'} name={group.selection_mode === 'single' ? `modifier-${productId}-${group.id}` : undefined} checked={checked} disabled={disabled} onChange={event => updateSelection(group.id, option.id, event.target.checked, group.selection_mode === 'single')} className="h-5 w-5 shrink-0 accent-emerald-700" />
                           <span className="min-w-0 flex-1 text-sm font-semibold">{option.label}</span>
-                          {option.price_delta_cents ? <span className="shrink-0 text-xs font-bold text-slate-600 dark:text-slate-300">+{formatIdrCents(option.price_delta_cents)}</span> : null}
+                          {option.price_delta_cents ? <span className="shrink-0 text-xs font-bold text-slate-600 dark:text-slate-300">{option.price_delta_cents > 0 ? '+' : '-'}{formatIdrCents(option.price_delta_cents)}</span> : null}
                         </label>
                       );
                     })}
