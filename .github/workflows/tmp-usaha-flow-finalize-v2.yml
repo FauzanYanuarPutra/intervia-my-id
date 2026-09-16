@@ -21,7 +21,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: frontend/apps/usaha/package-lock.json
+          cache-dependency-path: |
+            frontend/packages/package-lock.json
+            frontend/apps/usaha/package-lock.json
       - name: Apply corrected finalization patch
         shell: bash
         run: |
@@ -61,7 +63,6 @@ jobs:
               p = Path(fixture_path)
               text = p.read_text()
               def patch(match):
-                  nonlocal_dummy = None
                   body = match.group('body')
                   if 'selected_options:' in body:
                       return match.group(0)
@@ -80,6 +81,12 @@ jobs:
           cargo check --all-targets
           cargo test businesses::modifier_resolution
           cargo test businesses::sales::tests
+      - name: Verify shared product package
+        working-directory: frontend/packages
+        run: |
+          npm ci
+          npm test -- --run
+          npm run build
       - name: Verify Usaha
         working-directory: frontend/apps/usaha
         run: |
