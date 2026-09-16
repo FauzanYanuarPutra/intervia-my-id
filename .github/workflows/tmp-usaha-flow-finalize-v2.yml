@@ -1,0 +1,69 @@
+name: Temporary Usaha Flow Finalize V2
+
+on:
+  push:
+    branches: [feat/usaha-flow-system]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/usaha-flow-system
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/apps/usaha/package-lock.json
+      - name: Apply corrected finalization patch
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          workflow = Path('.github/workflows/tmp-usaha-flow-finalize.yml').read_text()
+          start_marker = "          python3 <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          script = dedent(workflow[start:end])
+          if "helpers = r'''" not in script:
+              raise SystemExit('expected raw helper block was not found')
+          script = script.replace("helpers = r'''", "helpers = '''", 1)
+          exec(compile(script, '<usaha-flow-finalizer>', 'exec'))
+          PY
+      - name: Verify Marketplace
+        working-directory: services/marketplace_service
+        run: |
+          cargo fmt
+          cargo check --all-targets
+          cargo test businesses::modifier_resolution --lib
+          cargo test businesses::sales::tests --lib
+      - name: Verify Usaha
+        working-directory: frontend/apps/usaha
+        run: |
+          npm ci
+          npm test -- --run
+          npm run typecheck
+          npm run lint
+          npm run build
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/apps/usaha services/marketplace_service
+          if git diff --cached --quiet; then
+            echo "No implementation changes to commit"
+            exit 1
+          fi
+          git commit -m "feat(usaha): complete configured POS and product costing flow"
+          git push origin HEAD:feat/usaha-flow-system
