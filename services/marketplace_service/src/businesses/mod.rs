@@ -33,6 +33,8 @@ mod media;
 #[cfg(test)]
 mod media_migration_tests;
 mod modifier_resolution;
+#[cfg(test)]
+mod modifier_recipe_effect_tests;
 mod product_modifiers;
 mod products;
 #[cfg(test)]
