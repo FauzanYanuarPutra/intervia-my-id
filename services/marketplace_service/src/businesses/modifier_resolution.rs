@@ -37,6 +37,7 @@ pub(crate) enum ModifierResolutionError {
     DuplicateOption,
     InvalidSelectionCount,
     InvalidOption,
+    InvalidPriceDelta,
     UnknownGroup,
     PriceOverflow,
     ConflictingRecipeSetEffect,
@@ -104,6 +105,9 @@ pub(crate) fn resolve_modifier_selection(
                 .iter()
                 .find(|option| option.id == option_id && option.enabled)
                 .ok_or(ModifierResolutionError::InvalidOption)?;
+            if option.price_delta_cents % 100 != 0 {
+                return Err(ModifierResolutionError::InvalidPriceDelta);
+            }
             delta = delta
                 .checked_add(option.price_delta_cents)
                 .ok_or(ModifierResolutionError::PriceOverflow)?;
@@ -214,6 +218,14 @@ mod tests {
             resolve_modifier_selection(&topping_groups(), &[single("topping", "boba")]).unwrap();
         assert_eq!(resolved.price_delta_cents, 300_000);
         assert_eq!(resolved.snapshots[0].option_label, "Boba");
+    }
+
+    #[test]
+    fn non_rupiah_modifier_delta_is_rejected_before_pos_conversion() {
+        let mut groups = topping_groups();
+        groups[0].options[0].price_delta_cents = 300_001;
+        let error = resolve_modifier_selection(&groups, &[single("topping", "boba")]).unwrap_err();
+        assert_eq!(error, ModifierResolutionError::InvalidPriceDelta);
     }
 
     #[test]
