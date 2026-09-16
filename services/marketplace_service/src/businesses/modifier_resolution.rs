@@ -1,8 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-use super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup};
+use super::product_modifiers::{
+    ModifierRecipeEffect, ModifierRecipeOperation, ModifierSelectionMode, ProductModifierGroup,
+};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct ModifierSelectionInput {
@@ -25,6 +28,7 @@ pub(crate) struct ResolvedModifierSelection {
     pub(crate) signature: String,
     pub(crate) price_delta_cents: i64,
     pub(crate) snapshots: Vec<ModifierSnapshot>,
+    pub(crate) recipe_effects: Vec<ModifierRecipeEffect>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +39,7 @@ pub(crate) enum ModifierResolutionError {
     InvalidOption,
     UnknownGroup,
     PriceOverflow,
+    ConflictingRecipeSetEffect,
 }
 
 pub(crate) fn resolve_modifier_selection(
@@ -53,6 +58,8 @@ pub(crate) fn resolve_modifier_selection(
     catalog.sort_by(|left, right| left.id.cmp(&right.id));
 
     let mut snapshots = Vec::new();
+    let mut recipe_effects = Vec::new();
+    let mut set_ingredients = HashSet::<Uuid>::new();
     let mut signature_parts = Vec::with_capacity(catalog.len());
     let mut delta = 0i64;
 
@@ -100,6 +107,14 @@ pub(crate) fn resolve_modifier_selection(
                 option_label: option.label.clone(),
                 price_delta_cents: option.price_delta_cents,
             });
+            for effect in &option.recipe_effects {
+                if effect.operation == ModifierRecipeOperation::Set
+                    && !set_ingredients.insert(effect.ingredient_id)
+                {
+                    return Err(ModifierResolutionError::ConflictingRecipeSetEffect);
+                }
+                recipe_effects.push(effect.clone());
+            }
             resolved_ids.push(option.id.clone());
         }
         signature_parts.push(format!("{}={}", group.id, resolved_ids.join(",")));
@@ -113,14 +128,17 @@ pub(crate) fn resolve_modifier_selection(
         signature: signature_parts.join("|"),
         price_delta_cents: delta,
         snapshots,
+        recipe_effects,
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use rust_decimal::Decimal;
+
     use super::*;
     use super::super::product_modifiers::{
-        ModifierSelectionMode, ProductModifierGroup, ProductModifierOption,
+        ModifierRecipeEffect, ModifierSelectionMode, ProductModifierGroup, ProductModifierOption,
     };
 
     fn option(id: &str, label: &str, price_delta_cents: i64, enabled: bool) -> ProductModifierOption {
@@ -130,6 +148,7 @@ mod tests {
             price_delta_cents,
             is_default: false,
             enabled,
+            recipe_effects: Vec::new(),
         }
     }
 
@@ -236,5 +255,46 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(duplicate_option, ModifierResolutionError::DuplicateOption);
+    }
+
+    #[test]
+    fn conflicting_set_effects_are_rejected() {
+        let ingredient_id = Uuid::new_v4();
+        let mut groups = topping_groups();
+        groups[0].options = vec![
+            ProductModifierOption {
+                id: "less".into(),
+                label: "Less Sugar".into(),
+                price_delta_cents: 0,
+                is_default: false,
+                enabled: true,
+                recipe_effects: vec![ModifierRecipeEffect {
+                    ingredient_id,
+                    operation: ModifierRecipeOperation::Set,
+                    quantity: Decimal::new(10, 0),
+                }],
+            },
+            ProductModifierOption {
+                id: "no".into(),
+                label: "Tanpa Gula".into(),
+                price_delta_cents: 0,
+                is_default: false,
+                enabled: true,
+                recipe_effects: vec![ModifierRecipeEffect {
+                    ingredient_id,
+                    operation: ModifierRecipeOperation::Set,
+                    quantity: Decimal::ZERO,
+                }],
+            },
+        ];
+        let error = resolve_modifier_selection(
+            &groups,
+            &[ModifierSelectionInput {
+                group_id: "topping".into(),
+                option_ids: vec!["less".into(), "no".into()],
+            }],
+        )
+        .unwrap_err();
+        assert_eq!(error, ModifierResolutionError::ConflictingRecipeSetEffect);
     }
 }
