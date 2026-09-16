@@ -28,6 +28,7 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
           from textwrap import dedent
+          import re
 
           workflow = Path('.github/workflows/tmp-usaha-flow-finalize.yml').read_text()
           start_marker = "          python3 <<'PY'\n"
@@ -39,6 +40,38 @@ jobs:
               raise SystemExit('expected raw helper block was not found')
           script = script.replace("helpers = r'''", "helpers = '''", 1)
           exec(compile(script, '<usaha-flow-finalizer>', 'exec'))
+
+          sales = Path('services/marketplace_service/src/businesses/sales.rs')
+          sales_text = sales.read_text()
+          marker = '    #[serde(default)]\n    pub(crate) unit_price_amount: i64,'
+          replacement = '    #[serde(default)]\n    #[allow(dead_code)]\n    pub(crate) unit_price_amount: i64,'
+          if marker not in sales_text:
+              raise SystemExit('sales compatibility price field marker missing')
+          sales.write_text(sales_text.replace(marker, replacement, 1))
+
+          fixture_paths = [
+              'services/marketplace_service/src/businesses/recipe_sales_versioning_tests.rs',
+              'services/marketplace_service/src/businesses/availability_persistence_tests.rs',
+              'services/marketplace_service/src/businesses/sales_incomplete_cost_persistence_tests.rs',
+              'services/marketplace_service/src/businesses/sales_persistence_tests.rs',
+          ]
+          initializer = re.compile(r'CreateSaleLineRequest \{(?P<body>.*?)\n(?P<indent>\s*)\}', re.S)
+          total_patched = 0
+          for fixture_path in fixture_paths:
+              p = Path(fixture_path)
+              text = p.read_text()
+              def patch(match):
+                  nonlocal_dummy = None
+                  body = match.group('body')
+                  if 'selected_options:' in body:
+                      return match.group(0)
+                  indent = match.group('indent')
+                  global total_patched
+                  total_patched += 1
+                  return 'CreateSaleLineRequest {' + body + f'\n{indent}    selected_options: Vec::new(),\n{indent}    note: None,\n{indent}' + '}'
+              p.write_text(initializer.sub(patch, text))
+          if total_patched != 6:
+              raise SystemExit(f'expected to patch 6 legacy sale fixtures, patched {total_patched}')
           PY
       - name: Verify Marketplace
         working-directory: services/marketplace_service
