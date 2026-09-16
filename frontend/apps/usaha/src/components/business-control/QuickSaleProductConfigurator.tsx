@@ -13,12 +13,19 @@ import {
 } from 'lajukan-ui';
 import { ModalSurface } from '@/components/interaction/ModalSurface';
 
+type InitialSelection = {
+  quantity: number;
+  selectedOptions: ProductModifierSelection[];
+  note?: string;
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productName: string;
   basePriceAmount: number;
   groups: ProductModifierGroup[];
+  initialSelection?: InitialSelection;
   onConfirm: (input: {
     quantity: number;
     selectedOptions: ProductModifierSelection[];
@@ -34,19 +41,25 @@ const money = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 0,
 });
 
+function cloneSelections(input: ProductModifierSelection[]) {
+  return input.map(selection => ({ ...selection, option_ids: [...selection.option_ids] }));
+}
+
 export function QuickSaleProductConfigurator({
   open,
   onOpenChange,
   productName,
   basePriceAmount,
   groups,
+  initialSelection,
   onConfirm,
 }: Props) {
   const orderedGroups = useMemo(() => orderedProductModifierGroups(groups), [groups]);
-  const [selections, setSelections] = useState<ProductModifierSelection[]>(() => defaultProductModifierSelections(groups));
-  const [quantity, setQuantity] = useState(1);
-  const [note, setNote] = useState('');
+  const [selections, setSelections] = useState<ProductModifierSelection[]>(() => cloneSelections(initialSelection?.selectedOptions ?? defaultProductModifierSelections(groups)));
+  const [quantity, setQuantity] = useState(() => Math.max(1, Math.min(200, initialSelection?.quantity ?? 1)));
+  const [note, setNote] = useState(initialSelection?.note ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const editing = Boolean(initialSelection);
 
   const previewUnitPriceAmount = useMemo(
     () => Math.max(0, Math.round(configuredPriceCents(basePriceAmount * 100, groups, selections) / 100)),
@@ -79,15 +92,11 @@ export function QuickSaleProductConfigurator({
     }
     onConfirm({
       quantity,
-      selectedOptions: selections.map(selection => ({ ...selection, option_ids: [...selection.option_ids] })),
+      selectedOptions: cloneSelections(selections),
       note: note.trim().replace(/\s+/g, ' '),
       previewUnitPriceAmount,
       configurationSummary: productConfigurationSummary(groups, selections),
     });
-    setSelections(defaultProductModifierSelections(groups));
-    setQuantity(1);
-    setNote('');
-    setErrors({});
     close();
   }
 
@@ -95,7 +104,7 @@ export function QuickSaleProductConfigurator({
     <ModalSurface
       open={open}
       onOpenChange={onOpenChange}
-      ariaLabel={`Atur ${productName}`}
+      ariaLabel={`${editing ? 'Edit' : 'Atur'} ${productName}`}
       presentation="adaptive"
       size="md"
     >
@@ -109,7 +118,7 @@ export function QuickSaleProductConfigurator({
                 <span className="text-[11px] font-bold uppercase tracking-wide">Pilihan pelanggan</span>
               </div>
               <h2 className="mt-1 truncate text-lg font-black text-portal-ink">{productName}</h2>
-              <p className="mt-0.5 text-xs text-portal-soft">Pilih sesuai pesanan pelanggan. Pilihan wajib ditampilkan lebih dulu.</p>
+              <p className="mt-0.5 text-xs text-portal-soft">{editing ? 'Ubah racikan tanpa membuat produk baru di katalog.' : 'Pilih sesuai pesanan pelanggan. Pilihan wajib ditampilkan lebih dulu.'}</p>
             </div>
             <button type="button" aria-label="Tutup pilihan" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-portal-soft hover:bg-[#f2f4f1] hover:text-portal-ink" onClick={close}>
               <X className="h-5 w-5" />
@@ -179,7 +188,7 @@ export function QuickSaleProductConfigurator({
             <span className="text-xs font-semibold text-portal-soft">{quantity} item</span>
             <strong className="text-lg tabular-nums text-portal-ink">{money.format(previewUnitPriceAmount * quantity)}</strong>
           </div>
-          <button type="button" onClick={confirm} className="portal-button-primary w-full justify-center py-3.5 text-base">Tambah ke pesanan</button>
+          <button type="button" onClick={confirm} className="portal-button-primary w-full justify-center py-3.5 text-base">{editing ? 'Simpan perubahan' : 'Tambah ke pesanan'}</button>
         </footer>
       </div>
     </ModalSurface>
