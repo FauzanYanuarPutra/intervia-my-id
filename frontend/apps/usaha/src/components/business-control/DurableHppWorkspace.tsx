@@ -73,12 +73,12 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const [recipeName, setRecipeName] = useState(products[0]?.name ?? 'Resep utama');
   const [servings, setServings] = useState(1);
   const [items, setItems] = useState<RecipeItem[]>([]);
-  const [sellingPrice, setSellingPrice] = useState(priceFromLabel(products[0]?.priceLabel));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   const product = products.find(item => item.id === productId) ?? products[0];
+  const sellingPrice = priceFromLabel(product?.priceLabel);
   const ingredientMap = useMemo(() => new Map(ingredients.map(item => [item.id, item])), [ingredients]);
 
   useEffect(() => {
@@ -95,7 +95,6 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             setRecipeName(selected?.name ?? 'Resep utama');
             setServings(1);
             setItems([]);
-            setSellingPrice(priceFromLabel(selected?.priceLabel));
           }
           return;
         }
@@ -110,8 +109,6 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             quantity: n(item.quantity),
             wastePercentOverride: item.waste_percent_override === null || item.waste_percent_override === undefined ? null : n(item.waste_percent_override),
           })).filter(item => item.ingredientId) : []);
-          const selected = products.find(item => item.id === productId);
-          setSellingPrice(priceFromLabel(selected?.priceLabel));
         }
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : 'Gagal memuat resep.');
@@ -212,15 +209,19 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   return (
     <div className="space-y-3">
       <section className="portal-panel p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-end">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end">
           <label className="text-xs font-semibold text-portal-soft">Produk
             <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={productId} onChange={event => selectProduct(event.target.value)}>
               {products.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </label>
-          <label className="text-xs font-semibold text-portal-soft">Harga jual
-            <input type="number" min="0" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink" value={sellingPrice} onChange={event => setSellingPrice(n(event.target.value))} />
-          </label>
+          <div className="rounded-xl border border-portal-line bg-[#fafbf9] px-3 py-2.5">
+            <p className="text-[11px] font-semibold text-portal-soft">Harga jual dari Barang</p>
+            <div className="mt-0.5 flex items-center justify-between gap-3">
+              <strong className="text-base text-portal-ink">{money.format(sellingPrice)}</strong>
+              <Link href={`/businesses/${businessId}/products`} className="text-[11px] font-bold text-portal-forest hover:underline">Ubah di Barang</Link>
+            </div>
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2 border-t border-portal-line pt-3 sm:grid-cols-4">
           <div><p className="text-[11px] text-portal-soft">Modal / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{money.format(recipeCost.totalCost)}</p></div>
