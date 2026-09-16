@@ -291,7 +291,10 @@ pub(crate) fn validate_groups(
                 if effect.ingredient_id.is_nil() {
                     return Err("invalid_modifier_recipe_ingredient");
                 }
-                if effect.quantity <= Decimal::ZERO {
+                let invalid_quantity = effect.quantity < Decimal::ZERO
+                    || (effect.operation == ModifierRecipeOperation::Add
+                        && effect.quantity == Decimal::ZERO);
+                if invalid_quantity {
                     return Err("invalid_modifier_recipe_quantity");
                 }
                 if !recipe_effect_keys.insert((effect.ingredient_id, effect.operation)) {
@@ -455,5 +458,43 @@ mod tests {
             result,
             Err("modifier_option_price_delta_must_be_whole_rupiah")
         );
+    }
+
+    #[test]
+    fn set_zero_recipe_effect_is_valid_but_add_zero_is_not() {
+        let ingredient_id = Uuid::new_v4();
+        let mut set_zero = option("none", "Tanpa Gula", false);
+        set_zero.recipe_effects = vec![ModifierRecipeEffect {
+            ingredient_id,
+            operation: ModifierRecipeOperation::Set,
+            quantity: Decimal::ZERO,
+        }];
+        let valid = validate_groups(vec![ProductModifierGroup {
+            id: "sugar".into(),
+            name: "Gula".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: false,
+            min_selections: 0,
+            max_selections: Some(1),
+            options: vec![set_zero],
+        }]);
+        assert!(valid.is_ok());
+
+        let mut add_zero = option("extra", "Tambah Gula", false);
+        add_zero.recipe_effects = vec![ModifierRecipeEffect {
+            ingredient_id,
+            operation: ModifierRecipeOperation::Add,
+            quantity: Decimal::ZERO,
+        }];
+        let invalid = validate_groups(vec![ProductModifierGroup {
+            id: "sugar".into(),
+            name: "Gula".into(),
+            selection_mode: ModifierSelectionMode::Single,
+            required: false,
+            min_selections: 0,
+            max_selections: Some(1),
+            options: vec![add_zero],
+        }]);
+        assert_eq!(invalid, Err("invalid_modifier_recipe_quantity"));
     }
 }
