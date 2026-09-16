@@ -7,6 +7,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -15,6 +16,7 @@ use crate::{user_id_from_auth, AppState};
 
 const MAX_GROUPS: usize = 12;
 const MAX_OPTIONS_PER_GROUP: usize = 30;
+const MAX_RECIPE_EFFECTS_PER_OPTION: usize = 20;
 const MAX_GROUP_NAME: usize = 80;
 const MAX_OPTION_LABEL: usize = 100;
 const MAX_ID_LEN: usize = 80;
@@ -27,6 +29,20 @@ pub(crate) enum ModifierSelectionMode {
     Multiple,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ModifierRecipeOperation {
+    Add,
+    Set,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub(crate) struct ModifierRecipeEffect {
+    pub(crate) ingredient_id: Uuid,
+    pub(crate) operation: ModifierRecipeOperation,
+    pub(crate) quantity: Decimal,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct ProductModifierOption {
     pub(crate) id: String,
@@ -37,6 +53,8 @@ pub(crate) struct ProductModifierOption {
     pub(crate) is_default: bool,
     #[serde(default = "default_true")]
     pub(crate) enabled: bool,
+    #[serde(default)]
+    pub(crate) recipe_effects: Vec<ModifierRecipeEffect>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -262,6 +280,21 @@ pub(crate) fn validate_groups(
             if option.price_delta_cents.abs() > MAX_PRICE_DELTA_CENTS {
                 return Err("invalid_modifier_price_delta");
             }
+            if option.recipe_effects.len() > MAX_RECIPE_EFFECTS_PER_OPTION {
+                return Err("too_many_modifier_recipe_effects");
+            }
+            let mut recipe_effect_keys = HashSet::with_capacity(option.recipe_effects.len());
+            for effect in &option.recipe_effects {
+                if effect.ingredient_id.is_nil() {
+                    return Err("invalid_modifier_recipe_ingredient");
+                }
+                if effect.quantity < Decimal::ZERO {
+                    return Err("invalid_modifier_recipe_quantity");
+                }
+                if !recipe_effect_keys.insert((effect.ingredient_id, effect.operation)) {
+                    return Err("duplicate_modifier_recipe_effect");
+                }
+            }
             if option.is_default && option.enabled {
                 default_count += 1;
             }
@@ -340,6 +373,7 @@ mod tests {
             price_delta_cents: 0,
             is_default: default,
             enabled: true,
+            recipe_effects: Vec::new(),
         }
     }
 
