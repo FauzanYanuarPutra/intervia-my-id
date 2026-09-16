@@ -47,8 +47,14 @@ fn accepts_set_and_add_recipe_effects() {
     ]))])
     .unwrap();
 
-    assert_eq!(groups[0].options[0].recipe_effects[0].quantity, Decimal::new(10, 0));
-    assert_eq!(groups[0].options[0].recipe_effects[1].quantity, Decimal::new(30, 0));
+    assert_eq!(
+        groups[0].options[0].recipe_effects[0].quantity,
+        Decimal::new(10, 0)
+    );
+    assert_eq!(
+        groups[0].options[0].recipe_effects[1].quantity,
+        Decimal::new(30, 0)
+    );
 }
 
 #[test]
@@ -68,17 +74,21 @@ fn rejects_invalid_recipe_effects() {
     ]))]);
     assert_eq!(duplicate, Err("duplicate_modifier_recipe_effect"));
 
-    let negative = validate_groups(vec![group(option_with_effects(vec![ModifierRecipeEffect {
-        ingredient_id: Uuid::new_v4(),
-        operation: ModifierRecipeOperation::Set,
-        quantity: Decimal::NEGATIVE_ONE,
-    }]))]);
+    let negative = validate_groups(vec![group(option_with_effects(vec![
+        ModifierRecipeEffect {
+            ingredient_id: Uuid::new_v4(),
+            operation: ModifierRecipeOperation::Set,
+            quantity: Decimal::NEGATIVE_ONE,
+        },
+    ]))]);
     assert_eq!(negative, Err("invalid_modifier_recipe_quantity"));
 
-    let nil = validate_groups(vec![group(option_with_effects(vec![ModifierRecipeEffect {
-        ingredient_id: Uuid::nil(),
-        operation: ModifierRecipeOperation::Add,
-        quantity: Decimal::ONE,
-    }]))]);
+    let nil = validate_groups(vec![group(option_with_effects(vec![
+        ModifierRecipeEffect {
+            ingredient_id: Uuid::nil(),
+            operation: ModifierRecipeOperation::Add,
+            quantity: Decimal::ONE,
+        },
+    ]))]);
     assert_eq!(nil, Err("invalid_modifier_recipe_ingredient"));
 }
