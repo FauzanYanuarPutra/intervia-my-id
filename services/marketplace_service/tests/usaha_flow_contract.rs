@@ -31,8 +31,14 @@ fn sale_configuration_snapshot_has_forward_only_migration() {
         "services/marketplace_service/migrations/20260916120000_business_sale_configuration_snapshot.down.sql",
     );
 
-    assert!(up.exists(), "configuration snapshot up migration is required");
-    assert!(down.exists(), "configuration snapshot down migration is required");
+    assert!(
+        up.exists(),
+        "configuration snapshot up migration is required"
+    );
+    assert!(
+        down.exists(),
+        "configuration snapshot down migration is required"
+    );
     let sql = fs::read_to_string(up).expect("snapshot migration");
     assert!(sql.contains("configuration_snapshot"));
     assert!(sql.contains("line_note"));
