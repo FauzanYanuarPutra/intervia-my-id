@@ -977,6 +977,7 @@ mod tests {
                 image_mime_type: None,
                 image_width: None,
                 image_height: None,
+                modifier_groups: serde_json::json!([]),
             }],
         };
 

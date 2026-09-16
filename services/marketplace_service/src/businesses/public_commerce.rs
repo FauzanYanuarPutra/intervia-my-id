@@ -17,7 +17,13 @@ use uuid::Uuid;
 
 use crate::{auth_claims_from_headers, AppState};
 
-use super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup};
+use super::{
+    modifier_resolution::{
+        resolve_modifier_selection as resolve_shared_modifier_selection, ModifierResolutionError,
+        ModifierSelectionInput, ModifierSnapshot, ResolvedModifierSelection,
+    },
+    product_modifiers::ProductModifierGroup,
+};
 
 const MAX_PUBLIC_ORDER_ITEMS: usize = 120;
 const MAX_PUBLIC_ORDER_QUANTITY: i32 = 200;
@@ -201,22 +207,6 @@ struct ResolvedOrderItem {
     unit_price: Decimal,
     line_total: Decimal,
     metadata: Value,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-struct ModifierSnapshot {
-    group_id: String,
-    group_name: String,
-    option_id: String,
-    option_label: String,
-    price_delta_cents: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ResolvedModifierSelection {
-    signature: String,
-    price_delta_cents: i64,
-    snapshots: Vec<ModifierSnapshot>,
 }
 
 #[derive(Clone)]
@@ -698,91 +688,25 @@ fn resolve_modifier_selection(
     groups: &[ProductModifierGroup],
     input: &[PublicModifierSelectionInput],
 ) -> Result<ResolvedModifierSelection, PublicCommerceError> {
-    let mut incoming = HashMap::<String, Vec<String>>::new();
-    for selection in input {
-        let group_id = selection.group_id.trim().to_ascii_lowercase();
-        if group_id.is_empty()
-            || incoming
-                .insert(group_id, selection.option_ids.clone())
-                .is_some()
-        {
-            return Err(PublicCommerceError::Validation(
-                "duplicate_modifier_group_selection",
-            ));
-        }
-    }
-
-    let mut snapshots = Vec::new();
-    let mut signature_parts = Vec::new();
-    let mut delta = 0i64;
-
-    for group in groups {
-        let selected = incoming.remove(&group.id).unwrap_or_default();
-        let mut unique = HashSet::with_capacity(selected.len());
-        let mut selected_ids = selected
-            .into_iter()
-            .map(|value| value.trim().to_ascii_lowercase())
-            .filter(|value| !value.is_empty())
-            .collect::<Vec<_>>();
-        if selected_ids
-            .iter()
-            .any(|value| !unique.insert(value.clone()))
-        {
-            return Err(PublicCommerceError::Validation(
-                "duplicate_modifier_option_selection",
-            ));
-        }
-        selected_ids.sort();
-
-        let minimum = if group.required {
-            group.min_selections.max(1)
-        } else {
-            group.min_selections
-        };
-        let maximum = match group.selection_mode {
-            ModifierSelectionMode::Single => 1,
-            ModifierSelectionMode::Multiple => group.max_selections.unwrap_or(group.options.len()),
-        };
-        if selected_ids.len() < minimum || selected_ids.len() > maximum {
-            return Err(PublicCommerceError::Validation(
-                "invalid_modifier_selection_count",
-            ));
-        }
-
-        if !selected_ids.is_empty() {
-            let mut resolved_ids = Vec::with_capacity(selected_ids.len());
-            for option_id in selected_ids {
-                let option = group
-                    .options
-                    .iter()
-                    .find(|option| option.id == option_id && option.enabled)
-                    .ok_or(PublicCommerceError::Validation("invalid_modifier_option"))?;
-                delta = delta
-                    .checked_add(option.price_delta_cents)
-                    .ok_or(PublicCommerceError::Validation("invalid_configured_price"))?;
-                snapshots.push(ModifierSnapshot {
-                    group_id: group.id.clone(),
-                    group_name: group.name.clone(),
-                    option_id: option.id.clone(),
-                    option_label: option.label.clone(),
-                    price_delta_cents: option.price_delta_cents,
-                });
-                resolved_ids.push(option.id.clone());
+    let selections = input
+        .iter()
+        .map(|selection| ModifierSelectionInput {
+            group_id: selection.group_id.clone(),
+            option_ids: selection.option_ids.clone(),
+        })
+        .collect::<Vec<_>>();
+    resolve_shared_modifier_selection(groups, &selections).map_err(|error| {
+        PublicCommerceError::Validation(match error {
+            ModifierResolutionError::DuplicateGroup => "duplicate_modifier_group_selection",
+            ModifierResolutionError::DuplicateOption => "duplicate_modifier_option_selection",
+            ModifierResolutionError::InvalidSelectionCount => "invalid_modifier_selection_count",
+            ModifierResolutionError::InvalidOption => "invalid_modifier_option",
+            ModifierResolutionError::UnknownGroup => "unknown_modifier_group",
+            ModifierResolutionError::PriceOverflow => "invalid_configured_price",
+            ModifierResolutionError::ConflictingRecipeSetEffect => {
+                "conflicting_modifier_recipe_effect"
             }
-            signature_parts.push(format!("{}={}", group.id, resolved_ids.join(",")));
-        } else {
-            signature_parts.push(format!("{}=", group.id));
-        }
-    }
-
-    if !incoming.is_empty() {
-        return Err(PublicCommerceError::Validation("unknown_modifier_group"));
-    }
-
-    Ok(ResolvedModifierSelection {
-        signature: signature_parts.join("|"),
-        price_delta_cents: delta,
-        snapshots,
+        })
     })
 }
 
@@ -809,7 +733,9 @@ fn storage_error(error: sqlx::Error) -> PublicCommerceError {
 
 #[cfg(test)]
 mod tests {
-    use super::super::product_modifiers::{ProductModifierGroup, ProductModifierOption};
+    use super::super::product_modifiers::{
+        ModifierSelectionMode, ProductModifierGroup, ProductModifierOption,
+    };
     use super::*;
 
     fn request(quantity: i32) -> CreatePublicOrderRequest {
@@ -891,6 +817,7 @@ mod tests {
                     price_delta_cents: 0,
                     is_default: true,
                     enabled: true,
+                    recipe_effects: Vec::new(),
                 },
                 ProductModifierOption {
                     id: "less".into(),
@@ -898,6 +825,7 @@ mod tests {
                     price_delta_cents: 0,
                     is_default: false,
                     enabled: true,
+                    recipe_effects: Vec::new(),
                 },
             ],
         }];
@@ -937,6 +865,7 @@ mod tests {
                 price_delta_cents: 0,
                 is_default: true,
                 enabled: true,
+                recipe_effects: Vec::new(),
             }],
         }];
         assert_eq!(

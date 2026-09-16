@@ -49,7 +49,11 @@ pub(crate) fn resolve_modifier_selection(
     let mut incoming = BTreeMap::<String, Vec<String>>::new();
     for selection in input {
         let group_id = selection.group_id.trim().to_ascii_lowercase();
-        if group_id.is_empty() || incoming.insert(group_id, selection.option_ids.clone()).is_some() {
+        if group_id.is_empty()
+            || incoming
+                .insert(group_id, selection.option_ids.clone())
+                .is_some()
+        {
             return Err(ModifierResolutionError::DuplicateGroup);
         }
     }
@@ -72,7 +76,10 @@ pub(crate) fn resolve_modifier_selection(
             .filter(|value| !value.is_empty())
             .collect::<Vec<_>>();
 
-        if selected_ids.iter().any(|value| !unique.insert(value.clone())) {
+        if selected_ids
+            .iter()
+            .any(|value| !unique.insert(value.clone()))
+        {
             return Err(ModifierResolutionError::DuplicateOption);
         }
         selected_ids.sort();
@@ -136,12 +143,17 @@ pub(crate) fn resolve_modifier_selection(
 mod tests {
     use rust_decimal::Decimal;
 
-    use super::*;
     use super::super::product_modifiers::{
         ModifierRecipeEffect, ModifierSelectionMode, ProductModifierGroup, ProductModifierOption,
     };
+    use super::*;
 
-    fn option(id: &str, label: &str, price_delta_cents: i64, enabled: bool) -> ProductModifierOption {
+    fn option(
+        id: &str,
+        label: &str,
+        price_delta_cents: i64,
+        enabled: bool,
+    ) -> ProductModifierOption {
         ProductModifierOption {
             id: id.into(),
             label: label.into(),
@@ -198,22 +210,16 @@ mod tests {
 
     #[test]
     fn server_price_delta_comes_from_catalog_option() {
-        let resolved = resolve_modifier_selection(
-            &topping_groups(),
-            &[single("topping", "boba")],
-        )
-        .unwrap();
+        let resolved =
+            resolve_modifier_selection(&topping_groups(), &[single("topping", "boba")]).unwrap();
         assert_eq!(resolved.price_delta_cents, 300_000);
         assert_eq!(resolved.snapshots[0].option_label, "Boba");
     }
 
     #[test]
     fn unavailable_or_unknown_option_is_rejected() {
-        let error = resolve_modifier_selection(
-            &sugar_groups(),
-            &[single("sugar", "invented")],
-        )
-        .unwrap_err();
+        let error = resolve_modifier_selection(&sugar_groups(), &[single("sugar", "invented")])
+            .unwrap_err();
         assert_eq!(error, ModifierResolutionError::InvalidOption);
     }
 

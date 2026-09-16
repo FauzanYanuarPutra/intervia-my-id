@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -126,6 +126,7 @@ pub(crate) struct BusinessProduct {
     pub(crate) image_mime_type: Option<String>,
     pub(crate) image_width: Option<i32>,
     pub(crate) image_height: Option<i32>,
+    pub(crate) modifier_groups: Value,
 }
 
 #[derive(Debug)]
@@ -685,7 +686,8 @@ const PRODUCT_SELECT: &str = r#"
       product.image_url,
       product.image_mime_type,
       product.image_width,
-      product.image_height
+      product.image_height,
+      COALESCE(product.modifier_groups, '[]'::jsonb) AS modifier_groups
     FROM business_products product
     JOIN business_inventory inventory
       ON inventory.product_id = product.id
@@ -714,7 +716,8 @@ const PRODUCT_SELECT_BY_ID: &str = r#"
       product.image_url,
       product.image_mime_type,
       product.image_width,
-      product.image_height
+      product.image_height,
+      COALESCE(product.modifier_groups, '[]'::jsonb) AS modifier_groups
     FROM business_products product
     JOIN business_inventory inventory
       ON inventory.product_id = product.id
@@ -745,6 +748,7 @@ struct ProductRow {
     image_mime_type: Option<String>,
     image_width: Option<i32>,
     image_height: Option<i32>,
+    modifier_groups: Value,
 }
 
 impl ProductRow {
@@ -769,6 +773,7 @@ impl ProductRow {
             image_mime_type: self.image_mime_type,
             image_width: self.image_width,
             image_height: self.image_height,
+            modifier_groups: self.modifier_groups,
         }
     }
 }
