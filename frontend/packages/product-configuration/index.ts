@@ -109,6 +109,7 @@ export function parseProductModifierGroups(
       const priceDelta = finiteNumber(option.price_delta_cents, Number.NaN);
       if (!Number.isFinite(priceDelta)) continue;
 
+      const recipeEffects = parseRecipeEffects(option.recipe_effects);
       seenOptions.add(optionId);
       options.push({
         id: optionId,
@@ -116,9 +117,7 @@ export function parseProductModifierGroups(
         price_delta_cents: Math.round(priceDelta),
         is_default: option.is_default === true,
         enabled: true,
-        ...(parseRecipeEffects(option.recipe_effects)
-          ? { recipe_effects: parseRecipeEffects(option.recipe_effects) }
-          : {}),
+        ...(recipeEffects ? { recipe_effects: recipeEffects } : {}),
       });
     }
 
@@ -250,7 +249,7 @@ export function productConfigurationSummary(
     selections.map(item => [item.group_id, new Set(item.option_ids)]),
   );
 
-  return groups
+  return orderedProductModifierGroups(groups)
     .flatMap(group =>
       group.options
         .filter(option => option.enabled && selected.get(group.id)?.has(option.id))
