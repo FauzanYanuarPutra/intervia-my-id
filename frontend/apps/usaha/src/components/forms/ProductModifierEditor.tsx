@@ -117,6 +117,11 @@ function centsFromRupiah(value: string) {
   return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
 }
 
+function invalidEffect(effect: ModifierRecipeEffect) {
+  if (!effect.ingredient_id || !Number.isFinite(effect.quantity) || effect.quantity < 0) return true;
+  return effect.operation === 'add' && effect.quantity === 0;
+}
+
 export function ProductModifierEditor({ businessId, productId }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [groups, setGroups] = useState<ModifierGroup[]>([]);
@@ -220,8 +225,8 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
         return;
       }
       for (const option of group.options) {
-        if ((option.recipe_effects ?? []).some(effect => !effect.ingredient_id || !Number.isFinite(effect.quantity) || effect.quantity <= 0)) {
-          setError(`Lengkapi Pengaruh ke bahan untuk “${option.label}”.`);
+        if ((option.recipe_effects ?? []).some(invalidEffect)) {
+          setError(`Lengkapi Pengaruh ke bahan untuk “${option.label}”. Tambah harus lebih dari 0; Ganti jumlah boleh 0.`);
           return;
         }
       }
@@ -351,14 +356,14 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
                                 </select>
                               </label>
                               <label className="grid gap-1 text-[11px] font-semibold text-portal-soft">Jumlah {ingredient?.recipe_unit ? `(${ingredient.recipe_unit})` : ''}
-                                <input className="portal-input bg-white" type="number" min="0.0001" step="any" value={effect.quantity} onChange={event => patchEffect(group.id, option, effectIndex, { quantity: Math.max(0, Number(event.target.value) || 0) })} />
+                                <input className="portal-input bg-white" type="number" min={effect.operation === 'set' ? '0' : '0.0001'} step="any" value={effect.quantity} onChange={event => patchEffect(group.id, option, effectIndex, { quantity: Math.max(0, Number(event.target.value) || 0) })} />
                               </label>
                               <button type="button" aria-label="Hapus pengaruh bahan" className="grid h-11 w-11 place-items-center rounded-xl text-portal-soft hover:bg-red-50 hover:text-red-700" onClick={() => updateOption(group.id, option.id, { recipe_effects: (option.recipe_effects ?? []).filter((_, index) => index !== effectIndex) })}><Trash2 className="h-4 w-4" /></button>
                             </div>
                           );
                         })}
                         <button type="button" className="portal-button-ghost" onClick={() => addEffect(group.id, option)}><Plus className="h-4 w-4" /> Hubungkan bahan</button>
-                        <p className="text-[11px] leading-5 text-portal-soft">Contoh: Less Sugar dapat mengganti gula menjadi 15 g; Boba dapat menambah pemakaian boba 30 g.</p>
+                        <p className="text-[11px] leading-5 text-portal-soft">Contoh: Less Sugar dapat mengganti gula menjadi 15 g; Tanpa Gula menjadi 0 g; Boba dapat menambah pemakaian boba 30 g.</p>
                       </div>
                     </details>
                   </div>
