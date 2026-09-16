@@ -26,7 +26,7 @@ jobs:
           from pathlib import Path
           import json, re
 
-          # Public commerce: delegate modifier semantics to the shared Marketplace resolver.
+          # Public commerce delegates modifier semantics to one shared Marketplace resolver.
           path = Path('services/marketplace_service/src/businesses/public_commerce.rs')
           s = path.read_text()
           s = s.replace('collections::{HashMap, HashSet},', 'collections::HashMap,')
@@ -38,7 +38,7 @@ jobs:
               },
               product_modifiers::ProductModifierGroup,
           };'''
-          assert old_import in s
+          assert old_import in s, 'public commerce modifier import changed unexpectedly'
           s = s.replace(old_import, new_import, 1)
 
           old_structs = '''#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -58,13 +58,13 @@ jobs:
           }
 
           '''
-          assert old_structs in s
+          assert old_structs in s, 'local modifier result structs not found'
           s = s.replace(old_structs, '', 1)
 
-          pattern = re.compile(r'''fn resolve_modifier_selection\(
-              groups: &\[ProductModifierGroup\],
-              input: &\[PublicModifierSelectionInput\],
-          \) -> Result<ResolvedModifierSelection, PublicCommerceError> \{.*?\n\}\n\nfn normalize_optional_text''', re.S | re.X)
+          pattern = re.compile(
+              r'fn resolve_modifier_selection\(\n\s*groups: &\[ProductModifierGroup\],\n\s*input: &\[PublicModifierSelectionInput\],\n\s*\) -> Result<ResolvedModifierSelection, PublicCommerceError> \{.*?\n\}\n\nfn normalize_optional_text',
+              re.S,
+          )
           replacement = '''fn resolve_modifier_selection(
               groups: &[ProductModifierGroup],
               input: &[PublicModifierSelectionInput],
@@ -91,13 +91,13 @@ jobs:
 
           fn normalize_optional_text'''
           s, n = pattern.subn(replacement, s, count=1)
-          assert n == 1, n
+          assert n == 1, f'expected one local resolver, found {n}'
           s = s.replace(
               'use super::super::product_modifiers::{ProductModifierGroup, ProductModifierOption};',
               'use super::super::product_modifiers::{ModifierSelectionMode, ProductModifierGroup, ProductModifierOption};',
               1,
           )
-          # Every test-only literal predating recipe effects gets an empty list.
+          # Existing public-commerce test fixtures predate recipe effects.
           s = re.sub(
               r'(ProductModifierOption \{.*?enabled: true,)(\n\s*\})',
               r'\1\n                    recipe_effects: Vec::new(),\2',
@@ -106,43 +106,48 @@ jobs:
           )
           path.write_text(s)
 
-          # Canonical business product payload must carry modifier_groups to Usaha/POS.
+          # Canonical business product payload carries modifier_groups to Usaha/POS.
           path = Path('services/marketplace_service/src/businesses/products.rs')
           s = path.read_text()
           s = s.replace('use serde_json::json;', 'use serde_json::{json, Value};', 1)
           marker = '    pub(crate) image_height: Option<i32>,\n}'
-          assert marker in s
+          assert marker in s, 'BusinessProduct end marker not found'
           s = s.replace(marker, '    pub(crate) image_height: Option<i32>,\n    pub(crate) modifier_groups: Value,\n}', 1)
-          for select_marker in [
-              '      product.image_height\n    FROM business_products product',
-          ]:
-              count = s.count(select_marker)
-              assert count == 2, count
-              s = s.replace(select_marker, "      product.image_height,\n      COALESCE(product.modifier_groups, '[]'::jsonb) AS modifier_groups\n    FROM business_products product")
+
+          select_pattern = re.compile(r'(?m)^(\s*)product\.image_height,?\n(\s*)FROM business_products product$')
+          def add_modifier_projection(match):
+              return (
+                  f"{match.group(1)}product.image_height,\n"
+                  f"{match.group(1)}COALESCE(product.modifier_groups, '[]'::jsonb) AS modifier_groups\n"
+                  f"{match.group(2)}FROM business_products product"
+              )
+          s, count = select_pattern.subn(add_modifier_projection, s)
+          assert count == 2, f'expected two product SELECT projections, found {count}'
+
           row_marker = '    image_height: Option<i32>,\n}'
-          assert row_marker in s
+          assert row_marker in s, 'ProductRow end marker not found'
           s = s.replace(row_marker, '    image_height: Option<i32>,\n    modifier_groups: Value,\n}', 1)
           map_marker = '            image_height: self.image_height,\n        }'
-          assert map_marker in s
+          assert map_marker in s, 'ProductRow mapper marker not found'
           s = s.replace(map_marker, '            image_height: self.image_height,\n            modifier_groups: self.modifier_groups,\n        }', 1)
           path.write_text(s)
 
           # Usaha consumes the same shared frontend domain as WWW.
           path = Path('frontend/apps/usaha/src/lib/portal-types.ts')
           s = path.read_text()
-          if "from 'lajukan-ui'" not in s:
+          if "import type { ProductModifierGroup } from 'lajukan-ui';" not in s:
               s = "import type { ProductModifierGroup } from 'lajukan-ui';\n" + s
           marker = '  imageUrl?: string; image?: BusinessImageValue;\n};'
-          assert marker in s
+          assert marker in s, 'ProductRecord end marker not found'
           s = s.replace(marker, '  imageUrl?: string; image?: BusinessImageValue; modifierGroups: ProductModifierGroup[];\n};', 1)
           path.write_text(s)
 
           path = Path('frontend/apps/usaha/src/lib/business-server.ts')
           s = path.read_text()
-          if "parseProductModifierGroups" not in s.split('\n', 8)[0:8]:
+          if "import { parseProductModifierGroups } from 'lajukan-ui';" not in s:
               s = "import { parseProductModifierGroups } from 'lajukan-ui';\n" + s
           marker = "    imageUrl: stringValue(item.image_url ?? item.imageUrl) || undefined,\n"
-          assert marker in s
+          assert marker in s, 'canonical product image mapping marker not found'
           s = s.replace(
               marker,
               marker + "    modifierGroups: parseProductModifierGroups({\n      modifier_groups: item.modifier_groups ?? item.modifierGroups,\n    }),\n",
@@ -150,7 +155,7 @@ jobs:
           )
           path.write_text(s)
 
-          # Add local shared package dependency; npm will generate the lock deterministically.
+          # Add local shared package dependency; npm generates the lockfile deterministically.
           package_path = Path('frontend/apps/usaha/package.json')
           package = json.loads(package_path.read_text())
           package.setdefault('dependencies', {})['lajukan-ui'] = 'file:../../packages'
@@ -164,10 +169,8 @@ jobs:
 
       - name: Format and verify Marketplace
         working-directory: services/marketplace_service
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: |
-          cargo fmt --all -- --check || cargo fmt --all
+          cargo fmt --all
           cargo check --locked
           cargo test --locked businesses::modifier_resolution::tests
           cargo test --locked businesses::modifier_recipe_effect_tests
@@ -189,7 +192,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add services/marketplace_service/src/businesses/public_commerce.rs services/marketplace_service/src/businesses/products.rs frontend/apps/usaha/package.json frontend/apps/usaha/package-lock.json frontend/apps/usaha/src/lib/portal-types.ts frontend/apps/usaha/src/lib/business-server.ts
+          git add services/marketplace_service/src/businesses/public_commerce.rs services/marketplace_service/src/businesses/products.rs services/marketplace_service/src/businesses/product_modifiers.rs services/marketplace_service/src/businesses/modifier_resolution.rs frontend/apps/usaha/package.json frontend/apps/usaha/package-lock.json frontend/apps/usaha/src/lib/portal-types.ts frontend/apps/usaha/src/lib/business-server.ts
           if git diff --cached --quiet; then
             echo "No integration changes to commit"
           else
