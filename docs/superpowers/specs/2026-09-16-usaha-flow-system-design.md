@@ -1,26 +1,28 @@
 # Lajukan Usaha Flow System Design
 
 ## Status
-Approved direction from product discussion on 2026-09-16. This document freezes the intended user flow and domain behavior before implementation planning.
+Approved product direction on 2026-09-16. This document freezes UX and domain behavior before implementation planning.
 
 ## Goal
-Make `usaha.lajukan.com` feel like one coherent business operating system instead of separate feature pages. A merchant should be able to move naturally through:
+Make `usaha.lajukan.com` feel like one coherent business operating system rather than unrelated feature pages.
+
+The intended merchant flow is:
 
 `Barang → Pilihan pelanggan → Bahan & kemasan → Modal produk → Kasir → Pesanan → Stok → Uang → Laporan`
 
-The surface must stay simple for a small merchant, while food/beverage and more advanced sellers can opt into modifiers, recipes, stock ingredients, and more accurate historical margin calculations.
+The surface stays simple for a small merchant, while food/beverage and advanced sellers can opt into choices, recipes, ingredient stock, and historical margin tracking.
 
 ## Product principles
 
-1. **Simple by default, advanced when needed.** A merchant selling a simple product must not be forced to configure recipes, modifiers, variants, suppliers, or cost allocations.
-2. **One concept, one name.** User-facing labels use merchant language instead of implementation terms. Examples: `Pilihan pelanggan` instead of `modifier`, `Modal produk` with HPP as supporting terminology, and `Bahan & kemasan` instead of inventory jargon.
-3. **One rule engine across channels.** Kasir and the public WWW storefront must consume the same product configuration semantics. They must not implement independent modifier rules.
-4. **Fast POS path.** Products without required configuration are one-tap add-to-cart. Products needing configuration open the configurator first.
-5. **Server is authoritative.** The client sends identifiers and quantities; the server validates configuration and recomputes authoritative price, availability, stock, and totals.
-6. **Historical truth is immutable.** Orders store snapshots of labels, prices, selected options, and cost data needed for historical reporting. Future catalog edits must not rewrite past transactions.
-7. **Stock is physical truth.** Multiple configured lines of the same base product must consume stock in aggregate and must never bypass availability checks.
-8. **Money is not profit.** Cash/balance movement and profit reporting remain separate concepts.
-9. **Interaction is consistent.** Sheets, dialogs, dismissal, focus, safe areas, sticky actions, and layering use the shared Usaha interaction system instead of feature-local modal behavior.
+1. **Simple by default, advanced when needed.** A simple seller must never be forced to configure recipes, choices, variants, suppliers, or cost allocation.
+2. **One concept, one name.** Use merchant language in UI: `Pilihan pelanggan`, `Modal produk`, `Bahan & kemasan`.
+3. **One rule engine across channels.** Kasir and WWW storefront use the same product-configuration semantics.
+4. **Fast POS path.** Product with no customer choices is one tap. Product with customer choices opens the configurator by default. A future merchant opt-in may allow quick-add using complete defaults.
+5. **Server is authoritative.** Client totals are previews; server validates choices, stock, price, and final totals.
+6. **Historical truth is immutable.** Old orders remain readable and financially stable after catalog or cost changes.
+7. **Stock is physical truth.** Different configurations of the same base stock cannot bypass aggregate stock checks.
+8. **Money is not profit.** Balance movements and profit reporting remain separate concepts.
+9. **Interaction is consistent.** Dialogs, sheets, focus, safe areas, dismissal, and layering use one shared Usaha interaction system.
 
 ## User mental model
 
@@ -29,66 +31,68 @@ The surface must stay simple for a small merchant, while food/beverage and more 
 - product identity
 - selling price
 - category
-- photo
-- availability
-- optional fixed variants where a real sellable form is distinct
+- image
+- sellability
+- optional fixed variants
 - optional `Pilihan pelanggan`
 
 ### Bahan & kemasan
 `Stok → Bahan & kemasan` owns physical inputs:
-- ingredient/package name
-- unit
+- ingredient/package identity
+- base unit
 - current stock
-- purchase quantity and purchase cost
+- purchases and purchase cost
 - stock adjustments
-- optional supplier metadata
-- normalized cost per base unit
+- optional supplier data
+- normalized unit cost
 
 ### Modal produk
-`Modal produk` answers: "Berapa modal satu porsi dan kira-kira untung kotornya?"
+`Modal produk` answers:
 
-It reads ingredient/package costs from the stock domain and does not ask users to re-enter purchase prices in a separate HPP silo.
+> Berapa modal satu porsi, kira-kira untung kotornya, dan stok cukup untuk berapa?
+
+It reads inventory costs instead of asking the merchant to duplicate purchase prices in another HPP silo.
 
 ### Kasir
-`Jual` is the fastest way to compose a real customer order. It uses the same options and pricing rules as the online storefront.
+`Jual` is the fastest way to build a real customer order. It uses the same choice semantics as the online storefront.
 
 ### Uang
-`Uang` answers where business money moved. Reports may derive gross profit from transaction cost snapshots, but balance allocation must never be treated as HPP or profit.
+`Uang` answers where business money moved. Gross-profit reporting may use order cost snapshots, but balance allocation is not HPP.
 
 ## Catalog model
 
 ### Base product
-A base product remains the primary catalog entity customers recognize, for example `Jus Buah Naga`.
+A base product is the customer-recognizable item, for example `Jus Buah Naga`.
 
-Minimum simple-product flow:
+Minimum creation flow:
 1. Name
 2. Selling price
-3. Optional category/photo
+3. Optional category/image
 4. Save
 
-No other setup is mandatory.
+Nothing else is mandatory.
 
-### Fixed variant versus customer option
+### Variant versus customer choice
 Keep these concepts separate.
 
-Use a **variant** when the sellable form is inherently different and may need its own SKU/barcode/base price/stock identity, such as:
-- 12 oz versus 16 oz when separately stocked/priced
-- red shirt size M versus L when separate SKUs are required
+Use a **variant** when the sellable form is structurally distinct and may need its own SKU/barcode/base price/stock identity, for example:
+- 12 oz versus 16 oz when independently priced or stocked
+- shirt size M versus L when separate SKUs are required
 
-Use **Pilihan pelanggan** when the customer customizes the same base product at ordering time, such as:
+Use **Pilihan pelanggan** for customization at ordering time, for example:
 - Normal / Less Sugar / Tanpa Gula
 - Normal Ice / Sedikit Es / Tanpa Es
 - Level pedas
 - Jenis susu
 - Topping
 - Tambah sambal
-- Packaging preferences
+- Kemasan
 
-Do not model `Jus Alpukat Less Sugar` as a separate product merely to support an order preference.
+Do not create fake products such as `Jus Alpukat Less Sugar` just to represent an order preference.
 
-## Customer choice model
+## Canonical customer-choice model
 
-Canonical conceptual structure:
+Conceptual frontend/domain shape:
 
 ```ts
 type ProductModifierGroup = {
@@ -110,7 +114,7 @@ type ProductModifierOption = {
 };
 ```
 
-Internal code may keep the `modifier` name; user-facing UI should say `Pilihan pelanggan` or context-specific language.
+Internal code may retain the term `modifier`; UI should prefer `Pilihan pelanggan` or context-specific wording.
 
 ### Group behavior
 A group can be:
@@ -123,12 +127,12 @@ A group can be:
 ### Option behavior
 An option can:
 - add or subtract price
-- be the default selection
+- be a default selection
 - be temporarily unavailable
-- later optionally alter recipe consumption
+- optionally change recipe consumption in the advanced layer
 
-### Default templates
-Creation UI should offer optional templates to reduce typing:
+### Templates
+Offer editable templates to reduce setup effort:
 - Tingkat gula
 - Es
 - Ukuran
@@ -137,70 +141,85 @@ Creation UI should offer optional templates to reduce typing:
 - Jenis susu
 - Kemasan
 
-Templates create normal editable groups. They are not hard-coded business rules.
+Templates create ordinary editable groups; they are not hard-coded domain rules.
 
-### Ordering and progressive disclosure
-Required groups appear before optional groups. Advanced controls such as min/max, stock impact, and recipe impact stay collapsed unless needed.
+### Ordering
+Required groups appear before optional groups. Advanced min/max and recipe-impact controls remain collapsed until needed.
+
+## Persistence and source of truth
+
+Use the existing business-product modifier representation as the canonical catalog source. Do **not** create a second Kasir-only modifier store.
+
+First-wave persistence target:
+- canonical modifier groups live on the business product record using the existing `modifier_groups` JSON representation (or its existing schema-equivalent field if migrations already established it)
+- Usaha product editor writes this canonical structure
+- Kasir reads this canonical structure
+- WWW storefront receives only the public-safe projection required to configure an order
+
+Public storefront projection must not leak private inventory, consignment, owner, supplier, internal notes, or merchant-only cost metadata.
+
+If the current database field differs in exact naming, implementation planning may map this design to the existing field rather than introduce a duplicate column.
 
 ## Product editor flow
 
 ### Default view
-The main product editor focuses on:
-- identity
+Keep the main editor focused on:
+- name
 - price
 - category
-- sales availability
-- picture
+- availability
+- image
 
 Then show an optional section:
 
 `Pilihan pelanggan`
 
-with one clear action:
+with one primary action:
 
 `+ Tambah pilihan`
 
-### Choice editor
-For each group, use merchant-friendly prompts:
-- `Pelanggan pilih satu` / `Pelanggan boleh pilih beberapa`
+### Choice editor wording
+Use merchant-friendly labels:
+- `Pelanggan pilih satu`
+- `Pelanggan boleh pilih beberapa`
 - `Wajib dipilih`
 - `Pilihan awal`
 - `Harga tambahan`
 - `Tersedia`
 
-Advanced min/max rules appear only for multiple-selection groups or when the merchant opens detailed rules.
+Only reveal raw min/max behavior when multiple selection or advanced rules require it.
 
 ### Preview
-The editor should show a compact preview of how the choice appears at checkout so the merchant does not need to mentally translate configuration fields into customer experience.
+Show a compact preview of how the choice will look at checkout so users do not have to translate configuration fields mentally.
 
 ## Inventory and purchasing flow
 
-### Bahan & kemasan
-Buying inventory should feel like recording a real purchase:
+### Recording a purchase
+Make the operation mirror reality:
 
 `Alpukat → beli 1 kg → Rp34.000 → stok bertambah`
 
-The system derives unit cost from purchases/stock valuation according to the chosen cost strategy. The product-cost editor consumes this data instead of duplicating cost entry.
+The inventory domain derives normalized unit cost using the system's existing valuation semantics. This project does **not** introduce a new valuation methodology in the first wave.
 
 ### Units
-The domain must distinguish purchase unit from recipe/base unit where necessary, for example:
-- buy 1 kg, consume grams
-- buy 1 liter, consume ml
-- buy 1 pack of 50 cups, consume pieces
+Distinguish purchase unit and recipe/base unit where needed:
+- buy kg, consume gram
+- buy liter, consume ml
+- buy pack of 50 cups, consume pcs
 
-Conversion belongs to the inventory master. Routine recipe editing should not repeatedly ask for conversion factors.
+Conversion belongs in the inventory master and should not be repeatedly requested during normal recipe editing.
 
-### Stock adjustments
-Purchases, waste, corrections, returns, and production use should remain distinguishable events rather than silently mutating a number without audit meaning.
+### Adjustments
+Purchases, waste, corrections, returns, and production use remain distinguishable stock events rather than unexplained direct number changes.
 
-## Product cost / recipe flow
+## Modal product / recipe flow
 
 ### User-facing name
-Primary label: `Modal produk`
-Supporting label/help text may explain: `HPP per porsi`.
+Primary label: `Modal produk`.
+Supporting help may say `HPP per porsi`.
 
-### Product summary
-For a configured product, surface the result before the recipe detail:
+### Summary first
+For a configured product, surface:
 - Harga jual
 - Modal / porsi
 - Untung kotor
@@ -221,7 +240,7 @@ Terbatas oleh     Cup 16 oz
 ```
 
 ### Recipe
-A recipe is a list of ingredient/package consumption per one sellable portion/variant.
+A recipe defines ingredient/package consumption for one sellable portion or variant.
 
 Example:
 - Alpukat 125 g
@@ -229,57 +248,54 @@ Example:
 - SKM 25 ml
 - Cup 1 pcs
 
-The system calculates current estimated cost from inventory unit costs.
+Current estimated cost is derived from inventory unit costs.
 
 ### Optional choice impact on recipe
-Customer options may optionally change ingredient consumption.
-
-Examples:
+Choices may optionally alter consumption:
 - Less Sugar: sugar 20 g → 10 g
 - Tanpa Gula: sugar 20 g → 0 g
 - + Boba: add boba 30 g
-- Large: may map to a variant or a recipe delta depending on product semantics
 
-This is an advanced optional layer. A merchant may use `Less Sugar` purely as an instruction without configuring recipe deltas.
+This layer is optional. `Less Sugar` may remain a customer instruction even when no recipe delta is configured.
 
 ## Shared Product Configuration Engine
 
-Kasir and WWW storefront must share the same domain rules, preferably through reusable schema/normalization utilities and backend validation contracts.
+Kasir and WWW must share the same domain semantics through reusable schema/normalization utilities plus backend validation contracts.
 
 Responsibilities:
-- normalize modifier groups/options
+- normalize groups/options
 - determine required selections
+- apply valid defaults
 - validate min/max constraints
-- apply default selections
 - reject unavailable options
-- produce canonical selection identity
-- calculate client preview price from trusted catalog data
-- serialize selection IDs for the API
-- render selection labels consistently
+- produce deterministic canonical selection identity
+- calculate client-side preview price from trusted catalog data
+- serialize IDs for API submission
+- render choice labels consistently
 
-The backend remains authoritative even when the frontend uses the same calculation logic for responsiveness.
+Backend validation remains authoritative even when frontend utilities mirror the rules for responsiveness.
 
 ## POS / Kasir flow
 
-### Product grid
-Keep product browsing fast and visually lightweight.
+### Product grid behavior
+When a product is tapped:
+- **no customer-choice groups** → add immediately
+- **one or more customer-choice groups** → open configurator by default
 
-When tapped:
-- product has no choices requiring interaction → add immediately
-- product has choices → open product configurator
+This rule applies even if all groups are optional, because optional toppings or preferences are still meaningful customer choices.
 
-If future advanced settings allow `Tambah cepat dengan pilihan awal`, the merchant may opt into bypassing the configurator only when every required choice has a valid default and no ambiguous customer decision is needed.
+A future merchant-level `Tambah cepat dengan pilihan awal` setting may bypass the configurator only when all required groups have valid defaults and the merchant explicitly opts into that faster behavior.
 
 ### Product configurator
-On mobile use the shared large bottom sheet; on desktop use the shared centered dialog.
+Mobile uses the shared large bottom sheet; desktop uses the shared centered dialog.
 
 Order inside the configurator:
-1. Product name / price
+1. Product name and current base price
 2. Required choices
 3. Optional choices
 4. Optional line note
 5. Quantity
-6. Sticky footer with computed total and `Tambah ke pesanan`
+6. Sticky footer with preview total and `Tambah ke pesanan`
 
 Example:
 
@@ -303,21 +319,21 @@ Topping
 1 item • Rp12.000       [Tambah ke pesanan]
 ```
 
-### Editing from cart
-Tapping a configured cart line reopens the same configurator populated with that line's selections.
+### Editing a cart line
+Tapping a configured cart line reopens the same configurator with that line's selections and quantity.
 
 ### Cart line identity
-A cart line is not identified by `productId` alone.
+A cart line is **not** identified by `productId` alone.
 
-Canonical line identity must include at least:
+Canonical identity includes at least:
 - base product/variant identity
 - normalized selected option IDs
-- relevant line-level note when notes are semantically distinct
+- meaningful line-level note when supported
 
 Therefore:
 - same product + same configuration → may merge quantity
 - same product + different configuration → separate lines
-- same product + same selections + different meaningful note → separate lines
+- same product + same configuration + different meaningful note → separate lines
 
 Example:
 
@@ -333,70 +349,78 @@ Jus Buah Naga
 
 These must never collapse into one quantity-2 line.
 
-## Price authority
+## API and price authority
 
-The browser must not submit authoritative totals or arbitrary modifier price deltas.
-
-A sale request sends identifiers such as:
+A sale request sends identifiers rather than authoritative monetary values, for example:
 - product/variant ID
 - quantity
-- selected modifier option IDs
-- line note when supported
+- selected option IDs grouped or otherwise normalized by the agreed API contract
+- optional line note
 
-The backend reloads current sellable configuration and validates:
+The backend reloads current catalog state and validates:
 - product is sellable
 - option belongs to the submitted group/product
-- group constraints are satisfied
+- required groups are satisfied
+- min/max is satisfied
 - option is available
 - quantity is valid
-- computed base price
-- computed option deltas
-- taxes/fees/discounts according to sale rules
-- final line and order totals
+- base price
+- option price deltas
+- applicable discount/tax/fee rules
+- final line/order totals
 
-Any client total is preview-only.
+The browser's computed total is preview-only and cannot override server pricing.
+
+API changes should be additive with safe defaults. Backend acceptance should land before a frontend starts sending fields that an older backend cannot understand.
 
 ## Backend stock invariants
 
-### Aggregate by stock identity
-Before decrementing stock, aggregate required quantity across every submitted line sharing the same physical stock identity.
+### Aggregate stock by physical identity
+Before decrementing stock, aggregate requirement across every submitted line sharing the same physical stock identity.
 
-Example: stock for base product is 1, but the request contains:
+Example: base-product stock is 1, request contains:
 - Jus Naga Normal ×1
 - Jus Naga Less Sugar ×1
 
-The request must fail as stock requirement is 2, not pass two independent `1 <= 1` checks.
+The request requires stock 2 and must fail. It must not pass two independent `1 <= 1` checks.
 
-### Known duplicate-line bug to remove
-Existing order validation must not compare unique product-row count against raw submitted line count. Multiple configured lines may legitimately reference the same product ID.
+### Fix duplicate-base-product validation
+Existing validation must not compare count of unique loaded product rows to count of submitted lines.
 
-Validation should resolve unique requested product IDs once, verify every unique ID exists, then evaluate all individual lines/configurations.
+Correct approach:
+1. collect unique requested product IDs
+2. load/validate every unique product ID once
+3. preserve every submitted line/configuration
+4. validate each line against its loaded product
+5. aggregate stock requirements before mutation
+
+Different configured lines may legitimately reference the same base product.
 
 ### Ingredient stock
-When recipe stock consumption is enabled, stock consumption must be calculated from the final normalized configuration and multiplied by quantity before checking/decrementing inventory.
+When recipe stock consumption is enabled, compute consumption from the final normalized configuration, multiply by quantity, aggregate by ingredient stock identity, then validate/decrement.
 
-All stock mutation for a sale should be transactionally consistent with order creation.
+Order creation and required stock mutation should be transactionally consistent within the service boundary. If effects cross service boundaries, use explicit failure/reconciliation semantics rather than pretending to provide an impossible distributed transaction.
 
-## Order snapshot
+## Immutable order snapshot
 
-Every finalized order line stores sufficient immutable display and reporting data, including:
+Finalized lines store sufficient immutable data to remain readable and reportable:
 - product/variant label snapshot
 - base unit price snapshot
-- selected option IDs when useful for analytics
+- selected option IDs where analytically useful
 - selected option label snapshots
 - option price delta snapshots
 - normalized configuration display text
 - line note snapshot
 - quantity
 - authoritative line total
-- optional product cost/HPP snapshot
-- optional ingredient-consumption snapshot if required for audit/reconciliation
+- optional HPP/cost snapshot
+- optional ingredient-consumption snapshot when needed for reconciliation
 
-Deleting or renaming a catalog option later must not make an old receipt unreadable.
+Renaming/deleting a current catalog option must not damage old receipts.
 
-## Receipts and order history
+## Receipt and order history
 
-Configured choices are secondary information under the product name, not separate fake products.
+Choices are secondary text under the product, not separate fake products.
 
 Example:
 
@@ -405,88 +429,90 @@ Jus Buah Naga   Rp15.000
 Less Sugar · Boba
 ```
 
-Order history and receipt generation use stored snapshots rather than current catalog labels.
+Order history and receipts read stored snapshots, not current catalog labels.
 
-## Money and reporting flow
+## Money and reporting
 
 ### Sale posting
-Completed sales create the appropriate business-money movement under the existing finance domain.
+A completed sale creates the appropriate business-money movement under the existing finance domain.
 
-### Balance allocation invariant
-Spending Rp200.000 from one finance bucket reduces only that bucket. It must not proportionally reduce unrelated target-percentage buckets.
+If finance posting is asynchronous or cross-service, the system must expose a reconciliation state/failure path instead of silently claiming every downstream effect succeeded.
 
-Target percentages are planning/allocation guidance, not a mechanism that rewrites every bucket balance on each spend.
+### Bucket invariant
+Spending Rp200.000 from one finance bucket reduces only that bucket.
+
+It must not proportionally reduce unrelated target-percentage buckets. Target percentages are planning/allocation guidance, not a command to rewrite every balance on each spend.
 
 ### Gross profit
-Historical gross profit should use transaction cost snapshots where available:
+Historical gross profit should use transaction cost snapshots when available:
 
 `Penjualan - snapshot modal transaksi = untung kotor historis`
 
-Changing today's avocado purchase cost must not retroactively change the reported gross profit of an order sold last month.
+A later ingredient-price change must not rewrite last month's historical gross profit.
 
-## Interaction system integration
+## Shared Usaha interaction system
 
-This feature must consume the shared Lajukan Usaha interaction system rather than adding new ad-hoc overlays.
+All new flows use shared primitives rather than ad-hoc overlays.
 
 ### Modal foundation
-Use native `<dialog>` / browser top layer behind a thin shared React abstraction when practical.
+Prefer native `<dialog>` / browser top layer behind a thin React abstraction when practical.
 
 Rules:
 - full-viewport translucent backdrop
-- background inert while modal is open
+- background inert while open
 - body behind cannot scroll
-- Escape closes when dismissal is allowed
-- backdrop click closes when dismissal is allowed
-- focus enters/traps in the dialog and restores to the trigger
-- dirty forms require discard confirmation before destructive dismissal
-- saving/submitting can temporarily block dismissal
-- reduced motion respected
+- Escape closes when allowed
+- backdrop click closes when allowed
+- focus enters/traps and restores to trigger
+- dirty forms require discard confirmation
+- saving/submitting may temporarily block dismissal
+- reduced motion is respected
 
 ### Responsive presentation
-- small selectors: desktop popover or compact dialog, mobile sheet
+- small selectors: desktop popover/compact dialog, mobile sheet
 - product configurator: desktop centered dialog, mobile large sheet
 - checkout: desktop centered dialog, mobile large sheet near `90–96dvh`
-- More navigation and mobile business switcher: bottom sheet with full backdrop
+- mobile `Lainnya` and business switcher: bottom sheet with full backdrop
 
 ### Sheet anatomy
-- optional drag/visual handle, without requiring swipe gestures
-- title and close control
-- scrollable body
+- visual handle may be shown; swipe gesture is not required
+- title + close
+- independently scrollable body
 - sticky action footer
-- safe-area bottom padding
-- dynamic viewport units (`dvh`) where appropriate
+- safe-area padding
+- `dvh` where appropriate
 - no background scroll chaining
 
 ### Layering
-Feature components must not invent arbitrary `z-[999]` values. Ordinary app layers use centralized tokens. Native modal dialogs live in the browser top layer rather than competing numerically with the header or mobile navigation.
+Feature components do not invent arbitrary `z-[999]` values. Ordinary app layers use centralized tokens. Native modal dialogs use browser top layer instead of competing with header/mobile-nav z-index.
 
 ### Mobile bottom navigation
 Keep five stable positions:
 
 `Beranda · Jual · Barang · Uang · Lainnya`
 
-`Stok` remains one tap away under `Lainnya` and may surface contextually from Beranda.
+`Stok` remains one tap away under `Lainnya` and can surface contextually from Beranda.
 
-Bottom navigation must:
+Navigation must:
 - keep positions stable
-- keep inactive items visually neutral
-- use semantic accent mainly for the active destination
+- keep inactive items neutral
+- use semantic accent mainly for active destination
 - respect safe areas
-- derive page bottom padding from the same nav-height token
-- avoid covering page-level actions
-- hide or adapt when the mobile virtual keyboard materially occupies the viewport
+- derive content bottom padding from the same nav-height token
+- not cover page-level actions
+- hide/adapt when the mobile virtual keyboard materially occupies the viewport
 
-## Accessibility and touch behavior
+## Accessibility and touch
 
-- target size approximately 44 px minimum for important touch controls
+- approximately 44 px minimum touch targets for important controls
 - visible keyboard focus
-- dialog title/description semantics
+- correct dialog title/description semantics
 - radio/checkbox semantics for choices
-- no color-only selection state
-- screen-reader-readable required state and validation errors
-- focus restored after closing configuration
-- reduced motion supported
-- validation message next to the affected group and summarized at action point when helpful
+- no color-only selected state
+- screen-reader-readable required state/errors
+- focus restoration after close
+- reduced-motion support
+- validation next to the affected group plus action-point summary when useful
 
 ## Responsive contract
 
@@ -500,169 +526,179 @@ Explicitly test at least:
 - mobile landscape
 - safe-area/notch devices
 - long product/option labels
-- keyboard open
+- virtual keyboard open
 - browser zoom
 
-No CTA may be hidden behind mobile navigation, browser chrome, safe area, or virtual keyboard.
+No CTA may hide behind navigation, browser chrome, safe area, or virtual keyboard.
 
 ## Migration and compatibility
 
 ### Existing products
-Products without modifier metadata continue to work unchanged and retain one-tap POS behavior.
+Products without customer-choice metadata continue unchanged and retain one-tap POS behavior.
 
-### Existing storefront modifier data
-Reuse/normalize the existing product modifier structure rather than creating a second incompatible representation.
+### Existing choice data
+Normalize/reuse the existing storefront/business-product modifier representation. Do not invent a second incompatible structure for Kasir.
 
 ### Existing orders
-Do not require historical orders to retroactively obtain modifier snapshots. New code must tolerate older records that lack the new metadata.
+Old orders do not need retroactive modifier snapshots. New renderers tolerate absent metadata.
 
-### API evolution
-Prefer additive fields with safe defaults during rollout. Deploy backend acceptance before frontend begins submitting new configuration payloads when compatibility requires staged deployment.
+### Cost valuation
+Use current inventory valuation behavior in the first implementation wave. Any future switch to weighted-average/FIFO/etc. is a separate product/accounting decision.
 
 ## Error handling
 
-User-facing messages should explain the recovery action.
+Messages explain the recovery action and do not expose backend implementation vocabulary.
 
 Examples:
 - `Pilihan Less Sugar sedang tidak tersedia. Pilih opsi lain.`
 - `Stok Jus Buah Naga tinggal 1, sedangkan pesanan membutuhkan 2.`
 - `Pilih minimal 1 topping.`
 
-Do not expose raw backend schema/validation terminology.
+If availability changes between configuration and checkout, return the user to the affected line with other selections preserved where possible. Do not silently remove or substitute an option.
 
-If availability changes between configuration and checkout, return the user to the affected line with preserved selections where possible instead of silently dropping an option.
+## Observability and reconciliation
 
-## Observability and audit
-
-Where existing infrastructure allows, capture structured failure reasons for:
-- invalid modifier selection
+Capture structured failure reasons where existing infrastructure supports it:
+- invalid selection
 - stale/unavailable option
 - insufficient aggregate stock
-- pricing mismatch discovered server-side
+- server/client pricing mismatch
 - inventory mutation failure
 - finance posting failure
 
-Order creation, stock mutation, and finance effects must have a clear reconciliation path. Do not silently report a successful sale when a required downstream mutation has failed.
+Order, stock, and finance effects require an explicit reconciliation path. A partial downstream failure must be visible rather than silently reported as fully successful.
 
 ## Test strategy
 
-Implementation must be test-driven around domain invariants before visual polish.
+Implementation is test-driven around domain invariants before visual polish.
 
 ### Domain/unit tests
-- default selection normalization
+- default-selection normalization
 - required single choice
 - optional single choice
 - multiple-choice min/max
 - unavailable option rejected
 - option from another product rejected
-- deterministic canonical selection identity
+- deterministic selection identity
 - same configuration merges
-- different configurations do not merge
-- different meaningful notes do not merge
-- price recomputation ignores client-manipulated totals
+- different configurations remain separate
+- meaningful different note remains separate
+- client-manipulated total cannot control server price
 
 ### Backend integration tests
-- duplicate base product lines are accepted when IDs are valid
-- aggregate stock check catches over-order across differently configured lines
-- server recomputes modifier deltas
-- invalid/stale option returns actionable validation error
-- finalized order stores immutable selection snapshots
-- stock decrement and order creation remain transactionally correct
-- ingredient consumption includes configuration deltas when configured
+- duplicate base-product lines are valid when IDs exist
+- aggregate stock catches over-order across configured lines
+- server recomputes option deltas
+- stale/invalid option gets actionable validation error
+- finalized order stores immutable snapshots
+- order and stock mutation remain consistent
+- recipe consumption includes choice delta when configured
 
 ### POS interaction tests
-- product without options adds in one tap
-- product with choices opens configurator
-- required groups block submission until valid
-- default choices are preselected
-- optional choice price updates preview total
-- add configured line
-- edit configured line
-- second different configuration remains a separate cart line
-- same configuration can increment quantity
-- modal backdrop/Escape behavior follows interaction rules
-- saving blocks accidental dismiss
-- focus restores to product trigger
-- sticky CTA stays visible above safe area/keyboard
+- product without choices adds in one tap
+- product with any choice group opens configurator
+- required group blocks invalid submission
+- defaults preselect correctly
+- optional price delta updates preview
+- configured line adds correctly
+- configured line edits correctly
+- different configuration creates separate line
+- same configuration may increment quantity
+- backdrop/Escape follows shared rules
+- saving blocks accidental dismissal
+- focus restores
+- CTA stays above safe area/keyboard
 
 ### Storefront tests
-- uses the same normalized rules as POS
-- product without choices retains quick order path
-- configuration pricing and labels match POS semantics
+- same normalized choice semantics as POS
+- no-choice product keeps quick path
+- configuration pricing and labels match POS behavior
 
 ### Reporting tests
 - historical margin uses stored cost snapshot
-- later cost edits do not rewrite prior margin
-- spending one finance bucket does not mutate unrelated bucket balances
+- later cost change does not rewrite prior margin
+- spending one finance bucket does not mutate unrelated buckets
 
 ## Acceptance journeys
 
-### Journey A — simple merchant
-1. Create `Air Mineral` at Rp5.000.
-2. Do not configure stock recipe or customer choices.
+### A — simple merchant
+1. Create `Air Mineral` Rp5.000.
+2. Do not configure recipe or choices.
 3. Tap in Kasir.
-4. It enters cart immediately.
-5. Checkout succeeds with no additional setup.
+4. Product enters cart immediately.
+5. Checkout works without additional setup.
 
-### Journey B — juice with customer preferences
+### B — juice with customer choices
 1. Create `Jus Buah Naga` Rp12.000.
 2. Add required `Tingkat gula`: Normal, Less Sugar, Tanpa Gula; Normal default.
 3. Add required `Es`: Normal, Sedikit, Tanpa Es; Normal default.
 4. Add optional multi-select `Topping`: Boba +Rp3.000, Jelly +Rp2.000.
-5. In Kasir choose Less Sugar and Boba.
-6. Add another Jus Buah Naga with Normal and no topping.
-7. Cart shows two distinct lines.
-8. Checkout server recomputes Rp15.000 + Rp12.000 before discounts/taxes.
-9. Base product stock checks total quantity 2.
-10. Receipt/history preserves both configurations.
+5. Kasir tap opens configurator.
+6. Add one Less Sugar + Boba.
+7. Add another Normal without topping.
+8. Cart shows two distinct lines.
+9. Server recomputes Rp15.000 + Rp12.000 before other adjustments.
+10. Base product stock validates total quantity 2.
+11. Receipt/history preserves both configurations.
 
-### Journey C — recipe-aware juice
-1. Inventory has sugar with a normalized gram cost.
-2. Product recipe consumes 20 g sugar by default.
-3. Less Sugar recipe delta changes usage to 10 g; Tanpa Gula to 0 g.
-4. Sale with Less Sugar consumes the normalized 10 g quantity.
-5. Order stores the cost snapshot used at transaction time.
-6. Later sugar purchase-cost changes do not rewrite the old order margin.
+### C — optional-only choice
+1. Product has no required group but has optional `Topping`.
+2. Kasir tap still opens configurator.
+3. Cashier may select none and add immediately, or choose a topping.
+4. Optional choices are never silently hidden by a one-tap shortcut unless merchant later enables the explicit quick-add setting.
 
-### Journey D — stale option
-1. Cashier opens product configurator while Boba is available.
+### D — recipe-aware choice
+1. Sugar has normalized gram cost.
+2. Product recipe consumes 20 g sugar.
+3. Less Sugar changes usage to 10 g; Tanpa Gula to 0 g.
+4. Less Sugar sale consumes 10 g × quantity.
+5. Order stores cost snapshot.
+6. Later sugar cost changes do not rewrite historical margin.
+
+### E — stale option
+1. Cashier opens configurator while Boba is available.
 2. Boba becomes unavailable before checkout.
-3. Backend rejects the stale selection rather than charging an invented/stale price.
-4. UI highlights the affected line and asks for another option while preserving other choices.
+3. Backend rejects stale selection rather than accepting stale price/state.
+4. UI highlights the affected line and asks for another option while preserving unaffected choices.
 
-## Non-goals for the first implementation wave
+## Non-goals for the first wave
 
-Do not turn this work into a full restaurant ERP or exhaustive SKU matrix system.
+Do not turn this project into a full restaurant ERP or exhaustive SKU matrix.
 
-Specifically defer unless already required by existing code:
-- arbitrary production/manufacturing work orders
-- complex batch/lot expiry accounting
-- every possible inventory valuation methodology
+Defer unless already required by existing code:
+- production/manufacturing work orders
+- batch/lot expiry accounting
+- new inventory valuation methodology
 - three-level nested modifiers
 - three-layer modal stacks
-- drag-and-drop modifier builders when simple ordering controls suffice
-- mandatory recipe setup for every product
-- mandatory variant setup for every product
+- drag-and-drop modifier builders when simple controls suffice
+- mandatory recipe setup
+- mandatory variant setup
 
-## Implementation sequencing recommendation
+## Recommended implementation sequence
 
-Implementation planning should preserve vertical correctness rather than landing isolated UI pieces.
+Implementation planning should land vertical correctness rather than isolated UI pieces:
 
-Recommended waves:
 1. shared schemas/normalization + cart line identity
-2. authoritative backend sale validation, price recomputation, duplicate-line and aggregate-stock fixes
-3. shared Usaha dialog/sheet primitives and navigation layering
+2. authoritative backend validation/pricing + duplicate-line and aggregate-stock fixes
+3. shared dialog/sheet primitives + navigation layering
 4. POS configurator + cart editing
-5. product editor simplification and customer-choice UX
-6. order snapshots/receipt/history rendering
-7. inventory/recipe option deltas and cost snapshots
-8. finance/reporting integration and reconciliation tests
-9. WWW migration onto the shared configuration contract where not already aligned
+5. product-editor simplification + customer-choice UX
+6. order snapshots + receipt/history rendering
+7. recipe option deltas + cost snapshots
+8. finance/reporting integration + reconciliation tests
+9. WWW migration onto the shared contract where still divergent
 
-Each wave must retain compatibility with simple products.
+Every wave must preserve simple-product compatibility.
 
 ## Definition of done
 
-This design is complete only when a merchant can create a simple product without extra friction, optionally add customer choices, sell differently configured instances of the same product through Kasir, have the backend independently validate price/options/stock, preserve readable historical order snapshots, and see inventory/cost/money effects without contradictory semantics.
+The flow is complete only when a merchant can:
+- create a simple product without extra friction
+- optionally add customer choices
+- configure and sell different versions of the same base product in Kasir
+- rely on the backend to validate price/options/stock independently
+- preserve readable historical order snapshots
+- keep stock, product cost, money, and gross-profit semantics non-contradictory
 
-Visual simplicity is necessary but not sufficient. The core domain invariants above are part of the product experience and must be verified by automated tests before declaring the flow complete.
+Visual simplicity is necessary but not sufficient. These domain invariants are part of the product experience and require automated verification before the work is declared complete.
