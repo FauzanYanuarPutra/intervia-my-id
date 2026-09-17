@@ -30,7 +30,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncSeekExt},
     net::TcpListener,
     sync::Mutex,
-    time::{sleep, Duration},
+    time::{sleep, timeout, Duration},
 };
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -1171,6 +1171,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(root))
         .route("/health", get(health))
+        .route("/ready", get(ready))
         .route("/v1/community/profile/sync", post(sync_current_profile))
         .route(
             "/v1/community/users/{user_id}/social",
@@ -1260,8 +1261,36 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = TcpListener::bind(&addr).await?;
     println!("community_service listening on {}", addr);
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("shutdown signal received");
 }
 
 // Retained only for migration characterization tests while startup DDL is
@@ -1739,6 +1768,26 @@ async fn root() -> impl IntoResponse {
 
 async fn health() -> impl IntoResponse {
     Json(json!({"status":"ok","service":"community_service"}))
+}
+
+async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match timeout(
+        Duration::from_secs(2),
+        sqlx::query_scalar::<_, i32>("SELECT 1").fetch_one(&state.db),
+    )
+    .await
+    {
+        Ok(Ok(1)) => (
+            StatusCode::OK,
+            Json(json!({"status":"ready","service":"community_service"})),
+        )
+            .into_response(),
+        Ok(Ok(_)) | Ok(Err(_)) | Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"status":"not_ready","service":"community_service"})),
+        )
+            .into_response(),
+    }
 }
 
 fn bearer_token(headers: &HeaderMap) -> Option<String> {

@@ -32,7 +32,7 @@ use std::{
 };
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, timeout, Duration};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
@@ -2443,6 +2443,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(businesses::router())
         .merge(news::router())
         .route("/health", get(health))
+        .route("/ready", get(ready))
         .route("/", get(root))
         .route("/v1/map/references", get(list_map_references))
         .route("/v1/content", get(list_content).post(create_content))
@@ -2683,12 +2684,60 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = TcpListener::bind(&addr).await?;
     println!("marketplace_service listening on {}", addr);
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("shutdown signal received");
 }
 
 async fn health() -> impl IntoResponse {
     Json(json!({"status":"ok","service":"marketplace_service"}))
+}
+
+async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match timeout(
+        Duration::from_secs(2),
+        sqlx::query_scalar::<_, i32>("SELECT 1").fetch_one(&state.db),
+    )
+    .await
+    {
+        Ok(Ok(1)) => (
+            StatusCode::OK,
+            Json(json!({"status":"ready","service":"marketplace_service"})),
+        )
+            .into_response(),
+        Ok(Ok(_)) | Ok(Err(_)) | Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"status":"not_ready","service":"marketplace_service"})),
+        )
+            .into_response(),
+    }
 }
 
 async fn collect_events(
