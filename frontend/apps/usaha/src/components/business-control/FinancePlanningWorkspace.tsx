@@ -114,6 +114,7 @@ export function FinancePlanningWorkspace({
   const [intervalDays, setIntervalDays] = useState('30');
   const [nextDueOn, setNextDueOn] = useState(jakartaDateKey());
   const [accountKey, setAccountKey] = useState('cash');
+  const obligationAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
   const paymentAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const todayValue = jakartaDateKey();
@@ -208,25 +209,33 @@ export function FinancePlanningWorkspace({
       setMessage('Isi nama tagihan, nominal, dan interval dengan benar.');
       return;
     }
+    const requestBody = {
+      action: 'create_obligation',
+      label: label.trim(),
+      entry_type: billType,
+      account_key: accountKey,
+      amount,
+      interval_days: interval,
+      next_due_on: nextDueOn,
+    };
+    const attempt = resolveIdempotencyAttempt(obligationAttemptRef.current, requestBody);
+    obligationAttemptRef.current = attempt;
+
     setSavingBill(true);
     setMessage('');
     try {
       const response = await fetch(`/api/businesses/${businessId}/wave2`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create_obligation',
-          label: label.trim(),
-          entry_type: billType,
-          account_key: accountKey,
-          amount,
-          interval_days: interval,
-          next_due_on: nextDueOn,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': attempt.key,
+        },
+        body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal menambah tagihan.');
       await reloadFinancePlan();
+      obligationAttemptRef.current = null;
       setLabel('');
       setBillAmount('');
       setMessage('Tagihan rutin tersimpan. Belum mengurangi kas sampai dibayar.');
