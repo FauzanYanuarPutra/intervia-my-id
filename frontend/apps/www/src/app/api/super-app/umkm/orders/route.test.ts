@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   createUmkmOrder: vi.fn(),
   getUmkmOrderById: vi.fn(),
   getUmkmStoreById: vi.fn(),
+  listUmkmOrderBundlesByStore: vi.fn(),
   listUmkmOrdersByStore: vi.fn(),
   listUmkmProducts: vi.fn(),
   buildUmkmShippingQuote: vi.fn(),
@@ -34,8 +35,8 @@ vi.mock('@/lib/serverRequest', () => ({
   parseJsonBodyWithSchema: mocks.parseJsonBodyWithSchema,
 }));
 
-vi.mock('@/lib/super-app/umkm-authorization', () => ({
-  hasUmkmStorePermission: vi.fn(() => true),
+vi.mock('@/lib/super-app/umkm-request-access', () => ({
+  hasUmkmStoreRequestPermission: vi.fn(() => true),
 }));
 
 vi.mock('@/lib/featureFlags', () => ({
@@ -46,6 +47,7 @@ vi.mock('@/lib/super-app/umkm-commerce', () => ({
   createUmkmOrder: mocks.createUmkmOrder,
   getUmkmOrderById: mocks.getUmkmOrderById,
   getUmkmStoreById: mocks.getUmkmStoreById,
+  listUmkmOrderBundlesByStore: mocks.listUmkmOrderBundlesByStore,
   listUmkmOrdersByStore: mocks.listUmkmOrdersByStore,
   listUmkmProducts: mocks.listUmkmProducts,
 }));
@@ -54,7 +56,7 @@ vi.mock('@/lib/super-app/umkm-shipping', () => ({
   buildUmkmShippingQuote: mocks.buildUmkmShippingQuote,
 }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 function onlinePayload() {
   return {
@@ -219,5 +221,110 @@ describe('POST /api/super-app/umkm/orders online channel', () => {
     expect(response.status).toBe(409);
     expect(body.error).toBe('product_unavailable');
     expect(mocks.createUmkmOrder).not.toHaveBeenCalled();
+  });
+
+  it('records the authenticated cashier as the offline order creator', async () => {
+    mocks.parseJsonBodyWithSchema.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        store_id: STORE_ID,
+        channel: 'offline',
+        table_id: '44444444-4444-4444-8444-444444444444',
+        customer_name: 'Pembeli meja 4',
+        items: [{ product_id: PRODUCT_ID, quantity: 1 }],
+        payment_method: 'cash',
+      },
+    });
+    mocks.requireAuth.mockResolvedValueOnce({
+      ok: true,
+      ctx: {
+        token: 'cashier-token',
+        userId: USER_ID,
+        email: 'kasir@example.test',
+        roles: ['user'],
+        payload: { sub: USER_ID },
+      },
+    });
+
+    const response = await POST(request({ cookie: 'access_token=cashier-token' }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.createUmkmOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          created_by_user_id: USER_ID,
+          created_by_email: 'kasir@example.test',
+        }),
+      }),
+    );
+    const createInput = mocks.createUmkmOrder.mock.calls[0]?.[0] as {
+      metadata: Record<string, unknown>;
+    };
+    expect(createInput.metadata).not.toHaveProperty('customer_user_id');
+  });
+});
+
+describe('GET /api/super-app/umkm/orders cashier list', () => {
+  it('returns order rows with nested line items for cashier cards', async () => {
+    mocks.getUmkmStoreById.mockResolvedValueOnce({
+      id: STORE_ID,
+      owner_user_id: '44444444-4444-4444-8444-444444444444',
+      online_order_enabled: true,
+    });
+    mocks.listUmkmOrderBundlesByStore.mockResolvedValueOnce([
+      {
+        order: {
+          id: '55555555-5555-4555-8555-555555555555',
+          store_id: STORE_ID,
+          channel: 'offline',
+          table_id: null,
+          table_code: 'T01',
+          status: 'pending',
+          payment_status: 'unpaid',
+          payment_method: 'cash',
+          payment_stage: 'awaiting_confirmation',
+          fulfillment_mode: 'dine_in',
+          customer_name: 'Pembeli meja 1',
+          customer_phone: null,
+          notes: null,
+          subtotal_cents: 10_000,
+          discount_cents: 0,
+          service_fee_cents: 0,
+          shipping_fee_cents: 0,
+          tax_cents: 0,
+          total_cents: 10_000,
+          checked_out_at: null,
+          metadata: {},
+          created_at: '2026-09-15T01:00:00.000Z',
+          updated_at: '2026-09-15T01:00:00.000Z',
+        },
+        items: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            order_id: '55555555-5555-4555-8555-555555555555',
+            product_id: PRODUCT_ID,
+            product_name: 'Nasi Bakar',
+            quantity: 1,
+            unit_price_cents: 10_000,
+            line_total_cents: 10_000,
+            notes: null,
+            metadata: { product_image_url: '/images/products/nasi.jpg' },
+            created_at: '2026-09-15T01:00:00.000Z',
+          },
+        ],
+      },
+    ]);
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/api/super-app/umkm/orders?store_id=${STORE_ID}`,
+      ),
+    );
+    const body = (await response.json()) as {
+      data?: { items?: Array<{ items?: unknown[] }> };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.data?.items?.[0]?.items).toHaveLength(1);
   });
 });

@@ -159,6 +159,8 @@ fn sale_request(product_id: Uuid) -> CreateSaleRequest {
             quantity: Decimal::from(2),
             unit_price_amount: 12_000,
             discount_amount: 0,
+            selected_options: Vec::new(),
+            note: None,
         }],
     }
 }

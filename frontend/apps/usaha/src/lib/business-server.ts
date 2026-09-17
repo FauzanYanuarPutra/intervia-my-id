@@ -1,3 +1,4 @@
+import { parseProductModifierGroups } from 'lajukan-ui/product-configuration';
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
@@ -322,6 +323,9 @@ function mapCanonicalProduct(value: unknown): ProductRecord | null {
     ),
     notes: stringValue(item.notes),
     imageUrl: stringValue(item.image_url ?? item.imageUrl) || undefined,
+    modifierGroups: parseProductModifierGroups({
+      modifier_groups: item.modifier_groups ?? item.modifierGroups,
+    }),
     ...(stringValue(item.image_url ?? item.imageUrl)
       ? {
           image: {

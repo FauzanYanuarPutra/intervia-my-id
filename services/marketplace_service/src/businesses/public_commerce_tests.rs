@@ -1,8 +1,9 @@
 use super::public_commerce::{
     CreatePublicOrderRequest, PublicCommerceError, PublicCommerceRepository, PublicFulfillmentMode,
-    PublicOrderItemInput,
+    PublicModifierSelectionInput, PublicOrderItemInput,
 };
 use rust_decimal::Decimal;
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -134,6 +135,7 @@ fn order_request(items: Vec<(Uuid, i32)>) -> CreatePublicOrderRequest {
                 product_id,
                 quantity,
                 note: None,
+                selected_options: Vec::new(),
             })
             .collect(),
         fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
@@ -184,6 +186,99 @@ async fn creates_server_authoritative_canonical_order(pool: PgPool) {
     assert_eq!(stored.2, seeded.business_id);
     assert_eq!(stored.3, "www");
     assert_eq!(stored.4.as_deref(), Some("www_umkm_storefront"));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn same_product_with_different_configurations_stays_separate(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(10)).await;
+    let groups = json!([{
+        "id": "sugar",
+        "name": "Tingkat gula",
+        "selection_mode": "single",
+        "required": true,
+        "min_selections": 1,
+        "max_selections": 1,
+        "options": [
+            {"id":"less","label":"Less Sugar","price_delta_cents":0,"is_default":false,"enabled":true},
+            {"id":"normal","label":"Normal","price_delta_cents":0,"is_default":true,"enabled":true}
+        ]
+    }]);
+    sqlx::query("UPDATE umkm_products SET metadata=jsonb_set(metadata,'{modifier_groups}',$2,true) WHERE id=$1")
+        .bind(seeded.product_id)
+        .bind(groups)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let request = CreatePublicOrderRequest {
+        items: vec![
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selected_options: vec![PublicModifierSelectionInput {
+                    group_id: "sugar".into(),
+                    option_ids: vec!["less".into()],
+                }],
+            },
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selected_options: vec![PublicModifierSelectionInput {
+                    group_id: "sugar".into(),
+                    option_ids: vec!["normal".into()],
+                }],
+            },
+        ],
+        fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
+        note: None,
+        source_surface: Some("www_umkm_storefront".into()),
+    };
+
+    let created = PublicCommerceRepository::new(pool.clone())
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), request)
+        .await
+        .unwrap();
+    assert_eq!(created.items.len(), 2);
+
+    let signatures: Vec<String> = sqlx::query_scalar(
+        "SELECT metadata->>'configuration_signature' FROM order_items WHERE order_id=$1 ORDER BY metadata->>'configuration_signature'",
+    )
+    .bind(created.order.id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(signatures, vec!["sugar=less", "sugar=normal"]);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn stock_is_checked_across_all_configurations_of_same_product(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(1)).await;
+    let request = CreatePublicOrderRequest {
+        items: vec![
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selected_options: Vec::new(),
+            },
+            PublicOrderItemInput {
+                product_id: seeded.product_id,
+                quantity: 1,
+                note: None,
+                selected_options: Vec::new(),
+            },
+        ],
+        fulfillment_mode: Some(PublicFulfillmentMode::Pickup),
+        note: None,
+        source_surface: None,
+    };
+    let error = PublicCommerceRepository::new(pool)
+        .create_product_order(Uuid::new_v4(), Uuid::new_v4(), request)
+        .await
+        .unwrap_err();
+    assert_eq!(error, PublicCommerceError::InsufficientStock);
 }
 
 #[sqlx::test(migrations = "./migrations")]

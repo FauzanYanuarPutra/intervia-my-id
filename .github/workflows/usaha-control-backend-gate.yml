@@ -50,6 +50,10 @@ jobs:
         run: cargo test --locked businesses::control::tests
       - name: Identity business access tests
         run: cargo test --locked businesses::identity_client::tests
+      - name: Public commerce modifier and order tests
+        run: |
+          cargo test --locked businesses::public_commerce::tests
+          cargo test --locked businesses::public_commerce_tests
       - name: Wave 2 domain and route tests
         run: |
           cargo test --locked businesses::wave2::tests
@@ -94,3 +98,6 @@ jobs:
           grep -q 'business_cash_shifts' migrations/20260913080000_business_os_wave2.sql
           grep -q 'business_product_primary_materials' migrations/20260913080000_business_os_wave2.sql
           grep -q 'business_material_yield_observations' migrations/20260913080000_business_os_wave2.sql
+          test -s migrations/20260916001000_product_modifier_groups.up.sql
+          grep -q 'modifier_groups JSONB' migrations/20260916001000_product_modifier_groups.up.sql
+          grep -q 'idx_business_products_modifier_groups_gin' migrations/20260916001000_product_modifier_groups.up.sql

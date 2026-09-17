@@ -5,6 +5,7 @@ import {
   filterIngredients,
   isIngredientIncomplete,
   needsIngredientPurchase,
+  suggestIngredientUnits,
 } from './ingredient-management';
 
 const alpukat = {
@@ -59,5 +60,35 @@ describe('ingredient management helpers', () => {
     expect(filterIngredients([alpukat, incomplete], 'all', 'pasar')).toEqual([
       alpukat,
     ]);
+  });
+
+  it('suggests recipe units and conversion factors for common purchase units', () => {
+    expect(suggestIngredientUnits('kg')).toEqual({
+      recipeUnit: 'gram',
+      conversionFactor: 1000,
+    });
+    expect(suggestIngredientUnits(' Liter ')).toEqual({
+      recipeUnit: 'ml',
+      conversionFactor: 1000,
+    });
+    expect(suggestIngredientUnits('lusin')).toEqual({
+      recipeUnit: 'pcs',
+      conversionFactor: 12,
+    });
+    expect(suggestIngredientUnits('pcs')).toEqual({
+      recipeUnit: 'pcs',
+      conversionFactor: 1,
+    });
+  });
+
+  it('falls back safely for business-specific units', () => {
+    expect(suggestIngredientUnits('karung')).toEqual({
+      recipeUnit: 'karung',
+      conversionFactor: 1,
+    });
+    expect(suggestIngredientUnits('')).toEqual({
+      recipeUnit: '',
+      conversionFactor: 1,
+    });
   });
 });
