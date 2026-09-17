@@ -1497,7 +1497,7 @@ async fn moderate_news(
     .bind(&action)
     .bind(previous_editorial_status)
     .bind(next_editorial_status)
-    .bind(note)
+    .bind(&note)
     .execute(&mut *tx)
     .await
     {
