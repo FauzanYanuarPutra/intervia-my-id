@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
 
 describe('lajukan-ui server runtime', () => {
   it('loads product configuration through a native Node-safe subpath', () => {
