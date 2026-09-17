@@ -21,6 +21,15 @@ function isRetryableBusinessProvisioning(error: unknown): boolean {
   );
 }
 
+async function listPortalBusinesses(): Promise<BusinessRecord[]> {
+  try {
+    return await listBusinessesForCurrentActor();
+  } catch (error) {
+    if (!isRetryableBusinessProvisioning(error)) throw error;
+    return [];
+  }
+}
+
 export async function getPortalAccount(options: GetPortalAccountOptions = {}) {
   void options.clearInvalidSession;
   return getAuthenticatedActor();
@@ -29,7 +38,7 @@ export async function getPortalAccount(options: GetPortalAccountOptions = {}) {
 export async function getPortalBusinesses() {
   const account = await getPortalAccount();
   if (!account) return [];
-  return listBusinessesForCurrentActor();
+  return listPortalBusinesses();
 }
 
 export async function resolvePortalHomeState(searchParams: SearchParamsLike) {
@@ -85,7 +94,7 @@ export async function resolvePortalBusinessPageState(businessId: string) {
       isAuthenticated: false as const,
     };
   }
-  const businesses = await listBusinessesForCurrentActor();
+  const businesses = await listPortalBusinesses();
   const activeBusiness =
     businesses.find(
       item => item.id === businessId || item.slug === businessId,
