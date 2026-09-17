@@ -86,6 +86,7 @@ export function StockPurchaseYieldWorkspace({
   const [savingPrimary, setSavingPrimary] = useState(false);
   const [message, setMessage] = useState('');
   const purchaseAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
+  const yieldAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const selectedIngredient = ingredients.find(item => item.id === ingredientId) ?? ingredients[0];
   const selectedYieldIngredient = ingredients.find(item => item.id === yieldIngredientId) ?? ingredients[0];
@@ -167,19 +168,24 @@ export function StockPurchaseYieldWorkspace({
       setMessage('Isi bahan, jumlah bahan, dan hasil nyata dengan benar.');
       return;
     }
+    const yieldPayload = {
+      action: 'create_yield_observation',
+      product_id: yieldProductId || null,
+      ingredient_id: yieldIngredientId,
+      input_quantity: input,
+      output_units: output,
+      input_unit: inputUnit,
+      observed_on: observedOn,
+      note: yieldNote,
+    };
+    const attempt = resolveIdempotencyAttempt(yieldAttemptRef.current, yieldPayload);
+    yieldAttemptRef.current = attempt;
+
     setSavingYield(true);
     setMessage('');
     try {
-      await post({
-        action: 'create_yield_observation',
-        product_id: yieldProductId || null,
-        ingredient_id: yieldIngredientId,
-        input_quantity: input,
-        output_units: output,
-        input_unit: inputUnit,
-        observed_on: observedOn,
-        note: yieldNote,
-      });
+      await post(yieldPayload, attempt.key);
+      yieldAttemptRef.current = null;
       setInputQuantity('');
       setOutputUnits('');
       setYieldNote('');
