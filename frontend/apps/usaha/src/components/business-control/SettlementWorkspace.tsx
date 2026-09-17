@@ -1,7 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Save, TriangleAlert } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { jakartaDateKey } from '@/lib/business-control/insights';
 import { reconcileSettlement } from '@/lib/business-control/settlement';
 
 type SettlementRecord = {
@@ -35,7 +38,6 @@ const money = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 0,
 });
 
-const today = () => new Date().toISOString().slice(0, 10);
 const defaultChannels: ChannelOption[] = [
   { key: 'gofood', label: 'GoFood' },
   { key: 'grabfood', label: 'GrabFood' },
@@ -59,8 +61,8 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
   }, [initialChannels]);
   const [records, setRecords] = useState(initialSettlements);
   const [channelKey, setChannelKey] = useState(channels[0]?.key ?? 'gofood');
-  const [periodStart, setPeriodStart] = useState(today());
-  const [periodEnd, setPeriodEnd] = useState(today());
+  const [periodStart, setPeriodStart] = useState(jakartaDateKey());
+  const [periodEnd, setPeriodEnd] = useState(jakartaDateKey());
   const [grossSales, setGrossSales] = useState(0);
   const [platformFee, setPlatformFee] = useState(0);
   const [merchantPromo, setMerchantPromo] = useState(0);
@@ -70,6 +72,7 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const saveAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const preview = useMemo(() => {
     try {
@@ -88,29 +91,39 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
       setMessage('Periode settlement tidak valid.');
       return;
     }
+    const requestBody = {
+      channel_key: channelKey,
+      period_start: periodStart,
+      period_end: periodEnd,
+      gross_sales_amount: grossSales,
+      platform_fee_amount: platformFee,
+      merchant_promo_amount: merchantPromo,
+      refunds_amount: refunds,
+      other_deductions_amount: otherDeductions,
+      actual_transfer_amount: actualTransfer,
+      note,
+    };
+    const attempt = resolveIdempotencyAttempt(saveAttemptRef.current, requestBody);
+    saveAttemptRef.current = attempt;
+
     setSaving(true);
     setMessage('');
     try {
       const response = await fetch(`/api/businesses/${businessId}/settlements`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel_key: channelKey,
-          period_start: periodStart,
-          period_end: periodEnd,
-          gross_sales_amount: grossSales,
-          platform_fee_amount: platformFee,
-          merchant_promo_amount: merchantPromo,
-          refunds_amount: refunds,
-          other_deductions_amount: otherDeductions,
-          actual_transfer_amount: actualTransfer,
-          note,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': attempt.key,
+        },
+        body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Gagal menyimpan settlement.');
       const saved = payload?.data?.settlement as SettlementRecord | undefined;
-      if (saved) setRecords(current => [saved, ...current]);
+      if (saved) {
+        setRecords(current => [saved, ...current.filter(item => item.id !== saved.id)]);
+        saveAttemptRef.current = null;
+      }
       setMessage(saved?.status === 'matched' ? 'Settlement cocok dan tersimpan.' : 'Settlement tersimpan. Ada selisih yang perlu diperiksa.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan settlement.');
@@ -130,11 +143,23 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
           <p className="mt-1 text-sm leading-6 text-portal-soft">Masukkan angka dari laporan merchant atau rekening. Lajukan menghitung transfer yang seharusnya dan selisihnya. Catatan settlement tidak otomatis dihitung lagi sebagai omzet.</p>
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 sm:p-5">
-          <label className="text-xs font-semibold text-portal-soft">Kanal
-            <select className={inputClass} value={channelKey} onChange={event => setChannelKey(event.target.value)}>
-              {channels.map(channel => <option key={channel.key} value={channel.key}>{channel.label}</option>)}
-            </select>
-          </label>
+          <div className="text-xs font-semibold text-portal-soft">
+            <span>Kanal</span>
+            <div className="mt-1">
+              {channels.length <= 6 ? (
+                <ChoiceChips
+                  value={channelKey}
+                  onChange={setChannelKey}
+                  ariaLabel="Kanal settlement"
+                  options={channels.map(channel => ({ value: channel.key, label: channel.label }))}
+                />
+              ) : (
+                <select className={inputClass} value={channelKey} onChange={event => setChannelKey(event.target.value)}>
+                  {channels.map(channel => <option key={channel.key} value={channel.key}>{channel.label}</option>)}
+                </select>
+              )}
+            </div>
+          </div>
           <label className="text-xs font-semibold text-portal-soft">Dari tanggal
             <input className={inputClass} type="date" value={periodStart} onChange={event => setPeriodStart(event.target.value)} />
           </label>
