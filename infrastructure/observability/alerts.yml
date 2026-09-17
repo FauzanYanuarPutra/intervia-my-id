@@ -1,0 +1,69 @@
+groups:
+  - name: lajukan-platform
+    rules:
+      - alert: LajukanProbeFailed
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lajukan dependency probe failed"
+          description: "{{ $labels.instance }} has failed readiness/connectivity probes for more than 2 minutes."
+
+      - alert: LajukanExporterDown
+        expr: up{job=~"node|cadvisor|postgres_.*|redis"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan observability exporter is down"
+          description: "{{ $labels.job }} target {{ $labels.instance }} is not scrapeable."
+
+      - alert: LajukanPostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lajukan PostgreSQL exporter reports database unavailable"
+          description: "{{ $labels.instance }} cannot reach its PostgreSQL source."
+
+      - alert: LajukanRedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan Redis is unavailable"
+          description: "Redis exporter cannot reach the cache/coordination service."
+
+      - alert: LajukanNodeMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan host memory is low"
+          description: "Available host memory has remained below 10% for 5 minutes."
+
+      - alert: LajukanNodeFilesystemLow
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|devtmpfs|overlay|squashfs"}
+          /
+          node_filesystem_size_bytes{fstype!~"tmpfs|devtmpfs|overlay|squashfs"}
+          < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan host filesystem space is low"
+          description: "{{ $labels.mountpoint }} has remained below 10% free space for 10 minutes."
+
+      - alert: LajukanNodeCpuHigh
+        expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan host CPU is saturated"
+          description: "Average CPU utilization has remained above 90% for 10 minutes."

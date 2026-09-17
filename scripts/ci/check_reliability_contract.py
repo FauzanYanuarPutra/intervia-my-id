@@ -26,6 +26,10 @@ slo_doc = read("docs/operations/slo-capacity-overload.md")
 incident_doc = read("docs/operations/incident-response.md")
 load_script = read("scripts/load/k6-read-paths.js")
 read("docs/operations/backup-and-disaster-recovery.md")
+observability_compose = read("docker-compose.observability.yml")
+prometheus_config = read("infrastructure/observability/prometheus.yml")
+alerts_config = read("infrastructure/observability/alerts.yml")
+blackbox_config = read("infrastructure/observability/blackbox.yml")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -38,8 +42,29 @@ for marker in ("stop_grace_period: 30s", "stop_grace_period: 60s"):
     if marker not in base_compose:
         errors.append(f"base compose missing graceful shutdown budget: {marker}")
 
-if "prometheus:" not in base_compose:
-    warnings.append("Prometheus configuration exists but is not wired into the base Compose stack; observability activation remains incomplete")
+for marker in (
+    "profiles: [observability]",
+    "prom/prometheus:v3.14.0",
+    "prom/node-exporter:v1.12.1",
+    "gcr.io/cadvisor/cadvisor:v0.60.5",
+    "prom/blackbox-exporter:v0.28.0",
+    "quay.io/prometheuscommunity/postgres-exporter:v0.20.1",
+    "oliver006/redis_exporter:v1.91.1",
+):
+    if marker not in observability_compose:
+        errors.append(f"observability overlay missing pinned component/profile: {marker}")
+
+for marker in ("blackbox_http", "blackbox_tcp", "postgres_identity", "redis"):
+    if marker not in prometheus_config:
+        errors.append(f"Prometheus config missing required job: {marker}")
+
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown"):
+    if marker not in alerts_config:
+        errors.append(f"Prometheus alert rules missing: {marker}")
+
+for marker in ("http_2xx", "tcp_connect"):
+    if marker not in blackbox_config:
+        errors.append(f"blackbox config missing module: {marker}")
 
 if "SCYLLA_NODES: ${SCYLLA_NODES:?" not in prod_compose:
     errors.append("production chat must fail closed when SCYLLA_NODES is absent")

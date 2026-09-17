@@ -21,6 +21,7 @@ This documentation system describes what exists in the repository now. It is not
 
 - `architecture/repository-map.md`
 - `architecture/system-architecture.md`
+- `architecture/scale-reliability-v1.md`
 - `architecture/service-catalog.md`
 - `architecture/database-map.md`
 - `architecture/api-map.md`
@@ -70,6 +71,13 @@ This documentation system describes what exists in the repository now. It is not
 - `engineering/refactor-plan.md`
 - `engineering/known-risks.md`
 - `engineering/lessons-learned.md`
+
+## Operations
+
+- `operations/slo-capacity-overload.md`
+- `operations/incident-response.md`
+- `operations/backup-and-disaster-recovery.md`
+- `../infrastructure/observability/README.md`
 
 ## Existing Specialized Docs
 

@@ -28,3 +28,14 @@ jobs:
       - name: Parse read-only k6 scenario
         shell: bash
         run: node --input-type=module --check < scripts/load/k6-read-paths.js
+      - name: Validate observability Compose contract
+        env:
+          IMAGE_TAG: sha-ci
+          DOCKERHUB_NAMESPACE: lajukan-ci
+        run: >-
+          docker compose --profile observability
+          --env-file .env.production.example
+          -f docker-compose.yml
+          -f docker-compose.prod.yml
+          -f docker-compose.observability.yml
+          config --quiet

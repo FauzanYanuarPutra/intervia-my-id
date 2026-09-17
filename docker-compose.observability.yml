@@ -1,0 +1,138 @@
+services:
+  prometheus:
+    profiles: [observability]
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.14.0}
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-2GB}
+      - --web.enable-lifecycle
+    volumes:
+      - ./infrastructure/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/observability/alerts.yml:/etc/prometheus/rules/alerts.yml:ro
+      - prometheus_data:/prometheus
+    expose: ["9090"]
+    depends_on:
+      node_exporter: { condition: service_started }
+      cadvisor: { condition: service_started }
+      blackbox_exporter: { condition: service_started }
+      identity_postgres_exporter: { condition: service_started }
+      marketplace_postgres_exporter: { condition: service_started }
+      community_postgres_exporter: { condition: service_started }
+      redis_exporter: { condition: service_started }
+      alertmanager: { condition: service_started }
+    networks: [app, data, cache, media]
+
+  alertmanager:
+    profiles: [observability]
+    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.34.1}
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./infrastructure/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    expose: ["9093"]
+    networks: [app]
+
+  blackbox_exporter:
+    profiles: [observability]
+    image: ${BLACKBOX_EXPORTER_IMAGE:-prom/blackbox-exporter:v0.28.0}
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+    volumes:
+      - ./infrastructure/observability/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    expose: ["9115"]
+    networks: [app, data, cache, media]
+
+  node_exporter:
+    profiles: [observability]
+    image: ${NODE_EXPORTER_IMAGE:-prom/node-exporter:v1.12.1}
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+    expose: ["9100"]
+    networks: [app]
+
+  cadvisor:
+    profiles: [observability]
+    image: ${CADVISOR_IMAGE:-gcr.io/cadvisor/cadvisor:v0.60.5}
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    expose: ["8080"]
+    networks: [app]
+
+  identity_postgres_exporter:
+    profiles: [observability]
+    image: ${POSTGRES_EXPORTER_IMAGE:-quay.io/prometheuscommunity/postgres-exporter:v0.20.1}
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: identity_db:5432/identity_db?sslmode=disable
+      DATA_SOURCE_USER: ${DB_USER}
+      DATA_SOURCE_PASS: ${DB_PASS}
+    expose: ["9187"]
+    depends_on:
+      identity_db: { condition: service_healthy }
+    networks: [data]
+
+  marketplace_postgres_exporter:
+    profiles: [observability]
+    image: ${POSTGRES_EXPORTER_IMAGE:-quay.io/prometheuscommunity/postgres-exporter:v0.20.1}
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: marketplace_db:5432/marketplace_db?sslmode=disable
+      DATA_SOURCE_USER: ${DB_USER}
+      DATA_SOURCE_PASS: ${DB_PASS}
+    expose: ["9187"]
+    depends_on:
+      marketplace_db: { condition: service_healthy }
+    networks: [data]
+
+  community_postgres_exporter:
+    profiles: [observability]
+    image: ${POSTGRES_EXPORTER_IMAGE:-quay.io/prometheuscommunity/postgres-exporter:v0.20.1}
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: community_db:5432/community_db?sslmode=disable
+      DATA_SOURCE_USER: ${DB_USER}
+      DATA_SOURCE_PASS: ${DB_PASS}
+    expose: ["9187"]
+    depends_on:
+      community_db: { condition: service_healthy }
+    networks: [data]
+
+  redis_exporter:
+    profiles: [observability]
+    image: ${REDIS_EXPORTER_IMAGE:-oliver006/redis_exporter:v1.91.1}
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis_cache:6379
+      REDIS_PASSWORD: ${REDIS_PASS}
+    expose: ["9121"]
+    depends_on:
+      redis_cache: { condition: service_healthy }
+    networks: [cache]
+
+volumes:
+  prometheus_data:
+  alertmanager_data:
