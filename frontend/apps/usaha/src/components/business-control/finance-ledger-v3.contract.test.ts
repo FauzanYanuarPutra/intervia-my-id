@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync('src/components/business-control/FinanceLedgerV2.tsx', 'utf8');
+const source = readFileSync('src/components/business-control/FinanceLedger.tsx', 'utf8');
 
 describe('finance ledger UX V3', () => {
   it('uses visible choices and effect previews for common finance work', () => {
