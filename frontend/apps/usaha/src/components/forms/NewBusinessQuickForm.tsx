@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useState } from 'react';
+import { startTransition, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Building2, MapPinned, Phone, Sparkles } from 'lucide-react';
 import { BusinessLocationField } from '@/components/forms/BusinessLocationField';
@@ -10,6 +10,7 @@ import {
   type BusinessTemplateKey,
 } from '@/lib/business-templates';
 import type { LatLng } from '@/lib/maps';
+import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 
 const categoryOptions = [
   'Makanan dan minuman',
@@ -40,6 +41,7 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
   const [phone, setPhone] = useState(initialOwnerPhone);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const provisionAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
   const preset = getBusinessTemplatePreset(templateKey);
 
   function selectTemplate(nextTemplateKey: BusinessTemplateKey) {
@@ -54,26 +56,31 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
     if (city.trim().length < 2) return setError('Isi kota usaha.');
     if (phone.replace(/\s+/g, '').length < 9) return setError('Isi nomor usaha yang aktif.');
     if (!point) return setError('Pilih titik lokasi utama di peta.');
+    const command = {
+      name: name.trim(),
+      templateKey,
+      category,
+      city: city.trim(),
+      address: address.trim(),
+      phone: phone.trim(),
+      locationQuery: locationQuery.trim(),
+      latitude: point.lat,
+      longitude: point.lng,
+    };
+    const attempt = resolveIdempotencyAttempt(provisionAttemptRef.current, command);
+    provisionAttemptRef.current = attempt;
+
     setPending(true);
     try {
-      const idempotencyKey = crypto.randomUUID();
       const response = await fetch('/api/businesses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
+          'Idempotency-Key': attempt.key,
         },
         body: JSON.stringify({
-          name: name.trim(),
-          templateKey,
-          category,
-          city: city.trim(),
-          address: address.trim(),
-          phone: phone.trim(),
-          locationQuery: locationQuery.trim(),
-          latitude: point.lat,
-          longitude: point.lng,
-          idempotencyKey,
+          ...command,
+          idempotencyKey: attempt.key,
         }),
       });
       const result = (await response.json()) as { error?: string; redirectTo?: string };
