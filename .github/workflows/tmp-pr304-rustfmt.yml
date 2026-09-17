@@ -1,0 +1,60 @@
+name: Temporary PR304 Rustfmt
+
+on:
+  push:
+    branches: [feat/usaha-flow-system]
+
+permissions:
+  contents: write
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/usaha-flow-system
+          fetch-depth: 0
+      - name: Install pinned Rust toolchain
+        working-directory: services/marketplace_service
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/marketplace_service
+      - name: Format Marketplace
+        working-directory: services/marketplace_service
+        run: cargo fmt
+      - name: Verify format, Clippy, and tests
+        working-directory: services/marketplace_service
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Commit verified formatting
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service
+          if git diff --cached --quiet; then
+            echo "No formatting changes"
+          else
+            git commit -m "style(marketplace): format usaha flow changes"
+            git push origin HEAD:feat/usaha-flow-system
+          fi

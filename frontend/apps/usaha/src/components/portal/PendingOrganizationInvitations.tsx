@@ -3,58 +3,37 @@
 import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, MailCheck, X } from 'lucide-react';
+import { organizationRoleLabel } from '@/lib/business-collaboration';
+import {
+  INVITATIONS_CHANGED_EVENT,
+  invitationExpiryLabel,
+  parsePendingInvitations,
+  type PendingOrganizationInvitation,
+} from '@/lib/invitation-ui';
 
-type Invitation = {
-  id: string;
-  org_id: string;
-  organization_name: string;
-  role: string;
-  expires_at: string;
+type PendingOrganizationInvitationsProps = {
+  showEmpty?: boolean;
 };
 
-function extractInvitations(payload: unknown): Invitation[] {
-  if (!payload || typeof payload !== 'object') return [];
-  const root = payload as Record<string, unknown>;
-  const data = root.data && typeof root.data === 'object' ? (root.data as Record<string, unknown>) : {};
-  const items = Array.isArray(data.items) ? data.items : Array.isArray(root.items) ? root.items : [];
-  return items.filter((item): item is Invitation => {
-    if (!item || typeof item !== 'object') return false;
-    const row = item as Record<string, unknown>;
-    return typeof row.id === 'string' && typeof row.organization_name === 'string';
-  });
-}
-
-function roleLabel(role: string) {
-  return (
-    {
-      org_admin: 'Admin usaha',
-      org_manager: 'Manager',
-      org_cashier: 'Kasir',
-      org_inventory: 'Stok & pembelian',
-      org_accounting: 'Keuangan',
-      org_viewer: 'Pantau saja',
-    }[role] || role
-  );
-}
-
-export function PendingOrganizationInvitations() {
+export function PendingOrganizationInvitations({ showEmpty = false }: PendingOrganizationInvitationsProps) {
   const router = useRouter();
-  const [items, setItems] = useState<Invitation[]>([]);
+  const [items, setItems] = useState<PendingOrganizationInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
     void fetch('/api/team/invitations', { signal: controller.signal, cache: 'no-store' })
       .then(async response => {
-        if (!response.ok) throw new Error('Gagal memuat undangan tim.');
+        if (!response.ok) throw new Error('Gagal memuat undangan usaha.');
         return response.json();
       })
-      .then(payload => setItems(extractInvitations(payload)))
+      .then(payload => setItems(parsePendingInvitations(payload)))
       .catch(fetchError => {
         if (!(fetchError instanceof DOMException && fetchError.name === 'AbortError')) {
-          setError(fetchError instanceof Error ? fetchError.message : 'Gagal memuat undangan tim.');
+          setError(fetchError instanceof Error ? fetchError.message : 'Gagal memuat undangan usaha.');
         }
       })
       .finally(() => {
@@ -66,6 +45,7 @@ export function PendingOrganizationInvitations() {
   async function respond(invitationId: string, action: 'accept' | 'reject') {
     setWorkingId(invitationId);
     setError('');
+    setNotice('');
     try {
       const response = await fetch(`/api/team/invitations/${invitationId}`, {
         method: 'POST',
@@ -75,6 +55,12 @@ export function PendingOrganizationInvitations() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || 'Undangan belum berhasil diproses.');
       setItems(current => current.filter(item => item.id !== invitationId));
+      setNotice(
+        action === 'accept'
+          ? 'Undangan diterima. Usaha akan muncul di daftar usahamu setelah akses tersinkron.'
+          : 'Undangan ditolak. Akses ke usaha tidak diberikan.',
+      );
+      window.dispatchEvent(new Event(INVITATIONS_CHANGED_EVENT));
       startTransition(() => router.refresh());
     } catch (responseError) {
       setError(
@@ -88,11 +74,19 @@ export function PendingOrganizationInvitations() {
   if (loading) {
     return <p className="text-sm text-portal-soft">Memeriksa undangan usaha...</p>;
   }
-  if (!items.length && !error) return null;
+  if (!items.length && !error && !notice && !showEmpty) return null;
 
   return (
     <div className="grid gap-3">
-      {error ? <p className="text-sm text-portal-ember">{error}</p> : null}
+      {error ? <p className="rounded-xl border border-portal-ember/20 bg-portal-ember/5 px-3 py-2 text-sm text-portal-ember">{error}</p> : null}
+      {notice ? <p className="rounded-xl border border-portal-forest/20 bg-portal-forest/5 px-3 py-2 text-sm text-portal-forest">{notice}</p> : null}
+      {!items.length && showEmpty ? (
+        <div className="rounded-2xl border border-dashed border-portal-line bg-white p-6 text-center">
+          <MailCheck className="mx-auto h-6 w-6 text-portal-forest" />
+          <p className="mt-3 font-bold text-portal-ink">Tidak ada undangan yang menunggu</p>
+          <p className="mt-1 text-sm leading-6 text-portal-soft">Kalau pemilik usaha mengundang akunmu, undangannya akan muncul di sini dan belum memberi akses sebelum kamu menerimanya.</p>
+        </div>
+      ) : null}
       {items.map(invitation => (
         <article
           key={invitation.id}
@@ -103,10 +97,9 @@ export function PendingOrganizationInvitations() {
               <MailCheck className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-portal-ink">{invitation.organization_name}</p>
+              <p className="font-bold text-portal-ink">{invitation.organizationName}</p>
               <p className="mt-1 text-xs leading-5 text-portal-soft">
-                Diundang sebagai {roleLabel(invitation.role)}. Undangan berlaku sampai{' '}
-                {new Date(invitation.expires_at).toLocaleDateString('id-ID')}.
+                Kamu diundang sebagai <strong>{organizationRoleLabel(invitation.role)}</strong>. {invitationExpiryLabel(invitation.expiresAt)}.
               </p>
             </div>
           </div>
@@ -117,7 +110,7 @@ export function PendingOrganizationInvitations() {
               onClick={() => void respond(invitation.id, 'accept')}
               className="portal-button-primary"
             >
-              <Check className="h-4 w-4" /> Terima
+              <Check className="h-4 w-4" /> {workingId === invitation.id ? 'Memproses...' : 'Terima & ikut usaha'}
             </button>
             <button
               type="button"

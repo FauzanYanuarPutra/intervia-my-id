@@ -12,7 +12,7 @@ export function hasPermission(business: BusinessRecord, permission: PermissionId
 
 const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
   info: 'viewInfo',
-  locations: 'viewInfo',
+  locations: 'manageInfo',
   products: 'viewProducts',
   inventory: 'viewInventory',
   orders: 'viewOrders',
@@ -85,9 +85,8 @@ export function getSetupSteps(business: BusinessRecord): ProgressStep[] {
   return [
     { id: 'info', label: 'Lengkapi profil usaha', hint: 'Nama, kategori dan kontak harus jelas.', done: business.infoComplete },
     { id: 'locations', label: 'Pastikan lokasi utama', hint: 'Alamat dan pin peta membantu pelanggan menemukan cabang.', done: locations.some(item => item.isPrimary) },
-    { id: 'products', label: 'Isi katalog', hint: 'Tambahkan produk atau jasa yang paling sering dicari.', done: business.productsCount > 0 },
-    { id: 'costing', label: 'Hitung HPP produk utama', hint: 'Masukkan bahan, kemasan dan resep supaya harga jual tidak menebak.', done: false },
-    { id: 'operations', label: 'Atur operasional', hint: 'Atur jam buka sesuai kondisi lapangan.', done: business.schedule.trim().length >= 5 && business.schedule !== 'Belum diatur' },
-    { id: 'buyer-page', label: 'Siapkan halaman pembeli', hint: 'Preview harus jelas sebelum link dibagikan.', done: business.buyerPageReady },
+    { id: 'products', label: 'Isi menu / produk', hint: 'Tambah yang dijual, kasih harga, lalu sudah bisa mulai jualan.', done: business.productsCount > 0 },
+    { id: 'operations', label: 'Atur jam usaha', hint: 'Atur jam buka sesuai kondisi lapangan.', done: business.schedule.trim().length >= 5 && business.schedule !== 'Belum diatur' },
+    { id: 'buyer-page', label: 'Siapkan tampilan pelanggan', hint: 'Opsional kalau ingin membagikan katalog atau link usaha.', done: business.buyerPageReady },
   ];
 }

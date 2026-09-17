@@ -7,6 +7,7 @@ on:
     paths:
       - "frontend/apps/usaha/**"
       - "frontend/apps/www/**"
+      - "frontend/packages/**"
       - "services/identity_service/**"
       - "services/marketplace_service/**"
       - "scripts/ci/check_usaha_business_os_contract.py"
@@ -17,6 +18,7 @@ on:
     paths:
       - "frontend/apps/usaha/**"
       - "frontend/apps/www/**"
+      - "frontend/packages/**"
       - "services/identity_service/**"
       - "services/marketplace_service/**"
       - "scripts/ci/check_usaha_business_os_contract.py"
@@ -58,7 +60,14 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/apps/usaha/package-lock.json
+          cache-dependency-path: |
+            frontend/packages/package-lock.json
+            frontend/apps/usaha/package-lock.json
+      - name: Build shared frontend package
+        working-directory: frontend/packages
+        run: |
+          npm ci --legacy-peer-deps --include=dev --ignore-scripts --no-audit --no-fund
+          npm run build
       - name: Install Usaha dependencies
         shell: bash
         run: |
@@ -83,6 +92,7 @@ jobs:
   gate:
     name: Usaha business OS gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs: [contract, frontend]
     steps:
