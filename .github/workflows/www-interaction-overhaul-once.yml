@@ -1,6 +1,7 @@
 name: WWW Interaction Overhaul Once
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/www-interaction-responsive-system
@@ -74,6 +75,10 @@ jobs:
       - name: Verify focused contract is GREEN
         working-directory: frontend/apps/www
         run: npx vitest run src/lib/ux/wwwInteractionResponsiveContract.test.ts
+
+      - name: WWW tests
+        working-directory: frontend/apps/www
+        run: npm test
 
       - name: Source health
         working-directory: frontend/apps/www
