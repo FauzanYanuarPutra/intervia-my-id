@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -13,6 +12,7 @@ import {
   Phone,
   ShoppingBag,
   Star,
+  Store,
 } from 'lucide-react';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import { getBaseUrl } from '@/lib/server/getBaseUrl';
@@ -35,6 +35,8 @@ import {
   loadStorefrontCatalog,
 } from '@/lib/super-app/umkm-storefront-products';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
+import { StorefrontProductOrderAction } from './StorefrontProductOrderAction';
+import { resolveStorefrontBrandMedia } from '@/lib/super-app/storefront-brand-media';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -73,27 +75,6 @@ function formatIdr(valueCents: number): string {
   }).format(Math.max(0, Math.round(valueCents / 100)));
 }
 
-function readMetaTextArray(
-  metadata: Record<string, unknown>,
-  ...keys: string[]
-): string[] {
-  return keys.flatMap(key => {
-    const value = metadata[key];
-    if (Array.isArray(value)) {
-      return value
-        .map(item => (typeof item === 'string' ? item.trim() : ''))
-        .filter(Boolean);
-    }
-    if (typeof value === 'string') {
-      return value
-        .split(/[,\n]/)
-        .map(item => item.trim())
-        .filter(Boolean);
-    }
-    return [];
-  });
-}
-
 function isPlaceholderImage(image: string): boolean {
   return image.includes('/images/placeholders/');
 }
@@ -102,38 +83,6 @@ function productImage(product: UmkmProduct): string | null {
   const image =
     product.image_url || readMetaText(product.metadata, 'image_url') || '';
   return image && !isPlaceholderImage(image) ? image : null;
-}
-
-function uniqueImages(images: string[]): string[] {
-  return Array.from(
-    new Set(images.map(image => image.trim()).filter(Boolean)),
-  ).slice(0, 3);
-}
-
-function getExplicitStoreImages(metadata: Record<string, unknown>): string[] {
-  const singularKeys = [
-    'store_photo_url',
-    'cover_image_url',
-    'cover_url',
-    'banner_url',
-    'image_url',
-    'imageUrl',
-    'image',
-    'menu_photo_url',
-  ];
-
-  return uniqueImages(
-    [
-      ...singularKeys.map(key => readMetaText(metadata, key)),
-      ...readMetaTextArray(
-        metadata,
-        'gallery_images',
-        'gallery',
-        'images',
-        'photos',
-      ),
-    ].filter(image => !isPlaceholderImage(image)),
-  );
 }
 
 function resolvePublicContact(
@@ -151,25 +100,25 @@ function resolvePublicContact(
   };
 }
 
-function StorePill({
-  children,
-  tone = 'neutral',
+function StatusChip({
+  label,
+  tone,
 }: {
-  children: ReactNode;
-  tone?: 'positive' | 'warning' | 'neutral';
+  label: string;
+  tone: 'positive' | 'warning' | 'neutral';
 }) {
   const toneClass =
     tone === 'positive'
-      ? 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/55 dark:text-emerald-200 dark:ring-emerald-800'
+      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/55 dark:text-emerald-200'
       : tone === 'warning'
-        ? 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/55 dark:text-amber-200 dark:ring-amber-800'
-        : 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700';
+        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/55 dark:text-amber-200'
+        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
 
   return (
     <span
-      className={`inline-flex min-h-8 items-center rounded-full px-3 text-xs font-bold ring-1 ${toneClass}`}
+      className={`inline-flex min-h-6 items-center rounded-full px-2.5 text-xs font-semibold ${toneClass}`}
     >
-      {children}
+      {label}
     </span>
   );
 }
@@ -177,27 +126,42 @@ function StorePill({
 function ProductCard({
   product,
   isId,
+  onlineOrderEnabled,
 }: {
   product: UmkmProduct;
   isId: boolean;
+  onlineOrderEnabled: boolean;
 }) {
   const stockStatus = getStorefrontProductStockStatus(product);
-  const inStock = stockStatus === 'in_stock';
   const image = productImage(product);
+  const available = product.is_available && stockStatus !== 'out_of_stock';
+
+  const stockLabel =
+    stockStatus === 'in_stock'
+      ? isId
+        ? 'Tersedia'
+        : 'Available'
+      : stockStatus === 'unknown'
+        ? isId
+          ? 'Cek stok'
+          : 'Check stock'
+        : isId
+          ? 'Habis'
+          : 'Sold out';
 
   return (
     <article
-      className="overflow-hidden rounded-[20px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+      className="group flex min-w-0 gap-3 border-b border-slate-100 py-3.5 last:border-b-0 dark:border-slate-800 sm:gap-4 sm:py-4 md:min-h-[132px] md:last:border-b"
       data-testid="storefront-product-card"
     >
-      <div className="relative aspect-[4/3] bg-slate-100 dark:bg-slate-800">
+      <div className="relative h-[84px] w-[84px] shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 sm:h-24 sm:w-24 md:h-[104px] md:w-[104px] md:rounded-2xl">
         {image ? (
           <LajukanImage
             src={image}
             alt={product.name}
             fill
-            sizes="(min-width: 1280px) 260px, (min-width: 640px) 44vw, 92vw"
-            className="object-cover"
+            sizes="(min-width: 768px) 104px, (min-width: 640px) 96px, 84px"
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.025]"
           />
         ) : (
           <div
@@ -207,98 +171,66 @@ function ProductCard({
                 ? `Belum ada foto untuk ${product.name}`
                 : `No photo for ${product.name}`
             }
-            className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-slate-400 dark:text-slate-500"
+            className="absolute inset-0 grid place-items-center text-slate-300 dark:text-slate-600"
           >
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-400 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-500 dark:ring-slate-700">
-              <ImageOff className="h-5 w-5" />
-            </span>
-            <span className="text-xs font-bold">
-              {isId ? 'Belum ada foto' : 'No photo yet'}
-            </span>
+            <ImageOff className="h-5 w-5" />
           </div>
         )}
-        {stockStatus !== 'in_stock' ? (
-          <span className="absolute left-3 top-3 rounded-full bg-slate-950/78 px-2.5 py-1 text-[11px] font-bold text-white">
-            {stockStatus === 'unknown'
-              ? isId
-                ? 'Stok perlu dikonfirmasi'
-                : 'Stock needs confirmation'
-              : isId
-                ? 'Stok habis'
-                : 'Out of stock'}
-          </span>
-        ) : null}
       </div>
-      <div className="p-3.5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-          {product.category || (isId ? 'Produk' : 'Product')}
-        </p>
-        <h3 className="mt-1 line-clamp-2 text-base font-bold leading-6 text-slate-950 dark:text-slate-50">
+
+      <div className="min-w-0 flex-1">
+        <h4 className="line-clamp-2 text-[15px] font-bold leading-5 text-slate-950 dark:text-slate-50">
           {product.name}
-        </h3>
+        </h4>
+
         {product.description ? (
-          <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+          <p className="mt-0.5 line-clamp-2 text-[13px] leading-[18px] text-slate-500 dark:text-slate-400">
             {product.description}
           </p>
         ) : null}
-        <div className="mt-3 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-          <p className="text-base font-extrabold text-emerald-700 dark:text-emerald-300">
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[15px] font-bold tabular-nums text-slate-950 dark:text-slate-100">
             {formatIdr(product.price_cents)}
-          </p>
-          {inStock ? (
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {isId
-                ? `Stok ${product.stock_qty}`
-                : `${product.stock_qty} in stock`}
-            </p>
-          ) : null}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1 text-xs font-medium ${
+              stockStatus === 'in_stock'
+                ? 'text-emerald-600 dark:text-emerald-300'
+                : stockStatus === 'unknown'
+                  ? 'text-amber-600 dark:text-amber-300'
+                  : 'text-slate-400 dark:text-slate-500'
+            }`}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+            {stockLabel}
+          </span>
+        </div>
+
+        <div className="mt-2">
+          <StorefrontProductOrderAction
+            storeId={product.store_id}
+            productId={product.id}
+            productName={product.name}
+            onlineOrderEnabled={onlineOrderEnabled}
+            productAvailable={available}
+            isId={isId}
+            variant="compact"
+          />
         </div>
       </div>
     </article>
   );
 }
 
-function InfoRow({
-  icon,
-  label,
-  value,
-  note,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  note?: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 py-3">
-      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <dt className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {label}
-        </dt>
-        <dd className="mt-0.5 text-sm font-bold leading-5 text-slate-900 dark:text-slate-100">
-          {value}
-        </dd>
-        {note ? (
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-            {note}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function PrimaryAction({
   action,
   testId,
-  className = '',
+  compact = false,
 }: {
   action: StoreAction;
   testId: string;
-  className?: string;
+  compact?: boolean;
 }) {
   const Icon =
     action.kind === 'whatsapp'
@@ -316,7 +248,9 @@ function PrimaryAction({
       href={action.href}
       target={action.external ? '_blank' : undefined}
       rel={action.external ? 'noopener noreferrer' : undefined}
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-bold text-white shadow-[0_16px_28px_-22px_rgba(4,120,87,0.8)] transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full bg-emerald-600 font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
+        compact ? 'min-h-10 px-3 text-sm' : 'min-h-11 px-4 text-sm'
+      }`}
       data-testid={testId}
     >
       <Icon className="h-4 w-4" />
@@ -357,7 +291,7 @@ export async function generateMetadata({
   const publicUrl = `${baseUrl}/${locale}/toko/${store.slug}`;
   const storeMetadata =
     store.metadata && typeof store.metadata === 'object' ? store.metadata : {};
-  const seoImage = getExplicitStoreImages(storeMetadata)[0];
+  const seoImage = resolveStorefrontBrandMedia(storeMetadata).seoImageUrl;
   const description =
     store.description ||
     (isId
@@ -405,8 +339,7 @@ export default async function TokoPage({ params }: PageProps) {
   ).length;
   const place = buildUmkmPlacePresentation(store, isId, null);
   const publicContact = resolvePublicContact(store, place);
-  const gallery = getExplicitStoreImages(metadata);
-  const hasMediaMosaic = gallery.length > 1;
+  const brandMedia = resolveStorefrontBrandMedia(metadata);
 
   const hasValidCoordinates = isCoordinateValid({
     lat: store.lat,
@@ -472,34 +405,34 @@ export default async function TokoPage({ params }: PageProps) {
   const primaryAction: StoreAction = publicContact.whatsappHref
     ? {
         href: publicContact.whatsappHref,
-        label: isId ? 'Tanya toko' : 'Ask the business',
+        label: isId ? 'Chat' : 'Chat',
         kind: 'whatsapp',
         external: true,
       }
     : publicContact.telHref
       ? {
           href: publicContact.telHref,
-          label: isId ? 'Telepon toko' : 'Call the business',
+          label: isId ? 'Telepon' : 'Call',
           kind: 'phone',
           external: false,
         }
       : hasFixedLocation
         ? {
             href: place.googleMapsDirectionsUrl,
-            label: isId ? 'Lihat lokasi' : 'View location',
+            label: isId ? 'Maps' : 'Maps',
             kind: 'maps',
             external: true,
           }
         : products.length > 0
           ? {
               href: '#produk',
-              label: isId ? 'Lihat katalog' : 'View catalog',
+              label: isId ? 'Menu' : 'Menu',
               kind: 'products',
               external: false,
             }
           : {
               href: '#informasi-usaha',
-              label: isId ? 'Lihat informasi' : 'View information',
+              label: isId ? 'Info' : 'Info',
               kind: 'information',
               external: false,
             };
@@ -511,13 +444,28 @@ export default async function TokoPage({ params }: PageProps) {
         ? 'positive'
         : 'warning';
 
+  const fallbackCategory = isId ? 'Menu lainnya' : 'Other items';
+  const menuGroups = Array.from(
+    products.reduce<Map<string, UmkmProduct[]>>((groups, product) => {
+      const label = product.category?.trim() || fallbackCategory;
+      const existing = groups.get(label);
+      if (existing) existing.push(product);
+      else groups.set(label, [product]);
+      return groups;
+    }, new Map()),
+  ).map(([label, items], index) => ({
+    id: `menu-category-${index + 1}`,
+    label,
+    items,
+  }));
+
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
     name: store.name,
     description: store.description || undefined,
     url: publicUrl,
-    ...(gallery[0] ? { image: gallery[0] } : {}),
+    ...(brandMedia.seoImageUrl ? { image: brandMedia.seoImageUrl } : {}),
     address: {
       '@type': 'PostalAddress',
       ...(place.locationMode === 'fixed' && store.address
@@ -551,317 +499,291 @@ export default async function TokoPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <main className="min-h-screen bg-slate-50 pb-40 pt-3 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:pt-5 lg:pb-10">
-        <div className="page-shell">
-          <nav
-            aria-label={isId ? 'Navigasi toko' : 'Business navigation'}
-            className="mb-3 flex items-center justify-between gap-3"
+
+      <main
+        data-layout="compact-food-storefront"
+        className="min-h-screen bg-white pb-8 text-slate-950 dark:bg-slate-950 dark:text-slate-50 sm:bg-slate-50 sm:py-4 sm:dark:bg-slate-950 lg:py-6"
+      >
+        <div className="mx-auto w-full max-w-[960px] sm:px-4 lg:px-5">
+
+          <section
+            className="relative overflow-hidden bg-white dark:bg-slate-900 sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm sm:dark:border-slate-800"
+            data-testid="storefront-summary"
           >
             <Link
               href={`/${locale}/umkm`}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white px-3.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800"
+              aria-label={isId ? 'Kembali' : 'Back'}
+              className="absolute left-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-slate-900 shadow-sm ring-1 ring-black/5 backdrop-blur transition hover:scale-[1.03] hover:bg-white dark:bg-slate-900/95 dark:text-slate-100 dark:ring-white/10 sm:left-4 sm:top-4"
             >
-              <ArrowLeft className="h-4 w-4" />
-              {isId ? 'Jelajahi UMKM' : 'Explore businesses'}
+              <ArrowLeft className="h-5 w-5" />
             </Link>
-            <span className="hidden text-xs font-semibold text-slate-500 dark:text-slate-400 sm:inline">
-              {isId ? 'Profil usaha publik' : 'Public business profile'}
-            </span>
-          </nav>
-
-          <section
-            className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_20px_50px_-42px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900 sm:rounded-[28px] lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]"
-            data-testid="storefront-summary"
-          >
-            <div
-              className={
-                hasMediaMosaic
-                  ? 'grid aspect-[16/10] min-h-[250px] grid-cols-[minmax(0,2fr)_minmax(100px,1fr)] grid-rows-2 gap-1 bg-slate-100 dark:bg-slate-800 sm:min-h-[340px] lg:aspect-auto lg:min-h-[440px]'
-                  : 'relative aspect-[16/10] min-h-[250px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[340px] lg:aspect-auto lg:min-h-[440px]'
-              }
-              data-testid="storefront-media"
-              data-media-count={gallery.length}
-            >
-              {gallery.length > 0 ? (
-                hasMediaMosaic ? (
-                  <>
-                    <div className="relative row-span-2 overflow-hidden bg-slate-200 dark:bg-slate-800">
-                      <LajukanImage
-                        src={gallery[0]}
-                        alt={store.name}
-                        fill
-                        priority
-                        sizes="(min-width: 1024px) 38vw, 67vw"
-                        className="object-cover"
-                      />
-                    </div>
-                    {gallery.slice(1, 3).map((image, index) => (
-                      <div
-                        key={image}
-                        className={`relative overflow-hidden bg-slate-200 dark:bg-slate-800 ${
-                          gallery.length === 2 ? 'row-span-2' : ''
-                        }`}
-                      >
-                        <LajukanImage
-                          src={image}
-                          alt={
-                            isId
-                              ? `Galeri ${store.name} ${index + 2}`
-                              : `${store.name} gallery ${index + 2}`
-                          }
-                          fill
-                          sizes="(min-width: 1024px) 18vw, 33vw"
-                          className="object-cover"
-                        />
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <LajukanImage
-                    src={gallery[0]}
-                    alt={store.name}
-                    fill
-                    priority
-                    sizes="(min-width: 1024px) 55vw, 100vw"
-                    className="object-cover"
-                  />
-                )
-              ) : (
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_48%),linear-gradient(145deg,#f8fafc,#eef2f7)] px-6 text-center dark:bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_48%),linear-gradient(145deg,#0f172a,#111827)]"
-                  data-testid="storefront-media-placeholder"
-                  role="img"
-                  aria-label={
-                    isId
-                      ? `Foto usaha ${store.name} belum tersedia`
-                      : `No business photo available for ${store.name}`
-                  }
-                >
-                  <span className="inline-flex h-16 w-16 items-center justify-center rounded-[22px] bg-white text-slate-400 ring-1 ring-slate-200 shadow-sm dark:bg-slate-900 dark:text-slate-500 dark:ring-slate-700">
-                    <ImageOff className="h-7 w-7" />
-                  </span>
-                  <p className="mt-4 text-base font-extrabold text-slate-700 dark:text-slate-200">
-                    {isId
-                      ? 'Foto usaha belum tersedia'
-                      : 'Business photo not available'}
-                  </p>
-                  <p className="mt-1 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {isId
-                      ? 'Gunakan nama, kategori, dan alamat di samping untuk memastikan usaha yang Anda cari.'
-                      : 'Use the name, category, and address beside this panel to confirm the business.'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col p-4 sm:p-6 lg:p-7">
-              <div className="flex flex-wrap gap-2">
-                <StorePill>{place.categoryLabel}</StorePill>
-                <StorePill tone={statusTone}>{statusLabel}</StorePill>
+            {brandMedia.coverUrl ? (
+              <div
+                className="relative aspect-[8/3] overflow-hidden bg-slate-100 dark:bg-slate-800"
+                data-testid="storefront-media"
+                data-media-count={
+                  Number(Boolean(brandMedia.coverUrl)) +
+                  Number(Boolean(brandMedia.logoUrl)) +
+                  brandMedia.galleryUrls.length
+                }
+              >
+                <LajukanImage
+                  src={brandMedia.coverUrl}
+                  alt={isId ? `Banner ${store.name}` : `${store.name} cover`}
+                  fill
+                  priority
+                  sizes="(min-width: 960px) 960px, 100vw"
+                  className="object-cover"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/15 to-transparent" />
               </div>
-              <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-[-0.035em] text-slate-950 dark:text-slate-50 sm:text-4xl">
-                {store.name}
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-                {store.description ||
-                  (isId
-                    ? `UMKM di ${store.city}. Cek produk dan informasi operasional sebelum berkunjung atau memesan.`
-                    : `A local business in ${store.city}. Check products and operating information before visiting or ordering.`)}
-              </p>
+            ) : null}
 
-              <dl className="mt-5 divide-y divide-slate-100 border-y border-slate-100 dark:divide-slate-800 dark:border-slate-800">
-                <InfoRow
-                  icon={<MapPin className="h-4 w-4" />}
-                  label={isId ? 'Area usaha' : 'Business area'}
-                  value={publicLocationLabel}
-                  note={locationNote || undefined}
-                />
-                <InfoRow
-                  icon={<Clock3 className="h-4 w-4" />}
-                  label={isId ? 'Jam operasional' : 'Opening hours'}
-                  value={openHoursLabel}
-                />
-                {hasRating ? (
-                  <InfoRow
-                    icon={<Star className="h-4 w-4" />}
-                    label={isId ? 'Ulasan pelanggan' : 'Customer reviews'}
-                    value={ratingLabel}
-                  />
-                ) : null}
-              </dl>
-
-              {place.serviceBadges.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {place.serviceBadges.map(badge => (
-                    <span
-                      key={badge}
-                      className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                    >
-                      {badge}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-
-              <PrimaryAction
-                action={primaryAction}
-                testId="storefront-primary-action-desktop"
-                className="mt-auto hidden lg:inline-flex"
-              />
-            </div>
-          </section>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-            <section
-              id="produk"
-              className="scroll-mt-24 rounded-[24px] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5"
-              data-testid="storefront-products"
+            <div
+              className={`px-4 pb-4 sm:px-5 sm:pb-5 md:px-6 ${
+                brandMedia.coverUrl ? 'pt-0' : 'pt-14 sm:pt-16'
+              }`}
             >
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">
-                    {isId ? 'Katalog' : 'Catalog'}
-                  </p>
-                  <h2 className="mt-1 text-xl font-extrabold text-slate-950 dark:text-slate-50 sm:text-2xl">
-                    {isId
-                      ? 'Produk dari toko ini'
-                      : 'Products from this business'}
-                  </h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {isId
-                      ? 'Harga dan stok mengikuti informasi terakhir dari pemilik toko.'
-                      : 'Prices and stock reflect the latest information from the owner.'}
+              <div className="flex items-start gap-3">
+                <div
+                  className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:h-[72px] sm:w-[72px] md:h-20 md:w-20 ${
+                    brandMedia.coverUrl ? '-mt-7 sm:-mt-8' : ''
+                  }`}
+                >
+                  {brandMedia.logoUrl ? (
+                    <LajukanImage
+                      src={brandMedia.logoUrl}
+                      alt={isId ? `Logo ${store.name}` : `${store.name} logo`}
+                      fill
+                      sizes="(min-width: 768px) 80px, (min-width: 640px) 72px, 64px"
+                      className="object-contain p-1"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 grid place-items-center bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      <Store className="h-7 w-7" />
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={`min-w-0 flex-1 ${brandMedia.coverUrl ? 'pt-2' : ''}`}
+                >
+                  <h1 className="line-clamp-2 text-2xl font-bold leading-[30px] text-slate-950 dark:text-slate-50 sm:text-[28px] sm:leading-[34px]">
+                    {store.name}
+                  </h1>
+                  <p className="mt-0.5 text-[13px] font-medium leading-[18px] text-slate-500 dark:text-slate-400">
+                    {place.categoryLabel}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                  {availableProductCount} {isId ? 'tersedia' : 'available'}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <StatusChip label={statusLabel} tone={statusTone} />
+                {hasRating ? (
+                  <span className="inline-flex min-h-6 items-center gap-1 rounded-full bg-slate-100 px-2.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    {place.ratingNumber.toFixed(1)}
+                  </span>
+                ) : null}
+                <span className="inline-flex min-h-6 items-center gap-1 rounded-full bg-slate-100 px-2.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  <span className="max-w-[170px] truncate">{openHoursLabel}</span>
                 </span>
               </div>
 
-              {catalog.status === 'unavailable' ? (
-                <div
-                  className="mt-5 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-8 text-center dark:border-amber-900/70 dark:bg-amber-950/30"
-                  role="status"
+              <div className="mt-3 flex min-w-0 items-center gap-2 sm:gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-slate-500 dark:text-slate-400 sm:text-[13px]">
+                  <MapPin className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{publicLocationLabel}</span>
+                  {hasFixedLocation && primaryAction.kind !== 'maps' ? (
+                    <a
+                      href={place.googleMapsDirectionsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300"
+                    >
+                      Maps
+                    </a>
+                  ) : null}
+                </div>
+
+                <PrimaryAction
+                  action={primaryAction}
+                  testId="storefront-primary-action"
+                  compact
+                />
+              </div>
+            </div>
+          </section>
+
+          <section
+            id="produk"
+            className="mt-1.5 bg-white dark:bg-slate-900 sm:mt-3 sm:overflow-hidden sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm sm:dark:border-slate-800"
+            data-testid="storefront-products"
+          >
+            <div className="sticky top-0 z-30 border-y border-slate-100 bg-white/95 px-4 py-2.5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 sm:rounded-t-3xl sm:border-t-0 sm:px-5 md:px-6">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold leading-7 text-slate-950 dark:text-slate-50">
+                  {isId ? 'Menu' : 'Menu'}
+                </h2>
+                <span className="text-xs font-medium text-slate-400 dark:text-slate-500">
+                  {products.length} {isId ? 'item' : 'items'}
+                </span>
+              </div>
+
+              {menuGroups.length > 1 ? (
+                <nav
+                  aria-label={isId ? 'Kategori menu' : 'Menu categories'}
+                  className="-mx-1 mt-2 flex snap-x gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 >
-                  <ShoppingBag className="mx-auto h-7 w-7 text-amber-600 dark:text-amber-300" />
-                  <p className="mt-3 font-bold text-amber-950 dark:text-amber-100">
-                    {isId
-                      ? 'Katalog belum bisa dimuat'
-                      : 'The catalog could not be loaded'}
-                  </p>
-                  <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-amber-800 dark:text-amber-200/80">
-                    {isId
-                      ? 'Informasi usaha tetap bisa dilihat. Coba muat ulang katalog dalam beberapa saat.'
-                      : 'The business profile is still available. Try loading the catalog again shortly.'}
+                  <a
+                    href="#menu-all"
+                    className="inline-flex min-h-8 shrink-0 snap-start items-center rounded-full bg-emerald-600 px-3 text-xs font-semibold text-white"
+                  >
+                    {isId ? 'Semua' : 'All'}
+                  </a>
+                  {menuGroups.map(group => (
+                    <a
+                      key={group.id}
+                      href={`#${group.id}`}
+                      className="inline-flex h-8 shrink-0 snap-start items-center rounded-full bg-slate-100 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      {group.label}
+                    </a>
+                  ))}
+                </nav>
+              ) : null}
+            </div>
+
+            <div id="menu-all" className="scroll-mt-24">
+              {catalog.status === 'unavailable' ? (
+                <div className="px-4 py-12 text-center" role="status">
+                  <ShoppingBag className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" />
+                  <p className="mt-2 text-sm font-semibold">
+                    {isId ? 'Menu belum bisa dimuat' : 'Menu unavailable'}
                   </p>
                   <Link
                     href={`/${locale}/toko/${encodeURIComponent(store.slug)}`}
-                    className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/50"
+                    className="mt-3 inline-flex min-h-10 items-center rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
                   >
                     {isId ? 'Coba lagi' : 'Try again'}
                   </Link>
                 </div>
-              ) : products.length > 0 ? (
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {products.map(product => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      isId={isId}
-                    />
+              ) : menuGroups.length > 0 ? (
+                <div>
+                  {menuGroups.map((group, groupIndex) => (
+                    <section
+                      id={group.id}
+                      key={group.id}
+                      data-testid="storefront-menu-group"
+                      className="scroll-mt-24"
+                    >
+                      <div
+                        className={`${
+                          groupIndex > 0
+                            ? 'border-t-[7px] border-slate-50 dark:border-slate-950'
+                            : ''
+                        } px-4 pb-1 pt-4 sm:px-5 md:px-6`}
+                      >
+                        <h3 className="text-base font-bold leading-[22px] text-slate-950 dark:text-slate-50">
+                          {group.label}
+                        </h3>
+                      </div>
+
+                      <div className="px-4 sm:px-5 md:grid md:grid-cols-2 md:gap-x-6 md:px-6">
+                        {group.items.map(product => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            isId={isId}
+                            onlineOrderEnabled={store.online_order_enabled}
+                          />
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
               ) : (
-                <div className="mt-5 rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center dark:border-slate-700 dark:bg-slate-950/55">
-                  <ShoppingBag className="mx-auto h-7 w-7 text-slate-400" />
-                  <p className="mt-3 font-bold text-slate-800 dark:text-slate-200">
-                    {isId
-                      ? 'Produk belum ditampilkan'
-                      : 'Products are not listed yet'}
+                <div className="px-4 py-12 text-center">
+                  <ShoppingBag className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" />
+                  <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {isId ? 'Belum ada menu' : 'No menu yet'}
                   </p>
-                  <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {publicContact.whatsappHref
-                      ? isId
-                        ? 'Gunakan tombol tanya toko untuk meminta katalog atau stok terbaru.'
-                        : 'Use the business contact button to ask for the latest catalog or stock.'
-                      : isId
-                        ? 'Pemilik toko belum mempublikasikan katalog dan kanal kontak.'
-                        : 'The owner has not published a catalog or contact channel.'}
-                  </p>
+                  {publicContact.whatsappHref ? (
+                    <a
+                      href={publicContact.whatsappHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      {isId ? 'Tanya toko' : 'Ask store'}
+                    </a>
+                  ) : null}
                 </div>
               )}
-            </section>
+            </div>
+          </section>
 
-            <aside className="space-y-3 lg:sticky lg:top-20">
-              <section
-                id="informasi-usaha"
-                className="scroll-mt-24 rounded-[24px] border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5"
-              >
-                <h2 className="text-lg font-extrabold text-slate-950 dark:text-slate-50">
-                  {isId ? 'Informasi usaha' : 'Business information'}
-                </h2>
-                <dl className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
-                  <InfoRow
-                    icon={<MapPin className="h-4 w-4" />}
-                    label={isId ? 'Lokasi' : 'Location'}
-                    value={publicLocationLabel}
-                    note={locationNote || undefined}
-                  />
-                  <InfoRow
-                    icon={<Clock3 className="h-4 w-4" />}
-                    label={isId ? 'Jam buka' : 'Opening hours'}
-                    value={openHoursLabel}
-                  />
-                  <InfoRow
-                    icon={<PackageCheck className="h-4 w-4" />}
-                    label={isId ? 'Layanan' : 'Services'}
-                    value={
-                      place.serviceBadges.length > 0
-                        ? place.serviceBadges.join(' · ')
-                        : isId
-                          ? 'Belum dicantumkan'
-                          : 'Not listed'
-                    }
-                  />
-                </dl>
+          <details
+            id="informasi-usaha"
+            className="group mt-1.5 border-y border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900 sm:mt-3 sm:rounded-2xl sm:border sm:shadow-sm"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold marker:content-none sm:px-5 md:px-6 [&::-webkit-details-marker]:hidden">
+              <span>{isId ? 'Info toko' : 'Store info'}</span>
+              <span className="text-lg font-normal text-slate-400 transition-transform group-open:rotate-45">
+                +
+              </span>
+            </summary>
 
-                {hasFixedLocation && primaryAction.kind !== 'maps' ? (
-                  <a
-                    href={place.googleMapsDirectionsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    {isId ? 'Buka rute di Maps' : 'Open route in Maps'}
-                  </a>
+            <div className="border-t border-slate-100 px-4 py-3 text-sm dark:border-slate-800 sm:px-5 md:px-6">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex gap-2.5">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 dark:text-slate-100">
+                      {publicLocationLabel}
+                    </p>
+                    {locationNote ? (
+                      <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        {locationNote}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5">
+                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  <p className="font-bold text-slate-900 dark:text-slate-100">
+                    {openHoursLabel}
+                  </p>
+                </div>
+
+                {place.serviceBadges.length > 0 ? (
+                  <div className="flex gap-2.5 sm:col-span-2">
+                    <PackageCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <p className="text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
+                      {place.serviceBadges.join(' · ')}
+                    </p>
+                  </div>
                 ) : null}
-              </section>
+              </div>
 
-              <section className="rounded-[24px] border border-emerald-100 bg-emerald-50 p-4 text-emerald-950 dark:border-emerald-900/70 dark:bg-emerald-950/35 dark:text-emerald-100">
-                <p className="text-sm font-extrabold">
-                  {isId ? 'Sebelum transaksi' : 'Before transacting'}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-emerald-900/80 dark:text-emerald-100/80">
-                  {isId
-                    ? 'Konfirmasi stok, harga, lokasi, dan cara pengiriman. Jangan kirim data pribadi atau pembayaran sebelum informasinya jelas.'
-                    : 'Confirm stock, price, location, and delivery. Do not send personal data or payment before the details are clear.'}
-                </p>
-              </section>
-            </aside>
-          </div>
+              {hasFixedLocation ? (
+                <a
+                  href={place.googleMapsDirectionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-slate-100 px-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Maps
+                </a>
+              ) : null}
+            </div>
+          </details>
         </div>
       </main>
-
-      <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 px-3 lg:hidden">
-        <div className="mx-auto max-w-md rounded-[20px] border border-slate-200 bg-white/96 p-2 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900/96">
-          <PrimaryAction
-            action={primaryAction}
-            testId="storefront-primary-action-mobile"
-            className="w-full"
-          />
-        </div>
-      </div>
     </>
   );
 }

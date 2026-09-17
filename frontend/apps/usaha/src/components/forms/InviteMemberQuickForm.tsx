@@ -2,7 +2,8 @@
 
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Send, UserRoundCheck } from 'lucide-react';
+import { Check, Search, Send, UserRoundCheck, X } from 'lucide-react';
+import { roleSummaryMap } from '@/lib/portal-access';
 import type { PortalRole } from '@/lib/portal-types';
 
 type InviteMemberQuickFormProps = {
@@ -15,7 +16,7 @@ type UserSuggestion = {
   fullName: string;
 };
 
-const roleOptions: Array<{ value: PortalRole; label: string; description: string }> = [
+const roleOptions: Array<{ value: Exclude<PortalRole, 'owner'>; label: string; description: string }> = [
   { value: 'manager', label: 'Manager', description: 'Kelola operasional dan tim.' },
   { value: 'cashier', label: 'Kasir', description: 'Fokus transaksi dan pesanan.' },
   { value: 'viewer', label: 'Pantau saja', description: 'Akses baca tanpa perubahan.' },
@@ -60,7 +61,7 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [role, setRole] = useState<PortalRole>('manager');
+  const [role, setRole] = useState<Exclude<PortalRole, 'owner'>>('manager');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -71,6 +72,7 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
   );
   const shouldQuerySuggestions = shouldQueryUsernameSuggestions(normalizedUsername, selectedUser);
   const visibleSuggestions = shouldQuerySuggestions ? suggestions : [];
+  const rolePreview = roleSummaryMap[role];
 
   useEffect(() => {
     if (!shouldQuerySuggestions) return;
@@ -218,7 +220,7 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
         Peran
         <select
           value={role}
-          onChange={event => setRole(event.target.value as PortalRole)}
+          onChange={event => setRole(event.target.value as Exclude<PortalRole, 'owner'>)}
           className="portal-input"
         >
           {roleOptions.map(option => (
@@ -228,6 +230,37 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
           ))}
         </select>
       </label>
+
+      <section className="rounded-2xl border border-portal-line bg-portal-mist/60 p-3" aria-label={`Akses ${rolePreview.label}`}>
+        <div>
+          <p className="text-sm font-bold text-portal-ink">{rolePreview.label} · {rolePreview.shortLabel}</p>
+          <p className="mt-1 text-xs leading-5 text-portal-soft">{rolePreview.description}</p>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-portal-forest">Bisa</p>
+            <ul className="mt-2 space-y-1.5">
+              {rolePreview.can.map(item => (
+                <li key={item} className="flex gap-2 text-xs leading-5 text-portal-ink">
+                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-portal-forest" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-portal-ember">Tidak bisa</p>
+            <ul className="mt-2 space-y-1.5">
+              {rolePreview.cannot.map(item => (
+                <li key={item} className="flex gap-2 text-xs leading-5 text-portal-ink">
+                  <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-portal-ember" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
 
       {error ? <p className="text-sm text-portal-ember">{error}</p> : null}
       {success ? <p className="text-sm text-portal-forest">{success}</p> : null}

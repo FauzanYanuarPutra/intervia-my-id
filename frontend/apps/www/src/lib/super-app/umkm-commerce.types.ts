@@ -10,7 +10,7 @@ export type UmkmOrderMutation = 'created' | 'merged' | 'updated';
 export type UmkmReservationStatus = 'pending' | 'confirmed' | 'seated' | 'completed' | 'cancelled';
 export type UmkmProductKind = 'physical' | 'digital';
 export type UmkmOrderFulfillmentMode = 'courier' | 'pickup' | 'digital' | 'dine_in';
-export type UmkmStoreMemberRole = 'owner' | 'manager' | 'cashier' | 'stock' | 'ops' | 'finance';
+export type UmkmStoreMemberRole = 'owner' | 'manager' | 'cashier' | 'viewer' | 'stock' | 'ops' | 'finance';
 export type UmkmStoreMemberStatus = 'active' | 'invited' | 'disabled';
 export type UmkmStorePermission =
   | 'store:view'
@@ -27,6 +27,7 @@ export type UmkmStorePermission =
 export type UmkmStore = {
   id: string;
   owner_user_id: string;
+  organization_id?: string | null;
   name: string;
   slug: string;
   description: string | null;

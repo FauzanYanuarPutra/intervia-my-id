@@ -82,6 +82,10 @@ http://crm.{$APP_DOMAIN} {
 # Canonical public API gateway. Preserve backend-native paths so existing BFF
 # and direct API clients do not need response-shape or prefix rewrites.
 http://api.{$APP_DOMAIN} {
+    @auth_no_store path /auth /auth/*
+    header @auth_no_store Cache-Control "no-store"
+    header @auth_no_store Pragma "no-cache"
+
     @identity path /auth /auth/* /users /users/*
     handle @identity {
         reverse_proxy identity_service:8080
@@ -101,6 +105,8 @@ http://api.{$APP_DOMAIN} {
 
 # Backward-compatible identity hostname while clients migrate to api.*.
 http://auth.{$APP_DOMAIN} {
+    header Cache-Control "no-store"
+    header Pragma "no-cache"
     reverse_proxy identity_service:8080
 }
 
