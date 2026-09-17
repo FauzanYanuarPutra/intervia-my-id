@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createDurableMarketplaceStore,
   ensureWorkspaceOrganization,
+  listWorkspaceOrganizations,
 } from './business-workspace';
 
 const ORGANIZATION_ID = '11111111-1111-4111-8111-111111111111';
@@ -83,6 +84,37 @@ describe('ensureWorkspaceOrganization', () => {
       }),
     ).rejects.toThrow('organization_selection_required');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('listWorkspaceOrganizations', () => {
+  it('normalizes organization roles returned by Identity', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      jsonResponse({
+        data: {
+          items: [
+            {
+              id: ORGANIZATION_ID,
+              name: 'Kedai Cuk',
+              current_user_role: 'ORG_CASHIER',
+            },
+          ],
+        },
+      }),
+    );
+
+    const organizations = await listWorkspaceOrganizations({
+      token: 'cashier-token',
+      fetchImpl,
+    });
+
+    expect(organizations).toEqual([
+      {
+        id: ORGANIZATION_ID,
+        name: 'Kedai Cuk',
+        current_user_role: 'org_cashier',
+      },
+    ]);
   });
 });
 

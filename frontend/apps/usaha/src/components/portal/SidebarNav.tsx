@@ -1,88 +1,76 @@
 import Link from 'next/link';
+import { ChevronDown, Settings2 } from 'lucide-react';
 import {
-  BarChart3,
-  Boxes,
-  Building2,
-  Calculator,
-  ClipboardList,
-  LayoutDashboard,
-  MapPinned,
-  PackageSearch,
-  ShieldCheck,
-  ShoppingBag,
-  Store,
-  UsersRound,
-  WalletCards,
-} from 'lucide-react';
-import { buildSectionHref, visiblePortalSections } from '@/lib/portal-logic';
+  desktopPrimaryNavigation,
+  portalMenuNavigation,
+} from '@/lib/portal-navigation';
+import { buildSectionHref } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
+import { portalSectionVisual } from '@/lib/portal-visual';
 
 type SidebarNavProps = {
   business: BusinessRecord | null;
   currentSection: PortalSection;
 };
 
-const groups: Array<{
-  label: string;
-  items: Array<{ id: PortalSection; label: string; icon: typeof Store }>;
-}> = [
-  { label: 'Hari ini', items: [{ id: 'home', label: 'Beranda', icon: LayoutDashboard }] },
-  {
-    label: 'Kerja utama',
-    items: [
-      { id: 'orders', label: 'Jualan', icon: ShoppingBag },
-      { id: 'products', label: 'Produk & HPP', icon: Calculator },
-      { id: 'inventory', label: 'Stok & Belanja', icon: PackageSearch },
-      { id: 'finance', label: 'Uang', icon: WalletCards },
-      { id: 'channels', label: 'Kanal Jual', icon: Boxes },
-      { id: 'reports', label: 'Laporan', icon: BarChart3 },
-    ],
-  },
-  {
-    label: 'Pengaturan usaha',
-    items: [
-      { id: 'operations', label: 'Operasional', icon: ClipboardList },
-      { id: 'info', label: 'Profil usaha', icon: Building2 },
-      { id: 'locations', label: 'Lokasi & Outlet', icon: MapPinned },
-      { id: 'buyerPage', label: 'Halaman pembeli', icon: Store },
-      { id: 'team', label: 'Tim', icon: UsersRound },
-      { id: 'security', label: 'Keamanan', icon: ShieldCheck },
-    ],
-  },
-];
-
 export function SidebarNav({ business, currentSection }: SidebarNavProps) {
   if (!business) return null;
-  const visible = new Set(visiblePortalSections(business.permissions));
+  const activeBusiness = business;
+  const primary = desktopPrimaryNavigation(activeBusiness.permissions);
+  const primaryIds = new Set(primary.map(item => item.id));
+  const secondary = portalMenuNavigation(activeBusiness.permissions).filter(
+    item => !primaryIds.has(item.id) && item.id !== 'security',
+  );
+  const secondaryActive = secondary.some(item => item.id === currentSection);
+
+  function link(item: { id: PortalSection; label: string }, compact = false) {
+    const visual = portalSectionVisual[item.id];
+    const Icon = visual.icon;
+    const active = currentSection === item.id;
+    return (
+      <Link
+        key={item.id}
+        href={buildSectionHref(activeBusiness.id, item.id)}
+        aria-current={active ? 'page' : undefined}
+        className={`flex items-center gap-2.5 rounded-xl px-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
+          compact ? 'min-h-10' : 'min-h-11'
+        } ${
+          active
+            ? visual.activeNavClass
+            : 'text-portal-soft hover:bg-[#f4f6f4] hover:text-portal-ink'
+        }`}
+      >
+        <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
+          <Icon className="h-[17px] w-[17px]" />
+        </span>
+        <span>{item.label}</span>
+      </Link>
+    );
+  }
 
   return (
-    <nav className="mt-3 space-y-4" aria-label="Navigasi usaha">
-      {groups.map(group => {
-        const items = group.items.filter(item => visible.has(item.id));
-        if (!items.length) return null;
-        return (
-          <div key={group.label}>
-            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[.12em] text-portal-soft/70">{group.label}</p>
-            <div className="space-y-1">
-              {items.map(item => {
-                const Icon = item.icon;
-                const active = currentSection === item.id;
-                return (
-                  <Link
-                    key={item.id}
-                    href={buildSectionHref(business.id, item.id)}
-                    aria-current={active ? 'page' : undefined}
-                    className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${active ? 'bg-portal-mist text-portal-forest' : 'text-portal-soft hover:bg-[#f4f6f4] hover:text-portal-ink'}`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
+    <nav className="mt-3 space-y-2" aria-label="Navigasi usaha">
+      <div className="space-y-1">{primary.map(item => link(item))}</div>
+      {secondary.length ? (
+        <details className="group border-t border-portal-line/70 pt-2" open={secondaryActive}>
+          <summary
+            className={`flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
+              secondaryActive
+                ? 'bg-[#f1f4f2] text-portal-ink'
+                : 'text-portal-soft hover:bg-[#f4f6f4] hover:text-portal-ink'
+            }`}
+          >
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f1f4f2] text-portal-soft">
+              <Settings2 className="h-[17px] w-[17px]" />
+            </span>
+            <span className="min-w-0 flex-1">Kelola usaha</span>
+            <ChevronDown className="h-4 w-4 shrink-0 transition group-open:rotate-180" />
+          </summary>
+          <div className="mt-1 space-y-0.5 pl-2">
+            {secondary.map(item => link(item, true))}
           </div>
-        );
-      })}
+        </details>
+      ) : null}
     </nav>
   );
 }

@@ -26,6 +26,7 @@ pub(crate) enum BusinessServiceError {
     OrganizationSelectionRequired,
     ReconciliationSelectionRequired,
     NotFound,
+    ProvisioningRetryable,
     Storage,
 }
 
@@ -91,6 +92,29 @@ impl BusinessService {
         Err(BusinessServiceError::NotFound)
     }
 
+    pub(crate) async fn organization_for_business(
+        &self,
+        authorization: &str,
+        business_id: Uuid,
+    ) -> Result<OrganizationSummary, BusinessServiceError> {
+        let organizations = self
+            .identity
+            .list_organizations(authorization)
+            .await
+            .map_err(map_identity_error)?;
+        for organization in organizations {
+            let existing = self
+                .repository
+                .get_for_organization(business_id, organization.id)
+                .await
+                .map_err(map_repository_error)?;
+            if existing.is_some() {
+                return Ok(organization);
+            }
+        }
+        Err(BusinessServiceError::NotFound)
+    }
+
     pub(crate) async fn update_profile(
         &self,
         actor_id: Uuid,
@@ -100,11 +124,14 @@ impl BusinessService {
     ) -> Result<BusinessAggregate, BusinessServiceError> {
         let command =
             validate_business_profile_update(request).map_err(BusinessServiceError::Validation)?;
-        let organization_id = self
-            .management_organization_for_business(authorization, business_id)
+        let organization = self
+            .organization_for_business(authorization, business_id)
             .await?;
+        if !organization.can_manage_business_profile() {
+            return Err(BusinessServiceError::AccessDenied);
+        }
         self.repository
-            .update_profile(actor_id, business_id, organization_id, &command)
+            .update_profile(actor_id, business_id, organization.id, &command)
             .await
             .map_err(map_repository_error)
     }
@@ -118,11 +145,14 @@ impl BusinessService {
     ) -> Result<BusinessProduct, BusinessServiceError> {
         let command =
             validate_create_request(request).map_err(BusinessServiceError::ProductValidation)?;
-        let organization_id = self
-            .management_organization_for_business(authorization, business_id)
+        let organization = self
+            .organization_for_business(authorization, business_id)
             .await?;
+        if !organization.can_manage_catalog() {
+            return Err(BusinessServiceError::AccessDenied);
+        }
         self.product_repository
-            .create(actor_id, business_id, organization_id, &command)
+            .create(actor_id, business_id, organization.id, &command)
             .await
             .map_err(map_product_repository_error)
     }
@@ -135,11 +165,14 @@ impl BusinessService {
         product_id: Uuid,
         request: UpdateBusinessProductRequest,
     ) -> Result<BusinessProduct, BusinessServiceError> {
-        let organization_id = self
-            .management_organization_for_business(authorization, business_id)
+        let organization = self
+            .organization_for_business(authorization, business_id)
             .await?;
+        if !organization.can_manage_catalog() {
+            return Err(BusinessServiceError::AccessDenied);
+        }
         self.product_repository
-            .update(actor_id, business_id, organization_id, product_id, request)
+            .update(actor_id, business_id, organization.id, product_id, request)
             .await
             .map_err(map_product_repository_error)
     }
@@ -152,11 +185,14 @@ impl BusinessService {
         product_id: Uuid,
         request: AdjustBusinessInventoryRequest,
     ) -> Result<BusinessProduct, BusinessServiceError> {
-        let organization_id = self
-            .management_organization_for_business(authorization, business_id)
+        let organization = self
+            .organization_for_business(authorization, business_id)
             .await?;
+        if !organization.can_manage_inventory_controls() {
+            return Err(BusinessServiceError::AccessDenied);
+        }
         self.product_repository
-            .adjust_inventory(actor_id, business_id, organization_id, product_id, request)
+            .adjust_inventory(actor_id, business_id, organization.id, product_id, request)
             .await
             .map_err(map_product_repository_error)
     }
@@ -166,25 +202,14 @@ impl BusinessService {
         authorization: &str,
         business_id: Uuid,
     ) -> Result<Uuid, BusinessServiceError> {
-        let organizations = self
-            .identity
-            .list_organizations(authorization)
-            .await
-            .map_err(map_identity_error)?;
-        for organization in &organizations {
-            let existing = self
-                .repository
-                .get_for_organization(business_id, organization.id)
-                .await
-                .map_err(map_repository_error)?;
-            if existing.is_none() {
-                continue;
-            }
-            return management_organization(&organizations, organization.id)
-                .map(|organization| organization.id)
-                .ok_or(BusinessServiceError::AccessDenied);
+        let organization = self
+            .organization_for_business(authorization, business_id)
+            .await?;
+        if organization.can_manage_businesses() {
+            Ok(organization.id)
+        } else {
+            Err(BusinessServiceError::AccessDenied)
         }
-        Err(BusinessServiceError::NotFound)
     }
 
     pub(crate) async fn provision(
@@ -248,25 +273,29 @@ impl BusinessService {
             .await
             .map_err(map_identity_error)?;
         let organization_id = if let Some(hint) = candidate.organization_id {
-            organizations
-                .iter()
-                .find(|organization| organization.id == hint)
+            management_organization(&organizations, hint)
                 .map(|organization| organization.id)
                 .ok_or(BusinessServiceError::AccessDenied)?
         } else {
             match organizations.len() {
                 0 => {
-                    self.identity
+                    let organization = self
+                        .identity
                         .ensure_organization(
                             authorization,
                             identity_child_key(idempotency_key),
                             &candidate.name,
                         )
                         .await
-                        .map_err(map_identity_error)?
-                        .id
+                        .map_err(map_identity_error)?;
+                    require_business_manager(organization)?.id
                 }
-                1 => organizations[0].id,
+                1 => {
+                    require_business_manager(
+                        organizations.into_iter().next().expect("one organization"),
+                    )?
+                    .id
+                }
                 _ => return Err(BusinessServiceError::ReconciliationSelectionRequired),
             }
         };
@@ -288,12 +317,13 @@ impl BusinessService {
                     .organization
                     .organization_id
                     .ok_or(BusinessServiceError::AccessDenied)?;
-                self.identity
+                let organizations = self
+                    .identity
                     .list_organizations(authorization)
                     .await
-                    .map_err(map_identity_error)?
-                    .into_iter()
-                    .find(|organization| organization.id == expected_id)
+                    .map_err(map_identity_error)?;
+                management_organization(&organizations, expected_id)
+                    .cloned()
                     .ok_or(BusinessServiceError::AccessDenied)
             }
             OrganizationMode::Create => {
@@ -302,10 +332,12 @@ impl BusinessService {
                     .new_organization_name
                     .as_deref()
                     .ok_or(BusinessServiceError::Storage)?;
-                self.identity
+                let organization = self
+                    .identity
                     .ensure_organization(authorization, identity_child_key(idempotency_key), name)
                     .await
-                    .map_err(map_identity_error)
+                    .map_err(map_identity_error)?;
+                require_business_manager(organization)
             }
             OrganizationMode::Auto => {
                 let organizations = self
@@ -320,16 +352,20 @@ impl BusinessService {
                             .new_organization_name
                             .as_deref()
                             .unwrap_or(&command.business.name);
-                        self.identity
+                        let organization = self
+                            .identity
                             .ensure_organization(
                                 authorization,
                                 identity_child_key(idempotency_key),
                                 name,
                             )
                             .await
-                            .map_err(map_identity_error)
+                            .map_err(map_identity_error)?;
+                        require_business_manager(organization)
                     }
-                    1 => Ok(organizations.into_iter().next().expect("one organization")),
+                    1 => require_business_manager(
+                        organizations.into_iter().next().expect("one organization"),
+                    ),
                     _ => Err(BusinessServiceError::OrganizationSelectionRequired),
                 }
             }
@@ -350,9 +386,8 @@ fn map_repository_error(error: RepositoryError) -> BusinessServiceError {
     match error {
         RepositoryError::IdempotencyConflict => BusinessServiceError::IdempotencyConflict,
         RepositoryError::VersionConflict => BusinessServiceError::VersionConflict,
-        RepositoryError::Database | RepositoryError::IncompleteAggregate => {
-            BusinessServiceError::Storage
-        }
+        RepositoryError::IncompleteAggregate => BusinessServiceError::ProvisioningRetryable,
+        RepositoryError::Database => BusinessServiceError::Storage,
     }
 }
 
@@ -376,6 +411,16 @@ fn identity_child_key(parent: Uuid) -> Uuid {
     Uuid::from_bytes(uuid_bytes)
 }
 
+fn require_business_manager(
+    organization: OrganizationSummary,
+) -> Result<OrganizationSummary, BusinessServiceError> {
+    if organization.can_manage_businesses() {
+        Ok(organization)
+    } else {
+        Err(BusinessServiceError::AccessDenied)
+    }
+}
+
 fn management_organization(
     organizations: &[OrganizationSummary],
     organization_id: Uuid,
@@ -389,6 +434,13 @@ fn management_organization(
 mod tests {
     use super::*;
 
+    fn organization(role: &str) -> OrganizationSummary {
+        OrganizationSummary {
+            id: Uuid::new_v4(),
+            current_user_role: role.to_owned(),
+        }
+    }
+
     #[test]
     fn identity_child_key_is_stable_and_distinct() {
         let parent = Uuid::parse_str("3d69acb2-aed8-4c48-b62d-30034e0440eb").unwrap();
@@ -397,11 +449,11 @@ mod tests {
     }
 
     #[test]
-    fn business_mutation_requires_an_admin_role_for_the_owning_organization() {
+    fn organization_level_business_creation_stays_admin_only() {
         let organization_id = Uuid::new_v4();
         let organizations = vec![OrganizationSummary {
             id: organization_id,
-            current_user_role: "org_member".to_owned(),
+            current_user_role: "org_manager".to_owned(),
         }];
         assert!(management_organization(&organizations, organization_id).is_none());
         let organizations = vec![OrganizationSummary {
@@ -412,5 +464,53 @@ mod tests {
             management_organization(&organizations, organization_id).map(|item| item.id),
             Some(organization_id)
         );
+    }
+
+    #[test]
+    fn invited_role_capabilities_separate_read_write_and_org_creation() {
+        let manager = organization("org_manager");
+        assert!(manager.can_manage_business_profile());
+        assert!(manager.can_manage_catalog());
+        assert!(manager.can_manage_inventory_controls());
+        assert!(!manager.can_manage_businesses());
+
+        let cashier = organization("org_cashier");
+        assert!(!cashier.can_view_inventory_controls());
+        assert!(cashier.can_record_sales());
+        assert!(cashier.can_view_sales());
+        assert!(cashier.can_manage_cash_shifts());
+        assert!(!cashier.can_manage_catalog());
+        assert!(!cashier.can_manage_finance_controls());
+
+        let viewer = organization("org_viewer");
+        assert!(!viewer.can_view_inventory_controls());
+        assert!(viewer.can_view_sales());
+        assert!(!viewer.can_manage_inventory_controls());
+        assert!(!viewer.can_record_sales());
+    }
+
+    #[test]
+    fn provisioning_and_reconciliation_fail_closed_without_business_management_role() {
+        assert!(matches!(
+            require_business_manager(organization("org_member")),
+            Err(BusinessServiceError::AccessDenied)
+        ));
+        assert!(matches!(
+            require_business_manager(organization("org_manager")),
+            Err(BusinessServiceError::AccessDenied)
+        ));
+        assert!(require_business_manager(organization("org_admin")).is_ok());
+    }
+
+    #[test]
+    fn repository_storage_and_incomplete_aggregate_errors_stay_distinct() {
+        assert!(matches!(
+            map_repository_error(RepositoryError::Database),
+            BusinessServiceError::Storage
+        ));
+        assert!(matches!(
+            map_repository_error(RepositoryError::IncompleteAggregate),
+            BusinessServiceError::ProvisioningRetryable
+        ));
     }
 }
