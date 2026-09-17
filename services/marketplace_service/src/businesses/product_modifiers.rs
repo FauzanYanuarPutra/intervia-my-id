@@ -259,8 +259,8 @@ pub(crate) fn validate_groups(
 
     for mut group in groups {
         group.id = normalize_id(&group.id).ok_or("invalid_modifier_group_id")?;
-        group.name = normalize_text(&group.name, MAX_GROUP_NAME)
-            .ok_or("invalid_modifier_group_name")?;
+        group.name =
+            normalize_text(&group.name, MAX_GROUP_NAME).ok_or("invalid_modifier_group_name")?;
         if !group_ids.insert(group.id.clone()) {
             return Err("duplicate_modifier_group_id");
         }
