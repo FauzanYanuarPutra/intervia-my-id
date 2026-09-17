@@ -128,6 +128,12 @@ function lossFromYield(value: string | number) {
   return Math.max(0, 100 - clampYield(value));
 }
 
+function normalizedUsableYield(item: Pick<Ingredient, 'yield_percent' | 'waste_percent'>) {
+  const baseYield = clampYield(item.yield_percent) || 100;
+  const legacyWaste = Math.min(100, Math.max(0, n(item.waste_percent)));
+  return Math.max(0, Math.min(100, baseYield * (1 - legacyWaste / 100)));
+}
+
 function humanDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -155,7 +161,7 @@ function responseError(payload: unknown, fallback: string) {
 }
 
 function draftFromIngredient(item: Ingredient): EditDraft {
-  const usable = clampYield(item.yield_percent) || 100;
+  const usable = normalizedUsableYield(item);
   return {
     name: item.name,
     kind: item.kind,
@@ -631,8 +637,8 @@ export function IngredientWorkspaceV2({
 
         <div className="divide-y divide-portal-line">
           {visibleIngredients.length ? visibleIngredients.map(item => {
-            const effectiveCost = effectiveIngredientUnitCost(item);
-            const usable = clampYield(item.yield_percent) || 100;
+            const usable = normalizedUsableYield(item);
+            const effectiveCost = effectiveIngredientUnitCost({ ...item, yield_percent: usable });
             const loss = lossFromYield(usable);
             const low = needsIngredientPurchase(item);
             const panelOpen = activePanel?.id === item.id;
