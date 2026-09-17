@@ -183,19 +183,20 @@
   }
 
   .portal-modal::backdrop {
-    background: rgba(15, 23, 42, 0.44);
-    backdrop-filter: blur(1.5px);
+    background: rgba(0, 0, 0, 0.56);
+    backdrop-filter: blur(1px);
   }
 
   .portal-modal-panel {
     position: absolute;
-    inset-inline: 0;
-    bottom: 0;
+    inset: 0;
     display: flex;
-    max-height: min(92dvh, 56rem);
+    min-height: 100dvh;
+    max-height: 100dvh;
+    width: 100%;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 24px 24px 0 0;
+    border-radius: 0;
     background: white;
     box-shadow: 0 -18px 64px -28px rgba(15, 23, 42, 0.55);
     padding-bottom: env(safe-area-inset-bottom);
@@ -222,6 +223,7 @@
       position: relative;
       inset: auto;
       width: min(100%, 34rem);
+      min-height: 0;
       max-height: min(90dvh, 50rem);
       margin: auto;
       border-radius: 24px;

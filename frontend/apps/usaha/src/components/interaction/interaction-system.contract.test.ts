@@ -24,8 +24,9 @@ describe('Lajukan interaction system', () => {
     expect(css).toContain('--portal-layer-nav: 35');
     expect(css).toContain('--portal-layer-popover');
     expect(css).toContain('.portal-modal::backdrop');
-    expect(css).toContain('rgba(15, 23, 42, 0.44)');
+    expect(css).toContain('rgba(0, 0, 0, 0.56)');
     expect(css).toContain('100dvh');
+    expect(css).toContain('min-height: 100dvh');
     expect(css).toContain('env(safe-area-inset-bottom)');
   });
 

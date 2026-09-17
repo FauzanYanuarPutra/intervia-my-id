@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useRef, useState } from 'react';
+import { startTransition, useRef, useState, type RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil, Save, X } from 'lucide-react';
 import { ModalSurface } from '@/components/interaction/ModalSurface';
@@ -11,16 +11,27 @@ import type { ProductRecord } from '@/lib/portal-types';
 type Props = {
   businessId: string;
   product: ProductRecord;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
 function rupiahNumber(priceLabel: string) {
   return priceLabel.replace(/\D/g, '');
 }
 
-export function ProductManageForm({ businessId, product }: Props) {
+export function ProductManageForm({
+  businessId,
+  product,
+  open,
+  onOpenChange,
+  showTrigger = true,
+  returnFocusRef,
+}: Props) {
   const router = useRouter();
   const openButtonRef = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [name, setName] = useState(product.name);
   const [category, setCategory] = useState(product.category);
   const [priceRupiah, setPriceRupiah] = useState(rupiahNumber(product.priceLabel));
@@ -31,6 +42,8 @@ export function ProductManageForm({ businessId, product }: Props) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [pending, setPending] = useState(false);
+  const modalOpen = open ?? internalOpen;
+  const setModalOpen = onOpenChange ?? setInternalOpen;
 
   async function request(path: string, body: Record<string, unknown>) {
     const response = await fetch(path, {
@@ -97,23 +110,25 @@ export function ProductManageForm({ businessId, product }: Props) {
 
   return (
     <>
-      <button
-        ref={openButtonRef}
-        type="button"
-        onClick={() => setOpen(true)}
-        className="portal-button-secondary mt-3"
-      >
-        <Pencil className="h-3.5 w-3.5" /> Kelola produk
-      </button>
+      {showTrigger ? (
+        <button
+          ref={openButtonRef}
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="portal-button-secondary mt-3"
+        >
+          <Pencil className="h-3.5 w-3.5" /> Kelola produk
+        </button>
+      ) : null}
 
       <ModalSurface
-        open={open}
-        onOpenChange={setOpen}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
         ariaLabel={`Kelola ${product.name}`}
         presentation="adaptive"
         size="lg"
         dismissible={!pending}
-        returnFocusRef={openButtonRef}
+        returnFocusRef={returnFocusRef ?? openButtonRef}
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-portal-line px-4 py-3 sm:px-5">
           <div className="min-w-0">
@@ -122,7 +137,7 @@ export function ProductManageForm({ businessId, product }: Props) {
           </div>
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={() => setModalOpen(false)}
             disabled={pending}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-portal-soft transition hover:bg-[#f4f5f2] hover:text-portal-ink disabled:opacity-50"
             aria-label="Tutup kelola produk"

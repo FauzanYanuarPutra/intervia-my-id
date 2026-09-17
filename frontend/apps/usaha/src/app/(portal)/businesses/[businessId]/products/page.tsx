@@ -1,20 +1,21 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Calculator, Plus, Search, Store } from 'lucide-react';
+import { Calculator, MoreHorizontal, Plus, Search, Store } from 'lucide-react';
+import { ProductManageQueryModal } from '@/components/forms/ProductManageQueryModal';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { ProductThumb } from '@/components/portal/ProductThumb';
 import { StatusBadge } from '@/components/portal/StatusBadge';
-import { ProductManageForm } from '@/components/forms/ProductManageForm';
 import { ProductQuickForm } from '@/components/forms/ProductQuickForm';
 import { productPrimaryMode } from '@/lib/business-control/progressive-disclosure';
+import { buildProductActionHref, buildProductsHref } from '@/lib/product-actions-modal';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
 type PageProps = {
   params: Promise<{ businessId: string }>;
-  searchParams: Promise<{ q?: string; stock?: string }>;
+  searchParams: Promise<{ q?: string; stock?: string; productAction?: string }>;
 };
 
 function stockTone(stockHealth: string | undefined): 'success' | 'warning' | 'danger' | 'neutral' {
@@ -45,6 +46,14 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
   const primaryMode = productPrimaryMode({ productCount: business.products.length, canManage });
   const needle = (query.q ?? '').trim().toLocaleLowerCase('id-ID');
   const attentionOnly = query.stock === 'attention';
+  const closeProductActionHref = buildProductsHref({
+    businessId: business.id,
+    q: query.q,
+    stock: query.stock,
+  });
+  const selectedActionProduct = canManage && query.productAction
+    ? business.products.find(product => product.id === query.productAction)
+    : null;
   const visibleProducts = business.products.filter(product => {
     const matchQuery = !needle || product.name.toLocaleLowerCase('id-ID').includes(needle) || product.category.toLocaleLowerCase('id-ID').includes(needle);
     const matchStock = !attentionOnly || product.stockHealth === 'habis' || product.stockHealth === 'tipis' || product.stockHealth === 'perlu-cocokkan';
@@ -78,8 +87,8 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
               <input name="q" defaultValue={query.q ?? ''} placeholder="Cari produk" className="portal-input w-full pl-10" />
             </label>
             <div className="flex gap-2 overflow-x-auto">
-              <Link href={`/businesses/${business.id}/products${query.q ? `?q=${encodeURIComponent(query.q)}` : ''}`} className={`merchant-chip ${!attentionOnly ? 'merchant-chip-active' : ''}`}>Semua</Link>
-              <Link href={`/businesses/${business.id}/products?stock=attention${query.q ? `&q=${encodeURIComponent(query.q)}` : ''}`} className={`merchant-chip ${attentionOnly ? 'merchant-chip-active' : ''}`}>Stok tipis / habis</Link>
+              <Link href={buildProductsHref({ businessId: business.id, q: query.q })} className={`merchant-chip ${!attentionOnly ? 'merchant-chip-active' : ''}`}>Semua</Link>
+              <Link href={buildProductsHref({ businessId: business.id, q: query.q, stock: 'attention' })} className={`merchant-chip ${attentionOnly ? 'merchant-chip-active' : ''}`}>Stok tipis / habis</Link>
               <button className="portal-button-secondary min-h-9 px-3 py-1.5 text-xs" type="submit">Cari</button>
             </div>
           </form>
@@ -101,18 +110,33 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
                       <StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge>
                     </div>
                   </div>
-                  <details className="group shrink-0">
-                    <summary className="portal-button-ghost cursor-pointer list-none px-3">Aksi</summary>
-                    <div className="mt-2 w-full sm:absolute sm:right-6 sm:z-20 sm:w-[520px]">
-                      <div className="rounded-[18px] border border-portal-line bg-white p-3 shadow-xl">
-                        {canManage ? <ProductManageForm businessId={business.id} product={product} /> : <p className="p-2 text-sm text-portal-soft">Mode lihat saja.</p>}
-                      </div>
-                    </div>
-                  </details>
+                  {canManage ? (
+                    <Link
+                      href={buildProductActionHref({
+                        businessId: business.id,
+                        productId: product.id,
+                        q: query.q,
+                        stock: query.stock,
+                      })}
+                      scroll={false}
+                      className="portal-button-ghost h-11 w-11 shrink-0 px-0"
+                      aria-label={`Kelola ${product.name}`}
+                    >
+                      <MoreHorizontal className="h-5 w-5" />
+                    </Link>
+                  ) : null}
                 </div>
               </article>
             )) : <EmptyState title="Produk tidak ditemukan" description="Coba kata pencarian lain atau tampilkan semua produk." icon={Store} />}
           </section>
+
+          {selectedActionProduct ? (
+            <ProductManageQueryModal
+              businessId={business.id}
+              product={selectedActionProduct}
+              closeHref={closeProductActionHref}
+            />
+          ) : null}
 
           {canManage ? (
             <details id="tambah-produk" className="merchant-surface-bordered group">
