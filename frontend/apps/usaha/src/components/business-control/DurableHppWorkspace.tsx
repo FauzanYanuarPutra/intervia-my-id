@@ -2,12 +2,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Plus, Save, Trash2, TriangleAlert } from 'lucide-react';
+import { Loader2, Plus, RotateCcw, Save, Trash2, TriangleAlert } from 'lucide-react';
 import {
   calculateProductionCapacity,
   calculateRecipeCost,
   type IngredientCostInput,
 } from '@/lib/business-control/costing';
+import {
+  recipeDraftFingerprint,
+  validateHppRecipeDraft,
+  type HppRecipeDraft,
+  type HppRecipeItemDraft,
+} from './hpp-recipe-state';
 
 type Ingredient = {
   id: string;
@@ -29,11 +35,7 @@ type Product = {
   priceLabel?: string;
 };
 
-type RecipeItem = {
-  ingredientId: string;
-  quantity: number;
-  wastePercentOverride: number | null;
-};
+type RecipeItem = HppRecipeItemDraft;
 
 type RecipeApiItem = {
   ingredient_id?: string | number;
@@ -68,11 +70,21 @@ function priceFromLabel(value?: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function blankDraft(product?: Product): HppRecipeDraft {
+  return {
+    recipeName: product?.name ?? 'Resep utama',
+    servings: 1,
+    items: [],
+  };
+}
+
 export function DurableHppWorkspace({ businessId, ingredients, products }: Props) {
+  const initialDraft = blankDraft(products[0]);
   const [productId, setProductId] = useState(products[0]?.id ?? '');
-  const [recipeName, setRecipeName] = useState(products[0]?.name ?? 'Resep utama');
-  const [servings, setServings] = useState(1);
-  const [items, setItems] = useState<RecipeItem[]>([]);
+  const [recipeName, setRecipeName] = useState(initialDraft.recipeName);
+  const [servings, setServings] = useState(initialDraft.servings);
+  const [items, setItems] = useState<RecipeItem[]>(initialDraft.items);
+  const [savedDraft, setSavedDraft] = useState<HppRecipeDraft>(initialDraft);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -80,6 +92,11 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const product = products.find(item => item.id === productId) ?? products[0];
   const sellingPrice = priceFromLabel(product?.priceLabel);
   const ingredientMap = useMemo(() => new Map(ingredients.map(item => [item.id, item])), [ingredients]);
+  const currentDraft = useMemo<HppRecipeDraft>(() => ({ recipeName, servings, items }), [recipeName, servings, items]);
+  const currentFingerprint = useMemo(() => recipeDraftFingerprint(currentDraft), [currentDraft]);
+  const savedFingerprint = useMemo(() => recipeDraftFingerprint(savedDraft), [savedDraft]);
+  const isDirty = currentFingerprint !== savedFingerprint;
+  const validationErrors = useMemo(() => validateHppRecipeDraft(currentDraft), [currentDraft]);
 
   useEffect(() => {
     if (!productId) return;
@@ -92,9 +109,11 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         if (response.status === 404) {
           if (!cancelled) {
             const selected = products.find(item => item.id === productId);
-            setRecipeName(selected?.name ?? 'Resep utama');
-            setServings(1);
-            setItems([]);
+            const nextDraft = blankDraft(selected);
+            setRecipeName(nextDraft.recipeName);
+            setServings(nextDraft.servings);
+            setItems(nextDraft.items);
+            setSavedDraft(nextDraft);
           }
           return;
         }
@@ -102,13 +121,19 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         if (!response.ok) throw new Error(payload?.error || 'Gagal memuat resep.');
         const aggregate = payload?.data?.recipe as RecipeApiAggregate | undefined;
         if (!cancelled && aggregate) {
-          setRecipeName(aggregate.recipe?.name || product?.name || 'Resep utama');
-          setServings(n(aggregate.recipe?.servings) || 1);
-          setItems(Array.isArray(aggregate.items) ? aggregate.items.map(item => ({
-            ingredientId: String(item.ingredient_id ?? ''),
-            quantity: n(item.quantity),
-            wastePercentOverride: item.waste_percent_override === null || item.waste_percent_override === undefined ? null : n(item.waste_percent_override),
-          })).filter(item => item.ingredientId) : []);
+          const nextDraft: HppRecipeDraft = {
+            recipeName: aggregate.recipe?.name || product?.name || 'Resep utama',
+            servings: n(aggregate.recipe?.servings) || 1,
+            items: Array.isArray(aggregate.items) ? aggregate.items.map(item => ({
+              ingredientId: String(item.ingredient_id ?? ''),
+              quantity: n(item.quantity),
+              wastePercentOverride: item.waste_percent_override === null || item.waste_percent_override === undefined ? null : n(item.waste_percent_override),
+            })).filter(item => item.ingredientId) : [],
+          };
+          setRecipeName(nextDraft.recipeName);
+          setServings(nextDraft.servings);
+          setItems(nextDraft.items);
+          setSavedDraft(nextDraft);
         }
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : 'Gagal memuat resep.');
@@ -119,6 +144,21 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
     load();
     return () => { cancelled = true; };
   }, [businessId, productId, product?.name, products]);
+
+  const missingCostIngredients = useMemo(() => {
+    const missing = new Map<string, string>();
+    for (const item of items) {
+      const ingredient = ingredientMap.get(item.ingredientId);
+      if (!ingredient) continue;
+      const hasInvalidCostData = ingredient.purchase_price_amount <= 0
+        || n(ingredient.purchase_quantity) <= 0
+        || n(ingredient.conversion_factor) <= 0
+        || n(ingredient.yield_percent) <= 0
+        || n(ingredient.yield_percent) > 100;
+      if (hasInvalidCostData) missing.set(ingredient.id, ingredient.name);
+    }
+    return [...missing.values()];
+  }, [ingredientMap, items]);
 
   const costRows = useMemo(() => items.flatMap(item => {
     const ingredient = ingredientMap.get(item.ingredientId);
@@ -145,10 +185,13 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
     availableQuantity: row.availableQuantity,
     recipeQuantity: row.recipeQuantity,
   }))), [costRows]);
+  const costingReady = items.length > 0 && missingCostIngredients.length === 0 && validationErrors.length === 0;
   const grossProfit = sellingPrice - recipeCost.totalCost;
   const margin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
 
   function selectProduct(nextId: string) {
+    if (nextId === productId) return;
+    if (isDirty && !window.confirm('Ada perubahan resep yang belum disimpan. Pindah produk dan buang perubahan ini?')) return;
     setProductId(nextId);
     setMessage('');
   }
@@ -161,16 +204,26 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       return;
     }
     setItems(current => [...current, { ingredientId: next.id, quantity: 1, wastePercentOverride: null }]);
+    setMessage('');
   }
 
   function patch(index: number, patchValue: Partial<RecipeItem>) {
     setItems(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patchValue } : item));
+    setMessage('');
+  }
+
+  function discardChanges() {
+    setRecipeName(savedDraft.recipeName);
+    setServings(savedDraft.servings);
+    setItems(savedDraft.items.map(item => ({ ...item })));
+    setMessage('Perubahan dibatalkan.');
   }
 
   async function save() {
     if (!productId) return;
-    if (!items.length) {
-      setMessage('Tambahkan minimal satu bahan ke resep.');
+    const errors = validateHppRecipeDraft(currentDraft);
+    if (errors.length) {
+      setMessage(errors[0]);
       return;
     }
     setSaving(true);
@@ -191,7 +244,14 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan resep.');
-      setMessage('Bahan produk tersimpan. Modal per porsi sekarang dihitung otomatis dari harga dan stok bahan.');
+      const nextSavedDraft: HppRecipeDraft = {
+        recipeName: recipeName.trim() || product?.name || 'Resep utama',
+        servings,
+        items: items.map(item => ({ ...item })),
+      };
+      setRecipeName(nextSavedDraft.recipeName);
+      setSavedDraft(nextSavedDraft);
+      setMessage('Resep tersimpan. Modal per porsi dihitung otomatis dari harga, konversi, yield, susut, dan jumlah bahan.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan resep.');
     } finally {
@@ -207,7 +267,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 pb-2">
       <section className="portal-panel p-4 sm:p-5">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end">
           <label className="text-xs font-semibold text-portal-soft">Produk
@@ -223,13 +283,27 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             </div>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-portal-line pt-3 sm:grid-cols-4">
-          <div><p className="text-[11px] text-portal-soft">Modal / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{money.format(recipeCost.totalCost)}</p></div>
-          <div><p className="text-[11px] text-portal-soft">Untung kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>
-          <div><p className="text-[11px] text-portal-soft">Margin</p><p className="mt-0.5 text-lg font-black text-portal-ink">{number.format(margin)}%</p></div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-portal-line pt-3">
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${isDirty ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-800'}`}>
+            {isDirty ? 'Ada perubahan belum disimpan' : 'Resep tersimpan'}
+          </span>
+          {missingCostIngredients.length ? <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700">Modal belum lengkap</span> : null}
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div><p className="text-[11px] text-portal-soft">Modal / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{costingReady ? money.format(recipeCost.totalCost) : '—'}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Untung kotor</p><p className={`mt-0.5 text-lg font-black ${costingReady && grossProfit < 0 ? 'text-red-700' : 'text-portal-forest'}`}>{costingReady ? money.format(grossProfit) : '—'}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Margin</p><p className="mt-0.5 text-lg font-black text-portal-ink">{costingReady && sellingPrice > 0 ? `${number.format(margin)}%` : '—'}</p></div>
           <div><p className="text-[11px] text-portal-soft">Bisa dibuat</p><p className="mt-0.5 text-lg font-black text-portal-ink">{capacity.capacity}</p></div>
         </div>
         {capacity.bottleneck ? <p className="mt-2 text-[11px] font-semibold text-amber-800">Terbatas oleh: {capacity.bottleneck.name}</p> : null}
+        {missingCostIngredients.length ? (
+          <div className="mt-3 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <TriangleAlert className="h-4 w-4 shrink-0" />
+            <p>Lengkapi harga beli, jumlah beli, konversi, atau yield untuk <strong>{missingCostIngredients.join(', ')}</strong> agar modal tidak tampil menyesatkan.</p>
+          </div>
+        ) : null}
       </section>
 
       <section className="portal-panel overflow-hidden">
@@ -243,31 +317,41 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             {items.length ? items.map((item, index) => {
               const ingredient = ingredientMap.get(item.ingredientId);
               const cost = recipeCost.breakdown[index];
+              const usedByOtherRows = new Set(items.filter((_, itemIndex) => itemIndex !== index).map(row => row.ingredientId));
+              const ingredientCostReady = Boolean(ingredient)
+                && (ingredient?.purchase_price_amount ?? 0) > 0
+                && n(ingredient?.purchase_quantity) > 0
+                && n(ingredient?.conversion_factor) > 0
+                && n(ingredient?.yield_percent) > 0
+                && n(ingredient?.yield_percent) <= 100;
               return (
                 <div key={`${item.ingredientId}-${index}`} className="px-4 py-3 sm:px-5">
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-end">
                     <label className="text-xs font-semibold text-portal-soft">Bahan
                       <select className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm text-portal-ink" value={item.ingredientId} onChange={event => patch(index, { ingredientId: event.target.value })}>
-                        {ingredients.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
+                        {ingredients.map(option => <option key={option.id} value={option.id} disabled={usedByOtherRows.has(option.id)}>{option.name}</option>)}
                       </select>
                     </label>
                     <label className="text-xs font-semibold text-portal-soft">Dipakai ({ingredient?.recipe_unit ?? 'unit'})
                       <input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm text-portal-ink" value={item.quantity} onChange={event => patch(index, { quantity: Math.max(n(event.target.value), 0) })} />
                     </label>
-                    <button type="button" aria-label="Hapus bahan" onClick={() => setItems(current => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-10 w-10 place-items-center rounded-lg text-portal-soft hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" aria-label="Hapus bahan" onClick={() => { setItems(current => current.filter((_, itemIndex) => itemIndex !== index)); setMessage(''); }} className="grid h-10 w-10 place-items-center rounded-lg text-portal-soft hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft">
-                    <span>Biaya <strong className="text-portal-ink">{money.format(cost?.itemCost ?? 0)}</strong></span>
+                    <span>Biaya <strong className="text-portal-ink">{ingredientCostReady && cost ? money.format(cost.itemCost) : 'belum bisa dihitung'}</strong></span>
                     <span>Stok {n(ingredient?.stock_quantity)} {ingredient?.recipe_unit}</span>
+                    {!ingredientCostReady ? <span className="font-semibold text-amber-800">Data harga/konversi belum lengkap</span> : null}
                   </div>
                   <details className="mt-2">
                     <summary className="cursor-pointer text-[11px] font-bold text-portal-soft">Detail perhitungan</summary>
-                    <div className="mt-2 grid gap-3 rounded-lg bg-[#fafbf9] p-3 sm:grid-cols-3">
+                    <div className="mt-2 grid gap-3 rounded-lg bg-[#fafbf9] p-3 sm:grid-cols-2 lg:grid-cols-4">
                       <label className="text-xs font-semibold text-portal-soft">Susut khusus %
-                        <input type="number" min="0" max="99" step="any" placeholder={String(n(ingredient?.waste_percent))} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={item.wastePercentOverride ?? ''} onChange={event => patch(index, { wastePercentOverride: event.target.value === '' ? null : n(event.target.value) })} />
+                        <input type="number" min="0" max="99.999" step="any" placeholder={String(n(ingredient?.waste_percent))} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={item.wastePercentOverride ?? ''} onChange={event => patch(index, { wastePercentOverride: event.target.value === '' ? null : n(event.target.value) })} />
                       </label>
                       <div><p className="text-xs font-semibold text-portal-soft">Harga beli</p><p className="mt-2 text-sm font-bold text-portal-ink">{money.format(ingredient?.purchase_price_amount ?? 0)} / {n(ingredient?.purchase_quantity)} {ingredient?.purchase_unit}</p></div>
+                      <div><p className="text-xs font-semibold text-portal-soft">Konversi</p><p className="mt-2 text-sm font-bold text-portal-ink">1 {ingredient?.purchase_unit} = {n(ingredient?.conversion_factor)} {ingredient?.recipe_unit}</p></div>
                       <div><p className="text-xs font-semibold text-portal-soft">Yield</p><p className="mt-2 text-sm font-bold text-portal-ink">{n(ingredient?.yield_percent)}%</p></div>
+                      {ingredientCostReady && cost ? <p className="text-[11px] text-portal-soft sm:col-span-2 lg:col-span-4">Biaya efektif setelah yield/susut: <strong className="text-portal-ink">{money.format(cost.effectiveUnitCost)} / {ingredient?.recipe_unit}</strong>.</p> : null}
                     </div>
                   </details>
                 </div>
@@ -278,19 +362,36 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       </section>
 
       <section className="portal-panel p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <details className="group">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <details className="group min-w-0 flex-1">
             <summary className="cursor-pointer text-xs font-bold text-portal-soft">Pengaturan lanjutan</summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-portal-soft">Nama resep<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={recipeName} onChange={event => setRecipeName(event.target.value)} /></label>
-              <label className="text-xs font-semibold text-portal-soft">Jumlah porsi<input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={servings} onChange={event => setServings(Math.max(n(event.target.value), 0.0001))} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Nama resep<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={recipeName} onChange={event => { setRecipeName(event.target.value); setMessage(''); }} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Jumlah hasil / porsi<input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={servings} onChange={event => { setServings(Math.max(n(event.target.value), 0)); setMessage(''); }} /></label>
             </div>
           </details>
-          <button type="button" disabled={saving || loading} onClick={save} className="portal-button-primary justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan resep</button>
+          <div className="flex gap-2">
+            <button type="button" disabled={!isDirty || saving || loading} onClick={discardChanges} className="portal-button-secondary justify-center disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Batalkan</button>
+            <button type="button" disabled={!isDirty || saving || loading || validationErrors.length > 0} onClick={save} className="portal-button-primary justify-center disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan perubahan</button>
+          </div>
         </div>
+        {validationErrors.length ? <p className="mt-3 flex gap-2 text-xs text-red-700"><TriangleAlert className="h-4 w-4 shrink-0" /> {validationErrors[0]}</p> : null}
         {capacity.bottleneck ? <p className="mt-3 flex gap-2 text-xs text-amber-800"><TriangleAlert className="h-4 w-4 shrink-0" /> Stok <strong>{capacity.bottleneck.name}</strong> membatasi produksi sekitar {capacity.capacity} porsi.</p> : null}
         {message ? <p role="status" className="mt-3 text-xs text-portal-soft">{message}</p> : null}
       </section>
+
+      {isDirty && !loading ? (
+        <div className="sticky bottom-3 z-20 rounded-2xl border border-amber-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <div className="mb-2 sm:mb-0">
+            <p className="text-sm font-bold text-portal-ink">Perubahan resep belum disimpan</p>
+            <p className="text-xs text-portal-soft">Simpan agar HPP produk memakai komposisi terbaru.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" disabled={saving} onClick={discardChanges} className="portal-button-secondary flex-1 justify-center sm:flex-none"><RotateCcw className="h-4 w-4" /> Batalkan</button>
+            <button type="button" disabled={saving || validationErrors.length > 0} onClick={save} className="portal-button-primary flex-1 justify-center disabled:opacity-50 sm:flex-none">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan</button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
