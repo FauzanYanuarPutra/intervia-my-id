@@ -8,7 +8,7 @@ export type ChoiceOption<T extends string> = {
 
 type ChoiceChipsProps<T extends string> = {
   value: T;
-  options: ChoiceOption<T>[];
+  options: readonly ChoiceOption<T>[];
   onChange: (value: T) => void;
   disabled?: boolean;
   ariaLabel: string;
