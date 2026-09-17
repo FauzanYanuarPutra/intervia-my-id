@@ -21,6 +21,7 @@ import {
   listControlIngredients,
 } from '@/lib/business-control-server';
 import { buildHomeDashboard } from '@/lib/business-control/home-dashboard';
+import { loadOptionalList } from '@/lib/business-control/home-data';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
 import { buildMerchantNextActions } from '@/lib/business-control/next-actions';
 import { getSetupSteps, getStatusCopy, hasPermission } from '@/lib/portal-logic';
@@ -75,9 +76,9 @@ export default async function HomePage({
   const canManageInventory = hasPermission(business, 'manageInventory');
 
   const [ingredients, financeEntries, channels] = await Promise.all([
-    canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
-    canViewFinance ? listControlFinanceEntries(business.id) : Promise.resolve([]),
-    canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
+    loadOptionalList(canViewCosting, () => listControlIngredients(business.id)),
+    loadOptionalList(canViewFinance, () => listControlFinanceEntries(business.id)),
+    loadOptionalList(canViewChannels, () => listControlChannels(business.id)),
   ]);
 
   const today = jakartaDateKey();
