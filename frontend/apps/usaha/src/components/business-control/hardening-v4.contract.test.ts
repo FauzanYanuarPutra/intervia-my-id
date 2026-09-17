@@ -7,6 +7,8 @@ const finance = readFileSync('src/components/business-control/FinanceLedger.tsx'
 const planning = readFileSync('src/components/business-control/FinancePlanningWorkspace.tsx', 'utf8');
 const modifiers = readFileSync('src/components/forms/ProductModifierEditor.tsx', 'utf8');
 const settlementRoute = readFileSync('src/app/api/businesses/[businessId]/settlements/route.ts', 'utf8');
+const provision = readFileSync('src/components/forms/NewBusinessQuickForm.tsx', 'utf8');
+const reconcile = readFileSync('src/components/forms/ReconcileBusinessButton.tsx', 'utf8');
 
 describe('Usaha hardening V4 contracts', () => {
   it('uses Jakarta business dates instead of UTC date slicing', () => {
@@ -27,6 +29,10 @@ describe('Usaha hardening V4 contracts', () => {
     expect(planning).toContain('paymentAttemptRef');
     expect(settlement).toContain('saveAttemptRef');
     expect(settlement).toContain("'Idempotency-Key': attempt.key");
+    expect(provision).toContain('provisionAttemptRef');
+    expect(reconcile).toContain('attemptRef');
+    expect(provision).not.toContain('crypto.randomUUID()');
+    expect(reconcile).not.toContain('crypto.randomUUID()');
   });
 
   it('keeps the settlement API backward compatible while forwarding idempotency', () => {
