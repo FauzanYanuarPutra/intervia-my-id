@@ -67,6 +67,10 @@ export function Footer() {
       label: surfaceCopy.discovery,
     },
     {
+      href: '/news',
+      label: isId ? 'Berita ekonomi & usaha' : 'Business & economy news',
+    },
+    {
       href: '/community',
       label: isId ? 'Komunitas' : 'Community',
     },

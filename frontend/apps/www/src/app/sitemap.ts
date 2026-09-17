@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next';
 import { buildContentHref } from '@/lib/content/routes';
 import { BLOG_ARTICLES, isBlogArticleIndexable } from '@/lib/seo/blog';
 import { LAJUKAN_EXPLORE_CATEGORIES } from '@/lib/discovery/lajukanCategories';
+import { buildNewsUrl, getNewsForSitemap } from '@/lib/news';
 
 // Dynamic content comes from marketplace_service, which is a runtime dependency.
 // Never make `next build` wait for that service: generate sitemap.xml on request.
@@ -43,6 +44,7 @@ function readContentItems(payload: unknown): SitemapContentItem[] {
 
 function isIndexableContent(item: SitemapContentItem): boolean {
   if (!readText(item.id)) return false;
+  if (readText(item.content_type || item.type).toLowerCase() === 'news') return false;
   const status = readText(item.content_status || item.status).toLowerCase();
   return !status || ['active', 'published', 'live'].includes(status);
 }
@@ -108,6 +110,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/reels', priority: 0.8, changeFrequency: 'daily' },
     { path: '/learn', priority: 0.82, changeFrequency: 'daily' },
     { path: '/blog', priority: 0.86, changeFrequency: 'weekly' },
+    { path: '/news', priority: 0.92, changeFrequency: 'hourly' },
+    ...['ekonomi', 'bisnis', 'umkm', 'teknologi', 'keuangan', 'regulasi', 'industri', 'daerah'].map(category => ({
+      path: `/news/category/${category}`,
+      priority: 0.82,
+      changeFrequency: 'hourly' as const,
+    })),
     { path: '/education', priority: 0.8, changeFrequency: 'weekly' },
     { path: '/microgigs', priority: 0.7, changeFrequency: 'daily' },
     { path: '/lainnya', priority: 0.68, changeFrequency: 'weekly' },
@@ -182,6 +190,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         },
       }),
     );
+  });
+
+  const newsItems = await getNewsForSitemap(1000);
+  newsItems.forEach(article => {
+    const lang = article.language === 'en' ? 'en' : 'id';
+    sitemapEntries.push({
+      url: buildNewsUrl(lang, article.slug),
+      lastModified: safeDate(article.updatedAt),
+      changeFrequency: 'hourly',
+      priority: 0.84,
+    });
   });
 
   return sitemapEntries;

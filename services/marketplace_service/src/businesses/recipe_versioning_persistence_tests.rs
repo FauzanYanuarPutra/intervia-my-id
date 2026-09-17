@@ -21,8 +21,6 @@ async fn seed_recipe_audit_scope(pool: &PgPool) -> RecipeAuditScope {
     let business_id = Uuid::new_v4();
     let product_id = Uuid::new_v4();
     let ingredient_id = Uuid::new_v4();
-    let role_id = Uuid::new_v4();
-    let membership_id = Uuid::new_v4();
 
     sqlx::query(
         r#"
@@ -41,57 +39,10 @@ async fn seed_recipe_audit_scope(pool: &PgPool) -> RecipeAuditScope {
     .await
     .unwrap();
 
-    sqlx::query(
-        r#"
-        INSERT INTO business_roles (
-          id, organization_id, business_id, role_key, name, is_system
-        ) VALUES ($1,$2,$3,'owner','Owner access',TRUE)
-        "#,
-    )
-    .bind(role_id)
-    .bind(organization_id)
-    .bind(business_id)
-    .execute(pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        r#"
-        INSERT INTO business_role_permissions (role_id, permission_key)
-        VALUES ($1,'recipe.view'), ($1,'recipe.manage')
-        "#,
-    )
-    .bind(role_id)
-    .execute(pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        r#"
-        INSERT INTO business_memberships (
-          id, organization_id, business_id, user_id, status
-        ) VALUES ($1,$2,$3,$4,'active')
-        "#,
-    )
-    .bind(membership_id)
-    .bind(organization_id)
-    .bind(business_id)
-    .bind(actor_id)
-    .execute(pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        r#"
-        INSERT INTO business_member_roles (
-          organization_id, business_id, membership_id, role_id
-        ) VALUES ($1,$2,$3,$4)
-        "#,
-    )
-    .bind(organization_id)
-    .bind(business_id)
-    .bind(membership_id)
-    .bind(role_id)
-    .execute(pool)
-    .await
-    .unwrap();
+    // Governance compatibility migrations provision the creator's owner role,
+    // membership, role grants, and permissions when the business is inserted.
+    // Re-inserting that access fixture here races the canonical trigger and
+    // violates the unique (business_id, role_key) contract.
 
     sqlx::query(
         r#"

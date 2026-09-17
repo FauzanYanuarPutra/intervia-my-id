@@ -241,3 +241,37 @@ export const bannerApi = {
     });
   },
 };
+
+// News editorial API (Marketplace Service)
+export const newsApi = {
+  queue: async (token: string, status = 'pending_review') => {
+    const query = new URLSearchParams({ status, limit: '100', offset: '0' }).toString();
+    return fetchWithAuth(`${MARKETPLACE_URL}/v1/news/editorial/queue?${query}`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  history: async (token: string, id: string) => {
+    return fetchWithAuth(`${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/editorial`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  moderate: async (
+    token: string,
+    id: string,
+    data: {
+      action: 'approve' | 'needs_revision' | 'reject' | 'retract' | 'correct';
+      note?: string;
+      business_impact?: string;
+    },
+  ) => {
+    return fetchWithAuth(`${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/moderate`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(data),
+    });
+  },
+};

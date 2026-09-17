@@ -15,6 +15,7 @@ const CONTENT_TYPES = [
   { id: 'job', label: 'Lowongan' },
   { id: 'property', label: 'Properti' },
   { id: 'article', label: 'Artikel' },
+  { id: 'news', label: 'News' },
 ];
 
 const CONTENT_STATUS_OPTIONS = [
@@ -873,6 +874,12 @@ export default function CmsDashboard() {
               >
                 Tutorial
               </Button>
+              <a
+                href="/news"
+                className="inline-flex items-center justify-center rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-2 text-xs font-semibold text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-muted)]"
+              >
+                Review News
+              </a>
               <a
                 href={wwwUrl}
                 className="inline-flex items-center justify-center rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-2 text-xs font-semibold text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-muted)]"
