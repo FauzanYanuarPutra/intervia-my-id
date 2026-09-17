@@ -20,8 +20,8 @@ impl BusinessDateContext {
             "Asia/Jayapura" => 9 * 60 * 60,
             _ => return Err(KernelValidationError::InvalidTimezone),
         };
-        let offset = FixedOffset::east_opt(offset_seconds)
-            .ok_or(KernelValidationError::InvalidTimezone)?;
+        let offset =
+            FixedOffset::east_opt(offset_seconds).ok_or(KernelValidationError::InvalidTimezone)?;
 
         Ok(Self {
             timezone_name: normalized.to_owned(),
