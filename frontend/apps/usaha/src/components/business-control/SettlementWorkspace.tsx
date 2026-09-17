@@ -120,11 +120,17 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Gagal menyimpan settlement.');
       const saved = payload?.data?.settlement as SettlementRecord | undefined;
+      const replayed = payload?.data?.replayed === true;
       if (saved) {
         setRecords(current => [saved, ...current.filter(item => item.id !== saved.id)]);
-        saveAttemptRef.current = null;
       }
-      setMessage(saved?.status === 'matched' ? 'Settlement cocok dan tersimpan.' : 'Settlement tersimpan. Ada selisih yang perlu diperiksa.');
+      setMessage(
+        replayed
+          ? 'Settlement ini sudah tersimpan. Retry tidak membuat catatan ganda.'
+          : saved?.status === 'matched'
+            ? 'Settlement cocok dan tersimpan.'
+            : 'Settlement tersimpan. Ada selisih yang perlu diperiksa.',
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan settlement.');
     } finally {
