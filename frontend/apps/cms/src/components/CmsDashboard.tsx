@@ -15,7 +15,6 @@ const CONTENT_TYPES = [
   { id: 'job', label: 'Lowongan' },
   { id: 'property', label: 'Properti' },
   { id: 'article', label: 'Artikel' },
-  { id: 'news', label: 'News' },
 ];
 
 const CONTENT_STATUS_OPTIONS = [
@@ -269,7 +268,9 @@ export default function CmsDashboard() {
       if (contentFilters.sector.trim()) params.sector = contentFilters.sector.trim();
 
       const res = await contentApi.list(accessToken, params);
-      const items = extractItems<ContentItem>(res);
+      const items = extractItems<ContentItem>(res).filter(
+        item => (item.content_type || item.type) !== 'news',
+      );
       const hasMore = readBooleanField(res, 'has_more') ?? items.length >= limit;
 
       setContentItems((prev) => (opts.append ? [...prev, ...items] : items));

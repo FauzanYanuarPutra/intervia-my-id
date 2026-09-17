@@ -61,7 +61,7 @@ export default function NewsModeration() {
   useEffect(() => {
     const meta = selected ? readRecord(readRecord(selected.metadata).news) : {};
     setBusinessImpact(readString(meta.business_impact));
-  }, [selected?.id]);
+  }, [selected]);
 
   const load = useCallback(async () => {
     if (!accessToken) return;

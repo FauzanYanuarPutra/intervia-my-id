@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 type NewsItem = {
   id: string;
@@ -31,7 +31,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
   const editable = Boolean(selected && ['pending_review', 'needs_revision', 'rejected'].includes(editorialStatus));
   const [form, setForm] = useState({ title: '', summary: '', body: '', category: 'Ekonomi', article_kind: 'news', location: '', source_urls: '' });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setStatus(current => ({ ...current, loading: true, error: '' }));
     try {
       const response = await fetch('/api/news/submissions', { cache: 'no-store' });
@@ -46,9 +46,9 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
     } catch {
       setStatus({ loading: false, saving: false, error: isId ? 'Tidak dapat memuat kiriman.' : 'Could not load submissions.', success: '' });
     }
-  };
+  }, [isId]);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     if (!selected) return;
@@ -63,7 +63,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
       location: text(news.location),
       source_urls: urls(news.source_urls).join('\n'),
     });
-  }, [selected?.id]);
+  }, [selected]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
