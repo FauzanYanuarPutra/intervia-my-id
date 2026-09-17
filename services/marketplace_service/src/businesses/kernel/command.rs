@@ -11,9 +11,7 @@ pub(crate) struct IdempotencyFingerprint {
 }
 
 #[allow(dead_code)]
-pub(crate) fn canonical_request_hash<T: Serialize>(
-    value: &T,
-) -> Result<String, serde_json::Error> {
+pub(crate) fn canonical_request_hash<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
     let canonical = canonicalize(serde_json::to_value(value)?);
     let bytes = serde_json::to_vec(&canonical)?;
     let mut hasher = Sha256::new();
