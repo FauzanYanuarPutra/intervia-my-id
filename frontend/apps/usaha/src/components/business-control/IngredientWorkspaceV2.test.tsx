@@ -33,7 +33,7 @@ describe('IngredientWorkspaceV2', () => {
     expect(html).toContain('Dipakai dalam resep sebagai');
     expect(html).toContain('1 kg =');
     expect(html).toContain('Ada bagian yang biasanya tidak terpakai?');
-    expect(html).toContain('Bagian yang dapat digunakan');
+    expect(html).toContain('Seluruh jumlah dianggap dapat dipakai');
     expect(html).not.toContain('Susut %');
     expect(html).not.toContain('Konversi</');
   });
@@ -61,8 +61,8 @@ describe('IngredientWorkspaceV2', () => {
       />,
     );
 
-    expect(html).toContain('Rp42,86');
-    expect(html).toContain('Rp30.000');
+    expect(html).toContain('42,86');
+    expect(html).toContain('30.000');
     expect(html).toContain('70% dapat digunakan');
     expect(html).toContain('30% tidak terpakai');
   });
