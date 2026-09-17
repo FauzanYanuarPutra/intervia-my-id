@@ -22,6 +22,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) return { robots: { index: false, follow: true } };
   const canonical = `${buildNewsUrl(locale)}/category/${category.toLowerCase()}`;
+  const { items } = await getPublishedNews({ category: label, limit: 1 });
+  const indexable = items.length > 0;
   return {
     title: `${label} | Lajukan News`,
     description: locale === 'id'
@@ -34,6 +36,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         en: `${buildNewsUrl('en')}/category/${category.toLowerCase()}`,
         'x-default': `${buildNewsUrl('id')}/category/${category.toLowerCase()}`,
       },
+    },
+    robots: {
+      index: indexable,
+      follow: true,
+      googleBot: { index: indexable, follow: true, 'max-image-preview': 'large' },
     },
   };
 }

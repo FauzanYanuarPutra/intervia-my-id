@@ -13,6 +13,27 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function sanitizeTopics(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : [];
+  const reserved = new Set([
+    'news', 'analysis', 'press_release', 'ekonomi', 'bisnis', 'umkm',
+    'teknologi', 'keuangan', 'regulasi', 'industri', 'daerah',
+  ]);
+  const result: string[] = [];
+  for (const entry of raw) {
+    const topic = readString(entry).toLowerCase().replace(/\s+/g, ' ');
+    if (!topic || topic.length > 36 || reserved.has(topic)) continue;
+    if (!/^[\p{L}\p{N}][\p{L}\p{N}\s._-]*$/u.test(topic)) continue;
+    if (!result.includes(topic)) result.push(topic);
+    if (result.length >= 8) break;
+  }
+  return result;
+}
+
 function sanitizeSources(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const result: string[] = [];
@@ -51,6 +72,7 @@ export async function PATCH(
   if (!parsed.ok) return parsed.response;
   const body = parsed.data as Record<string, unknown>;
   const sources = sanitizeSources(body.source_urls);
+  const topics = body.topics === undefined ? undefined : sanitizeTopics(body.topics);
   const kind = readString(body.article_kind);
   if (kind !== 'press_release' && sources.length === 0) {
     return NextResponse.json(
@@ -76,6 +98,7 @@ export async function PATCH(
           category: body.category,
           article_kind: body.article_kind,
           location: body.location,
+          topics,
           source_urls: sources,
         }),
         cache: 'no-store',

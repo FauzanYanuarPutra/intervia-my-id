@@ -15,6 +15,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const value = cleanFacet(topic);
   if (!value) return { robots: { index: false, follow: true } };
   const canonical = buildNewsFacetUrl(locale, 'topic', value);
+  const { items } = await getPublishedNews({ topic: value, limit: 1 });
+  const indexable = items.length > 0;
   return {
     title: `${value} | Topik Lajukan News`,
     description: locale === 'id'
@@ -29,9 +31,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     },
     robots: {
-      index: true,
+      index: indexable,
       follow: true,
-      googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+      googleBot: { index: indexable, follow: true, 'max-image-preview': 'large' },
     },
   };
 }

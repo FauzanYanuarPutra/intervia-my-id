@@ -247,6 +247,8 @@ export default function NewsModeration() {
   const category = readString(newsMeta.category) || '-';
   const kind = readString(newsMeta.article_kind) || 'news';
   const location = readString(newsMeta.location) || '-';
+  const requiresVerifiedSource = kind !== 'press_release';
+  const hasVerifiedSource = sources.some(source => source.verification_status === 'verified');
   const sourceUrls = Array.isArray(newsMeta.source_urls)
     ? newsMeta.source_urls.map(readString).filter(Boolean)
     : [];
@@ -396,6 +398,12 @@ export default function NewsModeration() {
                 )}
               </section>
 
+              {requiresVerifiedSource && !hasVerifiedSource ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">
+                  Minimal satu sumber harus ditandai <strong>verified</strong> sebelum berita/analisis dapat dipublish.
+                </div>
+              ) : null}
+
               <label className="block text-sm font-semibold text-[color:var(--color-text)]">
                 Dampak untuk pelaku usaha
                 <textarea value={businessImpact} onChange={event => setBusinessImpact(event.target.value)} rows={4} maxLength={2000} className="mt-2 w-full rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 text-sm" placeholder="Jelaskan implikasi praktis berita ini untuk UMKM/pelaku usaha..." />
@@ -407,7 +415,7 @@ export default function NewsModeration() {
               </label>
 
               <div className="flex flex-wrap gap-2">
-                <Button disabled={acting} variant="primary" onClick={() => void moderate('approve')}>Approve & publish</Button>
+                <Button disabled={acting || (requiresVerifiedSource && !hasVerifiedSource)} variant="primary" onClick={() => void moderate('approve')}>Approve & publish</Button>
                 <Button disabled={acting || !note.trim()} variant="secondary" onClick={() => void moderate('needs_revision')}>Minta revisi</Button>
                 <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('reject')}>Tolak</Button>
                 {status === 'published' || selected.content_status === 'active' ? (

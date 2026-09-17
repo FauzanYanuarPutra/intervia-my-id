@@ -29,6 +29,33 @@ describe('news SEO normalization', () => {
     expect(article?.location).toBe('Banten');
   });
 
+  it('keeps retraction state while hiding reserved system tags from public topics', () => {
+    const article = normalizeNewsArticle({
+      id: '11111111-1111-1111-1111-111111111111',
+      owner_id: '22222222-2222-2222-2222-222222222222',
+      slug: 'ditarik',
+      title: 'Berita yang ditarik',
+      summary: 'Ringkasan berita yang sudah ditarik.',
+      body: 'Isi lama',
+      tags: ['news', 'ekonomi', 'analysis', 'qris', 'harga pangan'],
+      content_status: 'archived',
+      metadata: {
+        news: {
+          category: 'Ekonomi',
+          article_kind: 'analysis',
+          editorial_status: 'retracted',
+          retraction_note: 'Sumber utama tidak lagi dapat diverifikasi.',
+        },
+      },
+      created_at: '2026-09-18T00:00:00Z',
+      updated_at: '2026-09-18T01:00:00Z',
+    });
+
+    expect(article?.editorialStatus).toBe('retracted');
+    expect(article?.retractionNote).toContain('tidak lagi');
+    expect(article?.tags).toEqual(['qris', 'harga pangan']);
+  });
+
   it('emits NewsArticle structured data', () => {
     const article = normalizeNewsArticle({
       id: '11111111-1111-1111-1111-111111111111',

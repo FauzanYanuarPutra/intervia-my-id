@@ -6,7 +6,9 @@ import {
   buildNewsArticleJsonLd,
   buildNewsBreadcrumbJsonLd,
   buildNewsFacetPath,
+  buildNewsPath,
   buildNewsUrl,
+  getPublishedNews,
   getPublishedNewsArticle,
 } from '@/lib/news';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
@@ -20,15 +22,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { locale, slug } = await params;
   const article = await getPublishedNewsArticle(slug);
   if (!article) return { robots: { index: false, follow: true } };
-  const description = article.summary || article.body.slice(0, 160);
+  const isRetracted = article.editorialStatus === 'retracted';
+  const description = isRetracted
+    ? (locale === 'id'
+        ? 'Artikel ini telah ditarik dari publikasi Lajukan News.'
+        : 'This article has been retracted from Lajukan News.')
+    : article.summary || article.body.slice(0, 160);
   return {
-    title: `${article.title} | Lajukan News`,
+    title: `${article.title}${isRetracted ? (locale === 'id' ? ' — Ditarik' : ' — Retracted') : ''} | Lajukan News`,
     description,
     robots: {
-      index: true,
+      index: !isRetracted,
       follow: true,
       googleBot: {
-        index: true,
+        index: !isRetracted,
         follow: true,
         'max-image-preview': 'large',
         'max-snippet': -1,
@@ -79,16 +86,24 @@ export default async function NewsArticlePage({ params }: PageProps) {
   const isId = locale === 'id';
   const article = await getPublishedNewsArticle(slug);
   if (!article) notFound();
+  const isRetracted = article.editorialStatus === 'retracted';
+  const relatedArticles = isRetracted
+    ? []
+    : (await getPublishedNews({ category: article.category, limit: 8 })).items
+        .filter(item => item.id !== article.id)
+        .slice(0, 3);
 
   const paragraphs = article.body
     .split(/\n{2,}/)
     .map(part => part.trim())
     .filter(Boolean);
 
-  const jsonLd = [
-    buildNewsArticleJsonLd(article, article.language),
-    buildNewsBreadcrumbJsonLd(article, article.language),
-  ];
+  const jsonLd = isRetracted
+    ? [buildNewsBreadcrumbJsonLd(article, article.language)]
+    : [
+        buildNewsArticleJsonLd(article, article.language),
+        buildNewsBreadcrumbJsonLd(article, article.language),
+      ];
 
   return (
     <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6">
@@ -106,6 +121,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
         <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8 lg:p-10">
           <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.14em]">
             <span className="rounded-full bg-emerald-700 px-3 py-1.5 text-white">{article.category}</span>
+            {isRetracted ? <span className="rounded-full bg-rose-100 px-3 py-1.5 text-rose-800 dark:bg-rose-400/15 dark:text-rose-200">{isId ? 'Ditarik' : 'Retracted'}</span> : null}
             {article.articleKind === 'press_release' ? <span className="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">{isId ? 'Rilis bisnis' : 'Business release'}</span> : null}
             {article.articleKind === 'analysis' ? <span className="rounded-full bg-sky-100 px-3 py-1.5 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200">{isId ? 'Analisis' : 'Analysis'}</span> : null}
           </div>
@@ -145,9 +161,20 @@ export default async function NewsArticlePage({ params }: PageProps) {
 
         <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-10">
           <div className="min-w-0">
-            <div className="space-y-5 text-[15px] font-medium leading-8 text-slate-700 dark:text-slate-200">
-              {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-            </div>
+            {isRetracted ? (
+              <section className="rounded-[24px] border border-rose-200 bg-rose-50 p-5 dark:border-rose-400/20 dark:bg-rose-400/10">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-rose-700 dark:text-rose-200">{isId ? 'Pemberitahuan penarikan' : 'Retraction notice'}</p>
+                <p className="mt-3 text-sm font-semibold leading-7 text-rose-950 dark:text-rose-100">
+                  {article.retractionNote || (isId
+                    ? 'Artikel ini telah ditarik dari publikasi. Konten asli tidak lagi ditampilkan.'
+                    : 'This article has been retracted. The original content is no longer displayed.')}
+                </p>
+              </section>
+            ) : (
+              <>
+                <div className="space-y-5 text-[15px] font-medium leading-8 text-slate-700 dark:text-slate-200">
+                  {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                </div>
 
             {article.businessImpact ? (
               <section className="mt-8 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-400/20 dark:bg-emerald-400/10">
@@ -176,6 +203,8 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 </div>
               </section>
             ) : null}
+              </>
+            )}
           </div>
 
           <aside className="space-y-3">
@@ -196,6 +225,24 @@ export default async function NewsArticlePage({ params }: PageProps) {
               <Store className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
               <p className="mt-3 font-bold text-slate-950 dark:text-white">{isId ? 'Cari produk, jasa, dan supplier' : 'Find products, services, and suppliers'}</p>
             </Link>
+            {relatedArticles.length ? (
+              <section className="rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{isId ? 'Berita terkait' : 'Related news'}</p>
+                <div className="mt-3 grid gap-3">
+                  {relatedArticles.map(related => (
+                    <Link
+                      key={related.id}
+                      href={buildNewsPath(related.slug)}
+                      data-news-action="related_clicked"
+                      className="block rounded-xl bg-slate-50 p-3 transition hover:bg-emerald-50 dark:bg-white/[0.04] dark:hover:bg-emerald-400/10"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-300">{related.category}</span>
+                      <p className="mt-1 line-clamp-3 text-sm font-bold leading-5 text-slate-900 dark:text-white">{related.title}</p>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </aside>
         </div>
       </article>
