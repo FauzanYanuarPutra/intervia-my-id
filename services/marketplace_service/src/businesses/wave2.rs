@@ -72,6 +72,12 @@ pub(crate) struct ObligationRecord {
     pub(crate) updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ObligationOutcome {
+    pub(crate) obligation: ObligationRecord,
+    pub(crate) replayed: bool,
+}
+
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub(crate) struct ObligationPaymentRecord {
     pub(crate) id: Uuid,
@@ -207,6 +213,12 @@ pub(crate) struct YieldObservationRecord {
     pub(crate) created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct YieldObservationOutcome {
+    pub(crate) observation: YieldObservationRecord,
+    pub(crate) replayed: bool,
+}
+
 #[derive(Clone)]
 pub(crate) struct Wave2Repository {
     db: PgPool,
@@ -261,20 +273,48 @@ impl Wave2Repository {
         actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
+        idempotency_key: Uuid,
         request: CreateObligationRequest,
-    ) -> Result<ObligationRecord, Wave2RepositoryError> {
+    ) -> Result<ObligationOutcome, Wave2RepositoryError> {
         let entry_type = canonical_expense_type(&request.entry_type)?;
         let label = normalized_text(&request.label, 160, "invalid_obligation_label")?;
         let account_key = normalized_account(&request.account_key)?;
         if request.amount <= 0 || request.interval_days <= 0 || request.interval_days > 3660 {
             return Err(Wave2RepositoryError::Validation("invalid_obligation"));
         }
-        sqlx::query_as::<_, ObligationRecord>(r#"
-          INSERT INTO business_recurring_obligations (business_id,organization_id,label,entry_type,account_key,amount,interval_days,next_due_on,created_by_user_id)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+
+        if let Some(existing) =
+            load_obligation(&self.db, business_id, organization_id, idempotency_key).await?
+        {
+            return Ok(ObligationOutcome {
+                obligation: existing,
+                replayed: true,
+            });
+        }
+
+        let inserted = sqlx::query_as::<_, ObligationRecord>(r#"
+          INSERT INTO business_recurring_obligations (business_id,organization_id,idempotency_key,label,entry_type,account_key,amount,interval_days,next_due_on,created_by_user_id)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          ON CONFLICT (business_id,idempotency_key) DO NOTHING
           RETURNING id,business_id,organization_id,label,entry_type,account_key,amount,interval_days,next_due_on,active,last_paid_at,created_by_user_id,created_at,updated_at
-        "#).bind(business_id).bind(organization_id).bind(label).bind(entry_type).bind(account_key).bind(request.amount).bind(request.interval_days).bind(request.next_due_on).bind(actor_id)
-        .fetch_one(&self.db).await.map_err(Into::into)
+        "#).bind(business_id).bind(organization_id).bind(idempotency_key).bind(label).bind(entry_type).bind(account_key).bind(request.amount).bind(request.interval_days).bind(request.next_due_on).bind(actor_id)
+        .fetch_optional(&self.db).await?;
+
+        if let Some(obligation) = inserted {
+            return Ok(ObligationOutcome {
+                obligation,
+                replayed: false,
+            });
+        }
+
+        let obligation =
+            load_obligation(&self.db, business_id, organization_id, idempotency_key)
+                .await?
+                .ok_or(Wave2RepositoryError::Conflict)?;
+        Ok(ObligationOutcome {
+            obligation,
+            replayed: true,
+        })
     }
 
     pub(crate) async fn pay_obligation(
@@ -463,8 +503,9 @@ impl Wave2Repository {
         actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
+        idempotency_key: Uuid,
         request: CreateYieldObservationRequest,
-    ) -> Result<YieldObservationRecord, Wave2RepositoryError> {
+    ) -> Result<YieldObservationOutcome, Wave2RepositoryError> {
         if request.input_quantity <= Decimal::ZERO || request.output_units <= Decimal::ZERO {
             return Err(Wave2RepositoryError::Validation(
                 "invalid_yield_observation",
@@ -472,8 +513,34 @@ impl Wave2Repository {
         }
         let input_unit = normalized_text(&request.input_unit, 40, "invalid_yield_unit")?;
         let note = normalized_optional_text(&request.note, 2000, "yield_note_too_long")?;
-        sqlx::query_as::<_,YieldObservationRecord>(r#"INSERT INTO business_material_yield_observations (business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10 WHERE EXISTS(SELECT 1 FROM business_ingredients WHERE id=$4 AND business_id=$1 AND organization_id=$2 AND status='active') AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM business_products WHERE id=$3 AND business_id=$1 AND organization_id=$2 AND status='active')) RETURNING id,business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id,created_at"#)
-            .bind(business_id).bind(organization_id).bind(request.product_id).bind(request.ingredient_id).bind(request.input_quantity).bind(request.output_units).bind(input_unit).bind(request.observed_on).bind(note).bind(actor_id).fetch_optional(&self.db).await?.ok_or(Wave2RepositoryError::NotFound)
+
+        if let Some(existing) =
+            load_yield_observation(&self.db, business_id, organization_id, idempotency_key).await?
+        {
+            return Ok(YieldObservationOutcome {
+                observation: existing,
+                replayed: true,
+            });
+        }
+
+        let inserted = sqlx::query_as::<_,YieldObservationRecord>(r#"INSERT INTO business_material_yield_observations (business_id,organization_id,idempotency_key,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11 WHERE EXISTS(SELECT 1 FROM business_ingredients WHERE id=$5 AND business_id=$1 AND organization_id=$2 AND status='active') AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM business_products WHERE id=$4 AND business_id=$1 AND organization_id=$2 AND status='active')) ON CONFLICT (business_id,idempotency_key) DO NOTHING RETURNING id,business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id,created_at"#)
+            .bind(business_id).bind(organization_id).bind(idempotency_key).bind(request.product_id).bind(request.ingredient_id).bind(request.input_quantity).bind(request.output_units).bind(input_unit).bind(request.observed_on).bind(note).bind(actor_id).fetch_optional(&self.db).await?;
+
+        if let Some(observation) = inserted {
+            return Ok(YieldObservationOutcome {
+                observation,
+                replayed: false,
+            });
+        }
+
+        let observation =
+            load_yield_observation(&self.db, business_id, organization_id, idempotency_key)
+                .await?
+                .ok_or(Wave2RepositoryError::Conflict)?;
+        Ok(YieldObservationOutcome {
+            observation,
+            replayed: true,
+        })
     }
 }
 
@@ -546,6 +613,36 @@ fn default_cash() -> String {
 }
 fn is_unique_violation(error: &sqlx::Error) -> bool {
     matches!(error,sqlx::Error::Database(db) if db.is_unique_violation())
+}
+
+async fn load_obligation(
+    pool: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+    key: Uuid,
+) -> Result<Option<ObligationRecord>, Wave2RepositoryError> {
+    sqlx::query_as::<_, ObligationRecord>("SELECT id,business_id,organization_id,label,entry_type,account_key,amount,interval_days,next_due_on,active,last_paid_at,created_by_user_id,created_at,updated_at FROM business_recurring_obligations WHERE business_id=$1 AND organization_id=$2 AND idempotency_key=$3")
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(key)
+        .fetch_optional(pool)
+        .await
+        .map_err(Into::into)
+}
+
+async fn load_yield_observation(
+    pool: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+    key: Uuid,
+) -> Result<Option<YieldObservationRecord>, Wave2RepositoryError> {
+    sqlx::query_as::<_, YieldObservationRecord>("SELECT id,business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id,created_at FROM business_material_yield_observations WHERE business_id=$1 AND organization_id=$2 AND idempotency_key=$3")
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(key)
+        .fetch_optional(pool)
+        .await
+        .map_err(Into::into)
 }
 
 async fn load_payment(
