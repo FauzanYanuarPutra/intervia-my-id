@@ -1,5 +1,6 @@
 export type ProductPrimaryMode = 'add-product' | 'browse' | 'view-only';
 export type ChannelSimulationReadiness = 'missing-price' | 'missing-hpp' | 'price-only' | 'ready';
+export type InventoryTab = 'stock' | 'purchase' | 'ingredients';
 
 type StockHealthRecord = {
   stockHealth?: string | null;
@@ -44,4 +45,13 @@ export function channelSimulationReadiness(input: {
   if (!input.canViewCosting) return 'price-only';
   if (input.hpp === null || input.hpp <= 0) return 'missing-hpp';
   return 'ready';
+}
+
+export function resolveInventoryTab(
+  tab: string | string[] | undefined,
+): InventoryTab {
+  const value = Array.isArray(tab) ? tab[0] : tab;
+  return value === 'purchase' || value === 'ingredients' || value === 'stock'
+    ? value
+    : 'stock';
 }

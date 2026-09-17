@@ -1058,7 +1058,11 @@ export async function createUmkmOrder(input: CreateUmkmOrderInput): Promise<Umkm
       unit_price_cents: product.price_cents,
       line_total_cents: lineTotalCents,
       notes: normText(item.notes),
-      metadata: {},
+      metadata: {
+        product_image_url: normText(product.image_url),
+        product_category: product.category,
+        product_slug: product.slug,
+      },
       created_at: nowIso(),
     });
   }
@@ -1282,6 +1286,12 @@ export async function getUmkmOrderById(orderId: string): Promise<UmkmOrderBundle
 
 export async function listUmkmOrdersByStore(input: ListUmkmOrdersOptions): Promise<UmkmOrder[]> {
   return listOrderRecordsByStore(input).map(cloneOrder);
+}
+
+export async function listUmkmOrderBundlesByStore(
+  input: ListUmkmOrdersOptions,
+): Promise<UmkmOrderBundle[]> {
+  return listOrderRecordsByStore(input).map(order => buildOrderBundle(order));
 }
 
 export async function checkoutUmkmOrder(input: CheckoutUmkmOrderInput): Promise<UmkmOrderBundle> {

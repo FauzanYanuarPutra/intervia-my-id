@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Calculator, PackagePlus, Plus, Trash2, TriangleAlert } from 'lucide-react';
+import { ChevronDown, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import {
   calculateProductionCapacity,
   calculateRecipeCost,
@@ -16,6 +16,7 @@ type CostRow = IngredientCostInput & {
 
 const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const number = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+const input = 'mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm text-portal-ink';
 
 const starterRows: CostRow[] = [
   { id: 'avocado', name: 'Alpukat', purchasePrice: 34000, purchaseQuantity: 1, conversionFactor: 1000, yieldPercent: 80, wastePercent: 0, recipeQuantity: 125, unitLabel: 'gram', availableQuantity: 2200 },
@@ -36,11 +37,8 @@ export function HppCalculator() {
   const [sellingPrice, setSellingPrice] = useState(12000);
 
   const recipe = useMemo(() => {
-    try {
-      return calculateRecipeCost(rows);
-    } catch {
-      return { breakdown: [], totalCost: 0 };
-    }
+    try { return calculateRecipeCost(rows); }
+    catch { return { breakdown: [], totalCost: 0 }; }
   }, [rows]);
 
   const capacity = useMemo(
@@ -70,57 +68,64 @@ export function HppCalculator() {
   }
 
   return (
-    <div className="space-y-4">
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="portal-panel p-4"><p className="portal-label">HPP per produk</p><p className="mt-2 text-2xl font-bold text-portal-ink">{money.format(recipe.totalCost)}</p><p className="mt-1 text-xs text-portal-soft">Bahan + kemasan dari resep di bawah.</p></div>
-        <div className="portal-panel p-4"><p className="portal-label">Untung kotor / produk</p><p className={`mt-2 text-2xl font-bold ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p><p className="mt-1 text-xs text-portal-soft">Margin {number.format(margin)}% sebelum biaya operasional.</p></div>
-        <div className="portal-panel p-4"><p className="portal-label">Bisa dibuat</p><p className="mt-2 text-2xl font-bold text-portal-ink">{capacity.capacity} cup</p><p className="mt-1 text-xs text-portal-soft">Pembatas: <strong>{capacity.bottleneck?.name ?? 'Belum ada data stok'}</strong></p></div>
+    <div className="space-y-3">
+      <section className="portal-panel p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold text-portal-soft">HPP / produk</p>
+            <p className="mt-1 text-3xl font-black text-portal-ink">{money.format(recipe.totalCost)}</p>
+          </div>
+          <label className="w-full text-xs font-semibold text-portal-soft sm:w-52">Harga jual
+            <input type="number" min="0" className={`${input} text-base font-bold`} value={sellingPrice} onChange={event => setSellingPrice(numeric(event.target.value))} />
+          </label>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-portal-line pt-3">
+          <div><p className="text-[11px] text-portal-soft">Untung kotor</p><p className={`mt-0.5 text-sm font-bold ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Margin</p><p className="mt-0.5 text-sm font-bold text-portal-ink">{number.format(margin)}%</p></div>
+          <div><p className="text-[11px] text-portal-soft">Bisa dibuat</p><p className="mt-0.5 text-sm font-bold text-portal-ink">{capacity.capacity} cup</p></div>
+        </div>
+        {capacity.bottleneck ? <p className="mt-3 flex items-center gap-2 text-xs text-amber-800"><TriangleAlert className="h-3.5 w-3.5" /> Stok pembatas: <strong>{capacity.bottleneck.name}</strong></p> : null}
       </section>
 
       <section className="portal-panel overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-portal-line p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div><p className="portal-kicker">Resep & biaya</p><h2 className="mt-1 text-lg font-bold text-portal-ink">Jus Alpukat 16 oz</h2><p className="mt-1 text-sm text-portal-soft">Contoh awal bisa langsung diubah. Masukkan harga beli, ukuran pembelian, hasil yang benar-benar bisa dipakai, dan pemakaian per cup.</p></div>
-          <button type="button" onClick={addRow} className="portal-button-secondary"><Plus className="h-4 w-4" /> Tambah bahan</button>
+        <div className="flex items-center justify-between gap-3 border-b border-portal-line px-4 py-3 sm:px-5">
+          <div><h2 className="font-bold text-portal-ink">Resep</h2><p className="text-xs text-portal-soft">Jus Alpukat 16 oz · {rows.length} bahan</p></div>
+          <button type="button" onClick={addRow} className="portal-button-secondary"><Plus className="h-4 w-4" /> Bahan</button>
         </div>
 
         <div className="divide-y divide-portal-line">
           {rows.map((row, index) => {
             const result = recipe.breakdown[index];
             return (
-              <article key={row.id} className="p-4 sm:p-5">
-                <div className="flex items-start justify-between gap-3">
+              <article key={row.id} className="px-4 py-3 sm:px-5">
+                <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <input aria-label="Nama bahan" className="w-full rounded-xl border border-portal-line bg-white px-3 py-2 text-sm font-bold text-portal-ink outline-none focus:border-portal-forest" value={row.name} onChange={event => patch(row.id, 'name', event.target.value)} />
-                    <p className="mt-1 text-xs text-portal-soft">Biaya ke resep: <strong className="text-portal-ink">{money.format(result?.itemCost ?? 0)}</strong></p>
+                    <input aria-label="Nama bahan" className="w-full border-0 bg-transparent p-0 text-sm font-bold text-portal-ink outline-none" value={row.name} onChange={event => patch(row.id, 'name', event.target.value)} />
+                    <p className="mt-0.5 text-xs text-portal-soft">{row.recipeQuantity} {row.unitLabel} · <strong className="text-portal-ink">{money.format(result?.itemCost ?? 0)}</strong></p>
                   </div>
-                  <button type="button" aria-label={`Hapus ${row.name}`} className="rounded-xl border border-portal-line p-2 text-portal-soft hover:text-red-700" onClick={() => setRows(current => current.filter(item => item.id !== row.id))}><Trash2 className="h-4 w-4" /></button>
+                  <button type="button" aria-label={`Hapus ${row.name}`} className="grid h-9 w-9 place-items-center rounded-lg text-portal-soft hover:bg-red-50 hover:text-red-700" onClick={() => setRows(current => current.filter(item => item.id !== row.id))}><Trash2 className="h-4 w-4" /></button>
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-                  <label className="text-xs font-semibold text-portal-soft">Harga beli<input type="number" min="0" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2 text-sm text-portal-ink" value={row.purchasePrice} onChange={event => patch(row.id, 'purchasePrice', numeric(event.target.value))} /></label>
-                  <label className="text-xs font-semibold text-portal-soft">Jumlah beli<input type="number" min="0.0001" step="any" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2 text-sm text-portal-ink" value={row.purchaseQuantity} onChange={event => patch(row.id, 'purchaseQuantity', numeric(event.target.value))} /></label>
-                  <label className="text-xs font-semibold text-portal-soft">Konversi ke unit resep<input type="number" min="0.0001" step="any" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2 text-sm text-portal-ink" value={row.conversionFactor} onChange={event => patch(row.id, 'conversionFactor', numeric(event.target.value))} /></label>
-                  <label className="text-xs font-semibold text-portal-soft">Hasil terpakai %<input type="number" min="1" max="100" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2 text-sm text-portal-ink" value={row.yieldPercent} onChange={event => patch(row.id, 'yieldPercent', numeric(event.target.value))} /></label>
-                  <label className="text-xs font-semibold text-portal-soft">Susut %<input type="number" min="0" max="99" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2 text-sm text-portal-ink" value={row.wastePercent} onChange={event => patch(row.id, 'wastePercent', numeric(event.target.value))} /></label>
-                  <label className="text-xs font-semibold text-portal-soft">Pakai / produk<input type="number" min="0" step="any" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2 text-sm text-portal-ink" value={row.recipeQuantity} onChange={event => patch(row.id, 'recipeQuantity', numeric(event.target.value))} /></label>
-                  <label className="text-xs font-semibold text-portal-soft">Stok tersedia<input type="number" min="0" step="any" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2 text-sm text-portal-ink" value={row.availableQuantity} onChange={event => patch(row.id, 'availableQuantity', numeric(event.target.value))} /></label>
-                </div>
-                <p className="mt-2 text-[11px] text-portal-soft">Unit resep: {row.unitLabel} · biaya efektif {money.format(result?.effectiveUnitCost ?? 0)} / {row.unitLabel} · jumlah usable {number.format(result?.usableQuantity ?? 0)} {row.unitLabel}</p>
+                <details className="group mt-2">
+                  <summary className="flex cursor-pointer list-none items-center gap-1 text-[11px] font-bold text-portal-soft">Detail bahan <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /></summary>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <label className="text-xs font-semibold text-portal-soft">Harga beli<input type="number" min="0" className={input} value={row.purchasePrice} onChange={event => patch(row.id, 'purchasePrice', numeric(event.target.value))} /></label>
+                    <label className="text-xs font-semibold text-portal-soft">Jumlah beli<input type="number" min="0.0001" step="any" className={input} value={row.purchaseQuantity} onChange={event => patch(row.id, 'purchaseQuantity', numeric(event.target.value))} /></label>
+                    <label className="text-xs font-semibold text-portal-soft">Pakai / produk<input type="number" min="0" step="any" className={input} value={row.recipeQuantity} onChange={event => patch(row.id, 'recipeQuantity', numeric(event.target.value))} /></label>
+                    <label className="text-xs font-semibold text-portal-soft">Stok<input type="number" min="0" step="any" className={input} value={row.availableQuantity} onChange={event => patch(row.id, 'availableQuantity', numeric(event.target.value))} /></label>
+                  </div>
+                  <details className="mt-3 rounded-lg bg-[#fafbf9] p-3">
+                    <summary className="cursor-pointer text-[11px] font-bold text-portal-soft">Teknis perhitungan</summary>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      <label className="text-xs font-semibold text-portal-soft">Konversi<input type="number" min="0.0001" step="any" className={input} value={row.conversionFactor} onChange={event => patch(row.id, 'conversionFactor', numeric(event.target.value))} /></label>
+                      <label className="text-xs font-semibold text-portal-soft">Hasil terpakai %<input type="number" min="1" max="100" className={input} value={row.yieldPercent} onChange={event => patch(row.id, 'yieldPercent', numeric(event.target.value))} /></label>
+                      <label className="text-xs font-semibold text-portal-soft">Susut %<input type="number" min="0" max="99" className={input} value={row.wastePercent} onChange={event => patch(row.id, 'wastePercent', numeric(event.target.value))} /></label>
+                    </div>
+                  </details>
+                </details>
               </article>
             );
           })}
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="portal-panel p-4 sm:p-5">
-          <div className="flex items-start gap-3"><span className="portal-icon-tile"><PackagePlus className="h-4 w-4" /></span><div><h3 className="font-bold text-portal-ink">Kemasan memang bagian HPP</h3><p className="mt-1 text-sm leading-6 text-portal-soft">Cup, seal/lid, sedotan, plastik, sendok, es, topping, dan bahan yang terbuang sebaiknya masuk resep. Kalau tidak, margin terlihat lebih besar dari kondisi nyata.</p></div></div>
-          {capacity.bottleneck ? <div className="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p><strong>{capacity.bottleneck.name}</strong> adalah pembatas produksi. Dengan stok sekarang, produk ini hanya bisa dibuat sekitar <strong>{capacity.capacity} kali</strong>.</p></div> : null}
-        </div>
-        <div className="portal-panel p-4 sm:p-5">
-          <div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-portal-forest" /><p className="font-bold text-portal-ink">Cek harga jual</p></div>
-          <label className="mt-4 block text-xs font-semibold text-portal-soft">Harga jual offline<input type="number" min="0" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-base font-bold text-portal-ink" value={sellingPrice} onChange={event => setSellingPrice(numeric(event.target.value))} /></label>
-          <div className="mt-4 space-y-2 text-sm"><div className="flex justify-between"><span className="text-portal-soft">HPP</span><strong>{money.format(recipe.totalCost)}</strong></div><div className="flex justify-between"><span className="text-portal-soft">Sisa setelah HPP</span><strong>{money.format(grossProfit)}</strong></div><div className="flex justify-between"><span className="text-portal-soft">Margin kotor</span><strong>{number.format(margin)}%</strong></div></div>
         </div>
       </section>
     </div>

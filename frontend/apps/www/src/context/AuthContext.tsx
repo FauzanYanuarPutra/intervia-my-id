@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { buildLoginPath, isProtectedRoutePath } from '@/lib/authRoutes';
+import { shouldBlockForAuthLoading } from '@/lib/auth/authLoadingPolicy';
 import { saveAccountSnapshot } from '@/lib/accountVault';
 import { clearChatMessageCache } from '@/lib/chatMessageCache';
 import { getLocaleFromPathname, isSupportedLocale } from '@/lib/locale';
@@ -665,11 +666,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const consumerLoading = shouldBlockForAuthLoading(pathname, loading);
+
   return (
     <AuthContext.Provider
       value={{
         user,
-        loading,
+        loading: consumerLoading,
         accessToken,
         isAuthenticated: !!user,
         login,

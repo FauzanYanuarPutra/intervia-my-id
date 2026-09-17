@@ -232,4 +232,20 @@ describe('ExploreSearchResults public references', () => {
     );
     expect(errorHtml).toContain('data-testid="public-reference-card"');
   });
+
+  it('renders entity-shaped skeleton sections during initial loading', () => {
+    const html = renderToStaticMarkup(
+      <ExploreSearchResults
+        payload={emptyGlobalSearchResponse('kopi')}
+        loading
+        error={false}
+        locale="id"
+      />,
+    );
+
+    expect(html).toContain('data-testid="explore-search-skeleton"');
+    expect(html).toContain('data-skeleton-kind="products"');
+    expect(html).toContain('data-skeleton-kind="services"');
+    expect(html).toContain('data-skeleton-kind="businesses"');
+  });
 });
