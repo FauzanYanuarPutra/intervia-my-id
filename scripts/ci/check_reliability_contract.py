@@ -198,6 +198,23 @@ for marker in ("sha256sum -c", "pg_restore --list", "This does not replace an is
     if marker not in backup_verify_script:
         errors.append(f"backup verification script missing marker: {marker}")
 
+community_source = read("services/community_service/src/main.rs")
+community_rate_limit_migration = read(
+    "services/community_service/migrations/20260918010000_shared_rate_limit_counters.up.sql"
+)
+for marker in (
+    "community_rate_limit_counters",
+    "ON CONFLICT (rate_key, window_bucket)",
+    "run_rate_limit_cleanup",
+):
+    if marker not in community_source:
+        errors.append(f"Community shared rate limiter missing runtime marker: {marker}")
+for marker in ("PRIMARY KEY (rate_key, window_bucket)", "expires_at"):
+    if marker not in community_rate_limit_migration:
+        errors.append(f"Community shared rate limiter migration missing marker: {marker}")
+if "Mutex<RateLimitStore>" in community_source:
+    errors.append("Community rate limiting must not regress to per-replica in-memory state")
+
 for warning in warnings:
     print(f"WARNING: {warning}", file=sys.stderr)
 

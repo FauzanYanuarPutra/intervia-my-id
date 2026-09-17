@@ -29,7 +29,6 @@ use std::{
 use tokio::{
     io::{AsyncReadExt, AsyncSeekExt},
     net::TcpListener,
-    sync::Mutex,
     time::{sleep, timeout, Duration},
 };
 use tower_http::cors::CorsLayer;
@@ -62,22 +61,7 @@ type ApiResult<T> = Result<T, ApiError>;
 struct AppState {
     db: PgPool,
     jwt_secret: String,
-    rate_limits: Mutex<RateLimitStore>,
 }
-
-#[derive(Debug, Clone)]
-struct RateEntry {
-    count: u32,
-    reset_at: DateTime<Utc>,
-}
-
-struct RateLimitStore {
-    entries: HashMap<String, RateEntry>,
-    last_cleanup: DateTime<Utc>,
-}
-
-const MAX_RATE_LIMIT_ENTRIES: usize = 100_000;
-const RATE_LIMIT_CLEANUP_SECONDS: i64 = 60;
 
 #[derive(Debug)]
 struct ApiError {
@@ -1107,14 +1091,9 @@ async fn main() -> anyhow::Result<()> {
     verify_schema_contract(&db).await?;
     sync_forum_users_from_identity(&db).await;
 
-    let state = Arc::new(AppState {
-        db,
-        jwt_secret,
-        rate_limits: Mutex::new(RateLimitStore {
-            entries: HashMap::new(),
-            last_cleanup: Utc::now(),
-        }),
-    });
+    let state = Arc::new(AppState { db, jwt_secret });
+
+    tokio::spawn(run_rate_limit_cleanup(state.db.clone()));
 
     if let Ok(rabbitmq_url) = env::var("RABBITMQ_URL") {
         let consumer_db = state.db.clone();
@@ -1898,39 +1877,91 @@ async fn enforce_rate_limit(
     limit: u32,
     window_seconds: i64,
 ) -> ApiResult<()> {
-    let now = Utc::now();
-    let mut store = state.rate_limits.lock().await;
-    if now.signed_duration_since(store.last_cleanup).num_seconds() >= RATE_LIMIT_CLEANUP_SECONDS {
-        store.entries.retain(|_, entry| entry.reset_at > now);
-        store.last_cleanup = now;
-    }
-
-    if !store.entries.contains_key(&key) && store.entries.len() >= MAX_RATE_LIMIT_ENTRIES {
-        return Err(ApiError::new(
+    let window_seconds = window_seconds.max(1);
+    let count = sqlx::query_scalar::<_, i64>(
+        r#"
+        INSERT INTO community_rate_limit_counters (
+          rate_key,
+          window_bucket,
+          count,
+          expires_at
+        )
+        VALUES (
+          $1,
+          FLOOR(
+            EXTRACT(EPOCH FROM clock_timestamp())
+            / GREATEST($2::bigint, 1)
+          )::bigint,
+          1,
+          clock_timestamp()
+            + (GREATEST($2::bigint, 1) * INTERVAL '1 second')
+        )
+        ON CONFLICT (rate_key, window_bucket)
+        DO UPDATE
+        SET
+          count = community_rate_limit_counters.count + 1,
+          expires_at = GREATEST(
+            community_rate_limit_counters.expires_at,
+            EXCLUDED.expires_at
+          )
+        RETURNING count::bigint
+        "#,
+    )
+    .bind(key)
+    .bind(window_seconds)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|error| {
+        tracing::warn!(error = ?error, "shared rate limiter unavailable");
+        ApiError::new(
             StatusCode::SERVICE_UNAVAILABLE,
-            "Rate limit capacity reached",
-        ));
-    }
+            "Rate limit service unavailable",
+        )
+    })?;
 
-    let entry = store.entries.entry(key).or_insert_with(|| RateEntry {
-        count: 0,
-        reset_at: now + chrono::Duration::seconds(window_seconds),
-    });
-
-    if entry.reset_at <= now {
-        entry.count = 0;
-        entry.reset_at = now + chrono::Duration::seconds(window_seconds);
-    }
-
-    if entry.count >= limit {
+    if count > i64::from(limit) {
         return Err(ApiError::new(
             StatusCode::TOO_MANY_REQUESTS,
             "Rate limit exceeded",
         ));
     }
 
-    entry.count += 1;
     Ok(())
+}
+
+async fn run_rate_limit_cleanup(db: PgPool) {
+    loop {
+        sleep(Duration::from_secs(600)).await;
+        let result = sqlx::query(
+            r#"
+            WITH expired AS (
+              SELECT ctid
+              FROM community_rate_limit_counters
+              WHERE expires_at < now() - INTERVAL '1 hour'
+              ORDER BY expires_at ASC
+              LIMIT 5000
+            )
+            DELETE FROM community_rate_limit_counters AS counters
+            USING expired
+            WHERE counters.ctid = expired.ctid
+            "#,
+        )
+        .execute(&db)
+        .await;
+
+        match result {
+            Ok(result) if result.rows_affected() > 0 => {
+                tracing::info!(
+                    deleted = result.rows_affected(),
+                    "cleaned expired shared rate-limit counters"
+                );
+            }
+            Ok(_) => {}
+            Err(error) => {
+                tracing::warn!(error = ?error, "rate-limit cleanup failed");
+            }
+        }
+    }
 }
 
 async fn mutation_rate_limit(
