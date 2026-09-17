@@ -126,7 +126,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
             {article.articleKind === 'analysis' ? <span className="rounded-full bg-sky-100 px-3 py-1.5 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200">{isId ? 'Analisis' : 'Analysis'}</span> : null}
           </div>
           <h1 className="mt-5 max-w-4xl text-3xl font-bold tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">{article.title}</h1>
-          {article.summary ? <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
+          {!isRetracted && article.summary ? <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
               <CalendarDays className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
@@ -211,9 +211,11 @@ export default async function NewsArticlePage({ params }: PageProps) {
             <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{isId ? 'Tentang publikasi' : 'About this publication'}</p>
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">
-                {article.articleKind === 'press_release'
-                  ? (isId ? 'Rilis bisnis berasal dari pihak pengirim dan tetap melewati pemeriksaan editorial dasar sebelum dipublikasikan.' : 'Business releases originate from the submitting party and still pass basic editorial review before publication.')
-                  : (isId ? 'Artikel ini diterbitkan melalui alur editorial Lajukan News. Koreksi material dicatat pada artikel.' : 'This article is published through the Lajukan News editorial workflow. Material corrections are recorded on the article.')}
+                {isRetracted
+                  ? (isId ? 'Artikel ini telah ditarik dari publikasi. Halaman dipertahankan sebagai catatan transparansi dan konten lama tidak ditampilkan.' : 'This article has been retracted. The URL is retained for transparency and the old content is no longer displayed.')
+                  : article.articleKind === 'press_release'
+                    ? (isId ? 'Rilis bisnis berasal dari pihak pengirim dan tetap melewati pemeriksaan editorial dasar sebelum dipublikasikan.' : 'Business releases originate from the submitting party and still pass basic editorial review before publication.')
+                    : (isId ? 'Artikel ini diterbitkan melalui alur editorial Lajukan News. Koreksi material dicatat pada artikel.' : 'This article is published through the Lajukan News editorial workflow. Material corrections are recorded on the article.')}
               </p>
             </div>
             <Link href="/blog" data-news-action="related_clicked" className="block rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">

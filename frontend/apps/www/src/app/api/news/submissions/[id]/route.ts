@@ -71,10 +71,10 @@ export async function PATCH(
   const parsed = await parseJsonBody(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data as Record<string, unknown>;
-  const sources = sanitizeSources(body.source_urls);
+  const sources = body.source_urls === undefined ? undefined : sanitizeSources(body.source_urls);
   const topics = body.topics === undefined ? undefined : sanitizeTopics(body.topics);
   const kind = readString(body.article_kind);
-  if (kind !== 'press_release' && sources.length === 0) {
+  if (sources !== undefined && kind !== 'press_release' && sources.length === 0) {
     return NextResponse.json(
       { error: 'Berita dan analisis membutuhkan minimal satu URL sumber.' },
       { status: 422 },
