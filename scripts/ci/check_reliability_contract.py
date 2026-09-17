@@ -54,7 +54,15 @@ for marker in (
     if marker not in observability_compose:
         errors.append(f"observability overlay missing pinned component/profile: {marker}")
 
-for marker in ("blackbox_http", "blackbox_tcp", "postgres_identity", "redis"):
+for marker in (
+    "blackbox_http",
+    "blackbox_tcp",
+    "postgres_identity",
+    "redis",
+    "identity_app",
+    "marketplace_app",
+    "community_app",
+):
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
@@ -89,6 +97,8 @@ for marker in (
 
 if "reverse_proxy" not in caddy:
     errors.append("production Caddy config has no reverse proxy")
+if "@internal_metrics path /metrics" not in caddy:
+    errors.append("production edge must block private /metrics endpoints")
 if "127.0.0.1" in caddy or "localhost:" in caddy:
     errors.append("production Caddy upstreams must use internal service discovery, not localhost")
 
@@ -147,3 +157,14 @@ if errors:
     raise SystemExit(1)
 
 print("Reliability architecture contract OK")
+
+
+for path in (
+    "services/identity_service/src/main.rs",
+    "services/marketplace_service/src/main.rs",
+    "services/community_service/src/main.rs",
+):
+    source = read(path)
+    for marker in ('route("/ready"', 'route("/metrics"', "with_graceful_shutdown"):
+        if marker not in source:
+            errors.append(f"{path} missing runtime reliability marker: {marker}")

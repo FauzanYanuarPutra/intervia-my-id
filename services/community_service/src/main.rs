@@ -1172,6 +1172,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .route("/health", get(health))
         .route("/ready", get(ready))
+        .route("/metrics", get(service_metrics))
         .route("/v1/community/profile/sync", post(sync_current_profile))
         .route(
             "/v1/community/users/{user_id}/social",
@@ -1844,6 +1845,51 @@ fn request_ip(headers: &HeaderMap) -> String {
         .filter(|value| !value.is_empty())
         .unwrap_or("unknown")
         .to_string()
+}
+
+
+async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let pool_size = state.db.size();
+    let pool_idle = state.db.num_idle();
+    let (outbox_backlog, metrics_query_ok) = match timeout(
+        Duration::from_secs(2),
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status IN ('pending', 'failed')",
+        )
+        .fetch_one(&state.db),
+    )
+    .await
+    {
+        Ok(Ok(value)) => (value, 1),
+        Ok(Err(_)) | Err(_) => (0, 0),
+    };
+
+    let body = format!(
+        concat!(
+            "# HELP lajukan_service_info Static service identity.\n",
+            "# TYPE lajukan_service_info gauge\n",
+            "lajukan_service_info{{service=\"community_service\"}} 1\n",
+            "# HELP lajukan_db_pool_connections PostgreSQL pool connections by state.\n",
+            "# TYPE lajukan_db_pool_connections gauge\n",
+            "lajukan_db_pool_connections{{service=\"community_service\",state=\"total\"}} {}\n",
+            "lajukan_db_pool_connections{{service=\"community_service\",state=\"idle\"}} {}\n",
+            "# HELP lajukan_outbox_backlog Pending or failed transactional outbox events.\n",
+            "# TYPE lajukan_outbox_backlog gauge\n",
+            "lajukan_outbox_backlog{{service=\"community_service\"}} {}\n",
+            "# HELP lajukan_metrics_db_query_ok Whether the metrics DB query succeeded.\n",
+            "# TYPE lajukan_metrics_db_query_ok gauge\n",
+            "lajukan_metrics_db_query_ok{{service=\"community_service\"}} {}\n"
+        ),
+        pool_size, pool_idle, outbox_backlog, metrics_query_ok
+    );
+
+    (
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
+        body,
+    )
 }
 
 async fn enforce_rate_limit(

@@ -40,6 +40,21 @@ scrape_configs:
     static_configs:
       - targets: ["redis_exporter:9121"]
 
+  - job_name: "identity_app"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["identity_service:8080"]
+
+  - job_name: "marketplace_app"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["marketplace_service:8081"]
+
+  - job_name: "community_app"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["community_service:8082"]
+
   - job_name: "blackbox_http"
     metrics_path: /probe
     params:

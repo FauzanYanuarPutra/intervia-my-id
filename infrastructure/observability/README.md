@@ -29,10 +29,13 @@ internal gateway.
 - application/data readiness through blackbox HTTP/TCP probes;
 - Prometheus self-health and alert-rule evaluation.
 
-The Rust/Phoenix applications do not currently expose a complete Prometheus
-application metric surface. Do not pretend they do. Add request latency,
-request count, error rate, pool saturation, outbox backlog, queue lag and
-domain-specific metrics inside each service in later slices.
+Identity, Marketplace and Community expose a deliberately small internal
+Prometheus surface: database pool total/idle connections, transactional outbox
+backlog and metrics-query health. Marketplace also exposes active realtime
+notification subscriber count. This is not a complete application metric
+surface. Request latency/count/error metrics, queue lag and richer domain
+metrics remain later slices and must be added from real code paths rather than
+invented at the dashboard layer.
 
 ## Security
 

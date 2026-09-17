@@ -36,6 +36,7 @@ use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
     get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_users, login,
     login_phone, logout, me, oauth_google, ready_check, refresh_token, register, reset_password,
+    service_metrics,
     update_me_profile,
 };
 
@@ -486,6 +487,7 @@ async fn main() -> Result<()> {
     let mut app = Router::new()
         .route("/health", get(health_check))
         .route("/ready", get(ready_check))
+        .route("/metrics", get(service_metrics))
         .nest(
             "/auth",
             Router::new()
