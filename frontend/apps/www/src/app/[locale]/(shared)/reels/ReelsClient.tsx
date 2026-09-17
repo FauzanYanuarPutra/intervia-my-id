@@ -2747,11 +2747,11 @@ export default function ReelsClient({
 
   return (
     <main
-      className="ui-layer-header fixed inset-x-0 bottom-0 top-[var(--app-viewport-offset-top)] isolate min-h-0 w-full min-w-0 overflow-hidden overscroll-none bg-[#090909] text-white [touch-action:pan-y]"
+      className="ui-layer-header fixed inset-x-0 bottom-0 top-[var(--app-viewport-offset-top)] isolate min-h-0 w-full min-w-0 overflow-hidden overscroll-none bg-[#090909] text-white [touch-action:pan-y] [text-size-adjust:100%]"
       data-reels-performance={performanceProfile.tier}
     >
       <div className="relative h-full min-h-0 w-full overflow-hidden bg-[#090909]">
-        <div className="relative mx-auto grid h-full min-h-0 w-full min-w-0 grid-cols-1 overflow-hidden bg-[#090909] sm:max-w-[560px] sm:justify-center xl:max-w-[1040px] xl:grid-cols-[220px_minmax(0,600px)] 2xl:max-w-[1380px] 2xl:grid-cols-[240px_minmax(0,620px)_360px]">
+        <div className="relative mx-auto grid h-full min-h-0 w-full min-w-0 grid-cols-1 overflow-hidden bg-[#090909] md:max-w-[720px] lg:max-w-[820px] xl:max-w-[1040px] xl:grid-cols-[220px_minmax(0,820px)] 2xl:max-w-[1440px] 2xl:grid-cols-[230px_minmax(0,760px)_minmax(320px,450px)]">
           <ReelsDesktopSidebar
             locale={locale}
             feedTab={feedTab}
@@ -2765,7 +2765,7 @@ export default function ReelsClient({
             onResetRecommendations={resetRecommendations}
           />
 
-          <section className="relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-black sm:border-x sm:border-white/10 lg:w-full">
+          <section className="relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-black md:ring-1 md:ring-white/[0.06] xl:border-x xl:border-white/10 xl:ring-0">
             <ReelsTopBar
               locale={locale}
               searchQuery={activeSearchQuery}
@@ -3198,7 +3198,7 @@ function ReelsDesktopSidebar({
       : ['supplier', 'packaging', 'kuliner', 'reseller', 'export', 'cashflow'];
 
   return (
-    <aside className="hidden h-full min-h-0 flex-col border-r border-white/10 bg-[#080808] px-4 py-4 text-white xl:flex xl:px-5">
+    <aside className="hidden h-full min-h-0 flex-col border-r border-white/10 bg-[#080808] px-3.5 py-3.5 text-white xl:flex 2xl:px-4">
       <div className="flex items-center gap-3">
         <Link
           href={`/${locale}/home`}
@@ -3219,7 +3219,7 @@ function ReelsDesktopSidebar({
       <button
         type="button"
         onClick={() => onOpenSearch()}
-        className="mt-5 flex min-h-11 items-center gap-3 rounded-[14px] bg-white/8 px-3.5 text-left text-sm font-semibold text-white/72 ring-1 ring-white/10 transition hover:bg-white/12 hover:text-white"
+        className="mt-4 flex min-h-10 items-center gap-2.5 rounded-xl bg-white/[0.07] px-3 text-left text-xs font-semibold text-white/70 ring-1 ring-white/10 transition hover:bg-white/12 hover:text-white"
         data-testid="reels-search-button"
       >
         <Search className="h-4.5 w-4.5 shrink-0" />
@@ -3228,7 +3228,7 @@ function ReelsDesktopSidebar({
         </span>
       </button>
 
-      <nav className="mt-4 space-y-1">
+      <nav className="mt-3 space-y-1">
         {feedItems.map(item => {
           const ItemIcon = item.icon;
           const active = feedTab === item.id;
@@ -3239,7 +3239,7 @@ function ReelsDesktopSidebar({
               onClick={() => onFeedTabChange(item.id)}
               aria-pressed={active}
               className={cn(
-                'flex min-h-12 w-full items-center gap-3 rounded-[14px] px-3 text-left transition',
+                'flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left transition',
                 active
                   ? 'bg-white text-slate-950'
                   : 'text-white/72 hover:bg-white/8 hover:text-white',
@@ -3286,7 +3286,7 @@ function ReelsDesktopSidebar({
         </Link>
       </nav>
 
-      <div className="mt-5 border-t border-white/10 pt-4">
+      <div className="mt-4 border-t border-white/10 pt-3.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 text-sm font-bold">
             <Sparkles className="h-4 w-4 shrink-0 text-emerald-300" />
@@ -3316,7 +3316,7 @@ function ReelsDesktopSidebar({
         </div>
       </div>
 
-      <div className="mt-auto space-y-3 pt-5">
+      <div className="mt-auto space-y-2.5 pt-4">
         <button
           type="button"
           onClick={onOpenUpload}
@@ -3776,13 +3776,13 @@ function ReelsTopBar({
   ];
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/85 via-black/35 to-transparent pb-6 pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] pt-[calc(env(safe-area-inset-top)+6px)] sm:pl-[calc(env(safe-area-inset-left)+14px)] sm:pr-[calc(env(safe-area-inset-right)+14px)]">
-      <div className="pointer-events-auto grid min-h-11 min-w-0 grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-1.5">
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/88 via-black/32 to-transparent pb-5 pl-[calc(env(safe-area-inset-left)+8px)] pr-[calc(env(safe-area-inset-right)+8px)] pt-[calc(env(safe-area-inset-top)+6px)] min-[390px]:pl-[calc(env(safe-area-inset-left)+10px)] min-[390px]:pr-[calc(env(safe-area-inset-right)+10px)] sm:pl-[calc(env(safe-area-inset-left)+14px)] sm:pr-[calc(env(safe-area-inset-right)+14px)]">
+      <div className="pointer-events-auto grid min-h-10 min-w-0 grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-1 min-[390px]:grid-cols-[40px_minmax(0,1fr)_auto] min-[390px]:gap-1.5">
         <button
           type="button"
           onClick={handleBack}
           aria-label={isId ? 'Kembali' : 'Back'}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/38 font-bold text-white ring-1 ring-white/12 transition hover:bg-black/55 active:scale-95"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/40 font-bold text-white ring-1 ring-white/12 transition hover:bg-black/55 active:scale-95 min-[390px]:h-10 min-[390px]:w-10"
         >
           <ArrowLeft className="h-[19px] w-[19px]" />
         </button>
@@ -3798,7 +3798,7 @@ function ReelsTopBar({
                   onClick={() => onFeedTabChange(tab.id)}
                   aria-pressed={active}
                   className={cn(
-                    'relative min-h-8 min-w-0 rounded-full px-1.5 text-[9px] font-bold transition min-[360px]:px-2 min-[360px]:text-[10px] min-[390px]:px-2.5 min-[390px]:text-[11px]',
+                    'relative min-h-8 min-w-0 rounded-full px-1.5 text-[10px] font-bold transition min-[360px]:px-2 min-[390px]:px-2.5 min-[390px]:text-[11px]',
                     active
                       ? 'bg-white text-slate-950 shadow-sm'
                       : 'text-white/70 hover:text-white',
@@ -3826,7 +3826,7 @@ function ReelsTopBar({
           </button>
         </div>
 
-        <div className="flex h-11 min-w-0 shrink-0 items-center justify-end gap-1">
+        <div className="flex min-h-10 min-w-0 shrink-0 items-center justify-end gap-1">
           <Link
             href={`/${locale}/manage/reels`}
             aria-label={isId ? 'Kelola Reels' : 'Manage Reels'}
@@ -3838,7 +3838,7 @@ function ReelsTopBar({
             type="button"
             onClick={onOpenSearch}
             aria-label={isId ? 'Cari Reels' : 'Search Reels'}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/38 text-white ring-1 ring-white/12 transition hover:bg-black/55 active:scale-95 max-[350px]:h-9 max-[350px]:w-9"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/40 text-white ring-1 ring-white/12 transition hover:bg-black/55 active:scale-95 min-[390px]:h-10 min-[390px]:w-10"
           >
             <Search className="h-[18px] w-[18px]" />
           </button>
@@ -3846,7 +3846,7 @@ function ReelsTopBar({
             type="button"
             onClick={onOpenUpload}
             aria-label={isId ? 'Buat Reels' : 'Create Reels'}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-lg shadow-black/25 transition hover:bg-emerald-100 active:scale-95 max-[350px]:h-9 max-[350px]:w-9"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-lg shadow-black/25 transition hover:bg-emerald-100 active:scale-95 min-[390px]:h-10 min-[390px]:w-10"
             data-testid="reels-create-button"
           >
             <Plus className="h-[19px] w-[19px] stroke-[2.8]" />
@@ -4263,7 +4263,7 @@ function ReelSlide({
   if (!shouldLoad) {
     return (
       <article
-        className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden bg-black pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[calc(env(safe-area-inset-left)+12px)] pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
+        className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden bg-black pb-[calc(env(safe-area-inset-bottom)+10px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] min-[390px]:pl-[calc(env(safe-area-inset-left)+12px)] min-[390px]:pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
         style={REEL_SLIDE_PLACEHOLDER_STYLE}
         aria-hidden="true"
       >
@@ -4279,7 +4279,7 @@ function ReelSlide({
 
   return (
     <article
-      className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden !bg-black !text-white pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[calc(env(safe-area-inset-left)+12px)] pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
+      className="relative flex h-full max-h-full min-h-full w-full min-w-0 snap-start overflow-hidden !bg-black !text-white pb-[calc(env(safe-area-inset-bottom)+10px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] min-[390px]:pl-[calc(env(safe-area-inset-left)+12px)] min-[390px]:pr-[calc(env(safe-area-inset-right)+12px)] sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]"
       style={REEL_SLIDE_LOADED_STYLE}
       data-reel-id={reel.id}
     >
@@ -4401,12 +4401,12 @@ function ReelSlide({
         </button>
       ) : null}
 
-      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[max(10px,env(safe-area-inset-left))] pr-[calc(env(safe-area-inset-right)+66px)] text-white min-[390px]:pl-[max(12px,env(safe-area-inset-left))] min-[390px]:pr-[calc(env(safe-area-inset-right)+72px)] sm:pl-[max(16px,env(safe-area-inset-left))] sm:pr-[calc(env(safe-area-inset-right)+80px)]">
+      <div className="absolute inset-x-0 bottom-0 z-20 min-w-0 pb-[calc(env(safe-area-inset-bottom)+10px)] pl-[max(10px,env(safe-area-inset-left))] pr-[calc(env(safe-area-inset-right)+58px)] text-white min-[390px]:pl-[max(12px,env(safe-area-inset-left))] min-[390px]:pr-[calc(env(safe-area-inset-right)+64px)] sm:pl-[max(16px,env(safe-area-inset-left))] sm:pr-[calc(env(safe-area-inset-right)+70px)]">
         <div className="flex min-w-0 items-center gap-1.5">
           <button
             type="button"
             onClick={onOpenCreatorProfile}
-            className="min-h-8 min-w-0 truncate text-left text-[14px] font-extrabold drop-shadow"
+            className="min-h-8 min-w-0 truncate text-left text-[13px] font-extrabold drop-shadow min-[390px]:text-[14px]"
           >
             @{reel.creator}
           </button>
@@ -4429,7 +4429,7 @@ function ReelSlide({
           ) : null}
         </div>
 
-        <div className="mt-0.5 text-[12px] font-medium leading-[18px] text-white/92 drop-shadow sm:text-[13px]">
+        <div className="mt-0.5 text-[11px] font-medium leading-[16px] text-white/92 drop-shadow min-[390px]:text-[12px] min-[390px]:leading-[18px] sm:text-[13px]">
           <ExpandableCaption
             text={
               reel.caption.toLowerCase().includes(`#${reel.tag.replace(/^#/, '').toLowerCase()}`)
@@ -4452,7 +4452,7 @@ function ReelSlide({
           <button
             type="button"
             onClick={onOpenProduct}
-            className="mt-2 inline-flex min-h-10 max-w-full items-center gap-2 rounded-[12px] bg-white/95 px-3 text-left text-[11px] font-bold text-slate-950 shadow-lg ring-1 ring-white/60 transition active:scale-[0.98]"
+            className="mt-1.5 inline-flex min-h-9 max-w-full items-center gap-2 rounded-xl bg-white/95 px-2.5 text-left text-[10px] font-bold text-slate-950 shadow-lg ring-1 ring-white/60 transition active:scale-[0.98] min-[390px]:min-h-10 min-[390px]:px-3 min-[390px]:text-[11px]"
           >
             <ShoppingBag className="h-4 w-4 shrink-0 text-emerald-700" />
             <span className="min-w-0 truncate">{reel.productName}</span>
@@ -4607,8 +4607,8 @@ function ActionRail({
   ];
 
   return (
-    <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+82px)] right-[max(6px,env(safe-area-inset-right))] z-30 flex origin-bottom-right flex-col items-center gap-1.5 sm:right-[calc(env(safe-area-inset-right)+10px)] max-[370px]:scale-[0.9]">
-      <div className="relative mb-1.5 flex h-[50px] w-[50px] items-center justify-center">
+    <div className="absolute bottom-[max(68px,calc(env(safe-area-inset-bottom)+66px))] right-[max(5px,env(safe-area-inset-right))] z-30 flex origin-bottom-right flex-col items-center gap-1 sm:right-[calc(env(safe-area-inset-right)+8px)] max-[380px]:scale-[0.88] [@media(max-height:720px)]:scale-[0.88]">
+      <div className="relative mb-1 flex h-11 w-11 items-center justify-center min-[390px]:h-12 min-[390px]:w-12">
         <Link
           href={profileHref}
           aria-label={
@@ -4621,7 +4621,7 @@ function ActionRail({
           <ReelCreatorAvatar
             reel={reel}
             className="h-full w-full rounded-full object-cover"
-            size={50}
+            size={48}
           />
         </Link>
 
@@ -4664,12 +4664,12 @@ function ActionRail({
             disabled={action.loading || action.disabled}
             aria-label={action.ariaLabel}
             title={action.ariaLabel}
-            className="flex max-w-[48px] flex-col items-center gap-0.5 transition active:scale-95 disabled:opacity-45"
+            className="flex max-w-11 flex-col items-center gap-0.5 transition active:scale-95 disabled:opacity-45 min-[390px]:max-w-12"
             data-testid={`reels-action-${action.key}`}
           >
             <span
               className={cn(
-                '!grid !h-11 !w-11 place-items-center rounded-full !bg-black/[0.32] !text-white shadow-md shadow-black/25 ring-1 ring-white/10 transition',
+                '!grid !h-10 !w-10 place-items-center rounded-full !bg-black/[0.34] !text-white shadow-md shadow-black/25 ring-1 ring-white/10 transition min-[390px]:!h-11 min-[390px]:!w-11',
                 action.key === 'like' && action.active && '!text-rose-500',
                 action.key === 'save' && action.active && '!text-yellow-300',
               )}
@@ -4679,7 +4679,7 @@ function ActionRail({
               ) : (
                 <ActionIcon
                   className={cn(
-                    '!h-[22px] !w-[22px] fill-none stroke-current stroke-[2.45]',
+                    '!h-5 !w-5 fill-none stroke-current stroke-[2.45] min-[390px]:!h-[22px] min-[390px]:!w-[22px]',
                     action.active && 'fill-current',
                   )}
                 />
@@ -4827,8 +4827,8 @@ function SearchOverlay({
 
   return (
     <section className="ui-layer-header fixed inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#050505] text-white">
-      <header className="shrink-0 border-b border-white/10 bg-black/95 pb-3 pl-[calc(env(safe-area-inset-left)+12px)] pr-[calc(env(safe-area-inset-right)+12px)] pt-[calc(env(safe-area-inset-top)+10px)] sm:pb-4 sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]">
-        <div className="mx-auto flex w-full min-w-0 max-w-[1440px] items-center gap-2 sm:gap-3">
+      <header className="shrink-0 border-b border-white/10 bg-black/96 pb-2.5 pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] pt-[calc(env(safe-area-inset-top)+8px)] sm:pb-3 sm:pl-[calc(env(safe-area-inset-left)+16px)] sm:pr-[calc(env(safe-area-inset-right)+16px)]">
+        <div className="mx-auto flex w-full min-w-0 max-w-[1280px] items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -4875,7 +4875,7 @@ function SearchOverlay({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onWheel={onWheel}
-          className="mx-auto mt-3 flex w-full max-w-[1440px] gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+          className="mx-auto mt-3 flex w-full max-w-[1280px] gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
         >
           {chips.map(chip => {
             const active = query === chip || (!query && chip === 'Semua');
@@ -4898,7 +4898,7 @@ function SearchOverlay({
           })}
         </div>
 
-        <div className="mx-auto mt-3 flex w-full max-w-[1440px] items-center gap-2 rounded-[14px] bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/60 ring-1 ring-white/10">
+        <div className="mx-auto mt-3 flex w-full max-w-[1280px] items-center gap-2 rounded-[14px] bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/60 ring-1 ring-white/10">
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
           <span className="min-w-0 flex-1 truncate">
             Watch time, like, simpan, share, pencarian, dan buka produk membantu menyesuaikan Untukmu.
@@ -4919,7 +4919,7 @@ function SearchOverlay({
         onScroll={handleResultsScroll}
         className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+24px)] pl-[calc(env(safe-area-inset-left)+10px)] pr-[calc(env(safe-area-inset-right)+10px)] pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:pl-[calc(env(safe-area-inset-left)+20px)] sm:pr-[calc(env(safe-area-inset-right)+20px)]"
       >
-        <div className="mx-auto w-full max-w-[1440px]">
+        <div className="mx-auto w-full max-w-[1280px]">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-white/45">
@@ -4936,7 +4936,7 @@ function SearchOverlay({
           </div>
 
           {results.length > 0 ? (
-            <div className="grid min-w-0 grid-cols-2 gap-2 min-[480px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+            <div className="grid min-w-0 grid-cols-2 gap-2 min-[520px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {results.map(({ item, index }) => (
                 <SearchVideoCard
                   key={item.id}
@@ -5133,7 +5133,7 @@ function DetailOverlay({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/68 p-0 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/72 p-0 text-white backdrop-blur-[2px] sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/48 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
@@ -5144,7 +5144,7 @@ function DetailOverlay({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[30px] bg-[#080808] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[620px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[440px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10">
+      <section className="relative flex max-h-[94dvh] w-full min-w-0 flex-col overflow-hidden rounded-t-3xl bg-[#080808] text-white shadow-2xl sm:max-h-[88dvh] sm:max-w-[620px] sm:rounded-3xl lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/24 lg:hidden" />
         <div className="relative h-[clamp(180px,34dvh,340px)] shrink-0 overflow-hidden bg-black lg:h-[260px]">
           {imageMedia ? (
@@ -5340,7 +5340,7 @@ function DetailOverlay({
             </div>
           )}
 
-          <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 min-[430px]:grid-cols-3">
             <StatPill
               label="Like"
               value={formatCompactMetric(metricCount(reel, 'likes'))}
@@ -5355,7 +5355,7 @@ function DetailOverlay({
             />
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 min-[430px]:grid-cols-3">
             <button
               type="button"
               onClick={() => onOpenComments(reel)}
@@ -5433,7 +5433,7 @@ function CreatorProfileSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white sm:items-center sm:justify-center sm:p-4"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/70 text-white backdrop-blur-[2px] sm:items-center sm:justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -5444,7 +5444,7 @@ function CreatorProfileSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl ring-1 ring-white/10 sm:max-h-[calc(100dvh-32px)] sm:max-w-[460px] sm:rounded-[24px]">
+      <section className="relative max-h-[92dvh] w-full min-w-0 overflow-y-auto rounded-t-3xl bg-[#0b0f14] text-white shadow-2xl ring-1 ring-white/10 sm:max-h-[86dvh] sm:max-w-[480px] sm:rounded-3xl">
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">
@@ -5471,7 +5471,7 @@ function CreatorProfileSheet({
             </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 min-[430px]:grid-cols-3">
             <CreatorStatCell
               label="Followers"
               value={formatCompactMetric(stats.followers)}
@@ -6114,7 +6114,7 @@ function ShareSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/70 text-white backdrop-blur-[2px] sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/48 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
@@ -6125,7 +6125,7 @@ function ShareSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[620px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+      <section className="relative flex max-h-[94dvh] w-full min-w-0 flex-col overflow-hidden rounded-t-3xl bg-[#0b0f14] text-white shadow-2xl sm:max-h-[88dvh] sm:max-w-[620px] sm:rounded-3xl lg:h-full lg:max-h-none lg:w-[min(480px,42vw)] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-white">
@@ -6532,7 +6532,7 @@ function MoreActionsSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/70 text-white backdrop-blur-[2px] sm:items-center sm:justify-center sm:p-4 lg:items-stretch lg:justify-end lg:bg-black/48 lg:p-0"
       role="dialog"
       aria-modal="true"
     >
@@ -6543,7 +6543,7 @@ function MoreActionsSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[26px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[520px] sm:rounded-[24px] lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10">
+      <section className="relative max-h-[90dvh] w-full min-w-0 overflow-y-auto rounded-t-3xl bg-[#0b0f14] text-white shadow-2xl sm:max-h-[84dvh] sm:max-w-[520px] sm:rounded-3xl lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10">
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
@@ -6562,7 +6562,7 @@ function MoreActionsSheet({
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] sm:grid-cols-4 lg:grid-cols-2 lg:pb-5">
+        <div className="grid grid-cols-2 gap-2 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] min-[390px]:grid-cols-3 min-[520px]:grid-cols-4 sm:px-4 lg:grid-cols-2 lg:pb-5">
           {actions.map(action => {
             const ActionIcon = action.icon;
             return (
@@ -6644,12 +6644,12 @@ function WhyRecommendationSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white sm:items-center sm:justify-center sm:p-4"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/70 text-white backdrop-blur-[2px] sm:items-center sm:justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
     >
       <button type="button" className="absolute inset-0" onClick={onClose} aria-label={isId ? 'Tutup' : 'Close'} />
-      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[26px] bg-[#0b0f14] p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-white/10 sm:max-h-[calc(100dvh-32px)] sm:max-w-[460px] sm:rounded-[22px]">
+      <section className="relative max-h-[90dvh] w-full min-w-0 overflow-y-auto rounded-t-3xl bg-[#0b0f14] p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-white/10 sm:max-h-[84dvh] sm:max-w-[480px] sm:rounded-3xl">
         <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -6768,7 +6768,7 @@ function CommentsSheet({
         className="absolute inset-0 z-0"
       />
 
-      <section className="relative z-10 flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[620px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+      <section className="relative z-10 flex max-h-[94dvh] w-full min-w-0 flex-col overflow-hidden rounded-t-3xl bg-[#0b0f14] text-white shadow-2xl sm:max-h-[88dvh] sm:max-w-[620px] sm:rounded-3xl lg:h-full lg:max-h-none lg:w-[min(480px,42vw)] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
   <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
 
   <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -7051,7 +7051,7 @@ function ProductSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[calc(100dvh-8px)] w-full min-w-0 flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[560px] sm:rounded-[28px] lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
+      <section className="relative flex max-h-[92dvh] w-full min-w-0 flex-col overflow-hidden rounded-t-3xl bg-[#0b0f14] text-white shadow-2xl sm:max-h-[86dvh] sm:max-w-[560px] sm:rounded-3xl lg:h-full lg:max-h-none lg:w-[min(440px,40vw)] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-start justify-between gap-3 p-4">
           <div className="min-w-0">
@@ -8215,7 +8215,7 @@ function UploadReelSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/80 text-slate-950 md:items-center md:justify-center md:p-4 dark:text-white"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/88 text-slate-950 backdrop-blur-[2px] md:items-center md:justify-center md:p-3 lg:p-5 dark:text-white"
       role="dialog"
       aria-modal="true"
       aria-label={locale === 'id' ? 'Buat Reels' : 'Create Reel'}
@@ -8231,10 +8231,10 @@ function UploadReelSheet({
         onSubmit={submit}
         data-lajukan-reels-studio="true"
         className={cn(
-          'relative flex h-[100dvh] max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-white shadow-2xl dark:bg-[#050505] md:h-[min(900px,calc(100dvh-2rem))] md:max-h-[calc(100dvh-2rem)]',
+          'relative flex h-[100dvh] max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-white shadow-2xl dark:bg-[#050505] md:h-[min(900px,calc(100dvh-1.5rem))] md:max-h-[calc(100dvh-1.5rem)]',
           step === 'media'
-            ? 'md:max-w-[470px] md:rounded-[30px]'
-            : 'md:max-w-[1000px] md:rounded-[28px]',
+            ? 'md:max-w-[480px] md:rounded-3xl'
+            : 'md:max-w-[1040px] md:rounded-3xl',
         )}
       >
         {step === 'media' ? (
@@ -8316,7 +8316,7 @@ function UploadReelSheet({
               )}
             </div>
 
-            <div className="absolute right-[max(10px,env(safe-area-inset-right))] top-[calc(env(safe-area-inset-top)+66px)] z-20 flex flex-col items-center gap-2.5">
+            <div className="absolute right-[max(8px,env(safe-area-inset-right))] top-[calc(env(safe-area-inset-top)+62px)] z-20 flex flex-col items-center gap-2 [@media(max-height:720px)]:gap-1.5">
               {[
                 {
                   label: locale === 'id' ? 'Balik' : 'Flip',
@@ -8346,9 +8346,9 @@ function UploadReelSheet({
                     key={tool.label}
                     type="button"
                     onClick={tool.onClick}
-                    className="flex w-[48px] flex-col items-center gap-1 text-[9px] font-bold text-white drop-shadow min-[390px]:w-[52px] min-[390px]:text-[10px]"
+                    className="flex w-11 flex-col items-center gap-1 text-[9px] font-bold text-white drop-shadow min-[390px]:w-12 min-[390px]:text-[10px]"
                   >
-                    <span className="grid h-9 w-9 place-items-center rounded-full bg-black/42 ring-1 ring-white/12 min-[390px]:h-10 min-[390px]:w-10">
+                    <span className="grid h-9 w-9 place-items-center rounded-full bg-black/45 ring-1 ring-white/12 min-[390px]:h-10 min-[390px]:w-10">
                       <ToolIcon className="h-[18px] w-[18px]" />
                     </span>
                     <span className="max-w-full truncate">{tool.label}</span>
@@ -8397,7 +8397,7 @@ function UploadReelSheet({
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 min-[390px]:px-7">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center px-3 min-[390px]:px-5 sm:px-7">
                 <label className="justify-self-start cursor-pointer">
                   <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-[14px] bg-white/14 ring-1 ring-white/15">
                     <Images className="h-5 w-5" />
@@ -8414,7 +8414,7 @@ function UploadReelSheet({
                   type="button"
                   onClick={handleStudioCapture}
                   className={cn(
-                    'grid h-[68px] w-[68px] place-items-center rounded-full border-4 border-white shadow-2xl transition active:scale-95 min-[390px]:h-[76px] min-[390px]:w-[76px] min-[390px]:border-[5px]',
+                    'grid h-16 w-16 place-items-center rounded-full border-4 border-white shadow-2xl transition active:scale-95 min-[390px]:h-[72px] min-[390px]:w-[72px] min-[390px]:border-[5px]',
                     recording ? 'bg-rose-500' : studioMode === 'live' ? 'bg-rose-500/85' : 'bg-white/18',
                   )}
                   aria-label={locale === 'id' ? 'Rekam video' : 'Record video'}
@@ -8456,7 +8456,7 @@ function UploadReelSheet({
           </section>
         ) : (
           <>
-            <header className="flex min-h-[58px] shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-3 dark:border-white/10 sm:px-4">
+            <header className="flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-3 dark:border-white/10 sm:px-4">
               <button
                 type="button"
                 onClick={() => setStep(step === 'post' ? 'edit' : 'media')}
@@ -8485,9 +8485,9 @@ function UploadReelSheet({
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 dark:bg-[#0b0b0b]">
               {step === 'edit' ? (
-                <div className="mx-auto grid min-h-full w-full max-w-[900px] gap-4 p-3 sm:p-4 md:grid-cols-[minmax(250px,340px)_minmax(0,1fr)] md:items-start">
-                  <div className="mx-auto w-full max-w-[260px] md:max-w-[340px]">
-                    <div className="relative aspect-[9/16] max-h-[46dvh] overflow-hidden rounded-[20px] bg-black shadow-xl sm:max-h-[52dvh] md:max-h-[calc(100dvh-8rem)] md:rounded-[22px]">
+                <div className="mx-auto grid min-h-full w-full max-w-[940px] gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-[minmax(220px,320px)_minmax(0,1fr)] md:items-start">
+                  <div className="mx-auto w-full max-w-[230px] min-[390px]:max-w-[260px] md:max-w-[320px]">
+                    <div className="relative aspect-[9/16] max-h-[42dvh] overflow-hidden rounded-2xl bg-black shadow-xl min-[390px]:max-h-[48dvh] sm:max-h-[52dvh] md:max-h-[calc(100dvh-7rem)] md:rounded-[22px]">
                       {mediaPreviewSrc ? (
                         isImageMedia ? (
                           <img src={mediaPreviewSrc} alt="Preview" className="h-full w-full object-cover" style={previewMediaStyle} />
@@ -8505,7 +8505,7 @@ function UploadReelSheet({
                   <div className="space-y-4 rounded-[22px] bg-white p-3 shadow-sm ring-1 ring-slate-200 dark:bg-[#151515] dark:ring-white/10 sm:p-4">
                     <div>
                       <p className="text-sm font-extrabold">{locale === 'id' ? 'Edit cepat' : 'Quick edit'}</p>
-                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="mt-3 grid grid-cols-2 gap-2 min-[520px]:grid-cols-4">
                         {[
                           { label: 'Audio', icon: Music, action: () => setStudioPanel('music') },
                           { label: 'Filter', icon: Sparkles, action: () => setStudioPanel('filters') },
@@ -8518,7 +8518,7 @@ function UploadReelSheet({
                               key={item.label}
                               type="button"
                               onClick={item.action}
-                              className="flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[16px] bg-slate-100 text-xs font-bold text-slate-800 transition active:scale-[0.98] dark:bg-white/8 dark:text-white"
+                              className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-2xl bg-slate-100 px-2 text-[11px] font-bold text-slate-800 transition active:scale-[0.98] sm:min-h-[72px] sm:text-xs dark:bg-white/8 dark:text-white"
                             >
                               <Icon className="h-5 w-5" />
                               {item.label}
@@ -8542,8 +8542,8 @@ function UploadReelSheet({
                   </div>
                 </div>
               ) : (
-                <div className="mx-auto grid w-full max-w-[920px] gap-3 p-3 pb-4 sm:gap-4 sm:p-4 md:grid-cols-[170px_minmax(0,1fr)] md:items-start md:gap-5 lg:grid-cols-[210px_minmax(0,1fr)]">
-                  <div className="mx-auto w-full max-w-[112px] sm:max-w-[140px] md:sticky md:top-4 md:max-w-[170px] lg:max-w-[210px]">
+                <div className="mx-auto grid w-full max-w-[940px] gap-3 p-3 pb-4 sm:gap-4 sm:p-4 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-5">
+                  <div className="mx-auto w-full max-w-[104px] min-[390px]:max-w-[120px] sm:max-w-[140px] md:sticky md:top-4 md:max-w-[150px] lg:max-w-[190px]">
                     <div className="relative aspect-[9/16] overflow-hidden rounded-[18px] bg-black shadow-lg">
                       {mediaPreviewSrc ? (
                         isImageMedia ? (
@@ -8786,7 +8786,7 @@ function UploadReelSheet({
         )}
 
         {studioPanel && step !== 'post' ? (
-          <div className="absolute inset-x-0 bottom-0 z-50 max-h-[48dvh] overflow-y-auto rounded-t-[24px] bg-[#111] p-3 pb-[max(14px,env(safe-area-inset-bottom))] text-white shadow-2xl ring-1 ring-white/10 md:absolute md:left-auto md:right-3 md:bottom-3 md:w-[360px] md:rounded-[22px]">
+          <div className="absolute inset-x-0 bottom-0 z-50 max-h-[52dvh] overflow-y-auto rounded-t-3xl bg-[#111] p-3 pb-[max(14px,env(safe-area-inset-bottom))] text-white shadow-2xl ring-1 ring-white/10 md:absolute md:left-auto md:right-3 md:bottom-3 md:w-[360px] md:rounded-[22px]">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-sm font-extrabold">
                 {studioPanel === 'filters' ? 'Filter' : studioPanel === 'effects' ? (locale === 'id' ? 'Efek' : 'Effects') : studioPanel === 'music' ? 'Audio' : studioPanel === 'speed' ? (locale === 'id' ? 'Kecepatan' : 'Speed') : 'Link video'}
@@ -8872,14 +8872,14 @@ function AuthPromptSheet({
   if (!message) return null;
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex items-end bg-black/65 text-slate-950 sm:items-center sm:justify-center sm:p-4">
+    <div className="ui-layer-modal fixed inset-0 flex items-end bg-black/70 text-slate-950 backdrop-blur-[2px] sm:items-center sm:justify-center sm:p-4">
       <button
         type="button"
         aria-label="Tutup"
         onClick={onClose}
         className="absolute inset-0"
       />
-      <section className="relative max-h-[calc(100dvh-8px)] w-full min-w-0 overflow-y-auto rounded-t-[28px] bg-white p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl sm:max-h-[calc(100dvh-32px)] sm:max-w-[420px] sm:rounded-[28px]">
+      <section className="relative max-h-[88dvh] w-full min-w-0 overflow-y-auto rounded-t-3xl bg-white p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl sm:max-h-[82dvh] sm:max-w-[430px] sm:rounded-3xl">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
