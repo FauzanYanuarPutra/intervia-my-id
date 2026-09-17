@@ -83,6 +83,40 @@ class MigrationImmutabilityTest(unittest.TestCase):
                 errors,
             )
 
+    def test_rejects_duplicate_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            migration = root / "migrations/a.sql"
+            migration.parent.mkdir(parents=True)
+            migration.write_text("SELECT 1;", encoding="utf-8")
+            manifest = root / "manifest.txt"
+            manifest.write_text(
+                "expected  migrations/a.sql\nexpected  migrations/a.sql\n",
+                encoding="utf-8",
+            )
+
+            errors = verify_manifest(
+                root,
+                manifest,
+                hash_file=lambda _: "expected",
+            )
+
+            self.assertEqual(["duplicate manifest path: migrations/a.sql"], errors)
+
+    def test_rejects_path_escape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "manifest.txt"
+            manifest.write_text("expected  ../outside.sql\n", encoding="utf-8")
+
+            errors = verify_manifest(
+                root,
+                manifest,
+                hash_file=lambda _: "expected",
+            )
+
+            self.assertEqual(["unsafe manifest path: ../outside.sql"], errors)
+
 
 if __name__ == "__main__":
     unittest.main()
