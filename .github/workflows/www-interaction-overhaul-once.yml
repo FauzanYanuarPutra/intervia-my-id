@@ -1,0 +1,102 @@
+name: WWW Interaction Overhaul Once
+
+on:
+  push:
+    branches:
+      - feat/www-interaction-responsive-system
+    paths:
+      - scripts/apply-www-interaction-responsive-overhaul.mjs
+      - .github/workflows/www-interaction-overhaul-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-verify-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: feat/www-interaction-responsive-system
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/apps/www/package-lock.json
+
+      - name: Reconcile latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Install WWW dependencies
+        working-directory: frontend/apps/www
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --legacy-peer-deps --no-audit --no-fund
+          swc_core_package=$(find node_modules -path '*/@swc/core/package.json' -print -quit)
+          if [[ -z "$swc_core_package" ]]; then
+            echo 'Unable to resolve @swc/core package for Linux native binding'
+            exit 1
+          fi
+          swc_version=$(node -p "require('./${swc_core_package}').version")
+          npm install --no-save --legacy-peer-deps --no-audit --no-fund \
+            @parcel/watcher-linux-x64-glibc@2.5.6 \
+            "@swc/core-linux-x64-gnu@$swc_version"
+
+      - name: Verify regression contract is RED before implementation
+        working-directory: frontend/apps/www
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          npx vitest run src/lib/ux/wwwInteractionResponsiveContract.test.ts
+          status=$?
+          set -e
+          if [[ "$status" -eq 0 ]]; then
+            echo 'Expected the pre-implementation interaction contract to fail, but it passed.'
+            exit 1
+          fi
+          echo 'RED confirmed: interaction contract fails before implementation.'
+
+      - name: Apply WWW interaction responsive overhaul
+        run: node scripts/apply-www-interaction-responsive-overhaul.mjs
+
+      - name: Verify focused contract is GREEN
+        working-directory: frontend/apps/www
+        run: npx vitest run src/lib/ux/wwwInteractionResponsiveContract.test.ts
+
+      - name: Source health
+        working-directory: frontend/apps/www
+        run: npm run quality:source
+
+      - name: Typecheck
+        working-directory: frontend/apps/www
+        run: npx tsc --noEmit --pretty false
+
+      - name: Lint
+        working-directory: frontend/apps/www
+        run: npm run lint
+
+      - name: Production build
+        working-directory: frontend/apps/www
+        run: npm run build
+
+      - name: Remove one-shot automation and commit verified result
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm scripts/apply-www-interaction-responsive-overhaul.mjs
+          rm .github/workflows/www-interaction-overhaul-once.yml
+          git add -A
+          git commit -m 'feat(www): maximize interaction and responsive system'
+          git push origin HEAD:feat/www-interaction-responsive-system
