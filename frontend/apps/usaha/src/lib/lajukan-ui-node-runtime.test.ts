@@ -1,15 +1,17 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 describe('lajukan-ui server runtime', () => {
-  it('can be imported by native Node ESM from the Usaha server runtime', () => {
+  it('loads product configuration through a native Node-safe subpath', () => {
     const result = spawnSync(
       process.execPath,
       [
         '--input-type=module',
         '--eval',
         [
-          "import('lajukan-ui')",
-          ".then(module => {",
+          "import('lajukan-ui/product-configuration')",
+          '.then(module => {',
           "  if (typeof module.parseProductModifierGroups !== 'function') process.exit(2);",
           '})',
           '.catch(error => {',
@@ -25,5 +27,12 @@ describe('lajukan-ui server runtime', () => {
     );
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
+  });
+
+  it('keeps the authenticated business server off the UI barrel', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/lib/business-server.ts'), 'utf8');
+
+    expect(source).toContain("from 'lajukan-ui/product-configuration'");
+    expect(source).not.toContain("from 'lajukan-ui';");
   });
 });
