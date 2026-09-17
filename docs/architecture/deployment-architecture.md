@@ -11,7 +11,7 @@ Production deployment remains manual through a protected GitHub environment. The
 1. immutable tag and Compose contract validation;
 2. image pull;
 3. `docker compose up --wait` with bounded timeout;
-4. HTTPS probes for WWW, Marketplace health, and Chat readiness through Caddy;
+4. HTTPS probes for WWW, Marketplace readiness, and Chat readiness through Caddy;
 5. persistence of the last successful immutable tag.
 
 If the health gate fails after replacement begins, the workflow redeploys the last validated tag. Database changes must therefore follow expand/backfill/switch/verify/contract and remain backward-compatible with the previous application release during the rollback window.
@@ -23,6 +23,7 @@ If the health gate fails after replacement begins, the workflow redeploys the la
 - `kyc`: OCR and liveness inference services. These are not production-ready merely because containers start.
 - `backoffice`: CMS, CRM, and Usaha in the development overlay.
 - `edge`: local Caddy in development.
+- `observability`: Prometheus, Alertmanager, exporters and blackbox probes from `docker-compose.observability.yml`; the overlay is shipped with releases but remains inactive unless the server enables the profile.
 
 `ai_service` is core because the WWW BFF depends on its internal contract. Ollama is optional because provider placement is an operational choice.
 
@@ -44,3 +45,15 @@ Caddy is the origin TLS terminator and publishes the only production host ports,
 - Persistent Caddy state for certificate renewal.
 - Database backup/recovery runbook before destructive migrations.
 - Payments, wallet live mode, KYC, and other sensitive features remain fail-closed until their specific runbooks and smoke tests pass.
+
+
+## Observability deployment contract
+
+The release archive includes `docker-compose.observability.yml` and
+`infrastructure/observability/`. This keeps monitoring configuration versioned
+with the application release while avoiding automatic activation on small
+hosts. Production or staging enables the `observability` profile explicitly
+through server-managed configuration when the host has been capacity-checked.
+
+Prometheus and Alertmanager remain private; no observability UI is published by
+the production edge contract.

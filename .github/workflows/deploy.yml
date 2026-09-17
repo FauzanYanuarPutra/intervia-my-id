@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
           overlay="docker-compose.${TARGET_ENV}.yml"
           [[ "$TARGET_ENV" == "production" ]] && overlay="docker-compose.prod.yml"
-          tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" infrastructure/caddy services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh
+          tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" docker-compose.observability.yml infrastructure/caddy infrastructure/observability services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh
       - name: Upload deployment contract
         shell: bash
         env:
@@ -130,7 +130,7 @@ jobs:
             fi
           fi
 
-          compose=(--env-file "$env_file" -f docker-compose.yml -f "$overlay")
+          compose=(--env-file "$env_file" -f docker-compose.yml -f "$overlay" -f docker-compose.observability.yml)
           release_marker="$DEPLOY_PATH/.last-successful-${TARGET_ENV}-image-tag"
           previous_image_tag=""
           if [[ -f "$release_marker" ]]; then
@@ -164,7 +164,7 @@ jobs:
           app_domain="$(awk -F= '$1 == "APP_DOMAIN" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
           [[ "$app_domain" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "APP_DOMAIN is missing or invalid in $env_file." >&2; false; }
           curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "www.${app_domain}:443:127.0.0.1" "https://www.${app_domain}/" >/dev/null
-          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "api.${app_domain}:443:127.0.0.1" "https://api.${app_domain}/health" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "api.${app_domain}:443:127.0.0.1" "https://api.${app_domain}/ready" >/dev/null
           curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "chat.${app_domain}:443:127.0.0.1" "https://chat.${app_domain}/api/ready" >/dev/null
           printf '%s\n' "$IMAGE_TAG" > "$release_marker"
           trap - ERR

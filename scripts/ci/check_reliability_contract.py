@@ -88,6 +88,8 @@ for marker in (
     ".last-successful-",
     "rollback_on_error",
     "--wait --wait-timeout",
+    "docker-compose.observability.yml",
+    "infrastructure/observability",
     "https://www.",
     "https://api.",
     "https://chat.",
@@ -148,17 +150,6 @@ for path, threshold in (
 if not re.search(r"image:\s+\$\{DOCKERHUB_NAMESPACE", prod_compose):
     errors.append("production services must continue using registry image references")
 
-for warning in warnings:
-    print(f"WARNING: {warning}", file=sys.stderr)
-
-if errors:
-    for error in errors:
-        print(f"ERROR: {error}", file=sys.stderr)
-    raise SystemExit(1)
-
-print("Reliability architecture contract OK")
-
-
 for path in (
     "services/identity_service/src/main.rs",
     "services/marketplace_service/src/main.rs",
@@ -190,3 +181,14 @@ for path, markers in {
     for marker in markers:
         if marker not in source:
             errors.append(f"{path} outbox worker missing crash-recovery lease marker: {marker}")
+
+
+for warning in warnings:
+    print(f"WARNING: {warning}", file=sys.stderr)
+
+if errors:
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    raise SystemExit(1)
+
+print("Reliability architecture contract OK")
