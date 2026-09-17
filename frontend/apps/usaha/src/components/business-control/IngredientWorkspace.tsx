@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import {
   effectiveIngredientUnitCost,
   ingredientNumber,
@@ -90,6 +91,18 @@ const kindLabels: Record<string, string> = {
   utility: 'Utilitas langsung',
   labor: 'Tenaga langsung',
 };
+
+const kindOptions = Object.entries(kindLabels).map(([value, label]) => ({ value, label }));
+const stockActionOptions: Array<{ value: StockAction; label: string }> = [
+  { value: 'purchase', label: 'Belanja / stok masuk' },
+  { value: 'waste', label: 'Rusak / terbuang' },
+  { value: 'other_usage', label: 'Pemakaian lain' },
+  { value: 'correction', label: 'Koreksi stok' },
+];
+const correctionDirectionOptions = [
+  { value: 'in', label: 'Tambah stok' },
+  { value: 'out', label: 'Kurangi stok' },
+] as const;
 
 const movementLabels: Record<string, string> = {
   purchase_receipt: 'Belanja / stok masuk',
@@ -531,12 +544,12 @@ export function IngredientWorkspace({
               Nama
               <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" placeholder="Contoh: Alpukat" value={name} onChange={event => setName(event.target.value)} />
             </label>
-            <label className="text-xs font-semibold text-portal-soft">
-              Kategori
-              <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={kind} onChange={event => setKind(event.target.value)}>
-                {Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
+            <div className="text-xs font-semibold text-portal-soft">
+              <span>Kategori</span>
+              <div className="mt-1">
+                <ChoiceChips value={kind} onChange={setKind} ariaLabel="Kategori bahan" options={kindOptions} />
+              </div>
+            </div>
           </div>
 
           <div className="mt-5 rounded-xl border border-portal-line bg-[#fafbf9] p-4">
@@ -686,7 +699,7 @@ export function IngredientWorkspace({
                       <div className="mt-4 space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="text-xs font-semibold text-portal-soft">Nama<input value={editDraft.name} onChange={event => setEditDraft(current => current ? { ...current, name: event.target.value } : current)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
-                          <label className="text-xs font-semibold text-portal-soft">Kategori<select value={editDraft.kind} onChange={event => setEditDraft(current => current ? { ...current, kind: event.target.value } : current)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm">{Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                          <div className="text-xs font-semibold text-portal-soft"><span>Kategori</span><div className="mt-1"><ChoiceChips value={editDraft.kind} onChange={value => setEditDraft(current => current ? { ...current, kind: value } : current)} ariaLabel="Kategori bahan" options={kindOptions} /></div></div>
                         </div>
                         <div className="rounded-xl border border-portal-line bg-white p-4">
                           <p className="text-xs font-bold text-portal-soft">Cara membeli</p>
@@ -712,9 +725,9 @@ export function IngredientWorkspace({
                     {activePanel.mode === 'stock' ? (
                       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="text-xs font-semibold text-portal-soft">Alasan perubahan<select value={stockAction} onChange={event => setStockAction(event.target.value as StockAction)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm"><option value="purchase">Belanja / stok masuk</option><option value="waste">Rusak / terbuang</option><option value="other_usage">Pemakaian lain</option><option value="correction">Koreksi stok</option></select></label>
+                          <div className="text-xs font-semibold text-portal-soft"><span>Alasan perubahan</span><div className="mt-1"><ChoiceChips value={stockAction} onChange={setStockAction} ariaLabel="Alasan perubahan stok" options={stockActionOptions} /></div></div>
                           <label className="text-xs font-semibold text-portal-soft">Jumlah ({item.recipe_unit})<input type="number" min="0.000001" step="any" value={stockQuantityInput} onChange={event => setStockQuantityInput(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
-                          {stockAction === 'correction' ? <label className="text-xs font-semibold text-portal-soft">Arah koreksi<select value={correctionDirection} onChange={event => setCorrectionDirection(event.target.value as 'in' | 'out')} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm"><option value="in">Tambah stok</option><option value="out">Kurangi stok</option></select></label> : null}
+                          {stockAction === 'correction' ? <div className="text-xs font-semibold text-portal-soft"><span>Arah koreksi</span><div className="mt-1"><ChoiceChips value={correctionDirection} onChange={setCorrectionDirection} ariaLabel="Arah koreksi stok" options={correctionDirectionOptions} /></div></div> : null}
                           <label className="text-xs font-semibold text-portal-soft sm:col-span-2">Catatan <span className="font-normal">(opsional)</span><input value={stockNote} onChange={event => setStockNote(event.target.value)} placeholder="Contoh: Belanja Pasar Induk" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
                         </div>
                         <div className="rounded-xl border border-portal-line bg-white p-4">
