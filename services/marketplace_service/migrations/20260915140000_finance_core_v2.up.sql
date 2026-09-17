@@ -88,21 +88,6 @@ CREATE INDEX IF NOT EXISTS business_allocation_movements_entry_idx
   ON business_allocation_movements (finance_entry_id)
   WHERE finance_entry_id IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS business_audit_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL,
-  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-  actor_user_id UUID NOT NULL,
-  event_key TEXT NOT NULL CHECK (char_length(btrim(event_key)) BETWEEN 1 AND 120),
-  subject_type TEXT NOT NULL CHECK (char_length(btrim(subject_type)) BETWEEN 1 AND 120),
-  subject_id UUID NOT NULL,
-  reason TEXT NOT NULL DEFAULT '',
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS business_audit_events_business_created_idx
-  ON business_audit_events (business_id, organization_id, created_at DESC, id);
-
 CREATE OR REPLACE VIEW business_allocation_bucket_balances AS
 SELECT business_id,
        organization_id,
@@ -199,11 +184,6 @@ FOR EACH ROW EXECUTE FUNCTION reject_business_finance_core_mutation();
 DROP TRIGGER IF EXISTS business_allocation_movements_append_only ON business_allocation_movements;
 CREATE TRIGGER business_allocation_movements_append_only
 BEFORE UPDATE OR DELETE ON business_allocation_movements
-FOR EACH ROW EXECUTE FUNCTION reject_business_finance_core_mutation();
-
-DROP TRIGGER IF EXISTS business_audit_events_append_only ON business_audit_events;
-CREATE TRIGGER business_audit_events_append_only
-BEFORE UPDATE OR DELETE ON business_audit_events
 FOR EACH ROW EXECUTE FUNCTION reject_business_finance_core_mutation();
 
 COMMIT;
