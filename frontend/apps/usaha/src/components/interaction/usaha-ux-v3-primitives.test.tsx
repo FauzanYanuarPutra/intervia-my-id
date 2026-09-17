@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ChoiceChips } from './ChoiceChips';
 import { EffectPreview } from './EffectPreview';
 import { SearchPicker } from './SearchPicker';
+import { SensitiveActionConfirm } from './SensitiveActionConfirm';
 
 describe('UX V3 primitives', () => {
   it('renders every small choice without a select', () => {
@@ -63,5 +64,22 @@ describe('UX V3 primitives', () => {
     expect(html).toContain('Alpukat');
     expect(html).toContain('aria-selected="true"');
     expect(html).not.toContain('<select');
+  });
+
+  it('renders a short explicit sensitive confirmation', () => {
+    const html = renderToStaticMarkup(
+      <SensitiveActionConfirm
+        open
+        title="Hapus lokasi?"
+        description="Lokasi akan dihapus dari daftar outlet."
+        confirmLabel="Hapus lokasi"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(html).toContain('Hapus lokasi?');
+    expect(html).toContain('Hapus lokasi');
+    expect(html).toContain('<dialog');
   });
 });
