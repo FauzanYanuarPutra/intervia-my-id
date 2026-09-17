@@ -14,10 +14,16 @@ import {
   WalletCards,
   X,
 } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { EffectPreview } from '@/components/interaction/EffectPreview';
 import {
   financeChannelOptions,
   financeEntryOptions,
 } from '@/lib/business-control/finance-entry-options';
+import {
+  allocationBalanceAfterMove,
+  commonFinanceChoices,
+} from '@/lib/business-control/finance-ux';
 import {
   financeEntrySignedCashEffect,
   summarizeFinanceEntries,
@@ -121,14 +127,22 @@ const allocationLabels: Record<Allocation['bucket'], string> = {
   reserve: 'Cadangan',
 };
 
-const allocationOptions: Array<{ value: string; label: string }> = [
+const allocationOptions = [
   { value: '', label: 'Tanpa kantong' },
   { value: 'owner', label: 'Owner' },
   { value: 'team', label: 'Gaji tim' },
   { value: 'reinvest', label: 'Diputar lagi' },
   { value: 'operations', label: 'Operasional' },
   { value: 'reserve', label: 'Cadangan' },
-];
+] as const;
+
+const accountOptions = [
+  { value: 'cash', label: 'Kas' },
+  { value: 'bank', label: 'Bank' },
+  { value: 'ewallet', label: 'E-wallet' },
+  { value: 'receivable', label: 'Piutang' },
+  { value: 'payable', label: 'Utang' },
+] as const;
 
 function userShort(value?: string | null) {
   return value ? value.slice(0, 8) : 'sistem';
@@ -197,7 +211,7 @@ export function FinanceLedgerV2({ businessId, initialEntries, channels = [] }: P
       ),
     [entries],
   );
-  const choices = financeEntryOptions(direction);
+  const choices = commonFinanceChoices(direction);
   const channelChoices = financeChannelOptions(channels);
 
   const allocations = summary?.allocations ?? [
@@ -207,6 +221,23 @@ export function FinanceLedgerV2({ businessId, initialEntries, channels = [] }: P
     { bucket: 'operations' as const, balance: 0 },
     { bucket: 'reserve' as const, balance: 0 },
   ];
+  const unallocatedBalance = Math.max(0, summary?.unallocated_cash ?? 0);
+  const allocationChoiceOptions = [
+    { value: 'unallocated', label: `Belum dibagi · ${money.format(unallocatedBalance)}` },
+    ...allocations.map(item => ({
+      value: item.bucket,
+      label: `${allocationLabels[item.bucket]} · ${money.format(item.balance)}`,
+    })),
+  ];
+  const allocationSourceBalance = allocationFrom === 'unallocated'
+    ? unallocatedBalance
+    : allocations.find(item => item.bucket === allocationFrom)?.balance ?? 0;
+  const allocationDestinationBalance = allocations.find(item => item.bucket === allocationTo)?.balance ?? 0;
+  const allocationMovePreview = allocationBalanceAfterMove({
+    sourceBalance: allocationSourceBalance,
+    destinationBalance: allocationDestinationBalance,
+    amount: Math.round(Number(allocationAmount)),
+  });
 
   async function reloadAll(silent = false) {
     if (!silent) setRefreshing(true);
@@ -438,13 +469,46 @@ export function FinanceLedgerV2({ businessId, initialEntries, channels = [] }: P
         </div>
         <details className="mt-3 rounded-xl bg-[#fafbf9] p-3">
           <summary className="cursor-pointer text-xs font-black text-portal-ink"><ArrowLeftRight className="mr-1 inline h-3.5 w-3.5" /> Pindahkan dana antar kantong</summary>
-          <div className="mt-3 grid gap-2 sm:grid-cols-4">
-            <label className="text-xs font-semibold text-portal-soft">Dari<select value={allocationFrom} onChange={event => setAllocationFrom(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"><option value="unallocated">Belum dibagi</option>{allocations.map(item => <option key={item.bucket} value={item.bucket}>{allocationLabels[item.bucket]} · {money.format(item.balance)}</option>)}</select></label>
-            <label className="text-xs font-semibold text-portal-soft">Ke<select value={allocationTo} onChange={event => setAllocationTo(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3">{allocations.map(item => <option key={item.bucket} value={item.bucket}>{allocationLabels[item.bucket]}</option>)}</select></label>
-            <label className="text-xs font-semibold text-portal-soft">Nominal<input type="number" min="1" inputMode="numeric" value={allocationAmount} onChange={event => setAllocationAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label>
-            <label className="text-xs font-semibold text-portal-soft">Alasan<input value={allocationReason} onChange={event => setAllocationReason(event.target.value)} placeholder="Contoh: tambah dana operasional" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label>
+          <div className="mt-3 grid gap-4">
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-portal-soft">Dari</p>
+              <ChoiceChips value={allocationFrom} onChange={setAllocationFrom} ariaLabel="Kantong sumber" options={allocationChoiceOptions} />
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-portal-soft">Ke</p>
+              <ChoiceChips
+                value={allocationTo}
+                onChange={setAllocationTo}
+                ariaLabel="Kantong tujuan"
+                options={allocationChoiceOptions.filter(option => option.value !== 'unallocated' && option.value !== allocationFrom)}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-portal-soft">
+                Nominal
+                <input type="number" min="1" inputMode="numeric" value={allocationAmount} onChange={event => setAllocationAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" />
+              </label>
+              <label className="text-xs font-semibold text-portal-soft">
+                Alasan
+                <input value={allocationReason} onChange={event => setAllocationReason(event.target.value)} placeholder="Contoh: tambah dana operasional" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" />
+              </label>
+            </div>
+            <EffectPreview
+              ariaLabel="Saldo setelah dipindah"
+              items={[
+                { label: 'Sumber setelah', value: money.format(allocationMovePreview.sourceAfter), tone: 'warning' },
+                { label: 'Tujuan setelah', value: money.format(allocationMovePreview.destinationAfter), tone: 'positive' },
+              ]}
+            />
           </div>
-          <button type="button" onClick={moveAllocation} disabled={movingAllocation} className="portal-button-primary mt-3 disabled:opacity-50">{movingAllocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Pindahkan</button>
+          <button
+            type="button"
+            onClick={moveAllocation}
+            disabled={movingAllocation || allocationFrom === allocationTo || !allocationMovePreview.valid || allocationReason.trim().length < 3}
+            className="portal-button-primary mt-3 disabled:opacity-50"
+          >
+            {movingAllocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />} Pindahkan
+          </button>
         </details>
       </section>
 
@@ -455,13 +519,64 @@ export function FinanceLedgerV2({ businessId, initialEntries, channels = [] }: P
             <button type="button" onClick={() => chooseDirection('in')} className={direction === 'in' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><ArrowDownLeft className="h-4 w-4" /> Uang masuk</button>
             <button type="button" onClick={() => chooseDirection('out')} className={direction === 'out' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><ArrowUpRight className="h-4 w-4" /> Uang keluar</button>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="text-xs font-semibold text-portal-soft">Kategori<select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={entryType} onChange={event => setEntryType(event.target.value)}>{choices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>
-            <label className="text-xs font-semibold text-portal-soft">Nominal<input inputMode="numeric" type="number" min="1" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink" placeholder="Contoh: 120000" value={entryAmount} onChange={event => setEntryAmount(event.target.value)} /></label>
-            <label className="text-xs font-semibold text-portal-soft">Kantong<select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm" value={allocationBucket} onChange={event => setAllocationBucket(event.target.value)}>{allocationOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          <div className="mt-4 grid gap-4">
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-portal-soft">Kategori</p>
+              <ChoiceChips
+                value={entryType}
+                onChange={setEntryType}
+                ariaLabel={direction === 'in' ? 'Kategori uang masuk' : 'Kategori uang keluar'}
+                options={choices}
+              />
+            </div>
+            <label className="text-xs font-semibold text-portal-soft">
+              Nominal
+              <input inputMode="numeric" type="number" min="1" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-base font-bold text-portal-ink" placeholder="Contoh: 120000" value={entryAmount} onChange={event => setEntryAmount(event.target.value)} />
+            </label>
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-portal-soft">Kantong</p>
+              <ChoiceChips value={allocationBucket} onChange={setAllocationBucket} ariaLabel="Kantong uang" options={allocationOptions} />
+            </div>
+            <EffectPreview items={[
+              { label: 'Nominal', value: money.format(Math.max(0, Number(entryAmount) || 0)) },
+              { label: 'Dampak', value: direction === 'in' ? 'Menambah nilai tercatat' : 'Mengurangi nilai tercatat', tone: direction === 'in' ? 'positive' : 'warning' },
+            ]} />
           </div>
-          <details className="mt-3 rounded-xl bg-[#fafbf9] p-3"><summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail transaksi</summary><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={occurredOn} onChange={event => setOccurredOn(event.target.value)} /></label><label className="text-xs font-semibold text-portal-soft">Akun<select className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={accountKey} onChange={event => setAccountKey(event.target.value)}><option value="cash">Kas</option><option value="bank">Bank</option><option value="ewallet">E-wallet</option><option value="receivable">Piutang</option><option value="payable">Utang</option></select></label><label className="text-xs font-semibold text-portal-soft">Kanal<select className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={channelKey} onChange={event => setChannelKey(event.target.value)}>{channelChoices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label><label className="text-xs font-semibold text-portal-soft">Catatan<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={note} onChange={event => setNote(event.target.value)} placeholder="Opsional" /></label></div></details>
-          <div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" disabled={saving} onClick={save} className="portal-button-primary disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan aman</button><p className="text-[11px] text-portal-soft">Double-click/retry dilindungi idempotency.</p></div>
+
+          <details className="mt-3 rounded-xl bg-[#fafbf9] p-3">
+            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail transaksi</summary>
+            <div className="mt-3 grid gap-4">
+              <label className="text-xs font-semibold text-portal-soft">
+                Tanggal
+                <input type="date" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={occurredOn} onChange={event => setOccurredOn(event.target.value)} />
+              </label>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-portal-soft">Akun</p>
+                <ChoiceChips value={accountKey} onChange={setAccountKey} ariaLabel="Akun transaksi" options={accountOptions} />
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-portal-soft">Kanal</p>
+                {channelChoices.length <= 6 ? (
+                  <ChoiceChips value={channelKey} onChange={setChannelKey} ariaLabel="Kanal" options={channelChoices} />
+                ) : (
+                  <select className="min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={channelKey} onChange={event => setChannelKey(event.target.value)}>
+                    {channelChoices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+                  </select>
+                )}
+              </div>
+              <label className="text-xs font-semibold text-portal-soft">
+                Catatan
+                <input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={note} onChange={event => setNote(event.target.value)} placeholder="Opsional" />
+              </label>
+            </div>
+          </details>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" disabled={saving} onClick={save} className="portal-button-primary disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan aman
+            </button>
+            <p className="text-[11px] text-portal-soft">Double-click/retry dilindungi idempotency.</p>
+          </div>
         </div>
       </details>
 
@@ -491,8 +606,20 @@ export function FinanceLedgerV2({ businessId, initialEntries, channels = [] }: P
                     <div className="flex items-center justify-between"><div className="flex items-center gap-2"><History className="h-4 w-4 text-portal-forest" /><p className="text-xs font-black text-portal-ink">Koreksi tanpa menghapus histori</p></div><button type="button" onClick={() => setCorrectingId(null)} className="p-1 text-portal-soft"><X className="h-4 w-4" /></button></div>
                     <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setCorrectionMode('correct')} className={correctionMode === 'correct' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><PencilLine className="h-4 w-4" /> Perbaiki</button><button type="button" onClick={() => setCorrectionMode('void')} className={correctionMode === 'void' ? 'portal-button-primary justify-center' : 'portal-button-secondary justify-center'}><RotateCcw className="h-4 w-4" /> Batalkan</button></div>
                     <label className="mt-3 block text-xs font-semibold text-portal-soft">Alasan wajib<input value={correctionReason} onChange={event => setCorrectionReason(event.target.value)} placeholder="Contoh: nominal salah input" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label>
-                    {correctionMode === 'correct' ? <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"><label className="text-xs font-semibold text-portal-soft">Kategori<select value={correctionType} onChange={event => setCorrectionType(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3">{[...financeEntryOptions('in'), ...financeEntryOptions('out')].filter((choice, index, all) => all.findIndex(item => item.value === choice.value) === index).map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label><label className="text-xs font-semibold text-portal-soft">Nominal<input type="number" min="1" value={correctionAmount} onChange={event => setCorrectionAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Akun<select value={correctionAccount} onChange={event => setCorrectionAccount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"><option value="cash">Kas</option><option value="bank">Bank</option><option value="ewallet">E-wallet</option><option value="receivable">Piutang</option><option value="payable">Utang</option></select></label><label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" value={correctionDate} onChange={event => setCorrectionDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Kantong<select value={correctionBucket} onChange={event => setCorrectionBucket(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3">{allocationOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label className="text-xs font-semibold text-portal-soft">Catatan<input value={correctionNote} onChange={event => setCorrectionNote(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label></div> : <p className="mt-3 text-xs leading-5 text-portal-soft">Sistem membuat reversal penuh. Baris asli tetap ada dan ditandai dibatalkan.</p>}
-                    <div className="mt-3 rounded-lg bg-white p-3 text-[11px] text-portal-soft"><strong className="text-portal-ink">Dampak:</strong> transaksi lama dibalik lebih dulu{correctionMode === 'correct' ? ', lalu nilai pengganti diposting.' : '.'} Saldo akun dan kantong dihitung ulang otomatis.</div>
+                    {correctionMode === 'correct' ? <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"><label className="text-xs font-semibold text-portal-soft">Kategori<select value={correctionType} onChange={event => setCorrectionType(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3">{[...financeEntryOptions('in'), ...financeEntryOptions('out')].filter((choice, index, all) => all.findIndex(item => item.value === choice.value) === index).map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label><label className="text-xs font-semibold text-portal-soft">Nominal<input type="number" min="1" value={correctionAmount} onChange={event => setCorrectionAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft">Akun<div className="mt-1"><ChoiceChips value={correctionAccount} onChange={setCorrectionAccount} ariaLabel="Akun pengganti" options={accountOptions} /></div></div><label className="text-xs font-semibold text-portal-soft">Tanggal<input type="date" value={correctionDate} onChange={event => setCorrectionDate(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft">Kantong<div className="mt-1"><ChoiceChips value={correctionBucket} onChange={setCorrectionBucket} ariaLabel="Kantong pengganti" options={allocationOptions} /></div></div><label className="text-xs font-semibold text-portal-soft">Catatan<input value={correctionNote} onChange={event => setCorrectionNote(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label></div> : <p className="mt-3 text-xs leading-5 text-portal-soft">Sistem membuat reversal penuh. Baris asli tetap ada dan ditandai dibatalkan.</p>}
+                    <div className="mt-3">
+                      <EffectPreview
+                        ariaLabel="Dampak koreksi"
+                        items={correctionMode === 'correct'
+                          ? [
+                              { label: 'Langkah 1', value: 'Transaksi lama dibalik', tone: 'warning' },
+                              { label: 'Langkah 2', value: 'Transaksi pengganti dibuat', tone: 'positive' },
+                            ]
+                          : [
+                              { label: 'Dampak', value: 'Transaksi lama dibalik penuh', tone: 'warning' },
+                            ]}
+                      />
+                    </div>
                     <button type="button" disabled={correcting} onClick={() => submitCorrection(entry)} className="portal-button-primary mt-3 disabled:opacity-50">{correcting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Konfirmasi {correctionMode === 'void' ? 'pembatalan' : 'koreksi'}</button>
                   </div>
                 ) : null}
