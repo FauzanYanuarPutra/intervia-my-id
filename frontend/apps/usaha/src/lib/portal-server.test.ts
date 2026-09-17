@@ -36,6 +36,16 @@ describe('portal server state', () => {
     await expect(getPortalBusinesses()).rejects.toBe(outage);
   });
 
+  it('keeps storage outages visible instead of treating them as provisioning', async () => {
+    const outage = Object.assign(new Error('business_storage_unavailable'), {
+      status: 503,
+      code: 'business_storage_unavailable',
+    });
+    businessServer.listBusinessesForCurrentActor.mockRejectedValue(outage);
+
+    await expect(getPortalBusinesses()).rejects.toBe(outage);
+  });
+
   it('keeps generic portal business lists renderable while provisioning is retryable', async () => {
     const provisioning = Object.assign(new Error('provisioning_retryable'), {
       status: 503,
