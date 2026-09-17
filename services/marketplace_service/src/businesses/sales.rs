@@ -8,6 +8,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
+    kernel::command::canonical_request_hash,
     modifier_resolution::{
         resolve_modifier_selection, ModifierSelectionInput, ResolvedModifierSelection,
     },
@@ -59,7 +60,7 @@ pub(crate) struct CostSnapshot {
     pub(crate) production_hpp_per_unit: Decimal,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct CreateSaleLineRequest {
     pub(crate) product_id: Uuid,
     pub(crate) quantity: Decimal,
@@ -75,7 +76,7 @@ pub(crate) struct CreateSaleLineRequest {
     pub(crate) note: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct CreateSaleRequest {
     pub(crate) occurred_on: NaiveDate,
     pub(crate) channel_key: Option<String>,
@@ -209,6 +210,7 @@ impl SaleRepository {
         request: CreateSaleRequest,
     ) -> Result<CreateSaleOutcome, SaleRepositoryError> {
         let normalized = validate_request(request)?;
+        let request_hash = canonical_sale_request_hash(&normalized)?;
         let mut tx = self.db.begin().await?;
         ensure_business_tx(&mut tx, business_id, organization_id).await?;
 
@@ -218,6 +220,13 @@ impl SaleRepository {
             if existing.organization_id != organization_id {
                 return Err(SaleRepositoryError::IdempotencyConflict);
             }
+            ensure_request_hash_matches_tx(
+                &mut tx,
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
             let lines = load_lines_tx(&mut tx, existing.id).await?;
             tx.commit().await?;
             return Ok(CreateSaleOutcome {
@@ -290,10 +299,10 @@ impl SaleRepository {
         let inserted_id = sqlx::query_scalar::<_, Uuid>(
             r#"
             INSERT INTO business_sales (
-              id, business_id, organization_id, idempotency_key, occurred_on,
+              id, business_id, organization_id, idempotency_key, request_hash, occurred_on,
               channel_key, account_key, status, gross_amount, discount_amount,
               final_amount, cogs_amount, cost_complete, created_by_user_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,'completed',$8,$9,$10,$11,$12,$13)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'completed',$9,$10,$11,$12,$13,$14)
             ON CONFLICT (business_id, idempotency_key) DO NOTHING
             RETURNING id
             "#,
@@ -302,6 +311,7 @@ impl SaleRepository {
         .bind(business_id)
         .bind(organization_id)
         .bind(idempotency_key)
+        .bind(&request_hash)
         .bind(normalized.occurred_on)
         .bind(normalized.channel_key.as_deref())
         .bind(&normalized.account_key)
@@ -322,6 +332,13 @@ impl SaleRepository {
             if existing.organization_id != organization_id {
                 return Err(SaleRepositoryError::IdempotencyConflict);
             }
+            ensure_request_hash_matches_pool(
+                &self.db,
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
             let lines = load_lines_pool(&self.db, existing.id).await?;
             return Ok(CreateSaleOutcome {
                 sale: SaleAggregate {
@@ -466,6 +483,69 @@ fn validate_request(
         account_key,
         lines: request.lines,
     })
+}
+
+#[derive(Serialize)]
+struct SaleRequestFingerprint {
+    occurred_on: NaiveDate,
+    channel_key: Option<String>,
+    account_key: String,
+    lines: Vec<SaleLineFingerprint>,
+}
+
+#[derive(Serialize)]
+struct SaleLineFingerprint {
+    product_id: Uuid,
+    quantity: String,
+    discount_amount: i64,
+    selected_options: Vec<ModifierSelectionInput>,
+    note: Option<String>,
+}
+
+fn canonical_sale_request_hash(
+    request: &NormalizedSaleRequest,
+) -> Result<String, SaleRepositoryError> {
+    let mut lines = Vec::with_capacity(request.lines.len());
+    for line in &request.lines {
+        let mut selected_options = line
+            .selected_options
+            .iter()
+            .map(|selection| {
+                let mut option_ids = selection
+                    .option_ids
+                    .iter()
+                    .map(|value| value.trim().to_ascii_lowercase())
+                    .filter(|value| !value.is_empty())
+                    .collect::<Vec<_>>();
+                option_ids.sort();
+                ModifierSelectionInput {
+                    group_id: selection.group_id.trim().to_ascii_lowercase(),
+                    option_ids,
+                }
+            })
+            .collect::<Vec<_>>();
+        selected_options.sort_by(|left, right| {
+            left.group_id
+                .cmp(&right.group_id)
+                .then_with(|| left.option_ids.cmp(&right.option_ids))
+        });
+
+        lines.push(SaleLineFingerprint {
+            product_id: line.product_id,
+            quantity: line.quantity.normalize().to_string(),
+            discount_amount: line.discount_amount,
+            selected_options,
+            note: normalize_sale_note(line.note.as_deref())?,
+        });
+    }
+
+    canonical_request_hash(&SaleRequestFingerprint {
+        occurred_on: request.occurred_on,
+        channel_key: request.channel_key.clone(),
+        account_key: request.account_key.clone(),
+        lines,
+    })
+    .map_err(|_| SaleRepositoryError::Database)
 }
 
 async fn prepare_line(
@@ -895,6 +975,66 @@ async fn ensure_business_tx(
     } else {
         Err(SaleRepositoryError::NotFound)
     }
+}
+
+async fn request_hash_by_idempotency_pool(
+    db: &PgPool,
+    business_id: Uuid,
+    idempotency_key: Uuid,
+) -> Result<Option<String>, SaleRepositoryError> {
+    let stored = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT request_hash FROM business_sales WHERE business_id=$1 AND idempotency_key=$2 LIMIT 1",
+    )
+    .bind(business_id)
+    .bind(idempotency_key)
+    .fetch_optional(db)
+    .await?;
+    Ok(stored.flatten())
+}
+
+async fn request_hash_by_idempotency_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    idempotency_key: Uuid,
+) -> Result<Option<String>, SaleRepositoryError> {
+    let stored = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT request_hash FROM business_sales WHERE business_id=$1 AND idempotency_key=$2 LIMIT 1",
+    )
+    .bind(business_id)
+    .bind(idempotency_key)
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(stored.flatten())
+}
+
+async fn ensure_request_hash_matches_pool(
+    db: &PgPool,
+    business_id: Uuid,
+    idempotency_key: Uuid,
+    expected_hash: &str,
+) -> Result<(), SaleRepositoryError> {
+    if request_hash_by_idempotency_pool(db, business_id, idempotency_key)
+        .await?
+        .is_some_and(|stored| stored != expected_hash)
+    {
+        return Err(SaleRepositoryError::IdempotencyConflict);
+    }
+    Ok(())
+}
+
+async fn ensure_request_hash_matches_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    idempotency_key: Uuid,
+    expected_hash: &str,
+) -> Result<(), SaleRepositoryError> {
+    if request_hash_by_idempotency_tx(tx, business_id, idempotency_key)
+        .await?
+        .is_some_and(|stored| stored != expected_hash)
+    {
+        return Err(SaleRepositoryError::IdempotencyConflict);
+    }
+    Ok(())
 }
 
 async fn find_by_idempotency_pool(
