@@ -20,6 +20,23 @@ fn business_scope_keeps_tenant_and_optional_location_together() {
 }
 
 #[test]
+fn business_scope_can_be_created_without_location_then_scoped_to_one() {
+    let organization_id = Uuid::new_v4();
+    let business_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
+
+    let business_scope = BusinessScope::without_location(organization_id, business_id);
+    assert_eq!(business_scope.organization_id, organization_id);
+    assert_eq!(business_scope.business_id, business_id);
+    assert_eq!(business_scope.location_id, None);
+
+    let location_scope = business_scope.at_location(location_id);
+    assert_eq!(location_scope.organization_id, organization_id);
+    assert_eq!(location_scope.business_id, business_id);
+    assert_eq!(location_scope.location_id, Some(location_id));
+}
+
+#[test]
 fn non_negative_amount_rejects_negative_values() {
     assert!(NonNegativeAmount::new(-1).is_err());
     assert_eq!(NonNegativeAmount::new(0).unwrap().value(), 0);
