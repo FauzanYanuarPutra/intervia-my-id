@@ -1,129 +1,141 @@
+'use client';
+
 import Link from 'next/link';
-import {
-  BarChart3,
-  Building2,
-  ClipboardList,
-  LayoutDashboard,
-  LockKeyhole,
-  MapPinned,
-  Menu,
-  PackageSearch,
-  Settings2,
-  ShoppingBag,
-  Store,
-  UsersRound,
-  WalletCards,
-  X,
-} from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ModalSurface } from '@/components/interaction/ModalSurface';
 import {
   mobilePrimaryNavigation,
   portalMenuNavigation,
 } from '@/lib/portal-navigation';
 import { buildSectionHref } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
+import { portalSectionVisual } from '@/lib/portal-visual';
 
 type MobileNavProps = {
   business: BusinessRecord | null;
   currentSection: PortalSection;
 };
 
-const iconMap: Record<PortalSection, typeof Store> = {
-  home: LayoutDashboard,
-  orders: ShoppingBag,
-  products: Store,
-  inventory: PackageSearch,
-  finance: WalletCards,
-  channels: Store,
-  reports: BarChart3,
-  operations: ClipboardList,
-  info: Settings2,
-  locations: MapPinned,
-  buyerPage: Store,
-  team: UsersRound,
-  security: LockKeyhole,
-};
-
 export function MobileNav({ business, currentSection }: MobileNavProps) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+
   if (!business) return null;
   const activeBusiness = business;
   const primary = mobilePrimaryNavigation(activeBusiness.permissions);
-  const more = portalMenuNavigation(activeBusiness.permissions);
+  const primaryIds = new Set(primary.map(item => item.id));
+  const more = portalMenuNavigation(activeBusiness.permissions).filter(item => !primaryIds.has(item.id));
+  const management = more.filter(item => ['inventory', 'reports', 'channels', 'buyerPage'].includes(item.id));
+  const settings = more.filter(item => !management.some(groupItem => groupItem.id === item.id));
 
   function menuLink(item: (typeof more)[number]) {
-    const Icon = iconMap[item.id];
+    const visual = portalSectionVisual[item.id];
+    const Icon = visual.icon;
     const active = currentSection === item.id;
     return (
       <Link
         key={item.id}
         href={buildSectionHref(activeBusiness.id, item.id)}
         aria-current={active ? 'page' : undefined}
-        className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${
-          active
-            ? 'bg-portal-mist text-portal-forest'
-            : 'text-portal-ink hover:bg-portal-mist/70'
+        onClick={() => setMoreOpen(false)}
+        className={`flex min-h-12 items-center gap-3 rounded-xl px-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
+          active ? visual.activeNavClass : 'text-portal-ink hover:bg-[#f5f7f4]'
         }`}
       >
-        <Icon className="h-4 w-4" /> {item.label}
+        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
+          <Icon className="h-[18px] w-[18px]" />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
       </Link>
     );
   }
 
   return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-portal-line bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_-20px_rgba(15,23,42,.3)] backdrop-blur lg:hidden"
-      aria-label="Navigasi usaha mobile"
-    >
-      <div
-        className="mx-auto grid max-w-md gap-1"
-        style={{ gridTemplateColumns: `repeat(${primary.length + 1}, minmax(0, 1fr))` }}
+    <>
+      <nav
+        className="fixed inset-x-0 bottom-0 z-[var(--portal-layer-nav)] border-t border-portal-line/80 bg-white/97 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-8px_30px_-24px_rgba(15,23,42,.45)] backdrop-blur-xl lg:hidden"
+        aria-label="Navigasi usaha mobile"
       >
-        {primary.map(item => {
-          const Icon = iconMap[item.id];
-          const active = currentSection === item.id;
-          return (
-            <Link
-              key={item.id}
-              href={buildSectionHref(activeBusiness.id, item.id)}
-              aria-current={active ? 'page' : undefined}
-              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
-                active
-                  ? 'bg-portal-mist text-portal-forest'
-                  : 'text-portal-soft hover:bg-portal-mist/70'
-              }`}
-            >
-              <Icon className="h-[18px] w-[18px]" />
-              {item.label}
-            </Link>
-          );
-        })}
-        <details className="group relative">
-          <summary
-            className={`flex min-h-12 cursor-pointer list-none flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          {primary.map(item => {
+            const visual = portalSectionVisual[item.id];
+            const Icon = visual.icon;
+            const active = currentSection === item.id;
+            return (
+              <Link
+                key={item.id}
+                href={buildSectionHref(activeBusiness.id, item.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
+                  active ? visual.activeNavClass : 'text-portal-soft hover:bg-[#f5f7f4]'
+                }`}
+              >
+                <span className={`inline-flex h-7 w-7 items-center justify-center rounded-[10px] ${visual.iconClass}`}>
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
+          <button
+            ref={moreButtonRef}
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen(true)}
+            className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-portal-forest/20 ${
               more.some(item => item.id === currentSection)
-                ? 'bg-portal-mist text-portal-forest'
-                : 'text-portal-soft hover:bg-portal-mist/70'
+                ? 'bg-[#f1f4f2] text-portal-ink'
+                : 'text-portal-soft hover:bg-[#f5f7f4]'
             }`}
           >
-            <Menu className="h-[18px] w-[18px] group-open:hidden" />
-            <X className="hidden h-[18px] w-[18px] group-open:block" />
-            Menu
-          </summary>
-          <div className="absolute bottom-[calc(100%+.65rem)] right-0 max-h-[70vh] w-[290px] overflow-y-auto rounded-[20px] border border-portal-line bg-white p-2 shadow-[0_24px_70px_-24px_rgba(15,23,42,.5)]">
-            <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-[.1em] text-portal-soft/70">
-              Menu usaha
-            </p>
-            {more.filter(item => item.id !== 'security').map(menuLink)}
-            {more.some(item => item.id === 'security') ? (
-              <>
-                <p className="mt-2 border-t border-portal-line px-2 pb-1 pt-3 text-[11px] font-bold uppercase tracking-[.1em] text-portal-soft/70">
-                  Akun
-                </p>
-                {more.filter(item => item.id === 'security').map(menuLink)}
-              </>
-            ) : null}
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-[10px] bg-[#f1f4f2] text-portal-soft">
+              <Menu className="h-[18px] w-[18px]" />
+            </span>
+            Lainnya
+          </button>
+        </div>
+      </nav>
+
+      <ModalSurface
+        open={moreOpen}
+        onOpenChange={setMoreOpen}
+        ariaLabel="Menu lainnya"
+        presentation="sheet"
+        size="sm"
+        returnFocusRef={moreButtonRef}
+      >
+        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-slate-200" />
+        <div className="flex items-start justify-between gap-4 border-b border-portal-line px-4 pb-3 pt-3">
+          <div>
+            <p className="text-base font-black text-portal-ink">Lainnya</p>
+            <p className="mt-0.5 text-xs text-portal-soft">Stok, laporan, toko, dan pengaturan usaha.</p>
           </div>
-        </details>
-      </div>
-    </nav>
+          <button
+            type="button"
+            aria-label="Tutup menu lainnya"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-portal-soft transition hover:bg-[#f3f5f2] hover:text-portal-ink"
+            onClick={() => setMoreOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+          {management.length ? (
+            <section>
+              <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-[.12em] text-portal-soft/75">Kelola</p>
+              <div className="space-y-1">{management.map(menuLink)}</div>
+            </section>
+          ) : null}
+          {settings.length ? (
+            <section className={management.length ? 'mt-3 border-t border-portal-line pt-3' : ''}>
+              <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-[.12em] text-portal-soft/75">Pengaturan</p>
+              <div className="space-y-1">{settings.map(menuLink)}</div>
+            </section>
+          ) : null}
+        </div>
+      </ModalSurface>
+    </>
   );
 }

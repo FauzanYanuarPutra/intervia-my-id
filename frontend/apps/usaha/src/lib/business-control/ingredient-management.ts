@@ -20,11 +20,46 @@ export type IngredientFilter =
   | 'low_stock'
   | 'incomplete';
 
+export type IngredientUnitSuggestion = {
+  recipeUnit: string;
+  conversionFactor: number;
+};
+
 export function ingredientNumber(
   value: string | number | null | undefined,
 ): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function suggestIngredientUnits(
+  purchaseUnit: string,
+): IngredientUnitSuggestion {
+  const normalized = purchaseUnit.trim().toLocaleLowerCase('id-ID');
+
+  if (['kg', 'kilogram', 'kilo'].includes(normalized)) {
+    return { recipeUnit: 'gram', conversionFactor: 1000 };
+  }
+  if (['g', 'gr', 'gram'].includes(normalized)) {
+    return { recipeUnit: 'gram', conversionFactor: 1 };
+  }
+  if (['liter', 'litre', 'l'].includes(normalized)) {
+    return { recipeUnit: 'ml', conversionFactor: 1000 };
+  }
+  if (['ml', 'mililiter', 'milliliter'].includes(normalized)) {
+    return { recipeUnit: 'ml', conversionFactor: 1 };
+  }
+  if (['lusin', 'dozen'].includes(normalized)) {
+    return { recipeUnit: 'pcs', conversionFactor: 12 };
+  }
+  if (['pcs', 'pc'].includes(normalized)) {
+    return { recipeUnit: 'pcs', conversionFactor: 1 };
+  }
+
+  return {
+    recipeUnit: normalized,
+    conversionFactor: 1,
+  };
 }
 
 export function effectiveIngredientUnitCost(

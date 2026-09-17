@@ -12,7 +12,7 @@ export function hasPermission(business: BusinessRecord, permission: PermissionId
 
 const sectionPermission: Partial<Record<PortalSection, PermissionId>> = {
   info: 'viewInfo',
-  locations: 'viewInfo',
+  locations: 'manageInfo',
   products: 'viewProducts',
   inventory: 'viewInventory',
   orders: 'viewOrders',

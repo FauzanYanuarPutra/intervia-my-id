@@ -1,0 +1,10 @@
+# Exact historical false positives only.
+#
+# Do not add broad rule/path allowlists here. Credential-shaped findings stay
+# visible until their owning credential has been verified rotated/revoked.
+
+# Historical KYC workflow cache key (cache identifier, not a credential).
+fd72519fa8be1db164713c7f0bd5657b8b721c71:.github/workflows/kyc-runtime-contract.yml:generic-api-key:62
+
+# Historical Reels localStorage preference key (client-side storage key, not a secret).
+7aa1ece8262784c3c40e27914039fbe10f000001:frontend/www/src/lib/reels/preferences.ts:generic-api-key:24

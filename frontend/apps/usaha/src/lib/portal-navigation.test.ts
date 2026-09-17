@@ -33,39 +33,37 @@ const ownerPermissions: PermissionId[] = [
 ];
 
 describe('portal navigation', () => {
-  it('keeps desktop work destinations in beginner-first order', () => {
+  it('keeps only daily merchant jobs in desktop primary navigation', () => {
     expect(desktopPrimaryNavigation(ownerPermissions).map(item => item.id)).toEqual([
       'home',
       'orders',
       'products',
       'inventory',
       'finance',
-      'reports',
-      'channels',
-      'info',
     ]);
   });
 
-  it('keeps mobile daily work focused on home, sales, stock, and money', () => {
+  it('keeps mobile daily work focused on home, sales, goods, and money', () => {
     expect(mobilePrimaryNavigation(ownerPermissions).map(item => item.id)).toEqual([
       'home',
       'orders',
-      'inventory',
+      'products',
       'finance',
     ]);
+    expect(portalMenuNavigation(ownerPermissions).map(item => item.id)).toContain('inventory');
   });
 
-  it('preserves remaining order when permissions hide destinations', () => {
+  it('preserves primary order when permissions hide destinations', () => {
     const permissions: PermissionId[] = ['viewProducts', 'viewInventory', 'viewReports'];
     expect(desktopPrimaryNavigation(permissions).map(item => item.id)).toEqual([
       'home',
       'products',
       'inventory',
-      'reports',
     ]);
+    expect(portalMenuNavigation(permissions).map(item => item.id)).toContain('reports');
   });
 
-  it('uses beginner-facing labels and keeps compatibility routes contextual', () => {
+  it('keeps management destinations available through the menu', () => {
     const labels = Object.fromEntries(
       [...desktopPrimaryNavigation(ownerPermissions), ...portalMenuNavigation(ownerPermissions)].map(
         item => [item.id, item.label],
@@ -73,8 +71,8 @@ describe('portal navigation', () => {
     );
 
     expect(labels.home).toBe('Beranda');
-    expect(labels.orders).toBe('Jualan');
-    expect(labels.products).toBe('Produk');
+    expect(labels.orders).toBe('Jual');
+    expect(labels.products).toBe('Barang');
     expect(labels.inventory).toBe('Stok');
     expect(labels.finance).toBe('Uang');
     expect(labels.reports).toBe('Laporan');

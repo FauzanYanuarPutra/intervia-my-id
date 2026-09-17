@@ -1,25 +1,36 @@
 import { notFound } from 'next/navigation';
-import { ClipboardCheck, Clock3, PackageCheck, ShoppingBag } from 'lucide-react';
+import { Clock3, ShoppingBag } from 'lucide-react';
 import { CashShiftWorkspace } from '@/components/business-control/CashShiftWorkspace';
 import { QuickSaleWorkspace } from '@/components/business-control/QuickSaleWorkspace';
-import { DataPanel } from '@/components/portal/DataPanel';
 import { EmptyState } from '@/components/portal/EmptyState';
+import { MetricStrip } from '@/components/portal/MetricStrip';
+import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
-import { SectionCard } from '@/components/portal/SectionCard';
-import { StatCard } from '@/components/portal/StatCard';
 import { StatusBadge } from '@/components/portal/StatusBadge';
+import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getCurrentWave2CashShift } from '@/lib/business-wave2-server';
-import { listControlSales } from '@/lib/business-control-server';
+import { listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
 import { jakartaDateKey } from '@/lib/business-control/insights';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
-type PageProps = { params: Promise<{ businessId: string }> };
+type PageProps = {
+  params: Promise<{ businessId: string }>;
+  searchParams: Promise<{ view?: string }>;
+};
+
+type ConfigurationSnapshot = {
+  choices?: Array<{ option_label?: string }>;
+  note?: string | null;
+};
+
+type SnapshotAwareSaleLine = ControlSaleLine & {
+  configuration_snapshot?: ConfigurationSnapshot | null;
+  line_note?: string | null;
+};
 
 const money = new Intl.NumberFormat('id-ID', {
-  style: 'currency',
-  currency: 'IDR',
-  maximumFractionDigits: 0,
+  style: 'currency', currency: 'IDR', maximumFractionDigits: 0,
 });
 
 function orderTone(status: string): 'info' | 'warning' | 'success' | 'neutral' {
@@ -29,10 +40,35 @@ function orderTone(status: string): 'info' | 'warning' | 'success' | 'neutral' {
   return 'neutral';
 }
 
-export default async function BusinessOrdersPage({ params }: PageProps) {
+function saleLineConfiguration(line: ControlSaleLine): ConfigurationSnapshot | null {
+  const snapshotLine = line as SnapshotAwareSaleLine;
+  if (snapshotLine.configuration_snapshot && typeof snapshotLine.configuration_snapshot === 'object') {
+    return snapshotLine.configuration_snapshot;
+  }
+  const configuration = line.cost_snapshot?.configuration;
+  return configuration && typeof configuration === 'object'
+    ? configuration as ConfigurationSnapshot
+    : null;
+}
+
+function saleLineChoiceSummary(line: ControlSaleLine) {
+  return saleLineConfiguration(line)?.choices
+    ?.map(choice => choice.option_label?.trim())
+    .filter(Boolean)
+    .join(' · ') ?? '';
+}
+
+function saleLineNote(line: ControlSaleLine) {
+  const snapshotLine = line as SnapshotAwareSaleLine;
+  const direct = snapshotLine.line_note?.trim();
+  if (direct) return direct;
+  return saleLineConfiguration(line)?.note?.trim() || '';
+}
+
+export default async function BusinessOrdersPage({ params, searchParams }: PageProps) {
   const { businessId } = await params;
-  const { account, businesses, activeBusiness } =
-    await resolvePortalBusinessPageState(businessId);
+  const query = await searchParams;
+  const { account, businesses, activeBusiness } = await resolvePortalBusinessPageState(businessId);
   const business = activeBusiness;
   if (!business) notFound();
 
@@ -45,152 +81,95 @@ export default async function BusinessOrdersPage({ params }: PageProps) {
     canViewTransactions ? listControlSales(business.id) : Promise.resolve([]),
     canCloseCashShift ? getCurrentWave2CashShift(business.id) : Promise.resolve(null),
   ]);
-  const saleProducts = business.products
-    .filter(product => product.status === 'live')
-    .map(product => ({
-      id: product.id,
-      name: product.name,
-      priceLabel: product.priceLabel,
-    }));
+
+  const saleProducts = business.products.filter(product => product.status === 'live').map(product => ({
+    id: product.id,
+    name: product.name,
+    priceLabel: product.priceLabel,
+    imageUrl: product.imageUrl,
+    category: product.category,
+    modifierGroups: product.modifierGroups ?? [],
+  }));
+
+  const availableViews = [
+    ...(canCreateSales ? [{ id: 'kasir', label: 'Kasir' }] : []),
+    ...(canViewTransactions ? [{ id: 'transaksi', label: 'Transaksi', badge: sales.length }] : []),
+    ...((canManageOrders || business.orders.length) ? [{ id: 'pesanan', label: 'Pesanan', badge: business.orders.length }] : []),
+  ];
+  const requested = query.view;
+  const activeView = availableViews.some(item => item.id === requested)
+    ? requested!
+    : availableViews[0]?.id ?? 'kasir';
+  const tabs = availableViews.map(item => ({
+    ...item,
+    href: `/businesses/${business.id}/orders?view=${item.id}`,
+  }));
+
   const newOrders = business.orders.filter(order => order.status === 'baru').length;
-  const processingOrders = business.orders.filter(
-    order => order.status === 'diproses' || order.status === 'siap kirim',
-  ).length;
-  const completedOrders = business.orders.filter(
-    order => order.status === 'selesai',
-  ).length;
+  const processingOrders = business.orders.filter(order => order.status === 'diproses' || order.status === 'siap kirim').length;
+  const completedOrders = business.orders.filter(order => order.status === 'selesai').length;
 
   return (
-    <PortalShell
-      activeBusiness={business}
-      availableBusinesses={businesses}
-      viewerName={account?.name ?? null}
-      currentSection="orders"
-    >
-      <SectionCard
-        eyebrow="Kasir"
-        title="Jual cepat, catatan tetap rapi"
-        description="Tap produk, pilih jumlah, Bayar, lalu lanjut transaksi berikutnya. HPP membantu analisis jika tersedia, tetapi tidak pernah menghalangi jualan."
-      >
-        <div className="space-y-4">
-          {canCloseCashShift ? (
-            <CashShiftWorkspace businessId={business.id} initialShift={currentShift} />
-          ) : null}
+    <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="orders">
+      <PageHeader
+        eyebrow="Jualan"
+        title={activeView === 'kasir' ? 'Kasir' : activeView === 'transaksi' ? 'Transaksi' : 'Pesanan'}
+        description={activeView === 'kasir' ? 'Tap produk, atur jumlah, lalu Bayar.' : activeView === 'transaksi' ? 'Riwayat penjualan yang sudah tercatat.' : 'Pantau pesanan yang perlu diproses.'}
+      />
 
-          {canCreateSales ? (
-            <DataPanel
-              title="Kasir"
-              description="Penjualan tersimpan sebagai transaksi canonical dan pendapatan dibuat otomatis sekali."
-            >
-              <div className="p-3 sm:p-4">
-                <QuickSaleWorkspace
-                  businessId={business.id}
-                  products={saleProducts}
-                  defaultDate={jakartaDateKey()}
-                />
-              </div>
-            </DataPanel>
-          ) : null}
+      <WorkspaceTabs items={tabs} activeId={activeView} ariaLabel="Mode jualan" />
 
-          {canViewTransactions ? (
-            <DataPanel
-              title="Transaksi tercatat"
-              description={`${sales.length} transaksi tersimpan. Biaya tetap jujur: jika HPP belum ada, laba tidak ditebak.`}
-            >
-              {sales.length ? (
-                <div className="divide-y divide-portal-line">
-                  {sales.map(({ sale, lines }) => {
-                    const itemSummary = lines
-                      .map(
-                        line =>
-                          `${line.product_name} × ${Number(line.quantity).toLocaleString('id-ID')}`,
-                      )
-                      .join(', ');
-                    const grossProfit =
-                      sale.cost_complete && sale.cogs_amount !== null
-                        ? sale.final_amount - sale.cogs_amount
-                        : null;
-                    return (
-                      <article
-                        key={sale.id}
-                        className="grid gap-2 px-4 py-3 sm:grid-cols-[110px_minmax(180px,1fr)_120px_150px] sm:items-center sm:px-5"
-                      >
-                        <div>
-                          <p className="text-[11px] font-semibold text-portal-soft">Tanggal</p>
-                          <p className="text-sm font-bold text-portal-ink">{sale.occurred_on}</p>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-portal-ink">{itemSummary}</p>
-                          <p className="mt-1 text-xs text-portal-soft">{sale.channel_key || 'Offline / langsung'} · {sale.account_key}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold text-portal-soft">Omzet</p>
-                          <p className="text-sm font-bold text-portal-ink">{money.format(sale.final_amount)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold text-portal-soft">{canViewCosting ? 'Laba kotor' : 'Status biaya'}</p>
-                          <p className="text-sm font-bold text-portal-ink">
-                            {canViewCosting
-                              ? grossProfit === null
-                                ? 'HPP belum lengkap'
-                                : money.format(grossProfit)
-                              : sale.cost_complete
-                                ? 'Terkunci'
-                                : 'Belum lengkap'}
-                          </p>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  title="Belum ada transaksi"
-                  description="Jualan dari Kasir akan muncul di sini. Produk tanpa HPP tetap boleh dijual dan ditandai belum lengkap biayanya."
-                  icon={ShoppingBag}
-                />
-              )}
-            </DataPanel>
-          ) : null}
-
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Baru masuk" value={newOrders} icon={ShoppingBag} note="Belum mulai diproses" />
-            <StatCard label="Sedang berjalan" value={processingOrders} icon={Clock3} note="Diproses atau siap kirim" />
-            <StatCard label="Selesai" value={completedOrders} icon={PackageCheck} note="Tercatat pada data workspace" />
-            <StatCard label="Akses" value={canManageOrders ? 'Kelola order' : canCreateSales ? 'Kasir' : 'Pantau'} icon={ClipboardCheck} note={canManageOrders ? 'Dapat memproses pesanan eksternal' : canCreateSales ? 'Dapat membuat transaksi penjualan' : 'Mode lihat saja'} />
-          </section>
-
-          <DataPanel
-            title="Antrean pesanan"
-            description={`${business.orders.length} pesanan kanal/operasional tercatat terpisah dari transaksi Kasir.`}
-          >
-            {business.orders.length ? (
-              <div>
-                <div className="hidden grid-cols-[120px_minmax(180px,1fr)_minmax(220px,1.4fr)_130px_110px] gap-4 border-b border-portal-line bg-[#fafbf9] px-5 py-3 text-[11px] font-bold text-portal-soft lg:grid">
-                  <span>ID</span><span>Pembeli</span><span>Pesanan</span><span>Total</span><span>Status</span>
-                </div>
-                <div className="divide-y divide-portal-line">
-                  {business.orders.map(order => (
-                    <article key={order.id} className="grid gap-3 px-4 py-4 transition hover:bg-[#fafbf9] sm:px-5 lg:grid-cols-[120px_minmax(180px,1fr)_minmax(220px,1.4fr)_130px_110px] lg:items-center lg:gap-4">
-                      <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">ID pesanan</p><p className="mt-1 text-xs font-bold text-portal-ink lg:mt-0">{order.id}</p></div>
-                      <div className="min-w-0"><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Pembeli</p><p className="mt-1 truncate text-sm font-bold text-portal-ink lg:mt-0">{order.buyer}</p><p className="mt-1 text-xs text-portal-soft">{order.channel}</p></div>
-                      <div className="min-w-0"><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Pesanan</p><p className="mt-1 text-sm leading-5 text-portal-ink lg:mt-0">{order.itemSummary}</p></div>
-                      <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Total</p><p className="mt-1 text-sm font-bold text-portal-ink lg:mt-0">{order.amountLabel}</p></div>
-                      <div><StatusBadge tone={orderTone(order.status)}>{order.status}</StatusBadge></div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                title="Belum ada pesanan"
-                description="Pesanan dari kanal order tampil di sini dan tidak dicampur dengan transaksi Kasir."
-                icon={ShoppingBag}
-              />
-            )}
-          </DataPanel>
+      {activeView === 'kasir' && canCreateSales ? (
+        <div className="space-y-3">
+          {canCloseCashShift ? <CashShiftWorkspace businessId={business.id} initialShift={currentShift} /> : null}
+          <QuickSaleWorkspace businessId={business.id} products={saleProducts} defaultDate={jakartaDateKey()} />
         </div>
-      </SectionCard>
+      ) : null}
+
+      {activeView === 'transaksi' && canViewTransactions ? (
+        <section className="merchant-list border border-portal-line/80">
+          {sales.length ? sales.map(({ sale, lines }) => {
+            const itemSummary = lines.map(line => {
+              const choices = saleLineChoiceSummary(line);
+              return `${line.product_name}${choices ? ` (${choices})` : ''} × ${Number(line.quantity).toLocaleString('id-ID')}`;
+            }).join(', ');
+            const notes = lines.map(line => saleLineNote(line)).filter(Boolean);
+            const grossProfit = sale.cost_complete && sale.cogs_amount !== null ? sale.final_amount - sale.cogs_amount : null;
+            return (
+              <article key={sale.id} className="merchant-action-row sm:grid sm:grid-cols-[minmax(0,1fr)_130px_150px] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-portal-ink">{itemSummary}</p>
+                  {notes.length ? <p className="mt-1 truncate text-[11px] font-medium text-portal-forest">Catatan: {notes.join(' · ')}</p> : null}
+                  <p className="mt-1 text-[11px] text-portal-soft">{sale.occurred_on} · {sale.channel_key || 'Langsung'} · {sale.account_key}</p>
+                </div>
+                <div className="text-right"><p className="text-[10px] font-semibold text-portal-soft">Total</p><p className="text-sm font-black text-portal-ink">{money.format(sale.final_amount)}</p></div>
+                <div className="hidden text-right sm:block"><p className="text-[10px] font-semibold text-portal-soft">{canViewCosting ? 'Laba kotor' : 'Biaya'}</p><p className="text-sm font-bold text-portal-ink">{canViewCosting ? (grossProfit === null ? 'HPP belum lengkap' : money.format(grossProfit)) : (sale.cost_complete ? 'Lengkap' : 'Belum lengkap')}</p></div>
+              </article>
+            );
+          }) : <EmptyState title="Belum ada transaksi" description="Penjualan dari Kasir akan muncul di sini." icon={ShoppingBag} />}
+        </section>
+      ) : null}
+
+      {activeView === 'pesanan' ? (
+        <div className="space-y-3">
+          <MetricStrip items={[
+            { label: 'Baru', value: newOrders, note: 'Belum diproses' },
+            { label: 'Berjalan', value: processingOrders, note: 'Diproses / siap kirim' },
+            { label: 'Selesai', value: completedOrders, note: 'Sudah ditutup' },
+            { label: 'Akses', value: canManageOrders ? 'Kelola' : 'Pantau', note: 'Pesanan kanal' },
+          ]} />
+          <section className="merchant-list border border-portal-line/80">
+            {business.orders.length ? business.orders.map(order => (
+              <article key={order.id} className="merchant-action-row sm:grid sm:grid-cols-[minmax(0,.8fr)_minmax(0,1.5fr)_120px_auto] sm:items-center">
+                <div className="min-w-0"><p className="truncate text-sm font-black text-portal-ink">{order.buyer}</p><p className="mt-0.5 text-[11px] text-portal-soft">{order.channel} · {order.id}</p></div>
+                <p className="min-w-0 truncate text-sm text-portal-ink">{order.itemSummary}</p>
+                <strong className="text-sm text-portal-ink">{order.amountLabel}</strong>
+                <StatusBadge tone={orderTone(order.status)}>{order.status}</StatusBadge>
+              </article>
+            )) : <EmptyState title="Belum ada pesanan" description="Pesanan dari kanal online akan muncul di sini." icon={Clock3} />}
+          </section>
+        </div>
+      ) : null}
     </PortalShell>
   );
 }

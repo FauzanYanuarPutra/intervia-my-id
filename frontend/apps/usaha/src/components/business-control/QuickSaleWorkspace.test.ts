@@ -38,17 +38,20 @@ describe('quick sale request', () => {
         {
           product_id: 'product-1',
           quantity: 2,
-          unit_price_amount: 12_000,
           discount_amount: 0,
+          selected_options: [],
+          note: null,
         },
         {
           product_id: 'product-2',
           quantity: 1,
-          unit_price_amount: 8_000,
           discount_amount: 1_000,
+          selected_options: [],
+          note: null,
         },
       ],
     });
+    expect(JSON.stringify(request)).not.toContain('unit_price_amount');
     expect(JSON.stringify(request)).not.toContain('cogs');
     expect(JSON.stringify(request)).not.toContain('hpp');
     expect(

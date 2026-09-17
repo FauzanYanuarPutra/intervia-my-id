@@ -94,6 +94,20 @@ export type OrderRecord = {
   created_at: string;
   updated_at: string;
   metadata: Record<string, unknown>;
+  items?: OrderItemRecord[];
+};
+
+export type OrderItemRecord = {
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  unit_price_cents: number;
+  line_total_cents: number;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 };
 
 export type ReservationRecord = {
@@ -153,6 +167,118 @@ export type CreateStoreResponse = {
 };
 
 export type OrderFilter = 'active' | 'awaiting_bill' | 'completed' | 'all';
+
+export type WorkspaceCollectionId =
+  | 'products'
+  | 'tables'
+  | 'qr'
+  | 'orders'
+  | 'reservations'
+  | 'team';
+
+const ROLE_PERMISSION_MAP: Record<
+  NonNullable<StoreRecord['access_role']>,
+  string[]
+> = {
+  owner: [
+    'store:view',
+    'store:update',
+    'store:publish',
+    'team:manage',
+    'product:manage',
+    'table:manage',
+    'qr:manage',
+    'order:manage',
+    'reservation:manage',
+    'payment:manage',
+  ],
+  manager: [
+    'store:view',
+    'store:update',
+    'store:publish',
+    'product:manage',
+    'table:manage',
+    'qr:manage',
+    'order:manage',
+    'reservation:manage',
+    'payment:manage',
+  ],
+  cashier: ['store:view', 'order:manage', 'payment:manage'],
+  stock: ['store:view', 'product:manage'],
+  ops: ['store:view', 'table:manage', 'qr:manage', 'order:manage', 'reservation:manage'],
+  finance: ['store:view', 'payment:manage'],
+};
+
+export function accessRoleHasPermission(
+  role: StoreRecord['access_role'] | null | undefined,
+  permission: string,
+): boolean {
+  if (!role) return false;
+  return ROLE_PERMISSION_MAP[role]?.includes(permission) || false;
+}
+
+export function shouldTreatWorkspaceCollectionAsOptional(input: {
+  workspace: UmkmManageWorkspaceId;
+  collection: WorkspaceCollectionId;
+  status: number;
+  accessRole?: StoreRecord['access_role'] | null;
+}): boolean {
+  if (input.status !== 401 && input.status !== 403) return false;
+  if (input.workspace !== 'orders') return false;
+  if (input.collection === 'orders' || input.collection === 'products') {
+    return false;
+  }
+  return input.accessRole === 'cashier' || input.accessRole === 'finance';
+}
+
+export function getOrderAttentionLevel(order: Pick<OrderRecord, 'status' | 'payment_status' | 'payment_stage'>): 'blocked' | 'ready' | 'done' | 'cancelled' {
+  if (order.status === 'cancelled') return 'cancelled';
+  if (order.status === 'paid' || order.payment_status === 'paid') return 'done';
+  if (order.payment_stage === 'awaiting_confirmation') return 'blocked';
+  return 'ready';
+}
+
+export function getOrderOperatorLabel(
+  order: Pick<OrderRecord, 'metadata'>,
+): string {
+  const metadata = order.metadata || {};
+  const payment =
+    metadata.payment && typeof metadata.payment === 'object' && !Array.isArray(metadata.payment)
+      ? (metadata.payment as Record<string, unknown>)
+      : {};
+
+  for (const value of [
+    metadata.last_action_by_email,
+    metadata.confirmed_by_email,
+    payment.checked_out_by_email,
+    metadata.created_by_email,
+    metadata.last_action_by_user_id,
+    metadata.created_by_user_id,
+  ]) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+export function mergeAccessibleRequestedStore(input: {
+  items: StoreRecord[];
+  requestedStoreId: string;
+  store?: StoreRecord | null;
+  accessRole: NonNullable<StoreRecord['access_role']>;
+}): StoreRecord[] {
+  if (!input.requestedStoreId || !input.store) return input.items;
+  if (input.store.id !== input.requestedStoreId) return input.items;
+  if (input.items.some(item => item.id === input.store?.id)) return input.items;
+
+  return [
+    {
+      ...input.store,
+      access_role: input.store.access_role || input.accessRole,
+      access_via: input.store.access_via || 'member',
+    },
+    ...input.items,
+  ];
+}
 
 export type StoreFormState = {
   name: string;

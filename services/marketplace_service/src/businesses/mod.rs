@@ -4,6 +4,10 @@ mod advisor_routes;
 mod availability_persistence_tests;
 pub(crate) mod control;
 pub(crate) mod domain;
+mod finance_core;
+mod finance_core_routes;
+#[cfg(test)]
+mod finance_core_tests;
 #[cfg(test)]
 mod finance_semantics_tests;
 mod governance;
@@ -28,6 +32,10 @@ mod inventory_tests;
 mod media;
 #[cfg(test)]
 mod media_migration_tests;
+#[cfg(test)]
+mod modifier_recipe_effect_tests;
+mod modifier_resolution;
+mod product_modifiers;
 mod products;
 #[cfg(test)]
 mod products_persistence_tests;
@@ -66,6 +74,8 @@ mod wave2_routes;
 
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
+        .merge(product_modifiers::router())
+        .merge(finance_core_routes::router())
         .merge(governance_routes::router())
         .merge(ingredient_management_routes::router())
         .merge(inventory_routes::router())

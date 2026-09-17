@@ -1,0 +1,163 @@
+# Development compatibility overlay.
+#
+# Docker Compose automatically loads this file when `docker compose` is run
+# without explicit `-f` arguments. It keeps direct local commands on the same
+# `lajukan_dev` project and supplies ONLY documented non-production defaults.
+#
+# Canonical development startup remains:
+#   .\up.ps1
+#
+# Staging/production launchers pass explicit compose files and env files, so
+# this compatibility overlay is not part of those environments.
+
+name: ${COMPOSE_PROJECT_NAME:-lajukan_dev}
+
+x-dev-db-credentials: &dev-db-credentials
+  POSTGRES_USER: ${DB_USER:-lajukan}
+  POSTGRES_PASSWORD: ${DB_PASS:-lajukan-dev-postgres}
+
+services:
+  identity_db:
+    environment:
+      <<: *dev-db-credentials
+      POSTGRES_DB: identity_db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-lajukan} -d identity_db",
+        ]
+    ports:
+      - "127.0.0.1:${PORT_IDENTITY_DB:-5432}:5432"
+
+  community_db:
+    environment:
+      <<: *dev-db-credentials
+      POSTGRES_DB: community_db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-lajukan} -d community_db",
+        ]
+    ports:
+      - "127.0.0.1:${PORT_COMMUNITY_DB:-5433}:5432"
+
+  marketplace_db:
+    environment:
+      <<: *dev-db-credentials
+      POSTGRES_DB: marketplace_db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-lajukan} -d marketplace_db",
+        ]
+    ports:
+      - "127.0.0.1:${PORT_MARKETPLACE_DB:-5434}:5432"
+
+  redis_cache:
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASS:-lajukan-dev-redis}
+      - --save
+      - "60"
+      - "1"
+      - --maxmemory-policy
+      - allkeys-lru
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli -a '${REDIS_PASS:-lajukan-dev-redis}' ping | grep -q PONG",
+        ]
+    ports:
+      - "127.0.0.1:${PORT_REDIS:-6379}:6379"
+
+  rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-lajukan}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS:-lajukan-dev-rabbit}
+    ports:
+      - "127.0.0.1:${PORT_RABBITMQ:-5672}:5672"
+      - "127.0.0.1:${PORT_RABBITMQ_UI:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  meilisearch:
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_KEY:-lajukan-dev-meili-master-key}
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "127.0.0.1:${PORT_MEILI:-7700}:7700"
+
+  identity_service:
+    environment:
+      ENV: development
+      IDENTITY_DATABASE_URL: postgres://${DB_USER:-lajukan}:${DB_PASS:-lajukan-dev-postgres}@identity_db:5432/identity_db
+      POSTGRES_HOST: identity_db
+      POSTGRES_USER: ${DB_USER:-lajukan}
+      REDIS_URL: redis://:${REDIS_PASS:-lajukan-dev-redis}@redis_cache:6379
+      REDIS_HOST: redis_cache
+      REDIS_PASSWORD: ${REDIS_PASS:-lajukan-dev-redis}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBIT_USER:-lajukan}
+      RABBITMQ_PASSWORD: ${RABBIT_PASS:-lajukan-dev-rabbit}
+      RABBITMQ_URL: amqp://${RABBIT_USER:-lajukan}:${RABBIT_PASS:-lajukan-dev-rabbit}@rabbitmq:5672/%2f
+      JWT_SECRET: ${JWT_SECRET:-lajukan-development-jwt-secret-change-me-before-sharing}
+    ports:
+      - "127.0.0.1:${PORT_IDENTITY:-8080}:8080"
+
+  marketplace_service:
+    environment:
+      ENV: development
+      MARKETPLACE_DATABASE_URL: postgres://${DB_USER:-lajukan}:${DB_PASS:-lajukan-dev-postgres}@marketplace_db:5432/marketplace_db
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_KEY:-lajukan-dev-meili-master-key}
+      REDIS_URL: redis://:${REDIS_PASS:-lajukan-dev-redis}@redis_cache:6379
+      REDIS_HOST: redis_cache
+      REDIS_PASSWORD: ${REDIS_PASS:-lajukan-dev-redis}
+      RABBITMQ_URL: amqp://${RABBIT_USER:-lajukan}:${RABBIT_PASS:-lajukan-dev-rabbit}@rabbitmq:5672/%2f
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBIT_USER:-lajukan}
+      RABBITMQ_PASSWORD: ${RABBIT_PASS:-lajukan-dev-rabbit}
+      JWT_SECRET: ${JWT_SECRET:-lajukan-development-jwt-secret-change-me-before-sharing}
+      IDENTITY_SERVICE_URL: http://identity_service:8080
+    ports:
+      - "127.0.0.1:${PORT_MARKETPLACE:-8081}:8081"
+
+  community_service:
+    environment:
+      ENV: development
+      COMMUNITY_DATABASE_URL: postgres://${DB_USER:-lajukan}:${DB_PASS:-lajukan-dev-postgres}@community_db:5432/community_db
+      REDIS_URL: redis://:${REDIS_PASS:-lajukan-dev-redis}@redis_cache:6379
+      REDIS_HOST: redis_cache
+      REDIS_PASSWORD: ${REDIS_PASS:-lajukan-dev-redis}
+      RABBITMQ_URL: amqp://${RABBIT_USER:-lajukan}:${RABBIT_PASS:-lajukan-dev-rabbit}@rabbitmq:5672/%2f
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBIT_USER:-lajukan}
+      RABBITMQ_PASSWORD: ${RABBIT_PASS:-lajukan-dev-rabbit}
+      JWT_SECRET: ${JWT_SECRET:-lajukan-development-jwt-secret-change-me-before-sharing}
+      INTERNAL_API_URL: http://identity_service:8080
+    ports:
+      - "127.0.0.1:${PORT_COMMUNITY:-8082}:8082"
+
+  usaha:
+    environment:
+      ENV: development
+      APP_ENV: development
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_ENV: development
+      INTERNAL_API_URL: http://identity_service:8080
+      INTERNAL_IDENTITY_URL: http://identity_service:8080
+      INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
+      INTERNAL_COMMUNITY_URL: http://community_service:8082
+      COMMUNITY_SERVICE_URL: http://community_service:8082
+    ports:
+      - "127.0.0.1:${PORT_USAHA:-3003}:3003"

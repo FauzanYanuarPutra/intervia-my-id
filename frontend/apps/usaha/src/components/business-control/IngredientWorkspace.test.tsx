@@ -32,6 +32,8 @@ describe('IngredientWorkspace existing ingredient management', () => {
     expect(html).toContain('Edit');
     expect(html).toContain('Riwayat');
     expect(html).toContain('Arsipkan');
+    expect(html).toContain('Aksi lain');
+    expect(html).toContain('Detail bahan');
   });
 
   it('shows missing operational setup as missing instead of rendering minimum zero as healthy data', () => {
@@ -46,5 +48,6 @@ describe('IngredientWorkspace existing ingredient management', () => {
     expect(html).toContain('Harga beli belum diisi');
     expect(html).toContain('Modal belum bisa dihitung');
     expect(html).not.toContain('minimum 0');
+    expect(html).toContain('Pengaturan lanjutan');
   });
 });
