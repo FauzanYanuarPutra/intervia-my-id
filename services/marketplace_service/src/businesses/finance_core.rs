@@ -1,10 +1,10 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::kernel::command::canonical_request_hash;
 
 const MAX_NOTE_LEN: usize = 2_000;
 const MAX_REASON_LEN: usize = 2_000;
@@ -169,7 +169,10 @@ fn normalized_note(value: &str) -> Result<String, FinanceCoreError> {
 }
 
 fn request_hash<T: Serialize>(payload: &T) -> Result<String, FinanceCoreError> {
-    canonical_request_hash(payload).map_err(|_| FinanceCoreError::Database)
+    let bytes = serde_json::to_vec(payload).map_err(|_| FinanceCoreError::Database)?;
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
