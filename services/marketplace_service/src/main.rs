@@ -143,6 +143,7 @@ struct OutboxEventRow {
     id: Uuid,
     routing_key: String,
     payload: Value,
+    lease_until: DateTime<Utc>,
 }
 
 fn parse_cors_origins() -> Vec<HeaderValue> {
@@ -2444,6 +2445,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(news::router())
         .route("/health", get(health))
         .route("/ready", get(ready))
+        .route("/metrics", get(service_metrics))
         .route("/", get(root))
         .route("/v1/map/references", get(list_map_references))
         .route("/v1/content", get(list_content).post(create_content))
@@ -2738,6 +2740,54 @@ async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         )
             .into_response(),
     }
+}
+
+async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let pool_size = state.db.size();
+    let pool_idle = state.db.num_idle();
+    let notification_subscribers = state.notification_tx.receiver_count();
+    let (outbox_backlog, metrics_query_ok) = match timeout(
+        Duration::from_secs(2),
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status <> 'published'",
+        )
+        .fetch_one(&state.db),
+    )
+    .await
+    {
+        Ok(Ok(value)) => (value, 1),
+        Ok(Err(_)) | Err(_) => (0, 0),
+    };
+
+    let body = format!(
+        concat!(
+            "# HELP lajukan_service_info Static service identity.\n",
+            "# TYPE lajukan_service_info gauge\n",
+            "lajukan_service_info{{service=\"marketplace_service\"}} 1\n",
+            "# HELP lajukan_db_pool_connections PostgreSQL pool connections by state.\n",
+            "# TYPE lajukan_db_pool_connections gauge\n",
+            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"total\"}} {}\n",
+            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"idle\"}} {}\n",
+            "# HELP lajukan_outbox_backlog Pending or failed transactional outbox events.\n",
+            "# TYPE lajukan_outbox_backlog gauge\n",
+            "lajukan_outbox_backlog{{service=\"marketplace_service\"}} {}\n",
+            "# HELP lajukan_metrics_db_query_ok Whether the metrics DB query succeeded.\n",
+            "# TYPE lajukan_metrics_db_query_ok gauge\n",
+            "lajukan_metrics_db_query_ok{{service=\"marketplace_service\"}} {}\n",
+            "# HELP lajukan_notification_subscribers Active realtime notification subscribers.\n",
+            "# TYPE lajukan_notification_subscribers gauge\n",
+            "lajukan_notification_subscribers{{service=\"marketplace_service\"}} {}\n"
+        ),
+        pool_size, pool_idle, outbox_backlog, metrics_query_ok, notification_subscribers
+    );
+
+    (
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
+        body,
+    )
 }
 
 async fn collect_events(
@@ -7811,7 +7861,7 @@ async fn unread_notification_count(db: &PgPool, user_id: Uuid) -> Result<i64, sq
     .await
 }
 
-async fn push_notification_best_effort(
+pub(crate) async fn push_notification_best_effort(
     state: &Arc<AppState>,
     user_id: Uuid,
     category: &str,
@@ -12435,6 +12485,83 @@ async fn create_content(
         return err(StatusCode::BAD_REQUEST, "body is too long").into_response();
     }
 
+    if content_type == "news" {
+        let open_submission_count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM content_items
+            WHERE owner_id = $1
+              AND content_type = 'news'
+              AND content_status = 'draft'
+              AND COALESCE(metadata->'news'->>'editorial_status', 'pending_review')
+                    IN ('pending_review', 'needs_revision')
+            "#,
+        )
+        .bind(owner_id)
+        .fetch_one(&state.db)
+        .await;
+
+        match open_submission_count {
+            Ok(count) if count >= 50 => {
+                return err(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "too many open news submissions; revise existing items first",
+                )
+                .into_response();
+            }
+            Ok(_) => {}
+            Err(error) => {
+                tracing::error!("create_content news quota check error: {:?}", error);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate news submission quota",
+                )
+                .into_response();
+            }
+        }
+
+        let duplicate = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+              SELECT 1
+              FROM content_items
+              WHERE owner_id = $1
+                AND content_type = 'news'
+                AND content_status <> 'deleted'
+                AND created_at >= NOW() - interval '7 days'
+                AND (
+                  lower(title) = lower($2)
+                  OR body = $3
+                )
+            )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(&title)
+        .bind(&body)
+        .fetch_one(&state.db)
+        .await;
+
+        match duplicate {
+            Ok(true) => {
+                return err(
+                    StatusCode::CONFLICT,
+                    "duplicate news submission; revise the existing submission instead",
+                )
+                .into_response();
+            }
+            Ok(false) => {}
+            Err(error) => {
+                tracing::error!("create_content news duplicate check error: {:?}", error);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate duplicate news submission",
+                )
+                .into_response();
+            }
+        }
+    }
+
     let slug = match clean_text(payload.slug) {
         Some(slug) => slug,
         None => match generate_unique_slug(&state.db, &title).await {
@@ -12682,6 +12809,9 @@ async fn create_content(
 
     match inserted {
         Ok(row) => {
+            if row.content_type == "news" {
+                news::after_submission_created(&state, row.id, row.owner_id).await;
+            }
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
                 Ok(map) => map.get(&row.owner_id).cloned(),
                 Err(e) => {
@@ -23669,11 +23799,27 @@ async fn publish_outbox_batch(
 ) -> anyhow::Result<usize> {
     let events = sqlx::query_as::<_, OutboxEventRow>(
         r#"
-        SELECT id, routing_key, payload
-        FROM events.event_outbox
-        WHERE status = 'pending' AND available_at <= NOW()
-        ORDER BY created_at ASC
-        LIMIT $1
+        WITH candidate AS (
+          SELECT id
+          FROM events.event_outbox
+          WHERE status IN ('pending', 'processing')
+            AND available_at <= NOW()
+          ORDER BY created_at ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT $1
+        )
+        UPDATE events.event_outbox AS outbox
+        SET
+          status = 'processing',
+          available_at = NOW() + INTERVAL '2 minutes',
+          error_message = NULL
+        FROM candidate
+        WHERE outbox.id = candidate.id
+        RETURNING
+          outbox.id,
+          outbox.routing_key,
+          outbox.payload,
+          outbox.available_at AS lease_until
         "#,
     )
     .bind(batch_size)
@@ -23685,16 +23831,6 @@ async fn publish_outbox_batch(
     }
 
     for event in events.iter() {
-        let claimed = sqlx::query(
-            "UPDATE events.event_outbox SET status = 'processing' WHERE id = $1 AND status = 'pending'",
-        )
-        .bind(event.id)
-        .execute(db)
-        .await?;
-
-        if claimed.rows_affected() == 0 {
-            continue;
-        }
 
         let payload_bytes = serde_json::to_vec(&event.payload)?;
         let publish_result = channel
@@ -23722,10 +23858,13 @@ async fn publish_outbox_batch(
                           available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
                           error_message = $2
                         WHERE id = $1
+                          AND status = 'processing'
+                          AND available_at = $3
                         "#,
                     )
                     .bind(event.id)
                     .bind(error_text)
+                    .bind(event.lease_until)
                     .execute(db)
                     .await;
                     continue;
@@ -23742,10 +23881,13 @@ async fn publish_outbox_batch(
                       available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
                       error_message = $2
                     WHERE id = $1
+                      AND status = 'processing'
+                      AND available_at = $3
                     "#,
                 )
                 .bind(event.id)
                 .bind(error_text)
+                .bind(event.lease_until)
                 .execute(db)
                 .await;
                 continue;
@@ -23757,9 +23899,12 @@ async fn publish_outbox_batch(
             UPDATE events.event_outbox
             SET status = 'published', published_at = NOW(), error_message = NULL
             WHERE id = $1
+              AND status = 'processing'
+              AND available_at = $2
             "#,
         )
         .bind(event.id)
+        .bind(event.lease_until)
         .execute(db)
         .await?;
     }
