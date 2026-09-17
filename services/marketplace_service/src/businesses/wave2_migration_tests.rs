@@ -1,6 +1,38 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+#[test]
+fn wave2_creation_idempotency_migration_has_business_scoped_unique_keys() {
+    let migration =
+        include_str!("../../migrations/20260918074000_wave2_creation_idempotency.up.sql");
+
+    for table in [
+        "business_recurring_obligations",
+        "business_material_yield_observations",
+    ] {
+        assert!(migration.contains(table), "missing idempotency table {table}");
+    }
+    assert_eq!(
+        migration
+            .matches("ON business_recurring_obligations (business_id, idempotency_key)")
+            .count(),
+        1
+    );
+    assert_eq!(
+        migration
+            .matches("ON business_material_yield_observations (business_id, idempotency_key)")
+            .count(),
+        1
+    );
+    assert_eq!(
+        migration
+            .matches("ALTER COLUMN idempotency_key SET NOT NULL")
+            .count(),
+        2
+    );
+}
+
+
 #[sqlx::test(migrations = "./migrations")]
 async fn wave2_operating_tables_exist(pool: PgPool) {
     for table in [
