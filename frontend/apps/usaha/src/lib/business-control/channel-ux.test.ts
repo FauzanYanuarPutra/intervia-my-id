@@ -23,6 +23,7 @@ describe('channel business summary', () => {
     const result = buildChannelBusinessSummary(input);
 
     expect(result.ready).toBe(true);
+    expect(result.totalDeductions).toBe(input.price - canonical.netRevenue);
     expect(result.netReceipt).toBe(canonical.netRevenue);
     expect(result.contributionProfit).toBe(canonical.contributionProfit);
     expect(result.recommendedPrice).toBeTypeOf('number');
@@ -38,6 +39,7 @@ describe('channel business summary', () => {
       targetMarginPercent: 25,
     })).toEqual({
       ready: false,
+      totalDeductions: null,
       netReceipt: null,
       contributionProfit: null,
       recommendedPrice: null,
