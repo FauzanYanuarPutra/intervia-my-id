@@ -44,6 +44,46 @@ export default async function HomePage({
   const business = state.activeBusiness;
   const viewerName = state.account.name;
 
+  if (state.businessesProvisioning) {
+    return (
+      <PortalShell
+        activeBusiness={null}
+        availableBusinesses={[]}
+        viewerName={viewerName}
+        currentSection="home"
+      >
+        <section className="mx-auto grid min-h-[calc(100vh-140px)] max-w-3xl place-items-center py-6">
+          <div
+            className="merchant-surface-bordered w-full p-5 sm:p-8"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="portal-icon-tile h-12 w-12">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <p className="mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-portal-soft">
+              Sinkronisasi usaha
+            </p>
+            <h1 className="mt-1 text-2xl font-black tracking-[-0.04em] text-portal-ink">
+              Usahamu sedang disiapkan.
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-portal-soft">
+              Akunmu sudah terhubung, tetapi layanan usaha masih menyelesaikan
+              sinkronisasi data. Jangan buat usaha baru dulu agar tidak terjadi
+              data ganda.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link href="/" className="portal-button-primary">
+                Coba lagi <ArrowRight className="h-4 w-4" />
+              </Link>
+              <ReconcileBusinessButton />
+            </div>
+          </div>
+        </section>
+      </PortalShell>
+    );
+  }
+
   if (!business) {
     return (
       <PortalShell activeBusiness={null} availableBusinesses={[]} viewerName={viewerName} currentSection="home">
