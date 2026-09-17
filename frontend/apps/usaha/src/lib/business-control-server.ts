@@ -346,9 +346,11 @@ export async function listControlSettlements(businessId: string) {
 export async function createControlSettlement(
   businessId: string,
   input: Record<string, unknown>,
+  idempotencyKey: string,
 ) {
   return requestControl(businessPath(businessId, '/settlements'), {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(input),
   });
 }
