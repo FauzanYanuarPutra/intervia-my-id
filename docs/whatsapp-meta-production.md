@@ -21,10 +21,12 @@ https://your-tunnel.example.com/api/webhooks/whatsapp-meta
 Isi `Verifikasi token` di Meta dengan nilai yang sama seperti env:
 
 ```env
-WHATSAPP_META_WEBHOOK_VERIFY_TOKEN=lajukan_verify_22012005
+WHATSAPP_META_WEBHOOK_VERIFY_TOKEN=replace_with_random_webhook_verify_token
 ```
 
-Token ini bebas dibuat sendiri. Gunakan string acak yang panjang dan jangan commit nilai asli.
+Buat token acak yang panjang menggunakan secret manager atau password generator. Jangan commit nilai asli ke source code, dokumentasi, screenshot, atau log.
+
+Di production dan pada host publik Lajukan, endpoint webhook tidak memiliki fallback token. Jika env `WHATSAPP_META_WEBHOOK_VERIFY_TOKEN` tidak tersedia, proses verifikasi callback akan ditolak sampai konfigurasi diperbaiki.
 
 ## Env Minimal
 
@@ -36,7 +38,7 @@ WHATSAPP_META_PHONE_NUMBER_ID=replace_with_meta_phone_number_id
 WHATSAPP_META_API_VERSION=v22.0
 WHATSAPP_META_DEFAULT_COUNTRY_CODE=62
 WHATSAPP_META_OTP_MODE=text
-WHATSAPP_META_WEBHOOK_VERIFY_TOKEN=lajukan_verify_22012005
+WHATSAPP_META_WEBHOOK_VERIFY_TOKEN=replace_with_random_webhook_verify_token
 WHATSAPP_META_APP_SECRET=replace_with_meta_app_secret
 WHATSAPP_META_WEBHOOK_REQUIRE_SIGNATURE=false
 ```
@@ -53,7 +55,7 @@ WHATSAPP_META_OTP_TEMPLATE_NAME=replace_with_approved_otp_template
 WHATSAPP_META_OTP_TEMPLATE_LANGUAGE=id
 WHATSAPP_META_OTP_TEMPLATE_BUTTON_SUB_TYPE=
 WHATSAPP_META_OTP_TEMPLATE_BUTTON_INDEX=0
-WHATSAPP_META_WEBHOOK_VERIFY_TOKEN=lajukan_verify_22012005
+WHATSAPP_META_WEBHOOK_VERIFY_TOKEN=replace_with_random_webhook_verify_token
 WHATSAPP_META_APP_SECRET=replace_with_meta_app_secret
 WHATSAPP_META_WEBHOOK_REQUIRE_SIGNATURE=true
 ```
@@ -76,6 +78,6 @@ Audit sengaja tidak menyimpan isi pesan mentah penuh supaya lebih aman untuk dat
 
 ## Catatan Keamanan
 
-Jika access token pernah terlihat di chat, screenshot, commit, atau log, anggap token sudah bocor dan rotate token sebelum production.
+Jika access token, app secret, verify token, tunnel token, atau credential lain pernah terlihat di chat, screenshot, commit, atau log, anggap nilainya sudah terekspos dan rotate/revoke sebelum production. Menghapus nilai dari file terbaru tidak menghapusnya dari histori Git.
 
 Di production, isi `WHATSAPP_META_APP_SECRET` dan biarkan `WHATSAPP_META_WEBHOOK_REQUIRE_SIGNATURE=true` supaya request POST webhook diverifikasi dari header `x-hub-signature-256`.

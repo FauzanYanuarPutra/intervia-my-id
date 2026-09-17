@@ -1,10 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
-import { MapPinned } from 'lucide-react';
 import { BusinessLocationsManager } from '@/components/forms/BusinessLocationsManager';
-import { DataPanel } from '@/components/portal/DataPanel';
+import { MetricStrip } from '@/components/portal/MetricStrip';
+import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
-import { SectionCard } from '@/components/portal/SectionCard';
-import { StatCard } from '@/components/portal/StatCard';
+import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
 export default async function BusinessLocationsPage({ params }: { params: Promise<{ businessId: string }> }) {
@@ -12,6 +11,9 @@ export default async function BusinessLocationsPage({ params }: { params: Promis
   const state = await resolvePortalBusinessPageState(businessId);
   if (!state.isAuthenticated) redirect(`/login?callbackUrl=${encodeURIComponent(`/businesses/${businessId}/locations`)}`);
   if (!state.activeBusiness) notFound();
+  if (!hasPermission(state.activeBusiness, 'manageInfo')) {
+    redirect(`/?business=${encodeURIComponent(state.activeBusiness.id)}`);
+  }
 
   const locations = state.activeBusiness.locations ?? [];
   const primary = locations.find(item => item.isPrimary);
@@ -19,18 +21,21 @@ export default async function BusinessLocationsPage({ params }: { params: Promis
 
   return (
     <PortalShell activeBusiness={state.activeBusiness} availableBusinesses={state.businesses} viewerName={state.account.name} currentSection="locations">
-      <SectionCard eyebrow="Operasional" title="Lokasi & Cabang" description="Kelola alamat, pin peta, kontak, dan cabang yang tampil ke pelanggan tanpa kehilangan konteks cabang utama.">
-        <div className="space-y-4">
-          <section className="grid gap-3 sm:grid-cols-3">
-            <StatCard label="Total lokasi" value={locations.length} icon={MapPinned} note="Semua cabang dan titik layanan" />
-            <StatCard label="Tampil publik" value={publicCount} icon={MapPinned} note="Dapat ditemukan pelanggan" />
-            <StatCard label="Lokasi utama" value={primary?.name || 'Belum ada'} icon={MapPinned} note={primary ? `${primary.city || 'Kota belum diisi'}` : 'Pilih satu cabang sebagai utama'} />
-          </section>
-          <DataPanel title="Kelola cabang" description="Klik lokasi untuk mengubah detail, pin, kontak, atau status lokasi utama.">
-            <div className="p-4 sm:p-5"><BusinessLocationsManager businessId={state.activeBusiness.id} businessName={state.activeBusiness.name} initialLocations={locations} /></div>
-          </DataPanel>
-        </div>
-      </SectionCard>
+      <PageHeader eyebrow="Kelola usaha" title="Lokasi & outlet" description="Lihat cabang utama dulu, lalu ubah alamat atau pin hanya saat dibutuhkan." />
+
+      <MetricStrip items={[
+        { label: 'Total outlet', value: locations.length },
+        { label: 'Tampil ke pelanggan', value: publicCount },
+        { label: 'Outlet utama', value: primary?.name || 'Belum ada', note: primary?.city || 'Pilih satu lokasi utama' },
+      ]} />
+
+      <section className="merchant-surface-bordered p-3 sm:p-4">
+        <BusinessLocationsManager
+          businessId={state.activeBusiness.id}
+          businessName={state.activeBusiness.name}
+          initialLocations={locations}
+        />
+      </section>
     </PortalShell>
   );
 }

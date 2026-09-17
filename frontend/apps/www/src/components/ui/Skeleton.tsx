@@ -8,6 +8,16 @@ type SkeletonProps = React.HTMLAttributes<HTMLDivElement> & {
   pulse?: boolean;
 };
 
+type SkeletonStatusProps = {
+  label: string;
+  className?: string;
+};
+
+type SkeletonGroupProps = React.HTMLAttributes<HTMLDivElement> & {
+  label: string;
+  busy?: boolean;
+};
+
 const variantClassNames: Record<SkeletonVariant, string> = {
   block: 'rounded-xl',
   line: 'h-3.5 rounded-full',
@@ -27,14 +37,47 @@ export function Skeleton({
   return (
     <div
       aria-hidden="true"
+      data-skeleton="true"
       className={cn(
-        'ui-skeleton',
+        'ui-skeleton motion-reduce:animate-none',
         pulse && 'ui-skeleton-pulse',
         variantClassNames[variant],
         className,
       )}
       {...props}
     />
+  );
+}
+
+export function SkeletonStatus({ label, className }: SkeletonStatusProps) {
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className={cn('sr-only', className)}
+    >
+      {label}
+    </span>
+  );
+}
+
+export function SkeletonGroup({
+  label,
+  busy = true,
+  className,
+  children,
+  ...props
+}: SkeletonGroupProps) {
+  return (
+    <div
+      aria-busy={busy}
+      className={className}
+      {...props}
+    >
+      {busy ? <SkeletonStatus label={label} /> : null}
+      {children}
+    </div>
   );
 }
 
@@ -69,7 +112,13 @@ export function SkeletonAvatar({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  return <Skeleton variant="circle" className={cn('h-10 w-10', className)} {...props} />;
+  return (
+    <Skeleton
+      variant="circle"
+      className={cn('h-10 w-10 shrink-0', className)}
+      {...props}
+    />
+  );
 }
 
 export function SkeletonPanel({

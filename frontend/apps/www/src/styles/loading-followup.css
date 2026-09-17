@@ -1,0 +1,12 @@
+/*
+ * Loading-state compatibility fixes.
+ *
+ * Community search currently renders a compact refresh spinner in its summary
+ * header and a full feed skeleton for the same initial empty load. When the
+ * skeleton is present, keep a single loading signal by suppressing only that
+ * immediately preceding spinner. Revalidation with existing content keeps the
+ * spinner because there is no adjacent skeleton.
+ */
+section:has(+ [aria-busy='true'][aria-label='Memuat komunitas']) .animate-spin {
+  display: none;
+}

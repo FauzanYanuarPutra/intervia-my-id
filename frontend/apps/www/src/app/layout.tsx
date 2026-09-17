@@ -1,5 +1,6 @@
 import '@/styles/globals.css';
 import '@/styles/ux-overhaul-foundation.css';
+import '@/styles/loading-followup.css';
 import 'leaflet/dist/leaflet.css';
 
 import type { Metadata, Viewport } from 'next';
