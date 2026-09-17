@@ -331,7 +331,9 @@ async fn canonical_sale_hash_ignores_legacy_client_price_hint(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(request_hash.len(), 64);
-    assert!(request_hash.chars().all(|character| character.is_ascii_hexdigit()));
+    assert!(request_hash
+        .chars()
+        .all(|character| character.is_ascii_hexdigit()));
 }
 
 #[sqlx::test(migrations = "./migrations")]
