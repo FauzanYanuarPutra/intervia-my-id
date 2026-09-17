@@ -26,6 +26,7 @@ pub(crate) enum BusinessServiceError {
     OrganizationSelectionRequired,
     ReconciliationSelectionRequired,
     NotFound,
+    ProvisioningRetryable,
     Storage,
 }
 
@@ -385,9 +386,8 @@ fn map_repository_error(error: RepositoryError) -> BusinessServiceError {
     match error {
         RepositoryError::IdempotencyConflict => BusinessServiceError::IdempotencyConflict,
         RepositoryError::VersionConflict => BusinessServiceError::VersionConflict,
-        RepositoryError::Database | RepositoryError::IncompleteAggregate => {
-            BusinessServiceError::Storage
-        }
+        RepositoryError::IncompleteAggregate => BusinessServiceError::ProvisioningRetryable,
+        RepositoryError::Database => BusinessServiceError::Storage,
     }
 }
 
@@ -500,5 +500,17 @@ mod tests {
             Err(BusinessServiceError::AccessDenied)
         ));
         assert!(require_business_manager(organization("org_admin")).is_ok());
+    }
+
+    #[test]
+    fn repository_storage_and_incomplete_aggregate_errors_stay_distinct() {
+        assert!(matches!(
+            map_repository_error(RepositoryError::Database),
+            BusinessServiceError::Storage
+        ));
+        assert!(matches!(
+            map_repository_error(RepositoryError::IncompleteAggregate),
+            BusinessServiceError::ProvisioningRetryable
+        ));
     }
 }
