@@ -132,6 +132,8 @@ type NewsListPayload = {
 
 export async function getPublishedNews(options: {
   category?: string;
+  topic?: string;
+  location?: string;
   query?: string;
   limit?: number;
   offset?: number;
@@ -140,6 +142,8 @@ export async function getPublishedNews(options: {
   params.set('limit', String(Math.min(100, Math.max(1, options.limit || 24))));
   params.set('offset', String(Math.max(0, options.offset || 0)));
   if (options.category?.trim()) params.set('category', options.category.trim());
+  if (options.topic?.trim()) params.set('topic', options.topic.trim());
+  if (options.location?.trim()) params.set('location', options.location.trim());
   if (options.query?.trim()) params.set('q', options.query.trim());
 
   try {
@@ -190,6 +194,19 @@ export function buildNewsPath(slug?: string): string {
 export function buildNewsUrl(locale: string, slug?: string): string {
   const lang = locale === 'en' ? 'en' : 'id';
   return `${SITE_URL}/${lang}${buildNewsPath(slug)}`;
+}
+
+export function buildNewsFacetPath(kind: 'topic' | 'location', value: string): string {
+  return `/news/${kind}/${encodeURIComponent(value.trim().toLowerCase())}`;
+}
+
+export function buildNewsFacetUrl(
+  locale: string,
+  kind: 'topic' | 'location',
+  value: string,
+): string {
+  const lang = locale === 'en' ? 'en' : 'id';
+  return `${SITE_URL}/${lang}${buildNewsFacetPath(kind, value)}`;
 }
 
 export function buildNewsArticleJsonLd(article: LajukanNewsArticle, locale: string) {

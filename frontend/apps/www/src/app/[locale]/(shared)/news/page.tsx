@@ -10,8 +10,10 @@ type PageProps = {
 
 const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regulasi', 'Industri', 'Daerah'] as const;
 
-export async function generateMetadata({ params }: Pick<PageProps, 'params'>): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { locale } = await params;
+  const filters = await searchParams;
+  const hasQueryVariant = Boolean(filters.q?.trim() || filters.category?.trim());
   const isId = locale === 'id';
   const title = isId ? 'Lajukan News | Ekonomi, Bisnis, dan UMKM' : 'Lajukan News | Economy, Business, and SMEs';
   const description = isId
@@ -20,6 +22,13 @@ export async function generateMetadata({ params }: Pick<PageProps, 'params'>): P
   return {
     title,
     description,
+    robots: hasQueryVariant
+      ? { index: false, follow: true }
+      : {
+          index: true,
+          follow: true,
+          googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+        },
     alternates: {
       canonical: buildNewsUrl(locale),
       languages: {

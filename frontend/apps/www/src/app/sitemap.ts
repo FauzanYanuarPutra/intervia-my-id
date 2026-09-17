@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { buildContentHref } from '@/lib/content/routes';
 import { BLOG_ARTICLES, isBlogArticleIndexable } from '@/lib/seo/blog';
 import { LAJUKAN_EXPLORE_CATEGORIES } from '@/lib/discovery/lajukanCategories';
-import { buildNewsUrl, getNewsForSitemap } from '@/lib/news';
+import { buildNewsFacetUrl, buildNewsUrl, getNewsForSitemap } from '@/lib/news';
 
 // Dynamic content comes from marketplace_service, which is a runtime dependency.
 // Never make `next build` wait for that service: generate sitemap.xml on request.
@@ -202,6 +202,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.84,
     });
   });
+
+  const topicFacets = Array.from(
+    new Set(newsItems.flatMap(article => article.tags).map(tag => tag.trim()).filter(Boolean)),
+  ).slice(0, 100);
+  const locationFacets = Array.from(
+    new Set(newsItems.map(article => article.location?.trim()).filter((value): value is string => Boolean(value))),
+  ).slice(0, 100);
+
+  for (const topic of topicFacets) {
+    for (const lang of locales) {
+      sitemapEntries.push({
+        url: buildNewsFacetUrl(lang, 'topic', topic),
+        changeFrequency: 'daily',
+        priority: 0.72,
+      });
+    }
+  }
+
+  for (const location of locationFacets) {
+    for (const lang of locales) {
+      sitemapEntries.push({
+        url: buildNewsFacetUrl(lang, 'location', location),
+        changeFrequency: 'daily',
+        priority: 0.74,
+      });
+    }
+  }
 
   return sitemapEntries;
 }

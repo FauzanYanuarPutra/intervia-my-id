@@ -58,6 +58,8 @@ struct ListNewsQuery {
     limit: Option<i64>,
     offset: Option<i64>,
     category: Option<String>,
+    topic: Option<String>,
+    location: Option<String>,
     q: Option<String>,
 }
 
@@ -178,6 +180,21 @@ fn moderation_target(action: &str) -> Option<(&'static str, &'static str)> {
     }
 }
 
+fn moderation_action_allowed(from_status: &str, action: &str) -> bool {
+    matches!(
+        (from_status, action),
+        ("pending_review", "approve")
+            | ("pending_review", "needs_revision")
+            | ("pending_review", "reject")
+            | ("published", "correct")
+            | ("published", "retract")
+    )
+}
+
+fn moderation_action_requires_note(action: &str) -> bool {
+    matches!(action, "needs_revision" | "reject" | "correct" | "retract")
+}
+
 fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
     if row.summary.as_deref().map(str::trim).unwrap_or("").len() < 20 {
         return Err("published news requires a meaningful summary");
@@ -243,6 +260,8 @@ async fn list_news(
     }
 
     let category = trimmed(query.category);
+    let topic = trimmed(query.topic);
+    let location = trimmed(query.location);
     let q = trimmed(query.q);
     let rows = sqlx::query_as::<_, NewsRow>(
         r#"
@@ -259,16 +278,30 @@ async fn list_news(
           )
           AND (
             $2::text IS NULL OR
-            title ILIKE ('%' || $2 || '%') OR
-            COALESCE(summary, '') ILIKE ('%' || $2 || '%') OR
-            body ILIKE ('%' || $2 || '%') OR
-            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%')
+            EXISTS (
+              SELECT 1
+              FROM unnest(COALESCE(tags, ARRAY[]::text[])) AS tag
+              WHERE lower(tag) = lower($2)
+            )
+          )
+          AND (
+            $3::text IS NULL OR
+            lower(COALESCE(metadata->'news'->>'location', '')) = lower($3)
+          )
+          AND (
+            $4::text IS NULL OR
+            title ILIKE ('%' || $4 || '%') OR
+            COALESCE(summary, '') ILIKE ('%' || $4 || '%') OR
+            body ILIKE ('%' || $4 || '%') OR
+            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $4 || '%')
           )
         ORDER BY COALESCE(published_at, created_at) DESC, id DESC
-        LIMIT $3 OFFSET $4
+        LIMIT $5 OFFSET $6
         "#,
     )
     .bind(category)
+    .bind(topic)
+    .bind(location)
     .bind(q)
     .bind(limit + 1)
     .bind(offset)
@@ -658,8 +691,11 @@ async fn moderate_news(
     if business_impact.as_ref().is_some_and(|value| value.len() > 2_000) {
         return response_error(StatusCode::BAD_REQUEST, "business impact is too long");
     }
-    if action == "correct" && note.is_none() {
-        return response_error(StatusCode::BAD_REQUEST, "correction requires a note");
+    if moderation_action_requires_note(&action) && note.is_none() {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "this editorial action requires a note",
+        );
     }
     if note.as_ref().is_some_and(|note| note.len() > NEWS_MAX_REVIEW_NOTE_LEN) {
         return response_error(StatusCode::BAD_REQUEST, "review note is too long");
@@ -682,6 +718,12 @@ async fn moderate_news(
         }
     };
     let previous_editorial_status = editorial_status(&current.content_status, &current.metadata);
+    if !moderation_action_allowed(&previous_editorial_status, &action) {
+        return response_error(
+            StatusCode::CONFLICT,
+            "editorial action is not allowed from the current status",
+        );
+    }
     if matches!(action.as_str(), "approve" | "correct") {
         if let Err(message) = validate_publishable_news(&current) {
             return response_error(StatusCode::UNPROCESSABLE_ENTITY, message);
@@ -829,7 +871,10 @@ async fn list_editorial_history(
 
 #[cfg(test)]
 mod tests {
-    use super::{moderation_target, normalize_queue_status};
+    use super::{
+        moderation_action_allowed, moderation_action_requires_note, moderation_target,
+        normalize_queue_status,
+    };
 
     #[test]
     fn moderation_actions_map_to_publication_states() {
@@ -845,5 +890,26 @@ mod tests {
         assert!(normalize_queue_status(Some("pending_review".into())).is_ok());
         assert!(normalize_queue_status(Some("all".into())).is_ok());
         assert!(normalize_queue_status(Some("made_up".into())).is_err());
+    }
+
+    #[test]
+    fn editorial_actions_are_state_safe() {
+        assert!(moderation_action_allowed("pending_review", "approve"));
+        assert!(moderation_action_allowed("pending_review", "needs_revision"));
+        assert!(moderation_action_allowed("pending_review", "reject"));
+        assert!(moderation_action_allowed("published", "correct"));
+        assert!(moderation_action_allowed("published", "retract"));
+        assert!(!moderation_action_allowed("published", "approve"));
+        assert!(!moderation_action_allowed("rejected", "approve"));
+        assert!(!moderation_action_allowed("retracted", "correct"));
+    }
+
+    #[test]
+    fn consequential_editorial_actions_require_notes() {
+        assert!(!moderation_action_requires_note("approve"));
+        assert!(moderation_action_requires_note("needs_revision"));
+        assert!(moderation_action_requires_note("reject"));
+        assert!(moderation_action_requires_note("correct"));
+        assert!(moderation_action_requires_note("retract"));
     }
 }
