@@ -2742,7 +2742,6 @@ async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     }
 }
 
-
 async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool_size = state.db.size();
     let pool_idle = state.db.num_idle();
@@ -2779,11 +2778,7 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
             "# TYPE lajukan_notification_subscribers gauge\n",
             "lajukan_notification_subscribers{{service=\"marketplace_service\"}} {}\n"
         ),
-        pool_size,
-        pool_idle,
-        outbox_backlog,
-        metrics_query_ok,
-        notification_subscribers
+        pool_size, pool_idle, outbox_backlog, metrics_query_ok, notification_subscribers
     );
 
     (
