@@ -10,17 +10,43 @@ const ALPUKAT = {
   purchase_unit: 'kg',
   recipe_unit: 'gram',
   conversion_factor: 1000,
-  purchase_price_amount: 0,
+  purchase_price_amount: 30_000,
   purchase_quantity: 1,
-  yield_percent: 100,
+  yield_percent: 70,
   waste_percent: 0,
-  stock_quantity: 0,
-  minimum_stock: 0,
-  supplier_name: null,
+  stock_quantity: 1400,
+  minimum_stock: 500,
+  supplier_name: 'Pasar Induk',
 };
 
-describe('IngredientWorkspace existing ingredient management', () => {
-  it('offers stock, edit, history, and archive actions for an existing ingredient', () => {
+const LEGACY_ALPUKAT = {
+  ...ALPUKAT,
+  id: '33333333-3333-4333-8333-333333333333',
+  name: 'Alpukat lama',
+  yield_percent: 80,
+  waste_percent: 10,
+};
+
+describe('IngredientWorkspace', () => {
+  it('uses business language instead of exposing raw database fields', () => {
+    const html = renderToStaticMarkup(
+      <IngredientWorkspace
+        businessId="22222222-2222-4222-8222-222222222222"
+        initialIngredients={[ALPUKAT]}
+      />,
+    );
+
+    expect(html).toContain('Bagaimana biasanya bahan ini dibeli?');
+    expect(html).toContain('Saya membeli');
+    expect(html).toContain('Dipakai dalam resep sebagai');
+    expect(html).toContain('1 kg =');
+    expect(html).toContain('Ada bagian yang biasanya tidak terpakai?');
+    expect(html).toContain('Seluruh jumlah dianggap dapat dipakai');
+    expect(html).not.toContain('Susut %');
+    expect(html).not.toContain('Konversi</');
+  });
+
+  it('keeps stock changes auditable and unit-aware', () => {
     const html = renderToStaticMarkup(
       <IngredientWorkspace
         businessId="22222222-2222-4222-8222-222222222222"
@@ -29,14 +55,13 @@ describe('IngredientWorkspace existing ingredient management', () => {
     );
 
     expect(html).toContain('Tambah stok');
-    expect(html).toContain('Edit');
     expect(html).toContain('Riwayat');
-    expect(html).toContain('Arsipkan');
-    expect(html).toContain('Aksi lain');
-    expect(html).toContain('Detail bahan');
+    expect(html).toContain('Stok awal yang siap dipakai');
+    expect(html).toContain('gram');
+    expect(html).toContain('Beri peringatan jika stok di bawah');
   });
 
-  it('shows missing operational setup as missing instead of rendering minimum zero as healthy data', () => {
+  it('shows effective cost and a human-readable purchase summary', () => {
     const html = renderToStaticMarkup(
       <IngredientWorkspace
         businessId="22222222-2222-4222-8222-222222222222"
@@ -44,10 +69,23 @@ describe('IngredientWorkspace existing ingredient management', () => {
       />,
     );
 
-    expect(html).toContain('Batas minimum belum diatur');
-    expect(html).toContain('Harga beli belum diisi');
-    expect(html).toContain('Modal belum bisa dihitung');
-    expect(html).not.toContain('minimum 0');
-    expect(html).toContain('Pengaturan lanjutan');
+    expect(html).toContain('42,86');
+    expect(html).toContain('30.000');
+    expect(html).toContain('70% dapat digunakan');
+    expect(html).toContain('30% tidak terpakai');
+  });
+
+  it('normalizes legacy yield plus waste into one usable percentage without changing economics', () => {
+    const html = renderToStaticMarkup(
+      <IngredientWorkspace
+        businessId="22222222-2222-4222-8222-222222222222"
+        initialIngredients={[LEGACY_ALPUKAT]}
+      />,
+    );
+
+    // Legacy economics: 80% yield x 90% after waste = 72% actually usable.
+    expect(html).toContain('72% dapat digunakan');
+    expect(html).toContain('28% tidak terpakai');
+    expect(html).toContain('41,67');
   });
 });
