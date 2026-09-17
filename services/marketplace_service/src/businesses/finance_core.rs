@@ -5,7 +5,6 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-
 const MAX_NOTE_LEN: usize = 2_000;
 const MAX_REASON_LEN: usize = 2_000;
 const ALLOCATION_BUCKETS: [&str; 5] = ["owner", "team", "reinvest", "operations", "reserve"];
