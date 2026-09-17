@@ -104,6 +104,7 @@ pub(crate) fn validate_settlement(
 pub(crate) enum SettlementRepositoryError {
     Validation(SettlementValidationError),
     NotFound,
+    Conflict,
     Database,
 }
 
@@ -134,6 +135,12 @@ pub(crate) struct SettlementRecord {
     pub(crate) created_by_user_id: Uuid,
     pub(crate) created_at: DateTime<Utc>,
     pub(crate) updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SettlementOutcome {
+    pub(crate) settlement: SettlementRecord,
+    pub(crate) replayed: bool,
 }
 
 #[derive(Clone)]
@@ -177,20 +184,31 @@ impl SettlementRepository {
         actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
+        idempotency_key: Uuid,
         request: CreateSettlementRequest,
-    ) -> Result<SettlementRecord, SettlementRepositoryError> {
+    ) -> Result<SettlementOutcome, SettlementRepositoryError> {
         let validated =
             validate_settlement(&request).map_err(SettlementRepositoryError::Validation)?;
         ensure_business(&self.db, business_id, organization_id).await?;
 
-        sqlx::query_as::<_, SettlementRecord>(
+        if let Some(existing) =
+            load_by_idempotency_key(&self.db, business_id, organization_id, idempotency_key).await?
+        {
+            return Ok(SettlementOutcome {
+                settlement: existing,
+                replayed: true,
+            });
+        }
+
+        let inserted = sqlx::query_as::<_, SettlementRecord>(
             r#"
             INSERT INTO business_settlements (
-              business_id, organization_id, channel_key, period_start, period_end,
+              business_id, organization_id, idempotency_key, channel_key, period_start, period_end,
               gross_sales_amount, platform_fee_amount, merchant_promo_amount, refunds_amount,
               other_deductions_amount, expected_transfer_amount, actual_transfer_amount,
               difference_amount, status, note, created_by_user_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+            ON CONFLICT (business_id, idempotency_key) DO NOTHING
             RETURNING id, business_id, organization_id, channel_key, period_start, period_end,
               gross_sales_amount, platform_fee_amount, merchant_promo_amount, refunds_amount,
               other_deductions_amount, expected_transfer_amount, actual_transfer_amount,
@@ -199,6 +217,7 @@ impl SettlementRepository {
         )
         .bind(business_id)
         .bind(organization_id)
+        .bind(idempotency_key)
         .bind(request.channel_key.trim().to_ascii_lowercase())
         .bind(request.period_start)
         .bind(request.period_end)
@@ -213,10 +232,51 @@ impl SettlementRepository {
         .bind(validated.status)
         .bind(request.note.trim())
         .bind(actor_id)
-        .fetch_one(&self.db)
-        .await
-        .map_err(Into::into)
+        .fetch_optional(&self.db)
+        .await?;
+
+        if let Some(settlement) = inserted {
+            return Ok(SettlementOutcome {
+                settlement,
+                replayed: false,
+            });
+        }
+
+        let settlement =
+            load_by_idempotency_key(&self.db, business_id, organization_id, idempotency_key)
+                .await?
+                .ok_or(SettlementRepositoryError::Conflict)?;
+        Ok(SettlementOutcome {
+            settlement,
+            replayed: true,
+        })
     }
+}
+
+async fn load_by_idempotency_key(
+    db: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+    idempotency_key: Uuid,
+) -> Result<Option<SettlementRecord>, SettlementRepositoryError> {
+    sqlx::query_as::<_, SettlementRecord>(
+        r#"
+        SELECT id, business_id, organization_id, channel_key, period_start, period_end,
+          gross_sales_amount, platform_fee_amount, merchant_promo_amount, refunds_amount,
+          other_deductions_amount, expected_transfer_amount, actual_transfer_amount,
+          difference_amount, status, note, created_by_user_id, created_at, updated_at
+        FROM business_settlements
+        WHERE business_id = $1
+          AND organization_id = $2
+          AND idempotency_key = $3
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(idempotency_key)
+    .fetch_optional(db)
+    .await
+    .map_err(Into::into)
 }
 
 async fn ensure_business(
