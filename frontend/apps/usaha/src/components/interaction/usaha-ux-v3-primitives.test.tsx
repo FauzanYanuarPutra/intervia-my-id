@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ChoiceChips } from './ChoiceChips';
 import { EffectPreview } from './EffectPreview';
+import { SearchPicker } from './SearchPicker';
 
 describe('UX V3 primitives', () => {
   it('renders every small choice without a select', () => {
@@ -37,5 +38,30 @@ describe('UX V3 primitives', () => {
     expect(html).toContain('+2 kg');
     expect(html).toContain('Rp60.000');
     expect(html).toContain('text-portal-forest');
+  });
+
+  it('renders a selected entity and searchable alternatives without select markup', () => {
+    const html = renderToStaticMarkup(
+      <SearchPicker
+        items={[
+          { id: 'a', name: 'Alpukat' },
+          { id: 'b', name: 'Mangga' },
+        ]}
+        value="a"
+        query=""
+        onQueryChange={() => {}}
+        onChange={() => {}}
+        getKey={item => item.id}
+        getLabel={item => item.name}
+        placeholder="Cari bahan"
+        emptyLabel="Tidak ditemukan"
+        ariaLabel="Pilih bahan"
+      />,
+    );
+
+    expect(html).toContain('Cari bahan');
+    expect(html).toContain('Alpukat');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).not.toContain('<select');
   });
 });
