@@ -118,19 +118,11 @@ fn refunds_never_exceed_captured_funds() {
 #[test]
 fn returned_quantity_never_exceeds_fulfilled_quantity() {
     assert_eq!(
-        validate_return_quantity(
-            Decimal::from(10),
-            Decimal::from(4),
-            Decimal::from(6)
-        ),
+        validate_return_quantity(Decimal::from(10), Decimal::from(4), Decimal::from(6)),
         Ok(())
     );
     assert_eq!(
-        validate_return_quantity(
-            Decimal::from(10),
-            Decimal::from(4),
-            Decimal::from(7)
-        ),
+        validate_return_quantity(Decimal::from(10), Decimal::from(4), Decimal::from(7)),
         Err(TransactionIntegrityError::ReturnExceedsFulfilled)
     );
 }
@@ -140,8 +132,7 @@ fn invoice_settlement_keeps_commercial_and_payment_state_separate() {
     let business_date = NaiveDate::from_ymd_opt(2026, 9, 18).unwrap();
     let due_on = NaiveDate::from_ymd_opt(2026, 9, 17).unwrap();
 
-    let partial =
-        derive_invoice_settlement(100_000, 40_000, Some(due_on), business_date).unwrap();
+    let partial = derive_invoice_settlement(100_000, 40_000, Some(due_on), business_date).unwrap();
     assert_eq!(partial.state, InvoiceSettlementState::Partial);
     assert_eq!(partial.outstanding_amount, 60_000);
     assert_eq!(partial.credit_amount, 0);
