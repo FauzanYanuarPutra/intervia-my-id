@@ -8,8 +8,11 @@ const businessServer = vi.hoisted(() => ({
 
 vi.mock('@/lib/business-server', () => businessServer);
 
-import { getPortalBusinesses } from './portal-server';
-import { resolvePortalBusinessPageState } from './portal-server';
+import {
+  getPortalBusinesses,
+  resolvePortalBusinessPageState,
+  resolvePortalHomeState,
+} from './portal-server';
 
 describe('portal server state', () => {
   beforeEach(() => {
@@ -31,6 +34,33 @@ describe('portal server state', () => {
     businessServer.listBusinessesForCurrentActor.mockRejectedValue(outage);
 
     await expect(getPortalBusinesses()).rejects.toBe(outage);
+  });
+
+  it('keeps home renderable while canonical businesses are temporarily provisioning', async () => {
+    const provisioning = Object.assign(new Error('provisioning_retryable'), {
+      status: 503,
+      code: 'provisioning_retryable',
+    });
+    businessServer.listBusinessesForCurrentActor.mockRejectedValue(provisioning);
+
+    const state = await resolvePortalHomeState({});
+
+    expect(state).toMatchObject({
+      isAuthenticated: true,
+      businesses: [],
+      activeBusiness: null,
+      businessesProvisioning: true,
+    });
+  });
+
+  it('still surfaces non-provisioning outages from the home business list', async () => {
+    const outage = Object.assign(new Error('marketplace_unavailable'), {
+      status: 503,
+      code: 'marketplace_unavailable',
+    });
+    businessServer.listBusinessesForCurrentActor.mockRejectedValue(outage);
+
+    await expect(resolvePortalHomeState({})).rejects.toBe(outage);
   });
 
   it('resolves the active business from one canonical list without a duplicate detail request', async () => {
