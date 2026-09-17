@@ -8,11 +8,14 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sqlx::{FromRow, Postgres, Transaction};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::{auth_claims_from_headers, has_cms_access, user_id_from_auth, AppState};
+use crate::{
+    auth_claims_from_headers, has_cms_access, push_notification_best_effort,
+    user_id_from_auth, AppState,
+};
 
 const PUBLIC_NEWS_MAX_OFFSET: i64 = 10_000;
 const NEWS_MAX_REVIEW_NOTE_LEN: usize = 4_000;
@@ -23,7 +26,12 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/v1/news/submissions/mine", get(list_my_news_submissions))
         .route("/v1/news/submissions/{id}", patch(update_news_submission))
         .route("/v1/news/editorial/queue", get(list_editorial_queue))
+        .route("/v1/news/editorial/metrics", get(get_editorial_metrics))
         .route("/v1/news/{id}/editorial", get(list_editorial_history))
+        .route(
+            "/v1/news/{id}/sources/{source_id}",
+            patch(update_news_source),
+        )
         .route("/v1/news/{id}/moderate", patch(moderate_news))
         .route("/v1/news/{slug}", get(get_news))
 }
@@ -51,6 +59,7 @@ struct NewsListResponse {
     limit: i64,
     offset: i64,
     has_more: bool,
+    next_cursor: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -61,6 +70,7 @@ struct ListNewsQuery {
     topic: Option<String>,
     location: Option<String>,
     q: Option<String>,
+    cursor: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -86,6 +96,62 @@ struct UpdateNewsSubmissionRequest {
     article_kind: Option<String>,
     location: Option<String>,
     source_urls: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct NewsVersionRow {
+    id: Uuid,
+    content_id: Uuid,
+    version_number: i64,
+    actor_id: Option<Uuid>,
+    actor_role: String,
+    action: String,
+    editorial_status: Option<String>,
+    title: String,
+    summary: Option<String>,
+    body: String,
+    tags: Option<Vec<String>>,
+    cover_image: Option<String>,
+    metadata: Value,
+    content_status: String,
+    published_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct NewsSourceRow {
+    id: Uuid,
+    content_id: Uuid,
+    position: i32,
+    source_url: String,
+    source_domain: Option<String>,
+    source_kind: String,
+    verification_status: String,
+    editor_note: Option<String>,
+    checked_at: Option<DateTime<Utc>>,
+    first_seen_at: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateNewsSourceRequest {
+    source_kind: Option<String>,
+    verification_status: Option<String>,
+    note: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct MetricBucketRow {
+    key: String,
+    value: i64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct NewsTopArticleMetricRow {
+    id: Uuid,
+    slug: Option<String>,
+    title: String,
+    opens: i64,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -237,6 +303,344 @@ fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn source_domain(source_url: &str) -> Option<String> {
+    let without_scheme = source_url
+        .strip_prefix("https://")
+        .or_else(|| source_url.strip_prefix("http://"))
+        .unwrap_or(source_url);
+    let authority = without_scheme.split('/').next()?.trim();
+    if authority.is_empty() {
+        return None;
+    }
+    let host = authority
+        .rsplit('@')
+        .next()
+        .unwrap_or(authority)
+        .split(':')
+        .next()
+        .unwrap_or(authority)
+        .trim()
+        .trim_start_matches("www.")
+        .to_ascii_lowercase();
+    if host.is_empty() { None } else { Some(host) }
+}
+
+fn news_source_urls(metadata: &Value) -> Vec<String> {
+    metadata
+        .get("news")
+        .and_then(Value::as_object)
+        .and_then(|news| news.get("source_urls"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            let mut urls = Vec::new();
+            for item in items {
+                let Some(url) = item.as_str().map(str::trim).filter(|value| !value.is_empty()) else {
+                    continue;
+                };
+                if !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2048 {
+                    continue;
+                }
+                if !urls.iter().any(|existing| existing == url) {
+                    urls.push(url.to_string());
+                }
+                if urls.len() >= 10 {
+                    break;
+                }
+            }
+            urls
+        })
+        .unwrap_or_default()
+}
+
+fn format_news_cursor(row: &NewsRow) -> String {
+    let at = row.published_at.as_ref().cloned().unwrap_or_else(|| row.created_at.clone());
+    format!("{}|{}", at.to_rfc3339(), row.id)
+}
+
+fn parse_news_cursor(raw: Option<&str>) -> Result<Option<(DateTime<Utc>, Uuid)>, &'static str> {
+    let Some(raw) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let Some((timestamp, id)) = raw.rsplit_once('|') else {
+        return Err("invalid news cursor");
+    };
+    let timestamp = DateTime::parse_from_rfc3339(timestamp)
+        .map_err(|_| "invalid news cursor")?
+        .with_timezone(&Utc);
+    let id = Uuid::parse_str(id).map_err(|_| "invalid news cursor")?;
+    Ok(Some((timestamp, id)))
+}
+
+async fn sync_source_references_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    content_id: Uuid,
+    metadata: &Value,
+) -> Result<(), sqlx::Error> {
+    let urls = news_source_urls(metadata);
+    sqlx::query(
+        r#"
+        DELETE FROM news_source_references
+        WHERE content_id = $1
+          AND NOT (source_url = ANY($2::text[]))
+        "#,
+    )
+    .bind(content_id)
+    .bind(&urls)
+    .execute(&mut **tx)
+    .await?;
+
+    for (position, source_url) in urls.iter().enumerate() {
+        sqlx::query(
+            r#"
+            INSERT INTO news_source_references (
+                content_id, position, source_url, source_domain,
+                source_kind, verification_status, first_seen_at, last_seen_at
+            )
+            VALUES ($1, $2, $3, $4, 'user_supplied', 'unverified', NOW(), NOW())
+            ON CONFLICT (content_id, source_url)
+            DO UPDATE SET
+                position = EXCLUDED.position,
+                source_domain = EXCLUDED.source_domain,
+                last_seen_at = NOW()
+            "#,
+        )
+        .bind(content_id)
+        .bind(position as i32)
+        .bind(source_url)
+        .bind(source_domain(source_url))
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
+async fn record_version_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    row: &NewsRow,
+    actor_id: Option<Uuid>,
+    actor_role: &str,
+    action: &str,
+) -> Result<(), sqlx::Error> {
+    let version_number = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COALESCE(MAX(version_number), 0) + 1
+        FROM news_article_versions
+        WHERE content_id = $1
+        "#,
+    )
+    .bind(row.id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO news_article_versions (
+            content_id, version_number, actor_id, actor_role, action,
+            editorial_status, title, summary, body, tags, cover_image,
+            metadata, content_status, published_at
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+        )
+        "#,
+    )
+    .bind(row.id)
+    .bind(version_number)
+    .bind(actor_id)
+    .bind(actor_role)
+    .bind(action)
+    .bind(editorial_status(&row.content_status, &row.metadata))
+    .bind(&row.title)
+    .bind(&row.summary)
+    .bind(&row.body)
+    .bind(&row.tags)
+    .bind(&row.cover_image)
+    .bind(&row.metadata)
+    .bind(&row.content_status)
+    .bind(row.published_at.clone())
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn enqueue_news_outbox_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    row: &NewsRow,
+    actor_id: Option<Uuid>,
+    event_type: &str,
+    routing_key: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO events.event_outbox (
+            aggregate_type, aggregate_id, event_type, payload, routing_key
+        )
+        VALUES ('news', $1, $2, $3, $4)
+        "#,
+    )
+    .bind(row.id.to_string())
+    .bind(event_type)
+    .bind(json!({
+        "content_id": row.id,
+        "owner_id": row.owner_id,
+        "slug": row.slug,
+        "title": row.title,
+        "editorial_status": editorial_status(&row.content_status, &row.metadata),
+        "content_status": row.content_status,
+        "published_at": row.published_at,
+        "updated_at": row.updated_at,
+        "actor_id": actor_id
+    }))
+    .bind(routing_key)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn load_news_by_id(
+    db: &PgPool,
+    content_id: Uuid,
+) -> Result<Option<NewsRow>, sqlx::Error> {
+    sqlx::query_as::<_, NewsRow>(
+        r#"
+        SELECT
+            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
+            content_status, published_at, created_at, updated_at
+        FROM content_items
+        WHERE id = $1 AND content_type = 'news' AND content_status <> 'deleted'
+        LIMIT 1
+        "#,
+    )
+    .bind(content_id)
+    .fetch_optional(db)
+    .await
+}
+
+pub(crate) async fn after_submission_created(
+    state: &Arc<AppState>,
+    content_id: Uuid,
+    owner_id: Uuid,
+) {
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::warn!("news after_submission_created begin error: {:?}", error);
+            return;
+        }
+    };
+    let row = match load_news_for_review(&mut tx, content_id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return,
+        Err(error) => {
+            tracing::warn!("news after_submission_created load error: {:?}", error);
+            return;
+        }
+    };
+    let already_versioned = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM news_article_versions WHERE content_id = $1)",
+    )
+    .bind(content_id)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(false);
+
+    let result = async {
+        if !already_versioned {
+            record_version_tx(&mut tx, &row, Some(owner_id), "contributor", "submitted").await?;
+        }
+        sync_source_references_tx(&mut tx, row.id, &row.metadata).await?;
+        enqueue_news_outbox_tx(
+            &mut tx,
+            &row,
+            Some(owner_id),
+            "news.submitted",
+            "news.editorial.changed",
+        )
+        .await?;
+        Ok::<(), sqlx::Error>(())
+    }
+    .await;
+
+    if let Err(error) = result {
+        tracing::warn!("news after_submission_created persistence error: {:?}", error);
+        let _ = tx.rollback().await;
+        return;
+    }
+    if let Err(error) = tx.commit().await {
+        tracing::warn!("news after_submission_created commit error: {:?}", error);
+        return;
+    }
+
+    push_notification_best_effort(
+        state,
+        owner_id,
+        "news",
+        "news.submission_received",
+        "Kiriman berita diterima",
+        "Kirimanmu sudah masuk antrean editorial Lajukan News.",
+        json!({
+            "content_id": content_id,
+            "slug": row.slug,
+            "href": "/news/submissions",
+            "editorial_status": "pending_review"
+        }),
+    )
+    .await;
+}
+
+async fn notify_editorial_result(
+    state: &Arc<AppState>,
+    row: &NewsRow,
+    action: &str,
+    note: Option<&str>,
+) {
+    let (event_type, title, message) = match action {
+        "approve" => (
+            "news.published",
+            "Berita diterbitkan",
+            "Kirimanmu sudah lolos review dan diterbitkan di Lajukan News.",
+        ),
+        "needs_revision" => (
+            "news.needs_revision",
+            "Berita perlu revisi",
+            "Editor meminta perubahan sebelum berita dapat diterbitkan.",
+        ),
+        "reject" => (
+            "news.rejected",
+            "Kiriman berita ditolak",
+            "Kiriman belum dapat diterbitkan. Lihat catatan editor untuk detail.",
+        ),
+        "correct" => (
+            "news.corrected",
+            "Koreksi berita dicatat",
+            "Koreksi editorial untuk beritamu telah dicatat.",
+        ),
+        "retract" => (
+            "news.retracted",
+            "Berita ditarik",
+            "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail.",
+        ),
+        _ => return,
+    };
+    push_notification_best_effort(
+        state,
+        row.owner_id,
+        "news",
+        event_type,
+        title,
+        message,
+        json!({
+            "content_id": row.id,
+            "slug": row.slug,
+            "action": action,
+            "note": note,
+            "href": "/news/submissions",
+            "editorial_status": editorial_status(&row.content_status, &row.metadata)
+        }),
+    )
+    .await;
+}
+
 fn response_error(status: StatusCode, message: &'static str) -> axum::response::Response {
     (status, Json(json!({ "error": message }))).into_response()
 }
@@ -263,6 +667,13 @@ async fn list_news(
     let topic = trimmed(query.topic);
     let location = trimmed(query.location);
     let q = trimmed(query.q);
+    let cursor = match parse_news_cursor(query.cursor.as_deref()) {
+        Ok(cursor) => cursor,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let cursor_at = cursor.as_ref().map(|value| value.0.clone());
+    let cursor_id = cursor.as_ref().map(|value| value.1);
+    let effective_offset = if cursor.is_some() { 0 } else { offset };
     let rows = sqlx::query_as::<_, NewsRow>(
         r#"
         SELECT
@@ -295,16 +706,22 @@ async fn list_news(
             body ILIKE ('%' || $4 || '%') OR
             COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $4 || '%')
           )
+          AND (
+            $5::timestamptz IS NULL OR
+            (COALESCE(published_at, created_at), id) < ($5, $6::uuid)
+          )
         ORDER BY COALESCE(published_at, created_at) DESC, id DESC
-        LIMIT $5 OFFSET $6
+        LIMIT $7 OFFSET $8
         "#,
     )
     .bind(category)
     .bind(topic)
     .bind(location)
     .bind(q)
+    .bind(cursor_at)
+    .bind(cursor_id)
     .bind(limit + 1)
-    .bind(offset)
+    .bind(effective_offset)
     .fetch_all(&state.db)
     .await;
 
@@ -314,7 +731,22 @@ async fn list_news(
             if has_more {
                 items.truncate(limit as usize);
             }
-            (StatusCode::OK, Json(NewsListResponse { items, limit, offset, has_more })).into_response()
+            let next_cursor = if has_more {
+                items.last().map(format_news_cursor)
+            } else {
+                None
+            };
+            (
+                StatusCode::OK,
+                Json(NewsListResponse {
+                    items,
+                    limit,
+                    offset: effective_offset,
+                    has_more,
+                    next_cursor,
+                }),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("list_news query error: {:?}", error);
@@ -577,6 +1009,44 @@ async fn update_news_submission(
         );
     }
 
+    if let Err(error) = sync_source_references_tx(&mut tx, updated.id, &updated.metadata).await {
+        tracing::error!("update_news_submission source sync error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to synchronize news sources",
+        );
+    }
+    if let Err(error) = record_version_tx(
+        &mut tx,
+        &updated,
+        Some(owner_id),
+        "contributor",
+        "resubmitted",
+    )
+    .await
+    {
+        tracing::error!("update_news_submission version error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news version",
+        );
+    }
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &updated,
+        Some(owner_id),
+        "news.resubmitted",
+        "news.editorial.changed",
+    )
+    .await
+    {
+        tracing::error!("update_news_submission outbox error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue news update",
+        );
+    }
+
     if let Err(error) = tx.commit().await {
         tracing::error!("update_news_submission commit error: {:?}", error);
         return response_error(
@@ -639,7 +1109,17 @@ async fn list_editorial_queue(
             if has_more {
                 items.truncate(limit as usize);
             }
-            (StatusCode::OK, Json(NewsListResponse { items, limit, offset, has_more })).into_response()
+            (
+                StatusCode::OK,
+                Json(NewsListResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                    next_cursor: None,
+                }),
+            )
+                .into_response()
         }
         Err(error) => {
             tracing::error!("list_editorial_queue query error: {:?}", error);
@@ -827,9 +1307,267 @@ async fn moderate_news(
         return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to record editorial action");
     }
 
+    if let Err(error) = sync_source_references_tx(&mut tx, updated.id, &updated.metadata).await {
+        tracing::error!("moderate_news source sync error: {:?}", error);
+        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to synchronize news sources");
+    }
+    if let Err(error) = record_version_tx(
+        &mut tx,
+        &updated,
+        Some(reviewer_id),
+        "editor",
+        &action,
+    )
+    .await
+    {
+        tracing::error!("moderate_news version error: {:?}", error);
+        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to record news version");
+    }
+    let routing_key = if matches!(action.as_str(), "approve" | "correct" | "retract") {
+        "news.publication.changed"
+    } else {
+        "news.editorial.changed"
+    };
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &updated,
+        Some(reviewer_id),
+        &format!("news.{}", action),
+        routing_key,
+    )
+    .await
+    {
+        tracing::error!("moderate_news outbox error: {:?}", error);
+        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to enqueue news event");
+    }
+
     if let Err(error) = tx.commit().await {
         tracing::error!("moderate_news commit error: {:?}", error);
         return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to moderate news");
+    }
+
+    notify_editorial_result(&state, &updated, &action, note.as_deref()).await;
+
+    (StatusCode::OK, Json(updated)).into_response()
+}
+
+async fn get_editorial_metrics(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if cms_reviewer_id(&headers, &state).is_none() {
+        return response_error(StatusCode::FORBIDDEN, "cms access required");
+    }
+
+    let queue = sqlx::query_as::<_, MetricBucketRow>(
+        r#"
+        SELECT
+          COALESCE(
+            NULLIF(metadata->'news'->>'editorial_status', ''),
+            CASE
+              WHEN content_status = 'active' THEN 'published'
+              WHEN content_status = 'archived' THEN 'rejected'
+              ELSE 'pending_review'
+            END
+          ) AS key,
+          COUNT(*)::bigint AS value
+        FROM content_items
+        WHERE content_type = 'news' AND content_status <> 'deleted'
+        GROUP BY 1
+        ORDER BY value DESC, key ASC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let engagement_24h = sqlx::query_as::<_, MetricBucketRow>(
+        r#"
+        SELECT event_name AS key, COUNT(*)::bigint AS value
+        FROM events.event_log
+        WHERE entity_type = 'news'
+          AND occurred_at >= NOW() - interval '24 hours'
+          AND event_name LIKE 'news.%'
+        GROUP BY event_name
+        ORDER BY value DESC, key ASC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let published_24h = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '24 hours'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let published_7d = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '7 days'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let versions = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM news_article_versions")
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(0);
+    let sources_total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM news_source_references")
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(0);
+    let sources_verified = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM news_source_references WHERE verification_status = 'verified'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let sources_flagged = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM news_source_references WHERE verification_status IN ('broken', 'rejected')",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let avg_review_minutes = sqlx::query_scalar::<_, Option<f64>>(
+        r#"
+        SELECT AVG(
+          EXTRACT(EPOCH FROM (
+            (metadata->'news'->>'reviewed_at')::timestamptz -
+            (metadata->'news'->>'submitted_at')::timestamptz
+          )) / 60.0
+        )::double precision
+        FROM content_items
+        WHERE content_type = 'news'
+          AND metadata->'news'->>'reviewed_at' IS NOT NULL
+          AND metadata->'news'->>'submitted_at' IS NOT NULL
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(None);
+
+    let top_articles_7d = sqlx::query_as::<_, NewsTopArticleMetricRow>(
+        r#"
+        SELECT c.id, c.slug, c.title, COUNT(e.event_id)::bigint AS opens
+        FROM events.event_log e
+        JOIN content_items c
+          ON c.id::text = e.entity_id
+         AND c.content_type = 'news'
+        WHERE e.entity_type = 'news'
+          AND e.event_name = 'news.opened'
+          AND e.occurred_at >= NOW() - interval '7 days'
+        GROUP BY c.id, c.slug, c.title
+        ORDER BY opens DESC, c.id
+        LIMIT 10
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "queue": queue,
+            "engagement_24h": engagement_24h,
+            "published_24h": published_24h,
+            "published_7d": published_7d,
+            "avg_review_minutes": avg_review_minutes,
+            "versions": versions,
+            "sources": {
+                "total": sources_total,
+                "verified": sources_verified,
+                "flagged": sources_flagged
+            },
+            "top_articles_7d": top_articles_7d,
+            "generated_at": Utc::now()
+        })),
+    )
+        .into_response()
+}
+
+async fn update_news_source(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((content_id, source_id)): Path<(String, String)>,
+    Json(payload): Json<UpdateNewsSourceRequest>,
+) -> impl IntoResponse {
+    let reviewer_id = match cms_reviewer_id(&headers, &state) {
+        Some(id) => id,
+        None => return response_error(StatusCode::FORBIDDEN, "cms access required"),
+    };
+    let content_id = match Uuid::parse_str(content_id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid news id"),
+    };
+    let source_id = match Uuid::parse_str(source_id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid source id"),
+    };
+
+    let source_kind = trimmed(payload.source_kind);
+    if source_kind.as_ref().is_some_and(|value| !matches!(
+        value.as_str(),
+        "user_supplied" | "primary" | "secondary" | "official" | "business"
+    )) {
+        return response_error(StatusCode::BAD_REQUEST, "unsupported source kind");
+    }
+    let verification_status = trimmed(payload.verification_status);
+    if verification_status.as_ref().is_some_and(|value| !matches!(
+        value.as_str(),
+        "unverified" | "verified" | "broken" | "rejected"
+    )) {
+        return response_error(StatusCode::BAD_REQUEST, "unsupported source verification status");
+    }
+    let note = trimmed(payload.note);
+    if note.as_ref().is_some_and(|value| value.len() > 4_000) {
+        return response_error(StatusCode::BAD_REQUEST, "source note is too long");
+    }
+
+    let updated = sqlx::query_as::<_, NewsSourceRow>(
+        r#"
+        UPDATE news_source_references
+        SET
+          source_kind = COALESCE($3, source_kind),
+          verification_status = COALESCE($4, verification_status),
+          editor_note = CASE WHEN $5::text IS NULL THEN editor_note ELSE $5 END,
+          checked_at = NOW(),
+          last_seen_at = NOW()
+        WHERE id = $1 AND content_id = $2
+        RETURNING
+          id, content_id, position, source_url, source_domain, source_kind,
+          verification_status, editor_note, checked_at, first_seen_at, last_seen_at
+        "#,
+    )
+    .bind(source_id)
+    .bind(content_id)
+    .bind(source_kind)
+    .bind(verification_status)
+    .bind(note)
+    .fetch_optional(&state.db)
+    .await;
+
+    let updated = match updated {
+        Ok(Some(row)) => row,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
+        Err(error) => {
+            tracing::error!("update_news_source error: {:?}", error);
+            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to update news source");
+        }
+    };
+
+    if let Ok(Some(article)) = load_news_by_id(&state.db, content_id).await {
+        if let Ok(mut tx) = state.db.begin().await {
+            let _ = enqueue_news_outbox_tx(
+                &mut tx,
+                &article,
+                Some(reviewer_id),
+                "news.source.reviewed",
+                "news.editorial.changed",
+            )
+            .await;
+            let _ = tx.commit().await;
+        }
     }
 
     (StatusCode::OK, Json(updated)).into_response()
@@ -861,7 +1599,47 @@ async fn list_editorial_history(
     .await;
 
     match rows {
-        Ok(items) => (StatusCode::OK, Json(json!({ "items": items }))).into_response(),
+        Ok(items) => {
+            let versions = sqlx::query_as::<_, NewsVersionRow>(
+                r#"
+                SELECT
+                  id, content_id, version_number, actor_id, actor_role, action,
+                  editorial_status, title, summary, body, tags, cover_image,
+                  metadata, content_status, published_at, created_at
+                FROM news_article_versions
+                WHERE content_id = $1
+                ORDER BY version_number DESC
+                LIMIT 50
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+            let sources = sqlx::query_as::<_, NewsSourceRow>(
+                r#"
+                SELECT
+                  id, content_id, position, source_url, source_domain, source_kind,
+                  verification_status, editor_note, checked_at, first_seen_at, last_seen_at
+                FROM news_source_references
+                WHERE content_id = $1
+                ORDER BY position ASC, id ASC
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "items": items,
+                    "versions": versions,
+                    "sources": sources
+                })),
+            )
+                .into_response()
+        }
         Err(error) => {
             tracing::error!("list_editorial_history query error: {:?}", error);
             response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to load editorial history")
@@ -873,7 +1651,7 @@ async fn list_editorial_history(
 mod tests {
     use super::{
         moderation_action_allowed, moderation_action_requires_note, moderation_target,
-        normalize_queue_status,
+        normalize_queue_status, parse_news_cursor, source_domain,
     };
 
     #[test]
@@ -911,5 +1689,24 @@ mod tests {
         assert!(moderation_action_requires_note("reject"));
         assert!(moderation_action_requires_note("correct"));
         assert!(moderation_action_requires_note("retract"));
+    }
+
+    #[test]
+    fn source_domain_normalizes_common_urls() {
+        assert_eq!(
+            source_domain("https://www.bi.go.id/id/publikasi"),
+            Some("bi.go.id".to_string())
+        );
+        assert_eq!(
+            source_domain("http://example.com:8080/path"),
+            Some("example.com".to_string())
+        );
+    }
+
+    #[test]
+    fn cursor_parser_accepts_timestamp_and_uuid() {
+        let cursor = "2026-09-18T00:00:00+00:00|11111111-1111-1111-1111-111111111111";
+        assert!(parse_news_cursor(Some(cursor)).unwrap().is_some());
+        assert!(parse_news_cursor(Some("broken")).is_err());
     }
 }

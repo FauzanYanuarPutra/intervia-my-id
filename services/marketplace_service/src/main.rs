@@ -7811,7 +7811,7 @@ async fn unread_notification_count(db: &PgPool, user_id: Uuid) -> Result<i64, sq
     .await
 }
 
-async fn push_notification_best_effort(
+pub(crate) async fn push_notification_best_effort(
     state: &Arc<AppState>,
     user_id: Uuid,
     category: &str,
@@ -12682,6 +12682,9 @@ async fn create_content(
 
     match inserted {
         Ok(row) => {
+            if row.content_type == "news" {
+                news::after_submission_created(&state, row.id, row.owner_id).await;
+            }
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
                 Ok(map) => map.get(&row.owner_id).cloned(),
                 Err(e) => {

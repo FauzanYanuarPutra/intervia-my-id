@@ -10,6 +10,7 @@ import {
   getPublishedNewsArticle,
 } from '@/lib/news';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
+import NewsAnalytics from './NewsAnalytics';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -92,6 +93,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
   return (
     <main className="page-shell page-shell-readable page-rhythm pb-12 pt-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
+      <NewsAnalytics articleId={article.id} slug={article.slug} category={article.category} />
 
       <nav aria-label="Breadcrumb">
         <Link href="/news" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
@@ -100,7 +102,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
         </Link>
       </nav>
 
-      <article className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_24px_68px_-50px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900">
+      <article id="news-article" className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_24px_68px_-50px_rgba(15,23,42,0.38)] dark:border-white/10 dark:bg-slate-900">
         <header className="bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_56%,#fff7ed_100%)] p-5 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8 lg:p-10">
           <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.14em]">
             <span className="rounded-full bg-emerald-700 px-3 py-1.5 text-white">{article.category}</span>
@@ -166,7 +168,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 <h2 className="text-lg font-bold text-slate-950 dark:text-white">{isId ? 'Sumber' : 'Sources'}</h2>
                 <div className="mt-3 grid gap-2">
                   {article.sourceUrls.map((source, index) => (
-                    <a key={source} href={source} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-start gap-2 break-all text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">
+                    <a key={source} href={source} target="_blank" rel="noopener noreferrer nofollow" data-news-action="source_clicked" className="inline-flex items-start gap-2 break-all text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">
                       <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />
                       {isId ? `Sumber ${index + 1}` : `Source ${index + 1}`}: {source}
                     </a>
@@ -185,12 +187,12 @@ export default async function NewsArticlePage({ params }: PageProps) {
                   : (isId ? 'Artikel ini diterbitkan melalui alur editorial Lajukan News. Koreksi material dicatat pada artikel.' : 'This article is published through the Lajukan News editorial workflow. Material corrections are recorded on the article.')}
               </p>
             </div>
-            <Link href="/blog" className="block rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
+            <Link href="/blog" data-news-action="related_clicked" className="block rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
               <BookOpenText className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
               <p className="mt-3 font-bold text-slate-950 dark:text-white">{isId ? 'Pelajari topiknya' : 'Learn the topic'}</p>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{isId ? 'Buka panduan evergreen Lajukan untuk konteks dan cara menerapkannya ke usaha.' : 'Open evergreen Lajukan guides for context and practical application.'}</p>
             </Link>
-            <Link href="/explore" className="block rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
+            <Link href="/explore" data-news-action="related_clicked" className="block rounded-[24px] border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
               <Store className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
               <p className="mt-3 font-bold text-slate-950 dark:text-white">{isId ? 'Cari produk, jasa, dan supplier' : 'Find products, services, and suppliers'}</p>
             </Link>

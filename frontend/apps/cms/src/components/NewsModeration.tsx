@@ -16,6 +16,38 @@ type EditorialEvent = {
   created_at: string;
 };
 
+type NewsVersion = {
+  id: string;
+  version_number: number;
+  actor_role: string;
+  action: string;
+  editorial_status?: string | null;
+  title: string;
+  summary?: string | null;
+  created_at: string;
+};
+
+type NewsSource = {
+  id: string;
+  source_url: string;
+  source_domain?: string | null;
+  source_kind: 'user_supplied' | 'primary' | 'secondary' | 'official' | 'business';
+  verification_status: 'unverified' | 'verified' | 'broken' | 'rejected';
+  editor_note?: string | null;
+  checked_at?: string | null;
+};
+
+type NewsroomMetrics = {
+  queue?: Array<{ key: string; value: number }>;
+  engagement_24h?: Array<{ key: string; value: number }>;
+  published_24h?: number;
+  published_7d?: number;
+  avg_review_minutes?: number | null;
+  versions?: number;
+  sources?: { total?: number; verified?: number; flagged?: number };
+  top_articles_7d?: Array<{ id: string; slug?: string | null; title: string; opens: number }>;
+};
+
 type NewsItem = {
   id: string;
   owner_id: string;
@@ -56,6 +88,11 @@ export default function NewsModeration() {
   const [businessImpact, setBusinessImpact] = useState('');
   const [history, setHistory] = useState<EditorialEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [versions, setVersions] = useState<NewsVersion[]>([]);
+  const [sources, setSources] = useState<NewsSource[]>([]);
+  const [metrics, setMetrics] = useState<NewsroomMetrics>({});
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [sourceUpdating, setSourceUpdating] = useState('');
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState('');
@@ -78,6 +115,8 @@ export default function NewsModeration() {
   useEffect(() => {
     if (!accessToken || !selected?.id) {
       setHistory([]);
+      setVersions([]);
+      setSources([]);
       return;
     }
     let active = true;
@@ -87,9 +126,15 @@ export default function NewsModeration() {
         if (!active) return;
         const record = readRecord(payload);
         setHistory(Array.isArray(record.items) ? (record.items as EditorialEvent[]) : []);
+        setVersions(Array.isArray(record.versions) ? (record.versions as NewsVersion[]) : []);
+        setSources(Array.isArray(record.sources) ? (record.sources as NewsSource[]) : []);
       })
       .catch(() => {
-        if (active) setHistory([]);
+        if (active) {
+          setHistory([]);
+          setVersions([]);
+          setSources([]);
+        }
       })
       .finally(() => {
         if (active) setHistoryLoading(false);
@@ -98,6 +143,44 @@ export default function NewsModeration() {
       active = false;
     };
   }, [accessToken, selected?.id]);
+
+  const loadMetrics = useCallback(async () => {
+    if (!accessToken) return;
+    setMetricsLoading(true);
+    try {
+      const payload = await newsApi.metrics(accessToken);
+      setMetrics(readRecord(payload) as NewsroomMetrics);
+    } catch {
+      setMetrics({});
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, [accessToken]);
+
+  const reviewSource = async (
+    source: NewsSource,
+    verificationStatus: NewsSource['verification_status'],
+    sourceKind: NewsSource['source_kind'] = source.source_kind,
+  ) => {
+    if (!accessToken || !selected) return;
+    setSourceUpdating(source.id);
+    setError('');
+    try {
+      await newsApi.updateSource(accessToken, selected.id, source.id, {
+        source_kind: sourceKind,
+        verification_status: verificationStatus,
+      });
+      const payload = await newsApi.history(accessToken, selected.id);
+      const record = readRecord(payload);
+      setSources(Array.isArray(record.sources) ? (record.sources as NewsSource[]) : []);
+      setSuccess(`Status sumber diperbarui: ${source.source_domain || source.source_url}`);
+      void loadMetrics();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memperbarui sumber');
+    } finally {
+      setSourceUpdating('');
+    }
+  };
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -108,17 +191,23 @@ export default function NewsModeration() {
       const record = readRecord(payload);
       setItems(Array.isArray(record.items) ? (record.items as NewsItem[]) : []);
       setSuccess('');
+      void loadMetrics();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat antrean berita');
     } finally {
       setLoading(false);
     }
-  }, [accessToken, status]);
+  }, [accessToken, loadMetrics, status]);
 
   useEffect(() => {
     if (!accessToken) return;
     void load();
   }, [accessToken, load]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    void loadMetrics();
+  }, [accessToken, loadMetrics]);
 
   const moderate = async (action: 'approve' | 'needs_revision' | 'reject' | 'retract' | 'correct') => {
     if (!accessToken || !selected) return;
@@ -135,6 +224,13 @@ export default function NewsModeration() {
       setSuccess(`Aksi "${action}" berhasil untuk: ${selected.title}`);
       setNote('');
       await load();
+      if (selected?.id) {
+        const payload = await newsApi.history(accessToken, selected.id);
+        const record = readRecord(payload);
+        setHistory(Array.isArray(record.items) ? (record.items as EditorialEvent[]) : []);
+        setVersions(Array.isArray(record.versions) ? (record.versions as NewsVersion[]) : []);
+        setSources(Array.isArray(record.sources) ? (record.sources as NewsSource[]) : []);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memoderasi berita');
     } finally {
@@ -171,6 +267,21 @@ export default function NewsModeration() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {success ? <Alert tone="success">{success}</Alert> : null}
+
+      <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {[
+          { label: 'Terbit 24 jam', value: metrics.published_24h ?? 0 },
+          { label: 'Terbit 7 hari', value: metrics.published_7d ?? 0 },
+          { label: 'Rata-rata review', value: metrics.avg_review_minutes == null ? '-' : `${Math.round(metrics.avg_review_minutes)} mnt` },
+          { label: 'Sumber verified', value: metrics.sources?.verified ?? 0 },
+          { label: 'Sumber bermasalah', value: metrics.sources?.flagged ?? 0 },
+        ].map(metric => (
+          <div key={metric.label} className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--color-text-soft)]">{metric.label}</p>
+            <p className="mt-2 text-xl font-semibold text-[color:var(--color-text)]">{metricsLoading ? '…' : metric.value}</p>
+          </div>
+        ))}
+      </section>
 
       <div className="mb-4 flex flex-wrap gap-2">
         {['pending_review', 'needs_revision', 'published', 'rejected', 'retracted', 'all'].map(value => (
@@ -232,16 +343,58 @@ export default function NewsModeration() {
               {selected.summary ? <p className="rounded-2xl bg-[color:var(--color-surface-muted)] p-4 text-sm font-semibold leading-6 text-[color:var(--color-text)]">{selected.summary}</p> : null}
               <div className="max-h-[42vh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-[color:var(--color-border)] p-4 text-sm leading-7 text-[color:var(--color-text)]">{selected.body}</div>
 
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-soft)]">Sumber</p>
-                {sourceUrls.length ? (
-                  <div className="grid gap-1">
+              <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-soft)]">Source provenance</p>
+                    <p className="mt-1 text-xs text-[color:var(--color-text-soft)]">Klasifikasi dan verifikasi sumber disimpan terpisah dari isi artikel.</p>
+                  </div>
+                  <span className="rounded-full bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--color-text-soft)]">{sources.length || sourceUrls.length} sumber</span>
+                </div>
+                {sources.length ? (
+                  <div className="mt-3 space-y-2">
+                    {sources.map(source => (
+                      <div key={source.id} className="rounded-xl bg-[color:var(--color-surface-muted)] p-3">
+                        <a href={source.source_url} target="_blank" rel="noreferrer" className="block break-all text-xs font-semibold text-[color:var(--color-primary)] underline">
+                          {source.source_domain || source.source_url}
+                        </a>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <select
+                            value={source.source_kind}
+                            disabled={sourceUpdating === source.id}
+                            onChange={event => void reviewSource(source, source.verification_status, event.target.value as NewsSource['source_kind'])}
+                            className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-1 text-[11px]"
+                          >
+                            <option value="user_supplied">user supplied</option>
+                            <option value="primary">primary</option>
+                            <option value="secondary">secondary</option>
+                            <option value="official">official</option>
+                            <option value="business">business</option>
+                          </select>
+                          {(['unverified', 'verified', 'broken', 'rejected'] as const).map(value => (
+                            <button
+                              key={value}
+                              type="button"
+                              disabled={sourceUpdating === source.id}
+                              onClick={() => void reviewSource(source, value)}
+                              className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${source.verification_status === value ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white' : 'border-[color:var(--color-border)] text-[color:var(--color-text-soft)]'}`}
+                            >
+                              {value}
+                            </button>
+                          ))}
+                        </div>
+                        {source.checked_at ? <p className="mt-2 text-[10px] text-[color:var(--color-text-soft)]">Dicek {formatDate(source.checked_at)}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : sourceUrls.length ? (
+                  <div className="mt-3 grid gap-1">
                     {sourceUrls.map(url => <a key={url} href={url} target="_blank" rel="noreferrer" className="break-all text-xs font-semibold text-[color:var(--color-primary)] underline">{url}</a>)}
                   </div>
                 ) : (
-                  <p className="text-xs text-[color:var(--color-text-soft)]">Tidak ada URL sumber. Pastikan jenis konten memang rilis bisnis sebelum approve.</p>
+                  <p className="mt-3 text-xs text-[color:var(--color-text-soft)]">Tidak ada URL sumber. Pastikan jenis konten memang rilis bisnis sebelum approve.</p>
                 )}
-              </div>
+              </section>
 
               <label className="block text-sm font-semibold text-[color:var(--color-text)]">
                 Dampak untuk pelaku usaha
@@ -264,6 +417,29 @@ export default function NewsModeration() {
                   </>
                 ) : null}
               </div>
+
+              <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-soft)]">Versi artikel</p>
+                    <p className="mt-1 text-xs text-[color:var(--color-text-soft)]">Snapshot immutable setiap submit, resubmit, publish, koreksi, dan penarikan.</p>
+                  </div>
+                  <span className="rounded-full bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--color-text-soft)]">{versions.length} versi</span>
+                </div>
+                {versions.length ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {versions.slice(0, 8).map(version => (
+                      <div key={version.id} className="rounded-xl bg-[color:var(--color-surface-muted)] p-3">
+                        <p className="text-xs font-semibold text-[color:var(--color-text)]">v{version.version_number} · {version.action.replaceAll('_', ' ')}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-[color:var(--color-text-soft)]">{version.title}</p>
+                        <p className="mt-2 text-[10px] text-[color:var(--color-text-soft)]">{version.actor_role} · {formatDate(version.created_at)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-[color:var(--color-text-soft)]">Snapshot versi akan muncul setelah migration hardening diterapkan.</p>
+                )}
+              </section>
 
               <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -293,6 +469,20 @@ export default function NewsModeration() {
                   <p className="mt-3 text-xs text-[color:var(--color-text-soft)]">Belum ada jejak editorial untuk item ini.</p>
                 )}
               </section>
+
+              {metrics.top_articles_7d?.length ? (
+                <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-soft)]">Top artikel 7 hari</p>
+                  <div className="mt-3 space-y-2">
+                    {metrics.top_articles_7d.slice(0, 5).map((article, index) => (
+                      <div key={article.id} className="flex items-center justify-between gap-3 rounded-xl bg-[color:var(--color-surface-muted)] p-3 text-xs">
+                        <span className="min-w-0 truncate font-semibold text-[color:var(--color-text)]">{index + 1}. {article.title}</span>
+                        <span className="shrink-0 text-[color:var(--color-text-soft)]">{article.opens} open</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
             </div>
           )}
         </Card>

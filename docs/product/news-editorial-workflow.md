@@ -61,3 +61,25 @@ CMS:
 ## Editorial boundaries
 
 Community content and opinion are not automatically News. Business-supplied material is labeled `press_release`. Publishing at scale should remain source-backed and human-reviewed rather than scraped or automatically rewritten.
+
+## Hardening V2
+
+The News domain also maintains durability and observability primitives:
+
+- `news_article_versions` stores immutable article snapshots for submit, resubmit, moderation, correction, and retraction transitions.
+- `news_source_references` normalizes source URLs separately from article metadata and retains editorial classification/verification state.
+- Editorial history returns events, version snapshots, and source provenance in one CMS-oriented response.
+- News publication and editorial changes enqueue explicit events into the existing marketplace transactional outbox. This supplements, rather than replaces, the generic `content_items` outbox trigger.
+- Contributors receive the existing Lajukan in-app/realtime notifications for submission receipt, publication, revision requests, rejection, correction, and retraction.
+- Public News listing supports cursor pagination while retaining bounded offset compatibility.
+- The News article surface emits engagement events: `news.opened`, `news.read_25`, `news.read_50`, `news.read_75`, `news.read_100`, `news.source_clicked`, and `news.related_clicked`.
+- CMS newsroom metrics aggregate queue state, publication throughput, review latency, source verification, and seven-day article opens from existing source-of-truth tables.
+
+### Source policy
+
+A source classification is editorial metadata, not an automatic truth score. `official`, `primary`, `secondary`, and `business` describe provenance. Verification state records whether an editor checked the submitted reference; it must not be used to claim that every assertion in an article is true.
+
+### Scale path
+
+News continues to reuse Lajukan's canonical event log, transactional outbox, notification inbox, search architecture, and observability stack. Do not create a parallel event bus, notification service, or analytics store only for News unless measured production limits justify a separate boundary.
+

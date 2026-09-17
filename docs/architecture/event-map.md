@@ -39,6 +39,7 @@ Use dotted event names in runtime code. The collector accepts older underscore a
 - RFQ/quote: `rfq.created`, `rfq.supplier_invited`, `quote.create_started`, `quote.submitted`, `quote.viewed`, `quote.shortlisted`, `quote.accepted`.
 - Conversation: `chat.opened`, `sample.requested`.
 - Trust/export: `report.submitted`, `verification.started`, `verification.completed`, `export.assessment_started`, `export.assessment_completed`.
+- News: `news.viewed`, `news.opened`, `news.read_25`, `news.read_50`, `news.read_75`, `news.read_100`, `news.source_clicked`, `news.related_clicked`.
 
 The frontend helper `trackLajukanEvent` and marketplace collector both remove sensitive event properties such as OTPs, tokens, passwords, private message bodies, and raw identity document markers before events are persisted.
 
