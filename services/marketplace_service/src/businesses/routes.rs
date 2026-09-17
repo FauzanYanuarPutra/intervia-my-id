@@ -559,13 +559,27 @@ async fn create_settlement(
         Ok(value) => value,
         Err(response) => return response,
     };
+    let key = match settlement_idempotency_key(&headers) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
+
     match SettlementRepository::new(state.db.clone())
-        .create(actor_id, business_id, organization_id, payload)
+        .create(actor_id, business_id, organization_id, key, payload)
         .await
     {
-        Ok(item) => (
-            StatusCode::CREATED,
-            Json(json!({ "data": { "settlement": item } })),
+        Ok(outcome) => (
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
+            Json(json!({
+                "data": {
+                    "settlement": outcome.settlement,
+                    "replayed": outcome.replayed
+                }
+            })),
         )
             .into_response(),
         Err(error) => settlement_error_response(error),
@@ -758,6 +772,16 @@ fn recipe_error_response(error: RecipeRepositoryError) -> Response {
     }
 }
 
+fn settlement_idempotency_key(headers: &HeaderMap) -> Result<Uuid, &'static str> {
+    let value = headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or("missing_idempotency_key")?;
+    Uuid::parse_str(value).map_err(|_| "invalid_idempotency_key")
+}
+
 fn settlement_error_response(error: SettlementRepositoryError) -> Response {
     match error {
         SettlementRepositoryError::Validation(error) => {
@@ -766,6 +790,10 @@ fn settlement_error_response(error: SettlementRepositoryError) -> Response {
         SettlementRepositoryError::NotFound => api_error(
             StatusCode::NOT_FOUND,
             "business_settlement_resource_not_found",
+        ),
+        SettlementRepositoryError::Conflict => api_error(
+            StatusCode::CONFLICT,
+            "business_settlement_command_conflict",
         ),
         SettlementRepositoryError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -903,6 +931,31 @@ mod tests {
     fn recipe_permission_errors_use_stable_forbidden_responses() {
         let response = recipe_error_response(RecipeRepositoryError::Forbidden);
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn settlement_idempotency_key_requires_a_valid_uuid() {
+        let headers = HeaderMap::new();
+        assert_eq!(
+            settlement_idempotency_key(&headers),
+            Err("missing_idempotency_key")
+        );
+
+        let mut headers = HeaderMap::new();
+        headers.insert("idempotency-key", "not-a-uuid".parse().unwrap());
+        assert_eq!(
+            settlement_idempotency_key(&headers),
+            Err("invalid_idempotency_key")
+        );
+
+        headers.insert(
+            "idempotency-key",
+            "11111111-1111-4111-8111-111111111111".parse().unwrap(),
+        );
+        assert_eq!(
+            settlement_idempotency_key(&headers).unwrap(),
+            Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap()
+        );
     }
 
     #[test]
