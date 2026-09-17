@@ -1,7 +1,7 @@
 # Business OS Source of Truth
 
 Status: Wave 0 foundation contract
-Date: 2026-09-17
+Date: 2026-09-18
 
 ## Principle
 
@@ -52,6 +52,12 @@ frontend/apps/usaha/src/lib/portal-store.ts
 - Usaha tests and build remain green.
 
 CI runs `scripts/ci/check_usaha_persistence_boundary.py` to prevent new production dependencies on the legacy store.
+
+## Party direction
+
+Business OS V4 will normalize reusable people/organization identities through a Party model rather than creating unrelated customer, supplier, employee, contractor, partner, and owner identity silos. `business_relationships` remains canonical during Wave 0; the future migration is defined in `docs/architecture/business-os-party-migration.md` and must preserve evidence without inventing legal, employment, payroll, KYC, or liability facts.
+
+Identity authentication remains owned by `identity_service`. A future Party record may reference an Identity user, but it must not become a parallel authentication source.
 
 ## Future domain ownership
 
