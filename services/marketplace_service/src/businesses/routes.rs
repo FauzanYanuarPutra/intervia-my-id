@@ -559,7 +559,11 @@ async fn create_settlement(
         Ok(value) => value,
         Err(response) => return response,
     };
-    let key = match settlement_idempotency_key(&headers) {
+    let key = match parse_idempotency_key(
+        headers
+            .get("idempotency-key")
+            .and_then(|value| value.to_str().ok()),
+    ) {
         Ok(value) => value,
         Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
     };
@@ -772,16 +776,6 @@ fn recipe_error_response(error: RecipeRepositoryError) -> Response {
     }
 }
 
-fn settlement_idempotency_key(headers: &HeaderMap) -> Result<Uuid, &'static str> {
-    let value = headers
-        .get("idempotency-key")
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or("missing_idempotency_key")?;
-    Uuid::parse_str(value).map_err(|_| "invalid_idempotency_key")
-}
-
 fn settlement_error_response(error: SettlementRepositoryError) -> Response {
     match error {
         SettlementRepositoryError::Validation(error) => {
@@ -931,31 +925,6 @@ mod tests {
     fn recipe_permission_errors_use_stable_forbidden_responses() {
         let response = recipe_error_response(RecipeRepositoryError::Forbidden);
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    }
-
-    #[test]
-    fn settlement_idempotency_key_requires_a_valid_uuid() {
-        let headers = HeaderMap::new();
-        assert_eq!(
-            settlement_idempotency_key(&headers),
-            Err("missing_idempotency_key")
-        );
-
-        let mut headers = HeaderMap::new();
-        headers.insert("idempotency-key", "not-a-uuid".parse().unwrap());
-        assert_eq!(
-            settlement_idempotency_key(&headers),
-            Err("invalid_idempotency_key")
-        );
-
-        headers.insert(
-            "idempotency-key",
-            "11111111-1111-4111-8111-111111111111".parse().unwrap(),
-        );
-        assert_eq!(
-            settlement_idempotency_key(&headers).unwrap(),
-            Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap()
-        );
     }
 
     #[test]
