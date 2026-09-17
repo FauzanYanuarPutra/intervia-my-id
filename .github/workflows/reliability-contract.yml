@@ -28,6 +28,11 @@ jobs:
       - name: Parse read-only k6 scenario
         shell: bash
         run: node --input-type=module --check < scripts/load/k6-read-paths.js
+      - name: Validate backup scripts
+        shell: bash
+        run: |
+          bash -n scripts/ops/postgres_logical_backup.sh
+          bash -n scripts/ops/verify_backup_set.sh
       - name: Validate observability Compose contract
         env:
           IMAGE_TAG: sha-ci

@@ -13,8 +13,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    auth_claims_from_headers, has_cms_access, push_notification_best_effort,
-    user_id_from_auth, AppState,
+    auth_claims_from_headers, has_cms_access, push_notification_best_effort, user_id_from_auth,
+    AppState,
 };
 
 const PUBLIC_NEWS_MAX_OFFSET: i64 = 10_000;
@@ -169,19 +169,25 @@ struct EditorialEventRow {
 }
 
 fn trimmed(value: Option<String>) -> Option<String> {
-    value.map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -> Value {
     if !metadata.is_object() {
         metadata = json!({});
     }
-    let root = metadata.as_object_mut().expect("metadata object was initialized");
+    let root = metadata
+        .as_object_mut()
+        .expect("metadata object was initialized");
     let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
     if !news.is_object() {
         *news = json!({});
     }
-    let news = news.as_object_mut().expect("news metadata object was initialized");
+    let news = news
+        .as_object_mut()
+        .expect("news metadata object was initialized");
     news.insert(
         "editorial_status".to_string(),
         Value::String("pending_review".to_string()),
@@ -198,7 +204,14 @@ pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -
 fn valid_news_category(value: &str) -> bool {
     matches!(
         value,
-        "Ekonomi" | "Bisnis" | "UMKM" | "Teknologi" | "Keuangan" | "Regulasi" | "Industri" | "Daerah"
+        "Ekonomi"
+            | "Bisnis"
+            | "UMKM"
+            | "Teknologi"
+            | "Keuangan"
+            | "Regulasi"
+            | "Industri"
+            | "Daerah"
     )
 }
 
@@ -348,9 +361,9 @@ fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
             .and_then(Value::as_array)
             .is_some_and(|items| {
                 items.iter().any(|item| {
-                    item.as_str()
-                        .map(str::trim)
-                        .is_some_and(|source| source.starts_with("https://") || source.starts_with("http://"))
+                    item.as_str().map(str::trim).is_some_and(|source| {
+                        source.starts_with("https://") || source.starts_with("http://")
+                    })
                 })
             });
         if !has_source {
@@ -379,7 +392,11 @@ fn source_domain(source_url: &str) -> Option<String> {
         .trim()
         .trim_start_matches("www.")
         .to_ascii_lowercase();
-    if host.is_empty() { None } else { Some(host) }
+    if host.is_empty() {
+        None
+    } else {
+        Some(host)
+    }
 }
 
 fn news_source_urls(metadata: &Value) -> Vec<String> {
@@ -391,10 +408,15 @@ fn news_source_urls(metadata: &Value) -> Vec<String> {
         .map(|items| {
             let mut urls = Vec::new();
             for item in items {
-                let Some(url) = item.as_str().map(str::trim).filter(|value| !value.is_empty()) else {
+                let Some(url) = item
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                else {
                     continue;
                 };
-                if !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2048 {
+                if !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2048
+                {
                     continue;
                 }
                 if !urls.iter().any(|existing| existing == url) {
@@ -410,7 +432,11 @@ fn news_source_urls(metadata: &Value) -> Vec<String> {
 }
 
 fn format_news_cursor(row: &NewsRow) -> String {
-    let at = row.published_at.as_ref().cloned().unwrap_or_else(|| row.created_at.clone());
+    let at = row
+        .published_at
+        .as_ref()
+        .cloned()
+        .unwrap_or_else(|| row.created_at.clone());
     format!("{}|{}", at.to_rfc3339(), row.id)
 }
 
@@ -554,10 +580,7 @@ async fn enqueue_news_outbox_tx(
     Ok(())
 }
 
-async fn load_news_by_id(
-    db: &PgPool,
-    content_id: Uuid,
-) -> Result<Option<NewsRow>, sqlx::Error> {
+async fn load_news_by_id(db: &PgPool, content_id: Uuid) -> Result<Option<NewsRow>, sqlx::Error> {
     sqlx::query_as::<_, NewsRow>(
         r#"
         SELECT
@@ -619,7 +642,10 @@ pub(crate) async fn after_submission_created(
     .await;
 
     if let Err(error) = result {
-        tracing::warn!("news after_submission_created persistence error: {:?}", error);
+        tracing::warn!(
+            "news after_submission_created persistence error: {:?}",
+            error
+        );
         let _ = tx.rollback().await;
         return;
     }
@@ -717,7 +743,10 @@ async fn list_news(
     let limit = query.limit.unwrap_or(24).clamp(1, 100);
     let offset = query.offset.unwrap_or(0);
     if !(0..=PUBLIC_NEWS_MAX_OFFSET).contains(&offset) {
-        return response_error(StatusCode::BAD_REQUEST, "offset is outside the supported range");
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "offset is outside the supported range",
+        );
     }
 
     let category = trimmed(query.category);
@@ -849,7 +878,10 @@ async fn get_news(
         Ok(None) => response_error(StatusCode::NOT_FOUND, "news article not found"),
         Err(error) => {
             tracing::error!("get_news query error: {:?}", error);
-            response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to load news article")
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load news article",
+            )
         }
     }
 }
@@ -881,11 +913,7 @@ async fn list_my_news_submissions(
     .await;
 
     match rows {
-        Ok(items) => (
-            StatusCode::OK,
-            Json(json!({ "items": items })),
-        )
-            .into_response(),
+        Ok(items) => (StatusCode::OK, Json(json!({ "items": items }))).into_response(),
         Err(error) => {
             tracing::error!("list_my_news_submissions query error: {:?}", error);
             response_error(
@@ -949,8 +977,14 @@ async fn update_news_submission(
         return response_error(StatusCode::BAD_REQUEST, "title must be 10-180 characters");
     }
     let summary = trimmed(payload.summary).or_else(|| current.summary.clone());
-    if summary.as_ref().is_some_and(|value| value.len() < 20 || value.len() > 1000) {
-        return response_error(StatusCode::BAD_REQUEST, "summary must be 20-1000 characters");
+    if summary
+        .as_ref()
+        .is_some_and(|value| value.len() < 20 || value.len() > 1000)
+    {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "summary must be 20-1000 characters",
+        );
     }
     let body = trimmed(payload.body).unwrap_or_else(|| current.body.clone());
     if body.len() < 120 || body.len() > 20_000 {
@@ -961,12 +995,16 @@ async fn update_news_submission(
     if !metadata.is_object() {
         metadata = json!({});
     }
-    let root = metadata.as_object_mut().expect("metadata object was initialized");
+    let root = metadata
+        .as_object_mut()
+        .expect("metadata object was initialized");
     let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
     if !news.is_object() {
         *news = json!({});
     }
-    let news = news.as_object_mut().expect("news metadata object was initialized");
+    let news = news
+        .as_object_mut()
+        .expect("news metadata object was initialized");
 
     if let Some(category) = trimmed(payload.category) {
         if !valid_news_category(&category) {
@@ -1234,7 +1272,10 @@ async fn list_editorial_queue(
         }
         Err(error) => {
             tracing::error!("list_editorial_queue query error: {:?}", error);
-            response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to load editorial queue")
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load editorial queue",
+            )
         }
     }
 }
@@ -1279,7 +1320,10 @@ async fn moderate_news(
     };
     let note = trimmed(payload.note);
     let business_impact = trimmed(payload.business_impact);
-    if business_impact.as_ref().is_some_and(|value| value.len() > 2_000) {
+    if business_impact
+        .as_ref()
+        .is_some_and(|value| value.len() > 2_000)
+    {
         return response_error(StatusCode::BAD_REQUEST, "business impact is too long");
     }
     if moderation_action_requires_note(&action) && note.is_none() {
@@ -1288,7 +1332,10 @@ async fn moderate_news(
             "this editorial action requires a note",
         );
     }
-    if note.as_ref().is_some_and(|note| note.len() > NEWS_MAX_REVIEW_NOTE_LEN) {
+    if note
+        .as_ref()
+        .is_some_and(|note| note.len() > NEWS_MAX_REVIEW_NOTE_LEN)
+    {
         return response_error(StatusCode::BAD_REQUEST, "review note is too long");
     }
 
@@ -1343,31 +1390,53 @@ async fn moderate_news(
     if !metadata.is_object() {
         metadata = json!({});
     }
-    let root = metadata.as_object_mut().expect("metadata object was initialized");
+    let root = metadata
+        .as_object_mut()
+        .expect("metadata object was initialized");
     let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
     if !news.is_object() {
         *news = json!({});
     }
-    let news = news.as_object_mut().expect("news metadata object was initialized");
+    let news = news
+        .as_object_mut()
+        .expect("news metadata object was initialized");
     let reviewed_at = Utc::now();
-    news.insert("editorial_status".to_string(), Value::String(next_editorial_status.to_string()));
-    news.insert("reviewed_at".to_string(), Value::String(reviewed_at.to_rfc3339()));
-    news.insert("reviewer_id".to_string(), Value::String(reviewer_id.to_string()));
+    news.insert(
+        "editorial_status".to_string(),
+        Value::String(next_editorial_status.to_string()),
+    );
+    news.insert(
+        "reviewed_at".to_string(),
+        Value::String(reviewed_at.to_rfc3339()),
+    );
+    news.insert(
+        "reviewer_id".to_string(),
+        Value::String(reviewer_id.to_string()),
+    );
     if let Some(note) = note.as_ref() {
         news.insert("review_note".to_string(), Value::String(note.clone()));
     } else {
         news.remove("review_note");
     }
     if let Some(business_impact) = business_impact {
-        news.insert("business_impact".to_string(), Value::String(business_impact));
+        news.insert(
+            "business_impact".to_string(),
+            Value::String(business_impact),
+        );
     }
     if action == "approve" && current.published_at.is_none() {
-        news.insert("published_at".to_string(), Value::String(reviewed_at.to_rfc3339()));
+        news.insert(
+            "published_at".to_string(),
+            Value::String(reviewed_at.to_rfc3339()),
+        );
     }
     if action == "correct" {
         if let Some(note) = note.as_ref() {
             news.insert("correction_note".to_string(), Value::String(note.clone()));
-            news.insert("corrected_at".to_string(), Value::String(reviewed_at.to_rfc3339()));
+            news.insert(
+                "corrected_at".to_string(),
+                Value::String(reviewed_at.to_rfc3339()),
+            );
         }
     }
     if action == "retract" {
@@ -1428,29 +1497,32 @@ async fn moderate_news(
     .bind(&action)
     .bind(previous_editorial_status)
     .bind(next_editorial_status)
-    .bind(&note)
+    .bind(note)
     .execute(&mut *tx)
     .await
     {
         tracing::error!("moderate_news audit insert error: {:?}", error);
-        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to record editorial action");
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record editorial action",
+        );
     }
 
     if let Err(error) = sync_source_references_tx(&mut tx, updated.id, &updated.metadata).await {
         tracing::error!("moderate_news source sync error: {:?}", error);
-        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to synchronize news sources");
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to synchronize news sources",
+        );
     }
-    if let Err(error) = record_version_tx(
-        &mut tx,
-        &updated,
-        Some(reviewer_id),
-        "editor",
-        &action,
-    )
-    .await
+    if let Err(error) =
+        record_version_tx(&mut tx, &updated, Some(reviewer_id), "editor", &action).await
     {
         tracing::error!("moderate_news version error: {:?}", error);
-        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to record news version");
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news version",
+        );
     }
     let routing_key = if matches!(action.as_str(), "approve" | "correct" | "retract") {
         "news.publication.changed"
@@ -1467,7 +1539,10 @@ async fn moderate_news(
     .await
     {
         tracing::error!("moderate_news outbox error: {:?}", error);
-        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to enqueue news event");
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue news event",
+        );
     }
 
     if let Err(error) = tx.commit().await {
@@ -1635,18 +1710,25 @@ async fn update_news_source(
     };
 
     let source_kind = trimmed(payload.source_kind);
-    if source_kind.as_ref().is_some_and(|value| !matches!(
-        value.as_str(),
-        "user_supplied" | "primary" | "secondary" | "official" | "business"
-    )) {
+    if source_kind.as_ref().is_some_and(|value| {
+        !matches!(
+            value.as_str(),
+            "user_supplied" | "primary" | "secondary" | "official" | "business"
+        )
+    }) {
         return response_error(StatusCode::BAD_REQUEST, "unsupported source kind");
     }
     let verification_status = trimmed(payload.verification_status);
-    if verification_status.as_ref().is_some_and(|value| !matches!(
-        value.as_str(),
-        "unverified" | "verified" | "broken" | "rejected"
-    )) {
-        return response_error(StatusCode::BAD_REQUEST, "unsupported source verification status");
+    if verification_status.as_ref().is_some_and(|value| {
+        !matches!(
+            value.as_str(),
+            "unverified" | "verified" | "broken" | "rejected"
+        )
+    }) {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "unsupported source verification status",
+        );
     }
     let note = trimmed(payload.note);
     if note.as_ref().is_some_and(|value| value.len() > 4_000) {
@@ -1681,7 +1763,10 @@ async fn update_news_source(
         Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
         Err(error) => {
             tracing::error!("update_news_source error: {:?}", error);
-            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to update news source");
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update news source",
+            );
         }
     };
 
@@ -1771,7 +1856,10 @@ async fn list_editorial_history(
         }
         Err(error) => {
             tracing::error!("list_editorial_history query error: {:?}", error);
-            response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to load editorial history")
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load editorial history",
+            )
         }
     }
 }
@@ -1786,9 +1874,15 @@ mod tests {
     #[test]
     fn moderation_actions_map_to_publication_states() {
         assert_eq!(moderation_target("approve"), Some(("active", "published")));
-        assert_eq!(moderation_target("needs_revision"), Some(("draft", "needs_revision")));
+        assert_eq!(
+            moderation_target("needs_revision"),
+            Some(("draft", "needs_revision"))
+        );
         assert_eq!(moderation_target("reject"), Some(("archived", "rejected")));
-        assert_eq!(moderation_target("retract"), Some(("archived", "retracted")));
+        assert_eq!(
+            moderation_target("retract"),
+            Some(("archived", "retracted"))
+        );
         assert_eq!(moderation_target("unknown"), None);
     }
 
@@ -1802,7 +1896,10 @@ mod tests {
     #[test]
     fn editorial_actions_are_state_safe() {
         assert!(moderation_action_allowed("pending_review", "approve"));
-        assert!(moderation_action_allowed("pending_review", "needs_revision"));
+        assert!(moderation_action_allowed(
+            "pending_review",
+            "needs_revision"
+        ));
         assert!(moderation_action_allowed("pending_review", "reject"));
         assert!(moderation_action_allowed("published", "correct"));
         assert!(moderation_action_allowed("published", "retract"));

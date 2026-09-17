@@ -204,3 +204,40 @@ drill evidence.
   https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html
 - NIST contingency planning and offsite recovery guidance:
   https://csrc.nist.gov/topics/security-and-privacy/security-programs-and-operations/contingency-planning
+
+
+## Executable PostgreSQL logical backup tier
+
+The repository includes a non-destructive logical backup helper for the three
+owned PostgreSQL databases. It deliberately refuses to write inside the Git
+working tree and validates every custom-format dump with `pg_restore --list`
+before the set is declared complete.
+
+Example on a production host:
+
+```bash
+compose=(
+  --env-file .env.production
+  -f docker-compose.yml
+  -f docker-compose.prod.yml
+  -f docker-compose.observability.yml
+)
+
+ENV=production bash scripts/ops/postgres_logical_backup.sh \
+  /var/backups/lajukan "${compose[@]}"
+```
+
+The command creates a timestamped backup set containing `manifest.json`,
+`checksums.sha256`, three PostgreSQL custom-format dumps, migration heads and
+the repository commit. It contains no application secrets by design.
+
+Verify an existing set without restoring into the live databases:
+
+```bash
+bash scripts/ops/verify_backup_set.sh \
+  /var/backups/lajukan/lajukan-YYYYMMDDTHHMMSSZ "${compose[@]}"
+```
+
+This helper is only the logical/inspection recovery tier. Production RPO targets
+still require off-host base backups plus uninterrupted WAL archiving/PITR, and
+the full recovery contract still requires an isolated restore drill.
