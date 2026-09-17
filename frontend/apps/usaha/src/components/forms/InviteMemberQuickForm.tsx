@@ -3,6 +3,7 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Search, Send, UserRoundCheck, X } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { roleSummaryMap } from '@/lib/portal-access';
 import type { PortalRole } from '@/lib/portal-types';
 
@@ -216,20 +217,15 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
         ) : null}
       </div>
 
-      <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-        Peran
-        <select
+      <div className="grid gap-2 text-sm font-semibold text-portal-ink">
+        <span>Peran</span>
+        <ChoiceChips
           value={role}
-          onChange={event => setRole(event.target.value as Exclude<PortalRole, 'owner'>)}
-          className="portal-input"
-        >
-          {roleOptions.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label} — {option.description}
-            </option>
-          ))}
-        </select>
-      </label>
+          onChange={setRole}
+          ariaLabel="Peran anggota"
+          options={roleOptions}
+        />
+      </div>
 
       <section className="rounded-2xl border border-portal-line bg-portal-mist/60 p-3" aria-label={`Akses ${rolePreview.label}`}>
         <div>

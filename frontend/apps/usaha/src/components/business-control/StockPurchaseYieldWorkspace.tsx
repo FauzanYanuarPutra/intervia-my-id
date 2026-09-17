@@ -3,6 +3,9 @@
 import { useMemo, useState } from 'react';
 import { Loader2, PackagePlus, Scale } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { EffectPreview } from '@/components/interaction/EffectPreview';
+import { SearchPicker } from '@/components/interaction/SearchPicker';
 import type { Wave2YieldObservation } from '@/lib/business-wave2-server';
 import {
   previewObservedYield,
@@ -39,6 +42,13 @@ const money = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 0,
 });
 
+const paymentOptions = [
+  { value: 'cash', label: 'Kas' },
+  { value: 'bank', label: 'Bank' },
+  { value: 'ewallet', label: 'E-wallet' },
+  { value: 'payable', label: 'Utang usaha' },
+] as const;
+
 export function StockPurchaseYieldWorkspace({
   businessId,
   ingredients,
@@ -47,16 +57,20 @@ export function StockPurchaseYieldWorkspace({
   canManage,
 }: Props) {
   const router = useRouter();
+
   const [ingredientId, setIngredientId] = useState(ingredients[0]?.id ?? '');
+  const [ingredientQuery, setIngredientQuery] = useState('');
   const [quantity, setQuantity] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
-  const [accountKey, setAccountKey] = useState('cash');
+  const [accountKey, setAccountKey] = useState<'cash' | 'bank' | 'ewallet' | 'payable'>('cash');
   const [occurredOn, setOccurredOn] = useState(today());
   const [note, setNote] = useState('');
   const [buying, setBuying] = useState(false);
 
   const [yieldIngredientId, setYieldIngredientId] = useState(ingredients[0]?.id ?? '');
+  const [yieldIngredientQuery, setYieldIngredientQuery] = useState('');
   const [yieldProductId, setYieldProductId] = useState('');
+  const [yieldProductQuery, setYieldProductQuery] = useState('');
   const [inputQuantity, setInputQuantity] = useState('');
   const [outputUnits, setOutputUnits] = useState('');
   const [inputUnit, setInputUnit] = useState(ingredients[0]?.purchase_unit ?? 'kg');
@@ -65,13 +79,18 @@ export function StockPurchaseYieldWorkspace({
   const [savingYield, setSavingYield] = useState(false);
 
   const [primaryProductId, setPrimaryProductId] = useState(products[0]?.id ?? '');
+  const [primaryProductQuery, setPrimaryProductQuery] = useState('');
   const [primaryIngredientId, setPrimaryIngredientId] = useState(ingredients[0]?.id ?? '');
+  const [primaryIngredientQuery, setPrimaryIngredientQuery] = useState('');
   const [expectedInput, setExpectedInput] = useState('1');
   const [expectedOutput, setExpectedOutput] = useState('');
   const [savingPrimary, setSavingPrimary] = useState(false);
   const [message, setMessage] = useState('');
 
   const selectedIngredient = ingredients.find(item => item.id === ingredientId) ?? ingredients[0];
+  const selectedYieldIngredient = ingredients.find(item => item.id === yieldIngredientId) ?? ingredients[0];
+  const selectedYieldProduct = products.find(item => item.id === yieldProductId) ?? null;
+
   const purchasePreview = summarizeStockPurchase({
     quantity: Number(quantity),
     totalAmount: Number(totalAmount),
@@ -206,79 +225,95 @@ export function StockPurchaseYieldWorkspace({
           <PackagePlus className="h-4 w-4 text-portal-forest" />
           <div className="min-w-0">
             <p className="font-bold text-portal-ink">Belanja stok</p>
-            <p className="text-xs text-portal-soft">Isi 3 hal. Stok + uang keluar tercatat otomatis.</p>
+            <p className="text-xs text-portal-soft">Pilih bahan, isi jumlah dan total. Dampaknya terlihat sebelum disimpan.</p>
           </div>
         </div>
 
-        <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
-          <label className="text-xs font-semibold text-portal-soft">
-            Bahan / kemasan
-            <select
+        <div className="grid gap-4 p-4 sm:p-5">
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-portal-soft">Bahan / kemasan</p>
+            <SearchPicker
+              items={ingredients}
               value={ingredientId}
-              onChange={event => setIngredientId(event.target.value)}
+              query={ingredientQuery}
+              onQueryChange={setIngredientQuery}
+              onChange={setIngredientId}
+              getKey={item => item.id}
+              getLabel={item => item.name}
+              getMeta={item => item.purchase_unit}
+              placeholder="Cari bahan / kemasan"
+              emptyLabel="Bahan tidak ditemukan"
+              ariaLabel="Pilih bahan belanja"
               disabled={!canManage}
-              className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink"
-            >
-              {ingredients.map(item => (
-                <option key={item.id} value={item.id}>{item.name} · {item.purchase_unit}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">
-            Jumlah dibeli
-            <div className="mt-1 flex items-center rounded-xl border border-portal-line bg-white pr-3">
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-semibold text-portal-soft">
+              Jumlah dibeli
+              <div className="mt-1 flex items-center rounded-xl border border-portal-line bg-white pr-3">
+                <input
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  value={quantity}
+                  onChange={event => setQuantity(event.target.value)}
+                  disabled={!canManage}
+                  className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-sm text-portal-ink outline-none"
+                  placeholder="2"
+                />
+                <span className="text-xs font-semibold text-portal-soft">{selectedIngredient?.purchase_unit ?? ''}</span>
+              </div>
+            </label>
+            <label className="text-xs font-semibold text-portal-soft">
+              Total dibayar
               <input
                 type="number"
-                min="0.000001"
-                step="any"
-                value={quantity}
-                onChange={event => setQuantity(event.target.value)}
+                min="1"
+                value={totalAmount}
+                onChange={event => setTotalAmount(event.target.value)}
                 disabled={!canManage}
-                className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-sm text-portal-ink outline-none"
-                placeholder="2"
+                className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink"
+                placeholder="70000"
               />
-              <span className="text-xs font-semibold text-portal-soft">{selectedIngredient?.purchase_unit ?? ''}</span>
-            </div>
-          </label>
-          <label className="text-xs font-semibold text-portal-soft">
-            Total dibayar
-            <input
-              type="number"
-              min="1"
-              value={totalAmount}
-              onChange={event => setTotalAmount(event.target.value)}
-              disabled={!canManage}
-              className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink"
-              placeholder="70000"
-            />
-          </label>
-        </div>
-
-        {purchasePreview.amountPerUnit !== null ? (
-          <div className="mx-4 mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-[#fafbf9] px-3 py-2.5 text-xs sm:mx-5 sm:mb-5">
-            <span className="font-bold text-portal-ink">
-              +{purchasePreview.quantity.toLocaleString('id-ID')} {selectedIngredient?.purchase_unit ?? ''} ke stok
-            </span>
-            <span className="text-portal-soft">
-              ≈ {money.format(purchasePreview.amountPerUnit)}/{selectedIngredient?.purchase_unit ?? 'unit'}
-            </span>
-            <span className="text-portal-soft">Uang keluar {money.format(purchasePreview.totalAmount)}</span>
+            </label>
           </div>
-        ) : null}
 
-        <div className="border-t border-portal-line px-4 py-3 sm:px-5">
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-portal-soft">Dibayar lewat</p>
+            <ChoiceChips
+              value={accountKey}
+              onChange={setAccountKey}
+              ariaLabel="Dibayar lewat"
+              options={paymentOptions}
+              disabled={!canManage}
+            />
+          </div>
+
+          {purchasePreview.amountPerUnit !== null ? (
+            <EffectPreview
+              items={[
+                {
+                  label: 'Stok bertambah',
+                  value: `+${purchasePreview.quantity.toLocaleString('id-ID')} ${selectedIngredient?.purchase_unit ?? ''}`,
+                  tone: 'positive',
+                },
+                {
+                  label: 'Biaya per unit',
+                  value: `${money.format(purchasePreview.amountPerUnit)}/${selectedIngredient?.purchase_unit ?? 'unit'}`,
+                },
+                {
+                  label: accountKey === 'payable' ? 'Utang bertambah' : 'Uang keluar',
+                  value: money.format(purchasePreview.totalAmount),
+                  tone: 'warning',
+                },
+              ]}
+            />
+          ) : null}
+
           <details>
             <summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail opsional</summary>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <label className="text-xs font-semibold text-portal-soft">
-                Dibayar lewat
-                <select value={accountKey} onChange={event => setAccountKey(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink">
-                  <option value="cash">Kas</option>
-                  <option value="bank">Bank</option>
-                  <option value="ewallet">E-wallet</option>
-                  <option value="payable">Utang usaha</option>
-                </select>
-              </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-portal-soft">
                 Tanggal
                 <input type="date" value={occurredOn} onChange={event => setOccurredOn(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" />
@@ -289,11 +324,12 @@ export function StockPurchaseYieldWorkspace({
               </label>
             </div>
           </details>
+
           <button
             type="button"
             onClick={savePurchase}
             disabled={!canManage || buying || purchasePreview.amountPerUnit === null}
-            className="portal-button-primary mt-3 w-full justify-center disabled:opacity-50 sm:w-auto"
+            className="portal-button-primary w-full justify-center disabled:opacity-50 sm:w-auto"
           >
             {buying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Simpan belanja
@@ -307,9 +343,10 @@ export function StockPurchaseYieldWorkspace({
           <span className="font-bold text-portal-ink">Berapa hasil nyata?</span>
           <span className="ml-2 text-xs font-semibold text-portal-soft">Opsional · biar sistem belajar</span>
         </summary>
+
         <div className="border-t border-portal-line p-4 sm:p-5">
           <p className="mb-4 text-xs leading-5 text-portal-soft">
-            Cukup catat contoh seperti “1 kg alpukat menghasilkan 6 cup”. Tidak perlu menghitung kulit, biji, atau sisa satu-satu.
+            Catat seperti “1 kg alpukat menghasilkan 6 cup”. Tidak perlu menghitung kulit, biji, atau sisa satu-satu.
           </p>
 
           <div className="mb-4 grid grid-cols-3 gap-2">
@@ -331,47 +368,76 @@ export function StockPurchaseYieldWorkspace({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs font-semibold text-portal-soft">
-              Bahan
-              <select
+          <div className="grid gap-4">
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-portal-soft">Bahan</p>
+              <SearchPicker
+                items={ingredients}
                 value={yieldIngredientId}
-                onChange={event => {
-                  const next = event.target.value;
+                query={yieldIngredientQuery}
+                onQueryChange={setYieldIngredientQuery}
+                onChange={next => {
                   setYieldIngredientId(next);
                   setInputUnit(ingredients.find(item => item.id === next)?.purchase_unit ?? 'kg');
                 }}
+                getKey={item => item.id}
+                getLabel={item => item.name}
+                getMeta={item => item.purchase_unit}
+                placeholder="Cari bahan"
+                emptyLabel="Bahan tidak ditemukan"
+                ariaLabel="Pilih bahan hasil nyata"
                 disabled={!canManage}
-                className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink"
-              >
-                {ingredients.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">
-              Produk <span className="font-normal">(opsional)</span>
-              <select value={yieldProductId} onChange={event => setYieldProductId(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink">
-                <option value="">Tanpa produk tertentu</option>
-                {products.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">
-              Bahan dipakai
-              <div className="mt-1 flex items-center rounded-xl border border-portal-line bg-white pr-3">
-                <input type="number" min="0.000001" step="any" value={inputQuantity} onChange={event => setInputQuantity(event.target.value)} disabled={!canManage} className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-sm text-portal-ink outline-none" placeholder="1" />
-                <span className="text-xs font-semibold text-portal-soft">{inputUnit}</span>
+              />
+            </div>
+
+            {products.length ? (
+              <div>
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-portal-soft">Produk terkait <span className="font-normal">(opsional)</span></p>
+                  {yieldProductId ? (
+                    <button type="button" className="portal-button-ghost min-h-8 px-2 py-1 text-xs" onClick={() => setYieldProductId('')} disabled={!canManage}>
+                      Tanpa produk tertentu
+                    </button>
+                  ) : null}
+                </div>
+                <SearchPicker
+                  items={products}
+                  value={yieldProductId}
+                  query={yieldProductQuery}
+                  onQueryChange={setYieldProductQuery}
+                  onChange={setYieldProductId}
+                  getKey={item => item.id}
+                  getLabel={item => item.name}
+                  placeholder="Cari produk (opsional)"
+                  emptyLabel="Produk tidak ditemukan"
+                  ariaLabel="Pilih produk hasil nyata"
+                  disabled={!canManage}
+                />
               </div>
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">
-              Hasil nyata
-              <input type="number" min="0.000001" step="any" value={outputUnits} onChange={event => setOutputUnits(event.target.value)} disabled={!canManage} placeholder="6 cup" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" />
-            </label>
+            ) : null}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-portal-soft">
+                Bahan dipakai
+                <div className="mt-1 flex items-center rounded-xl border border-portal-line bg-white pr-3">
+                  <input type="number" min="0.000001" step="any" value={inputQuantity} onChange={event => setInputQuantity(event.target.value)} disabled={!canManage} className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-sm text-portal-ink outline-none" placeholder="1" />
+                  <span className="text-xs font-semibold text-portal-soft">{inputUnit}</span>
+                </div>
+              </label>
+              <label className="text-xs font-semibold text-portal-soft">
+                Hasil nyata
+                <input type="number" min="0.000001" step="any" value={outputUnits} onChange={event => setOutputUnits(event.target.value)} disabled={!canManage} placeholder="6" className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" />
+              </label>
+            </div>
           </div>
 
           {currentYieldPreview.valid ? (
-            <div className="mt-3 rounded-xl bg-[#fafbf9] px-3 py-2.5 text-sm text-portal-ink">
-              <span className="font-bold">{inputQuantity} {inputUnit} → {outputUnits} hasil</span>
-              <span className="ml-2 text-xs text-portal-soft">≈ {currentYieldPreview.outputPerInput?.toLocaleString('id-ID')} hasil/{inputUnit}</span>
-            </div>
+            <p className="mt-3 rounded-xl bg-[#fafbf9] px-3 py-2.5 text-sm font-bold text-portal-ink">
+              {inputQuantity} {inputUnit} {selectedYieldIngredient?.name ?? 'bahan'} menghasilkan {outputUnits} {selectedYieldProduct?.name ?? 'unit hasil'}
+              <span className="ml-2 text-xs font-normal text-portal-soft">
+                ≈ {currentYieldPreview.outputPerInput?.toLocaleString('id-ID')} hasil/{inputUnit}
+              </span>
+            </p>
           ) : null}
 
           <details className="mt-3">
@@ -396,22 +462,58 @@ export function StockPurchaseYieldWorkspace({
           {products.length ? (
             <details className="mt-5 rounded-xl border border-portal-line">
               <summary className="cursor-pointer list-none p-4 text-sm font-bold text-portal-ink">Pengaturan bahan utama</summary>
-              <div className="grid gap-3 border-t border-portal-line p-4 md:grid-cols-2 xl:grid-cols-4">
-                <label className="text-xs font-semibold text-portal-soft">Produk
-                  <select value={primaryProductId} onChange={event => setPrimaryProductId(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink">{products.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-                </label>
-                <label className="text-xs font-semibold text-portal-soft">Bahan utama
-                  <select value={primaryIngredientId} onChange={event => setPrimaryIngredientId(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line bg-white px-3 py-2.5 text-sm text-portal-ink">{ingredients.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-                </label>
-                <label className="text-xs font-semibold text-portal-soft">Perkiraan input
-                  <input type="number" min="0.000001" step="any" value={expectedInput} onChange={event => setExpectedInput(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" />
-                </label>
-                <label className="text-xs font-semibold text-portal-soft">Perkiraan hasil
-                  <input type="number" min="0.000001" step="any" value={expectedOutput} onChange={event => setExpectedOutput(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" />
-                </label>
-                <div className="md:col-span-2 xl:col-span-4">
+              <div className="grid gap-4 border-t border-portal-line p-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold text-portal-soft">Produk</p>
+                    <SearchPicker
+                      items={products}
+                      value={primaryProductId}
+                      query={primaryProductQuery}
+                      onQueryChange={setPrimaryProductQuery}
+                      onChange={setPrimaryProductId}
+                      getKey={item => item.id}
+                      getLabel={item => item.name}
+                      placeholder="Cari produk"
+                      emptyLabel="Produk tidak ditemukan"
+                      ariaLabel="Pilih produk bahan utama"
+                      disabled={!canManage}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold text-portal-soft">Bahan utama</p>
+                    <SearchPicker
+                      items={ingredients}
+                      value={primaryIngredientId}
+                      query={primaryIngredientQuery}
+                      onQueryChange={setPrimaryIngredientQuery}
+                      onChange={setPrimaryIngredientId}
+                      getKey={item => item.id}
+                      getLabel={item => item.name}
+                      getMeta={item => item.purchase_unit}
+                      placeholder="Cari bahan utama"
+                      emptyLabel="Bahan tidak ditemukan"
+                      ariaLabel="Pilih bahan utama"
+                      disabled={!canManage}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-portal-soft">
+                    Perkiraan input
+                    <input type="number" min="0.000001" step="any" value={expectedInput} onChange={event => setExpectedInput(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" />
+                  </label>
+                  <label className="text-xs font-semibold text-portal-soft">
+                    Perkiraan hasil
+                    <input type="number" min="0.000001" step="any" value={expectedOutput} onChange={event => setExpectedOutput(event.target.value)} disabled={!canManage} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" />
+                  </label>
+                </div>
+
+                <div>
                   <button type="button" onClick={savePrimaryMaterial} disabled={!canManage || savingPrimary} className="portal-button-secondary disabled:opacity-50">
-                    {savingPrimary ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Simpan bahan utama
+                    {savingPrimary ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Simpan bahan utama
                   </button>
                 </div>
               </div>

@@ -3,21 +3,26 @@
 import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import type { BusinessImageValue } from '@/lib/media-crop';
 
 type ProductQuickFormProps = { businessId: string };
 
-const categoryOptions = ['Makanan', 'Minuman', 'Paket', 'Layanan', 'Lainnya'];
+const categoryOptions = ['Makanan', 'Minuman', 'Paket', 'Layanan', 'Lainnya'] as const;
 const sourceTypeOptions = [
   { value: 'owned', label: 'Milik usaha sendiri' },
   { value: 'consignment', label: 'Barang titipan' },
+] as const;
+const stockModeOptions = [
+  { value: 'manual', label: 'Sudah dihitung' },
+  { value: 'estimated', label: 'Masih perkiraan' },
 ] as const;
 
 export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
   const router = useRouter();
   const [name, setName] = useState('');
-  const [category, setCategory] = useState(categoryOptions[0]);
+  const [category, setCategory] = useState<(typeof categoryOptions)[number]>(categoryOptions[0]);
   const [sourceType, setSourceType] = useState<'owned' | 'consignment'>('owned');
   const [priceRupiah, setPriceRupiah] = useState('');
   const [ownerLabel, setOwnerLabel] = useState('');
@@ -146,43 +151,63 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
           <span className="hidden text-xs font-bold text-portal-forest group-open:inline">Tutup</span>
         </summary>
         <div className="grid gap-4 border-t border-portal-line p-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-semibold text-portal-ink">Kategori
-              <select value={category} onChange={event => setCategory(event.target.value)} className="portal-input">
-                {categoryOptions.map(option => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-portal-ink">Sumber barang
-              <select value={sourceType} onChange={event => setSourceType(event.target.value as 'owned' | 'consignment')} className="portal-input">
-                {sourceTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
+          <div className="grid gap-4">
+            <div className="grid gap-2 text-sm font-semibold text-portal-ink">
+              <span>Kategori</span>
+              <ChoiceChips
+                value={category}
+                onChange={setCategory}
+                ariaLabel="Kategori produk"
+                options={categoryOptions.map(value => ({ value, label: value }))}
+              />
+            </div>
+            <div className="grid gap-2 text-sm font-semibold text-portal-ink">
+              <span>Sumber barang</span>
+              <ChoiceChips
+                value={sourceType}
+                onChange={setSourceType}
+                ariaLabel="Sumber barang"
+                options={sourceTypeOptions}
+              />
+            </div>
           </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-semibold text-portal-ink">Batas stok tipis
+            <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+              Batas stok tipis
               <input type="number" inputMode="decimal" min="0" step="any" value={minStockAlert} onChange={event => setMinStockAlert(event.target.value)} placeholder="Contoh: 5" className="portal-input" />
             </label>
-            <label className="grid gap-2 text-sm font-semibold text-portal-ink">Satuan stok
+            <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+              Satuan stok
               <input maxLength={40} value={stockUnit} onChange={event => setStockUnit(event.target.value)} placeholder="pcs / botol / cup" className="portal-input" />
             </label>
           </div>
-          <label className="grid gap-2 text-sm font-semibold text-portal-ink">Cara menghitung stok
-            <select value={stockMode} onChange={event => setStockMode(event.target.value as 'manual' | 'estimated')} className="portal-input">
-              <option value="manual">Sudah dihitung</option>
-              <option value="estimated">Masih perkiraan</option>
-            </select>
-          </label>
+
+          <div className="grid gap-2 text-sm font-semibold text-portal-ink">
+            <span>Cara menghitung stok</span>
+            <ChoiceChips
+              value={stockMode}
+              onChange={setStockMode}
+              ariaLabel="Cara menghitung stok"
+              options={stockModeOptions}
+            />
+          </div>
+
           {sourceType === 'consignment' ? (
             <div className="grid gap-4 rounded-xl bg-[#f7f8f5] p-3 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm font-semibold text-portal-ink">Nama penitip / supplier
+              <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+                Nama penitip / supplier
                 <input value={ownerLabel} onChange={event => setOwnerLabel(event.target.value)} placeholder="Contoh: Bu Rini Snack" className="portal-input" />
               </label>
-              <label className="grid gap-2 text-sm font-semibold text-portal-ink">Aturan titip jual
+              <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+                Aturan titip jual
                 <input value={consignmentTerms} onChange={event => setConsignmentTerms(event.target.value)} placeholder="Contoh: bagi hasil 80/20" className="portal-input" />
               </label>
             </div>
           ) : null}
-          <label className="grid gap-2 text-sm font-semibold text-portal-ink"><span>Catatan <span className="font-normal text-portal-soft">(opsional)</span></span>
+
+          <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+            <span>Catatan <span className="font-normal text-portal-soft">(opsional)</span></span>
             <input value={notes} onChange={event => setNotes(event.target.value)} placeholder="Contoh: paling laris pagi hari" className="portal-input" />
           </label>
         </div>

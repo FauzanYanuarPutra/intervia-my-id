@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Boxes, PackagePlus, TriangleAlert } from 'lucide-react';
-import { IngredientWorkspaceV2 } from '@/components/business-control/IngredientWorkspaceV2';
+import { IngredientWorkspace } from '@/components/business-control/IngredientWorkspace';
 import { StockPurchaseYieldWorkspace } from '@/components/business-control/StockPurchaseYieldWorkspace';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { PageHeader } from '@/components/portal/PageHeader';
@@ -174,7 +174,7 @@ export default async function BusinessInventoryPage({ params, searchParams }: Pa
                 </div>
               </section>
 
-              <IngredientWorkspaceV2
+              <IngredientWorkspace
                 businessId={business.id}
                 initialIngredients={ingredients}
                 primaryLocationId={primaryLocation?.id ?? null}
