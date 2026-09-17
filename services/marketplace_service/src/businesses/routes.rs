@@ -724,9 +724,13 @@ fn error_response(error: BusinessServiceError) -> Response {
         BusinessServiceError::IdentityUnavailable => {
             api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable")
         }
-        BusinessServiceError::Storage => {
+        BusinessServiceError::ProvisioningRetryable => {
             api_error(StatusCode::SERVICE_UNAVAILABLE, "provisioning_retryable")
         }
+        BusinessServiceError::Storage => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_storage_unavailable",
+        ),
     }
 }
 
@@ -791,6 +795,18 @@ mod tests {
     fn optimistic_concurrency_conflicts_use_http_conflict() {
         let response = error_response(BusinessServiceError::VersionConflict);
         assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn storage_and_retryable_provisioning_use_service_unavailable() {
+        assert_eq!(
+            error_response(BusinessServiceError::Storage).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            error_response(BusinessServiceError::ProvisioningRetryable).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
     }
 
     #[test]
