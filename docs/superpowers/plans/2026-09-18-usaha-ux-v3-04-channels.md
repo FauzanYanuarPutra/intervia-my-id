@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make each sales channel answer the merchant question “kalau jual segini, saya terima dan untung berapa?” before exposing technical fee settings.
+**Goal:** Make each sales channel answer “kalau jual segini, saya terima dan untung berapa?” before exposing technical fee settings.
 
-**Architecture:** Keep `ChannelSettingsWorkspace` and the existing costing helpers as the source of truth. The default row becomes a read-first business summary; technical fee/promo/target-margin inputs move under `Atur perhitungan` without duplicating pricing formulas.
+**Architecture:** Keep `ChannelSettingsWorkspace` and the existing `calculateChannelMargin` / `recommendChannelPrice` helpers as the source of truth. Add a thin presentation adapter that renames `netRevenue` to merchant-facing “diterima bersih” without recalculating it. Existing channel PUT payloads remain unchanged.
 
 **Tech Stack:** Next.js 16, React 19, TypeScript 5.9, Vitest 3.
 
@@ -12,43 +12,69 @@
 
 ## Global Constraints
 
-- Do not duplicate `calculateChannelMargin` or `recommendChannelPrice` formulas.
+- Do not duplicate channel-cost formulas.
 - Existing channel PUT payload remains unchanged.
-- HPP visibility continues to obey costing permissions.
+- HPP visibility obeys costing permissions.
 - Channel activation remains immediate and obvious.
-- Technical fee configuration stays available but secondary.
+- Technical fee fields remain available under progressive disclosure.
 
 ---
 
-### Task 1: Add a pure channel-summary presentation helper
+### Task 1: Add a pure channel business-summary adapter
 
 **Files:**
 - Create: `frontend/apps/usaha/src/lib/business-control/channel-ux.ts`
 - Create: `frontend/apps/usaha/src/lib/business-control/channel-ux.test.ts`
 
 **Interfaces:**
-- Produces: `buildChannelBusinessSummary({ price, hpp, feePercent, fixedFee, merchantPromo, targetMarginPercent })`.
-- Internally delegates to existing costing helpers.
+- Produces: `buildChannelBusinessSummary(input)`.
+- Delegates all calculations to `calculateChannelMargin` and `recommendChannelPrice`.
 
-- [ ] **Step 1: Write the failing helper test**
+- [ ] **Step 1: Write the failing helper tests**
 
 ```ts
 import { describe, expect, it } from 'vitest';
+import { calculateChannelMargin } from './costing';
 import { buildChannelBusinessSummary } from './channel-ux';
 
-it('returns net receipt, contribution profit, and recommendation from shared costing math', () => {
-  const result = buildChannelBusinessSummary({
-    price: 20000,
-    hpp: 8000,
+it('maps shared costing results to merchant-facing values', () => {
+  const input = {
+    price: 20_000,
+    hpp: 8_000,
     feePercent: 20,
-    fixedFee: 1000,
-    merchantPromo: 1000,
+    fixedFee: 1_000,
+    merchantPromo: 1_000,
     targetMarginPercent: 25,
+  };
+  const canonical = calculateChannelMargin({
+    price: input.price,
+    hpp: input.hpp,
+    feeRatePercent: input.feePercent,
+    fixedFee: input.fixedFee,
+    merchantPromo: input.merchantPromo,
   });
+  const result = buildChannelBusinessSummary(input);
+
   expect(result.ready).toBe(true);
-  expect(result.netReceipt).toBeTypeOf('number');
-  expect(result.contributionProfit).toBeTypeOf('number');
+  expect(result.netReceipt).toBe(canonical.netRevenue);
+  expect(result.contributionProfit).toBe(canonical.contributionProfit);
   expect(result.recommendedPrice).toBeTypeOf('number');
+});
+
+it('does not invent profit when price or HPP is unavailable', () => {
+  expect(buildChannelBusinessSummary({
+    price: 20_000,
+    hpp: null,
+    feePercent: 20,
+    fixedFee: 0,
+    merchantPromo: 0,
+    targetMarginPercent: 25,
+  })).toEqual({
+    ready: false,
+    netReceipt: null,
+    contributionProfit: null,
+    recommendedPrice: null,
+  });
 });
 ```
 
@@ -58,35 +84,63 @@ it('returns net receipt, contribution profit, and recommendation from shared cos
 cd frontend/apps/usaha
 npm test -- src/lib/business-control/channel-ux.test.ts
 ```
-Expected: FAIL because helper is missing.
 
-- [ ] **Step 3: Implement by delegating to shared costing functions**
+Expected: FAIL because the helper is missing.
+
+- [ ] **Step 3: Implement the adapter using canonical helpers**
 
 ```ts
 import { calculateChannelMargin, recommendChannelPrice } from './costing';
 
 export function buildChannelBusinessSummary(input: {
-  price: number | null; hpp: number | null; feePercent: number; fixedFee: number; merchantPromo: number; targetMarginPercent: number;
+  price: number | null;
+  hpp: number | null;
+  feePercent: number;
+  fixedFee: number;
+  merchantPromo: number;
+  targetMarginPercent: number;
 }) {
-  if (input.price === null || input.hpp === null) return { ready: false as const, netReceipt: null, contributionProfit: null, recommendedPrice: null };
-  const margin = calculateChannelMargin({ price: input.price, hpp: input.hpp, feeRatePercent: input.feePercent, merchantPromo: input.merchantPromo, fixedFee: input.fixedFee });
-  const recommendation = recommendChannelPrice({ hpp: input.hpp, deductionRatePercent: input.feePercent, fixedFee: input.fixedFee + input.merchantPromo, targetMarginPercent: input.targetMarginPercent, roundTo: 500 });
+  if (input.price === null || input.hpp === null) {
+    return {
+      ready: false as const,
+      netReceipt: null,
+      contributionProfit: null,
+      recommendedPrice: null,
+    };
+  }
+
+  const margin = calculateChannelMargin({
+    price: input.price,
+    hpp: input.hpp,
+    feeRatePercent: input.feePercent,
+    fixedFee: input.fixedFee,
+    merchantPromo: input.merchantPromo,
+  });
+  const recommendation = recommendChannelPrice({
+    hpp: input.hpp,
+    deductionRatePercent: input.feePercent,
+    fixedFee: input.fixedFee + input.merchantPromo,
+    targetMarginPercent: input.targetMarginPercent,
+    roundTo: 500,
+  });
+
   return {
     ready: true as const,
-    netReceipt: margin.netReceipt,
+    netReceipt: margin.netRevenue,
     contributionProfit: margin.contributionProfit,
     recommendedPrice: recommendation.valid ? recommendation.recommendedPrice : null,
   };
 }
 ```
 
-- [ ] **Step 4: Run helper test + typecheck**
+- [ ] **Step 4: Run helper tests and typecheck**
 
 ```bash
 npm test -- src/lib/business-control/channel-ux.test.ts
 npm run typecheck
 ```
-Expected: PASS. If the exact `calculateChannelMargin` return field for net receipt differs, use the existing canonical field rather than adding a second calculation.
+
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -102,18 +156,26 @@ git commit -m "feat(usaha): add channel business summary helper"
 - Create: `frontend/apps/usaha/src/components/business-control/channel-settings-v3.contract.test.ts`
 
 **Interfaces:**
-- Consumes `buildChannelBusinessSummary()`.
-- Preserve PUT `/api/businesses/${businessId}/channels/${channelKey}` body.
+- Preserve PUT `/api/businesses/${businessId}/channels/${encodeURIComponent(row.key)}` body: `display_name`, `fee_rate_bps`, `fixed_fee_amount`, `merchant_promo_amount`, `target_margin_bps`, `enabled`, `metadata`.
 
 - [ ] **Step 1: Write the failing source contract**
 
 ```ts
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
 const source = readFileSync('src/components/business-control/ChannelSettingsWorkspace.tsx', 'utf8');
-expect(source).toContain('Harga jual');
-expect(source).toContain('Diterima bersih');
-expect(source).toContain('Laba per item');
-expect(source).toContain('Harga aman');
-expect(source).toContain('Atur perhitungan');
+
+describe('channel UX V3', () => {
+  it('shows business outcomes before technical settings', () => {
+    expect(source).toContain('Harga jual');
+    expect(source).toContain('Diterima bersih');
+    expect(source).toContain('Laba per item');
+    expect(source).toContain('Harga aman');
+    expect(source).toContain('Atur perhitungan');
+    expect(source).toContain('buildChannelBusinessSummary');
+  });
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -121,74 +183,116 @@ expect(source).toContain('Atur perhitungan');
 ```bash
 npm test -- src/components/business-control/channel-settings-v3.contract.test.ts
 ```
-Expected: FAIL because current row emphasizes fee percentage rather than the full business summary.
 
-- [ ] **Step 3: Build the row summary from the helper**
+Expected: FAIL.
+
+- [ ] **Step 3: Replace row-local margin/recommendation memo with the presentation adapter**
+
+Import:
+
+```tsx
+import { buildChannelBusinessSummary } from '@/lib/business-control/channel-ux';
+```
+
+Inside `ChannelRow`:
 
 ```tsx
 const businessSummary = useMemo(() => buildChannelBusinessSummary({
-  price, hpp, feePercent: row.feePercent, fixedFee: row.fixedFee,
-  merchantPromo: row.merchantPromo, targetMarginPercent: row.targetMarginPercent,
+  price,
+  hpp,
+  feePercent: row.feePercent,
+  fixedFee: row.fixedFee,
+  merchantPromo: row.merchantPromo,
+  targetMarginPercent: row.targetMarginPercent,
 }), [price, hpp, row.feePercent, row.fixedFee, row.merchantPromo, row.targetMarginPercent]);
 ```
 
-Render, when ready:
+Remove direct row-local `calculateChannelMargin` and `recommendChannelPrice` calls after this adapter is in use. The adapter itself remains the only new layer and delegates to those existing helpers.
+
+- [ ] **Step 4: Render the default business summary**
+
+When `businessSummary.ready` is true:
 
 ```tsx
 <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-  <Metric label="Harga jual" value={money.format(price ?? 0)} />
-  <Metric label="Diterima bersih" value={money.format(businessSummary.netReceipt ?? 0)} />
-  <Metric label="Laba per item" value={money.format(businessSummary.contributionProfit ?? 0)} />
-  <Metric label="Harga aman" value={businessSummary.recommendedPrice === null ? 'Belum ada' : money.format(businessSummary.recommendedPrice)} />
+  <div className="rounded-xl bg-[#fafbf9] p-3">
+    <p className="text-[11px] text-portal-soft">Harga jual</p>
+    <p className="mt-1 text-sm font-black text-portal-ink">{money.format(price ?? 0)}</p>
+  </div>
+  <div className="rounded-xl bg-[#fafbf9] p-3">
+    <p className="text-[11px] text-portal-soft">Diterima bersih</p>
+    <p className="mt-1 text-sm font-black text-portal-ink">{money.format(businessSummary.netReceipt)}</p>
+  </div>
+  <div className="rounded-xl bg-[#fafbf9] p-3">
+    <p className="text-[11px] text-portal-soft">Laba per item</p>
+    <p className={`mt-1 text-sm font-black ${businessSummary.contributionProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>
+      {money.format(businessSummary.contributionProfit)}
+    </p>
+  </div>
+  <div className="rounded-xl bg-[#fafbf9] p-3">
+    <p className="text-[11px] text-portal-soft">Harga aman</p>
+    <p className="mt-1 text-sm font-black text-portal-ink">
+      {businessSummary.recommendedPrice === null ? 'Belum ada' : money.format(businessSummary.recommendedPrice)}
+    </p>
+  </div>
 </div>
 ```
 
-When HPP is hidden/missing, render a permission/readiness explanation instead of fabricating profit.
+When readiness is not complete, keep the existing `channelSimulationReadiness` explanation. If `canViewCosting` is false, do not expose HPP or profit-derived values.
 
-- [ ] **Step 4: Rename technical details summary**
+- [ ] **Step 5: Rename the technical disclosure**
 
-Change `Atur` to `Atur perhitungan`. Keep `Potongan %`, `Target margin %`, `Biaya tetap`, and `Promo dari toko` inside it.
+Change the channel-row summary from `Atur` to `Atur perhitungan`. Keep these existing fields inside it:
+- Nama kanal
+- Potongan %
+- Target margin % when permitted
+- Biaya tetap
+- Promo dari toko
+- Simpan
 
-- [ ] **Step 5: Run targeted tests and typecheck**
+Do not move those technical fields to the default row.
+
+- [ ] **Step 6: Run targeted tests and typecheck**
 
 ```bash
 npm test -- src/components/business-control/channel-settings-v3.contract.test.ts src/lib/business-control/channel-ux.test.ts
 npm run typecheck
 ```
+
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/components/business-control/ChannelSettingsWorkspace.tsx src/components/business-control/channel-settings-v3.contract.test.ts
 git commit -m "feat(usaha): make channel pricing business-first"
 ```
 
-### Task 3: Preserve readiness and permission behavior
+### Task 3: Lock readiness, permission, and formula behavior
 
 **Files:**
 - Modify: `frontend/apps/usaha/src/components/business-control/channel-settings-v3.contract.test.ts`
-- Test existing: costing/progressive-disclosure tests under `src/lib/business-control`.
+- Test existing costing module: `frontend/apps/usaha/src/lib/business-control/costing.ts` and its current matching test file.
 
-**Interfaces:**
-- No new production API.
-
-- [ ] **Step 1: Add contract coverage for incomplete data**
+- [ ] **Step 1: Add permission/readiness assertions**
 
 ```ts
 expect(source).toContain("readiness !== 'ready'");
 expect(source).toContain('canViewCosting');
 expect(source).toContain('Akses ini tidak menampilkan HPP dan keuntungan');
+expect(source).toContain('buildChannelBusinessSummary');
 ```
 
-- [ ] **Step 2: Run channel and costing tests**
+- [ ] **Step 2: Run all matching channel/costing tests**
 
 ```bash
-npm test -- src/components/business-control/channel-settings-v3.contract.test.ts src/lib/business-control/channel-ux.test.ts src/lib/business-control/costing.test.ts
+npm test -- src/components/business-control/channel-settings-v3.contract.test.ts src/lib/business-control/channel-ux.test.ts
+npm test -- costing
 ```
-Expected: PASS; if the costing test filename differs, run `npm test -- costing` and use the matching existing suite.
 
-- [ ] **Step 3: Run full Usaha verification**
+Expected: PASS. The second command must run the repository's existing tests whose names match `costing`.
+
+- [ ] **Step 3: Run complete Usaha verification**
 
 ```bash
 npm run lint
@@ -196,9 +300,10 @@ npm test
 npm run typecheck
 npm run build
 ```
-Expected: all exit 0.
 
-- [ ] **Step 4: Commit only test/readiness changes**
+Expected: all commands exit 0.
+
+- [ ] **Step 4: Commit test-only changes**
 
 ```bash
 git add src/components/business-control/channel-settings-v3.contract.test.ts
