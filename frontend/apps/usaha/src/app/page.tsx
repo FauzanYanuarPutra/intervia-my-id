@@ -23,6 +23,7 @@ import {
 import { buildHomeDashboard } from '@/lib/business-control/home-dashboard';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
 import { buildMerchantNextActions } from '@/lib/business-control/next-actions';
+import { settleHomeControlData } from '@/lib/home-control-data';
 import { getSetupSteps, getStatusCopy, hasPermission } from '@/lib/portal-logic';
 import { resolvePortalHomeState } from '@/lib/portal-server';
 
@@ -74,11 +75,17 @@ export default async function HomePage({
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
 
-  const [ingredients, financeEntries, channels] = await Promise.all([
-    canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
-    canViewFinance ? listControlFinanceEntries(business.id) : Promise.resolve([]),
-    canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
-  ]);
+  const { ingredients, financeEntries, channels } = await settleHomeControlData({
+    ingredients: canViewCosting
+      ? listControlIngredients(business.id)
+      : Promise.resolve([]),
+    financeEntries: canViewFinance
+      ? listControlFinanceEntries(business.id)
+      : Promise.resolve([]),
+    channels: canViewChannels
+      ? listControlChannels(business.id)
+      : Promise.resolve([]),
+  });
 
   const today = jakartaDateKey();
   const control = summarizeControlCenter({ ingredients, financeEntries, channels, today });
