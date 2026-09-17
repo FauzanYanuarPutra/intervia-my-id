@@ -10,6 +10,12 @@ type ProductUpdateInput = {
   stockMode?: 'manual' | 'estimated';
   consignmentTerms?: string;
   notes?: string;
+  image?: {
+    url: string;
+    mimeType: string;
+    width: number;
+    height: number;
+  };
 };
 
 function trimmed(value: string | undefined) {
@@ -33,6 +39,16 @@ export function productUpdatePayload(input: ProductUpdateInput) {
       ? { consignment_terms: trimmed(input.consignmentTerms) }
       : {}),
     ...(input.notes !== undefined ? { notes: trimmed(input.notes) } : {}),
+    ...(input.image !== undefined
+      ? {
+          image: {
+            url: trimmed(input.image.url),
+            mime_type: trimmed(input.image.mimeType),
+            width: input.image.width,
+            height: input.image.height,
+          },
+        }
+      : {}),
   };
 }
 

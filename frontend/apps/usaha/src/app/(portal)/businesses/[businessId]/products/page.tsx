@@ -1,11 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Boxes, Calculator, PackagePlus, Store, TriangleAlert } from 'lucide-react';
-import { DataPanel } from '@/components/portal/DataPanel';
+import { Calculator, Plus, Search, Store } from 'lucide-react';
 import { EmptyState } from '@/components/portal/EmptyState';
+import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
-import { SectionCard } from '@/components/portal/SectionCard';
-import { StatCard } from '@/components/portal/StatCard';
+import { ProductThumb } from '@/components/portal/ProductThumb';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { ProductManageForm } from '@/components/forms/ProductManageForm';
 import { ProductQuickForm } from '@/components/forms/ProductQuickForm';
@@ -13,7 +12,10 @@ import { productPrimaryMode } from '@/lib/business-control/progressive-disclosur
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 
-type PageProps = { params: Promise<{ businessId: string }> };
+type PageProps = {
+  params: Promise<{ businessId: string }>;
+  searchParams: Promise<{ q?: string; stock?: string }>;
+};
 
 function stockTone(stockHealth: string | undefined): 'success' | 'warning' | 'danger' | 'neutral' {
   if (stockHealth === 'aman') return 'success';
@@ -24,14 +26,15 @@ function stockTone(stockHealth: string | undefined): 'success' | 'warning' | 'da
 
 function stockLabel(stockHealth: string | undefined) {
   if (stockHealth === 'aman') return 'Aman';
-  if (stockHealth === 'tipis') return 'Tipis';
+  if (stockHealth === 'tipis') return 'Stok tipis';
   if (stockHealth === 'habis') return 'Habis';
-  if (stockHealth === 'perlu-cocokkan') return 'Perlu cocokkan';
+  if (stockHealth === 'perlu-cocokkan') return 'Perlu dicek';
   return 'Belum dinilai';
 }
 
-export default async function BusinessProductsPage({ params }: PageProps) {
+export default async function BusinessProductsPage({ params, searchParams }: PageProps) {
   const { businessId } = await params;
+  const query = await searchParams;
   const { account, businesses, activeBusiness } = await resolvePortalBusinessPageState(businessId);
   const business = activeBusiness;
   if (!business) notFound();
@@ -40,84 +43,94 @@ export default async function BusinessProductsPage({ params }: PageProps) {
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewChannels = hasPermission(business, 'viewChannels');
   const primaryMode = productPrimaryMode({ productCount: business.products.length, canManage });
-  const activeProductsCount = business.products.filter(product => product.status === 'live').length;
-  const attentionCount = (business.lowStockProductsCount ?? 0) + (business.stockCheckCount ?? 0);
+  const needle = (query.q ?? '').trim().toLocaleLowerCase('id-ID');
+  const attentionOnly = query.stock === 'attention';
+  const visibleProducts = business.products.filter(product => {
+    const matchQuery = !needle || product.name.toLocaleLowerCase('id-ID').includes(needle) || product.category.toLocaleLowerCase('id-ID').includes(needle);
+    const matchStock = !attentionOnly || product.stockHealth === 'habis' || product.stockHealth === 'tipis' || product.stockHealth === 'perlu-cocokkan';
+    return matchQuery && matchStock;
+  });
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="products">
-      <SectionCard eyebrow="Produk & HPP" title="Mulai dari produk yang benar-benar kamu jual" description="Produk tetap menjadi pusat. Resep, HPP, stok, dan harga kanal baru dibuka setelah produk tersedia dan hanya untuk peran yang berhak.">
-        <div className="space-y-4">
-          {primaryMode === 'add-product' ? (
-            <DataPanel title="Tambah produk pertama" description="Isi produk utama dulu. HPP dan pengaturan kanal bisa menyusul setelah katalog punya data nyata.">
-              <div className="p-4 sm:p-5"><ProductQuickForm businessId={business.id} /></div>
-            </DataPanel>
-          ) : null}
+      <PageHeader
+        eyebrow="Produk"
+        title="Produk yang dijual"
+        description="Foto, nama, harga, dan stok dulu. Detail lain dibuka saat diperlukan."
+        action={canManage && business.products.length ? (
+          <a href="#tambah-produk" className="portal-button-primary"><Plus className="h-4 w-4" /> Produk</a>
+        ) : null}
+      />
 
-          {business.products.length ? (
-            <>
-              <section className="grid gap-3 sm:grid-cols-3">
-                <StatCard label="Produk aktif" value={activeProductsCount} icon={Boxes} note={`${business.ownedProductsCount ?? business.productsCount} stok sendiri`} />
-                <StatCard label="Barang titipan" value={business.consignmentProductsCount ?? 0} icon={PackagePlus} note="Produk dengan sumber konsinyasi" />
-                <StatCard label="Perlu cek stok" value={attentionCount} icon={TriangleAlert} note={attentionCount ? 'Prioritaskan sebelum menerima order baru' : 'Tidak ada perhatian stok'} />
-              </section>
+      {primaryMode === 'add-product' ? (
+        <section className="merchant-surface-bordered p-4 sm:p-5" id="tambah-produk">
+          <h2 className="font-black text-portal-ink">Tambah produk pertama</h2>
+          <p className="mt-1 text-xs text-portal-soft">Nama dan harga wajib. Foto dan stok membantu saat jualan.</p>
+          <div className="mt-4"><ProductQuickForm businessId={business.id} /></div>
+        </section>
+      ) : null}
 
-              <DataPanel title="Daftar produk" description={`${business.products.length} produk tercatat. Identitas jual, harga, stok, dan status ditampilkan sebelum detail biaya.`}>
-                <div>
-                  <div className="hidden grid-cols-[minmax(220px,1.5fr)_minmax(140px,.8fr)_120px_120px_110px] gap-4 border-b border-portal-line bg-[#fafbf9] px-5 py-3 text-[11px] font-bold text-portal-soft lg:grid">
-                    <span>Produk</span><span>Sumber</span><span>Harga</span><span>Stok</span><span>Status</span>
+      {business.products.length ? (
+        <>
+          <form className="flex flex-col gap-2 sm:flex-row" action={`/businesses/${business.id}/products`} method="get">
+            <label className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-soft" />
+              <input name="q" defaultValue={query.q ?? ''} placeholder="Cari produk" className="portal-input w-full pl-10" />
+            </label>
+            <div className="flex gap-2 overflow-x-auto">
+              <Link href={`/businesses/${business.id}/products${query.q ? `?q=${encodeURIComponent(query.q)}` : ''}`} className={`merchant-chip ${!attentionOnly ? 'merchant-chip-active' : ''}`}>Semua</Link>
+              <Link href={`/businesses/${business.id}/products?stock=attention${query.q ? `&q=${encodeURIComponent(query.q)}` : ''}`} className={`merchant-chip ${attentionOnly ? 'merchant-chip-active' : ''}`}>Stok tipis / habis</Link>
+              <button className="portal-button-secondary min-h-9 px-3 py-1.5 text-xs" type="submit">Cari</button>
+            </div>
+          </form>
+
+          <section className="merchant-list border border-portal-line/80">
+            {visibleProducts.length ? visibleProducts.map(product => (
+              <article key={product.id} className="border-b border-portal-line/70 last:border-b-0">
+                <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
+                  <ProductThumb name={product.name} imageUrl={product.imageUrl} size="lg" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="truncate text-sm font-black text-portal-ink sm:text-[15px]">{product.name}</h2>
+                      {product.status !== 'live' ? <StatusBadge tone="neutral">Diarsipkan</StatusBadge> : null}
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-portal-soft">{product.category}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <strong className="text-sm text-portal-ink">{product.priceLabel || 'Belum ada harga'}</strong>
+                      <span className="text-xs text-portal-soft">{product.stockLabel} {product.stockUnit ?? ''}</span>
+                      <StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge>
+                    </div>
                   </div>
-                  <div className="divide-y divide-portal-line">
-                    {business.products.map(product => (
-                      <article key={product.id} className="px-4 py-4 transition hover:bg-[#fafbf9] sm:px-5">
-                        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.5fr)_minmax(140px,.8fr)_120px_120px_110px] lg:items-center lg:gap-4">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate font-bold tracking-[-0.02em] text-portal-ink">{product.name}</h3>
-                              {product.sourceType === 'consignment' ? <StatusBadge tone="info">Titipan</StatusBadge> : null}
-                            </div>
-                            <p className="mt-1 truncate text-xs text-portal-soft">{product.category}{product.notes ? ` · ${product.notes}` : ''}</p>
-                          </div>
-                          <div className="text-sm"><p className="font-semibold text-portal-ink">{product.sourceType === 'consignment' ? 'Konsinyasi' : 'Stok sendiri'}</p><p className="mt-1 text-xs text-portal-soft">{product.ownerLabel ?? (product.sourceType === 'consignment' ? 'Pemilik belum dicatat' : 'Milik usaha')}</p></div>
-                          <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Harga</p><p className="mt-1 text-sm font-bold text-portal-ink lg:mt-0">{product.priceLabel || 'Belum ada harga'}</p></div>
-                          <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Kondisi stok</p><div className="mt-1 flex flex-wrap items-center gap-2 lg:mt-0"><StatusBadge tone={stockTone(product.stockHealth)}>{stockLabel(product.stockHealth)}</StatusBadge><span className="text-xs text-portal-soft">{product.stockLabel}</span></div></div>
-                          <div><p className="text-[11px] font-semibold text-portal-soft lg:hidden">Status</p><div className="mt-1 lg:mt-0"><StatusBadge tone={product.status === 'live' ? 'success' : 'neutral'}>{product.status === 'live' ? 'Aktif' : 'Diarsipkan'}</StatusBadge></div></div>
-                        </div>
-                        {(product.consignmentTerms || product.stockUpdatedAt || product.stockMode === 'estimated') ? (
-                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft">
-                            {product.consignmentTerms ? <span>Skema: <strong className="font-semibold text-portal-ink">{product.consignmentTerms}</strong></span> : null}
-                            {product.stockMode === 'estimated' ? <span>Stok masih berupa estimasi</span> : null}
-                            {product.stockUpdatedAt ? <span>Update stok: {product.stockUpdatedAt}</span> : null}
-                          </div>
-                        ) : null}
-                        {canManage ? <ProductManageForm businessId={business.id} product={product} /> : null}
-                      </article>
-                    ))}
-                  </div>
+                  <details className="group shrink-0">
+                    <summary className="portal-button-ghost cursor-pointer list-none px-3">Aksi</summary>
+                    <div className="mt-2 w-full sm:absolute sm:right-6 sm:z-20 sm:w-[520px]">
+                      <div className="rounded-[18px] border border-portal-line bg-white p-3 shadow-xl">
+                        {canManage ? <ProductManageForm businessId={business.id} product={product} /> : <p className="p-2 text-sm text-portal-soft">Mode lihat saja.</p>}
+                      </div>
+                    </div>
+                  </details>
                 </div>
-              </DataPanel>
+              </article>
+            )) : <EmptyState title="Produk tidak ditemukan" description="Coba kata pencarian lain atau tampilkan semua produk." icon={Store} />}
+          </section>
 
-              {canManage ? (
-                <details className="portal-panel group">
-                  <summary className="cursor-pointer list-none p-4 font-bold text-portal-ink sm:p-5">Tambah produk lain <span className="ml-2 text-xs font-semibold text-portal-forest">Buka form</span></summary>
-                  <div className="border-t border-portal-line p-4 sm:p-5"><ProductQuickForm businessId={business.id} /></div>
-                </details>
-              ) : null}
-
-              {(canViewCosting || canViewChannels) ? (
-                <details className="portal-panel group">
-                  <summary className="cursor-pointer list-none p-4 sm:p-5"><span className="font-bold text-portal-ink">Pengaturan lanjutan produk</span><span className="ml-2 text-xs font-semibold text-portal-soft">HPP, resep, dan harga kanal</span></summary>
-                  <div className="grid gap-3 border-t border-portal-line p-4 sm:grid-cols-2 sm:p-5">
-                    {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="rounded-xl border border-portal-line p-4 transition hover:bg-portal-mist/40"><Calculator className="h-4 w-4 text-portal-forest" /><p className="mt-3 font-bold text-portal-ink">Atur resep & HPP</p><p className="mt-1 text-sm leading-6 text-portal-soft">Hubungkan bahan dan kemasan untuk menghitung modal dari data nyata.</p></Link> : null}
-                    {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="rounded-xl border border-portal-line p-4 transition hover:bg-portal-mist/40"><Store className="h-4 w-4 text-portal-forest" /><p className="mt-3 font-bold text-portal-ink">Atur harga per kanal</p><p className="mt-1 text-sm leading-6 text-portal-soft">Gunakan asumsi fee dan promo merchant yang tersimpan, bukan angka hard-code.</p></Link> : null}
-                  </div>
-                </details>
-              ) : null}
-            </>
-          ) : primaryMode === 'view-only' ? (
-            <EmptyState title="Belum ada produk" description="Belum ada katalog yang dapat dilihat. Tambah atau ubah produk membutuhkan akses owner atau manager." icon={Boxes} />
+          {canManage ? (
+            <details id="tambah-produk" className="merchant-surface-bordered group">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 font-black text-portal-ink sm:px-5">
+                <span>Tambah produk</span><span className="text-xs text-portal-forest group-open:hidden">Buka</span><span className="hidden text-xs text-portal-forest group-open:inline">Tutup</span>
+              </summary>
+              <div className="border-t border-portal-line/70 p-4 sm:p-5"><ProductQuickForm businessId={business.id} /></div>
+            </details>
           ) : null}
-        </div>
-      </SectionCard>
+
+          {(canViewCosting || canViewChannels) ? (
+            <section className="grid gap-2 sm:grid-cols-2">
+              {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="merchant-surface-bordered p-4"><Calculator className="h-4 w-4 text-portal-forest" /><p className="mt-2 font-black text-portal-ink">Modal produk (HPP)</p><p className="mt-1 text-xs leading-5 text-portal-soft">Atur bahan dan biaya saat datanya sudah siap.</p></Link> : null}
+              {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="merchant-surface-bordered p-4"><Store className="h-4 w-4 text-portal-forest" /><p className="mt-2 font-black text-portal-ink">Harga online</p><p className="mt-1 text-xs leading-5 text-portal-soft">Atur harga marketplace tanpa memenuhi form produk.</p></Link> : null}
+            </section>
+          ) : null}
+        </>
+      ) : primaryMode === 'view-only' ? <EmptyState title="Belum ada produk" description="Menambah produk membutuhkan akses yang sesuai." icon={Store} /> : null}
     </PortalShell>
   );
 }

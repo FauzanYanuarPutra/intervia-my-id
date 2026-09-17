@@ -1,7 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Skeleton as UISkeleton, SkeletonPanel } from '@/components/ui/Skeleton';
+import {
+  Skeleton as UISkeleton,
+  SkeletonGroup,
+  SkeletonPanel,
+} from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
 
 interface SkeletonProps {
@@ -26,15 +30,12 @@ export function Skeleton({
   const uiVariant =
     variant === 'circular'
       ? 'circle'
-      : variant === 'rounded'
-        ? 'block'
-        : variant === 'rectangular'
-          ? 'block'
-          : 'line';
+      : variant === 'text'
+        ? 'line'
+        : 'block';
 
   return (
     <UISkeleton
-      aria-hidden="true"
       variant={uiVariant}
       pulse={pulse}
       className={cn(
@@ -48,15 +49,22 @@ export function Skeleton({
   );
 }
 
-export function CardSkeleton() {
+export function CardSkeleton({
+  mediaClassName = 'aspect-[4/3]',
+}: {
+  mediaClassName?: string;
+}) {
   return (
     <SkeletonPanel className="p-4">
-      <Skeleton variant="rounded" className="w-full h-40 mb-4" />
-      <Skeleton variant="text" className="h-4 w-3/4 mb-2" />
-      <Skeleton variant="text" className="h-3 w-1/2 mb-4" />
+      <Skeleton
+        variant="rounded"
+        className={cn('mb-4 w-full', mediaClassName)}
+      />
+      <Skeleton variant="text" className="mb-2 h-4 w-3/4" />
+      <Skeleton variant="text" className="mb-4 h-3 w-1/2" />
       <div className="flex gap-2">
-        <Skeleton variant="rounded" className="h-6 w-16" />
-        <Skeleton variant="rounded" className="h-6 w-16" />
+        <Skeleton variant="rounded" className="h-8 w-20" />
+        <Skeleton variant="rounded" className="h-8 w-16" />
       </div>
     </SkeletonPanel>
   );
@@ -64,98 +72,137 @@ export function CardSkeleton() {
 
 export function ListItemSkeleton() {
   return (
-    <div className="flex items-center gap-4 border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)]">
-      <Skeleton variant="circular" width={48} height={48} />
-      <div className="flex-1">
-        <Skeleton variant="text" className="h-4 w-1/3 mb-2" />
+    <div className="flex items-center gap-3 border-b border-[color:var(--app-border)] px-3 py-3 dark:border-[color:var(--app-border-strong)] sm:gap-4 sm:px-4">
+      <Skeleton variant="circular" width={44} height={44} />
+      <div className="min-w-0 flex-1">
+        <Skeleton variant="text" className="mb-2 h-4 w-1/3" />
         <Skeleton variant="text" className="h-3 w-2/3" />
       </div>
-      <Skeleton variant="rounded" className="h-8 w-20" />
+      <Skeleton variant="rounded" className="h-9 w-20 shrink-0" />
     </div>
   );
 }
 
 export function ProfileSkeleton() {
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Skeleton variant="circular" width={80} height={80} />
-        <div className="flex-1">
-          <Skeleton variant="text" className="h-6 w-1/3 mb-2" />
+    <SkeletonGroup label="Memuat profil" className="p-4 sm:p-6">
+      <div className="mb-6 flex items-center gap-4">
+        <Skeleton variant="circular" width={72} height={72} />
+        <div className="min-w-0 flex-1">
+          <Skeleton variant="text" className="mb-2 h-6 w-1/3" />
           <Skeleton variant="text" className="h-4 w-1/4" />
         </div>
       </div>
-      <Skeleton variant="rounded" className="h-24 w-full mb-4" />
-      <div className="grid grid-cols-3 gap-4">
-        <Skeleton variant="rounded" className="h-20" />
-        <Skeleton variant="rounded" className="h-20" />
-        <Skeleton variant="rounded" className="h-20" />
+      <div className="mb-5 space-y-2">
+        <Skeleton variant="text" className="h-4 w-full" />
+        <Skeleton variant="text" className="h-4 w-2/3" />
       </div>
-    </div>
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Skeleton key={index} variant="rounded" className="h-16 sm:h-20" />
+        ))}
+      </div>
+    </SkeletonGroup>
   );
 }
 
 export function ChatListSkeleton() {
   return (
-    <div className="space-y-0">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <ListItemSkeleton key={i} />
+    <SkeletonGroup label="Memuat percakapan" className="space-y-0">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <ListItemSkeleton key={index} />
       ))}
-    </div>
+    </SkeletonGroup>
   );
 }
 
 export function FeedSkeleton() {
   return (
-    <div className="space-y-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-          <div className="flex items-center gap-3 mb-4">
-            <Skeleton variant="circular" width={40} height={40} />
-            <div>
-              <Skeleton variant="text" className="h-4 w-32 mb-1" />
+    <SkeletonGroup label="Memuat linimasa" className="space-y-4">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          data-feed-skeleton-item="true"
+          className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)]"
+        >
+          <div className="mb-4 flex items-center gap-3">
+            <Skeleton variant="circular" width={44} height={44} />
+            <div className="min-w-0 flex-1">
+              <Skeleton variant="text" className="mb-1.5 h-4 w-32" />
               <Skeleton variant="text" className="h-3 w-20" />
             </div>
+            <Skeleton variant="circular" width={32} height={32} />
           </div>
-          <Skeleton variant="text" className="h-4 w-full mb-2" />
-          <Skeleton variant="text" className="h-4 w-3/4 mb-4" />
-          <Skeleton variant="rounded" className="h-48 w-full mb-4" />
-          <div className="flex gap-4">
-            <Skeleton variant="rounded" className="h-8 w-20" />
-            <Skeleton variant="rounded" className="h-8 w-20" />
-            <Skeleton variant="rounded" className="h-8 w-20" />
+          <Skeleton variant="text" className="mb-2 h-4 w-5/6" />
+          <Skeleton variant="text" className="mb-2 h-4 w-full" />
+          <Skeleton variant="text" className="mb-4 h-4 w-2/3" />
+          <Skeleton
+            variant="rounded"
+            className="mb-4 aspect-video w-full rounded-xl"
+          />
+          <div className="flex gap-3">
+            {Array.from({ length: 3 }).map((_, actionIndex) => (
+              <Skeleton
+                key={actionIndex}
+                variant="rounded"
+                className="h-9 w-20"
+              />
+            ))}
           </div>
         </div>
       ))}
-    </div>
+    </SkeletonGroup>
   );
 }
 
-export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+export function TableSkeleton({
+  rows = 5,
+  cols = 4,
+}: {
+  rows?: number;
+  cols?: number;
+}) {
+  const safeRows = Math.max(1, Math.min(8, rows));
+  const safeCols = Math.max(1, Math.min(6, cols));
+
   return (
-    <div className="overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
+    <SkeletonGroup
+      label="Memuat tabel"
+      className="overflow-hidden rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]"
+    >
       <div className="flex gap-4 border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)]">
-        {Array.from({ length: cols }).map((_, i) => (
-          <Skeleton key={i} variant="text" className="h-4 flex-1" />
+        {Array.from({ length: safeCols }).map((_, index) => (
+          <Skeleton key={index} variant="text" className="h-4 flex-1" />
         ))}
       </div>
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex gap-4 border-b border-[color:var(--app-border)] p-4 dark:border-[color:var(--app-border-strong)]">
-          {Array.from({ length: cols }).map((_, j) => (
-            <Skeleton key={j} variant="text" className="h-4 flex-1" />
+      {Array.from({ length: safeRows }).map((_, rowIndex) => (
+        <div
+          key={rowIndex}
+          data-table-skeleton-row="true"
+          className="flex gap-4 border-b border-[color:var(--app-border)] p-4 last:border-b-0 dark:border-[color:var(--app-border-strong)]"
+        >
+          {Array.from({ length: safeCols }).map((_, colIndex) => (
+            <Skeleton key={colIndex} variant="text" className="h-4 flex-1" />
           ))}
         </div>
       ))}
-    </div>
+    </SkeletonGroup>
   );
 }
 
 export function GridSkeleton({ count = 6 }: { count?: number }) {
+  const safeCount = Math.max(1, Math.min(6, count));
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: count }).map((_, i) => (
-        <CardSkeleton key={i} />
+    <SkeletonGroup
+      label="Memuat daftar"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      {Array.from({ length: safeCount }).map((_, index) => (
+        <div key={index} data-grid-skeleton-item="true">
+          <CardSkeleton />
+        </div>
       ))}
-    </div>
+    </SkeletonGroup>
   );
 }

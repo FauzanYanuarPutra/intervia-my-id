@@ -20,6 +20,7 @@ import {
   type LatLng,
 } from './maps';
 import { isUmkmMapPublicReference } from '@/lib/umkmSurface';
+import { resolveStorefrontBrandMedia } from './storefront-brand-media';
 
 export type UmkmPlaceLike = {
   id?: string;
@@ -111,19 +112,6 @@ function readNumber(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
-}
-
-function readTextArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map(item => readText(item)).filter(Boolean);
-  }
-  if (typeof value === 'string') {
-    return value
-      .split(/[,\n]/)
-      .map(item => item.trim())
-      .filter(Boolean);
-  }
-  return [];
 }
 
 function normalizePhone(phone: string): string {
@@ -638,31 +626,19 @@ function getServiceBadges(
 }
 
 function getCoverImage(place: UmkmPlaceLike): string {
-  const explicit =
-    readMetaText(
-      place,
-      'store_photo_url',
-      'cover_image_url',
-      'cover_url',
-      'banner_url',
-      'image_url',
-      'imageUrl',
-      'image',
-      'menu_photo_url',
-    ) || '';
+  const media = resolveStorefrontBrandMedia(asRecord(place.metadata));
+  const explicit = media.coverUrl || media.logoUrl;
   if (explicit) return explicit;
   return DEFAULT_UMKM_IMAGE;
 }
 
 function getGalleryImages(place: UmkmPlaceLike): string[] {
   const cover = getCoverImage(place);
-  const galleryValues = readTextArray(
-    asRecord(place.metadata).gallery_images,
-  ).slice(0, 3);
-  return Array.from(new Set([cover, ...galleryValues].filter(Boolean))).slice(
-    0,
-    3,
+  const media = resolveStorefrontBrandMedia(asRecord(place.metadata));
+  const images = [cover, media.logoUrl, ...media.galleryUrls].filter(
+    (image): image is string => Boolean(image),
   );
+  return Array.from(new Set(images)).slice(0, 3);
 }
 
 function buildMapsLabel(place: UmkmPlaceLike): string {

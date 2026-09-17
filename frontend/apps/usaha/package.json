@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "lajukan-ui": "file:../../packages",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.562.0",
     "next": "^16.0.7",
