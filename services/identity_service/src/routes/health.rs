@@ -48,7 +48,7 @@ pub async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRes
     let (outbox_backlog, metrics_query_ok) = match timeout(
         Duration::from_secs(2),
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status IN ('pending', 'failed')",
+            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status <> 'published'",
         )
         .fetch_one(&state.db),
     )

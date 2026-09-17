@@ -143,6 +143,7 @@ struct OutboxEventRow {
     id: Uuid,
     routing_key: String,
     payload: Value,
+    lease_until: DateTime<Utc>,
 }
 
 fn parse_cors_origins() -> Vec<HeaderValue> {
@@ -2749,7 +2750,7 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
     let (outbox_backlog, metrics_query_ok) = match timeout(
         Duration::from_secs(2),
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status IN ('pending', 'failed')",
+            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status <> 'published'",
         )
         .fetch_one(&state.db),
     )
@@ -23726,11 +23727,27 @@ async fn publish_outbox_batch(
 ) -> anyhow::Result<usize> {
     let events = sqlx::query_as::<_, OutboxEventRow>(
         r#"
-        SELECT id, routing_key, payload
-        FROM events.event_outbox
-        WHERE status = 'pending' AND available_at <= NOW()
-        ORDER BY created_at ASC
-        LIMIT $1
+        WITH candidate AS (
+          SELECT id
+          FROM events.event_outbox
+          WHERE status IN ('pending', 'processing')
+            AND available_at <= NOW()
+          ORDER BY created_at ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT $1
+        )
+        UPDATE events.event_outbox AS outbox
+        SET
+          status = 'processing',
+          available_at = NOW() + INTERVAL '2 minutes',
+          error_message = NULL
+        FROM candidate
+        WHERE outbox.id = candidate.id
+        RETURNING
+          outbox.id,
+          outbox.routing_key,
+          outbox.payload,
+          outbox.available_at AS lease_until
         "#,
     )
     .bind(batch_size)
@@ -23742,16 +23759,6 @@ async fn publish_outbox_batch(
     }
 
     for event in events.iter() {
-        let claimed = sqlx::query(
-            "UPDATE events.event_outbox SET status = 'processing' WHERE id = $1 AND status = 'pending'",
-        )
-        .bind(event.id)
-        .execute(db)
-        .await?;
-
-        if claimed.rows_affected() == 0 {
-            continue;
-        }
 
         let payload_bytes = serde_json::to_vec(&event.payload)?;
         let publish_result = channel
@@ -23779,10 +23786,13 @@ async fn publish_outbox_batch(
                           available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
                           error_message = $2
                         WHERE id = $1
+                          AND status = 'processing'
+                          AND available_at = $3
                         "#,
                     )
                     .bind(event.id)
                     .bind(error_text)
+                    .bind(event.lease_until)
                     .execute(db)
                     .await;
                     continue;
@@ -23799,10 +23809,13 @@ async fn publish_outbox_batch(
                       available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
                       error_message = $2
                     WHERE id = $1
+                      AND status = 'processing'
+                      AND available_at = $3
                     "#,
                 )
                 .bind(event.id)
                 .bind(error_text)
+                .bind(event.lease_until)
                 .execute(db)
                 .await;
                 continue;
@@ -23814,9 +23827,12 @@ async fn publish_outbox_batch(
             UPDATE events.event_outbox
             SET status = 'published', published_at = NOW(), error_message = NULL
             WHERE id = $1
+              AND status = 'processing'
+              AND available_at = $2
             "#,
         )
         .bind(event.id)
+        .bind(event.lease_until)
         .execute(db)
         .await?;
     }

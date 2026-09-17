@@ -1854,7 +1854,7 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
     let (outbox_backlog, metrics_query_ok) = match timeout(
         Duration::from_secs(2),
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status IN ('pending', 'failed')",
+            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status <> 'published'",
         )
         .fetch_one(&state.db),
     )
@@ -2934,7 +2934,7 @@ async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::R
         SELECT id, payload
         FROM events.event_inbox
         WHERE source = 'identity_service'
-          AND status IN ('pending', 'failed')
+          AND status IN ('pending', 'failed', 'processing')
           AND available_at <= now()
         ORDER BY received_at ASC
         LIMIT $1
@@ -2948,23 +2948,34 @@ async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::R
         return Ok(0);
     }
 
+    let mut claimed_count = 0usize;
+
     for row in rows.iter() {
         let id = row.get::<Uuid, _>("id");
         let payload = row.get::<Value, _>("payload");
-        let claimed = sqlx::query(
+        let lease_until = sqlx::query_scalar::<_, DateTime<Utc>>(
             r#"
             UPDATE events.event_inbox
-            SET status = 'processing'
-            WHERE id = $1 AND status IN ('pending', 'failed')
+            SET
+              status = 'processing',
+              available_at = now() + INTERVAL '2 minutes',
+              error_message = NULL
+            WHERE id = $1
+              AND (
+                status IN ('pending', 'failed')
+                OR (status = 'processing' AND available_at <= now())
+              )
+            RETURNING available_at
             "#,
         )
         .bind(id)
-        .execute(db)
+        .fetch_optional(db)
         .await?;
 
-        if claimed.rows_affected() == 0 {
+        let Some(lease_until) = lease_until else {
             continue;
-        }
+        };
+        claimed_count += 1;
 
         match apply_identity_profile_event(db, &payload).await {
             Ok(()) => {
@@ -2973,9 +2984,12 @@ async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::R
                     UPDATE events.event_inbox
                     SET status = 'processed', processed_at = now(), error_message = NULL
                     WHERE id = $1
+                      AND status = 'processing'
+                      AND available_at = $2
                     "#,
                 )
                 .bind(id)
+                .bind(lease_until)
                 .execute(db)
                 .await?;
             }
@@ -2990,17 +3004,20 @@ async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::R
                       available_at = now() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
                       error_message = $2
                     WHERE id = $1
+                      AND status = 'processing'
+                      AND available_at = $3
                     "#,
                 )
                 .bind(id)
                 .bind(error_message)
+                .bind(lease_until)
                 .execute(db)
                 .await;
             }
         }
     }
 
-    Ok(rows.len())
+    Ok(claimed_count)
 }
 
 async fn run_identity_inbox_processor(db: PgPool) {

@@ -168,3 +168,25 @@ for path in (
     for marker in ('route("/ready"', 'route("/metrics"', "with_graceful_shutdown"):
         if marker not in source:
             errors.append(f"{path} missing runtime reliability marker: {marker}")
+
+
+for path, markers in {
+    "services/identity_service/src/main.rs": (
+        "FOR UPDATE SKIP LOCKED",
+        "status IN ('pending', 'failed', 'publishing')",
+        "available_at = NOW() + INTERVAL '2 minutes'",
+    ),
+    "services/marketplace_service/src/main.rs": (
+        "FOR UPDATE SKIP LOCKED",
+        "status IN ('pending', 'processing')",
+        "available_at = NOW() + INTERVAL '2 minutes'",
+    ),
+    "services/community_service/src/main.rs": (
+        "status = 'processing' AND available_at <= now()",
+        "available_at = now() + INTERVAL '2 minutes'",
+    ),
+}.items():
+    source = read(path)
+    for marker in markers:
+        if marker not in source:
+            errors.append(f"{path} outbox worker missing crash-recovery lease marker: {marker}")
