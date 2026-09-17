@@ -30,6 +30,8 @@ observability_compose = read("docker-compose.observability.yml")
 prometheus_config = read("infrastructure/observability/prometheus.yml")
 alerts_config = read("infrastructure/observability/alerts.yml")
 blackbox_config = read("infrastructure/observability/blackbox.yml")
+postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
+backup_verify_script = read("scripts/ops/verify_backup_set.sh")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -182,6 +184,19 @@ for path, markers in {
         if marker not in source:
             errors.append(f"{path} outbox worker missing crash-recovery lease marker: {marker}")
 
+
+for marker in (
+    "pg_dump",
+    "pg_restore --list",
+    "sha256sum",
+    "Refusing to place backups inside the Git repository",
+):
+    if marker not in postgres_backup_script:
+        errors.append(f"PostgreSQL backup script missing safety/verification marker: {marker}")
+
+for marker in ("sha256sum -c", "pg_restore --list", "This does not replace an isolated restore drill"):
+    if marker not in backup_verify_script:
+        errors.append(f"backup verification script missing marker: {marker}")
 
 for warning in warnings:
     print(f"WARNING: {warning}", file=sys.stderr)
