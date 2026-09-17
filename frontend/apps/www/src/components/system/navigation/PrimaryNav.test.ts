@@ -43,6 +43,15 @@ describe('PrimaryNav route activity', () => {
     ).toBeNull();
   });
 
+  it('keeps News active for news index, categories, submissions, and articles', () => {
+    const items = buildPrimaryNavItems(true, 'id');
+
+    expect(resolveActivePrimaryNavKey(items, '/id/news')).toBe('news');
+    expect(resolveActivePrimaryNavKey(items, '/id/news/category/ekonomi')).toBe('news');
+    expect(resolveActivePrimaryNavKey(items, '/id/news/submit')).toBe('news');
+    expect(resolveActivePrimaryNavKey(items, '/id/news/contoh-berita')).toBe('news');
+  });
+
   it('distinguishes the signed-in profile from public profile pages', () => {
     const items = buildPrimaryNavItems(true, 'id');
 

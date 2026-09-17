@@ -4,6 +4,7 @@ import {
   Clapperboard,
   Compass,
   Home,
+  Newspaper,
   PlusCircle,
   User,
   Users,
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 export type PrimaryNavItem = {
-  key: 'home' | 'explore' | 'community' | 'video' | 'create' | 'account';
+  key: 'home' | 'explore' | 'news' | 'community' | 'video' | 'create' | 'account';
   label: string;
   href: string;
   icon: LucideIcon;
@@ -73,6 +74,7 @@ export function buildPrimaryNavItems(
   const text = {
     home: locale === 'id' ? 'Beranda' : 'Home',
     explore: locale === 'id' ? 'Jelajahi' : 'Explore',
+    news: locale === 'id' ? 'News' : 'News',
     community: locale === 'id' ? 'Komunitas' : 'Community',
     video: locale === 'id' ? 'Video' : 'Video',
     create: locale === 'id' ? 'Buat' : 'Create',
@@ -93,6 +95,13 @@ export function buildPrimaryNavItems(
       href: '/explore',
       icon: Compass,
       matchers: ['/explore'],
+    },
+    {
+      key: 'news',
+      label: text.news,
+      href: '/news',
+      icon: Newspaper,
+      matchers: ['/news'],
     },
     {
       key: 'community',

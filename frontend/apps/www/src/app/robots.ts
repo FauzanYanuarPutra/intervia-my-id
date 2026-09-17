@@ -38,7 +38,10 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: ['Googlebot', 'Googlebot-Image', 'Googlebot-News'], allow: '/', disallow: DISALLOW_ROUTES },
       { userAgent: 'Bingbot', allow: '/', disallow: DISALLOW_ROUTES },
     ],
-    sitemap: ['https://www.lajukan.com/sitemap.xml'],
+    sitemap: [
+      'https://www.lajukan.com/sitemap.xml',
+      'https://www.lajukan.com/news-sitemap.xml',
+    ],
     host: 'https://www.lajukan.com',
   };
 }

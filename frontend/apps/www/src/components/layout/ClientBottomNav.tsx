@@ -14,6 +14,7 @@ import {
   Compass,
   Home,
   MessageCircle,
+  Newspaper,
   Plus,
   Search,
   Store,
@@ -55,7 +56,8 @@ type CreateAction = {
     | 'need'
     | 'business'
     | 'community'
-    | 'video';
+    | 'video'
+    | 'news';
   label: string;
   description: string;
   href: string;
@@ -363,6 +365,22 @@ export default function ClientBottomNav() {
           ),
           icon: Clapperboard,
           badge: 'Video',
+        },
+        {
+          key: 'news',
+          label: isId
+            ? 'Kirim berita'
+            : 'Submit news',
+          description: isId
+            ? 'Kirim berita, analisis, atau rilis bisnis untuk review editorial.'
+            : 'Submit news, analysis, or a business release for editorial review.',
+          href: authHref(
+            '/news/submit',
+            isAuthenticated,
+            locale,
+          ),
+          icon: Newspaper,
+          badge: 'News',
         },
       ],
       [

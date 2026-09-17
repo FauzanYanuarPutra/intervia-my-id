@@ -39,6 +39,7 @@ use uuid::Uuid;
 
 mod businesses;
 mod identity_projection;
+mod news;
 mod order_engine;
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
@@ -2440,6 +2441,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .merge(businesses::router())
+        .merge(news::router())
         .route("/health", get(health))
         .route("/", get(root))
         .route("/v1/map/references", get(list_map_references))
@@ -12463,10 +12465,15 @@ async fn create_content(
         }
     }
 
-    let content_status =
+    let mut content_status =
         normalize_content_status(payload.content_status).unwrap_or_else(|| "active".to_string());
     if !matches!(content_status.as_str(), "draft" | "active") {
         return err(StatusCode::BAD_REQUEST, "invalid content_status for create").into_response();
+    }
+    // News is always born as a submission. Publication is only allowed through
+    // the dedicated editorial workflow, never through the generic content API.
+    if content_type == "news" {
+        content_status = "draft".to_string();
     }
 
     let cover_image = clean_text(payload.cover_image.clone());
@@ -12479,6 +12486,11 @@ async fn create_content(
     let metadata = match sanitize_content_metadata(&content_type, raw_metadata) {
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let metadata = if content_type == "news" {
+        news::prepare_submission_metadata(metadata, owner_id)
+    } else {
+        metadata
     };
     let price_unit = if price_cents.is_some() {
         normalize_price_unit(payload.price_unit)
@@ -12725,6 +12737,13 @@ async fn update_content(
     }
 
     let current_content_type = canonical_content_type(&existing.content_type.to_lowercase());
+    if current_content_type == "news" {
+        return err(
+            StatusCode::CONFLICT,
+            "news content must be edited through the news submission workflow",
+        )
+        .into_response();
+    }
     let content_type = match resolve_requested_content_type(
         payload.content_type.clone(),
         payload.type_alias.clone(),
@@ -12736,6 +12755,13 @@ async fn update_content(
     };
     if !is_valid_content_type(&content_type) {
         return err(StatusCode::BAD_REQUEST, "invalid content_type").into_response();
+    }
+    if content_type == "news" {
+        return err(
+            StatusCode::CONFLICT,
+            "news content must be created and edited through the news submission workflow",
+        )
+        .into_response();
     }
     if current_content_type != content_type {
         let activity = match load_content_activity_counts(&state.db, existing.id).await {
@@ -13053,6 +13079,13 @@ async fn delete_content(
     };
     if existing.owner_id != user_id {
         return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+    if canonical_content_type(&existing.content_type.to_lowercase()) == "news" {
+        return err(
+            StatusCode::CONFLICT,
+            "news content must be changed through the news editorial workflow",
+        )
+        .into_response();
     }
 
     let deleted = sqlx::query_as::<_, ContentRow>(
