@@ -6,6 +6,16 @@ import { newsApi } from '@/lib/api';
 import { Button, Card } from '@/ui';
 import { Alert } from 'lajukan-ui';
 
+type EditorialEvent = {
+  id: string;
+  action: string;
+  actor_role: string;
+  from_status?: string | null;
+  to_status: string;
+  note?: string | null;
+  created_at: string;
+};
+
 type NewsItem = {
   id: string;
   owner_id: string;
@@ -44,6 +54,8 @@ export default function NewsModeration() {
   const [selectedId, setSelectedId] = useState('');
   const [note, setNote] = useState('');
   const [businessImpact, setBusinessImpact] = useState('');
+  const [history, setHistory] = useState<EditorialEvent[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState('');
@@ -62,6 +74,30 @@ export default function NewsModeration() {
     const meta = selected ? readRecord(readRecord(selected.metadata).news) : {};
     setBusinessImpact(readString(meta.business_impact));
   }, [selected]);
+
+  useEffect(() => {
+    if (!accessToken || !selected?.id) {
+      setHistory([]);
+      return;
+    }
+    let active = true;
+    setHistoryLoading(true);
+    void newsApi.history(accessToken, selected.id)
+      .then(payload => {
+        if (!active) return;
+        const record = readRecord(payload);
+        setHistory(Array.isArray(record.items) ? (record.items as EditorialEvent[]) : []);
+      })
+      .catch(() => {
+        if (active) setHistory([]);
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessToken, selected?.id]);
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -86,6 +122,11 @@ export default function NewsModeration() {
 
   const moderate = async (action: 'approve' | 'needs_revision' | 'reject' | 'retract' | 'correct') => {
     if (!accessToken || !selected) return;
+    const requiresNote = action !== 'approve';
+    if (requiresNote && !note.trim()) {
+      setError('Catatan editor wajib untuk revisi, penolakan, koreksi, atau penarikan publikasi.');
+      return;
+    }
     setActing(true);
     setError('');
     setSuccess('');
@@ -214,15 +255,44 @@ export default function NewsModeration() {
 
               <div className="flex flex-wrap gap-2">
                 <Button disabled={acting} variant="primary" onClick={() => void moderate('approve')}>Approve & publish</Button>
-                <Button disabled={acting} variant="secondary" onClick={() => void moderate('needs_revision')}>Minta revisi</Button>
-                <Button disabled={acting} variant="danger" onClick={() => void moderate('reject')}>Tolak</Button>
+                <Button disabled={acting || !note.trim()} variant="secondary" onClick={() => void moderate('needs_revision')}>Minta revisi</Button>
+                <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('reject')}>Tolak</Button>
                 {status === 'published' || selected.content_status === 'active' ? (
                   <>
-                    <Button disabled={acting} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
-                    <Button disabled={acting} variant="danger" onClick={() => void moderate('retract')}>Tarik publikasi</Button>
+                    <Button disabled={acting || !note.trim()} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
+                    <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('retract')}>Tarik publikasi</Button>
                   </>
                 ) : null}
               </div>
+
+              <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-soft)]">Jejak editorial</p>
+                    <p className="mt-1 text-xs text-[color:var(--color-text-soft)]">Approval, revisi, koreksi, dan penarikan tercatat permanen sebagai audit trail.</p>
+                  </div>
+                  <span className="rounded-full bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--color-text-soft)]">{history.length} event</span>
+                </div>
+                {historyLoading ? (
+                  <p className="mt-3 text-xs text-[color:var(--color-text-soft)]">Memuat histori...</p>
+                ) : history.length ? (
+                  <div className="mt-3 space-y-2">
+                    {history.map(event => (
+                      <div key={event.id} className="rounded-xl bg-[color:var(--color-surface-muted)] p-3">
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[color:var(--color-text)]">
+                          <span>{event.action.replaceAll('_', ' ')}</span>
+                          <span className="text-[color:var(--color-text-soft)]">•</span>
+                          <span className="text-[color:var(--color-text-soft)]">{event.from_status || '-'} → {event.to_status}</span>
+                        </div>
+                        <p className="mt-1 text-[10px] font-medium text-[color:var(--color-text-soft)]">{event.actor_role} • {formatDate(event.created_at)}</p>
+                        {event.note ? <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[color:var(--color-text)]">{event.note}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-[color:var(--color-text-soft)]">Belum ada jejak editorial untuk item ini.</p>
+                )}
+              </section>
             </div>
           )}
         </Card>

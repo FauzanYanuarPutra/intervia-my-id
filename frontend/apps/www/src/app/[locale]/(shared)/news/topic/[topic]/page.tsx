@@ -7,7 +7,7 @@ import { buildNewsFacetUrl, buildNewsPath, getPublishedNews } from '@/lib/news';
 type Props = { params: Promise<{ locale: string; topic: string }> };
 
 function cleanFacet(value: string): string {
-  return decodeURIComponent(value).trim().slice(0, 80);
+  return value.trim().slice(0, 80);
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

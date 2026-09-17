@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, MapPin, Store } from 'lucide-react';
+import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Store } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
   buildNewsArticleJsonLd,
   buildNewsBreadcrumbJsonLd,
+  buildNewsFacetPath,
   buildNewsUrl,
   getPublishedNewsArticle,
 } from '@/lib/news';
@@ -115,12 +116,29 @@ export default async function NewsArticlePage({ params }: PageProps) {
             </span>
             <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 dark:bg-white/10">{article.byline}</span>
             {article.location ? (
-              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
+              <Link
+                href={buildNewsFacetPath('location', article.location)}
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 transition hover:text-emerald-700 dark:bg-white/10 dark:hover:text-emerald-300"
+              >
                 <MapPin className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
                 {article.location}
-              </span>
+              </Link>
             ) : null}
           </div>
+          {article.tags.length ? (
+            <nav aria-label={isId ? 'Topik berita' : 'News topics'} className="mt-4 flex flex-wrap gap-2">
+              {article.tags.map(tag => (
+                <Link
+                  key={tag}
+                  href={buildNewsFacetPath('topic', tag)}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-3 text-xs font-bold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 dark:hover:text-emerald-300"
+                >
+                  <Hash className="h-3.5 w-3.5" />
+                  {tag}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
         </header>
 
         <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-10">
