@@ -34,6 +34,9 @@ for service in ("identity_db:", "marketplace_db:", "community_db:"):
 if "restart: unless-stopped" not in base_compose:
     errors.append("base compose must retain process restart policy")
 
+if "prometheus:" not in base_compose:
+    warnings.append("Prometheus configuration exists but is not wired into the base Compose stack; observability activation remains incomplete")
+
 if "SCYLLA_NODES: ${SCYLLA_NODES:?" not in prod_compose:
     errors.append("production chat must fail closed when SCYLLA_NODES is absent")
 
@@ -70,7 +73,7 @@ for upstream in (
         errors.append(f"production edge lost upstream route: {upstream}")
 
 for marker in (
-    "single operational failure domain",
+    "one operational failure domain",
     "PostgreSQL remains the transactional source of truth",
     "Redis, RabbitMQ and Meilisearch must not become the only durable copy",
     "Phase 2 — remove the single-host failure domain",
