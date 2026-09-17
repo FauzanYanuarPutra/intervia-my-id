@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import type {
   Wave2FinancePlan,
   Wave2Obligation,
@@ -37,6 +38,21 @@ const money = new Intl.NumberFormat('id-ID', {
   currency: 'IDR',
   maximumFractionDigits: 0,
 });
+
+const billTypeOptions = [
+  { value: 'payroll_expense', label: 'Gaji' },
+  { value: 'rent_expense', label: 'Sewa' },
+  { value: 'utilities_expense', label: 'Utilitas' },
+  { value: 'transport_expense', label: 'Transport' },
+  { value: 'marketing_expense', label: 'Promosi' },
+  { value: 'other_expense', label: 'Lainnya' },
+] as const;
+
+const billAccountOptions = [
+  { value: 'cash', label: 'Kas' },
+  { value: 'bank', label: 'Bank' },
+  { value: 'ewallet', label: 'E-wallet' },
+] as const;
 
 const bucketLabels: Record<string, string> = {
   owner: 'Owner',
@@ -290,7 +306,7 @@ export function FinancePlanningWorkspace({
 
       <details className="portal-panel group">
         <summary className="flex cursor-pointer list-none items-center justify-between p-4 sm:p-5"><span className="font-bold text-portal-ink">Tambah tagihan rutin</span><Plus className="h-4 w-4 text-portal-soft" /></summary>
-        <div className="border-t border-portal-line p-4 sm:p-5"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><label className="text-xs font-semibold text-portal-soft">Nama tagihan<input value={label} onChange={event => setLabel(event.target.value)} placeholder="Contoh: Sewa kios" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Kategori<select value={billType} onChange={event => setBillType(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"><option value="payroll_expense">Gaji</option><option value="rent_expense">Sewa</option><option value="utilities_expense">Utilitas</option><option value="transport_expense">Transport</option><option value="marketing_expense">Promosi</option><option value="other_expense">Lainnya</option></select></label><label className="text-xs font-semibold text-portal-soft">Nominal<input type="number" min="1" value={billAmount} onChange={event => setBillAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Tiap berapa hari<input type="number" min="1" value={intervalDays} onChange={event => setIntervalDays(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Jatuh tempo berikutnya<input type="date" value={nextDueOn} onChange={event => setNextDueOn(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Bayar lewat<select value={accountKey} onChange={event => setAccountKey(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3"><option value="cash">Kas</option><option value="bank">Bank</option><option value="ewallet">E-wallet</option></select></label></div><button type="button" onClick={addBill} disabled={savingBill} className="portal-button-primary mt-3 disabled:opacity-50">{savingBill ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Tambah tagihan</button></div>
+        <div className="border-t border-portal-line p-4 sm:p-5"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><label className="text-xs font-semibold text-portal-soft">Nama tagihan<input value={label} onChange={event => setLabel(event.target.value)} placeholder="Contoh: Sewa kios" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft"><span>Kategori</span><div className="mt-1"><ChoiceChips value={billType} onChange={setBillType} ariaLabel="Kategori tagihan" options={billTypeOptions} /></div></div><label className="text-xs font-semibold text-portal-soft">Nominal<input type="number" min="1" value={billAmount} onChange={event => setBillAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Tiap berapa hari<input type="number" min="1" value={intervalDays} onChange={event => setIntervalDays(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Jatuh tempo berikutnya<input type="date" value={nextDueOn} onChange={event => setNextDueOn(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft"><span>Bayar lewat</span><div className="mt-1"><ChoiceChips value={accountKey} onChange={setAccountKey} ariaLabel="Akun tagihan" options={billAccountOptions} /></div></div></div><button type="button" onClick={addBill} disabled={savingBill} className="portal-button-primary mt-3 disabled:opacity-50">{savingBill ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Tambah tagihan</button></div>
       </details>
 
       {message ? <div role="status" className="rounded-xl border border-portal-line bg-white px-4 py-3 text-xs font-semibold text-portal-soft">{message}</div> : null}
