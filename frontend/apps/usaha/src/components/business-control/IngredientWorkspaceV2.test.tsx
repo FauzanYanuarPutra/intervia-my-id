@@ -19,6 +19,14 @@ const ALPUKAT = {
   supplier_name: 'Pasar Induk',
 };
 
+const LEGACY_ALPUKAT = {
+  ...ALPUKAT,
+  id: '33333333-3333-4333-8333-333333333333',
+  name: 'Alpukat lama',
+  yield_percent: 80,
+  waste_percent: 10,
+};
+
 describe('IngredientWorkspaceV2', () => {
   it('uses business language instead of exposing raw database fields', () => {
     const html = renderToStaticMarkup(
@@ -65,5 +73,19 @@ describe('IngredientWorkspaceV2', () => {
     expect(html).toContain('30.000');
     expect(html).toContain('70% dapat digunakan');
     expect(html).toContain('30% tidak terpakai');
+  });
+
+  it('normalizes legacy yield plus waste into one usable percentage without changing economics', () => {
+    const html = renderToStaticMarkup(
+      <IngredientWorkspaceV2
+        businessId="22222222-2222-4222-8222-222222222222"
+        initialIngredients={[LEGACY_ALPUKAT]}
+      />,
+    );
+
+    // Legacy economics: 80% yield x 90% after waste = 72% actually usable.
+    expect(html).toContain('72% dapat digunakan');
+    expect(html).toContain('28% tidak terpakai');
+    expect(html).toContain('41,67');
   });
 });
