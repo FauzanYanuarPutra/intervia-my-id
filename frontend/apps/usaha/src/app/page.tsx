@@ -23,6 +23,7 @@ import {
 import { buildHomeDashboard } from '@/lib/business-control/home-dashboard';
 import { jakartaDateKey, summarizeControlCenter } from '@/lib/business-control/insights';
 import { buildMerchantNextActions } from '@/lib/business-control/next-actions';
+import { settleHomeControlData } from '@/lib/home-control-data';
 import { getSetupSteps, getStatusCopy, hasPermission } from '@/lib/portal-logic';
 import { resolvePortalHomeState } from '@/lib/portal-server';
 
@@ -42,6 +43,46 @@ export default async function HomePage({
   if (!state.isAuthenticated) redirect('/login?callbackUrl=/');
   const business = state.activeBusiness;
   const viewerName = state.account.name;
+
+  if (state.businessesProvisioning) {
+    return (
+      <PortalShell
+        activeBusiness={null}
+        availableBusinesses={[]}
+        viewerName={viewerName}
+        currentSection="home"
+      >
+        <section className="mx-auto grid min-h-[calc(100vh-140px)] max-w-3xl place-items-center py-6">
+          <div
+            className="merchant-surface-bordered w-full p-5 sm:p-8"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="portal-icon-tile h-12 w-12">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <p className="mt-5 text-[10px] font-black uppercase tracking-[0.1em] text-portal-soft">
+              Sinkronisasi usaha
+            </p>
+            <h1 className="mt-1 text-2xl font-black tracking-[-0.04em] text-portal-ink">
+              Usahamu sedang disiapkan.
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-portal-soft">
+              Akunmu sudah terhubung, tetapi layanan usaha masih menyelesaikan
+              sinkronisasi data. Jangan buat usaha baru dulu agar tidak terjadi
+              data ganda.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link href="/" className="portal-button-primary">
+                Coba lagi <ArrowRight className="h-4 w-4" />
+              </Link>
+              <ReconcileBusinessButton />
+            </div>
+          </div>
+        </section>
+      </PortalShell>
+    );
+  }
 
   if (!business) {
     return (
@@ -74,11 +115,17 @@ export default async function HomePage({
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canManageInventory = hasPermission(business, 'manageInventory');
 
-  const [ingredients, financeEntries, channels] = await Promise.all([
-    canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
-    canViewFinance ? listControlFinanceEntries(business.id) : Promise.resolve([]),
-    canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
-  ]);
+  const { ingredients, financeEntries, channels } = await settleHomeControlData({
+    ingredients: canViewCosting
+      ? listControlIngredients(business.id)
+      : Promise.resolve([]),
+    financeEntries: canViewFinance
+      ? listControlFinanceEntries(business.id)
+      : Promise.resolve([]),
+    channels: canViewChannels
+      ? listControlChannels(business.id)
+      : Promise.resolve([]),
+  });
 
   const today = jakartaDateKey();
   const control = summarizeControlCenter({ ingredients, financeEntries, channels, today });

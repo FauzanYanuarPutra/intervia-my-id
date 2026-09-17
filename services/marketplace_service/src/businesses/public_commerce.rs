@@ -701,6 +701,7 @@ fn resolve_modifier_selection(
             ModifierResolutionError::DuplicateOption => "duplicate_modifier_option_selection",
             ModifierResolutionError::InvalidSelectionCount => "invalid_modifier_selection_count",
             ModifierResolutionError::InvalidOption => "invalid_modifier_option",
+            ModifierResolutionError::InvalidPriceDelta => "invalid_modifier_price_delta",
             ModifierResolutionError::UnknownGroup => "unknown_modifier_group",
             ModifierResolutionError::PriceOverflow => "invalid_configured_price",
             ModifierResolutionError::ConflictingRecipeSetEffect => {

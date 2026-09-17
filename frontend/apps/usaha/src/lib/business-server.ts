@@ -1,4 +1,4 @@
-import { parseProductModifierGroups } from 'lajukan-ui';
+import { parseProductModifierGroups } from 'lajukan-ui/product-configuration';
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
