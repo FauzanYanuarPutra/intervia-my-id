@@ -9,10 +9,12 @@ x-logging: &default-logging
 x-service-defaults: &service-defaults
   restart: unless-stopped
   init: true
+  stop_grace_period: 30s
   logging: *default-logging
 
 x-data-defaults: &data-defaults
   restart: unless-stopped
+  stop_grace_period: 60s
   logging: *default-logging
 
 services:
