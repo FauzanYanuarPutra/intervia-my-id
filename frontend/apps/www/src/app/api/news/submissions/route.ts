@@ -30,11 +30,33 @@ type SubmissionBody = {
   category?: unknown;
   article_kind?: unknown;
   location?: unknown;
+  topics?: unknown;
   source_urls?: unknown;
 };
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function readTopics(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : [];
+  const reserved = new Set([
+    'news', 'analysis', 'press_release', 'ekonomi', 'bisnis', 'umkm',
+    'teknologi', 'keuangan', 'regulasi', 'industri', 'daerah',
+  ]);
+  const topics: string[] = [];
+  for (const entry of raw) {
+    const topic = readString(entry).toLowerCase().replace(/\s+/g, ' ');
+    if (!topic || topic.length > 36 || reserved.has(topic)) continue;
+    if (!/^[\p{L}\p{N}][\p{L}\p{N}\s._-]*$/u.test(topic)) continue;
+    if (!topics.includes(topic)) topics.push(topic);
+    if (topics.length >= 8) break;
+  }
+  return topics;
 }
 
 function readSources(value: unknown): string[] {
@@ -123,6 +145,7 @@ export async function POST(request: NextRequest) {
   const category = readString(payload.category) || 'Ekonomi';
   const articleKind = readString(payload.article_kind) || 'news';
   const location = readString(payload.location);
+  const topics = readTopics(payload.topics);
   const sourceUrls = readSources(payload.source_urls);
 
   if (rawTitle.length < 10 || rawTitle.length > 180) {
@@ -180,7 +203,7 @@ export async function POST(request: NextRequest) {
       summary: summarySafety.sanitizedText,
       body: bodySafety.sanitizedText,
       content_status: 'draft',
-      tags: ['news', category.toLowerCase(), articleKind],
+      tags: ['news', category.toLowerCase(), articleKind, ...topics],
       metadata: {
         news: {
           category,

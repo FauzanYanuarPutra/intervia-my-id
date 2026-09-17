@@ -34,9 +34,11 @@ export type LajukanNewsArticle = {
   coverImage: string | null;
   category: string;
   articleKind: 'news' | 'analysis' | 'press_release';
+  editorialStatus: 'pending_review' | 'needs_revision' | 'published' | 'rejected' | 'retracted';
   location: string | null;
   businessImpact: string | null;
   correctionNote: string | null;
+  retractionNote: string | null;
   sourceUrls: string[];
   byline: string;
   language: 'id' | 'en';
@@ -102,6 +104,28 @@ export function normalizeNewsArticle(row: RawNewsRow): LajukanNewsArticle | null
       return false;
     }
   });
+  const category = readString(news.category) || 'Ekonomi';
+  const articleKind = normalizeKind(news.article_kind);
+  const contentStatus = readString(row.content_status);
+  const editorialStatusRaw =
+    readString(news.editorial_status) ||
+    (contentStatus === 'active' ? 'published' : contentStatus === 'archived' ? 'rejected' : 'pending_review');
+  const editorialStatus: LajukanNewsArticle['editorialStatus'] =
+    editorialStatusRaw === 'needs_revision' ||
+    editorialStatusRaw === 'published' ||
+    editorialStatusRaw === 'rejected' ||
+    editorialStatusRaw === 'retracted'
+      ? editorialStatusRaw
+      : 'pending_review';
+  const reservedTags = new Set([
+    'news',
+    'analysis',
+    'press_release',
+    category.toLowerCase(),
+  ]);
+  const publicTags = readStringArray(row.tags).filter(
+    tag => !reservedTags.has(tag.toLowerCase()),
+  );
 
   return {
     id,
@@ -110,13 +134,15 @@ export function normalizeNewsArticle(row: RawNewsRow): LajukanNewsArticle | null
     title,
     summary: readString(row.summary),
     body: readString(row.body),
-    tags: readStringArray(row.tags),
+    tags: publicTags,
     coverImage: readString(row.cover_image) || null,
-    category: readString(news.category) || 'Ekonomi',
-    articleKind: normalizeKind(news.article_kind),
+    category,
+    articleKind,
+    editorialStatus,
     location: readString(news.location) || null,
     businessImpact: readString(news.business_impact) || null,
     correctionNote: readString(news.correction_note) || null,
+    retractionNote: readString(news.retraction_note) || null,
     sourceUrls,
     byline: readString(news.byline) || 'Lajukan News',
     language,

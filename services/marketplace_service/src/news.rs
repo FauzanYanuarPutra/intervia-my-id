@@ -95,6 +95,7 @@ struct UpdateNewsSubmissionRequest {
     category: Option<String>,
     article_kind: Option<String>,
     location: Option<String>,
+    topics: Option<Vec<String>>,
     source_urls: Option<Vec<String>>,
 }
 
@@ -203,6 +204,62 @@ fn valid_news_category(value: &str) -> bool {
 
 fn valid_article_kind(value: &str) -> bool {
     matches!(value, "news" | "analysis" | "press_release")
+}
+
+fn sanitize_topics(value: Option<Vec<String>>) -> Result<Option<Vec<String>>, &'static str> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let reserved = [
+        "news", "analysis", "press_release", "ekonomi", "bisnis", "umkm",
+        "teknologi", "keuangan", "regulasi", "industri", "daerah",
+    ];
+    let mut topics = Vec::new();
+    for raw in value {
+        let topic = raw.trim().to_lowercase();
+        if topic.is_empty() || reserved.contains(&topic.as_str()) {
+            continue;
+        }
+        if topic.len() > 36 {
+            return Err("news topic is too long");
+        }
+        if !topics.iter().any(|existing| existing == &topic) {
+            topics.push(topic);
+        }
+        if topics.len() > 8 {
+            return Err("too many news topics");
+        }
+    }
+    Ok(Some(topics))
+}
+
+fn is_press_release(metadata: &Value) -> bool {
+    metadata
+        .get("news")
+        .and_then(Value::as_object)
+        .and_then(|news| news.get("article_kind"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .is_some_and(|kind| kind == "press_release")
+}
+
+async fn has_verified_source_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    content_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS(
+          SELECT 1
+          FROM news_source_references
+          WHERE content_id = $1
+            AND verification_status = 'verified'
+        )
+        "#,
+    )
+    .bind(content_id)
+    .fetch_one(&mut **tx)
+    .await
 }
 
 fn editorial_status(content_status: &str, metadata: &Value) -> String {
@@ -768,8 +825,16 @@ async fn get_news(
             content_status, published_at, created_at, updated_at
         FROM content_items
         WHERE content_type = 'news'
-          AND content_status = 'active'
-          AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'published') = 'published'
+          AND (
+            (
+              content_status = 'active'
+              AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'published') = 'published'
+            )
+            OR (
+              content_status = 'archived'
+              AND metadata->'news'->>'editorial_status' = 'retracted'
+            )
+          )
           AND (($1::uuid IS NOT NULL AND id = $1) OR slug = $2)
         LIMIT 1
         "#,
@@ -921,6 +986,44 @@ async fn update_news_submission(
         }
         news.insert("location".to_string(), Value::String(location));
     }
+    if let Some(topics) = match sanitize_topics(payload.topics) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    } {
+        let category_tag = news
+            .get("category")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or("Ekonomi")
+            .to_lowercase();
+        let article_kind_tag = news
+            .get("article_kind")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or("news")
+            .to_string();
+        let mut tags = vec!["news".to_string(), category_tag, article_kind_tag];
+        for topic in topics {
+            if !tags.iter().any(|existing| existing == &topic) {
+                tags.push(topic);
+            }
+        }
+        if let Err(error) = sqlx::query(
+            "UPDATE content_items SET tags = $2 WHERE id = $1 AND owner_id = $3 AND content_type = 'news'",
+        )
+        .bind(content_id)
+        .bind(tags)
+        .bind(owner_id)
+        .execute(&mut *tx)
+        .await
+        {
+            tracing::error!("update_news_submission topic update error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update news topics",
+            );
+        }
+    }
     if let Some(source_urls) = payload.source_urls {
         let cleaned: Vec<Value> = source_urls
             .into_iter()
@@ -977,7 +1080,7 @@ async fn update_news_submission(
     .fetch_one(&mut *tx)
     .await;
 
-    let updated = match updated {
+    let mut updated = match updated {
         Ok(row) => row,
         Err(error) => {
             tracing::error!("update_news_submission update error: {:?}", error);
@@ -1016,6 +1119,14 @@ async fn update_news_submission(
             "failed to synchronize news sources",
         );
     }
+    updated = match load_news_for_review(&mut tx, updated.id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news submission not found"),
+        Err(error) => {
+            tracing::error!("update_news_submission reload error: {:?}", error);
+            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to reload news submission");
+        }
+    };
     if let Err(error) = record_version_tx(
         &mut tx,
         &updated,
@@ -1207,6 +1318,24 @@ async fn moderate_news(
     if matches!(action.as_str(), "approve" | "correct") {
         if let Err(message) = validate_publishable_news(&current) {
             return response_error(StatusCode::UNPROCESSABLE_ENTITY, message);
+        }
+    }
+    if action == "approve" && !is_press_release(&current.metadata) {
+        match has_verified_source_tx(&mut tx, current.id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return response_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "approval requires at least one verified source",
+                );
+            }
+            Err(error) => {
+                tracing::error!("moderate_news verified source check error: {:?}", error);
+                return response_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate news sources",
+                );
+            }
         }
     }
 

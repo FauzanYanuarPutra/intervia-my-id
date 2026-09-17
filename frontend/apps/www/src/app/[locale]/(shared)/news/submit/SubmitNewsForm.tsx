@@ -17,6 +17,7 @@ export default function SubmitNewsForm({ locale }: Props) {
     category: 'Ekonomi',
     article_kind: 'news',
     location: '',
+    topics: '',
     source_urls: '',
   });
   const [state, setState] = useState<{ loading: boolean; error: string; success: string }>({
@@ -38,6 +39,7 @@ export default function SubmitNewsForm({ locale }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          topics: form.topics.split(',').map(value => value.trim()).filter(Boolean),
           source_urls: form.source_urls.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
         }),
       });
@@ -60,6 +62,7 @@ export default function SubmitNewsForm({ locale }: Props) {
         category: 'Ekonomi',
         article_kind: 'news',
         location: '',
+        topics: '',
         source_urls: '',
       });
       setState({
@@ -108,6 +111,20 @@ export default function SubmitNewsForm({ locale }: Props) {
           <input maxLength={120} value={form.location} onChange={event => update('location', event.target.value)} className={inputClass} placeholder="Tangerang Selatan" />
         </label>
       </div>
+
+      <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
+        {isId ? 'Topik SEO / isu (opsional)' : 'Topics (optional)'}
+        <input
+          maxLength={300}
+          value={form.topics}
+          onChange={event => update('topics', event.target.value)}
+          className={inputClass}
+          placeholder={isId ? 'contoh: qris, inflasi, harga pangan' : 'e.g. qris, inflation, food prices'}
+        />
+        <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+          {isId ? 'Pisahkan dengan koma. Maksimal 8 topik; kategori dan jenis konten tidak perlu diulang.' : 'Comma-separated, up to 8 topics. Do not repeat the category or content type.'}
+        </span>
+      </label>
 
       <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
         {isId ? 'Ringkasan' : 'Summary'}

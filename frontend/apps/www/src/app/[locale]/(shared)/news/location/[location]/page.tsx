@@ -15,6 +15,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const value = cleanFacet(location);
   if (!value) return { robots: { index: false, follow: true } };
   const canonical = buildNewsFacetUrl(locale, 'location', value);
+  const { items } = await getPublishedNews({ location: value, limit: 1 });
+  const indexable = items.length > 0;
   return {
     title: `${value} | Berita Daerah Lajukan`,
     description: locale === 'id'
@@ -29,9 +31,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     },
     robots: {
-      index: true,
+      index: indexable,
       follow: true,
-      googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+      googleBot: { index: indexable, follow: true, 'max-image-preview': 'large' },
     },
   };
 }

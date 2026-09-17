@@ -74,6 +74,9 @@ The News domain also maintains durability and observability primitives:
 - Public News listing supports cursor pagination while retaining bounded offset compatibility.
 - The News article surface emits engagement events: `news.opened`, `news.read_25`, `news.read_50`, `news.read_75`, `news.read_100`, `news.source_clicked`, and `news.related_clicked`.
 - CMS newsroom metrics aggregate queue state, publication throughput, review latency, source verification, and seven-day article opens from existing source-of-truth tables.
+- News and analysis require at least one editor-verified source before first publication. Business press releases remain explicitly labeled and follow their separate disclosure policy.
+- Retracted articles keep their canonical URL as a noindex retraction tombstone instead of silently becoming a 404. The original body is not shown on the tombstone.
+- Public topic tags exclude internal routing tags such as `news`, category slugs, and article-kind markers; empty topic/location/category facets are noindex to avoid thin-page crawl growth.
 
 ### Source policy
 

@@ -7,6 +7,7 @@ type NewsItem = {
   title: string;
   summary?: string | null;
   body: string;
+  tags?: string[] | null;
   content_status: string;
   metadata?: Record<string, unknown>;
   updated_at: string;
@@ -19,6 +20,10 @@ function record(value: unknown): Record<string, unknown> {
 }
 function text(value: unknown): string { return typeof value === 'string' ? value.trim() : ''; }
 function urls(value: unknown): string[] { return Array.isArray(value) ? value.map(text).filter(Boolean) : []; }
+function topics(value: unknown, category: string, kind: string): string[] {
+  const reserved = new Set(['news', 'analysis', 'press_release', category.toLowerCase(), kind.toLowerCase()]);
+  return urls(value).filter(topic => !reserved.has(topic.toLowerCase()));
+}
 
 export default function MyNewsSubmissions({ locale }: { locale: string }) {
   const isId = locale === 'id';
@@ -29,7 +34,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
   const meta = selected ? record(record(selected.metadata).news) : {};
   const editorialStatus = text(meta.editorial_status) || selected?.content_status || '';
   const editable = Boolean(selected && ['pending_review', 'needs_revision', 'rejected'].includes(editorialStatus));
-  const [form, setForm] = useState({ title: '', summary: '', body: '', category: 'Ekonomi', article_kind: 'news', location: '', source_urls: '' });
+  const [form, setForm] = useState({ title: '', summary: '', body: '', category: 'Ekonomi', article_kind: 'news', location: '', topics: '', source_urls: '' });
 
   const load = useCallback(async () => {
     setStatus(current => ({ ...current, loading: true, error: '' }));
@@ -61,6 +66,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
       category: text(news.category) || 'Ekonomi',
       article_kind: text(news.article_kind) || 'news',
       location: text(news.location),
+      topics: topics(selected.tags, text(news.category) || 'Ekonomi', text(news.article_kind) || 'news').join(', '),
       source_urls: urls(news.source_urls).join('\n'),
     });
   }, [selected]);
@@ -73,7 +79,11 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
       const response = await fetch(`/api/news/submissions/${encodeURIComponent(selected.id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, source_urls: form.source_urls.split(/\r?\n/).map(value => value.trim()).filter(Boolean) }),
+        body: JSON.stringify({
+          ...form,
+          topics: form.topics.split(',').map(value => value.trim()).filter(Boolean),
+          source_urls: form.source_urls.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+        }),
       });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) {
@@ -121,6 +131,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
             <label className="text-sm font-bold text-slate-800 dark:text-slate-100">{isId?'Jenis':'Type'}<select disabled={!editable} value={form.article_kind} onChange={e=>setForm(f=>({...f,article_kind:e.target.value}))} className={inputClass}><option value="news">Berita</option><option value="analysis">Analisis</option><option value="press_release">Rilis bisnis</option></select></label>
             <label className="text-sm font-bold text-slate-800 dark:text-slate-100">{isId?'Lokasi':'Location'}<input disabled={!editable} value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} className={inputClass}/></label>
           </div>
+          <label className="text-sm font-bold text-slate-800 dark:text-slate-100">{isId?'Topik':'Topics'}<input disabled={!editable} value={form.topics} onChange={e=>setForm(f=>({...f,topics:e.target.value}))} className={inputClass} placeholder="qris, inflasi, harga pangan"/></label>
           <label className="text-sm font-bold text-slate-800 dark:text-slate-100">{isId?'Ringkasan':'Summary'}<textarea disabled={!editable} rows={3} value={form.summary} onChange={e=>setForm(f=>({...f,summary:e.target.value}))} className={inputClass}/></label>
           <label className="text-sm font-bold text-slate-800 dark:text-slate-100">{isId?'Isi':'Body'}<textarea disabled={!editable} rows={12} value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))} className={inputClass}/></label>
           <label className="text-sm font-bold text-slate-800 dark:text-slate-100">{isId?'URL sumber':'Source URLs'}<textarea disabled={!editable} rows={4} value={form.source_urls} onChange={e=>setForm(f=>({...f,source_urls:e.target.value}))} className={inputClass}/></label>

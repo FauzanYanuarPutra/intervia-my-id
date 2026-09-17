@@ -12490,6 +12490,83 @@ async fn create_content(
         return err(StatusCode::BAD_REQUEST, "body is too long").into_response();
     }
 
+    if content_type == "news" {
+        let open_submission_count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM content_items
+            WHERE owner_id = $1
+              AND content_type = 'news'
+              AND content_status = 'draft'
+              AND COALESCE(metadata->'news'->>'editorial_status', 'pending_review')
+                    IN ('pending_review', 'needs_revision')
+            "#,
+        )
+        .bind(owner_id)
+        .fetch_one(&state.db)
+        .await;
+
+        match open_submission_count {
+            Ok(count) if count >= 50 => {
+                return err(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "too many open news submissions; revise existing items first",
+                )
+                .into_response();
+            }
+            Ok(_) => {}
+            Err(error) => {
+                tracing::error!("create_content news quota check error: {:?}", error);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate news submission quota",
+                )
+                .into_response();
+            }
+        }
+
+        let duplicate = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+              SELECT 1
+              FROM content_items
+              WHERE owner_id = $1
+                AND content_type = 'news'
+                AND content_status <> 'deleted'
+                AND created_at >= NOW() - interval '7 days'
+                AND (
+                  lower(title) = lower($2)
+                  OR body = $3
+                )
+            )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(&title)
+        .bind(&body)
+        .fetch_one(&state.db)
+        .await;
+
+        match duplicate {
+            Ok(true) => {
+                return err(
+                    StatusCode::CONFLICT,
+                    "duplicate news submission; revise the existing submission instead",
+                )
+                .into_response();
+            }
+            Ok(false) => {}
+            Err(error) => {
+                tracing::error!("create_content news duplicate check error: {:?}", error);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate duplicate news submission",
+                )
+                .into_response();
+            }
+        }
+    }
+
     let slug = match clean_text(payload.slug) {
         Some(slug) => slug,
         None => match generate_unique_slug(&state.db, &title).await {
