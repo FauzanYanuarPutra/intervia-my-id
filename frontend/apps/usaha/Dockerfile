@@ -1,6 +1,6 @@
 ARG NPM_REGISTRY=https://registry.npmjs.org/
 
-FROM node:20-bullseye-slim AS usaha_deps
+FROM node:22-bullseye-slim AS usaha_deps
 
 ARG NPM_REGISTRY
 ARG NEXT_PUBLIC_APP_ENV=development

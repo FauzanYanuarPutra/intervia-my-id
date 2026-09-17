@@ -142,6 +142,44 @@ pub async fn list_organization_members(
         Ok(actor_user_id) => actor_user_id,
         Err(error) => return actor_auth_error_response(error),
     };
+
+    let can_view_team: bool = match sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+          SELECT 1
+          FROM core.organizations o
+          JOIN core.organization_users ou ON ou.org_id = o.id AND ou.user_id = $2
+          LEFT JOIN core.roles r ON r.id = ou.role_id
+          WHERE o.id = $1
+            AND o.deleted_at IS NULL
+            AND COALESCE(ou.status, 'active') = 'active'
+            AND (o.owner_user_id = $2 OR r.name IN ('org_admin', 'org_manager'))
+        )
+        "#,
+    )
+    .bind(organization_id)
+    .bind(actor_user_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(_) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({ "error": "organization service unavailable" })),
+            )
+                .into_response()
+        }
+    };
+
+    if !can_view_team {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "organization team permission required" })),
+        )
+            .into_response();
+    }
+
     let service = OrganizationService::new(OrganizationRepository::new(&state.db));
 
     match service.members(actor_user_id, organization_id).await {
