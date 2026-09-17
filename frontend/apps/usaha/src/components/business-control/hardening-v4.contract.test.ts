@@ -18,10 +18,12 @@ describe('Usaha hardening V4 contracts', () => {
 
   it('keeps retry-sensitive writes on client-stable idempotency keys', () => {
     expect(stock).toContain('purchaseAttemptRef');
+    expect(stock).toContain('yieldAttemptRef');
     expect(stock).toContain("'Idempotency-Key': idempotencyKey");
     expect(finance).toContain('createAttemptRef');
     expect(finance).toContain('correctionAttemptRef');
     expect(finance).toContain('allocationAttemptRef');
+    expect(planning).toContain('obligationAttemptRef');
     expect(planning).toContain('paymentAttemptRef');
     expect(settlement).toContain('saveAttemptRef');
     expect(settlement).toContain("'Idempotency-Key': attempt.key");
