@@ -2,7 +2,8 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use serde_json::json;
+use serde::Serialize;
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -61,6 +62,25 @@ pub(crate) struct EffectiveRecipe {
     pub(crate) name: String,
     pub(crate) servings: Decimal,
     pub(crate) items: Vec<EffectiveRecipeItem>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub(crate) struct RecipeAuditEventRecord {
+    pub(crate) id: Uuid,
+    pub(crate) actor_user_id: Option<Uuid>,
+    pub(crate) event_key: String,
+    pub(crate) subject_type: String,
+    pub(crate) subject_id: Option<Uuid>,
+    pub(crate) reason: Option<String>,
+    pub(crate) metadata: Value,
+    pub(crate) occurred_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct RetireRecipeOutcome {
+    pub(crate) recipe_id: Option<Uuid>,
+    pub(crate) recipe_version_id: Option<Uuid>,
+    pub(crate) retired_at: DateTime<Utc>,
 }
 
 #[derive(Clone)]
@@ -304,6 +324,171 @@ impl RecipeRepository {
             items,
         })
     }
+
+    pub(crate) async fn retire_active(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        product_id: Uuid,
+        reason: &str,
+    ) -> Result<RetireRecipeOutcome, RecipeRepositoryError> {
+        let reason = normalize_reason(reason)?;
+        GovernanceRepository::new(self.db.clone())
+            .authorize(actor_id, business_id, organization_id, RECIPE_MANAGE)
+            .await?;
+
+        let mut tx = self.db.begin().await?;
+        let product_exists = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+              SELECT 1
+              FROM business_products
+              WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'
+            )
+            "#,
+        )
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if !product_exists {
+            return Err(RecipeRepositoryError::NotFound);
+        }
+
+        let legacy_recipe = sqlx::query_as::<_, (Uuid, i64)>(
+            r#"
+            SELECT id, version
+            FROM business_recipes
+            WHERE business_id=$1 AND organization_id=$2 AND product_id=$3 AND status='active'
+            FOR UPDATE
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(product_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let active_version = sqlx::query_as::<_, (Uuid, i64)>(
+            r#"
+            SELECT id, version_number
+            FROM business_recipe_versions
+            WHERE business_id=$1 AND organization_id=$2 AND product_id=$3
+              AND status='published' AND effective_until IS NULL
+            FOR UPDATE
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(product_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if legacy_recipe.is_none() && active_version.is_none() {
+            return Err(RecipeRepositoryError::NotFound);
+        }
+
+        let retired_at: DateTime<Utc> = sqlx::query_scalar("SELECT NOW()")
+            .fetch_one(&mut *tx)
+            .await?;
+
+        if let Some((version_id, _)) = active_version {
+            sqlx::query(
+                r#"
+                UPDATE business_recipe_versions
+                SET status='retired', effective_until=$4, updated_at=NOW()
+                WHERE id=$1 AND business_id=$2 AND organization_id=$3
+                "#,
+            )
+            .bind(version_id)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(retired_at)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if let Some((recipe_id, version)) = legacy_recipe {
+            sqlx::query(
+                r#"
+                UPDATE business_recipes
+                SET status='retired', version=$4, updated_at=NOW()
+                WHERE id=$1 AND business_id=$2 AND organization_id=$3
+                "#,
+            )
+            .bind(recipe_id)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(version + 1)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_audit_events (
+              organization_id, business_id, actor_user_id, event_key,
+              subject_type, subject_id, reason, metadata, occurred_at
+            ) VALUES ($1,$2,$3,'recipe.retired','recipe',$4,$5,$6,$7)
+            "#,
+        )
+        .bind(organization_id)
+        .bind(business_id)
+        .bind(actor_id)
+        .bind(
+            active_version
+                .map(|(id, _)| id)
+                .or(legacy_recipe.map(|(id, _)| id)),
+        )
+        .bind(&reason)
+        .bind(json!({
+            "product_id": product_id,
+            "legacy_recipe_id": legacy_recipe.map(|(id, _)| id),
+            "recipe_version_id": active_version.map(|(id, _)| id),
+            "source": "legacy_recipe_delete"
+        }))
+        .bind(retired_at)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(RetireRecipeOutcome {
+            recipe_id: legacy_recipe.map(|(id, _)| id),
+            recipe_version_id: active_version.map(|(id, _)| id),
+            retired_at,
+        })
+    }
+
+    pub(crate) async fn list_audit_history(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        product_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<RecipeAuditEventRecord>, RecipeRepositoryError> {
+        self.authorize_view(actor_id, business_id, organization_id)
+            .await?;
+        sqlx::query_as::<_, RecipeAuditEventRecord>(
+            r#"
+            SELECT id, actor_user_id, event_key, subject_type, subject_id,
+              reason, metadata, occurred_at
+            FROM business_audit_events
+            WHERE business_id=$1 AND organization_id=$2
+              AND event_key IN ('recipe.published', 'recipe.retired')
+              AND metadata->>'product_id' = $3
+            ORDER BY occurred_at DESC, id DESC
+            LIMIT $4
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(product_id.to_string())
+        .bind(limit.clamp(1, 100))
+        .fetch_all(&self.db)
+        .await
+        .map_err(Into::into)
+    }
 }
 
 pub(crate) async fn resolve_effective_recipe(
@@ -479,4 +664,15 @@ fn validate_publish_request(request: &ReplaceRecipeRequest) -> Result<(), Recipe
         }
     }
     Ok(())
+}
+
+fn normalize_reason(reason: &str) -> Result<String, RecipeRepositoryError> {
+    let value = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+    if value.chars().count() < 3 || value.chars().count() > 2_000 {
+        Err(RecipeRepositoryError::Validation(
+            "recipe_retirement_reason_required",
+        ))
+    } else {
+        Ok(value)
+    }
 }

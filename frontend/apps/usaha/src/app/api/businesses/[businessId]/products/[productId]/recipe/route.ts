@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import {
   BusinessControlHttpError,
+  deleteControlRecipe,
   getControlRecipe,
+  listControlRecipeHistory,
   replaceControlRecipe,
 } from '@/lib/business-control-server';
 
@@ -13,11 +15,16 @@ function errorResponse(error: unknown, fallback: string) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ businessId: string; productId: string }> },
 ) {
   const { businessId, productId } = await context.params;
   try {
+    const url = new URL(request.url);
+    if (url.searchParams.get('history') === '1') {
+      const history = await listControlRecipeHistory(businessId, productId);
+      return NextResponse.json({ data: { history } });
+    }
     const recipe = await getControlRecipe(businessId, productId);
     if (!recipe) return NextResponse.json({ error: 'recipe_not_found' }, { status: 404 });
     return NextResponse.json({ data: { recipe } });
@@ -37,5 +44,19 @@ export async function PUT(
     return NextResponse.json(payload);
   } catch (error) {
     return errorResponse(error, 'Gagal menyimpan resep produk.');
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ businessId: string; productId: string }> },
+) {
+  const { businessId, productId } = await context.params;
+  try {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const payload = await deleteControlRecipe(businessId, productId, body);
+    return NextResponse.json(payload);
+  } catch (error) {
+    return errorResponse(error, 'Gagal menghapus resep aktif.');
   }
 }

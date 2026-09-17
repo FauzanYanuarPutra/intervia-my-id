@@ -52,6 +52,17 @@ export type ControlRecipe = {
   items: ControlRecipeItem[];
 };
 
+export type ControlRecipeHistoryEvent = {
+  id: string;
+  actor_user_id: string | null;
+  event_key: 'recipe.published' | 'recipe.retired' | string;
+  subject_type: string;
+  subject_id: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown>;
+  occurred_at: string;
+};
+
 export type ControlChannel = {
   id: string;
   business_id: string;
@@ -262,6 +273,34 @@ export async function replaceControlRecipe(
       `/products/${encodeURIComponent(productId)}/recipe`,
     ),
     { method: 'PUT', body: JSON.stringify(input) },
+  );
+}
+
+export async function deleteControlRecipe(
+  businessId: string,
+  productId: string,
+  input: Record<string, unknown>,
+) {
+  return requestControl(
+    businessPath(
+      businessId,
+      `/products/${encodeURIComponent(productId)}/recipe`,
+    ),
+    { method: 'DELETE', body: JSON.stringify(input) },
+  );
+}
+
+export async function listControlRecipeHistory(
+  businessId: string,
+  productId: string,
+) {
+  return items<ControlRecipeHistoryEvent>(
+    await requestControl(
+      businessPath(
+        businessId,
+        `/products/${encodeURIComponent(productId)}/recipe/history`,
+      ),
+    ),
   );
 }
 

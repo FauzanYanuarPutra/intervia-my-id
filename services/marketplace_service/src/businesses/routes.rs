@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -56,7 +57,11 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         )
         .route(
             "/v1/businesses/{business_id}/products/{product_id}/recipe",
-            get(get_recipe).put(replace_recipe),
+            get(get_recipe).put(replace_recipe).delete(retire_recipe),
+        )
+        .route(
+            "/v1/businesses/{business_id}/products/{product_id}/recipe/history",
+            get(list_recipe_history),
         )
         .route("/v1/businesses/{business_id}/channels", get(list_channels))
         .route(
@@ -318,6 +323,76 @@ async fn replace_recipe(
         Ok(recipe) => (
             StatusCode::OK,
             Json(json!({ "data": { "recipe": recipe } })),
+        )
+            .into_response(),
+        Err(error) => recipe_error_response(error),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct RetireRecipeRequest {
+    reason: String,
+}
+
+async fn retire_recipe(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((business_id, product_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<RetireRecipeRequest>,
+) -> Response {
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ManageCosting,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    match RecipeRepository::new(state.db.clone())
+        .retire_active(
+            actor_id,
+            business_id,
+            organization_id,
+            product_id,
+            &payload.reason,
+        )
+        .await
+    {
+        Ok(outcome) => (
+            StatusCode::OK,
+            Json(json!({ "data": { "retired": true, "recipe": outcome } })),
+        )
+            .into_response(),
+        Err(error) => recipe_error_response(error),
+    }
+}
+
+async fn list_recipe_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((business_id, product_id)): Path<(Uuid, Uuid)>,
+) -> Response {
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ViewCosting,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    match RecipeRepository::new(state.db.clone())
+        .list_audit_history(actor_id, business_id, organization_id, product_id, 50)
+        .await
+    {
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({ "data": { "count": items.len(), "items": items } })),
         )
             .into_response(),
         Err(error) => recipe_error_response(error),
