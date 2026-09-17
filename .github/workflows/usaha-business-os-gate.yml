@@ -11,6 +11,8 @@ on:
       - "services/identity_service/**"
       - "services/marketplace_service/**"
       - "scripts/ci/check_usaha_business_os_contract.py"
+      - "scripts/ci/check_usaha_persistence_boundary.py"
+      - "scripts/ci/test_usaha_persistence_boundary.py"
       - "scripts/config/test_usaha_ui_contract.py"
       - ".github/workflows/usaha-business-os-gate.yml"
   push:
@@ -22,6 +24,8 @@ on:
       - "services/identity_service/**"
       - "services/marketplace_service/**"
       - "scripts/ci/check_usaha_business_os_contract.py"
+      - "scripts/ci/check_usaha_persistence_boundary.py"
+      - "scripts/ci/test_usaha_persistence_boundary.py"
       - "scripts/config/test_usaha_ui_contract.py"
       - ".github/workflows/usaha-business-os-gate.yml"
 
@@ -44,6 +48,11 @@ jobs:
           python-version: "3.12"
       - name: Validate application boundary
         run: python scripts/ci/check_usaha_business_os_contract.py
+      - name: Reject legacy Usaha persistence dependencies
+        run: |
+          python scripts/ci/check_usaha_persistence_boundary.py
+          cd scripts/ci
+          python -m unittest -v test_usaha_persistence_boundary.py
       - name: Validate Business OS UI architecture
         run: python scripts/config/test_usaha_ui_contract.py
 

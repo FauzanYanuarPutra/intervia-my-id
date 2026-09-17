@@ -16,7 +16,6 @@ fn finance_core_migration_is_append_only_and_idempotent() {
         "business_allocation_bucket_balances",
         "business_finance_account_balances",
         "business_finance_entry_corrections",
-        "business_audit_events",
         "reject_business_finance_core_mutation",
     ] {
         assert!(

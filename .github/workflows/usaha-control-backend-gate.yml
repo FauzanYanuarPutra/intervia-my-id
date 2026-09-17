@@ -6,6 +6,8 @@ on:
       - 'services/marketplace_service/src/businesses/**'
       - 'services/marketplace_service/migrations/**'
       - 'services/marketplace_service/tests/**'
+      - 'scripts/ci/check_business_os_migration_immutability.py'
+      - 'scripts/ci/test_business_os_migration_immutability.py'
       - '.github/workflows/usaha-control-backend-gate.yml'
   workflow_dispatch:
 
@@ -45,6 +47,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: services/marketplace_service
+      - name: Verify applied Business OS migrations are immutable
+        run: |
+          python ../../scripts/ci/check_business_os_migration_immutability.py
+          cd ../../scripts/ci
+          python -m unittest -v test_business_os_migration_immutability.py
       - name: Cargo check locked
         run: cargo check --locked
       - name: Applied migration immutability contract
