@@ -24,6 +24,19 @@ describe('Flow Usaha final contracts', () => {
     expect(hpp).toContain('Harga jual dari Barang');
   });
 
+  it('keeps Modal produk accountable, searchable, and explicit', () => {
+    const hpp = source('src/components/business-control/DurableHppWorkspace.tsx');
+    expect(hpp).toContain('Cari produk');
+    expect(hpp).toContain('Cari bahan');
+    expect(hpp).toContain('Ganti bahan dengan hapus lalu tambah lagi');
+    expect(hpp).toContain('Hapus resep aktif');
+    expect(hpp).toContain('Riwayat perubahan');
+    expect(hpp).toContain('PIC');
+    expect(hpp).toContain('hasUnsavedChanges');
+    expect(hpp).not.toContain('value={item.ingredientId} onChange={event => patch(index, { ingredientId: event.target.value })}');
+    expect(hpp).not.toContain('const next = ingredients.find');
+  });
+
   it('lets cashier reopen and edit a configured cart line', () => {
     const workspace = source('src/components/business-control/QuickSaleWorkspace.tsx');
     const configurator = source('src/components/business-control/QuickSaleProductConfigurator.tsx');
