@@ -34,6 +34,10 @@ for service in ("identity_db:", "marketplace_db:", "community_db:"):
 if "restart: unless-stopped" not in base_compose:
     errors.append("base compose must retain process restart policy")
 
+for marker in ("stop_grace_period: 30s", "stop_grace_period: 60s"):
+    if marker not in base_compose:
+        errors.append(f"base compose missing graceful shutdown budget: {marker}")
+
 if "prometheus:" not in base_compose:
     warnings.append("Prometheus configuration exists but is not wired into the base Compose stack; observability activation remains incomplete")
 
