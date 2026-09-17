@@ -318,6 +318,17 @@ mod tests {
     }
 
     #[test]
+    fn settlement_idempotency_migration_has_a_business_scoped_unique_key() {
+        let migration =
+            include_str!("../../migrations/20260918073000_business_settlement_idempotency.up.sql");
+
+        assert!(migration.contains("ADD COLUMN IF NOT EXISTS idempotency_key UUID"));
+        assert!(migration.contains("SET idempotency_key = id"));
+        assert!(migration.contains("ALTER COLUMN idempotency_key SET NOT NULL"));
+        assert!(migration.contains("(business_id, idempotency_key)"));
+    }
+
+    #[test]
     fn settlement_validation_accepts_a_matched_transfer() {
         let validated = validate_settlement(&request()).expect("valid settlement");
         assert_eq!(validated.expected_transfer_amount, 611_500);
