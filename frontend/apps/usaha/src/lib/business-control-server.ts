@@ -78,6 +78,8 @@ export type ControlFinanceEntry = {
   occurred_on: string;
   note: string;
   channel_key: string | null;
+  source_type?: string | null;
+  source_id?: string | null;
   created_by_user_id: string;
   created_at: string;
   updated_at: string;
@@ -103,6 +105,50 @@ export type ControlSettlement = {
   created_by_user_id: string;
   created_at: string;
   updated_at: string;
+};
+
+export type ControlSaleRecord = {
+  id: string;
+  business_id: string;
+  organization_id: string;
+  occurred_on: string;
+  channel_key: string | null;
+  account_key: 'cash' | 'bank' | 'ewallet' | 'receivable';
+  status: 'completed' | 'voided';
+  gross_amount: number;
+  discount_amount: number;
+  final_amount: number;
+  cogs_amount: number | null;
+  cost_complete: boolean;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ControlSaleLine = {
+  id: string;
+  sale_id: string;
+  product_id: string;
+  product_name: string;
+  quantity: string | number;
+  unit_price_amount: number;
+  discount_amount: number;
+  final_revenue_amount: number;
+  unit_cogs_amount: number | null;
+  line_cogs_amount: number | null;
+  cost_snapshot: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ControlSaleAggregate = {
+  sale: ControlSaleRecord;
+  lines: ControlSaleLine[];
+};
+
+export type CreateControlSaleResult = {
+  sale: ControlSaleAggregate;
+  replayed: boolean;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -266,4 +312,29 @@ export async function createControlSettlement(
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export async function listControlSales(businessId: string) {
+  return items<ControlSaleAggregate>(
+    await requestControl(businessPath(businessId, '/sales')),
+  );
+}
+
+export async function createControlSale(
+  businessId: string,
+  idempotencyKey: string,
+  input: Record<string, unknown>,
+): Promise<CreateControlSaleResult> {
+  const payload = await requestControl(businessPath(businessId, '/sales'), {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(input),
+  });
+  const root = record(payload) ?? {};
+  const data = record(root.data) ?? root;
+  const sale = data.sale as ControlSaleAggregate | undefined;
+  if (!sale) {
+    throw new BusinessControlHttpError(502, 'invalid_sale_response');
+  }
+  return { sale, replayed: data.replayed === true };
 }

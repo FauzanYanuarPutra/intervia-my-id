@@ -120,17 +120,22 @@ import {
   createVerificationFormState,
   type CollectionResponse,
   type CreateStoreResponse,
+  accessRoleHasPermission,
   derivePublishServices,
   formatDateTime,
   formatIdr,
   formatOrderFulfillmentLabel,
   formatPaymentMethod,
   formatPaymentStage,
+  getOrderAttentionLevel,
+  getOrderOperatorLabel,
+  mergeAccessibleRequestedStore,
   readBusinessCategory,
   readMetaBool,
   readMetaNumber,
   readMetaString,
   type OrderFilter,
+  type OrderItemRecord,
   type OrderRecord,
   type ProductFormState,
   type ProductRecord,
@@ -138,6 +143,7 @@ import {
   readPaymentFlow,
   type ReservationRecord,
   SECTION_TO_WORKSPACE,
+  shouldTreatWorkspaceCollectionAsOptional,
   statusTone,
   type StoreFormState,
   type StoreRecord,
@@ -251,6 +257,20 @@ type SetupDetailStep = {
   done: boolean;
   href?: string;
 };
+
+function readOrderItemImageUrl(
+  item: OrderItemRecord,
+  products: ProductRecord[],
+): string {
+  const metadataImage = readMetaString(
+    item.metadata || {},
+    'product_image_url',
+  );
+  if (metadataImage) return metadataImage;
+  return (
+    products.find(product => product.id === item.product_id)?.image_url || ''
+  );
+}
 
 const STORE_CREATE_STEP_ORDER: StoreCreateStepId[] = [
   'identity',
@@ -561,6 +581,22 @@ export function UmkmHubClient({
   const canManageTeam =
     selectedStore?.access_role === 'owner' ||
     selectedStore?.access_via === 'owner';
+  const activeAccessRole =
+    selectedStore?.access_role ||
+    (selectedStore?.access_via === 'owner' ? 'owner' : null);
+  const canManageOrders = accessRoleHasPermission(
+    activeAccessRole,
+    'order:manage',
+  );
+  const canManagePayments = accessRoleHasPermission(
+    activeAccessRole,
+    'payment:manage',
+  );
+  const canMoveOrderTables = accessRoleHasPermission(
+    activeAccessRole,
+    'table:manage',
+  );
+  const isCashierWorkspace = activeAccessRole === 'cashier';
 
   const onlineQr = useMemo(
     () => qrs.find(qr => qr.mode === 'online') || null,
@@ -2631,7 +2667,30 @@ export function UmkmHubClient({
       if (!res.ok || !payload.data) {
         throw new Error(payload.error || 'Failed to load businesses');
       }
-      const items = payload.data.items || [];
+      let items = payload.data.items || [];
+      if (
+        requestedStoreId &&
+        !items.some(item => item.id === requestedStoreId)
+      ) {
+        try {
+          const accessProbe = await authFetch(
+            `/api/super-app/umkm/orders?store_id=${encodeURIComponent(requestedStoreId)}&limit=1`,
+          );
+          const accessPayload = (await accessProbe
+            .json()
+            .catch(() => ({}))) as CollectionResponse<OrderRecord>;
+          if (accessProbe.ok && accessPayload.data?.store) {
+            items = mergeAccessibleRequestedStore({
+              items,
+              requestedStoreId,
+              store: accessPayload.data.store,
+              accessRole: 'cashier',
+            });
+          }
+        } catch {
+          // Keep the regular "mine" list usable when the direct access probe is unavailable.
+        }
+      }
       setMyStores(items);
       setSelectedStoreId(current => {
         const savedStoreId =
@@ -2723,6 +2782,24 @@ export function UmkmHubClient({
         const teamPayload = (await teamRes
           .json()
           .catch(() => ({}))) as CollectionResponse<TeamMemberRecord>;
+        const selectedAccessRole =
+          myStores.find(store => store.id === storeId)?.access_role || null;
+        const optionalCollection = (
+          collection:
+            | 'products'
+            | 'tables'
+            | 'qr'
+            | 'orders'
+            | 'reservations'
+            | 'team',
+          status: number,
+        ) =>
+          shouldTreatWorkspaceCollectionAsOptional({
+            workspace: currentWorkspace,
+            collection,
+            status,
+            accessRole: selectedAccessRole,
+          });
 
         if (!productRes.ok || !productPayload.data) {
           throw new Error(productPayload.error || 'Failed to load products');
@@ -2730,18 +2807,28 @@ export function UmkmHubClient({
         if (!tableRes.ok || !tablePayload.data) {
           throw new Error(tablePayload.error || 'Failed to load tables');
         }
-        if (!PROMO_ONLY_MODE && (!qrRes?.ok || !qrPayload.data)) {
+        if (
+          !PROMO_ONLY_MODE &&
+          (!qrRes?.ok || !qrPayload.data) &&
+          !optionalCollection('qr', qrRes?.status || 500)
+        ) {
           throw new Error(qrPayload.error || 'Failed to load QR tokens');
         }
         if (!PROMO_ONLY_MODE && (!orderRes?.ok || !orderPayload.data)) {
           throw new Error(orderPayload.error || 'Failed to load orders');
         }
-        if (!reservationRes.ok || !reservationPayload.data) {
+        if (
+          (!reservationRes.ok || !reservationPayload.data) &&
+          !optionalCollection('reservations', reservationRes.status)
+        ) {
           throw new Error(
             reservationPayload.error || 'Failed to load reservations',
           );
         }
-        if (!teamRes.ok || !teamPayload.data) {
+        if (
+          (!teamRes.ok || !teamPayload.data) &&
+          !optionalCollection('team', teamRes.status)
+        ) {
           throw new Error(teamPayload.error || 'Failed to load team members');
         }
 
@@ -2751,8 +2838,8 @@ export function UmkmHubClient({
         setTables(tablePayload.data.items || []);
         setQrs(qrPayload.data?.items || []);
         setOrders(orderPayload.data?.items || []);
-        setReservations(reservationPayload.data.items || []);
-        setTeamMembers(teamPayload.data.items || []);
+        setReservations(reservationPayload.data?.items || []);
+        setTeamMembers(teamPayload.data?.items || []);
       } catch (error) {
         if (requestId !== storeRequestRef.current) return;
 
@@ -2769,7 +2856,7 @@ export function UmkmHubClient({
         }
       }
     },
-    [authFetch, isId],
+    [authFetch, currentWorkspace, isId, myStores],
   );
 
   useEffect(() => {
@@ -14196,6 +14283,38 @@ export function UmkmHubClient({
                           ) : null
                         }
                       >
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-accent-border)] px-4 py-3 text-[color:var(--app-accent)]">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold">
+                              {isCashierWorkspace
+                                ? isId
+                                  ? 'Mode kasir'
+                                  : 'Cashier mode'
+                                : isId
+                                  ? 'Mode operasional'
+                                  : 'Operations mode'}
+                            </p>
+                            <p className="text-xs">
+                              {selectedStore?.name || '-'}{' '}
+                              {activeAccessRole
+                                ? `/ ${teamRoleLabel(activeAccessRole, isId)}`
+                                : ''}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                            {canManageOrders ? (
+                              <span className="rounded-full border border-[color:var(--app-accent-border)] px-2.5 py-1">
+                                {isId ? 'Order' : 'Orders'}
+                              </span>
+                            ) : null}
+                            {canManagePayments ? (
+                              <span className="rounded-full border border-[color:var(--app-accent-border)] px-2.5 py-1">
+                                {isId ? 'Pembayaran' : 'Payments'}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <StatCard
                             label={isId ? 'Aktif' : 'Active'}
@@ -14324,11 +14443,28 @@ export function UmkmHubClient({
                                 paymentStage !== 'awaiting_confirmation' &&
                                 (order.payment_status !== 'paid' ||
                                   order.status === 'served');
+                              const orderItems = Array.isArray(order.items)
+                                ? order.items
+                                : [];
+                              const lastHandler = getOrderOperatorLabel(order);
+                              const attentionLevel =
+                                getOrderAttentionLevel({
+                                  status: order.status,
+                                  payment_status: order.payment_status,
+                                  payment_stage: paymentStage,
+                                });
 
                               return (
                                 <article
                                   key={order.id}
-                                  className="rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 shadow-sm border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
+                                  className={cn(
+                                    'rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 shadow-sm border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]',
+                                    attentionLevel === 'blocked'
+                                      ? 'ring-2 ring-amber-200'
+                                      : attentionLevel === 'ready'
+                                        ? 'ring-2 ring-emerald-200'
+                                        : '',
+                                  )}
                                 >
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0">
@@ -14441,6 +14577,68 @@ export function UmkmHubClient({
                                     </div>
                                   ) : null}
 
+                                  {orderItems.length > 0 ? (
+                                    <div className="mt-4 grid gap-2">
+                                      {orderItems.map(item => {
+                                        const imageUrl =
+                                          readOrderItemImageUrl(
+                                            item,
+                                            products,
+                                          );
+
+                                        return (
+                                          <div
+                                            key={item.id}
+                                            className="grid min-h-[72px] grid-cols-[56px_1fr_auto] items-center gap-3 rounded-2xl border border-[color:var(--app-accent-border)] px-3 py-2 text-[color:var(--app-accent)]"
+                                          >
+                                            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-bg-subtle)]">
+                                              {imageUrl ? (
+                                                <img
+                                                  src={imageUrl}
+                                                  alt={item.product_name}
+                                                  className="h-full w-full object-cover"
+                                                  loading="lazy"
+                                                />
+                                              ) : (
+                                                <PackagePlus className="h-5 w-5" />
+                                              )}
+                                            </div>
+                                            <div className="min-w-0">
+                                              <p className="truncate text-sm font-bold">
+                                                {item.product_name}
+                                              </p>
+                                              <p className="text-xs">
+                                                {item.quantity} x{' '}
+                                                {formatIdr(
+                                                  item.unit_price_cents,
+                                                )}
+                                              </p>
+                                              {item.notes ? (
+                                                <p className="mt-0.5 line-clamp-1 text-xs">
+                                                  {item.notes}
+                                                </p>
+                                              ) : null}
+                                            </div>
+                                            <p className="text-right text-sm font-bold">
+                                              {formatIdr(
+                                                item.line_total_cents,
+                                              )}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : null}
+
+                                  {lastHandler ? (
+                                    <p className="mt-3 text-xs text-[color:var(--app-accent)]">
+                                      {isId
+                                        ? 'Ditangani oleh'
+                                        : 'Handled by'}{' '}
+                                      {lastHandler}
+                                    </p>
+                                  ) : null}
+
                                   {paymentBlocked ? (
                                     <div className="mt-3 rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-3 text-xs  border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
                                       {paymentStage === 'awaiting_confirmation'
@@ -14468,7 +14666,8 @@ export function UmkmHubClient({
                                       type="button"
                                       disabled={
                                         actingOrderId === order.id ||
-                                        paymentBlocked
+                                        paymentBlocked ||
+                                        !canManageOrders
                                       }
                                       onClick={() =>
                                         void runOrderAction(order.id, {
@@ -14496,7 +14695,8 @@ export function UmkmHubClient({
                                       type="button"
                                       disabled={
                                         actingOrderId === order.id ||
-                                        paymentBlocked
+                                        paymentBlocked ||
+                                        !canManageOrders
                                       }
                                       onClick={() =>
                                         void runOrderAction(order.id, {
@@ -14528,7 +14728,10 @@ export function UmkmHubClient({
                                       'awaiting_confirmation' ? (
                                       <button
                                         type="button"
-                                        disabled={actingOrderId === order.id}
+                                        disabled={
+                                          actingOrderId === order.id ||
+                                          !canManagePayments
+                                        }
                                         onClick={() =>
                                           void runOrderAction(order.id, {
                                             action: 'confirm_bill',
@@ -14547,7 +14750,8 @@ export function UmkmHubClient({
                                       type="button"
                                       disabled={
                                         actingOrderId === order.id ||
-                                        !canCheckout
+                                        !canCheckout ||
+                                        !canManagePayments
                                       }
                                       onClick={() =>
                                         void runOrderAction(order.id, {
@@ -14568,7 +14772,10 @@ export function UmkmHubClient({
 
                                     <button
                                       type="button"
-                                      disabled={actingOrderId === order.id}
+                                      disabled={
+                                        actingOrderId === order.id ||
+                                        !canManageOrders
+                                      }
                                       onClick={() =>
                                         void runOrderAction(order.id, {
                                           action: 'update_status',
@@ -14583,7 +14790,8 @@ export function UmkmHubClient({
                                   </div>
 
                                   {order.channel === 'offline' &&
-                                    order.payment_status === 'unpaid' ? (
+                                    order.payment_status === 'unpaid' &&
+                                    canMoveOrderTables ? (
                                     <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                                       <select
                                         value={moveTargets[order.id] || ''}

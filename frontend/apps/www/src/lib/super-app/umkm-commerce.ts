@@ -61,6 +61,7 @@ export {
   getUmkmStoreById,
   getUmkmStoreBySlug,
   getUmkmStoreMemberById,
+  listUmkmOrderBundlesByStore,
   listUmkmOrdersByStore,
   listUmkmProducts,
   listUmkmQrTokens,
