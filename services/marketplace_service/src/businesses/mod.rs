@@ -29,6 +29,7 @@ mod inventory_routes;
 mod inventory_routes_tests;
 #[cfg(test)]
 mod inventory_tests;
+pub(crate) mod kernel;
 mod media;
 #[cfg(test)]
 mod media_migration_tests;
