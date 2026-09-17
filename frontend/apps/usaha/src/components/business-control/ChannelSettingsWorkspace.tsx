@@ -2,10 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, Loader2, Save } from 'lucide-react';
-import {
-  calculateChannelMargin,
-  recommendChannelPrice,
-} from '@/lib/business-control/costing';
+import { buildChannelBusinessSummary } from '@/lib/business-control/channel-ux';
 import { channelSimulationReadiness } from '@/lib/business-control/progressive-disclosure';
 
 type Channel = {
@@ -46,7 +43,11 @@ const defaults: EditableChannel[] = [
   { key: 'shopeefood', displayName: 'ShopeeFood', feePercent: 0, fixedFee: 0, merchantPromo: 0, targetMarginPercent: 25, enabled: false },
 ];
 
-const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+const money = new Intl.NumberFormat('id-ID', {
+  style: 'currency',
+  currency: 'IDR',
+  maximumFractionDigits: 0,
+});
 const pct = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 });
 const input = 'mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm text-portal-ink';
 
@@ -76,7 +77,13 @@ function nullableNumber(value: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-export function ChannelSettingsWorkspace({ businessId, initialChannels, defaultPrice, defaultHpp = null, canViewCosting }: Props) {
+export function ChannelSettingsWorkspace({
+  businessId,
+  initialChannels,
+  defaultPrice,
+  defaultHpp = null,
+  canViewCosting,
+}: Props) {
   const [rows, setRows] = useState(() => initialRows(initialChannels));
   const [price, setPrice] = useState<number | null>(defaultPrice);
   const [hpp, setHpp] = useState<number | null>(defaultHpp);
@@ -119,27 +126,77 @@ export function ChannelSettingsWorkspace({ businessId, initialChannels, defaultP
     <div className="space-y-3">
       <details className="portal-panel group" open={readiness !== 'ready'}>
         <summary className="flex cursor-pointer list-none items-center justify-between p-4 sm:p-5">
-          <div><h2 className="font-bold text-portal-ink">Pengaturan harga online</h2><p className="mt-0.5 text-xs text-portal-soft">Harga toko dan HPP dipakai untuk simulasi semua kanal.</p></div>
+          <div>
+            <h2 className="font-bold text-portal-ink">Pengaturan harga online</h2>
+            <p className="mt-0.5 text-xs text-portal-soft">Harga toko dan HPP dipakai untuk simulasi semua kanal.</p>
+          </div>
           <ChevronDown className="h-4 w-4 text-portal-soft transition group-open:rotate-180" />
         </summary>
         <div className="border-t border-portal-line p-4 sm:p-5">
           {readiness !== 'ready' ? (
-            <div className="mb-3 flex gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900"><AlertTriangle className="h-4 w-4 shrink-0" /><p>{readiness === 'missing-price' ? 'Isi harga toko agar simulasi bisa dihitung.' : readiness === 'missing-hpp' ? 'Isi HPP agar saran harga aman bisa dihitung.' : 'Akses ini tidak menampilkan HPP dan keuntungan.'}</p></div>
+            <div className="mb-3 flex gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <p>
+                {readiness === 'missing-price'
+                  ? 'Isi harga toko agar simulasi bisa dihitung.'
+                  : readiness === 'missing-hpp'
+                    ? 'Isi HPP agar saran harga aman bisa dihitung.'
+                    : 'Akses ini tidak menampilkan HPP dan keuntungan.'}
+              </p>
+            </div>
           ) : null}
+
           <div className={`grid gap-3 ${canViewCosting ? 'sm:grid-cols-2' : ''}`}>
-            <label className="text-xs font-semibold text-portal-soft">Harga toko<input type="number" min="0" className={input} value={price ?? ''} placeholder="Contoh: 10000" onChange={event => setPrice(nullableNumber(event.target.value))} /></label>
-            {canViewCosting ? <label className="text-xs font-semibold text-portal-soft">HPP produk<input type="number" min="0" className={input} value={hpp ?? ''} placeholder="Modal per produk" onChange={event => setHpp(nullableNumber(event.target.value))} /></label> : null}
+            <label className="text-xs font-semibold text-portal-soft">
+              Harga toko
+              <input
+                type="number"
+                min="0"
+                className={input}
+                value={price ?? ''}
+                placeholder="Contoh: 10000"
+                onChange={event => setPrice(nullableNumber(event.target.value))}
+              />
+            </label>
+            {canViewCosting ? (
+              <label className="text-xs font-semibold text-portal-soft">
+                HPP produk
+                <input
+                  type="number"
+                  min="0"
+                  className={input}
+                  value={hpp ?? ''}
+                  placeholder="Modal per produk"
+                  onChange={event => setHpp(nullableNumber(event.target.value))}
+                />
+              </label>
+            ) : null}
           </div>
         </div>
       </details>
 
       <section className="portal-panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-portal-line px-4 py-3 sm:px-5">
-          <div><h2 className="font-bold text-portal-ink">Kanal penjualan</h2><p className="text-xs text-portal-soft">Aktifkan yang benar-benar dipakai.</p></div>
+          <div>
+            <h2 className="font-bold text-portal-ink">Kanal penjualan</h2>
+            <p className="text-xs text-portal-soft">Lihat hasil bersih dulu, lalu buka perhitungan jika perlu.</p>
+          </div>
           <span className="text-xs font-semibold text-portal-soft">{rows.filter(row => row.enabled).length} aktif</span>
         </div>
+
         <div className="divide-y divide-portal-line">
-          {rows.map(row => <ChannelRow key={row.key} row={row} price={price} hpp={hpp} canViewCosting={canViewCosting} saving={savingKey === row.key} onPatch={patch} onSave={save} />)}
+          {rows.map(row => (
+            <ChannelRow
+              key={row.key}
+              row={row}
+              price={price}
+              hpp={hpp}
+              canViewCosting={canViewCosting}
+              saving={savingKey === row.key}
+              onPatch={patch}
+              onSave={save}
+            />
+          ))}
         </div>
       </section>
 
@@ -148,7 +205,15 @@ export function ChannelSettingsWorkspace({ businessId, initialChannels, defaultP
   );
 }
 
-function ChannelRow({ row, price, hpp, canViewCosting, saving, onPatch, onSave }: {
+function ChannelRow({
+  row,
+  price,
+  hpp,
+  canViewCosting,
+  saving,
+  onPatch,
+  onSave,
+}: {
   row: EditableChannel;
   price: number | null;
   hpp: number | null;
@@ -158,31 +223,127 @@ function ChannelRow({ row, price, hpp, canViewCosting, saving, onPatch, onSave }
   onSave: (row: EditableChannel) => Promise<void>;
 }) {
   const readiness = channelSimulationReadiness({ recordedPrice: price, hpp, canViewCosting });
-  const margin = useMemo(() => readiness === 'ready' && price !== null && hpp !== null ? calculateChannelMargin({ price, hpp, feeRatePercent: row.feePercent, merchantPromo: row.merchantPromo, fixedFee: row.fixedFee }) : null, [readiness, price, hpp, row.feePercent, row.merchantPromo, row.fixedFee]);
-  const recommendation = useMemo(() => readiness === 'ready' && hpp !== null ? recommendChannelPrice({ hpp, deductionRatePercent: row.feePercent, fixedFee: row.fixedFee + row.merchantPromo, targetMarginPercent: row.targetMarginPercent, roundTo: 500 }) : null, [readiness, hpp, row.feePercent, row.fixedFee, row.merchantPromo, row.targetMarginPercent]);
+  const businessSummary = useMemo(
+    () => buildChannelBusinessSummary({
+      price,
+      hpp,
+      feePercent: row.feePercent,
+      fixedFee: row.fixedFee,
+      merchantPromo: row.merchantPromo,
+      targetMarginPercent: row.targetMarginPercent,
+    }),
+    [price, hpp, row.feePercent, row.fixedFee, row.merchantPromo, row.targetMarginPercent],
+  );
 
   return (
-    <div className="px-4 py-3 sm:px-5">
+    <div className="px-4 py-4 sm:px-5">
       <div className="flex items-center gap-3">
-        <label className="flex min-h-10 shrink-0 items-center"><input type="checkbox" checked={row.enabled} onChange={event => onPatch(row.key, 'enabled', event.target.checked)} className="h-4 w-4" /></label>
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-portal-ink">{row.displayName}</p><p className="mt-0.5 text-[11px] text-portal-soft">{row.enabled ? `${pct.format(row.feePercent)}% potongan${recommendation?.valid && recommendation.recommendedPrice !== null ? ` · saran ${money.format(recommendation.recommendedPrice)}` : ''}` : 'Tidak dipakai'}</p></div>
-        {margin ? <span className={`shrink-0 text-xs font-bold ${margin.contributionProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(margin.contributionProfit)}</span> : null}
+        <label className="flex min-h-10 shrink-0 items-center">
+          <input
+            type="checkbox"
+            checked={row.enabled}
+            onChange={event => onPatch(row.key, 'enabled', event.target.checked)}
+            className="h-4 w-4"
+            aria-label={`Aktifkan ${row.displayName}`}
+          />
+        </label>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-portal-ink">{row.displayName}</p>
+          <p className="mt-0.5 text-[11px] text-portal-soft">
+            {row.enabled
+              ? `${pct.format(row.feePercent)}% potongan platform`
+              : 'Tidak dipakai'}
+          </p>
+        </div>
+
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+          row.enabled ? 'bg-portal-mist text-portal-forest' : 'bg-[#f5f6f4] text-portal-soft'
+        }`}>
+          {row.enabled ? 'Aktif' : 'Tidak dipakai'}
+        </span>
       </div>
 
-      <details className="group mt-2 ml-7">
-        <summary className="cursor-pointer list-none text-[11px] font-bold text-portal-soft">Atur</summary>
+      {row.enabled && canViewCosting && businessSummary.ready ? (
+        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
+          <div className="rounded-xl bg-[#fafbf9] p-3">
+            <p className="text-[11px] text-portal-soft">Harga jual</p>
+            <p className="mt-1 text-sm font-black text-portal-ink">{money.format(price ?? 0)}</p>
+          </div>
+          <div className="rounded-xl bg-[#fafbf9] p-3">
+            <p className="text-[11px] text-portal-soft">Total potongan</p>
+            <p className="mt-1 text-sm font-black text-portal-ink">{money.format(businessSummary.totalDeductions)}</p>
+          </div>
+          <div className="rounded-xl bg-[#fafbf9] p-3">
+            <p className="text-[11px] text-portal-soft">Diterima bersih</p>
+            <p className="mt-1 text-sm font-black text-portal-ink">{money.format(businessSummary.netReceipt)}</p>
+          </div>
+          <div className="rounded-xl bg-[#fafbf9] p-3">
+            <p className="text-[11px] text-portal-soft">Laba per item</p>
+            <p className={`mt-1 text-sm font-black ${
+              businessSummary.contributionProfit >= 0 ? 'text-portal-forest' : 'text-red-700'
+            }`}>
+              {money.format(businessSummary.contributionProfit)}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[#fafbf9] p-3">
+            <p className="text-[11px] text-portal-soft">Harga aman</p>
+            <p className="mt-1 text-sm font-black text-portal-ink">
+              {businessSummary.recommendedPrice === null
+                ? 'Belum ada'
+                : money.format(businessSummary.recommendedPrice)}
+            </p>
+          </div>
+        </div>
+      ) : row.enabled && readiness !== 'ready' ? (
+        <p className="mt-3 rounded-xl bg-[#fafbf9] px-3 py-2.5 text-xs text-portal-soft">
+          {readiness === 'missing-price'
+            ? 'Isi harga toko untuk melihat simulasi kanal.'
+            : readiness === 'missing-hpp'
+              ? 'Lengkapi HPP untuk melihat laba dan harga aman.'
+              : 'Akses ini tidak menampilkan HPP dan keuntungan.'}
+        </p>
+      ) : null}
+
+      <details className="group mt-3 ml-7">
+        <summary className="cursor-pointer list-none text-[11px] font-bold text-portal-soft">
+          Atur perhitungan
+        </summary>
         <div className="mt-3 grid gap-3 rounded-xl bg-[#fafbf9] p-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="text-xs font-semibold text-portal-soft">Nama kanal<input className={input} value={row.displayName} onChange={event => onPatch(row.key, 'displayName', event.target.value)} /></label>
-          <label className="text-xs font-semibold text-portal-soft">Potongan %<input type="number" min="0" max="100" step="0.01" className={input} value={row.feePercent} onChange={event => onPatch(row.key, 'feePercent', Number(event.target.value) || 0)} /></label>
-          {canViewCosting ? <label className="text-xs font-semibold text-portal-soft">Target margin %<input type="number" min="0" max="99" step="0.1" className={input} value={row.targetMarginPercent} onChange={event => onPatch(row.key, 'targetMarginPercent', Number(event.target.value) || 0)} /></label> : null}
+          <label className="text-xs font-semibold text-portal-soft">
+            Nama kanal
+            <input className={input} value={row.displayName} onChange={event => onPatch(row.key, 'displayName', event.target.value)} />
+          </label>
+          <label className="text-xs font-semibold text-portal-soft">
+            Potongan %
+            <input type="number" min="0" max="100" step="0.01" className={input} value={row.feePercent} onChange={event => onPatch(row.key, 'feePercent', Number(event.target.value) || 0)} />
+          </label>
+          {canViewCosting ? (
+            <label className="text-xs font-semibold text-portal-soft">
+              Target margin %
+              <input type="number" min="0" max="99" step="0.1" className={input} value={row.targetMarginPercent} onChange={event => onPatch(row.key, 'targetMarginPercent', Number(event.target.value) || 0)} />
+            </label>
+          ) : null}
+
           <details className="sm:col-span-2 lg:col-span-3">
             <summary className="cursor-pointer text-[11px] font-bold text-portal-soft">Biaya tambahan</summary>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-portal-soft">Biaya tetap<input type="number" min="0" className={input} value={row.fixedFee} onChange={event => onPatch(row.key, 'fixedFee', Number(event.target.value) || 0)} /></label>
-              <label className="text-xs font-semibold text-portal-soft">Promo dari toko<input type="number" min="0" className={input} value={row.merchantPromo} onChange={event => onPatch(row.key, 'merchantPromo', Number(event.target.value) || 0)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">
+                Biaya tetap
+                <input type="number" min="0" className={input} value={row.fixedFee} onChange={event => onPatch(row.key, 'fixedFee', Number(event.target.value) || 0)} />
+              </label>
+              <label className="text-xs font-semibold text-portal-soft">
+                Promo dari toko
+                <input type="number" min="0" className={input} value={row.merchantPromo} onChange={event => onPatch(row.key, 'merchantPromo', Number(event.target.value) || 0)} />
+              </label>
             </div>
           </details>
-          <div className="sm:col-span-2 lg:col-span-3"><button type="button" disabled={saving} onClick={() => onSave(row)} className="portal-button-primary disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan</button></div>
+
+          <div className="sm:col-span-2 lg:col-span-3">
+            <button type="button" disabled={saving} onClick={() => onSave(row)} className="portal-button-primary disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan
+            </button>
+          </div>
         </div>
       </details>
     </div>
