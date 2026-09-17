@@ -5,6 +5,7 @@ on:
     paths:
       - 'services/marketplace_service/src/businesses/**'
       - 'services/marketplace_service/migrations/**'
+      - 'services/marketplace_service/tests/**'
       - '.github/workflows/usaha-control-backend-gate.yml'
   workflow_dispatch:
 
@@ -46,6 +47,8 @@ jobs:
           workspaces: services/marketplace_service
       - name: Cargo check locked
         run: cargo check --locked
+      - name: Applied migration immutability contract
+        run: cargo test --locked --test migration_immutability_contract
       - name: Business control unit tests
         run: cargo test --locked businesses::control::tests
       - name: Identity business access tests
