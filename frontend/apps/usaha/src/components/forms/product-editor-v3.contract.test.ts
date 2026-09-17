@@ -1,0 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+const page = readFileSync('src/app/(portal)/businesses/[businessId]/products/page.tsx', 'utf8');
+const editor = readFileSync('src/components/forms/ProductEditorWorkspace.tsx', 'utf8');
+
+describe('product editor V3', () => {
+  it('uses a persistent editor and no normal-edit ModalSurface', () => {
+    expect(page).toContain('query.edit');
+    expect(page).toContain('ProductEditorWorkspace');
+    expect(editor).not.toContain('ModalSurface');
+    expect(editor).toContain('/inventory');
+    expect(editor).toContain('ProductModifierEditor');
+    expect(editor).toContain('Simpan status');
+  });
+});
