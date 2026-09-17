@@ -36,6 +36,16 @@ describe('portal server state', () => {
     await expect(getPortalBusinesses()).rejects.toBe(outage);
   });
 
+  it('keeps generic portal business lists renderable while provisioning is retryable', async () => {
+    const provisioning = Object.assign(new Error('provisioning_retryable'), {
+      status: 503,
+      code: 'provisioning_retryable',
+    });
+    businessServer.listBusinessesForCurrentActor.mockRejectedValue(provisioning);
+
+    await expect(getPortalBusinesses()).resolves.toEqual([]);
+  });
+
   it('keeps home renderable while canonical businesses are temporarily provisioning', async () => {
     const provisioning = Object.assign(new Error('provisioning_retryable'), {
       status: 503,
