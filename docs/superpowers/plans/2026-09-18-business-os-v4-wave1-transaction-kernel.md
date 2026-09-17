@@ -17,8 +17,9 @@ Implemented in the first Wave 1 slice:
 - canonical order, invoice, payment, and fulfillment state-machine guards;
 - payment-allocation, refund, and return quantity invariants;
 - derived invoice settlement semantics for unpaid/partial/paid/credit balance + overdue;
-- canonical request hashing reused by Finance Core;
+- canonical request hashing applied to new sale commands while existing Finance Core hash semantics remain stable for historical retry compatibility;
 - sale idempotency key bound to a normalized semantic request hash;
+- hash-algorithm migrations must be explicitly versioned; persisted historical fingerprints are never reinterpreted in place;
 - legacy sale rows remain readable when they predate request hashes;
 - conflicting idempotency reuse fails before inventory or finance effects;
 - focused CI coverage for transaction invariants and sale persistence.
