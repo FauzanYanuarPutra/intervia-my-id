@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { normalizeBusinessApiError } from '@/lib/business-api-error';
 import { updateCanonicalProduct } from '@/lib/product-mutation-server';
+import { parseBusinessImageValue } from '@/lib/media-crop';
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -38,6 +39,7 @@ export async function PATCH(
           : undefined,
       consignmentTerms: optionalString(body.consignmentTerms),
       notes: optionalString(body.notes),
+      image: parseBusinessImageValue(body.image),
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

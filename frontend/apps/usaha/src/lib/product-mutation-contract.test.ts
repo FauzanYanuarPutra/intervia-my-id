@@ -19,6 +19,12 @@ describe('canonical product mutation payloads', () => {
         stockMode: 'manual',
         consignmentTerms: '80/20',
         notes: 'internal only',
+        image: {
+          url: '/api/forum/media/menu-jus-mangga.webp',
+          mimeType: 'image/webp',
+          width: 1200,
+          height: 1200,
+        },
       }),
     ).toEqual({
       name: 'Jus Mangga Premium',
@@ -32,6 +38,12 @@ describe('canonical product mutation payloads', () => {
       stock_mode: 'manual',
       consignment_terms: '80/20',
       notes: 'internal only',
+      image: {
+        url: '/api/forum/media/menu-jus-mangga.webp',
+        mime_type: 'image/webp',
+        width: 1200,
+        height: 1200,
+      },
     });
   });
 

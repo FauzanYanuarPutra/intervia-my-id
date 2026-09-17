@@ -129,7 +129,7 @@ services:
 
   minio:
     <<: *data-defaults
-    image: ${MINIO_IMAGE:-minio/minio}
+    image: ${MINIO_IMAGE:-quay.io/minio/minio}
     command: server /data --address ":9002" --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_USER}

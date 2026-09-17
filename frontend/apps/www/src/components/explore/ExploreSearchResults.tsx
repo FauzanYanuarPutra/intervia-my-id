@@ -22,6 +22,7 @@ import { ProductSearchCard } from '@/components/search/result-cards/ProductSearc
 import { ServiceSearchCard } from '@/components/search/result-cards/ServiceSearchCard';
 import { UserSearchCard } from '@/components/search/result-cards/UserSearchCard';
 import { VideoSearchCard } from '@/components/search/result-cards/VideoSearchCard';
+import { Skeleton, SkeletonStack } from '@/components/ui/Skeleton';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import type { LajukanLocale } from '@/lib/discovery/lajukanCategories';
 import { getZeroResultRecovery } from '@/lib/discovery/exploreResultConversion';
@@ -101,7 +102,84 @@ function PublicReferenceCard({ item, locale }: { item: GlobalSearchItem; locale:
   );
 }
 
-function SearchSkeleton() { return <section className="py-3" aria-hidden="true"><div className="h-5 w-40 animate-pulse rounded bg-[color:var(--app-border)]" /><div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-44 animate-pulse rounded-lg bg-[color:var(--app-border)]" />)}</div></section>; }
+function EntitySkeletonCard({ kind }: { kind: GlobalSearchGroupKey }) {
+  const isWide =
+    kind === 'businesses' || kind === 'references' || kind === 'communities';
+  return (
+    <article
+      className="min-w-0 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5"
+      data-skeleton-kind={kind}
+    >
+      <Skeleton
+        variant="media"
+        className={cn(
+          'w-full',
+          kind === 'videos' ? 'aspect-[9/16]' : 'aspect-[4/3]',
+        )}
+      />
+      <div className="mt-3 space-y-2">
+        <Skeleton variant="line" className="h-3 w-20" />
+        <Skeleton variant="line" className="h-4 w-4/5" />
+        {isWide ? <SkeletonStack lines={2} /> : null}
+        <div className="flex items-center gap-2 pt-1">
+          <Skeleton variant="chip" className="h-7 w-20" />
+          <Skeleton variant="chip" className="h-7 w-16" />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function SkeletonSection({
+  kind,
+  locale,
+}: {
+  kind: GlobalSearchGroupKey;
+  locale: LajukanLocale;
+}) {
+  const isId = locale === 'id';
+  const copy = SEARCH_GROUP_COPY[kind];
+  const gridClass =
+    kind === 'businesses'
+      ? 'sm:grid-cols-2 lg:grid-cols-3'
+      : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4';
+
+  return (
+    <section className="mt-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 sm:p-4">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <Skeleton variant="line" className="h-4 w-32" />
+          <p className="sr-only">{isId ? copy.labelId : copy.labelEn}</p>
+          <Skeleton variant="line" className="mt-2 h-3 w-20" />
+        </div>
+        <Skeleton variant="chip" className="h-8 w-20" />
+      </div>
+      <div className={`mt-4 grid gap-3 ${gridClass}`}>
+        {Array.from({ length: kind === 'businesses' ? 3 : 4 }).map(
+          (_, index) => (
+            <EntitySkeletonCard key={index} kind={kind} />
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SearchSkeleton({ locale }: { locale: LajukanLocale }) {
+  return (
+    <section
+      className="py-3"
+      aria-busy="true"
+      aria-label={locale === 'id' ? 'Memuat hasil pencarian' : 'Loading search results'}
+      data-testid="explore-search-skeleton"
+    >
+      <Skeleton variant="line" className="h-5 w-40" />
+      {DEFAULT_SEARCH_GROUPS.map(kind => (
+        <SkeletonSection key={kind} kind={kind} locale={locale} />
+      ))}
+    </section>
+  );
+}
 function renderSearchCard(item: GlobalSearchItem, locale: LajukanLocale) { if (item.kind === 'products') return <ProductSearchCard item={item} locale={locale} />; if (item.kind === 'services') return <ServiceSearchCard item={item} locale={locale} />; if (item.kind === 'businesses') return <BusinessSearchCard item={item} locale={locale} />; if (item.kind === 'references') return <PublicReferenceCard item={item} locale={locale} />; if (item.kind === 'needs') return <NeedSearchCard item={item} locale={locale} />; if (item.kind === 'communities') return <CommunitySearchCard item={item} locale={locale} />; if (item.kind === 'videos') return <VideoSearchCard item={item} />; return <UserSearchCard item={item} locale={locale} />; }
 
 function SearchGroupSection({ groupKey, group, locale, compact, onSelectTab, onNextCursor }: { groupKey: GlobalSearchGroupKey; group: GlobalSearchGroup; locale: LajukanLocale; compact: boolean; onSelectTab?: (tab: GlobalSearchTab) => void; onNextCursor?: (cursor: string) => void }) {
@@ -115,7 +193,7 @@ export function ExploreSearchResults({ payload, loading, error, locale, compact 
   const visiblePayload: GlobalSearchResponse = safeReferenceItems.length === payload.groups.references.items.length ? payload : { ...payload, groups: { ...payload.groups, references: { ...payload.groups.references, items: safeReferenceItems, total: safeReferenceItems.length === 0 ? 0 : Math.max(safeReferenceItems.length, payload.groups.references.total) } } };
   const referenceNextCursor = activeTab === 'references' ? visiblePayload.groups.references.nextCursor : null;
   const hasVisibleItems = activeTab === 'all' ? DEFAULT_SEARCH_GROUPS.some(key => visiblePayload.groups[key].items.length > 0) : visiblePayload.groups[activeTab as GlobalSearchGroupKey]?.items.length > 0;
-  if (loading && !hasVisibleItems) return <SearchSkeleton />;
+  if (loading && !hasVisibleItems) return <SearchSkeleton locale={locale} />;
   if (error && !hasVisibleItems) return <section className="py-3"><div className="flex flex-col items-start gap-4 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="flex items-center gap-2 text-sm font-bold"><CircleAlert className="h-4 w-4 text-amber-600" />{isId ? 'Hasil belum bisa dimuat.' : 'Results could not be loaded.'}</p><p className="mt-1 text-xs text-[color:var(--app-text-soft)]">{isId ? 'Coba lagi sebentar.' : 'Please retry in a moment.'}</p></div>{onRetry ? <button type="button" onClick={onRetry} className="min-h-10 rounded-[8px] border px-4 text-xs font-bold">{isId ? 'Coba lagi' : 'Retry'}</button> : null}</div></section>;
   const activeGroupKey = activeTab === 'all' ? null : activeTab as GlobalSearchGroupKey;
   const displayedTotal = activeGroupKey ? visiblePayload.groups[activeGroupKey]?.total || 0 : DEFAULT_SEARCH_GROUPS.reduce((total, key) => total + (visiblePayload.groups[key]?.total || 0), 0);

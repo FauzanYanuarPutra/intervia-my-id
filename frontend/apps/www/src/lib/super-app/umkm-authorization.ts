@@ -53,6 +53,7 @@ const ROLE_PERMISSION_MAP: Record<UmkmStoreMemberRole, UmkmStorePermission[]> = 
     'payment:manage',
   ],
   cashier: ['store:view', 'order:manage', 'payment:manage'],
+  viewer: ['store:view'],
   stock: ['store:view', 'product:manage'],
   ops: ['store:view', 'table:manage', 'qr:manage', 'order:manage', 'reservation:manage'],
   finance: ['store:view', 'payment:manage'],

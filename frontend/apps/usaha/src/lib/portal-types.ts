@@ -1,4 +1,9 @@
-export type PortalRole = 'owner' | 'manager' | 'cashier' | 'viewer';
+import type { ProductModifierGroup } from 'lajukan-ui';
+import type { BusinessTemplateKey } from './business-templates';
+import type { BusinessImageValue } from './media-crop';
+
+export type PortalRole = 'owner' | 'manager' | 'cashier' | 'accounting' | 'inventory' | 'viewer';
+export type BusinessRelationship = 'owned' | 'joined';
 
 export type PermissionId =
   | 'viewInfo'
@@ -11,6 +16,12 @@ export type PermissionId =
   | 'manageInventory'
   | 'viewOrders'
   | 'manageOrders'
+  | 'createSales'
+  | 'viewTransactions'
+  | 'reprintReceipts'
+  | 'closeCashShift'
+  | 'voidSales'
+  | 'refundSales'
   | 'viewFinance'
   | 'manageFinance'
   | 'viewChannels'
@@ -80,19 +91,40 @@ export type ProductRecord = {
   sourceType?: ProductSourceType; ownerLabel?: string; stockCount?: number | null; stockUnit?: string;
   minStockAlert?: number | null; stockMode?: ProductStockMode; stockHealth?: ProductStockHealth;
   stockUpdatedAt?: string; consignmentTerms?: string; lastSoldAt?: string; notes?: string;
+  imageUrl?: string; image?: BusinessImageValue; modifierGroups?: ProductModifierGroup[];
 };
 export type OrderRecord = { id: string; buyer: string; itemSummary: string; amountLabel: string; status: OrderStatus; channel: string };
 export type ReservationRecord = { id: string; guest: string; schedule: string; pax: string; status: ReservationStatus };
 export type ProgressStep = { id: string; label: string; hint: string; done: boolean };
 
+export type BusinessProfileSummary = {
+  templateKey: BusinessTemplateKey | string;
+  templateVersion: number;
+  currency: string;
+  timezone: string;
+  costingPolicy: string;
+  accountingMode: string;
+  approvalPolicy: string;
+  branchMode: string;
+  negativeStockPolicy: string;
+  documentPrefix: string;
+  version: number;
+};
+
 export type BusinessRecord = {
   id: string;
   version?: number;
   capabilityKey?: string;
+  /** Typed profile is additive while old fixtures and older API payloads remain valid. */
+  profile?: BusinessProfileSummary;
+  templateKey?: BusinessTemplateKey | string;
+  activeCapabilityKeys?: string[];
   slug: string;
   name: string;
   /** Additive during migration so old local fixtures remain type-compatible. */
   organizationId?: string | null;
+  /** Real backend adapters provide this; optional only for legacy fixtures. */
+  relationship?: BusinessRelationship;
   currentRole: PortalRole;
   city: string;
   address: string;
@@ -103,6 +135,8 @@ export type BusinessRecord = {
   category: string;
   phone: string;
   description: string;
+  logoUrl?: string;
+  bannerUrl?: string;
   schedule: string;
   infoComplete: boolean;
   productsCount: number;

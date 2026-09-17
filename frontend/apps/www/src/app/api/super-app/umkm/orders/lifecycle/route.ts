@@ -4,7 +4,6 @@ import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
-import { hasUmkmStorePermission } from '@/lib/super-app/umkm-authorization';
 import {
   checkoutUmkmOrder,
   confirmUmkmOrderBill,
@@ -13,6 +12,7 @@ import {
   moveUmkmOrderTable,
   updateUmkmOrderStatus,
 } from '@/lib/super-app/umkm-commerce';
+import { hasUmkmStoreRequestPermission } from '@/lib/super-app/umkm-request-access';
 
 const LifecycleSchema = z.discriminatedUnion('action', [
   z.object({
@@ -75,29 +75,41 @@ export async function POST(req: NextRequest) {
           ? 'table:manage'
           : 'order:manage';
 
-    if (
-      !hasUmkmStorePermission({
-        storeId: store.id,
-        ownerUserId: store.owner_user_id,
-        actorUserId: auth.ctx.userId,
-        actorEmail: auth.ctx.email,
-        roles: auth.ctx.roles,
-        permission: requiredPermission,
-      })
-    ) {
+    const canUpdateOrder = await hasUmkmStoreRequestPermission({
+      store,
+      authCtx: auth.ctx,
+      permission: requiredPermission,
+    });
+    if (!canUpdateOrder) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const actorMetadata = {
+      last_action_by_user_id: auth.ctx.userId,
+      ...(auth.ctx.email ? { last_action_by_email: auth.ctx.email } : {}),
+      last_action_at: new Date().toISOString(),
+      last_action: payload.action,
+    };
 
     const bundle =
       payload.action === 'checkout'
         ? await checkoutUmkmOrder({
             orderId: payload.order_id,
-            paymentMetadata: payload.payment_metadata,
+            paymentMetadata: {
+              ...payload.payment_metadata,
+              checked_out_by_user_id: auth.ctx.userId,
+              ...(auth.ctx.email ? { checked_out_by_email: auth.ctx.email } : {}),
+            },
           })
         : payload.action === 'confirm_bill'
           ? await confirmUmkmOrderBill({
               orderId: payload.order_id,
-              metadataPatch: payload.metadata_patch,
+              metadataPatch: {
+                ...payload.metadata_patch,
+                ...actorMetadata,
+                confirmed_by_user_id: auth.ctx.userId,
+                ...(auth.ctx.email ? { confirmed_by_email: auth.ctx.email } : {}),
+              },
             })
         : payload.action === 'move_table'
           ? await moveUmkmOrderTable({
@@ -107,7 +119,10 @@ export async function POST(req: NextRequest) {
           : await updateUmkmOrderStatus({
               orderId: payload.order_id,
               status: payload.status,
-              metadataPatch: payload.metadata_patch,
+              metadataPatch: {
+                ...payload.metadata_patch,
+                ...actorMetadata,
+              },
             });
 
     return NextResponse.json(
