@@ -244,7 +244,16 @@ impl BusinessRepository {
         .await?;
         let mut aggregates = Vec::with_capacity(rows.len());
         for row in rows {
-            aggregates.push(load_aggregate(&self.db, row.id, row.organization_id).await?);
+            match optional_complete_aggregate(
+                load_aggregate(&self.db, row.id, row.organization_id).await,
+            )? {
+                Some(aggregate) => aggregates.push(aggregate),
+                None => tracing::warn!(
+                    business_id = %row.id,
+                    organization_id = %row.organization_id,
+                    "skipping incomplete business aggregate while listing organization businesses"
+                ),
+            }
         }
         Ok(aggregates)
     }
@@ -254,11 +263,7 @@ impl BusinessRepository {
         business_id: Uuid,
         organization_id: Uuid,
     ) -> Result<Option<BusinessAggregate>, RepositoryError> {
-        match load_aggregate(&self.db, business_id, organization_id).await {
-            Ok(aggregate) => Ok(Some(aggregate)),
-            Err(RepositoryError::IncompleteAggregate) => Ok(None),
-            Err(error) => Err(error),
-        }
+        optional_complete_aggregate(load_aggregate(&self.db, business_id, organization_id).await)
     }
 
     pub(crate) async fn update_profile(
@@ -611,6 +616,16 @@ impl BusinessRepository {
             aggregate,
             replayed: false,
         })
+    }
+}
+
+fn optional_complete_aggregate<T>(
+    result: Result<T, RepositoryError>,
+) -> Result<Option<T>, RepositoryError> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(RepositoryError::IncompleteAggregate) => Ok(None),
+        Err(error) => Err(error),
     }
 }
 
@@ -981,3 +996,26 @@ const LOCATION_QUERY: &str = r#"
     FROM business_locations
     WHERE business_id = $1 AND organization_id = $2 AND is_primary
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::{optional_complete_aggregate, RepositoryError};
+
+    #[test]
+    fn complete_aggregate_is_returned() {
+        let result = optional_complete_aggregate::<u8>(Ok(7));
+        assert!(matches!(result, Ok(Some(7))));
+    }
+
+    #[test]
+    fn incomplete_aggregate_is_ignored_for_collection_reads() {
+        let result = optional_complete_aggregate::<u8>(Err(RepositoryError::IncompleteAggregate));
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[test]
+    fn database_errors_are_not_hidden_as_incomplete_aggregates() {
+        let result = optional_complete_aggregate::<u8>(Err(RepositoryError::Database));
+        assert!(matches!(result, Err(RepositoryError::Database)));
+    }
+}

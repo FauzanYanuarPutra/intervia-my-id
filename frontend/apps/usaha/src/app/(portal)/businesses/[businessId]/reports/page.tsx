@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BarChart3, Calculator, PackageSearch, Sparkles, Store, WalletCards } from 'lucide-react';
+import { Calculator, PackageSearch, Sparkles, Store, WalletCards } from 'lucide-react';
+import { MetricStrip } from '@/components/portal/MetricStrip';
+import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
-import { SectionCard } from '@/components/portal/SectionCard';
 import { getBusinessAdvisorSummary } from '@/lib/business-advisor-server';
 import {
   listControlChannels,
@@ -18,15 +19,12 @@ import { resolvePortalBusinessPageState } from '@/lib/portal-server';
 type PageProps = { params: Promise<{ businessId: string }> };
 
 const money = new Intl.NumberFormat('id-ID', {
-  style: 'currency',
-  currency: 'IDR',
-  maximumFractionDigits: 0,
+  style: 'currency', currency: 'IDR', maximumFractionDigits: 0,
 });
 
 export default async function BusinessReportsPage({ params }: PageProps) {
   const { businessId } = await params;
-  const { account, businesses, activeBusiness } =
-    await resolvePortalBusinessPageState(businessId);
+  const { account, businesses, activeBusiness } = await resolvePortalBusinessPageState(businessId);
   const business = activeBusiness;
   if (!business) notFound();
 
@@ -38,136 +36,81 @@ export default async function BusinessReportsPage({ params }: PageProps) {
 
   const [ingredients, financeEntries, channels, sales] = canView
     ? await Promise.all([
-        canViewCosting
-          ? listControlIngredients(business.id)
-          : Promise.resolve([]),
-        canViewFinance
-          ? listControlFinanceEntries(business.id)
-          : Promise.resolve([]),
+        canViewCosting ? listControlIngredients(business.id) : Promise.resolve([]),
+        canViewFinance ? listControlFinanceEntries(business.id) : Promise.resolve([]),
         canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
         listControlSales(business.id),
       ])
     : [[], [], [], []];
-  const advisor = canView && canViewFinance
-    ? await getBusinessAdvisorSummary(business.id)
-    : null;
-  const summary = summarizeControlCenter({
-    ingredients,
-    financeEntries,
-    channels,
-    today,
-  });
-  const todaySales = sales.filter(
-    item =>
-      item.sale.status === 'completed' && item.sale.occurred_on === today,
-  );
+  const advisor = canView && canViewFinance ? await getBusinessAdvisorSummary(business.id) : null;
+  const summary = summarizeControlCenter({ ingredients, financeEntries, channels, today });
+  const todaySales = sales.filter(item => item.sale.status === 'completed' && item.sale.occurred_on === today);
   const salesSummary = summarizeSales(todaySales.map(item => item.sale));
   const hasSalesToday = todaySales.length > 0;
-  const grossProfit =
-    canViewCosting && hasSalesToday ? salesSummary.grossProfit : null;
-  const recordedOperatingResult =
-    grossProfit !== null && canViewFinance
-      ? grossProfit - summary.financeToday.operatingExpenses
-      : null;
+  const grossProfit = canViewCosting && hasSalesToday ? salesSummary.grossProfit : null;
+  const recordedOperatingResult = grossProfit !== null && canViewFinance
+    ? grossProfit - summary.financeToday.operatingExpenses
+    : null;
 
   return (
-    <PortalShell
-      activeBusiness={business}
-      availableBusinesses={businesses}
-      viewerName={account?.name ?? null}
-      currentSection="reports"
-    >
-      <SectionCard
-        eyebrow="Laporan"
-        title="Lihat yang penting, bukan tumpukan angka"
-        description="Omzet dan HPP berasal dari penjualan canonical yang sudah tersimpan. Jika snapshot biaya belum lengkap, Lajukan menandainya—bukan mengubah HPP kosong menjadi Rp0."
-      >
-        {canView ? (
-          <div className="space-y-4">
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="portal-panel p-4">
-                <div className="portal-icon-tile"><BarChart3 className="h-4 w-4" /></div>
-                <p className="mt-3 portal-label">Omzet hari ini</p>
-                <p className="mt-1 text-2xl font-bold text-portal-ink">{hasSalesToday ? money.format(salesSummary.revenue) : 'Belum ada data'}</p>
-                <p className="mt-1 text-xs leading-5 text-portal-soft">{hasSalesToday ? `${todaySales.length} penjualan canonical selesai.` : 'Belum ada penjualan canonical hari ini.'}</p>
-              </div>
-              <div className="portal-panel p-4">
-                <div className="portal-icon-tile"><Calculator className="h-4 w-4" /></div>
-                <p className="mt-3 portal-label">HPP terjual</p>
-                <p className="mt-1 text-2xl font-bold text-portal-ink">{canViewCosting ? hasSalesToday && salesSummary.cogs !== null ? money.format(salesSummary.cogs) : hasSalesToday ? 'Belum lengkap' : 'Belum ada data' : '—'}</p>
-                <p className="mt-1 text-xs leading-5 text-portal-soft">{canViewCosting ? salesSummary.costComplete ? 'Menggunakan snapshot saat penjualan disimpan.' : 'Ada snapshot biaya yang belum lengkap.' : 'Detail HPP dibatasi sesuai peran.'}</p>
-              </div>
-              <div className="portal-panel p-4">
-                <div className="portal-icon-tile"><WalletCards className="h-4 w-4" /></div>
-                <p className="mt-3 portal-label">Laba kotor</p>
-                <p className="mt-1 text-2xl font-bold text-portal-ink">{canViewCosting ? grossProfit === null ? hasSalesToday ? 'Belum lengkap' : 'Belum ada data' : money.format(grossProfit) : '—'}</p>
-                <p className="mt-1 text-xs leading-5 text-portal-soft">{canViewCosting && salesSummary.grossMarginPercent !== null ? `Margin kotor ${salesSummary.grossMarginPercent.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%.` : 'Margin tidak ditampilkan tanpa HPP lengkap.'}</p>
-              </div>
-              <div className="portal-panel p-4">
-                <div className="portal-icon-tile"><Store className="h-4 w-4" /></div>
-                <p className="mt-3 portal-label">Biaya operasional hari ini</p>
-                <p className="mt-1 text-2xl font-bold text-portal-ink">{canViewFinance && summary.todayEntryCount ? money.format(summary.financeToday.operatingExpenses) : canViewFinance ? 'Belum ada data' : '—'}</p>
-                <p className="mt-1 text-xs leading-5 text-portal-soft">Modal pemilik, Ambil owner, dan transfer aplikasi tidak diubah menjadi omzet/laba.</p>
-              </div>
-            </section>
+    <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="reports">
+      <PageHeader eyebrow="Laporan" title="Kinerja usaha" description="Lihat hasil hari ini. Angka yang belum lengkap ditandai, bukan ditebak." />
 
-            {advisor ? (
-              <section className="portal-panel p-4 sm:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="portal-kicker"><Sparkles className="mr-1 inline h-3.5 w-3.5" /> Saran hari ini</p>
-                    <h2 className="mt-1 font-bold text-portal-ink">Berdasarkan angka deterministic, bukan tebakan AI</h2>
-                  </div>
-                  <span className="rounded-full border border-portal-line px-3 py-1 text-xs font-semibold text-portal-soft">
-                    {advisor.provider.provider === 'disabled' ? 'Deterministic' : `Advisor: ${advisor.provider.provider}`}
-                  </span>
-                </div>
-                <div className="mt-4 grid gap-2 lg:grid-cols-2">
-                  {advisor.signals.map(signal => (
-                    <p key={signal} className="rounded-xl border border-portal-line bg-white px-4 py-3 text-sm leading-6 text-portal-ink">{signal}</p>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs leading-5 text-portal-soft">Advisor hanya membaca ringkasan terstruktur. Ia tidak punya endpoint untuk memindahkan uang, mengubah stok, harga, void, atau refund.</p>
-              </section>
+      {canView ? (
+        <div className="space-y-4">
+          <MetricStrip items={[
+            { label: 'Penjualan', value: hasSalesToday ? money.format(salesSummary.revenue) : '—', note: hasSalesToday ? `${todaySales.length} transaksi selesai` : 'Belum ada penjualan hari ini' },
+            { label: 'Laba kotor', value: canViewCosting ? (grossProfit === null ? 'Belum lengkap' : money.format(grossProfit)) : '—', note: canViewCosting ? (salesSummary.costComplete ? 'HPP lengkap' : 'Ada HPP yang belum lengkap') : 'Sesuai akses' },
+            { label: 'Uang keluar', value: canViewFinance && summary.todayEntryCount ? money.format(summary.financeToday.operatingExpenses) : '—', note: canViewFinance ? 'Biaya operasi tercatat hari ini' : 'Sesuai akses' },
+            { label: 'Hasil tercatat', value: recordedOperatingResult === null ? 'Belum lengkap' : money.format(recordedOperatingResult), note: 'Laba kotor dikurangi biaya operasi tercatat' },
+          ]} />
+
+          {!salesSummary.costComplete && hasSalesToday && canViewCosting ? (
+            <section className="flex flex-col gap-3 rounded-[18px] bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="font-black text-amber-950">HPP belum lengkap</p><p className="mt-1 text-xs leading-5 text-amber-800">Lengkapi bahan/resep jika ingin melihat laba kotor yang lengkap.</p></div>
+              <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-secondary shrink-0">Buka HPP</Link>
+            </section>
+          ) : null}
+
+          <section className="grid gap-3 lg:grid-cols-3">
+            <Link href={`/businesses/${business.id}/inventory`} className="merchant-surface-bordered p-4 transition hover:border-portal-forest/25">
+              <PackageSearch className="h-4 w-4 text-portal-forest" />
+              <p className="mt-3 text-xs font-semibold text-portal-soft">Stok & bahan</p>
+              <p className="mt-1 text-lg font-black text-portal-ink">{canViewCosting ? `${summary.lowIngredientCount} perlu perhatian` : 'Lihat stok'}</p>
+              <p className="mt-1 text-xs leading-5 text-portal-soft">Selesaikan bahan atau produk yang hampir habis.</p>
+            </Link>
+            {canViewFinance ? (
+              <Link href={`/businesses/${business.id}/finance`} className="merchant-surface-bordered p-4 transition hover:border-portal-forest/25">
+                <WalletCards className="h-4 w-4 text-portal-forest" />
+                <p className="mt-3 text-xs font-semibold text-portal-soft">Uang</p>
+                <p className="mt-1 text-lg font-black text-portal-ink">{summary.todayEntryCount ? money.format(summary.financeToday.cashMovement) : 'Belum ada gerak kas'}</p>
+                <p className="mt-1 text-xs leading-5 text-portal-soft">Gerak kas yang benar-benar tercatat hari ini.</p>
+              </Link>
             ) : null}
-
-            {!salesSummary.costComplete && hasSalesToday && canViewCosting ? (
-              <div className="portal-panel flex flex-wrap items-center justify-between gap-3 p-4">
-                <div><p className="font-bold text-portal-ink">HPP belum lengkap</p><p className="mt-1 text-sm text-portal-soft">Lengkapi resep/bahan saat datanya tersedia. Penjualan lama tetap memakai snapshot yang tersimpan dan tidak dihitung ulang diam-diam.</p></div>
-                <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-primary">Buka HPP</Link>
-              </div>
+            {canViewChannels ? (
+              <Link href={`/businesses/${business.id}/channels`} className="merchant-surface-bordered p-4 transition hover:border-portal-forest/25">
+                <Store className="h-4 w-4 text-portal-forest" />
+                <p className="mt-3 text-xs font-semibold text-portal-soft">Jual online</p>
+                <p className="mt-1 text-lg font-black text-portal-ink">{summary.configuredChannelCount ? `${summary.enabledChannelCount} kanal aktif` : 'Belum diatur'}</p>
+                <p className="mt-1 text-xs leading-5 text-portal-soft">Cek harga dan potongan kanal online.</p>
+              </Link>
             ) : null}
+          </section>
 
-            <section className="grid gap-4 lg:grid-cols-3">
-              <div className="portal-panel p-5">
-                <p className="portal-kicker">HPP & stok</p>
-                <h2 className="mt-1 font-bold text-portal-ink">{canViewCosting && summary.lowIngredientCount ? `${summary.lowIngredientCount} bahan mencapai batas minimum` : canViewCosting && ingredients.length ? 'Bahan belum menunjukkan batas minimum kritis' : 'Lengkapi bahan jika ingin menghitung HPP'}</h2>
-                <p className="mt-2 text-sm leading-6 text-portal-soft">{canViewCosting && summary.lowIngredients.length ? `Prioritas: ${summary.lowIngredients.slice(0, 4).map(item => item.name).join(', ')}.` : 'Penjualan dengan resep/HPP lengkap mengurangi bahan sesuai snapshot resep. Jika HPP belum lengkap, konsumsi bahan tidak ditebak.'}</p>
-                <div className="mt-4 flex flex-wrap gap-2"><Link href={`/businesses/${business.id}/inventory`} className="portal-button-primary">Buka stok</Link>{canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-secondary"><Calculator className="h-4 w-4" /> Buka HPP</Link> : null}</div>
+          {advisor ? (
+            <details className="merchant-surface-bordered group">
+              <summary className="cursor-pointer list-none p-4 sm:p-5"><Sparkles className="mr-2 inline h-4 w-4 text-portal-forest" /><span className="font-black text-portal-ink">Saran hari ini</span><span className="ml-2 text-xs text-portal-soft">Berdasarkan data tercatat</span></summary>
+              <div className="grid gap-2 border-t border-portal-line/70 p-4 sm:p-5 lg:grid-cols-2">
+                {advisor.signals.map(signal => <p key={signal} className="rounded-xl bg-[#f7f9f6] px-4 py-3 text-sm leading-6 text-portal-ink">{signal}</p>)}
               </div>
-              <div className="portal-panel p-5">
-                <p className="portal-kicker">Hasil usaha tercatat</p>
-                <h2 className="mt-1 font-bold text-portal-ink">{recordedOperatingResult === null ? 'Belum dapat dihitung lengkap' : money.format(recordedOperatingResult)}</h2>
-                <p className="mt-2 text-sm leading-6 text-portal-soft">Ini laba kotor canonical dikurangi biaya operasional yang benar-benar tercatat hari ini. Bukan laba bersih final dan tidak memasukkan modal/drawing sebagai pendapatan atau biaya.</p>
-                {canViewFinance ? <Link href={`/businesses/${business.id}/finance`} className="portal-button-primary mt-4">Buka Uang</Link> : null}
-              </div>
-              <div className="portal-panel p-5">
-                <p className="portal-kicker">Kanal jual</p>
-                <h2 className="mt-1 font-bold text-portal-ink">{canViewChannels && summary.configuredChannelCount ? `${summary.enabledChannelCount} dari ${summary.configuredChannelCount} kanal aktif` : 'Belum ada asumsi kanal tersimpan'}</h2>
-                <p className="mt-2 text-sm leading-6 text-portal-soft">Potongan aplikasi dan promo tidak di-hard-code. Gunakan angka sesuai kontrak toko lalu bandingkan margin sebelum mengubah harga.</p>
-                {canViewChannels ? <Link href={`/businesses/${business.id}/channels`} className="portal-button-primary mt-4">Buka Jual Online</Link> : null}
-              </div>
-            </section>
+            </details>
+          ) : null}
 
-            <section className="grid gap-3 sm:grid-cols-2">
-              <div className="portal-panel p-4"><div className="portal-icon-tile"><PackageSearch className="h-4 w-4" /></div><p className="mt-3 portal-label">Bahan perlu perhatian</p><p className="mt-1 text-2xl font-bold text-portal-ink">{canViewCosting ? summary.lowIngredientCount : '—'}</p></div>
-              <div className="portal-panel p-4"><div className="portal-icon-tile"><WalletCards className="h-4 w-4" /></div><p className="mt-3 portal-label">Gerak kas tercatat hari ini</p><p className="mt-1 text-2xl font-bold text-portal-ink">{canViewFinance && summary.todayEntryCount ? money.format(summary.financeToday.cashMovement) : 'Belum ada data'}</p></div>
-            </section>
-          </div>
-        ) : (
-          <div className="portal-panel p-5 text-sm text-portal-soft">Peranmu tidak memiliki akses melihat laporan biaya dan keuangan.</div>
-        )}
-      </SectionCard>
+          {canViewCosting ? <Link href={`/businesses/${business.id}/products/hpp`} className="portal-button-ghost"><Calculator className="h-4 w-4" /> Detail modal produk</Link> : null}
+        </div>
+      ) : (
+        <div className="merchant-surface-bordered p-5 text-sm text-portal-soft">Peranmu tidak memiliki akses melihat laporan usaha.</div>
+      )}
     </PortalShell>
   );
 }

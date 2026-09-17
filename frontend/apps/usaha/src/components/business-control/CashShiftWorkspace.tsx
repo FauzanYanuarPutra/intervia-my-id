@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, LockKeyhole, UnlockKeyhole } from 'lucide-react';
+import { ChevronDown, Loader2, LockKeyhole, UnlockKeyhole } from 'lucide-react';
 import type { Wave2CashShift } from '@/lib/business-wave2-server';
 
 type Props = {
@@ -14,6 +14,8 @@ const money = new Intl.NumberFormat('id-ID', {
   currency: 'IDR',
   maximumFractionDigits: 0,
 });
+
+const inputClass = 'mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink';
 
 export function CashShiftWorkspace({ businessId, initialShift }: Props) {
   const [shift, setShift] = useState(initialShift);
@@ -38,7 +40,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
   async function openShift() {
     const amount = Math.round(Number(openingCash));
     if (!Number.isFinite(amount) || amount < 0) {
-      setMessage('Isi modal kas awal minimal Rp0.');
+      setMessage('Isi kas awal minimal Rp0.');
       return;
     }
     setSaving(true);
@@ -48,9 +50,9 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
       setShift(payload?.data?.shift ?? null);
       setLastClosed(null);
       setActualCash('');
-      setMessage('Shift kas dibuka. Penjualan tunai setelah waktu ini masuk perhitungan penutupan kas.');
+      setMessage('Kas dibuka.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Gagal membuka shift kas.');
+      setMessage(error instanceof Error ? error.message : 'Gagal membuka kas.');
     } finally {
       setSaving(false);
     }
@@ -60,7 +62,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
     if (!shift) return;
     const amount = Math.round(Number(actualCash));
     if (!Number.isFinite(amount) || amount < 0) {
-      setMessage('Hitung uang fisik lalu isi jumlah aktual minimal Rp0.');
+      setMessage('Isi jumlah uang fisik di laci.');
       return;
     }
     setSaving(true);
@@ -78,57 +80,88 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
       setOpeningCash('');
       setActualCash('');
       setNote('');
-      setMessage('Shift kas ditutup. Selisih disimpan sebagai hasil rekonsiliasi, bukan disembunyikan.');
+      setMessage('Kas ditutup.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Gagal menutup shift kas.');
+      setMessage(error instanceof Error ? error.message : 'Gagal menutup kas.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="portal-panel p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="portal-panel overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-portal-line px-4 py-3 sm:px-5">
         <div>
-          <p className="font-bold text-portal-ink">Kas shift</p>
-          <p className="mt-1 text-xs leading-5 text-portal-soft">Kasir tidak melihat HPP/laba. Yang dicek hanya kas awal, kas seharusnya, kas fisik, dan selisih.</p>
+          <h2 className="font-bold text-portal-ink">Kas shift</h2>
+          <p className="mt-0.5 text-xs text-portal-soft">{shift ? 'Shift sedang berjalan' : 'Buka kas sebelum mulai jualan'}</p>
         </div>
-        <span className="rounded-full border border-portal-line px-3 py-1 text-xs font-semibold text-portal-soft">{shift ? 'Shift aktif' : 'Belum aktif'}</span>
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${shift ? 'bg-portal-mist text-portal-forest' : 'bg-[#f5f6f4] text-portal-soft'}`}>
+          {shift ? 'Aktif' : 'Belum aktif'}
+        </span>
       </div>
 
       {shift ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-portal-line p-3"><p className="text-xs text-portal-soft">Kas awal</p><p className="mt-1 font-bold text-portal-ink">{money.format(shift.opening_cash)}</p></div>
-          <div className="rounded-xl border border-portal-line p-3 sm:col-span-1 xl:col-span-3"><p className="text-xs text-portal-soft">Dibuka</p><p className="mt-1 text-sm font-bold text-portal-ink">{new Date(shift.opened_at).toLocaleString('id-ID')}</p></div>
-          <label className="text-xs font-semibold text-portal-soft sm:col-span-1 xl:col-span-2">Kas fisik saat tutup
-            <input type="number" min="0" value={actualCash} onChange={event => setActualCash(event.target.value)} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" placeholder="Hitung uang di laci" />
+        <div className="p-4 sm:p-5">
+          <div className="flex items-end justify-between gap-4 rounded-xl bg-[#fafbf9] p-3">
+            <div>
+              <p className="text-xs text-portal-soft">Kas awal</p>
+              <p className="mt-1 text-xl font-black text-portal-ink">{money.format(shift.opening_cash)}</p>
+            </div>
+            <p className="text-right text-[11px] text-portal-soft">Mulai<br /><strong className="text-portal-ink">{new Date(shift.opened_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</strong></p>
+          </div>
+
+          <label className="mt-4 block text-xs font-semibold text-portal-soft">
+            Kas fisik saat tutup
+            <input type="number" min="0" inputMode="numeric" value={actualCash} onChange={event => setActualCash(event.target.value)} className={`${inputClass} text-base font-bold`} placeholder="Hitung uang di laci" />
           </label>
-          <label className="text-xs font-semibold text-portal-soft sm:col-span-1 xl:col-span-2">Catatan <span className="font-normal">(opsional)</span>
-            <input value={note} onChange={event => setNote(event.target.value)} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" placeholder="Misal: uang receh kurang" />
-          </label>
-          <div className="sm:col-span-2 xl:col-span-4"><button type="button" onClick={closeShift} disabled={saving} className="portal-button-primary disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />} Tutup kas</button></div>
+
+          <details className="group mt-3">
+            <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-portal-soft">
+              Detail shift <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
+            </summary>
+            <label className="mt-3 block text-xs font-semibold text-portal-soft">
+              Catatan <span className="font-normal">(opsional)</span>
+              <input value={note} onChange={event => setNote(event.target.value)} className={inputClass} placeholder="Misal: uang receh kurang" />
+            </label>
+          </details>
+
+          <button type="button" onClick={closeShift} disabled={saving} className="portal-button-primary mt-4 w-full justify-center py-3 disabled:opacity-50">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />} Tutup kas
+          </button>
         </div>
       ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-xs font-semibold text-portal-soft">Kas awal
-            <input type="number" min="0" value={openingCash} onChange={event => setOpeningCash(event.target.value)} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" placeholder="Contoh: 200000" />
+        <div className="p-4 sm:p-5">
+          <label className="block text-xs font-semibold text-portal-soft">
+            Kas awal
+            <input type="number" min="0" inputMode="numeric" value={openingCash} onChange={event => setOpeningCash(event.target.value)} className={`${inputClass} text-base font-bold`} placeholder="Contoh: 200000" />
           </label>
-          <label className="text-xs font-semibold text-portal-soft">Catatan <span className="font-normal">(opsional)</span>
-            <input value={note} onChange={event => setNote(event.target.value)} className="mt-1 w-full rounded-xl border border-portal-line px-3 py-2.5 text-sm text-portal-ink" placeholder="Shift pagi" />
-          </label>
-          <div className="sm:col-span-2"><button type="button" onClick={openShift} disabled={saving} className="portal-button-secondary disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UnlockKeyhole className="h-4 w-4" />} Buka kas</button></div>
+          <details className="group mt-3">
+            <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-portal-soft">
+              Detail shift <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
+            </summary>
+            <label className="mt-3 block text-xs font-semibold text-portal-soft">
+              Catatan <span className="font-normal">(opsional)</span>
+              <input value={note} onChange={event => setNote(event.target.value)} className={inputClass} placeholder="Shift pagi" />
+            </label>
+          </details>
+          <button type="button" onClick={openShift} disabled={saving} className="portal-button-primary mt-4 w-full justify-center py-3 disabled:opacity-50">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UnlockKeyhole className="h-4 w-4" />} Buka kas
+          </button>
         </div>
       )}
 
       {lastClosed ? (
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-xl border border-portal-line p-3"><p className="text-xs text-portal-soft">Seharusnya</p><p className="mt-1 font-bold text-portal-ink">{money.format(lastClosed.expected_cash ?? 0)}</p></div>
-          <div className="rounded-xl border border-portal-line p-3"><p className="text-xs text-portal-soft">Fisik</p><p className="mt-1 font-bold text-portal-ink">{money.format(lastClosed.actual_cash ?? 0)}</p></div>
-          <div className="rounded-xl border border-portal-line p-3"><p className="text-xs text-portal-soft">Selisih</p><p className={`mt-1 font-bold ${(lastClosed.variance ?? 0) === 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(lastClosed.variance ?? 0)}</p></div>
+        <div className="border-t border-portal-line bg-[#fafbf9] p-4 sm:p-5">
+          <p className="text-xs font-bold text-portal-ink">Hasil shift terakhir</p>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+            <div><p className="text-[11px] text-portal-soft">Seharusnya</p><p className="mt-1 text-sm font-bold">{money.format(lastClosed.expected_cash ?? 0)}</p></div>
+            <div><p className="text-[11px] text-portal-soft">Fisik</p><p className="mt-1 text-sm font-bold">{money.format(lastClosed.actual_cash ?? 0)}</p></div>
+            <div><p className="text-[11px] text-portal-soft">Selisih</p><p className={`mt-1 text-sm font-black ${(lastClosed.variance ?? 0) === 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(lastClosed.variance ?? 0)}</p></div>
+          </div>
         </div>
       ) : null}
 
-      {message ? <p className="mt-3 text-xs leading-5 text-portal-soft">{message}</p> : null}
-    </div>
+      {message ? <p role="status" className="border-t border-portal-line px-4 py-3 text-xs text-portal-soft sm:px-5">{message}</p> : null}
+    </section>
   );
 }

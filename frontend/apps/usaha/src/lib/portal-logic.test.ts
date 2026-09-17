@@ -11,13 +11,17 @@ describe('visiblePortalSections', () => {
     ]);
   });
 
-  it('shows owner-only security and team entries only when granted', () => {
+  it('separates read-only business info from location editing and owner-only destinations', () => {
     expect(visiblePortalSections(['viewInfo', 'viewTeam', 'manageSecurity'])).toEqual([
       'home',
       'info',
-      'locations',
       'team',
       'security',
+    ]);
+    expect(visiblePortalSections(['viewInfo', 'manageInfo'])).toEqual([
+      'home',
+      'info',
+      'locations',
     ]);
   });
 });

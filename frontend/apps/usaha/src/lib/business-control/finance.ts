@@ -73,7 +73,11 @@ export function summarizeBusinessDay(input: BusinessDayInput) {
 
   const grossProfit = revenue - cogs;
   const operatingProfit = grossProfit + otherIncome - operatingExpenses;
-  const cashMovement = revenue + otherIncome + ownerCapital - cogs - operatingExpenses - ownerDrawing;
+  // COGS is an accrual/profit recognition event, not proof that cash left on
+  // the same day. Inventory may have been purchased days or weeks earlier.
+  // Detailed cash balances come from the account ledger; this legacy helper
+  // therefore only models direct same-day operating cash effects.
+  const cashMovement = revenue + otherIncome + ownerCapital - operatingExpenses - ownerDrawing;
 
   return {
     revenue,

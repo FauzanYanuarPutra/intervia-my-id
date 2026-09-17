@@ -8,8 +8,8 @@ export type PortalNavigationItem = {
 
 const labels: Record<PortalSection, string> = {
   home: 'Beranda',
-  orders: 'Jualan',
-  products: 'Produk',
+  orders: 'Jual',
+  products: 'Barang',
   inventory: 'Stok',
   finance: 'Uang',
   reports: 'Laporan',
@@ -28,29 +28,32 @@ const desktopPrimaryOrder: PortalSection[] = [
   'products',
   'inventory',
   'finance',
-  'reports',
-  'channels',
-  'info',
 ];
 
-const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'inventory', 'finance'];
+const mobilePrimaryOrder: PortalSection[] = ['home', 'orders', 'products', 'finance'];
 
 const menuOrder: PortalSection[] = [
-  'products',
+  'inventory',
   'reports',
   'channels',
   'info',
-  'team',
   'locations',
-  'buyerPage',
   'operations',
+  'team',
+  'buyerPage',
   'security',
 ];
 
+export function canAccessPortalSection(
+  permissions: PermissionId[],
+  section: PortalSection,
+) {
+  return visiblePortalSections(permissions).includes(section);
+}
+
 function selectNavigation(order: PortalSection[], permissions: PermissionId[]) {
-  const visible = new Set(visiblePortalSections(permissions));
   return order
-    .filter(id => visible.has(id))
+    .filter(id => canAccessPortalSection(permissions, id))
     .map(id => ({ id, label: labels[id] } satisfies PortalNavigationItem));
 }
 

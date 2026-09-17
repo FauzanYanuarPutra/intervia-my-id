@@ -1,8 +1,19 @@
+import {
+  productConfigurationSignature,
+  type ProductModifierSelection,
+} from 'lajukan-ui';
+
 export type QuickSaleLineDraft = {
   productId: string;
   quantity: number | string;
-  unitPriceAmount: number | string;
+  basePriceAmount?: number | string;
+  unitPricePreviewAmount?: number | string;
+  /** @deprecated Preview compatibility only. Never serialized as price authority. */
+  unitPriceAmount?: number | string;
   discountAmount: number | string;
+  selectedOptions?: ProductModifierSelection[];
+  note?: string;
+  configurationSignature?: string;
 };
 
 export type QuickSaleDraft = {
@@ -18,6 +29,8 @@ export type ReceiptLine = {
   name: string;
   quantity: number;
   unitPrice: number;
+  configurationSummary?: string;
+  note?: string;
 };
 
 export type ReceiptView = {
@@ -36,9 +49,13 @@ type ProductLike = {
   name: string;
 };
 
-function finiteNumber(value: number | string) {
-  const parsed = typeof value === 'number' ? value : Number(value);
+function finiteNumber(value: number | string | undefined) {
+  const parsed = typeof value === 'number' ? value : Number(value ?? Number.NaN);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function previewUnitPrice(line: QuickSaleLineDraft) {
+  return finiteNumber(line.unitPricePreviewAmount ?? line.unitPriceAmount ?? line.basePriceAmount);
 }
 
 function compactRupiah(amount: number) {
@@ -46,23 +63,50 @@ function compactRupiah(amount: number) {
   return `Rp${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(safeAmount)}`;
 }
 
+export function normalizeLineNote(note?: string) {
+  return (note ?? '').trim().replace(/\s+/g, ' ');
+}
+
+export function quickSaleLineIdentity(
+  line: Pick<QuickSaleLineDraft, 'productId' | 'selectedOptions' | 'note' | 'configurationSignature'>,
+) {
+  const signature =
+    line.configurationSignature ?? productConfigurationSignature(line.selectedOptions ?? []);
+  return [line.productId, signature, normalizeLineNote(line.note)].join('::');
+}
+
+export function mergeQuickSaleLine(lines: QuickSaleLineDraft[], incoming: QuickSaleLineDraft) {
+  const identity = quickSaleLineIdentity(incoming);
+  const index = lines.findIndex(line => quickSaleLineIdentity(line) === identity);
+  if (index < 0) return [...lines, incoming];
+  return lines.map((line, currentIndex) =>
+    currentIndex === index
+      ? {
+          ...line,
+          quantity: finiteNumber(line.quantity) + finiteNumber(incoming.quantity),
+        }
+      : line,
+  );
+}
+
 export function buildQuickSaleRequest(draft: QuickSaleDraft) {
   if (!draft.occurredOn || !draft.lines.length) throw new Error('invalid_sale_lines');
 
   const lines = draft.lines.map(line => {
     const quantity = finiteNumber(line.quantity);
-    const unitPriceAmount = finiteNumber(line.unitPriceAmount);
+    const unitPricePreviewAmount = previewUnitPrice(line);
     const discountAmount = finiteNumber(line.discountAmount);
-    if (quantity <= 0 || unitPriceAmount < 0 || discountAmount < 0) {
+    if (quantity <= 0 || unitPricePreviewAmount < 0 || discountAmount < 0) {
       throw new Error('invalid_sale_amount');
     }
-    const gross = Math.round(quantity * unitPriceAmount);
-    if (discountAmount > gross) throw new Error('sale_discount_exceeds_line_total');
+    const previewGross = Math.round(quantity * unitPricePreviewAmount);
+    if (discountAmount > previewGross) throw new Error('sale_discount_exceeds_line_total');
     return {
       product_id: line.productId,
       quantity,
-      unit_price_amount: Math.round(unitPriceAmount),
       discount_amount: Math.round(discountAmount),
+      selected_options: line.selectedOptions ?? [],
+      note: normalizeLineNote(line.note) || null,
     };
   });
 
@@ -77,7 +121,7 @@ export function buildQuickSaleRequest(draft: QuickSaleDraft) {
 export function quickSaleTotal(lines: QuickSaleLineDraft[]) {
   return lines.reduce((total, line) => {
     const quantity = finiteNumber(line.quantity);
-    const unitPriceAmount = finiteNumber(line.unitPriceAmount);
+    const unitPriceAmount = previewUnitPrice(line);
     const discountAmount = finiteNumber(line.discountAmount);
     if (
       !Number.isFinite(quantity) ||
@@ -86,13 +130,7 @@ export function quickSaleTotal(lines: QuickSaleLineDraft[]) {
     ) {
       return total;
     }
-    return (
-      total +
-      Math.max(
-        0,
-        Math.round(quantity * unitPriceAmount) - Math.round(discountAmount),
-      )
-    );
+    return total + Math.max(0, Math.round(quantity * unitPriceAmount) - Math.round(discountAmount));
   }, 0);
 }
 
@@ -163,14 +201,13 @@ export function buildReceiptView(input: {
 }
 
 export function buildReceiptShareText(receipt: ReceiptView) {
-  const lines = [
-    receipt.receiptNumber,
-    ...receipt.lines.map(
-      line => `${line.name} ×${line.quantity}  ${compactRupiah(line.quantity * line.unitPrice)}`,
-    ),
-    `Total ${compactRupiah(receipt.total)}`,
-    receipt.paymentLabel,
-  ];
+  const itemLines = receipt.lines.flatMap(line => {
+    const rows = [`${line.name} ×${line.quantity}  ${compactRupiah(line.quantity * line.unitPrice)}`];
+    if (line.configurationSummary) rows.push(`  ${line.configurationSummary}`);
+    if (line.note) rows.push(`  Catatan: ${line.note}`);
+    return rows;
+  });
+  const lines = [receipt.receiptNumber, ...itemLines, `Total ${compactRupiah(receipt.total)}`, receipt.paymentLabel];
   if (receipt.tenderedAmount !== null) {
     lines.push(`Diterima ${compactRupiah(receipt.tenderedAmount)}`);
     lines.push(`Kembalian ${compactRupiah(receipt.changeAmount)}`);

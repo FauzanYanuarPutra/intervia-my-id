@@ -6,11 +6,9 @@ import {
   ChevronDown,
   History,
   Loader2,
-  PackagePlus,
   Pencil,
   Plus,
   Search,
-  TriangleAlert,
 } from 'lucide-react';
 import {
   effectiveIngredientUnitCost,
@@ -422,25 +420,13 @@ export function IngredientWorkspace({
   }
 
   return (
-    <div className="space-y-4">
-      <section className="grid gap-2 sm:grid-cols-3">
-        <div className="rounded-xl border border-portal-line bg-white p-3">
-          <div className="flex items-center gap-2 text-portal-soft">
-            <PackagePlus className="h-4 w-4" />
-            <span className="text-xs font-semibold">Tercatat</span>
-          </div>
-          <p className="mt-2 text-xl font-bold text-portal-ink">{ingredients.length}</p>
-        </div>
-        <div className="rounded-xl border border-portal-line bg-white p-3">
-          <div className="flex items-center gap-2 text-amber-700">
-            <TriangleAlert className="h-4 w-4" />
-            <span className="text-xs font-semibold">Perlu belanja</span>
-          </div>
-          <p className="mt-2 text-xl font-bold text-portal-ink">{lowStock.length}</p>
-        </div>
-        <div className="rounded-xl border border-portal-line bg-white p-3">
-          <p className="text-xs font-semibold text-portal-soft">Data belum lengkap</p>
-          <p className="mt-2 text-xl font-bold text-portal-ink">{incomplete.length}</p>
+    <div className="space-y-3">
+      <section className="portal-panel px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <span><strong className="text-lg text-portal-ink">{ingredients.length}</strong> <span className="text-portal-soft">bahan</span></span>
+          <span className={lowStock.length ? 'font-semibold text-amber-800' : 'text-portal-soft'}>{lowStock.length} perlu belanja</span>
+          <span className={incomplete.length ? 'font-semibold text-amber-800' : 'text-portal-soft'}>{incomplete.length} belum lengkap</span>
+          {primaryLocationName ? <span className="ml-auto text-xs text-portal-soft">{primaryLocationName}</span> : null}
         </div>
       </section>
 
@@ -448,9 +434,9 @@ export function IngredientWorkspace({
         <div className="border-b border-portal-line p-4 sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="font-bold text-portal-ink">Bahan & kemasan saat ini</h2>
+              <h2 className="font-bold text-portal-ink">Bahan & stok</h2>
               <p className="mt-1 text-sm text-portal-soft">
-                Harga beli, hasil terpakai, dan stok menjadi sumber perhitungan HPP resep.
+                Cari bahan, cek stok, lalu tambah stok saat belanja.
               </p>
               {primaryLocationName ? (
                 <p className="mt-1 text-xs font-semibold text-portal-soft">
@@ -515,66 +501,41 @@ export function IngredientWorkspace({
                           ) : null}
                         </div>
 
-                        <div className="mt-2 grid gap-x-5 gap-y-1 text-xs text-portal-soft sm:grid-cols-2 lg:grid-cols-3">
-                          <p>
-                            <span className="font-semibold text-portal-ink">Stok:</span>{' '}
-                            {stock} {item.recipe_unit}
-                          </p>
-                          <p>
-                            {min > 0
-                              ? `Batas minimum ${min} ${item.recipe_unit}`
-                              : 'Batas minimum belum diatur'}
-                          </p>
-                          <p>{item.supplier_name ? `Supplier: ${item.supplier_name}` : 'Supplier belum diisi'}</p>
-                          <p>
-                            {n(item.purchase_price_amount) > 0
-                              ? `${money.format(item.purchase_price_amount)} / ${n(item.purchase_quantity)} ${item.purchase_unit}`
-                              : 'Harga beli belum diisi'}
-                          </p>
-                          <p>Hasil terpakai {n(item.yield_percent)}%</p>
-                          <p className={effectiveCost === null ? 'font-semibold text-amber-800' : 'font-semibold text-portal-forest'}>
-                            {effectiveCost === null
-                              ? 'Modal belum bisa dihitung'
-                              : `± ${unitMoney.format(effectiveCost)} / ${item.recipe_unit} terpakai`}
-                          </p>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-portal-soft">
+                          <span><strong className="text-portal-ink">{stock} {item.recipe_unit}</strong> tersedia</span>
+                          <span className={effectiveCost === null ? 'font-semibold text-amber-800' : 'font-semibold text-portal-forest'}>
+                            {effectiveCost === null ? 'Modal belum bisa dihitung' : `${unitMoney.format(effectiveCost)} / ${item.recipe_unit}`}
+                          </span>
+                          {item.supplier_name ? <span>{item.supplier_name}</span> : null}
                         </div>
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[11px] font-semibold text-portal-soft">Detail bahan</summary>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft">
+                            <span>{min > 0 ? `Minimum ${min} ${item.recipe_unit}` : 'Batas minimum belum diatur'}</span>
+                            <span>{n(item.purchase_price_amount) > 0 ? `${money.format(item.purchase_price_amount)} / ${n(item.purchase_quantity)} ${item.purchase_unit}` : 'Harga beli belum diisi'}</span>
+                            <span>Hasil terpakai {n(item.yield_percent)}%</span>
+                            {!item.supplier_name ? <span>Supplier belum diisi</span> : null}
+                          </div>
+                        </details>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap xl:justify-end">
+                      <div className="flex items-center gap-2 xl:justify-end">
                         <button
                           type="button"
                           disabled={!canManage}
                           onClick={() => openStock(item)}
-                          className="portal-button-primary min-h-11 justify-center disabled:cursor-not-allowed disabled:opacity-50"
+                          className="portal-button-primary min-h-10 justify-center disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Plus className="h-4 w-4" /> Tambah stok
                         </button>
-                        <button
-                          type="button"
-                          disabled={!canManage}
-                          onClick={() => openEdit(item)}
-                          className="portal-button-secondary min-h-11 justify-center disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Pencil className="h-4 w-4" /> Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void openHistory(item)}
-                          className="portal-button-secondary min-h-11 justify-center"
-                        >
-                          <History className="h-4 w-4" /> Riwayat
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canManage}
-                          onClick={() => {
-                            setActionMessage('');
-                            setActivePanel({ id: item.id, mode: 'archive' });
-                          }}
-                          className="portal-button-secondary min-h-11 justify-center text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Archive className="h-4 w-4" /> Arsipkan
-                        </button>
+                        <details className="relative">
+                          <summary className="portal-button-secondary min-h-10 cursor-pointer list-none justify-center">Aksi lain</summary>
+                          <div className="mt-2 grid min-w-36 gap-1 rounded-xl border border-portal-line bg-white p-1.5 shadow-lg xl:absolute xl:right-0 xl:z-20">
+                            <button type="button" disabled={!canManage} onClick={() => openEdit(item)} className="flex min-h-9 items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-portal-ink hover:bg-[#fafbf9] disabled:opacity-40"><Pencil className="h-3.5 w-3.5" /> Edit</button>
+                            <button type="button" onClick={() => void openHistory(item)} className="flex min-h-9 items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-portal-ink hover:bg-[#fafbf9]"><History className="h-3.5 w-3.5" /> Riwayat</button>
+                            <button type="button" disabled={!canManage} onClick={() => { setActionMessage(''); setActivePanel({ id: item.id, mode: 'archive' }); }} className="flex min-h-9 items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"><Archive className="h-3.5 w-3.5" /> Arsipkan</button>
+                          </div>
+                        </details>
                       </div>
                     </div>
                   </div>
@@ -764,8 +725,8 @@ export function IngredientWorkspace({
       <details className="rounded-xl border border-portal-line bg-white group">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5">
           <div>
-            <p className="font-bold text-portal-ink">Tambah bahan atau kemasan baru</p>
-            <p className="mt-0.5 text-xs text-portal-soft">Input sekali, lalu gunakan di stok dan resep HPP.</p>
+            <p className="font-bold text-portal-ink">Tambah bahan baru</p>
+            <p className="mt-0.5 text-xs text-portal-soft">Isi yang penting dulu. Detail teknis bisa ditambahkan jika perlu.</p>
           </div>
           <ChevronDown className="h-4 w-4 text-portal-soft transition group-open:rotate-180" />
         </summary>
@@ -775,42 +736,28 @@ export function IngredientWorkspace({
               <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" placeholder="Contoh: Alpukat" value={name} onChange={event => setName(event.target.value)} />
             </label>
             <label className="text-xs font-semibold text-portal-soft">Jenis
-              <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={kind} onChange={event => setKind(event.target.value)}>
-                {Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={kind} onChange={event => setKind(event.target.value)}>{Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             </label>
             <label className="text-xs font-semibold text-portal-soft">Harga beli
               <input type="number" min="0" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" placeholder="34000" value={purchasePrice} onChange={event => setPurchasePrice(event.target.value)} />
             </label>
-            <label className="text-xs font-semibold text-portal-soft">Jumlah beli
-              <input type="number" step="any" min="0.0001" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Unit beli
-              <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={purchaseUnit} onChange={event => setPurchaseUnit(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Unit resep
-              <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={recipeUnit} onChange={event => setRecipeUnit(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Konversi
-              <input type="number" step="any" min="0.0001" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={conversionFactor} onChange={event => setConversionFactor(event.target.value)} />
-              <span className="mt-1 block font-normal">Contoh 1 kg = 1000 gram.</span>
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Hasil terpakai %
-              <input type="number" min="1" max="100" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={yieldPercent} onChange={event => setYieldPercent(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Susut %
-              <input type="number" min="0" max="99" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={wastePercent} onChange={event => setWastePercent(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Stok awal ({recipeUnit || 'unit resep'})
+            <label className="text-xs font-semibold text-portal-soft">Stok awal ({recipeUnit || 'unit'})
               <input type="number" min="0" step="any" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={stockQuantity} onChange={event => setStockQuantity(event.target.value)} />
             </label>
-            <label className="text-xs font-semibold text-portal-soft">Batas minimum
-              <input type="number" min="0" step="any" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={minimumStock} onChange={event => setMinimumStock(event.target.value)} />
-            </label>
-            <label className="text-xs font-semibold text-portal-soft">Supplier <span className="font-normal">(opsional)</span>
-              <input className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" value={supplier} onChange={event => setSupplier(event.target.value)} />
-            </label>
           </div>
+          <details className="mt-3 rounded-xl bg-[#fafbf9] p-3">
+            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Pengaturan lanjutan</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-xs font-semibold text-portal-soft">Jumlah beli<input type="number" step="any" min="0.0001" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Unit beli<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={purchaseUnit} onChange={event => setPurchaseUnit(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Unit resep<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={recipeUnit} onChange={event => setRecipeUnit(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Konversi<input type="number" step="any" min="0.0001" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={conversionFactor} onChange={event => setConversionFactor(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Hasil terpakai %<input type="number" min="1" max="100" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={yieldPercent} onChange={event => setYieldPercent(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Susut %<input type="number" min="0" max="99" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={wastePercent} onChange={event => setWastePercent(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Batas minimum<input type="number" min="0" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={minimumStock} onChange={event => setMinimumStock(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-portal-soft">Supplier<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={supplier} onChange={event => setSupplier(event.target.value)} /></label>
+            </div>
+          </details>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button type="button" disabled={saving || !canManage} onClick={() => void save()} className="portal-button-primary min-h-11 disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan bahan

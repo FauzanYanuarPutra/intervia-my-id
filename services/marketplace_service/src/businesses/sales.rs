@@ -3,11 +3,17 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::{prelude::ToPrimitive, Decimal, RoundingStrategy};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::recipes::resolve_effective_recipe;
+use super::{
+    modifier_resolution::{
+        resolve_modifier_selection, ModifierSelectionInput, ResolvedModifierSelection,
+    },
+    product_modifiers::{ModifierRecipeEffect, ModifierRecipeOperation, ProductModifierGroup},
+    recipes::resolve_effective_recipe,
+};
 
 const MAX_SALE_LINES: usize = 100;
 const MAX_CHANNEL_KEY_LEN: usize = 80;
@@ -57,9 +63,16 @@ pub(crate) struct CostSnapshot {
 pub(crate) struct CreateSaleLineRequest {
     pub(crate) product_id: Uuid,
     pub(crate) quantity: Decimal,
+    /// Compatibility only. The server always recomputes canonical product + modifier price.
+    #[serde(default)]
+    #[allow(dead_code)]
     pub(crate) unit_price_amount: i64,
     #[serde(default)]
     pub(crate) discount_amount: i64,
+    #[serde(default)]
+    pub(crate) selected_options: Vec<ModifierSelectionInput>,
+    #[serde(default)]
+    pub(crate) note: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -344,6 +357,13 @@ impl SaleRepository {
             .await?;
         }
 
+        if let Err(error) =
+            consume_product_inventory(&mut tx, business_id, organization_id, &prepared).await
+        {
+            tx.rollback().await?;
+            return Err(error);
+        }
+
         if let Err(error) = consume_ingredient_inventory(
             &mut tx,
             actor_id,
@@ -435,9 +455,10 @@ fn validate_request(
         if line.quantity <= Decimal::ZERO {
             return Err(SaleRepositoryError::Validation("invalid_sale_quantity"));
         }
-        if line.unit_price_amount < 0 || line.discount_amount < 0 {
+        if line.discount_amount < 0 {
             return Err(SaleRepositoryError::Validation("invalid_sale_amount"));
         }
+        normalize_sale_note(line.note.as_deref())?;
     }
     Ok(NormalizedSaleRequest {
         occurred_on: request.occurred_on,
@@ -454,21 +475,31 @@ async fn prepare_line(
     effective_at: DateTime<Utc>,
     line: &CreateSaleLineRequest,
 ) -> Result<PreparedSaleLine, SaleRepositoryError> {
-    let product_name = sqlx::query_scalar::<_, String>(
-        r#"
-        SELECT name FROM business_products
+    let (product_name, price_label, modifier_groups) =
+        sqlx::query_as::<_, (String, String, Value)>(
+            r#"
+        SELECT name, price_label, modifier_groups FROM business_products
         WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'
         FOR SHARE
         "#,
-    )
-    .bind(line.product_id)
-    .bind(business_id)
-    .bind(organization_id)
-    .fetch_optional(&mut **tx)
-    .await?
-    .ok_or(SaleRepositoryError::NotFound)?;
+        )
+        .bind(line.product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(SaleRepositoryError::NotFound)?;
 
-    let gross = decimal_money(Decimal::from(line.unit_price_amount) * line.quantity)?;
+    let groups = serde_json::from_value::<Vec<ProductModifierGroup>>(modifier_groups)
+        .map_err(|_| SaleRepositoryError::Validation("invalid_sale_product_options"))?;
+    let resolved = resolve_modifier_selection(&groups, &line.selected_options)
+        .map_err(|_| SaleRepositoryError::Validation("invalid_sale_product_options"))?;
+    let unit_price_amount =
+        authoritative_unit_price_amount(&price_label, resolved.price_delta_cents)?;
+    let note = normalize_sale_note(line.note.as_deref())?;
+    let configuration_snapshot = modifier_configuration_snapshot(&resolved, note.as_deref());
+
+    let gross = decimal_money(Decimal::from(unit_price_amount) * line.quantity)?;
     if line.discount_amount > gross {
         return Err(SaleRepositoryError::Validation(
             "sale_discount_exceeds_line_total",
@@ -491,14 +522,15 @@ async fn prepare_line(
             recipe_version_id: None,
             product_name,
             quantity: line.quantity,
-            unit_price_amount: line.unit_price_amount,
+            unit_price_amount,
             discount_amount: line.discount_amount,
             final_revenue_amount,
             unit_cogs_amount: None,
             line_cogs_amount: None,
-            cost_snapshot: serde_json::json!({
+            cost_snapshot: json!({
                 "status": "incomplete",
-                "reason": "recipe_missing"
+                "reason": "recipe_missing",
+                "configuration": configuration_snapshot
             }),
             ingredient_consumptions: Vec::new(),
         });
@@ -507,7 +539,7 @@ async fn prepare_line(
     if recipe.items.is_empty() {
         return Err(SaleRepositoryError::IncompleteCosting);
     }
-    let ingredient_inputs = recipe
+    let mut ingredient_inputs = recipe
         .items
         .iter()
         .map(|row| SnapshotIngredientInput {
@@ -521,6 +553,15 @@ async fn prepare_line(
             waste_percent: row.waste_percent,
         })
         .collect::<Vec<_>>();
+    apply_modifier_recipe_effects(
+        tx,
+        business_id,
+        organization_id,
+        recipe.servings,
+        &resolved.recipe_effects,
+        &mut ingredient_inputs,
+    )
+    .await?;
     let recipe_version_id = recipe.recipe_version_id;
     let snapshot = calculate_line_snapshot(
         recipe.recipe_id,
@@ -543,15 +584,16 @@ async fn prepare_line(
             quantity: item.quantity_per_unit * line.quantity,
         })
         .collect();
-    let cost_snapshot =
+    let mut cost_snapshot =
         serde_json::to_value(&snapshot).map_err(|_| SaleRepositoryError::Database)?;
+    attach_configuration_snapshot(&mut cost_snapshot, configuration_snapshot);
 
     Ok(PreparedSaleLine {
         product_id: line.product_id,
         recipe_version_id,
         product_name,
         quantity: line.quantity,
-        unit_price_amount: line.unit_price_amount,
+        unit_price_amount,
         discount_amount: line.discount_amount,
         final_revenue_amount,
         unit_cogs_amount,
@@ -559,6 +601,181 @@ async fn prepare_line(
         cost_snapshot,
         ingredient_consumptions,
     })
+}
+
+fn authoritative_unit_price_amount(
+    price_label: &str,
+    modifier_delta_cents: i64,
+) -> Result<i64, SaleRepositoryError> {
+    let digits = price_label
+        .chars()
+        .filter(|character| character.is_ascii_digit())
+        .collect::<String>();
+    if digits.is_empty() {
+        return Err(SaleRepositoryError::Validation("invalid_product_price"));
+    }
+    let base = digits
+        .parse::<i64>()
+        .map_err(|_| SaleRepositoryError::Validation("invalid_product_price"))?;
+    let delta = (Decimal::from(modifier_delta_cents) / Decimal::from(100))
+        .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero)
+        .to_i64()
+        .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+    let total = base
+        .checked_add(delta)
+        .ok_or(SaleRepositoryError::Validation("sale_amount_overflow"))?;
+    if total < 0 {
+        return Err(SaleRepositoryError::Validation("invalid_sale_amount"));
+    }
+    Ok(total)
+}
+
+fn normalize_sale_note(note: Option<&str>) -> Result<Option<String>, SaleRepositoryError> {
+    let Some(note) = note else {
+        return Ok(None);
+    };
+    let normalized = note.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+    if normalized.chars().count() > 200 {
+        return Err(SaleRepositoryError::Validation("invalid_sale_note"));
+    }
+    Ok(Some(normalized))
+}
+
+fn modifier_configuration_snapshot(
+    resolved: &ResolvedModifierSelection,
+    note: Option<&str>,
+) -> Value {
+    json!({
+        "signature": resolved.signature,
+        "choices": &resolved.snapshots,
+        "note": note,
+    })
+}
+
+fn attach_configuration_snapshot(snapshot: &mut Value, configuration: Value) {
+    if let Value::Object(object) = snapshot {
+        object.insert("configuration".to_owned(), configuration);
+    }
+}
+
+async fn apply_modifier_recipe_effects(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    servings: Decimal,
+    effects: &[ModifierRecipeEffect],
+    ingredients: &mut Vec<SnapshotIngredientInput>,
+) -> Result<(), SaleRepositoryError> {
+    for effect in effects {
+        let recipe_quantity = effect.quantity * servings;
+        if let Some(item) = ingredients
+            .iter_mut()
+            .find(|item| item.ingredient_id == effect.ingredient_id)
+        {
+            match effect.operation {
+                ModifierRecipeOperation::Add => item.recipe_quantity += recipe_quantity,
+                ModifierRecipeOperation::Set => item.recipe_quantity = recipe_quantity,
+            }
+            continue;
+        }
+
+        if recipe_quantity <= Decimal::ZERO {
+            continue;
+        }
+        let row = sqlx::query_as::<_, (String, i64, Decimal, Decimal, Decimal, Decimal)>(
+            r#"
+            SELECT name, purchase_price_amount, purchase_quantity, conversion_factor,
+              yield_percent, waste_percent
+            FROM business_ingredients
+            WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'
+            FOR SHARE
+            "#,
+        )
+        .bind(effect.ingredient_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(SaleRepositoryError::Validation(
+            "invalid_modifier_recipe_ingredient",
+        ))?;
+        ingredients.push(SnapshotIngredientInput {
+            ingredient_id: effect.ingredient_id,
+            ingredient_name: row.0,
+            recipe_quantity,
+            purchase_price_amount: row.1,
+            purchase_quantity: row.2,
+            conversion_factor: row.3,
+            yield_percent: row.4,
+            waste_percent: row.5,
+        });
+    }
+    ingredients.retain(|item| item.recipe_quantity > Decimal::ZERO);
+    Ok(())
+}
+
+async fn consume_product_inventory(
+    tx: &mut Transaction<'_, Postgres>,
+    business_id: Uuid,
+    organization_id: Uuid,
+    prepared_lines: &[PreparedSaleLine],
+) -> Result<(), SaleRepositoryError> {
+    let mut required_by_product = BTreeMap::<Uuid, Decimal>::new();
+    for line in prepared_lines {
+        *required_by_product
+            .entry(line.product_id)
+            .or_insert(Decimal::ZERO) += line.quantity;
+    }
+
+    for (product_id, required_quantity) in required_by_product {
+        let inventory = sqlx::query_as::<_, (String, Option<f64>)>(
+            r#"
+            SELECT stock_mode, stock_count
+            FROM business_inventory
+            WHERE product_id=$1 AND business_id=$2 AND organization_id=$3
+            FOR UPDATE
+            "#,
+        )
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+
+        let Some((stock_mode, Some(stock_count))) = inventory else {
+            continue;
+        };
+        if stock_mode != "manual" {
+            continue;
+        }
+        let required = required_quantity
+            .to_f64()
+            .ok_or(SaleRepositoryError::Validation("invalid_sale_quantity"))?;
+        if required <= 0.0 || stock_count + f64::EPSILON < required {
+            return Err(SaleRepositoryError::InsufficientStock);
+        }
+        let updated = sqlx::query(
+            r#"
+            UPDATE business_inventory
+            SET stock_count = stock_count - $4, updated_at = NOW()
+            WHERE product_id=$1 AND business_id=$2 AND organization_id=$3
+              AND stock_mode='manual' AND stock_count >= $4
+            "#,
+        )
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(required)
+        .execute(&mut **tx)
+        .await?;
+        if updated.rows_affected() != 1 {
+            return Err(SaleRepositoryError::InsufficientStock);
+        }
+    }
+    Ok(())
 }
 
 async fn consume_ingredient_inventory(
@@ -903,6 +1120,28 @@ mod tests {
     }
 
     #[test]
+    fn canonical_pos_price_converts_modifier_cents_to_rupiah() {
+        assert_eq!(
+            authoritative_unit_price_amount("Rp12.000", 300_000).unwrap(),
+            15_000
+        );
+        assert_eq!(
+            authoritative_unit_price_amount("Rp12.000", -200_000).unwrap(),
+            10_000
+        );
+    }
+
+    #[test]
+    fn sale_note_is_normalized_for_snapshot_identity() {
+        assert_eq!(
+            normalize_sale_note(Some("  es   sedikit  "))
+                .unwrap()
+                .as_deref(),
+            Some("es sedikit")
+        );
+    }
+
+    #[test]
     fn sale_request_validation_rejects_invalid_account_and_quantity() {
         let request = CreateSaleRequest {
             occurred_on: NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
@@ -913,6 +1152,8 @@ mod tests {
                 quantity: Decimal::ONE,
                 unit_price_amount: 12_000,
                 discount_amount: 0,
+                selected_options: Vec::new(),
+                note: None,
             }],
         };
         assert_eq!(

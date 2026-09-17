@@ -1,7 +1,8 @@
+import type { ProductModifierGroup } from 'lajukan-ui';
 import type { BusinessTemplateKey } from './business-templates';
 import type { BusinessImageValue } from './media-crop';
 
-export type PortalRole = 'owner' | 'manager' | 'cashier' | 'viewer';
+export type PortalRole = 'owner' | 'manager' | 'cashier' | 'accounting' | 'inventory' | 'viewer';
 export type BusinessRelationship = 'owned' | 'joined';
 
 export type PermissionId =
@@ -90,7 +91,7 @@ export type ProductRecord = {
   sourceType?: ProductSourceType; ownerLabel?: string; stockCount?: number | null; stockUnit?: string;
   minStockAlert?: number | null; stockMode?: ProductStockMode; stockHealth?: ProductStockHealth;
   stockUpdatedAt?: string; consignmentTerms?: string; lastSoldAt?: string; notes?: string;
-  imageUrl?: string; image?: BusinessImageValue;
+  imageUrl?: string; image?: BusinessImageValue; modifierGroups?: ProductModifierGroup[];
 };
 export type OrderRecord = { id: string; buyer: string; itemSummary: string; amountLabel: string; status: OrderStatus; channel: string };
 export type ReservationRecord = { id: string; guest: string; schedule: string; pax: string; status: ReservationStatus };

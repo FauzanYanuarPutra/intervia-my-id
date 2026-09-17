@@ -78,6 +78,22 @@ export const permissionMap: Record<PortalRole, PermissionId[]> = {
     'manageOperations',
     'viewBuyerPage',
   ],
+  accounting: [
+    'viewProducts',
+    'viewOrders',
+    'viewTransactions',
+    'viewFinance',
+    'manageFinance',
+    'viewReports',
+    'viewBuyerPage',
+  ],
+  inventory: [
+    'viewProducts',
+    'viewCosting',
+    'viewInventory',
+    'manageInventory',
+    'viewBuyerPage',
+  ],
   viewer: [
     'viewInfo',
     'viewProducts',
@@ -135,6 +151,22 @@ export const roleSummaryMap: Record<PortalRole, RoleSummary> = {
       'Lihat produk dan stok operasional',
     ],
     cannot: ['Void/refund tanpa izin lebih tinggi', 'Lihat HPP dan laba', 'Lihat saldo bank', 'Ubah profil dan tim'],
+  },
+  accounting: {
+    label: 'Keuangan',
+    shortLabel: 'Keuangan & laporan',
+    description:
+      'Mengelola pencatatan keuangan dan membaca laporan tanpa mendapat hak mengubah katalog, stok, tim, atau keamanan.',
+    can: ['Lihat transaksi', 'Catat uang masuk dan keluar', 'Lihat laporan usaha'],
+    cannot: ['Ubah produk', 'Ubah stok', 'Atur kanal jual', 'Undang anggota', 'Atur keamanan usaha'],
+  },
+  inventory: {
+    label: 'Stok',
+    shortLabel: 'Stok & bahan',
+    description:
+      'Mengelola stok dan bahan yang diperlukan untuk operasional tanpa membuka keuangan, transaksi penjualan, tim, atau keamanan.',
+    can: ['Lihat produk', 'Lihat detail bahan', 'Tambah atau kurangi stok'],
+    cannot: ['Lihat keuangan', 'Buat transaksi penjualan', 'Atur kanal jual', 'Undang anggota', 'Atur keamanan usaha'],
   },
   viewer: {
     label: 'Viewer',

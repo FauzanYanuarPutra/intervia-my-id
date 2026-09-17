@@ -43,6 +43,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./product-configuration": {
+      "types": "./dist/product-configuration/index.d.ts",
+      "default": "./dist/product-configuration/index.js"
+    },
     "./tokens.css": "./tokens.css"
   }
 }

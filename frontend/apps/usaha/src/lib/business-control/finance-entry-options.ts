@@ -8,14 +8,18 @@ export type FinanceEntryOption = {
 const incomeOptions: FinanceEntryOption[] = [
   { value: 'other_income', label: 'Pendapatan lain' },
   { value: 'capital_income', label: 'Modal masuk' },
+  { value: 'receivable_payment', label: 'Piutang dibayar' },
 ];
 
 const expenseOptions: FinanceEntryOption[] = [
-  { value: 'inventory_expense', label: 'Belanja stok / bahan' },
+  { value: 'inventory_purchase', label: 'Belanja stok / bahan' },
   { value: 'payroll_expense', label: 'Gaji karyawan' },
   { value: 'rent_expense', label: 'Sewa kios / tempat' },
   { value: 'utilities_expense', label: 'Listrik / air / internet' },
   { value: 'transport_expense', label: 'Transport / bensin' },
+  { value: 'marketing_expense', label: 'Promosi' },
+  { value: 'equipment_expense', label: 'Peralatan' },
+  { value: 'payable_payment', label: 'Bayar utang usaha' },
   { value: 'owner_draw', label: 'Ambil owner' },
   { value: 'other_expense', label: 'Pengeluaran lain' },
 ];

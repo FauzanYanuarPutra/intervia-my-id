@@ -13,6 +13,12 @@ const MARKETPLACE_URL =
 type JsonRecord = Record<string, unknown>;
 type FetchLike = typeof fetch;
 
+export type WorkspaceOrganization = {
+  id: string;
+  name: string;
+  current_user_role: string;
+};
+
 function asRecord(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as JsonRecord)
@@ -107,6 +113,40 @@ export async function ensureWorkspaceOrganization(input: {
   const organizationId = text(organization.id);
   if (!organizationId) throw new Error('identity_invalid_organization_response');
   return organizationId;
+}
+
+export async function listWorkspaceOrganizations(input: {
+  token: string;
+  fetchImpl?: FetchLike;
+}): Promise<WorkspaceOrganization[]> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const headers = {
+    Accept: 'application/json',
+    Authorization: `Bearer ${input.token}`,
+  };
+
+  let response: Response;
+  try {
+    response = await fetchImpl(`${IDENTITY_URL}/organizations`, {
+      headers,
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error('identity_unavailable');
+  }
+
+  const payload = await parseJson(response);
+  if (!response.ok) {
+    throw new Error(upstreamError(payload, 'identity_unavailable'));
+  }
+
+  return listItems(payload)
+    .map(item => ({
+      id: text(item.id),
+      name: text(item.name),
+      current_user_role: text(item.current_user_role).toLowerCase(),
+    }))
+    .filter(item => item.id);
 }
 
 export async function createDurableMarketplaceStore(input: {
