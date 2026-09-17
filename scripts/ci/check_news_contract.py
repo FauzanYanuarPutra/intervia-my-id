@@ -90,8 +90,8 @@ require(
     (
         "news.opened",
         "news.read_",
-        "source_clicked",
-        "related_clicked",
+        "a[data-news-action]",
+        "news.${action}",
     ),
 )
 
