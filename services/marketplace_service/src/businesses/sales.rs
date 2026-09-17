@@ -220,13 +220,8 @@ impl SaleRepository {
             if existing.organization_id != organization_id {
                 return Err(SaleRepositoryError::IdempotencyConflict);
             }
-            ensure_request_hash_matches_tx(
-                &mut tx,
-                business_id,
-                idempotency_key,
-                &request_hash,
-            )
-            .await?;
+            ensure_request_hash_matches_tx(&mut tx, business_id, idempotency_key, &request_hash)
+                .await?;
             let lines = load_lines_tx(&mut tx, existing.id).await?;
             tx.commit().await?;
             return Ok(CreateSaleOutcome {
@@ -332,13 +327,8 @@ impl SaleRepository {
             if existing.organization_id != organization_id {
                 return Err(SaleRepositoryError::IdempotencyConflict);
             }
-            ensure_request_hash_matches_pool(
-                &self.db,
-                business_id,
-                idempotency_key,
-                &request_hash,
-            )
-            .await?;
+            ensure_request_hash_matches_pool(&self.db, business_id, idempotency_key, &request_hash)
+                .await?;
             let lines = load_lines_pool(&self.db, existing.id).await?;
             return Ok(CreateSaleOutcome {
                 sale: SaleAggregate {
