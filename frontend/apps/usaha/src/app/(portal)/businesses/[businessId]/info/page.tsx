@@ -1,10 +1,11 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ExternalLink, MapPinned, Store } from 'lucide-react';
+import { Clock3, ExternalLink, ImageIcon, MapPinned, Store, UsersRound } from 'lucide-react';
 import { BusinessInfoQuickForm } from '@/components/forms/BusinessInfoQuickForm';
+import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { BusinessLocationMap } from '@/components/maps/BusinessLocationMap';
-import { DataPanel } from '@/components/portal/DataPanel';
+import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
-import { SectionCard } from '@/components/portal/SectionCard';
 import { StatusBadge } from '@/components/portal/StatusBadge';
 import { hasPermission } from '@/lib/portal-logic';
 import { buildBusinessLocationQuery } from '@/lib/portal-links';
@@ -20,52 +21,74 @@ export default async function BusinessInfoPage({ params }: PageProps) {
   if (!business) notFound();
 
   const canManage = hasPermission(business, 'manageInfo');
+  const canViewTeam = hasPermission(business, 'viewTeam');
   const businessPoint = toLatLng(business.latitude, business.longitude);
   const businessLocationQuery = buildBusinessLocationQuery({ name: business.name, address: business.address, city: business.city, locationQuery: business.locationQuery });
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="info">
-      <SectionCard eyebrow="Bisnis" title="Profil usaha" description="Jaga identitas, kontak, lokasi, dan informasi publik tetap akurat agar pembeli melihat bisnis yang sama dengan yang dikelola tim.">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,.78fr)]">
-          <DataPanel title={canManage ? 'Informasi utama' : 'Ringkasan profil'} description={canManage ? 'Perubahan disimpan ke profil usaha yang sama.' : 'Peranmu saat ini hanya dapat melihat data profil.'}>
-            <div className="p-4 sm:p-5">
-              {canManage ? (
-                <BusinessInfoQuickForm business={business} />
-              ) : (
-                <dl className="grid gap-4 sm:grid-cols-2">
-                  <div><dt className="portal-label">Nama usaha</dt><dd className="mt-1 text-sm font-semibold text-portal-ink">{business.name}</dd></div>
-                  <div><dt className="portal-label">Kategori</dt><dd className="mt-1 text-sm font-semibold text-portal-ink">{business.category}</dd></div>
-                  <div className="sm:col-span-2"><dt className="portal-label">Deskripsi</dt><dd className="mt-1 text-sm leading-6 text-portal-soft">{business.description}</dd></div>
-                </dl>
-              )}
-            </div>
-          </DataPanel>
+      <PageHeader eyebrow="Pengaturan Usaha" title={canManage ? 'Kelola usaha' : 'Info usaha'} description={canManage ? 'Ubah yang perlu saja. Data teknis tetap tersedia tanpa memenuhi layar utama.' : 'Lihat informasi usaha yang dibagikan sesuai aksesmu.'} />
 
-          <DataPanel title="Kesiapan profil" description="Ringkasan cepat sebelum informasi dilihat pelanggan.">
-            <div className="space-y-3 p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3 rounded-[14px] border border-portal-line px-3.5 py-3"><span className="text-sm text-portal-soft">Kelengkapan</span><StatusBadge tone={business.infoComplete ? 'success' : 'warning'}>{business.infoComplete ? 'Lengkap' : 'Perlu dilengkapi'}</StatusBadge></div>
-              <div className="flex items-center justify-between gap-3 rounded-[14px] border border-portal-line px-3.5 py-3"><span className="text-sm text-portal-soft">Status publik</span><StatusBadge tone={business.buyerPageReady ? 'success' : 'neutral'}>{business.buyerPageReady ? 'Siap' : 'Belum siap'}</StatusBadge></div>
-              <div className="rounded-[14px] border border-portal-line px-3.5 py-3"><p className="portal-label">Kontak</p><p className="mt-1 text-sm font-semibold text-portal-ink">{business.phone || 'Belum diisi'}</p></div>
-              <div className="rounded-[14px] border border-portal-line px-3.5 py-3"><p className="portal-label">Jam operasional</p><p className="mt-1 text-sm font-semibold text-portal-ink">{business.schedule}</p></div>
-            </div>
-          </DataPanel>
+      <section className="merchant-list border border-portal-line/80">
+        <details className="group border-b border-portal-line/70">
+          <summary className="merchant-action-row cursor-pointer list-none">
+            <span className="portal-icon-tile"><Store className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Info usaha</span><span className="mt-0.5 block truncate text-xs text-portal-soft">{business.name} · {business.category}</span></span>
+            <StatusBadge tone={business.infoComplete ? 'success' : 'warning'}>{business.infoComplete ? 'Lengkap' : 'Lengkapi'}</StatusBadge>
+          </summary>
+          <div className="border-t border-portal-line/70 p-4 sm:p-5">
+            {canManage ? <BusinessInfoQuickForm business={business} /> : (
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div><dt className="portal-label">Nama usaha</dt><dd className="mt-1 text-sm font-semibold text-portal-ink">{business.name}</dd></div>
+                <div><dt className="portal-label">Kategori</dt><dd className="mt-1 text-sm font-semibold text-portal-ink">{business.category}</dd></div>
+                <div className="sm:col-span-2"><dt className="portal-label">Deskripsi</dt><dd className="mt-1 text-sm leading-6 text-portal-soft">{business.description || 'Belum ada deskripsi.'}</dd></div>
+              </dl>
+            )}
+          </div>
+        </details>
 
-          <DataPanel title="Lokasi yang dilihat pelanggan" description="Pastikan pin dan alamat sesuai kondisi lapangan." className="xl:col-span-2">
-            <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <BusinessLocationMap value={businessPoint} searchQuery={businessLocationQuery} markerLabel={business.name} heightClassName="h-[280px] w-full" />
-              <div className="space-y-3">
-                <div className="portal-icon-tile"><MapPinned className="h-4 w-4" /></div>
-                <div><p className="portal-label">Alamat</p><p className="mt-1 text-sm leading-6 font-semibold text-portal-ink">{business.address || 'Alamat belum lengkap'}</p><p className="mt-1 text-xs text-portal-soft">{business.city}</p></div>
-                <div className="flex flex-col gap-2 pt-2">
-                  <a href={business.googleMapsUrl} target="_blank" rel="noreferrer" className="portal-button-secondary"><MapPinned className="h-4 w-4" /> Buka Google Maps</a>
-                  <a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary"><Store className="h-4 w-4" /> Lihat halaman publik <ExternalLink className="h-4 w-4" /></a>
-                </div>
-                {businessPoint ? <p className="text-[11px] text-portal-soft">Koordinat {businessPoint.lat}, {businessPoint.lng}</p> : null}
-              </div>
+        <details className="group border-b border-portal-line/70">
+          <summary className="merchant-action-row cursor-pointer list-none">
+            <span className="portal-icon-tile"><ImageIcon className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Foto & logo</span><span className="mt-0.5 block text-xs text-portal-soft">Logo dan banner tampilan toko</span></span>
+            <span className="text-xs font-black text-portal-forest">{canManage ? 'Atur' : 'Lihat'}</span>
+          </summary>
+          <div className="grid gap-6 border-t border-portal-line/70 p-4 sm:p-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+            {canManage ? <BusinessImageCropUpload businessId={business.id} kind="logo" currentUrl={business.logoUrl} label="Logo / foto usaha" description="Rasio 1:1 untuk kartu usaha dan foto toko." /> : <div className="aspect-square rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.logoUrl ? { backgroundImage: `url(${business.logoUrl})` } : undefined} />}
+            {canManage ? <BusinessImageCropUpload businessId={business.id} kind="banner" currentUrl={business.bannerUrl} label="Banner usaha" description="Rasio 8:3 untuk bagian atas tampilan toko." /> : <div className="aspect-[8/3] rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.bannerUrl ? { backgroundImage: `url(${business.bannerUrl})` } : undefined} />}
+          </div>
+        </details>
+
+        <details className="group border-b border-portal-line/70">
+          <summary className="merchant-action-row cursor-pointer list-none">
+            <span className="portal-icon-tile"><MapPinned className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Lokasi utama</span><span className="mt-0.5 block truncate text-xs text-portal-soft">{business.address || 'Alamat belum lengkap'} · {business.city}</span></span>
+            <span className="text-xs font-black text-portal-forest">Lihat</span>
+          </summary>
+          <div className="grid gap-4 border-t border-portal-line/70 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <BusinessLocationMap value={businessPoint} searchQuery={businessLocationQuery} markerLabel={business.name} heightClassName="h-[250px] w-full" />
+            <div className="space-y-2">
+              {canManage ? <Link href={`/businesses/${business.id}/locations`} className="portal-button-secondary w-full"><MapPinned className="h-4 w-4" /> Atur lokasi</Link> : null}
+              <a href={business.googleMapsUrl} target="_blank" rel="noreferrer" className="portal-button-secondary w-full"><ExternalLink className="h-4 w-4" /> Google Maps</a>
+              <a href={business.publicUrl} target="_blank" rel="noreferrer" className="portal-button-primary w-full"><Store className="h-4 w-4" /> Lihat Tampilan Toko</a>
             </div>
-          </DataPanel>
-        </div>
-      </SectionCard>
+          </div>
+        </details>
+
+        <Link href={`/businesses/${business.id}/operations`} className="merchant-action-row">
+          <span className="portal-icon-tile"><Clock3 className="h-4 w-4" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Jam & operasional</span><span className="mt-0.5 block text-xs text-portal-soft">{business.schedule}</span></span>
+          <span className="text-xs font-black text-portal-forest">Buka</span>
+        </Link>
+
+        {canViewTeam ? (
+          <Link href={`/businesses/${business.id}/team`} className="merchant-action-row">
+            <span className="portal-icon-tile"><UsersRound className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Tim & akses</span><span className="mt-0.5 block text-xs text-portal-soft">Atur siapa yang boleh mengelola usaha.</span></span>
+            <span className="text-xs font-black text-portal-forest">Buka</span>
+          </Link>
+        ) : null}
+      </section>
     </PortalShell>
   );
 }

@@ -50,6 +50,7 @@ jobs:
   frontend-runtime-gate:
     name: Frontend runtime gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs: [contract, docker-build]
     steps:

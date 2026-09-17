@@ -71,6 +71,8 @@ function canonicalBusiness(
               category: 'Kuliner',
               schedule: 'Setiap hari',
               locationQuery: 'Jl. Contoh, Jakarta',
+              logo_url: '/api/forum/media/logo-warung.webp',
+              banner_url: '/api/forum/media/banner-warung.webp',
             },
             ...(legacyProducts ? { products: legacyProducts } : {}),
           },
@@ -244,6 +246,8 @@ describe('canonical Usaha Business adapter', () => {
     expect(updated.currentRole).toBe('manager');
     expect(updated.category).toBe('Kuliner');
     expect(updated.schedule).toBe('Setiap hari');
+    expect(updated.logoUrl).toBe('/api/forum/media/logo-warung.webp');
+    expect(updated.bannerUrl).toBe('/api/forum/media/banner-warung.webp');
     expect(fetchMock).toHaveBeenCalledWith(
       `http://marketplace_service:8081/v1/businesses/${BUSINESS_ID}`,
       expect.objectContaining({
@@ -274,6 +278,10 @@ describe('canonical Usaha Business adapter', () => {
         stock_mode: 'manual',
         stock_health: 'aman',
         stock_updated_at: '2026-09-03T00:00:00Z',
+        image_url: '/api/forum/media/menu-jus-mangga.webp',
+        image_mime_type: 'image/webp',
+        image_width: 1200,
+        image_height: 1200,
       }],
       [{ id: 'legacy-product', name: 'Produk lama' }],
     );
@@ -297,6 +305,7 @@ describe('canonical Usaha Business adapter', () => {
         priceLabel: 'Rp10.000',
         stockLabel: '4 botol',
         status: 'live',
+        imageUrl: '/api/forum/media/menu-jus-mangga.webp',
       }),
     ]);
     expect(business?.products.some(product => product.id === 'legacy-product')).toBe(false);

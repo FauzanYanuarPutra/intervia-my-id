@@ -3,7 +3,17 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use super::products::BusinessProduct;
+use super::media::{
+    validate_business_image, BusinessImageInput, BusinessImageKind, ValidatedBusinessImage,
+};
+
+use super::{
+    products::BusinessProduct,
+    profile::{
+        validate_profile_input, BusinessCapabilityRecord, BusinessProfileInput,
+        BusinessProfileRecord, ProfileValidationError, ResolvedBusinessProfile,
+    },
+};
 
 const MAX_NAME_LEN: usize = 160;
 const MAX_ADDRESS_LEN: usize = 500;
@@ -31,6 +41,8 @@ pub(crate) struct BusinessInput {
     pub(crate) name: String,
     #[serde(default = "default_capability_key")]
     pub(crate) capability_key: String,
+    #[serde(default)]
+    pub(crate) profile: Option<BusinessProfileInput>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -79,6 +91,10 @@ pub(crate) struct BusinessProfileUpdateRequest {
     pub(crate) schedule: String,
     pub(crate) location_query: String,
     pub(crate) primary_location: PrimaryLocationInput,
+    #[serde(default)]
+    pub(crate) logo: Option<BusinessImageInput>,
+    #[serde(default)]
+    pub(crate) banner: Option<BusinessImageInput>,
 }
 
 #[derive(Debug, Clone)]
@@ -91,12 +107,15 @@ pub(crate) struct ValidatedBusinessProfileUpdate {
     pub(crate) schedule: String,
     pub(crate) location_query: String,
     pub(crate) primary_location: PrimaryLocationInput,
+    pub(crate) logo: Option<ValidatedBusinessImage>,
+    pub(crate) banner: Option<ValidatedBusinessImage>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct ValidatedProvisionCommand {
     pub(crate) organization: OrganizationSelection,
     pub(crate) business: BusinessInput,
+    pub(crate) profile: ResolvedBusinessProfile,
     pub(crate) primary_location: PrimaryLocationInput,
     pub(crate) storefront: StorefrontInput,
     pub(crate) request_hash: String,
@@ -153,6 +172,8 @@ pub(crate) struct BusinessLocation {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct BusinessAggregate {
     pub(crate) business: BusinessRecord,
+    pub(crate) profile: BusinessProfileRecord,
+    pub(crate) capabilities: Vec<BusinessCapabilityRecord>,
     pub(crate) primary_store: BusinessStore,
     pub(crate) primary_location: BusinessLocation,
     pub(crate) products: Vec<BusinessProduct>,
@@ -166,6 +187,15 @@ pub(crate) enum ValidationError {
     OrganizationNameNotAllowed,
     InvalidBusinessName,
     InvalidCapability,
+    InvalidTemplate,
+    InvalidCurrency,
+    InvalidTimezone,
+    InvalidCostingPolicy,
+    InvalidAccountingMode,
+    InvalidApprovalPolicy,
+    InvalidBranchMode,
+    InvalidNegativeStockPolicy,
+    InvalidDocumentPrefix,
     InvalidLocationName,
     InvalidLocationAddress,
     InvalidLocationCity,
@@ -177,6 +207,8 @@ pub(crate) enum ValidationError {
     InvalidCategory,
     InvalidSchedule,
     InvalidLocationQuery,
+    InvalidBusinessLogo,
+    InvalidBusinessBanner,
 }
 
 impl ValidationError {
@@ -188,6 +220,15 @@ impl ValidationError {
             Self::OrganizationNameNotAllowed => "organization_name_not_allowed",
             Self::InvalidBusinessName => "invalid_business_name",
             Self::InvalidCapability => "invalid_capability_key",
+            Self::InvalidTemplate => "invalid_business_template",
+            Self::InvalidCurrency => "invalid_business_currency",
+            Self::InvalidTimezone => "invalid_business_timezone",
+            Self::InvalidCostingPolicy => "invalid_costing_policy",
+            Self::InvalidAccountingMode => "invalid_accounting_mode",
+            Self::InvalidApprovalPolicy => "invalid_approval_policy",
+            Self::InvalidBranchMode => "invalid_branch_mode",
+            Self::InvalidNegativeStockPolicy => "invalid_negative_stock_policy",
+            Self::InvalidDocumentPrefix => "invalid_document_prefix",
             Self::InvalidLocationName => "invalid_location_name",
             Self::InvalidLocationAddress => "invalid_location_address",
             Self::InvalidLocationCity => "invalid_location_city",
@@ -199,6 +240,24 @@ impl ValidationError {
             Self::InvalidCategory => "invalid_business_category",
             Self::InvalidSchedule => "invalid_business_schedule",
             Self::InvalidLocationQuery => "invalid_location_query",
+            Self::InvalidBusinessLogo => "invalid_business_logo",
+            Self::InvalidBusinessBanner => "invalid_business_banner",
+        }
+    }
+}
+
+impl From<ProfileValidationError> for ValidationError {
+    fn from(error: ProfileValidationError) -> Self {
+        match error {
+            ProfileValidationError::InvalidTemplate => Self::InvalidTemplate,
+            ProfileValidationError::InvalidCurrency => Self::InvalidCurrency,
+            ProfileValidationError::InvalidTimezone => Self::InvalidTimezone,
+            ProfileValidationError::InvalidCostingPolicy => Self::InvalidCostingPolicy,
+            ProfileValidationError::InvalidAccountingMode => Self::InvalidAccountingMode,
+            ProfileValidationError::InvalidApprovalPolicy => Self::InvalidApprovalPolicy,
+            ProfileValidationError::InvalidBranchMode => Self::InvalidBranchMode,
+            ProfileValidationError::InvalidNegativeStockPolicy => Self::InvalidNegativeStockPolicy,
+            ProfileValidationError::InvalidDocumentPrefix => Self::InvalidDocumentPrefix,
         }
     }
 }
@@ -235,6 +294,16 @@ pub(crate) fn validate_business_profile_update(
     validate_coordinates(request.primary_location.lat, request.primary_location.lng)?;
     let phone = normalize_optional_or_empty(request.primary_location.phone, MAX_PHONE_LEN)
         .ok_or(ValidationError::InvalidPhone)?;
+    let logo = request
+        .logo
+        .map(|image| validate_business_image(image, BusinessImageKind::Logo))
+        .transpose()
+        .map_err(|_| ValidationError::InvalidBusinessLogo)?;
+    let banner = request
+        .banner
+        .map(|image| validate_business_image(image, BusinessImageKind::Banner))
+        .transpose()
+        .map_err(|_| ValidationError::InvalidBusinessBanner)?;
 
     Ok(ValidatedBusinessProfileUpdate {
         expected_version: request.expected_version,
@@ -253,6 +322,8 @@ pub(crate) fn validate_business_profile_update(
             phone,
             public_visibility: request.primary_location.public_visibility,
         },
+        logo,
+        banner,
     })
 }
 
@@ -261,13 +332,17 @@ pub(crate) fn validate_provision_request(
 ) -> Result<ValidatedProvisionCommand, ValidationError> {
     let business_name = normalize_required(request.business.name, MAX_NAME_LEN)
         .ok_or(ValidationError::InvalidBusinessName)?;
-    let capability_key = request.business.capability_key.trim().to_ascii_lowercase();
+    let requested_capability_key = request.business.capability_key.trim().to_ascii_lowercase();
     if !matches!(
-        capability_key.as_str(),
+        requested_capability_key.as_str(),
         "general" | "food_beverage" | "retail" | "services"
     ) {
         return Err(ValidationError::InvalidCapability);
     }
+    let profile =
+        validate_profile_input(request.business.profile.as_ref(), &requested_capability_key)
+            .map_err(ValidationError::from)?;
+    let capability_key = profile.legacy_capability_key.clone();
 
     let organization_name = request
         .organization
@@ -327,6 +402,7 @@ pub(crate) fn validate_provision_request(
     let business = BusinessInput {
         name: business_name,
         capability_key,
+        profile: Some(profile.as_input()),
     };
     let primary_location = PrimaryLocationInput {
         name: location_name,
@@ -344,9 +420,10 @@ pub(crate) fn validate_provision_request(
         public_metadata: request.storefront.public_metadata,
     };
     let canonical = serde_json::json!({
-        "version": 1,
+        "version": 2,
         "organization": &organization,
         "business": &business,
+        "profile": &profile,
         "primary_location": &primary_location,
         "storefront": &storefront,
     });
@@ -356,6 +433,7 @@ pub(crate) fn validate_provision_request(
     Ok(ValidatedProvisionCommand {
         organization,
         business,
+        profile,
         primary_location,
         storefront,
         request_hash,
@@ -405,13 +483,14 @@ fn validate_coordinates(lat: Option<f64>, lng: Option<f64>) -> Result<(), Valida
     }
 }
 
-const PUBLIC_STORE_KEYS: [&str; 44] = [
+const PUBLIC_STORE_KEYS: [&str; 45] = [
     "source",
     "portal_public_url",
     "store_photo_url",
     "cover_image_url",
     "cover_url",
     "banner_url",
+    "logo_url",
     "image_url",
     "imageUrl",
     "image",
@@ -456,6 +535,16 @@ pub(crate) fn project_public_store_details(raw: &Value) -> serde_json::Map<Strin
     let Some(object) = raw.as_object() else {
         return serde_json::Map::new();
     };
+    let mut projected = project_public_store_detail_fields(object);
+    if let Some(public_object) = object.get("public").and_then(Value::as_object) {
+        projected.extend(project_public_store_detail_fields(public_object));
+    }
+    projected
+}
+
+fn project_public_store_detail_fields(
+    object: &serde_json::Map<String, Value>,
+) -> serde_json::Map<String, Value> {
     PUBLIC_STORE_KEYS
         .iter()
         .filter_map(|key| {
@@ -554,7 +643,11 @@ impl<T> TransposeOption<T> for Option<Option<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::businesses::products::BusinessProduct;
+    use crate::businesses::{
+        products::BusinessProduct,
+        profile::{BusinessCapabilityRecord, BusinessProfileRecord},
+    };
+    use chrono::NaiveTime;
     use serde_json::json;
     use uuid::Uuid;
 
@@ -568,6 +661,7 @@ mod tests {
             business: BusinessInput {
                 name: "  Kedai   Cuk  ".to_owned(),
                 capability_key: "FOOD_BEVERAGE".to_owned(),
+                profile: None,
             },
             primary_location: PrimaryLocationInput {
                 name: "  Lokasi   utama ".to_owned(),
@@ -594,9 +688,24 @@ mod tests {
 
         assert_eq!(first.business.name, "Kedai Cuk");
         assert_eq!(first.business.capability_key, "food_beverage");
+        assert_eq!(first.profile.template_key, "juice_fnb");
         assert_eq!(first.primary_location.name, "Lokasi utama");
         assert_eq!(first.request_hash, second.request_hash);
         assert_eq!(first.request_hash.len(), 64);
+    }
+
+    #[test]
+    fn explicit_template_is_authoritative_over_legacy_projection() {
+        let mut request = valid_request();
+        request.business.capability_key = "general".to_owned();
+        request.business.profile = Some(BusinessProfileInput {
+            template_key: "laundry".to_owned(),
+            ..BusinessProfileInput::default()
+        });
+
+        let command = validate_provision_request(request).expect("valid laundry profile");
+        assert_eq!(command.profile.template_key, "laundry");
+        assert_eq!(command.business.capability_key, "services");
     }
 
     #[test]
@@ -666,6 +775,8 @@ mod tests {
                 phone: Some(" +628123456789 ".to_owned()),
                 public_visibility: true,
             },
+            logo: None,
+            banner: None,
         };
 
         let command = validate_business_profile_update(request).expect("valid profile update");
@@ -698,6 +809,8 @@ mod tests {
                 phone: None,
                 public_visibility: true,
             },
+            logo: None,
+            banner: None,
         };
 
         assert_eq!(
@@ -712,6 +825,8 @@ mod tests {
     fn public_store_serialization_is_allowlist_only() {
         let dto = PublicStore {
             id: Uuid::new_v4(),
+            owner_user_id: Uuid::new_v4(),
+            organization_id: Some(Uuid::new_v4()),
             name: "Kedai Cuk".to_owned(),
             slug: "kedai-cuk".to_owned(),
             description: Some("Minuman segar".to_owned()),
@@ -730,17 +845,52 @@ mod tests {
 
         let serialized = serde_json::to_value(dto).expect("serialize public store");
         let object = serialized.as_object().expect("public store object");
-        assert_eq!(object.len(), 15);
+        assert_eq!(object.len(), 17);
     }
 
     #[test]
-    fn business_aggregate_serializes_canonical_products_outside_store_metadata() {
+    fn public_store_projection_exposes_brand_media_without_private_metadata() {
+        let projected = project_public_store_details(&json!({
+            "logo_url": "/api/forum/media/logo.webp",
+            "banner_url": "/api/forum/media/banner.webp",
+            "private_note": "never expose this",
+        }));
+
+        assert_eq!(projected["logo_url"], "/api/forum/media/logo.webp");
+        assert_eq!(projected["banner_url"], "/api/forum/media/banner.webp");
+        assert!(!projected.contains_key("private_note"));
+    }
+
+    #[test]
+    fn public_store_projection_exposes_nested_public_brand_media() {
+        let projected = project_public_store_details(&json!({
+            "private_note": "never expose this",
+            "public": {
+                "logo_url": "/api/forum/media/logo.webp",
+                "banner_url": "/api/forum/media/banner.webp",
+                "cover_image_url": "/api/forum/media/banner.webp",
+                "store_photo_url": "/api/forum/media/banner.webp",
+                "private_note": "never expose this either"
+            }
+        }));
+
+        assert_eq!(projected["logo_url"], "/api/forum/media/logo.webp");
+        assert_eq!(projected["banner_url"], "/api/forum/media/banner.webp");
+        assert_eq!(projected["cover_image_url"], "/api/forum/media/banner.webp");
+        assert_eq!(projected["store_photo_url"], "/api/forum/media/banner.webp");
+        assert!(!projected.contains_key("private_note"));
+    }
+
+    #[test]
+    fn business_aggregate_serializes_profile_capabilities_and_products() {
         let now = chrono::Utc::now();
         let product_id = Uuid::new_v4();
+        let business_id = Uuid::new_v4();
+        let organization_id = Uuid::new_v4();
         let aggregate = BusinessAggregate {
             business: BusinessRecord {
-                id: Uuid::new_v4(),
-                organization_id: Uuid::new_v4(),
+                id: business_id,
+                organization_id,
                 name: "Kedai Cuk".to_owned(),
                 capability_key: "food_beverage".to_owned(),
                 status: "active".to_owned(),
@@ -748,6 +898,33 @@ mod tests {
                 created_at: now,
                 updated_at: now,
             },
+            profile: BusinessProfileRecord {
+                business_id,
+                organization_id,
+                template_key: "juice_fnb".to_owned(),
+                template_version: 1,
+                currency: "IDR".to_owned(),
+                timezone: "Asia/Jakarta".to_owned(),
+                costing_policy: "weighted_average".to_owned(),
+                accounting_mode: "simple".to_owned(),
+                approval_policy: "owner_managed".to_owned(),
+                branch_mode: "single".to_owned(),
+                negative_stock_policy: "deny".to_owned(),
+                business_day_cutoff: NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
+                document_prefix: "FNB".to_owned(),
+                version: 1,
+                created_at: now,
+                updated_at: now,
+            },
+            capabilities: vec![BusinessCapabilityRecord {
+                business_id,
+                organization_id,
+                capability_key: "recipes".to_owned(),
+                enabled: true,
+                source: "template".to_owned(),
+                created_at: now,
+                updated_at: now,
+            }],
             primary_store: BusinessStore {
                 id: Uuid::new_v4(),
                 name: "Kedai Cuk".to_owned(),
@@ -796,10 +973,17 @@ mod tests {
                 stock_updated_at: now,
                 consignment_terms: None,
                 notes: None,
+                image_url: None,
+                image_mime_type: None,
+                image_width: None,
+                image_height: None,
+                modifier_groups: serde_json::json!([]),
             }],
         };
 
         let serialized = serde_json::to_value(aggregate).expect("serialize business aggregate");
+        assert_eq!(serialized["profile"]["template_key"], "juice_fnb");
+        assert_eq!(serialized["capabilities"][0]["capability_key"], "recipes");
         assert_eq!(serialized["products"][0]["id"], product_id.to_string());
         assert_eq!(
             serialized["primary_store"]["metadata"]["products"][0]["id"],
@@ -822,6 +1006,8 @@ mod tests {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct PublicStore {
     pub(crate) id: Uuid,
+    pub(crate) owner_user_id: Uuid,
+    pub(crate) organization_id: Option<Uuid>,
     pub(crate) name: String,
     pub(crate) slug: String,
     pub(crate) description: Option<String>,

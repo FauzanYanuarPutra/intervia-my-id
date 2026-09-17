@@ -18,11 +18,12 @@ use super::{
         CreateIngredientRequest, ReplaceRecipeRequest, UpsertChannelRequest,
     },
     domain::{BusinessProfileUpdateRequest, ProvisionBusinessRequest, ReconcileBusinessRequest},
-    identity_client::IdentityClient,
+    identity_client::{IdentityClient, OrganizationSummary},
     products::{
         AdjustBusinessInventoryRequest, CreateBusinessProductRequest, ProductRepository,
         UpdateBusinessProductRequest,
     },
+    recipes::{RecipeRepository, RecipeRepositoryError},
     repository::BusinessRepository,
     service::{BusinessService, BusinessServiceError},
     settlement::{CreateSettlementRequest, SettlementRepository, SettlementRepositoryError},
@@ -203,7 +204,14 @@ async fn list_ingredients(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (_, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ViewInventory,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -226,7 +234,14 @@ async fn create_ingredient(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateIngredientRequest>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (_, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ManageInventory,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -248,10 +263,23 @@ async fn get_recipe(
     headers: HeaderMap,
     Path((business_id, product_id)): Path<(Uuid, Uuid)>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ViewCosting,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
+    if let Err(error) = RecipeRepository::new(state.db.clone())
+        .authorize_view(actor_id, business_id, organization_id)
+        .await
+    {
+        return recipe_error_response(error);
+    }
     match ControlRepository::new(state.db.clone())
         .get_recipe(business_id, organization_id, product_id)
         .await
@@ -272,12 +300,19 @@ async fn replace_recipe(
     Path((business_id, product_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ReplaceRecipeRequest>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ManageCosting,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
-    match ControlRepository::new(state.db.clone())
-        .replace_recipe(business_id, organization_id, product_id, payload)
+    match RecipeRepository::new(state.db.clone())
+        .publish_legacy(actor_id, business_id, organization_id, product_id, payload)
         .await
     {
         Ok(recipe) => (
@@ -285,7 +320,7 @@ async fn replace_recipe(
             Json(json!({ "data": { "recipe": recipe } })),
         )
             .into_response(),
-        Err(error) => control_error_response(error),
+        Err(error) => recipe_error_response(error),
     }
 }
 
@@ -294,7 +329,14 @@ async fn list_channels(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (_, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::Channels,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -317,7 +359,14 @@ async fn upsert_channel(
     Path((business_id, channel_key)): Path<(Uuid, String)>,
     Json(payload): Json<UpsertChannelRequest>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (_, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::Channels,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -335,7 +384,14 @@ async fn list_finance_entries(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (_, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::Finance,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -358,7 +414,13 @@ async fn create_finance_entry(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateFinanceEntryRequest>,
 ) -> Response {
-    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::Finance,
+    )
+    .await
     {
         Ok(value) => value,
         Err(response) => return response,
@@ -381,7 +443,14 @@ async fn list_settlements(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization_id) = match management_context(&state, &headers, business_id).await {
+    let (_, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::Finance,
+    )
+    .await
+    {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -404,7 +473,13 @@ async fn create_settlement(
     Path(business_id): Path<Uuid>,
     Json(payload): Json<CreateSettlementRequest>,
 ) -> Response {
-    let (actor_id, organization_id) = match management_context(&state, &headers, business_id).await
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::Finance,
+    )
+    .await
     {
         Ok(value) => value,
         Err(response) => return response,
@@ -490,18 +565,47 @@ async fn reconcile(
     }
 }
 
-async fn management_context(
+#[derive(Debug, Clone, Copy)]
+enum BusinessControlAccess {
+    ViewInventory,
+    ManageInventory,
+    ViewCosting,
+    ManageCosting,
+    Channels,
+    Finance,
+}
+
+impl BusinessControlAccess {
+    fn allows(self, organization: &OrganizationSummary) -> bool {
+        match self {
+            Self::ViewInventory => organization.can_view_inventory_controls(),
+            Self::ManageInventory => organization.can_manage_inventory_controls(),
+            Self::ViewCosting | Self::ManageCosting => organization.can_view_sale_costs(),
+            Self::Channels => organization.can_manage_channels(),
+            Self::Finance => organization.can_view_finance_controls(),
+        }
+    }
+}
+
+async fn business_control_context(
     state: &AppState,
     headers: &HeaderMap,
     business_id: Uuid,
+    access: BusinessControlAccess,
 ) -> Result<(Uuid, Uuid), Response> {
     let (actor_id, authorization) =
         actor_and_authorization(state, headers).map_err(actor_auth_error_response)?;
-    let organization_id = service(state)
-        .management_organization_for_business(&authorization, business_id)
+    let organization = service(state)
+        .organization_for_business(&authorization, business_id)
         .await
         .map_err(error_response)?;
-    Ok((actor_id, organization_id))
+    if !access.allows(&organization) {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "business_control_access_denied",
+        ));
+    }
+    Ok((actor_id, organization.id))
 }
 
 fn service(state: &AppState) -> BusinessService {
@@ -560,6 +664,25 @@ fn control_error_response(error: ControlRepositoryError) -> Response {
     }
 }
 
+fn recipe_error_response(error: RecipeRepositoryError) -> Response {
+    match error {
+        RecipeRepositoryError::NotFound => {
+            api_error(StatusCode::NOT_FOUND, "business_recipe_not_found")
+        }
+        RecipeRepositoryError::Validation(code) => api_error(StatusCode::BAD_REQUEST, code),
+        RecipeRepositoryError::Forbidden => {
+            api_error(StatusCode::FORBIDDEN, "business_recipe_access_denied")
+        }
+        RecipeRepositoryError::Conflict => {
+            api_error(StatusCode::CONFLICT, "business_recipe_conflict")
+        }
+        RecipeRepositoryError::Database => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_recipe_storage_unavailable",
+        ),
+    }
+}
+
 fn settlement_error_response(error: SettlementRepositoryError) -> Response {
     match error {
         SettlementRepositoryError::Validation(error) => {
@@ -601,9 +724,13 @@ fn error_response(error: BusinessServiceError) -> Response {
         BusinessServiceError::IdentityUnavailable => {
             api_error(StatusCode::SERVICE_UNAVAILABLE, "identity_unavailable")
         }
-        BusinessServiceError::Storage => {
+        BusinessServiceError::ProvisioningRetryable => {
             api_error(StatusCode::SERVICE_UNAVAILABLE, "provisioning_retryable")
         }
+        BusinessServiceError::Storage => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_storage_unavailable",
+        ),
     }
 }
 
@@ -614,6 +741,45 @@ fn api_error(status: StatusCode, code: &'static str) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn organization(role: &str) -> OrganizationSummary {
+        OrganizationSummary {
+            id: Uuid::new_v4(),
+            current_user_role: role.to_owned(),
+        }
+    }
+
+    #[test]
+    fn invited_role_control_access_is_operation_specific() {
+        let cashier = organization("cashier");
+        assert!(!BusinessControlAccess::ViewInventory.allows(&cashier));
+        assert!(!BusinessControlAccess::ManageInventory.allows(&cashier));
+        assert!(!BusinessControlAccess::ViewCosting.allows(&cashier));
+        assert!(!BusinessControlAccess::Finance.allows(&cashier));
+
+        let viewer = organization("viewer");
+        assert!(!BusinessControlAccess::ViewInventory.allows(&viewer));
+        assert!(!BusinessControlAccess::ManageInventory.allows(&viewer));
+        assert!(!BusinessControlAccess::Channels.allows(&viewer));
+
+        let manager = organization("manager");
+        assert!(BusinessControlAccess::ViewInventory.allows(&manager));
+        assert!(BusinessControlAccess::ManageInventory.allows(&manager));
+        assert!(BusinessControlAccess::ViewCosting.allows(&manager));
+        assert!(BusinessControlAccess::ManageCosting.allows(&manager));
+        assert!(BusinessControlAccess::Channels.allows(&manager));
+        assert!(BusinessControlAccess::Finance.allows(&manager));
+
+        let inventory = organization("org_inventory");
+        assert!(BusinessControlAccess::ViewInventory.allows(&inventory));
+        assert!(BusinessControlAccess::ManageInventory.allows(&inventory));
+        assert!(!BusinessControlAccess::ViewCosting.allows(&inventory));
+        assert!(!BusinessControlAccess::Finance.allows(&inventory));
+
+        let accounting = organization("org_accounting");
+        assert!(BusinessControlAccess::Finance.allows(&accounting));
+        assert!(!BusinessControlAccess::ViewInventory.allows(&accounting));
+    }
 
     #[test]
     fn idempotency_key_is_required_and_must_be_a_uuid() {
@@ -632,6 +798,18 @@ mod tests {
     }
 
     #[test]
+    fn storage_and_retryable_provisioning_use_service_unavailable() {
+        assert_eq!(
+            error_response(BusinessServiceError::Storage).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            error_response(BusinessServiceError::ProvisioningRetryable).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
+
+    #[test]
     fn product_validation_errors_use_stable_bad_request_responses() {
         let response = error_response(BusinessServiceError::ProductValidation(
             super::super::products::ProductValidationError::Name,
@@ -644,6 +822,12 @@ mod tests {
         let response =
             control_error_response(ControlRepositoryError::Validation("invalid_finance_amount"));
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn recipe_permission_errors_use_stable_forbidden_responses() {
+        let response = recipe_error_response(RecipeRepositoryError::Forbidden);
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     #[test]

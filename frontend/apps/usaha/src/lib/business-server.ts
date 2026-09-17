@@ -1,6 +1,12 @@
+import { parseProductModifierGroups } from 'lajukan-ui/product-configuration';
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import {
+  getBusinessTemplatePreset,
+  type BusinessTemplateKey,
+} from '@/lib/business-templates';
+import { normalizeWorkspaceRole } from '@/lib/business-role';
 import { permissionMap } from '@/lib/portal-access';
 import {
   buildBusinessGoogleMapsUrl,
@@ -8,6 +14,7 @@ import {
 } from '@/lib/portal-links';
 import type {
   BusinessLocation,
+  BusinessProfileSummary,
   BusinessRecord,
   PortalRole,
   ProductRecord,
@@ -17,6 +24,7 @@ import type {
   ReservationRecord,
   TeamMember,
 } from '@/lib/portal-types';
+import type { BusinessImageValue } from '@/lib/media-crop';
 
 const IDENTITY_URL =
   process.env.INTERNAL_API_URL ||
@@ -127,8 +135,7 @@ async function requestJson(url: string, init: RequestInit = {}): Promise<unknown
 function parseActor(payload: unknown): PortalAccount | null {
   const root = record(payload) ?? {};
   const data = record(root.data);
-  const user =
-    record(root.user) ?? record(data?.user) ?? data ?? root;
+  const user = record(root.user) ?? record(data?.user) ?? data ?? root;
   const id = stringValue(user.id ?? user.user_id ?? user.sub);
   if (!id) return null;
   const metadata = record(user.metadata) ?? {};
@@ -190,13 +197,6 @@ export async function listWorkspaceOrganizations(
       currentUserRole: stringValue(item.current_user_role) || 'viewer',
     }))
     .filter(item => item.id && item.name);
-}
-
-function normalizeRole(value: string, isOwner: boolean): PortalRole {
-  if (isOwner || value === 'owner') return 'owner';
-  if (['admin', 'manager', 'org_admin'].includes(value)) return 'manager';
-  if (['cashier', 'staff', 'operator'].includes(value)) return 'cashier';
-  return 'viewer';
 }
 
 function metadataOf(store: JsonRecord): JsonRecord {
@@ -322,6 +322,41 @@ function mapCanonicalProduct(value: unknown): ProductRecord | null {
       item.consignment_terms ?? item.consignmentTerms,
     ),
     notes: stringValue(item.notes),
+    imageUrl: stringValue(item.image_url ?? item.imageUrl) || undefined,
+    modifierGroups: parseProductModifierGroups({
+      modifier_groups: item.modifier_groups ?? item.modifierGroups,
+    }),
+    ...(stringValue(item.image_url ?? item.imageUrl)
+      ? {
+          image: {
+            url: stringValue(item.image_url ?? item.imageUrl),
+            mimeType: stringValue(item.image_mime_type ?? item.imageMimeType) || 'image/webp',
+            width: Number(item.image_width ?? item.imageWidth) || 1200,
+            height: Number(item.image_height ?? item.imageHeight) || 1200,
+          },
+        }
+      : {}),
+  };
+}
+
+function mapCanonicalProfile(value: unknown): BusinessProfileSummary | undefined {
+  const profile = record(value);
+  if (!profile) return undefined;
+  const templateKey = stringValue(profile.template_key ?? profile.templateKey);
+  if (!templateKey) return undefined;
+  return {
+    templateKey,
+    templateVersion: Number(profile.template_version ?? profile.templateVersion) || 1,
+    currency: stringValue(profile.currency) || 'IDR',
+    timezone: stringValue(profile.timezone) || 'Asia/Jakarta',
+    costingPolicy: stringValue(profile.costing_policy ?? profile.costingPolicy),
+    accountingMode: stringValue(profile.accounting_mode ?? profile.accountingMode),
+    approvalPolicy: stringValue(profile.approval_policy ?? profile.approvalPolicy),
+    branchMode: stringValue(profile.branch_mode ?? profile.branchMode) || 'single',
+    negativeStockPolicy:
+      stringValue(profile.negative_stock_policy ?? profile.negativeStockPolicy) || 'deny',
+    documentPrefix: stringValue(profile.document_prefix ?? profile.documentPrefix),
+    version: Number(profile.version) || 1,
   };
 }
 
@@ -340,7 +375,7 @@ function mapStore(
     stringValue(metadata.organization_id ?? metadata.organizationId);
   const organization = organizations.find(item => item.id === organizationId);
   const ownerUserId = stringValue(store.owner_user_id);
-  const role = normalizeRole(
+  const role = normalizeWorkspaceRole(
     organization?.currentUserRole ?? '',
     ownerUserId === actor.id || organization?.ownerUserId === actor.id,
   );
@@ -381,6 +416,12 @@ function mapStore(
     category: stringValue(metadata.category) || 'Usaha umum',
     phone: stringValue(store.phone),
     description: stringValue(store.description),
+    logoUrl: stringValue(
+      metadata.logo_url ?? metadata.image_url ?? metadata.store_photo_url,
+    ) || undefined,
+    bannerUrl: stringValue(
+      metadata.banner_url ?? metadata.cover_image_url ?? metadata.cover_url,
+    ) || undefined,
     schedule: stringValue(metadata.schedule) || 'Belum diatur',
     infoComplete: Boolean(name && city && stringValue(store.phone)),
     productsCount: products.length,
@@ -422,7 +463,7 @@ function mapCanonicalBusiness(
         .map(mapCanonicalProduct)
         .filter((item): item is ProductRecord => Boolean(item))
     : undefined;
-  return mapStore(
+  const mapped = mapStore(
     {
       ...store,
       organization_id: business.organization_id,
@@ -437,6 +478,16 @@ function mapCanonicalBusiness(
     stringValue(business.capability_key) || 'general',
     canonicalProducts,
   );
+  const profile = mapCanonicalProfile(value.profile);
+  const activeCapabilityKeys = arrayValue<JsonRecord>(value.capabilities)
+    .filter(capability => boolValue(capability.enabled, true))
+    .map(capability => stringValue(capability.capability_key ?? capability.capabilityKey))
+    .filter(Boolean);
+  return {
+    ...mapped,
+    ...(profile ? { profile, templateKey: profile.templateKey } : {}),
+    ...(activeCapabilityKeys.length > 0 ? { activeCapabilityKeys } : {}),
+  };
 }
 
 async function getCanonicalAggregate(
@@ -482,6 +533,7 @@ export async function getBusinessForCurrentActor(
 
 export async function createBusiness(input: {
   name: string;
+  templateKey?: BusinessTemplateKey;
   category: string;
   city: string;
   address: string;
@@ -492,14 +544,7 @@ export async function createBusiness(input: {
   idempotencyKey?: string;
 }) {
   const { token } = await requireAuthenticatedActor();
-  const normalizedCategory = input.category.toLowerCase();
-  const capabilityKey = /makanan|minuman|kuliner|kopi|cafe|resto/.test(normalizedCategory)
-    ? 'food_beverage'
-    : /retail|ritel|toko/.test(normalizedCategory)
-      ? 'retail'
-      : /jasa|service|laundry/.test(normalizedCategory)
-        ? 'services'
-        : 'general';
+  const preset = getBusinessTemplatePreset(input.templateKey ?? 'general');
   const payload = await requestJson(`${MARKETPLACE_URL}/v1/businesses/provision`, {
     method: 'POST',
     headers: {
@@ -513,7 +558,11 @@ export async function createBusiness(input: {
         organization_id: null,
         new_organization_name: input.name,
       },
-      business: { name: input.name, capability_key: capabilityKey },
+      business: {
+        name: input.name,
+        capability_key: preset.legacyCapabilityKey,
+        profile: { template_key: preset.key },
+      },
       primary_location: {
         name: 'Lokasi utama',
         address: input.address,
@@ -578,6 +627,7 @@ export type CreateBusinessProductInput = {
   stockMode: ProductStockMode;
   consignmentTerms?: string;
   notes?: string;
+  image?: BusinessImageValue;
 };
 
 export async function createBusinessProduct(
@@ -606,6 +656,16 @@ export async function createBusinessProduct(
         stock_mode: input.stockMode,
         consignment_terms: stringValue(input.consignmentTerms) || null,
         notes: stringValue(input.notes) || null,
+        ...(input.image
+          ? {
+              image: {
+                url: input.image.url,
+                mime_type: input.image.mimeType,
+                width: input.image.width,
+                height: input.image.height,
+              },
+            }
+          : {}),
       }),
     },
   );
@@ -633,6 +693,8 @@ export async function updateBusiness(
     latitude?: number | null;
     longitude?: number | null;
     metadataPatch?: JsonRecord;
+    logo?: BusinessImageValue;
+    banner?: BusinessImageValue;
   },
 ): Promise<BusinessRecord> {
   const { token, account } = await requireAuthenticatedActor();
@@ -698,9 +760,6 @@ export async function updateBusiness(
   const primaryLocation = current.locations?.find(item => item.isPrimary)
     ?? current.locations?.[0];
   const category = input.category ?? current.category;
-  const capabilityKey = input.category === undefined
-    ? current.capabilityKey ?? 'general'
-    : capabilityKeyForCategory(category);
   const payload = await requestJson(
     `${MARKETPLACE_URL}/v1/businesses/${encodeURIComponent(current.id)}`,
     {
@@ -712,7 +771,7 @@ export async function updateBusiness(
       body: JSON.stringify({
         expected_version: current.version ?? 1,
         name: input.name ?? current.name,
-        capability_key: capabilityKey,
+        capability_key: current.capabilityKey ?? 'general',
         category,
         description: input.description ?? current.description,
         schedule: input.schedule ?? current.schedule,
@@ -726,6 +785,26 @@ export async function updateBusiness(
           phone: input.phone ?? current.phone,
           public_visibility: primaryLocation?.publicVisibility ?? true,
         },
+        ...(input.logo
+          ? {
+              logo: {
+                url: input.logo.url,
+                mime_type: input.logo.mimeType,
+                width: input.logo.width,
+                height: input.logo.height,
+              },
+            }
+          : {}),
+        ...(input.banner
+          ? {
+              banner: {
+                url: input.banner.url,
+                mime_type: input.banner.mimeType,
+                width: input.banner.width,
+                height: input.banner.height,
+              },
+            }
+          : {}),
       }),
     },
   );
@@ -736,17 +815,6 @@ export async function updateBusiness(
     throw new UpstreamHttpError(502, 'invalid_marketplace_business_response');
   }
   return updated;
-}
-
-function capabilityKeyForCategory(category: string) {
-  const normalizedCategory = category.toLowerCase();
-  return /makanan|minuman|kuliner|kopi|cafe|resto/.test(normalizedCategory)
-    ? 'food_beverage'
-    : /retail|ritel|toko/.test(normalizedCategory)
-      ? 'retail'
-      : /jasa|service|laundry/.test(normalizedCategory)
-        ? 'services'
-        : 'general';
 }
 
 export async function replaceBusinessLocations(

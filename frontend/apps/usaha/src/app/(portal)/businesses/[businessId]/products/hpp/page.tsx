@@ -21,11 +21,11 @@ export default async function BusinessHppPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="products">
-      <SectionCard eyebrow="Produk & HPP" title="Hitung modal per produk" description="Bahan, kemasan, yield, susut, stok, dan resep tersimpan per usaha. Lajukan menghitung HPP dari sumber yang sama agar angka tidak perlu diketik ulang.">
+      <SectionCard eyebrow="Barang" title="Modal produk" description="Pilih produk dan isi bahan yang dipakai. Lajukan menghitung modal per porsi, perkiraan untung, margin, dan berapa banyak yang masih bisa dibuat.">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary"><ArrowLeft className="h-4 w-4" /> Kembali ke produk</Link>
-            <div className="flex max-w-2xl gap-2 rounded-2xl border border-portal-line bg-white px-3 py-2 text-xs leading-5 text-portal-soft"><Info className="mt-0.5 h-4 w-4 shrink-0 text-portal-forest" /><p>Harga beli dan stok berasal dari <strong>Stok & Belanja</strong>. Perubahan resep disimpan ke backend canonical. HPP penjualan historis tetap perlu cost snapshot saat transaksi jual terhubung penuh.</p></div>
+            <div className="flex max-w-2xl gap-2 rounded-2xl border border-portal-line bg-white px-3 py-2 text-xs leading-5 text-portal-soft"><Info className="mt-0.5 h-4 w-4 shrink-0 text-portal-forest" /><p>Harga beli dan stok diambil otomatis dari <strong>Stok & Belanja</strong>. Kamu cukup mengatur bahan yang dipakai untuk satu produk.</p></div>
           </div>
           {canView ? (
             <DurableHppWorkspace
@@ -33,7 +33,7 @@ export default async function BusinessHppPage({ params }: PageProps) {
               ingredients={ingredients}
               products={business.products.map(product => ({ id: product.id, name: product.name, priceLabel: product.priceLabel }))}
             />
-          ) : <div className="portal-panel p-5 text-sm text-portal-soft">Peranmu tidak memiliki akses melihat HPP, biaya supplier, dan margin produk.</div>}
+          ) : <div className="portal-panel p-5 text-sm text-portal-soft">Peranmu tidak memiliki akses melihat modal, biaya bahan, dan margin produk.</div>}
         </div>
       </SectionCard>
     </PortalShell>

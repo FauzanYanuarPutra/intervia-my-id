@@ -1,17 +1,13 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getRedis } from '@/lib/redis';
+import { getWhatsAppMetaVerificationConfig } from './verification';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const IS_PRODUCTION = APP_ENV === 'production';
-const CONFIGURED_VERIFY_TOKEN = (
-  process.env.WHATSAPP_META_WEBHOOK_VERIFY_TOKEN || ''
-).trim();
-const PRIMARY_VERIFY_TOKEN = 'lajukan_verify_22012005';
-const DEV_VERIFY_TOKEN = 'lajukan-dev-whatsapp-meta-webhook';
 const APP_SECRET = (process.env.WHATSAPP_META_APP_SECRET || '').trim();
 const REQUIRE_SIGNATURE_SETTING = (
   process.env.WHATSAPP_META_WEBHOOK_REQUIRE_SIGNATURE || ''
@@ -131,21 +127,10 @@ function isProductionRequest(req: NextRequest): boolean {
   return IS_PRODUCTION || isPublicLajukanHost(req);
 }
 
-function verifyTokensForRequest(req: NextRequest): string[] {
-  const tokens = new Set<string>();
-  if (CONFIGURED_VERIFY_TOKEN) tokens.add(CONFIGURED_VERIFY_TOKEN);
-  tokens.add(PRIMARY_VERIFY_TOKEN);
-
-  if (!isProductionRequest(req)) {
-    tokens.add(DEV_VERIFY_TOKEN);
-  }
-
-  return Array.from(tokens).filter(Boolean);
-}
-
-function matchesVerifyToken(req: NextRequest, token: string): boolean {
-  return verifyTokensForRequest(req).some(expected =>
-    timingSafeEqual(token, expected),
+function verificationConfigForRequest(req: NextRequest) {
+  return getWhatsAppMetaVerificationConfig(
+    process.env,
+    isProductionRequest(req),
   );
 }
 
@@ -210,9 +195,7 @@ function summarizePayload(payload: WhatsAppWebhookPayload): WhatsAppWebhookAudit
             .filter((field): field is string => Boolean(field));
           const values = changes
             .map(change => change.value)
-            .filter((value): value is NonNullable<typeof value> =>
-              Boolean(value),
-            );
+            .filter((value): value is NonNullable<typeof value> => Boolean(value));
 
           return {
             id: nullableString(entry.id),
@@ -224,9 +207,7 @@ function summarizePayload(payload: WhatsAppWebhookPayload): WhatsAppWebhookAudit
                 .find(Boolean) || null,
             displayPhoneNumber:
               values
-                .map(value =>
-                  maskPhoneLike(value.metadata?.display_phone_number),
-                )
+                .map(value => maskPhoneLike(value.metadata?.display_phone_number))
                 .find(Boolean) || null,
             contacts: values.flatMap(value =>
               Array.isArray(value.contacts)
@@ -258,9 +239,7 @@ function summarizePayload(payload: WhatsAppWebhookPayload): WhatsAppWebhookAudit
                     status: nullableString(status.status),
                     timestamp: nullableString(status.timestamp),
                     conversationId: nullableString(status.conversation?.id),
-                    conversationOrigin: nullableString(
-                      status.conversation?.origin?.type,
-                    ),
+                    conversationOrigin: nullableString(status.conversation?.origin?.type),
                   }))
                 : [],
             ),
@@ -286,18 +265,32 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('hub.verify_token') || '';
   const challenge = req.nextUrl.searchParams.get('hub.challenge') || '';
 
-  if (
-    mode === 'subscribe' &&
-    challenge &&
-    matchesVerifyToken(req, token)
-  ) {
-    return new NextResponse(challenge, {
-      status: 200,
-      headers: {
-        'content-type': 'text/plain; charset=utf-8',
-        'cache-control': 'no-store',
-      },
-    });
+  if (mode === 'subscribe' && challenge) {
+    const verification = verificationConfigForRequest(req);
+
+    if (verification.required && !verification.token) {
+      return new NextResponse('Webhook verify token is not configured', {
+        status: 503,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      });
+    }
+
+    const tokenMatches = verification.token
+      ? timingSafeEqual(token, verification.token)
+      : !verification.required;
+
+    if (tokenMatches) {
+      return new NextResponse(challenge, {
+        status: 200,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      });
+    }
   }
 
   return new NextResponse('Forbidden', {
@@ -343,9 +336,7 @@ export async function POST(req: NextRequest) {
     console.log('[WhatsApp Meta webhook]', {
       object: audit.object,
       entries: audit.entries.length,
-      fields: Array.from(
-        new Set(audit.entries.flatMap(entry => entry.fields)),
-      ),
+      fields: Array.from(new Set(audit.entries.flatMap(entry => entry.fields))),
       messages: messageCount,
       statuses: statusCount,
     });
