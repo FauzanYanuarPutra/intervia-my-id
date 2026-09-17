@@ -52,10 +52,13 @@ describe('Lajukan interaction system', () => {
     expect(shell).toContain('portal-mobile-content-clearance');
   });
 
-  it('migrates transactional overlays to the shared top-layer modal system', () => {
+  it('keeps cashier transaction work in a persistent non-blocking workspace', () => {
     const sale = read('../business-control/QuickSaleWorkspace.tsx');
-    expect(sale).toContain('ModalSurface');
-    expect(sale).toContain('dismissible={!saving}');
+    const configurator = read('../business-control/QuickSaleProductConfigurator.tsx');
+    expect(sale).not.toContain('ModalSurface');
+    expect(configurator).not.toContain('ModalSurface');
+    expect(sale).toContain("type WorkspaceMode = 'cart' | 'configure' | 'checkout'");
+    expect(sale).toContain('Pesanan saat ini');
     expect(sale).toContain('var(--portal-mobile-nav-height)');
     expect(sale).not.toContain('fixed inset-0 z-40 grid place-items-end bg-black/35');
     expect(sale).not.toContain('fixed inset-0 z-50 grid place-items-end bg-black/40');

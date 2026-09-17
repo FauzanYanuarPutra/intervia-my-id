@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
-import { Clock3, ShoppingBag } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import { CashShiftWorkspace } from '@/components/business-control/CashShiftWorkspace';
+import { OrderInboxWorkspace } from '@/components/business-control/OrderInboxWorkspace';
 import { QuickSaleWorkspace } from '@/components/business-control/QuickSaleWorkspace';
 import { EmptyState } from '@/components/portal/EmptyState';
 import { MetricStrip } from '@/components/portal/MetricStrip';
 import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
-import { StatusBadge } from '@/components/portal/StatusBadge';
 import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getCurrentWave2CashShift } from '@/lib/business-wave2-server';
 import { listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
@@ -32,13 +32,6 @@ type SnapshotAwareSaleLine = ControlSaleLine & {
 const money = new Intl.NumberFormat('id-ID', {
   style: 'currency', currency: 'IDR', maximumFractionDigits: 0,
 });
-
-function orderTone(status: string): 'info' | 'warning' | 'success' | 'neutral' {
-  if (status === 'baru') return 'info';
-  if (status === 'diproses' || status === 'siap kirim') return 'warning';
-  if (status === 'selesai') return 'success';
-  return 'neutral';
-}
 
 function saleLineConfiguration(line: ControlSaleLine): ConfigurationSnapshot | null {
   const snapshotLine = line as SnapshotAwareSaleLine;
@@ -114,7 +107,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
       <PageHeader
         eyebrow="Jualan"
         title={activeView === 'kasir' ? 'Kasir' : activeView === 'transaksi' ? 'Transaksi' : 'Pesanan'}
-        description={activeView === 'kasir' ? 'Tap produk, atur jumlah, lalu Bayar.' : activeView === 'transaksi' ? 'Riwayat penjualan yang sudah tercatat.' : 'Pantau pesanan yang perlu diproses.'}
+        description={activeView === 'kasir' ? 'Tap produk, cek pesanan di panel, lalu selesaikan pembayaran.' : activeView === 'transaksi' ? 'Riwayat penjualan yang sudah tercatat.' : 'Urutkan pesanan berdasarkan status dan lihat langkah operasional berikutnya.'}
       />
 
       <WorkspaceTabs items={tabs} activeId={activeView} ariaLabel="Mode jualan" />
@@ -158,16 +151,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
             { label: 'Selesai', value: completedOrders, note: 'Sudah ditutup' },
             { label: 'Akses', value: canManageOrders ? 'Kelola' : 'Pantau', note: 'Pesanan kanal' },
           ]} />
-          <section className="merchant-list border border-portal-line/80">
-            {business.orders.length ? business.orders.map(order => (
-              <article key={order.id} className="merchant-action-row sm:grid sm:grid-cols-[minmax(0,.8fr)_minmax(0,1.5fr)_120px_auto] sm:items-center">
-                <div className="min-w-0"><p className="truncate text-sm font-black text-portal-ink">{order.buyer}</p><p className="mt-0.5 text-[11px] text-portal-soft">{order.channel} · {order.id}</p></div>
-                <p className="min-w-0 truncate text-sm text-portal-ink">{order.itemSummary}</p>
-                <strong className="text-sm text-portal-ink">{order.amountLabel}</strong>
-                <StatusBadge tone={orderTone(order.status)}>{order.status}</StatusBadge>
-              </article>
-            )) : <EmptyState title="Belum ada pesanan" description="Pesanan dari kanal online akan muncul di sini." icon={Clock3} />}
-          </section>
+          <OrderInboxWorkspace orders={business.orders} canManageOrders={canManageOrders} />
         </div>
       ) : null}
     </PortalShell>

@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Check,
   History,
   Loader2,
   Plus,
   Save,
+  Search,
   ShieldCheck,
   Trash2,
   TriangleAlert,
@@ -116,11 +116,12 @@ function formatOccurredAt(value?: string) {
 
 export function DurableHppWorkspace({ businessId, ingredients, products }: Props) {
   const [productId, setProductId] = useState(products[0]?.id ?? '');
+  const [productSearch, setProductSearch] = useState('');
+  const [ingredientSearch, setIngredientSearch] = useState('');
   const [recipeName, setRecipeName] = useState(products[0]?.name ?? 'Resep utama');
   const [servings, setServings] = useState(1);
   const [items, setItems] = useState<RecipeItem[]>([]);
   const [initialSignature, setInitialSignature] = useState(recipeSignature(products[0]?.name ?? 'Resep utama', 1, []));
-  const [selectedIngredientId, setSelectedIngredientId] = useState('');
   const [history, setHistory] = useState<RecipeHistoryEvent[]>([]);
   const [showIngredientPicker, setShowIngredientPicker] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -135,6 +136,18 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
     const used = new Set(items.map(item => item.ingredientId));
     return ingredients.filter(item => !used.has(item.id));
   }, [ingredients, items]);
+  const productResults = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    if (query) return products.filter(item => item.name.toLowerCase().includes(query)).slice(0, 8);
+    const active = products.filter(item => item.id === productId);
+    const others = products.filter(item => item.id !== productId).slice(0, 4);
+    return [...active, ...others];
+  }, [productId, productSearch, products]);
+  const ingredientResults = useMemo(() => {
+    const query = ingredientSearch.trim().toLowerCase();
+    const filtered = query ? availableIngredients.filter(item => item.name.toLowerCase().includes(query)) : availableIngredients;
+    return filtered.slice(0, 10);
+  }, [availableIngredients, ingredientSearch]);
   const hasUnsavedChanges = initialSignature !== recipeSignature(recipeName, servings, items);
 
   useEffect(() => {
@@ -144,7 +157,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       setLoading(true);
       setMessage('');
       setShowIngredientPicker(false);
-      setSelectedIngredientId('');
+      setIngredientSearch('');
       const selected = products.find(item => item.id === productId);
       let nextRecipeName = selected?.name ?? 'Resep utama';
       let nextServings = 1;
@@ -214,31 +227,26 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const margin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
 
   function selectProduct(nextId: string) {
+    if (nextId === productId) return;
     if (hasUnsavedChanges && !window.confirm('Perubahan resep belum disimpan. Pindah produk tanpa menyimpan?')) return;
     setProductId(nextId);
+    setProductSearch('');
     setMessage('');
   }
 
-  function addSelectedIngredient() {
-    if (!selectedIngredientId) {
-      setMessage('Pilih bahan dulu, baru tambahkan ke resep.');
-      return;
-    }
-    if (items.some(item => item.ingredientId === selectedIngredientId)) {
+  function addIngredient(ingredientId: string) {
+    if (!ingredientId) return;
+    if (items.some(item => item.ingredientId === ingredientId)) {
       setMessage('Bahan itu sudah ada di resep. Ubah jumlahnya di rincian bahan.');
       return;
     }
-    setItems(current => [...current, { ingredientId: selectedIngredientId, quantity: 1, wastePercentOverride: null }]);
-    setSelectedIngredientId('');
+    setItems(current => [...current, { ingredientId, quantity: 1, wastePercentOverride: null }]);
+    setIngredientSearch('');
     setShowIngredientPicker(false);
     setMessage('');
   }
 
   function patch(index: number, patchValue: Partial<RecipeItem>) {
-    if (patchValue.ingredientId && items.some((item, itemIndex) => itemIndex !== index && item.ingredientId === patchValue.ingredientId)) {
-      setMessage('Satu bahan hanya boleh muncul sekali dalam resep.');
-      return;
-    }
     setItems(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patchValue } : item));
     setMessage('');
   }
@@ -342,12 +350,19 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   return (
     <div className="space-y-3 pb-20">
       <section className="portal-panel p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end">
-          <label className="text-xs font-semibold text-portal-soft">Produk
-            <select className="mt-1 min-h-11 w-full rounded-xl border border-portal-line bg-white px-3 text-sm text-portal-ink" value={productId} onChange={event => selectProduct(event.target.value)}>
-              {products.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-          </label>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
+          <div>
+            <label className="text-xs font-semibold text-portal-soft" htmlFor="hpp-product-search">Cari produk</label>
+            <div className="relative mt-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-soft" />
+              <input id="hpp-product-search" className="portal-input min-h-11 w-full pl-9" value={productSearch} onChange={event => setProductSearch(event.target.value)} placeholder="Ketik nama produk…" autoComplete="off" />
+              {productSearch ? <button type="button" aria-label="Hapus pencarian produk" onClick={() => setProductSearch('')} className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-portal-soft hover:bg-[#f2f4f1]"><X className="h-4 w-4" /></button> : null}
+            </div>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {productResults.map(item => <button key={item.id} type="button" onClick={() => selectProduct(item.id)} className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${item.id === productId ? 'border-portal-ink bg-portal-ink text-white' : 'border-portal-line bg-white text-portal-ink hover:bg-[#fafbf9]'}`}><span className="block max-w-44 truncate">{item.name}</span><span className={`mt-0.5 block text-[10px] ${item.id === productId ? 'text-white/70' : 'text-portal-soft'}`}>{item.priceLabel || 'Harga belum diisi'}</span></button>)}
+            </div>
+            {!productResults.length ? <p className="mt-2 text-xs text-portal-soft">Produk tidak ditemukan.</p> : null}
+          </div>
           <div className="rounded-xl border border-portal-line bg-[#fafbf9] px-3 py-2.5">
             <p className="text-[11px] font-semibold text-portal-soft">Harga jual dari Barang</p>
             <div className="mt-0.5 flex items-center justify-between gap-3">
@@ -360,31 +375,30 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
           <div><p className="text-[11px] text-portal-soft">HPP / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{money.format(recipeCost.totalCost)}</p></div>
           <div><p className="text-[11px] text-portal-soft">Sisa kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>
           <div><p className="text-[11px] text-portal-soft">Margin</p><p className="mt-0.5 text-lg font-black text-portal-ink">{number.format(margin)}%</p></div>
-          <div><p className="text-[11px] text-portal-soft">Bisa dibuat</p><p className="mt-0.5 text-lg font-black text-portal-ink">{items.length ? whole.format(capacity.capacity) : '-'}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Bisa dibuat</p><p className="mt-0.5 text-lg font-black text-portal-ink">{items.length ? `${whole.format(capacity.capacity)} porsi` : '-'}</p></div>
           <div><p className="text-[11px] text-portal-soft">Status</p><p className="mt-0.5 text-sm font-black text-portal-ink">{hasUnsavedChanges ? 'Belum disimpan' : 'Tersimpan'}</p></div>
         </div>
-        {capacity.bottleneck ? <p className="mt-2 text-[11px] font-semibold text-amber-800">Terbatas oleh: {capacity.bottleneck.name}</p> : null}
+        {capacity.bottleneck ? <p className="mt-2 text-[11px] font-semibold text-amber-800">Stok terbatas oleh {capacity.bottleneck.name}.</p> : null}
       </section>
 
       <section className="portal-panel overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-portal-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div><h2 className="font-bold text-portal-ink">Rincian bahan</h2><p className="text-xs text-portal-soft">{product?.name} - {items.length} bahan - harga dan stok diambil otomatis</p></div>
-          <button type="button" onClick={() => setShowIngredientPicker(true)} className="portal-button-secondary justify-center"><Plus className="h-4 w-4" /> Pilih bahan</button>
+          <div><h2 className="font-bold text-portal-ink">Rincian bahan</h2><p className="text-xs text-portal-soft">{product?.name} · {items.length} bahan · harga dan stok diambil otomatis</p></div>
+          <button type="button" onClick={() => setShowIngredientPicker(true)} className="portal-button-secondary justify-center"><Plus className="h-4 w-4" /> Tambah bahan</button>
         </div>
 
         {showIngredientPicker ? (
           <div className="border-b border-portal-line bg-[#fafbf9] p-4 sm:p-5">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
-              <label className="text-xs font-semibold text-portal-soft">Pilih bahan
-                <select className="mt-1 min-h-11 w-full rounded-lg border border-portal-line bg-white px-3 text-sm text-portal-ink" value={selectedIngredientId} onChange={event => setSelectedIngredientId(event.target.value)}>
-                  <option value="">Pilih bahan yang belum ada di resep</option>
-                  {availableIngredients.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-                </select>
-              </label>
-              <button type="button" onClick={addSelectedIngredient} className="portal-button-primary justify-center"><Check className="h-4 w-4" /> Tambahkan</button>
-              <button type="button" onClick={() => setShowIngredientPicker(false)} className="portal-button-secondary justify-center"><X className="h-4 w-4" /> Batal</button>
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-sm font-black text-portal-ink">Tambah bahan ke resep</p><p className="mt-0.5 text-xs text-portal-soft">Cari lalu tap bahan. Tidak perlu dropdown panjang.</p></div>
+              <button type="button" aria-label="Tutup pencarian bahan" onClick={() => { setShowIngredientPicker(false); setIngredientSearch(''); }} className="grid h-9 w-9 place-items-center rounded-lg text-portal-soft hover:bg-white"><X className="h-4 w-4" /></button>
             </div>
-            {!availableIngredients.length ? <p className="mt-2 text-xs text-portal-soft">Semua bahan sudah masuk resep. Ubah jumlah di rincian bahan.</p> : null}
+            <label className="mt-3 block text-xs font-semibold text-portal-soft" htmlFor="hpp-ingredient-search">Cari bahan</label>
+            <div className="relative mt-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-soft" /><input id="hpp-ingredient-search" className="portal-input min-h-11 w-full bg-white pl-9" value={ingredientSearch} onChange={event => setIngredientSearch(event.target.value)} placeholder="Contoh: alpukat, gula, cup…" autoComplete="off" /></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {ingredientResults.map(option => <button key={option.id} type="button" onClick={() => addIngredient(option.id)} className="rounded-xl border border-portal-line bg-white px-3 py-3 text-left transition hover:border-portal-ink/20 hover:shadow-sm"><span className="block text-sm font-bold text-portal-ink">{option.name}</span><span className="mt-0.5 block text-[11px] text-portal-soft">Stok {number.format(n(option.stock_quantity))} {option.recipe_unit}</span></button>)}
+            </div>
+            {!ingredientResults.length ? <p className="mt-3 text-xs text-portal-soft">{availableIngredients.length ? 'Bahan tidak ditemukan.' : 'Semua bahan sudah masuk resep.'}</p> : null}
           </div>
         ) : null}
 
@@ -394,23 +408,22 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
               const ingredient = ingredientMap.get(item.ingredientId);
               const cost = recipeCost.breakdown[index];
               return (
-                <div key={`${item.ingredientId}-${index}`} className="px-4 py-3 sm:px-5">
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-end">
-                    <label className="text-xs font-semibold text-portal-soft">Bahan
-                      <select className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm text-portal-ink" value={item.ingredientId} onChange={event => patch(index, { ingredientId: event.target.value })}>
-                        {ingredients.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-                      </select>
+                <div key={`${item.ingredientId}-${index}`} className="px-4 py-4 sm:px-5">
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px_auto] sm:items-center">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-portal-ink">{ingredient?.name ?? 'Bahan tidak ditemukan'}</p>
+                      <p className="mt-0.5 text-[11px] text-portal-soft">Stok {number.format(n(ingredient?.stock_quantity))} {ingredient?.recipe_unit} · Biaya {money.format(cost?.itemCost ?? 0)}</p>
+                      <p className="mt-1 text-[10px] text-portal-soft">Ganti bahan dengan hapus lalu tambah lagi.</p>
+                    </div>
+                    <label className="text-xs font-semibold text-portal-soft">Dipakai
+                      <div className="mt-1 flex min-h-11 items-center overflow-hidden rounded-xl border border-portal-line bg-white focus-within:border-portal-ink/40">
+                        <input type="number" min="0.0001" step="any" className="min-h-10 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-portal-ink outline-none" value={item.quantity} onChange={event => patch(index, { quantity: Math.max(n(event.target.value), 0) })} />
+                        <span className="shrink-0 border-l border-portal-line bg-[#fafbf9] px-3 text-xs font-bold text-portal-soft">{ingredient?.recipe_unit ?? 'unit'}</span>
+                      </div>
                     </label>
-                    <label className="text-xs font-semibold text-portal-soft">Dipakai ({ingredient?.recipe_unit ?? 'unit'})
-                      <input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm text-portal-ink" value={item.quantity} onChange={event => patch(index, { quantity: Math.max(n(event.target.value), 0) })} />
-                    </label>
-                    <button type="button" aria-label="Hapus bahan" onClick={() => setItems(current => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-10 w-10 place-items-center rounded-lg text-portal-soft hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" aria-label={`Hapus ${ingredient?.name ?? 'bahan'}`} onClick={() => setItems(current => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-11 w-11 place-items-center rounded-xl text-portal-soft hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft">
-                    <span>Biaya <strong className="text-portal-ink">{money.format(cost?.itemCost ?? 0)}</strong></span>
-                    <span>Stok {number.format(n(ingredient?.stock_quantity))} {ingredient?.recipe_unit}</span>
-                    <span>Dipakai per porsi {number.format(costRows[index]?.recipeQuantity ?? 0)} {ingredient?.recipe_unit}</span>
-                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-portal-soft"><span>Per porsi <strong className="text-portal-ink">{number.format(costRows[index]?.recipeQuantity ?? 0)} {ingredient?.recipe_unit}</strong></span><span>Hasil terpakai {number.format(n(ingredient?.yield_percent))}%</span></div>
                   <details className="mt-2">
                     <summary className="cursor-pointer text-[11px] font-bold text-portal-soft">Lihat cara hitung</summary>
                     <div className="mt-2 grid gap-3 rounded-lg bg-[#fafbf9] p-3 sm:grid-cols-3">
@@ -418,12 +431,12 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
                         <input type="number" min="0" max="99" step="any" placeholder={String(n(ingredient?.waste_percent))} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3 text-sm" value={item.wastePercentOverride ?? ''} onChange={event => patch(index, { wastePercentOverride: event.target.value === '' ? null : n(event.target.value) })} />
                       </label>
                       <div><p className="text-xs font-semibold text-portal-soft">Harga beli</p><p className="mt-2 text-sm font-bold text-portal-ink">{money.format(ingredient?.purchase_price_amount ?? 0)} / {number.format(n(ingredient?.purchase_quantity))} {ingredient?.purchase_unit}</p></div>
-                      <div><p className="text-xs font-semibold text-portal-soft">Formula</p><p className="mt-2 text-xs leading-5 text-portal-soft">Harga beli dibagi jumlah beli, konversi, yield, dan susut; hasilnya dikali pemakaian per porsi.</p></div>
+                      <div><p className="text-xs font-semibold text-portal-soft">Formula</p><p className="mt-2 text-xs leading-5 text-portal-soft">Harga beli dibagi jumlah beli, konversi, hasil terpakai, dan susut; hasilnya dikali pemakaian per porsi.</p></div>
                     </div>
                   </details>
                 </div>
               );
-            }) : <div className="p-5 text-sm text-portal-soft">Belum ada bahan. Tekan <strong>Pilih bahan</strong> untuk mulai tanpa bahan acak.</div>}
+            }) : <div className="p-5 text-sm text-portal-soft">Belum ada bahan. Tekan <strong>Tambah bahan</strong>, cari nama bahan, lalu tap hasilnya.</div>}
           </div>
         )}
       </section>
@@ -447,17 +460,11 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       </section>
 
       <section className="portal-panel p-4 sm:p-5">
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-portal-forest" />
-          <h2 className="font-bold text-portal-ink">Riwayat perubahan</h2>
-        </div>
+        <div className="flex items-center gap-2"><History className="h-4 w-4 text-portal-forest" /><h2 className="font-bold text-portal-ink">Riwayat perubahan</h2></div>
         <div className="mt-3 divide-y divide-portal-line">
           {history.length ? history.slice(0, 8).map((event, index) => (
             <div key={event.id ?? `${event.event_key}-${index}`} className="py-3 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <strong className="text-portal-ink">{formatEventKey(event.event_key)}</strong>
-                <span className="text-portal-soft">{formatOccurredAt(event.occurred_at)}</span>
-              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-portal-ink">{formatEventKey(event.event_key)}</strong><span className="text-portal-soft">{formatOccurredAt(event.occurred_at)}</span></div>
               <p className="mt-1 flex items-center gap-1 text-portal-soft"><ShieldCheck className="h-3.5 w-3.5" /> PIC: <span className="font-semibold text-portal-ink">{event.actor_user_id ?? 'Sistem'}</span></p>
               {event.reason ? <p className="mt-1 text-portal-soft">Alasan: {event.reason}</p> : null}
             </div>
