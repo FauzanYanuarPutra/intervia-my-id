@@ -11,6 +11,7 @@ export function buildChannelBusinessSummary(input: {
   if (input.price === null || input.hpp === null) {
     return {
       ready: false as const,
+      totalDeductions: null,
       netReceipt: null,
       contributionProfit: null,
       recommendedPrice: null,
@@ -34,6 +35,7 @@ export function buildChannelBusinessSummary(input: {
 
   return {
     ready: true as const,
+    totalDeductions: input.price - margin.netRevenue,
     netReceipt: margin.netRevenue,
     contributionProfit: margin.contributionProfit,
     recommendedPrice: recommendation.valid ? recommendation.recommendedPrice : null,
