@@ -31,6 +31,12 @@ const ROUTE_VIEW_EVENTS: Array<{
     surface: 'umkm',
   },
   {
+    prefix: '/news',
+    eventName: 'news.viewed',
+    module: 'news',
+    surface: 'news',
+  },
+  {
     prefix: '/community',
     eventName: 'community.viewed',
     module: 'community',

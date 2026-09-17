@@ -1,7 +1,21 @@
 global:
-  scrape_interval: 5s
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
   - job_name: "node"
     static_configs:
       - targets: ["node_exporter:9100"]
@@ -10,18 +24,70 @@ scrape_configs:
     static_configs:
       - targets: ["cadvisor:8080"]
 
-  - job_name: "identity_service"
+  - job_name: "postgres_identity"
+    static_configs:
+      - targets: ["identity_postgres_exporter:9187"]
+
+  - job_name: "postgres_marketplace"
+    static_configs:
+      - targets: ["marketplace_postgres_exporter:9187"]
+
+  - job_name: "postgres_community"
+    static_configs:
+      - targets: ["community_postgres_exporter:9187"]
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis_exporter:9121"]
+
+  - job_name: "identity_app"
+    metrics_path: /metrics
     static_configs:
       - targets: ["identity_service:8080"]
 
-  - job_name: "marketplace_service"
+  - job_name: "marketplace_app"
+    metrics_path: /metrics
     static_configs:
       - targets: ["marketplace_service:8081"]
 
-  - job_name: "community_service"
+  - job_name: "community_app"
+    metrics_path: /metrics
     static_configs:
       - targets: ["community_service:8082"]
 
-  - job_name: "chat_service"
+  - job_name: "blackbox_http"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
     static_configs:
-      - targets: ["chat_service:4000"]
+      - targets:
+          - http://identity_service:8080/ready
+          - http://marketplace_service:8081/ready
+          - http://community_service:8082/ready
+          - http://chat_service:4000/api/ready
+          - http://ai_service:8080/ready
+          - http://www:3000/api/health
+          - http://meilisearch:7700/health
+          - http://minio:9002/minio/health/ready
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox_exporter:9115
+
+  - job_name: "blackbox_tcp"
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+          - rabbitmq:5672
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox_exporter:9115

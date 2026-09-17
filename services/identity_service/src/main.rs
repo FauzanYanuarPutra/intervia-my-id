@@ -35,7 +35,8 @@ use identity_service::organizations::routes::{
 use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
     get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_users, login,
-    login_phone, logout, me, oauth_google, refresh_token, register, reset_password,
+    login_phone, logout, me, oauth_google, ready_check, refresh_token, register, reset_password,
+    service_metrics,
     update_me_profile,
 };
 
@@ -47,6 +48,7 @@ struct IdentityOutboxEventRow {
     event_type: String,
     routing_key: String,
     payload: Value,
+    lease_until: chrono::DateTime<chrono::Utc>,
 }
 
 // Kept temporarily for migration characterization tests only. Runtime schema
@@ -215,11 +217,30 @@ async fn publish_identity_outbox_batch(
 ) -> Result<usize> {
     let events = sqlx::query_as::<_, IdentityOutboxEventRow>(
         r#"
-        SELECT id, aggregate_type, aggregate_id, event_type, routing_key, payload
-        FROM events.event_outbox
-        WHERE status IN ('pending', 'failed') AND available_at <= NOW()
-        ORDER BY created_at ASC
-        LIMIT $1
+        WITH candidate AS (
+          SELECT id
+          FROM events.event_outbox
+          WHERE status IN ('pending', 'failed', 'publishing')
+            AND available_at <= NOW()
+          ORDER BY created_at ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT $1
+        )
+        UPDATE events.event_outbox AS outbox
+        SET
+          status = 'publishing',
+          available_at = NOW() + INTERVAL '2 minutes',
+          error_message = NULL
+        FROM candidate
+        WHERE outbox.id = candidate.id
+        RETURNING
+          outbox.id,
+          outbox.aggregate_type,
+          outbox.aggregate_id,
+          outbox.event_type,
+          outbox.routing_key,
+          outbox.payload,
+          outbox.available_at AS lease_until
         "#,
     )
     .bind(batch_size)
@@ -231,16 +252,6 @@ async fn publish_identity_outbox_batch(
     }
 
     for event in events.iter() {
-        let claimed = sqlx::query(
-            "UPDATE events.event_outbox SET status = 'publishing' WHERE id = $1 AND status IN ('pending', 'failed')",
-        )
-        .bind(event.id)
-        .execute(db)
-        .await?;
-
-        if claimed.rows_affected() == 0 {
-            continue;
-        }
 
         let mut envelope = event.payload.clone();
         if let Value::Object(ref mut object) = envelope {
@@ -277,12 +288,12 @@ async fn publish_identity_outbox_batch(
         match publish_result {
             Ok(confirm) => {
                 if let Err(error) = confirm.await {
-                    mark_identity_outbox_retry(db, event.id, format!("confirm: {error:?}")).await;
+                    mark_identity_outbox_retry(db, event.id, event.lease_until, format!("confirm: {error:?}")).await;
                     continue;
                 }
             }
             Err(error) => {
-                mark_identity_outbox_retry(db, event.id, format!("publish: {error:?}")).await;
+                mark_identity_outbox_retry(db, event.id, event.lease_until, format!("publish: {error:?}")).await;
                 continue;
             }
         }
@@ -292,9 +303,12 @@ async fn publish_identity_outbox_batch(
             UPDATE events.event_outbox
             SET status = 'published', published_at = NOW(), error_message = NULL
             WHERE id = $1
+              AND status = 'publishing'
+              AND available_at = $2
             "#,
         )
         .bind(event.id)
+        .bind(event.lease_until)
         .execute(db)
         .await?;
     }
@@ -302,7 +316,12 @@ async fn publish_identity_outbox_batch(
     Ok(events.len())
 }
 
-async fn mark_identity_outbox_retry(db: &sqlx::PgPool, event_id: uuid::Uuid, error: String) {
+async fn mark_identity_outbox_retry(
+    db: &sqlx::PgPool,
+    event_id: uuid::Uuid,
+    lease_until: chrono::DateTime<chrono::Utc>,
+    error: String,
+) {
     let _ = sqlx::query(
         r#"
         UPDATE events.event_outbox
@@ -312,10 +331,13 @@ async fn mark_identity_outbox_retry(db: &sqlx::PgPool, event_id: uuid::Uuid, err
           available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
           error_message = $2
         WHERE id = $1
+          AND status = 'publishing'
+          AND available_at = $3
         "#,
     )
     .bind(event_id)
     .bind(error)
+    .bind(lease_until)
     .execute(db)
     .await;
 }
@@ -485,6 +507,8 @@ async fn main() -> Result<()> {
     // 4. Build Router
     let mut app = Router::new()
         .route("/health", get(health_check))
+        .route("/ready", get(ready_check))
+        .route("/metrics", get(service_metrics))
         .nest(
             "/auth",
             Router::new()
@@ -568,8 +592,27 @@ async fn main() -> Result<()> {
 }
 
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to install Ctrl+C handler");
-    println!("🛑 Shutdown signal received...");
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    println!("Shutdown signal received");
 }

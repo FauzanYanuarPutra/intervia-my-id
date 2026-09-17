@@ -41,6 +41,10 @@ usaha.{$APP_DOMAIN} {
 api.{$APP_DOMAIN} {
     import security_headers
 
+    # Service metrics are private; Prometheus reaches them over the internal network.
+    @internal_metrics path /metrics
+    respond @internal_metrics 404
+
     @auth_no_store path /auth /auth/*
     header @auth_no_store Cache-Control "no-store"
     header @auth_no_store Pragma "no-cache"

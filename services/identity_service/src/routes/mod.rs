@@ -12,7 +12,7 @@ pub use auth::{
     change_password, login, login_phone, logout, me, oauth_google, refresh_token, register,
     reset_password,
 };
-pub use health::health_check;
+pub use health::{health_check, ready_check, service_metrics};
 pub use info::app_info;
 pub use user_lookup::{
     discover_users, get_public_user_profile, get_user_by_email, get_user_by_phone,

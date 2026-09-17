@@ -128,6 +128,7 @@ export function normalizeNewsArticle(row: RawNewsRow): LajukanNewsArticle | null
 type NewsListPayload = {
   items?: RawNewsRow[];
   has_more?: boolean;
+  next_cursor?: string | null;
 };
 
 export async function getPublishedNews(options: {
@@ -135,9 +136,10 @@ export async function getPublishedNews(options: {
   topic?: string;
   location?: string;
   query?: string;
+  cursor?: string;
   limit?: number;
   offset?: number;
-} = {}): Promise<{ items: LajukanNewsArticle[]; hasMore: boolean }> {
+} = {}): Promise<{ items: LajukanNewsArticle[]; hasMore: boolean; nextCursor: string | null }> {
   const params = new URLSearchParams();
   params.set('limit', String(Math.min(100, Math.max(1, options.limit || 24))));
   params.set('offset', String(Math.max(0, options.offset || 0)));
@@ -145,12 +147,13 @@ export async function getPublishedNews(options: {
   if (options.topic?.trim()) params.set('topic', options.topic.trim());
   if (options.location?.trim()) params.set('location', options.location.trim());
   if (options.query?.trim()) params.set('q', options.query.trim());
+  if (options.cursor?.trim()) params.set('cursor', options.cursor.trim());
 
   try {
     const response = await fetch(`${MARKETPLACE_URL}/v1/news?${params.toString()}`, {
       next: { revalidate: 120 },
     });
-    if (!response.ok) return { items: [], hasMore: false };
+    if (!response.ok) return { items: [], hasMore: false, nextCursor: null };
     const payload = (await response.json()) as NewsListPayload;
     const rows = Array.isArray(payload.items) ? payload.items : [];
     return {
@@ -158,9 +161,10 @@ export async function getPublishedNews(options: {
         .map(normalizeNewsArticle)
         .filter((item): item is LajukanNewsArticle => Boolean(item)),
       hasMore: payload.has_more === true,
+      nextCursor: readString(payload.next_cursor) || null,
     };
   } catch {
-    return { items: [], hasMore: false };
+    return { items: [], hasMore: false, nextCursor: null };
   }
 }
 

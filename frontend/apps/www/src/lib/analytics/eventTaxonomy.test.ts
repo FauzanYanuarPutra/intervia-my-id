@@ -20,5 +20,8 @@ describe('eventTaxonomy', () => {
     expect(resolveRouteViewEvent('/id/create/jual/jasa')?.eventName).toBe(
       'listing.create_started',
     );
+    expect(resolveRouteViewEvent('/id/news/ekonomi-umkm')?.eventName).toBe(
+      'news.viewed',
+    );
   });
 });

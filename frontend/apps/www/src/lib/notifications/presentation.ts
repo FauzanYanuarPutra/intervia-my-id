@@ -9,6 +9,7 @@ import {
   Handshake,
   Info,
   Heart,
+  Newspaper,
   PackageCheck,
   RefreshCcw,
   ShieldAlert,
@@ -294,6 +295,31 @@ export function notificationPresentation({
       surfaceClassName:
         'border-orange-200/80 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_64%,#ffedd5_100%)] dark:border-orange-400/20 dark:bg-orange-400/10',
       titleClassName: 'text-orange-800 dark:text-orange-100',
+    });
+  }
+
+  if (
+    cat === 'news' ||
+    has(
+      text,
+      'news.published',
+      'news.needs_revision',
+      'news.rejected',
+      'news.corrected',
+      'news.retracted',
+      'news.submission_received',
+      'lajukan news',
+    )
+  ) {
+    return makeTone({
+      Icon: Newspaper,
+      label: 'News',
+      accentClassName: 'bg-emerald-600',
+      iconClassName:
+        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/12 dark:text-emerald-100',
+      surfaceClassName:
+        'border-emerald-200/80 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_64%,#ecfdf5_100%)] dark:border-emerald-400/20 dark:bg-emerald-400/10',
+      titleClassName: 'text-emerald-800 dark:text-emerald-100',
     });
   }
 

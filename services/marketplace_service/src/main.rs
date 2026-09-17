@@ -32,7 +32,7 @@ use std::{
 };
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, timeout, Duration};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
@@ -143,6 +143,7 @@ struct OutboxEventRow {
     id: Uuid,
     routing_key: String,
     payload: Value,
+    lease_until: DateTime<Utc>,
 }
 
 fn parse_cors_origins() -> Vec<HeaderValue> {
@@ -2443,6 +2444,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(businesses::router())
         .merge(news::router())
         .route("/health", get(health))
+        .route("/ready", get(ready))
+        .route("/metrics", get(service_metrics))
         .route("/", get(root))
         .route("/v1/map/references", get(list_map_references))
         .route("/v1/content", get(list_content).post(create_content))
@@ -2683,12 +2686,113 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = TcpListener::bind(&addr).await?;
     println!("marketplace_service listening on {}", addr);
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("shutdown signal received");
 }
 
 async fn health() -> impl IntoResponse {
     Json(json!({"status":"ok","service":"marketplace_service"}))
+}
+
+async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match timeout(
+        Duration::from_secs(2),
+        sqlx::query_scalar::<_, i32>("SELECT 1").fetch_one(&state.db),
+    )
+    .await
+    {
+        Ok(Ok(1)) => (
+            StatusCode::OK,
+            Json(json!({"status":"ready","service":"marketplace_service"})),
+        )
+            .into_response(),
+        Ok(Ok(_)) | Ok(Err(_)) | Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"status":"not_ready","service":"marketplace_service"})),
+        )
+            .into_response(),
+    }
+}
+
+
+async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let pool_size = state.db.size();
+    let pool_idle = state.db.num_idle();
+    let notification_subscribers = state.notification_tx.receiver_count();
+    let (outbox_backlog, metrics_query_ok) = match timeout(
+        Duration::from_secs(2),
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status <> 'published'",
+        )
+        .fetch_one(&state.db),
+    )
+    .await
+    {
+        Ok(Ok(value)) => (value, 1),
+        Ok(Err(_)) | Err(_) => (0, 0),
+    };
+
+    let body = format!(
+        concat!(
+            "# HELP lajukan_service_info Static service identity.\n",
+            "# TYPE lajukan_service_info gauge\n",
+            "lajukan_service_info{{service=\"marketplace_service\"}} 1\n",
+            "# HELP lajukan_db_pool_connections PostgreSQL pool connections by state.\n",
+            "# TYPE lajukan_db_pool_connections gauge\n",
+            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"total\"}} {}\n",
+            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"idle\"}} {}\n",
+            "# HELP lajukan_outbox_backlog Pending or failed transactional outbox events.\n",
+            "# TYPE lajukan_outbox_backlog gauge\n",
+            "lajukan_outbox_backlog{{service=\"marketplace_service\"}} {}\n",
+            "# HELP lajukan_metrics_db_query_ok Whether the metrics DB query succeeded.\n",
+            "# TYPE lajukan_metrics_db_query_ok gauge\n",
+            "lajukan_metrics_db_query_ok{{service=\"marketplace_service\"}} {}\n",
+            "# HELP lajukan_notification_subscribers Active realtime notification subscribers.\n",
+            "# TYPE lajukan_notification_subscribers gauge\n",
+            "lajukan_notification_subscribers{{service=\"marketplace_service\"}} {}\n"
+        ),
+        pool_size,
+        pool_idle,
+        outbox_backlog,
+        metrics_query_ok,
+        notification_subscribers
+    );
+
+    (
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
+        body,
+    )
 }
 
 async fn collect_events(
@@ -7762,7 +7866,7 @@ async fn unread_notification_count(db: &PgPool, user_id: Uuid) -> Result<i64, sq
     .await
 }
 
-async fn push_notification_best_effort(
+pub(crate) async fn push_notification_best_effort(
     state: &Arc<AppState>,
     user_id: Uuid,
     category: &str,
@@ -12633,6 +12737,9 @@ async fn create_content(
 
     match inserted {
         Ok(row) => {
+            if row.content_type == "news" {
+                news::after_submission_created(&state, row.id, row.owner_id).await;
+            }
             let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
                 Ok(map) => map.get(&row.owner_id).cloned(),
                 Err(e) => {
@@ -23620,11 +23727,27 @@ async fn publish_outbox_batch(
 ) -> anyhow::Result<usize> {
     let events = sqlx::query_as::<_, OutboxEventRow>(
         r#"
-        SELECT id, routing_key, payload
-        FROM events.event_outbox
-        WHERE status = 'pending' AND available_at <= NOW()
-        ORDER BY created_at ASC
-        LIMIT $1
+        WITH candidate AS (
+          SELECT id
+          FROM events.event_outbox
+          WHERE status IN ('pending', 'processing')
+            AND available_at <= NOW()
+          ORDER BY created_at ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT $1
+        )
+        UPDATE events.event_outbox AS outbox
+        SET
+          status = 'processing',
+          available_at = NOW() + INTERVAL '2 minutes',
+          error_message = NULL
+        FROM candidate
+        WHERE outbox.id = candidate.id
+        RETURNING
+          outbox.id,
+          outbox.routing_key,
+          outbox.payload,
+          outbox.available_at AS lease_until
         "#,
     )
     .bind(batch_size)
@@ -23636,16 +23759,6 @@ async fn publish_outbox_batch(
     }
 
     for event in events.iter() {
-        let claimed = sqlx::query(
-            "UPDATE events.event_outbox SET status = 'processing' WHERE id = $1 AND status = 'pending'",
-        )
-        .bind(event.id)
-        .execute(db)
-        .await?;
-
-        if claimed.rows_affected() == 0 {
-            continue;
-        }
 
         let payload_bytes = serde_json::to_vec(&event.payload)?;
         let publish_result = channel
@@ -23673,10 +23786,13 @@ async fn publish_outbox_batch(
                           available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
                           error_message = $2
                         WHERE id = $1
+                          AND status = 'processing'
+                          AND available_at = $3
                         "#,
                     )
                     .bind(event.id)
                     .bind(error_text)
+                    .bind(event.lease_until)
                     .execute(db)
                     .await;
                     continue;
@@ -23693,10 +23809,13 @@ async fn publish_outbox_batch(
                       available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
                       error_message = $2
                     WHERE id = $1
+                      AND status = 'processing'
+                      AND available_at = $3
                     "#,
                 )
                 .bind(event.id)
                 .bind(error_text)
+                .bind(event.lease_until)
                 .execute(db)
                 .await;
                 continue;
@@ -23708,9 +23827,12 @@ async fn publish_outbox_batch(
             UPDATE events.event_outbox
             SET status = 'published', published_at = NOW(), error_message = NULL
             WHERE id = $1
+              AND status = 'processing'
+              AND available_at = $2
             "#,
         )
         .bind(event.id)
+        .bind(event.lease_until)
         .execute(db)
         .await?;
     }

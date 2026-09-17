@@ -259,6 +259,33 @@ export const newsApi = {
     });
   },
 
+  metrics: async (token: string) => {
+    return fetchWithAuth(`${MARKETPLACE_URL}/v1/news/editorial/metrics`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  updateSource: async (
+    token: string,
+    contentId: string,
+    sourceId: string,
+    data: {
+      source_kind?: 'user_supplied' | 'primary' | 'secondary' | 'official' | 'business';
+      verification_status?: 'unverified' | 'verified' | 'broken' | 'rejected';
+      note?: string;
+    },
+  ) => {
+    return fetchWithAuth(
+      `${MARKETPLACE_URL}/v1/news/${encodeURIComponent(contentId)}/sources/${encodeURIComponent(sourceId)}`,
+      {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify(data),
+      },
+    );
+  },
+
   moderate: async (
     token: string,
     id: string,
