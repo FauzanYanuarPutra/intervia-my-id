@@ -39,6 +39,7 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
   const business = activeBusiness;
   if (!business) notFound();
 
+  const resolvedBusinessId = business.id;
   const canManage = hasPermission(business, 'manageProducts');
   const canViewCosting = hasPermission(business, 'viewCosting');
   const canViewChannels = hasPermission(business, 'viewChannels');
@@ -68,7 +69,7 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
     if (stock) search.set('stock', stock);
     if (options.edit) search.set('edit', options.edit);
     const suffix = search.toString();
-    return `/businesses/${business.id}/products${suffix ? `?${suffix}` : ''}`;
+    return `/businesses/${resolvedBusinessId}/products${suffix ? `?${suffix}` : ''}`;
   }
 
   const listHref = productsHref({ edit: null });
