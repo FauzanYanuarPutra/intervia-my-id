@@ -89,7 +89,12 @@ def main() -> int:
     require(
         'frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx',
         'GoFood', 'GrabFood', 'ShopeeFood', 'Pengaturan harga online',
-        'Potongan %', 'Promo dari toko', 'recommendChannelPrice', 'Simpan'
+        'Potongan %', 'Promo dari toko', 'buildChannelBusinessSummary',
+        'Diterima bersih', 'Harga aman', 'Simpan'
+    )
+    require(
+        'frontend/apps/usaha/src/lib/business-control/channel-ux.ts',
+        'calculateChannelMargin', 'recommendChannelPrice', 'margin.netRevenue'
     )
     forbid('frontend/apps/usaha/src/components/business-control/ChannelSettingsWorkspace.tsx', 'defaultPrice ?? 15000', 'defaultPrice || 15000')
     require('frontend/apps/usaha/src/app/(portal)/businesses/[businessId]/channels/page.tsx', 'ChannelSettingsWorkspace', 'MerchantCopyPack', 'parseRecordedProductPrice', 'Jual Online')
