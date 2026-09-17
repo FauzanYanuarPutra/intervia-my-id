@@ -113,7 +113,7 @@ jobs:
           test -s migrations/20260916001000_product_modifier_groups.up.sql
           grep -q 'modifier_groups JSONB' migrations/20260916001000_product_modifier_groups.up.sql
           grep -q 'idx_business_products_modifier_groups_gin' migrations/20260916001000_product_modifier_groups.up.sql
-          test -s migrations/20260918070000_business_sale_request_hash.up.sql
-          test -s migrations/20260918070000_business_sale_request_hash.down.sql
-          grep -q 'request_hash' migrations/20260918070000_business_sale_request_hash.up.sql
-          grep -q 'business_sales_request_hash_check' migrations/20260918070000_business_sale_request_hash.up.sql
+          test -s migrations/20260918124500_business_sale_request_hash.up.sql
+          test -s migrations/20260918124500_business_sale_request_hash.down.sql
+          grep -q 'request_hash' migrations/20260918124500_business_sale_request_hash.up.sql
+          grep -q 'business_sales_request_hash_check' migrations/20260918124500_business_sale_request_hash.up.sql
