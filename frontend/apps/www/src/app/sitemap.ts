@@ -111,11 +111,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/learn', priority: 0.82, changeFrequency: 'daily' },
     { path: '/blog', priority: 0.86, changeFrequency: 'weekly' },
     { path: '/news', priority: 0.92, changeFrequency: 'hourly' },
-    ...['ekonomi', 'bisnis', 'umkm', 'teknologi', 'keuangan', 'regulasi', 'industri', 'daerah'].map(category => ({
-      path: `/news/category/${category}`,
-      priority: 0.82,
-      changeFrequency: 'hourly' as const,
-    })),
     { path: '/education', priority: 0.8, changeFrequency: 'weekly' },
     { path: '/microgigs', priority: 0.7, changeFrequency: 'daily' },
     { path: '/lainnya', priority: 0.68, changeFrequency: 'weekly' },
@@ -202,6 +197,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.84,
     });
   });
+
+  const newsCategories = Array.from(
+    new Set(newsItems.map(article => article.category.trim()).filter(Boolean)),
+  );
+  for (const category of newsCategories) {
+    const slug = category.toLowerCase();
+    for (const lang of locales) {
+      sitemapEntries.push({
+        url: `${baseUrl}/${lang}/news/category/${encodeURIComponent(slug)}`,
+        changeFrequency: 'hourly',
+        priority: 0.82,
+      });
+    }
+  }
 
   const topicFacets = Array.from(
     new Set(newsItems.flatMap(article => article.tags).map(tag => tag.trim()).filter(Boolean)),
