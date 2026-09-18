@@ -10,7 +10,7 @@ function escapeXml(value: string): string {
 }
 
 export async function GET() {
-  const { items } = await getPublishedNews({ limit: 50 });
+  const { items } = await getPublishedNews({ language: 'id', limit: 50 });
   const channelUrl = buildNewsUrl('id');
 
   const entries = items
