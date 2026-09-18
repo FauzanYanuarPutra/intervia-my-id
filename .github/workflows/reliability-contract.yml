@@ -50,7 +50,7 @@ jobs:
             -e ADMIN_EMAIL=ops@lajukan.test \
             -v "$PWD/infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine \
-            validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Validate observability Compose contract
         env:
