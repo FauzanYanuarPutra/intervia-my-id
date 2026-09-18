@@ -120,7 +120,9 @@ the AMQP message ID, and the event payload carries `event_id`, `event_key`,
 The publisher has a bounded retry budget. Exhausted events enter `failed` state and stay
 visible in backlog/age metrics plus the dedicated `lajukan_outbox_failed` alert. They are
 not silently discarded. Requeue is an explicit operator action after the downstream cause
-is fixed.
+is fixed. Operators use `scripts/ops/requeue_marketplace_outbox_event.sh`, which only
+requeues one failed event selected by UUID or event key and requires
+`CONFIRM_REQUEUE=I_UNDERSTAND_REQUEUE`.
 
 The legacy outbox remains temporarily for compatibility. It should only be retired after
 all downstream consumers use canonical event identity and durable consumer inbox/dedupe
