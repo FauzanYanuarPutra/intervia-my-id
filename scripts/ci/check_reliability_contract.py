@@ -711,6 +711,7 @@ for marker in (
     "pg_dump -U postgres",
     "no published network port",
     "docker volume rm",
+    "ready_streak >= 3",
 ):
     if marker not in restore_drill_script:
         errors.append(f"isolated PostgreSQL restore drill missing safety/validation marker: {marker}")
