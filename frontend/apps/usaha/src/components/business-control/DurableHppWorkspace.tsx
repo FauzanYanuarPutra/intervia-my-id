@@ -19,6 +19,7 @@ import {
   type IngredientCostInput,
 } from '@/lib/business-control/costing';
 import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 
 type Ingredient = {
   id: string;
@@ -170,7 +171,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         const response = await fetch(`/api/businesses/${businessId}/products/${productId}/recipe`, { cache: 'no-store' });
         if (response.status !== 404) {
           const payload = await response.json();
-          if (!response.ok) throw new Error(payload?.error || 'Gagal memuat resep.');
+          if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memuat resep.', response.status));
           const aggregate = payload?.data?.recipe as RecipeApiAggregate | undefined;
           if (aggregate) {
             nextRecipeName = aggregate.recipe?.name || selected?.name || 'Resep utama';
@@ -307,7 +308,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan resep.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan resep.', response.status));
       setRecipeName(savedRecipeName);
       setInitialSignature(recipeSignature(savedRecipeName, servings, items));
       setMessage('Resep tersimpan. HPP, margin, stok, dan PIC perubahan tercatat di riwayat.');
@@ -343,7 +344,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         body: JSON.stringify({ reason }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menghapus resep aktif.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menghapus resep aktif.', response.status));
       const emptyItems: RecipeItem[] = [];
       setItems(emptyItems);
       setInitialSignature(recipeSignature(recipeName, servings, emptyItems));
