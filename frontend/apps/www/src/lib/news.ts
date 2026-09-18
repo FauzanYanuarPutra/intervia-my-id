@@ -177,10 +177,21 @@ export async function getPublishedNews(options: {
   if (options.query?.trim()) params.set('q', options.query.trim());
   if (options.cursor?.trim()) params.set('cursor', options.cursor.trim());
 
+  const highCardinalityRequest = Boolean(
+    options.query?.trim() ||
+      options.cursor?.trim() ||
+      (options.offset || 0) > 0 ||
+      options.topic?.trim() ||
+      options.location?.trim(),
+  );
+
   try {
-    const response = await fetch(`${MARKETPLACE_URL}/v1/news?${params.toString()}`, {
-      next: { revalidate: 30 },
-    });
+    const response = await fetch(
+      `${MARKETPLACE_URL}/v1/news?${params.toString()}`,
+      highCardinalityRequest
+        ? { cache: 'no-store' }
+        : { next: { revalidate: 30 } },
+    );
     if (!response.ok) return { items: [], hasMore: false, nextCursor: null };
     const payload = (await response.json()) as NewsListPayload;
     const rows = Array.isArray(payload.items) ? payload.items : [];
