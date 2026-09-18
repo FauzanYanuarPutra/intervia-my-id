@@ -88,7 +88,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
