@@ -23,12 +23,55 @@ const messages: Record<string, string> = {
   invalid_product_notes: 'Catatan produk terlalu panjang.',
   invalid_inventory_reason: 'Alasan perubahan stok terlalu panjang.',
   empty_product_update: 'Tidak ada perubahan produk untuk disimpan.',
+  missing_idempotency_key: 'Permintaan belum lengkap. Muat ulang halaman lalu coba lagi.',
+  inventory_insufficient_stock: 'Stok tidak cukup untuk perubahan ini.',
+  sale_inventory_insufficient: 'Stok produk tidak cukup untuk jumlah ini.',
+  sale_discount_exceeds_line_total: 'Diskon tidak boleh melebihi subtotal produk.',
+  ingredient_in_active_recipe: 'Bahan masih dipakai resep aktif. Lepaskan dari resep sebelum mengarsipkan.',
+  business_ingredient_permission_denied: 'Peran Anda tidak memiliki izin mengubah bahan atau stok.',
+  invalid_obligation_payment: 'Data pembayaran tagihan belum lengkap.',
+  invalid_cash_shift: 'Shift kas tidak valid atau sudah berubah.',
+  invalid_product_id: 'Produk yang dipilih tidak valid.',
+  primary_location_required: 'Usaha harus memiliki minimal satu lokasi utama.',
+  business_control_request_failed: 'Data operasional belum dapat diproses. Coba lagi.',
+  business_wave2_request_failed: 'Kontrol usaha belum dapat diproses. Coba lagi.',
+  finance_core_request_failed: 'Transaksi keuangan belum dapat diproses. Coba lagi.',
+  invalid_json_response: 'Respons layanan tidak valid. Coba lagi.',
+  invalid_sale_response: 'Respons transaksi tidak valid. Coba lagi.',
+  invalid_finance_summary_response: 'Ringkasan keuangan belum dapat dibaca. Coba lagi.',
 };
 
 function errorRecord(error: unknown): Record<string, unknown> | null {
   return error && typeof error === 'object'
     ? error as Record<string, unknown>
     : null;
+}
+
+function looksLikeErrorCode(value: string) {
+  return /^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(value);
+}
+
+export function businessApiErrorMessage(
+  payload: unknown,
+  fallbackMessage: string,
+  status = 400,
+) {
+  const value = errorRecord(payload);
+  const rawError = typeof value?.error === 'string' ? value.error.trim() : '';
+  const rawMessage = typeof value?.message === 'string' ? value.message.trim() : '';
+  const explicitCode = typeof value?.code === 'string' ? value.code.trim() : '';
+  const inferredCode = looksLikeErrorCode(rawError) ? rawError : '';
+  const code = explicitCode || inferredCode;
+  const safeStatus = status >= 400 && status <= 599 ? status : 500;
+
+  if (code && messages[code]) return messages[code];
+  if (safeStatus === 401) return messages.auth_required;
+  if (safeStatus === 403) return 'Anda tidak memiliki izin untuk tindakan ini.';
+  if (safeStatus >= 500) return 'Layanan sedang bermasalah. Coba lagi sebentar.';
+
+  if (rawError && !looksLikeErrorCode(rawError)) return rawError;
+  if (rawMessage && !looksLikeErrorCode(rawMessage)) return rawMessage;
+  return fallbackMessage;
 }
 
 export function normalizeBusinessApiError(
