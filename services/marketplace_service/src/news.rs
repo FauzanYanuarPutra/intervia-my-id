@@ -970,22 +970,6 @@ async fn enqueue_news_outbox_tx(
     Ok(())
 }
 
-async fn load_news_by_id(db: &PgPool, content_id: Uuid) -> Result<Option<NewsRow>, sqlx::Error> {
-    sqlx::query_as::<_, NewsRow>(
-        r#"
-        SELECT
-            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
-            content_status, published_at, created_at, updated_at
-        FROM content_items
-        WHERE id = $1 AND content_type = 'news' AND content_status <> 'deleted'
-        LIMIT 1
-        "#,
-    )
-    .bind(content_id)
-    .fetch_optional(db)
-    .await
-}
-
 pub(crate) async fn after_submission_created(
     state: &Arc<AppState>,
     content_id: Uuid,
