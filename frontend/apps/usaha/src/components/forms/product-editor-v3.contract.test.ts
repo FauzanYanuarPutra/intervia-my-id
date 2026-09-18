@@ -8,9 +8,12 @@ describe('product editor V3', () => {
   it('uses a persistent editor and no normal-edit ModalSurface', () => {
     expect(page).toContain('query.edit');
     expect(page).toContain('ProductEditorWorkspace');
+    expect(page).toContain('key={selectedProduct.id}');
     expect(editor).not.toContain('ModalSurface');
     expect(editor).toContain('/inventory');
     expect(editor).toContain('ProductModifierEditor');
     expect(editor).toContain('Simpan status');
+    expect(editor).toContain('SensitiveActionConfirm');
+    expect(editor).toContain('Arsipkan produk?');
   });
 });
