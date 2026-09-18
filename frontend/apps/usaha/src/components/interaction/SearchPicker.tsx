@@ -59,6 +59,12 @@ export function SearchPicker<T>({
         aria-label={`Cari ${ariaLabel.toLocaleLowerCase('id-ID')}`}
       />
 
+      {hiddenCount ? (
+        <p className="mt-2 text-[11px] text-portal-soft">
+          Menampilkan {visible.length} dari {matches.length}. Ketik pencarian agar hasil lebih spesifik.
+        </p>
+      ) : null}
+
       <div role="listbox" aria-label={`${ariaLabel} pilihan`} className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-portal-line bg-white">
         {visible.length ? (
           visible.map(item => {
