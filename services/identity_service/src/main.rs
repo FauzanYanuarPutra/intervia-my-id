@@ -450,13 +450,13 @@ async fn main() -> Result<()> {
 
     println!("Initializing Redis...");
     let redis_pool = db::init_redis(&cfg).await;
-    println!("Initializing RabbitMQ...");
-    let rabbitmq_conn = db::init_rabbitmq(&cfg).await;
 
+    // RabbitMQ is intentionally not part of request-serving readiness.
+    // The transactional outbox publisher owns its broker connection and retries
+    // independently, so authentication remains available during broker outages.
     let app_state = Arc::new(AppState {
         db: db_pool,
         redis: redis_pool,
-        rabbitmq: rabbitmq_conn,
         config: cfg.clone(),
     });
 
