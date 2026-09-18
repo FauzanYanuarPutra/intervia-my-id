@@ -43,7 +43,8 @@ struct NewsRow {
     slug: Option<String>,
     title: String,
     summary: Option<String>,
-    body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    body: Option<String>,
     tags: Option<Vec<String>>,
     cover_image: Option<String>,
     metadata: Value,
@@ -229,13 +230,17 @@ fn public_news_metadata(metadata: &Value, source_urls: Option<&[String]>) -> Val
     json!({ "news": Value::Object(public) })
 }
 
-fn public_news_row(row: NewsRow, source_urls: Option<&[String]>) -> PublicNewsRow {
+fn public_news_row(
+    row: NewsRow,
+    source_urls: Option<&[String]>,
+    include_body: bool,
+) -> PublicNewsRow {
     PublicNewsRow {
         id: row.id,
         slug: row.slug,
         title: row.title,
         summary: row.summary,
-        body: row.body,
+        body: include_body.then_some(row.body),
         tags: row.tags,
         cover_image: row.cover_image,
         metadata: public_news_metadata(&row.metadata, source_urls),
@@ -1059,7 +1064,7 @@ async fn list_news(
             };
             let public_items = items
                 .into_iter()
-                .map(|item| public_news_row(item, None))
+                .map(|item| public_news_row(item, None, false))
                 .collect();
             (
                 StatusCode::OK,
@@ -1124,7 +1129,7 @@ async fn get_news(
                     );
                 }
             };
-            (StatusCode::OK, Json(public_news_row(item, Some(&sources)))).into_response()
+            (StatusCode::OK, Json(public_news_row(item, Some(&sources), true))).into_response()
         }
         Ok(None) => response_error(StatusCode::NOT_FOUND, "news article not found"),
         Err(error) => {
