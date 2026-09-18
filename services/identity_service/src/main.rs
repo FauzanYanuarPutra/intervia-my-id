@@ -432,53 +432,69 @@ async fn main() -> Result<()> {
 
     let db_pool = db::init_postgres(&cfg).await;
 
-    // Auto-migrate.
-    // Dev stack memakai shared database lintas service, jadi versi migrasi lain
-    // boleh ada di _sqlx_migrations.
-    let mut migrator = sqlx::migrate!("./migrations");
-    if !is_prod {
-        migrator.set_ignore_missing(true);
-    }
-    let migration_timeout = if is_prod { 60 } else { 10 };
-    match timeout(
-        Duration::from_secs(migration_timeout),
-        migrator.run(&db_pool),
-    )
-    .await
-    {
-        Ok(Ok(())) => {}
-        Ok(Err(error)) => {
-            let message = error.to_string();
-            let checksum_mismatch =
-                message.contains("was previously applied but has been modified");
+    let migrate_only = env::var("MIGRATE_ONLY")
+        .ok()
+        .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"));
+    let run_migrations_on_startup = migrate_only
+        || env::var("RUN_MIGRATIONS_ON_STARTUP")
+            .ok()
+            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+            .unwrap_or(!is_prod);
 
-            if !is_prod && checksum_mismatch {
-                tracing::info!(
-                    "Shared DB migration checksum drift in {} (ignored): {}",
-                    cfg.env,
-                    message
+    // Production/staging migrations are release-owned. Normal application
+    // replicas verify the schema but do not race each other to mutate it.
+    if run_migrations_on_startup {
+        let mut migrator = sqlx::migrate!("./migrations");
+        if !is_prod {
+            migrator.set_ignore_missing(true);
+        }
+        let migration_timeout = if is_prod { 60 } else { 10 };
+        match timeout(
+            Duration::from_secs(migration_timeout),
+            migrator.run(&db_pool),
+        )
+        .await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                let message = error.to_string();
+                let checksum_mismatch =
+                    message.contains("was previously applied but has been modified");
+
+                if !is_prod && checksum_mismatch {
+                    tracing::info!(
+                        "Shared DB migration checksum drift in {} (ignored): {}",
+                        cfg.env,
+                        message
+                    );
+                } else {
+                    return Err(error.into());
+                }
+            }
+            Err(_) if !is_prod => {
+                tracing::warn!(
+                    "Embedded migrations timed out after {}s in {}; continuing because entrypoint already handles migrations.",
+                    migration_timeout,
+                    cfg.env
                 );
-            } else {
-                return Err(error.into());
+            }
+            Err(_) => {
+                return Err(anyhow::anyhow!(
+                    "Embedded migrations timed out after {}s in {}",
+                    migration_timeout,
+                    cfg.env
+                ));
             }
         }
-        Err(_) if !is_prod => {
-            tracing::warn!(
-                "Embedded migrations timed out after {}s in {}; continuing because entrypoint already handles migrations.",
-                migration_timeout,
-                cfg.env
-            );
-        }
-        Err(_) => {
-            return Err(anyhow::anyhow!(
-                "Embedded migrations timed out after {}s in {}",
-                migration_timeout,
-                cfg.env
-            ));
-        }
+    } else {
+        tracing::info!("startup migrations disabled; expecting release-owned migration step");
     }
 
     verify_identity_schema(&db_pool).await?;
+    if migrate_only {
+        tracing::info!("identity migration-only release step completed");
+        return Ok(());
+    }
 
     tracing::info!("initializing Redis");
     let redis_pool = db::init_redis(&cfg).await;
