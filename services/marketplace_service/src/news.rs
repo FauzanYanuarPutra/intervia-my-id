@@ -441,11 +441,7 @@ fn news_source_urls(metadata: &Value) -> Vec<String> {
 }
 
 fn format_news_cursor(row: &NewsRow) -> String {
-    let at = row
-        .published_at
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| row.created_at.clone());
+    let at = row.published_at.unwrap_or(row.created_at);
     format!("{}|{}", at.to_rfc3339(), row.id)
 }
 
@@ -549,7 +545,7 @@ async fn record_version_tx(
     .bind(&row.cover_image)
     .bind(&row.metadata)
     .bind(&row.content_status)
-    .bind(row.published_at.clone())
+    .bind(row.published_at)
     .execute(&mut **tx)
     .await?;
     Ok(())
@@ -766,7 +762,7 @@ async fn list_news(
         Ok(cursor) => cursor,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
-    let cursor_at = cursor.as_ref().map(|value| value.0.clone());
+    let cursor_at = cursor.as_ref().map(|value| value.0);
     let cursor_id = cursor.as_ref().map(|value| value.1);
     let effective_offset = if cursor.is_some() { 0 } else { offset };
     let rows = sqlx::query_as::<_, NewsRow>(

@@ -208,6 +208,49 @@ class GoogleOauthRuntimeContractTests(unittest.TestCase):
             errors,
         )
 
+class WwwReplicaSafetyContractTests(unittest.TestCase):
+    def test_non_development_rejects_local_www_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            model["services"]["www"]["environment"].update(
+                {
+                    "PERSONAL_AI_ALLOW_FILE_STORE": "true",
+                    "AI_LEARNING_ENABLED": "true",
+                }
+            )
+
+            errors = validate_contract(model, {}, "staging", set())
+
+        self.assertTrue(
+            any("PERSONAL_AI_ALLOW_FILE_STORE" in error for error in errors),
+            errors,
+        )
+        self.assertTrue(
+            any("AI_LEARNING_ENABLED" in error for error in errors),
+            errors,
+        )
+
+    def test_non_development_accepts_shared_state_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            model["services"]["www"]["environment"].update(
+                {
+                    "PERSONAL_AI_ALLOW_FILE_STORE": "false",
+                    "AI_LEARNING_ENABLED": "false",
+                }
+            )
+
+            errors = validate_contract(model, {}, "production", set())
+
+        local_state_errors = [
+            error
+            for error in errors
+            if "PERSONAL_AI_ALLOW_FILE_STORE" in error
+            or "AI_LEARNING_ENABLED" in error
+        ]
+        self.assertEqual(local_state_errors, [], local_state_errors)
+
+
 class KycRuntimeContractTests(unittest.TestCase):
     def test_kyc_rejects_empty_liveness_model_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

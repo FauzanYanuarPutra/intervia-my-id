@@ -134,3 +134,49 @@ groups:
         annotations:
           summary: "Lajukan RabbitMQ metrics are unavailable"
           description: "Prometheus cannot scrape the RabbitMQ metrics endpoint for 2 minutes; broker health or visibility may be impaired."
+
+
+  - name: lajukan-application-state
+    rules:
+      - alert: LajukanOutboxBacklogHigh
+        expr: lajukan_outbox_backlog > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan transactional outbox backlog is high"
+          description: "{{ $labels.service }} has more than 100 unpublished outbox events for 10 minutes. Check broker availability and publisher progress."
+
+      - alert: LajukanOutboxBacklogCritical
+        expr: lajukan_outbox_backlog > 1000
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lajukan transactional outbox backlog is critical"
+          description: "{{ $labels.service }} has more than 1000 unpublished outbox events for 10 minutes. Business writes may be committed while downstream projections are stale."
+
+      - alert: LajukanMetricsDbQueryFailed
+        expr: lajukan_metrics_db_query_ok == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan application metrics cannot query its database"
+          description: "{{ $labels.service }} cannot evaluate DB-backed runtime metrics; service/database visibility is impaired."
+
+      - alert: LajukanDbPoolSaturated
+        expr: |
+          1 -
+          (
+            lajukan_db_pool_connections{state="idle"}
+            /
+            clamp_min(lajukan_db_pool_connections{state="total"}, 1)
+          )
+          > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan database pool is highly utilized"
+          description: "{{ $labels.service }} has used more than 90% of its SQL pool for 10 minutes. Check slow queries, lock waits and pool sizing before increasing limits."

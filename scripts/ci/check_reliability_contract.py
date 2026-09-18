@@ -93,7 +93,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
@@ -453,6 +453,8 @@ for marker in (
     "probe_success",
     "pg_up",
     "rabbitmq_queue_messages_ready",
+    "lajukan_outbox_backlog",
+    "lajukan_db_pool_connections",
 ):
     if marker not in grafana_dashboard:
         errors.append(f"Grafana overview dashboard missing: {marker}")
