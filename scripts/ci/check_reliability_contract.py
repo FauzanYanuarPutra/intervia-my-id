@@ -93,7 +93,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanOutboxOldestEventStale", "LajukanOutboxOldestEventCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
@@ -389,6 +389,21 @@ for path in (
 
 
 for path in (
+    "services/identity_service/src/routes/health.rs",
+    "services/marketplace_service/src/main.rs",
+    "services/community_service/src/main.rs",
+):
+    source = read(path)
+    for marker in (
+        "lajukan_outbox_oldest_age_seconds",
+        "MIN(created_at)",
+        "status <> 'published'",
+    ):
+        if marker not in source:
+            errors.append(f"{path} missing outbox staleness metric marker: {marker}")
+
+
+for path in (
     "services/identity_service/src/main.rs",
     "services/marketplace_service/src/main.rs",
     "services/community_service/src/main.rs",
@@ -477,6 +492,7 @@ for marker in (
     "pg_up",
     "rabbitmq_queue_messages_ready",
     "lajukan_outbox_backlog",
+    "lajukan_outbox_oldest_age_seconds",
     "lajukan_db_pool_connections",
 ):
     if marker not in grafana_dashboard:
