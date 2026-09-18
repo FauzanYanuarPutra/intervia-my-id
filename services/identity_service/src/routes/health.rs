@@ -41,7 +41,6 @@ pub async fn ready_check(State(state): State<Arc<AppState>>) -> impl IntoRespons
     }
 }
 
-
 pub async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool_size = state.db.size();
     let pool_idle = state.db.num_idle();

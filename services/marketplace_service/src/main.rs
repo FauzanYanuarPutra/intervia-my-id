@@ -23835,7 +23835,6 @@ async fn publish_outbox_batch(
     }
 
     for event in events.iter() {
-
         let payload_bytes = serde_json::to_vec(&event.payload)?;
         let publish_result = channel
             .basic_publish(

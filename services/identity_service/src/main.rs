@@ -37,8 +37,7 @@ use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
     get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_users, login,
     login_phone, logout, me, oauth_google, ready_check, refresh_token, register, reset_password,
-    service_metrics,
-    update_me_profile,
+    service_metrics, update_me_profile,
 };
 
 #[derive(Debug, FromRow)]
@@ -253,7 +252,6 @@ async fn publish_identity_outbox_batch(
     }
 
     for event in events.iter() {
-
         let mut envelope = event.payload.clone();
         if let Value::Object(ref mut object) = envelope {
             object.insert("event_id".to_string(), Value::String(event.id.to_string()));
@@ -289,12 +287,24 @@ async fn publish_identity_outbox_batch(
         match publish_result {
             Ok(confirm) => {
                 if let Err(error) = confirm.await {
-                    mark_identity_outbox_retry(db, event.id, event.lease_until, format!("confirm: {error:?}")).await;
+                    mark_identity_outbox_retry(
+                        db,
+                        event.id,
+                        event.lease_until,
+                        format!("confirm: {error:?}"),
+                    )
+                    .await;
                     continue;
                 }
             }
             Err(error) => {
-                mark_identity_outbox_retry(db, event.id, event.lease_until, format!("publish: {error:?}")).await;
+                mark_identity_outbox_retry(
+                    db,
+                    event.id,
+                    event.lease_until,
+                    format!("publish: {error:?}"),
+                )
+                .await;
                 continue;
             }
         }

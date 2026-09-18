@@ -224,8 +224,17 @@ fn sanitize_topics(value: Option<Vec<String>>) -> Result<Option<Vec<String>>, &'
         return Ok(None);
     };
     let reserved = [
-        "news", "analysis", "press_release", "ekonomi", "bisnis", "umkm",
-        "teknologi", "keuangan", "regulasi", "industri", "daerah",
+        "news",
+        "analysis",
+        "press_release",
+        "ekonomi",
+        "bisnis",
+        "umkm",
+        "teknologi",
+        "keuangan",
+        "regulasi",
+        "industri",
+        "daerah",
     ];
     let mut topics = Vec::new();
     for raw in value {
@@ -1162,7 +1171,10 @@ async fn update_news_submission(
         Ok(None) => return response_error(StatusCode::NOT_FOUND, "news submission not found"),
         Err(error) => {
             tracing::error!("update_news_submission reload error: {:?}", error);
-            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to reload news submission");
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to reload news submission",
+            );
         }
     };
     if let Err(error) = record_version_tx(
@@ -1497,7 +1509,7 @@ async fn moderate_news(
     .bind(&action)
     .bind(previous_editorial_status)
     .bind(next_editorial_status)
-    .bind(note)
+    .bind(&note)
     .execute(&mut *tx)
     .await
     {

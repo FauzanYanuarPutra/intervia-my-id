@@ -1829,7 +1829,6 @@ fn request_ip(headers: &HeaderMap) -> String {
         .to_string()
 }
 
-
 async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool_size = state.db.size();
     let pool_idle = state.db.num_idle();
