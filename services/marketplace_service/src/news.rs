@@ -79,6 +79,15 @@ struct NewsListResponse {
     next_cursor: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct EditorialNewsListResponse {
+    items: Vec<NewsRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+    next_cursor: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Default)]
 struct ListNewsQuery {
     limit: Option<i64>,
@@ -1563,7 +1572,7 @@ async fn list_editorial_queue(
             }
             (
                 StatusCode::OK,
-                Json(NewsListResponse {
+                Json(EditorialNewsListResponse {
                     items,
                     limit,
                     offset,
