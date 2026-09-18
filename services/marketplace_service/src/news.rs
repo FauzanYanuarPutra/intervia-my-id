@@ -166,6 +166,8 @@ struct NewsSourceReviewEventRow {
     id: Uuid,
     content_id: Uuid,
     source_id: Option<Uuid>,
+    source_url_snapshot: Option<String>,
+    source_domain_snapshot: Option<String>,
     reviewer_id: Uuid,
     from_source_kind: String,
     to_source_kind: String,
@@ -2329,16 +2331,18 @@ async fn update_news_source(
     if let Err(error) = sqlx::query(
         r#"
         INSERT INTO news_source_review_events (
-          content_id, source_id, reviewer_id,
-          from_source_kind, to_source_kind,
+          content_id, source_id, source_url_snapshot, source_domain_snapshot,
+          reviewer_id, from_source_kind, to_source_kind,
           from_verification_status, to_verification_status,
           note
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         "#,
     )
     .bind(content_id)
     .bind(source_id)
+    .bind(&current_source.source_url)
+    .bind(&current_source.source_domain)
     .bind(reviewer_id)
     .bind(&current_source.source_kind)
     .bind(&updated.source_kind)
@@ -2442,8 +2446,8 @@ async fn list_editorial_history(
             let source_reviews = sqlx::query_as::<_, NewsSourceReviewEventRow>(
                 r#"
                 SELECT
-                  id, content_id, source_id, reviewer_id,
-                  from_source_kind, to_source_kind,
+                  id, content_id, source_id, source_url_snapshot, source_domain_snapshot,
+                  reviewer_id, from_source_kind, to_source_kind,
                   from_verification_status, to_verification_status,
                   note, created_at
                 FROM news_source_review_events
