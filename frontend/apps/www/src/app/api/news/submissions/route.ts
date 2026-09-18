@@ -75,9 +75,7 @@ function readSources(value: unknown): string[] {
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     sources.push(normalized);
-    if (sources.length >= 10) break; catch {
-      continue;
-    }
+    if (sources.length >= 10) break;
   }
   return sources;
 }
