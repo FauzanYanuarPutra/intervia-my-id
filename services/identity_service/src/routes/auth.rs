@@ -20,7 +20,6 @@ use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite}; // ✅ Gunakan A
 
 use deadpool_redis::redis::AsyncCommands;
 
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 
 use rand::{distributions::Alphanumeric, Rng};
@@ -825,11 +824,13 @@ fn access_token_algorithm() -> Result<Algorithm, anyhow::Error> {
     }
 }
 
-fn decode_key_material(name: &str) -> Result<Vec<u8>, anyhow::Error> {
-    let encoded = env::var(name).map_err(|_| anyhow::anyhow!("{name} is required"))?;
-    STANDARD
-        .decode(encoded.trim())
-        .map_err(|_| anyhow::anyhow!("{name} is not valid base64"))
+fn key_material(name: &str) -> Result<Vec<u8>, anyhow::Error> {
+    let value = env::var(name).map_err(|_| anyhow::anyhow!("{name} is required"))?;
+    let pem = value.replace("\\n", "\n");
+    if !pem.contains("-----BEGIN ") || !pem.contains(" KEY-----") {
+        anyhow::bail!("{name} is not PEM key material");
+    }
+    Ok(pem.into_bytes())
 }
 
 fn create_access_token(
@@ -863,9 +864,9 @@ fn create_access_token(
 
     let token = match algorithm {
         Algorithm::RS256 => {
-            let private_pem = decode_key_material("JWT_PRIVATE_KEY_PEM_B64")?;
+            let private_pem = key_material("JWT_PRIVATE_KEY_PEM")?;
             let key = EncodingKey::from_rsa_pem(&private_pem)
-                .map_err(|e| anyhow::anyhow!("invalid JWT_PRIVATE_KEY_PEM_B64: {e:?}"))?;
+                .map_err(|e| anyhow::anyhow!("invalid JWT_PRIVATE_KEY_PEM: {e:?}"))?;
             encode(&header, &claims, &key)
         }
         Algorithm::HS256 => encode(
@@ -894,9 +895,9 @@ fn decode_access_token(secret: &str, token: &str) -> Result<AccessClaims, anyhow
 
     let data = match algorithm {
         Algorithm::RS256 => {
-            let public_pem = decode_key_material("JWT_PUBLIC_KEY_PEM_B64")?;
+            let public_pem = key_material("JWT_PUBLIC_KEY_PEM")?;
             let key = DecodingKey::from_rsa_pem(&public_pem)
-                .map_err(|e| anyhow::anyhow!("invalid JWT_PUBLIC_KEY_PEM_B64: {e:?}"))?;
+                .map_err(|e| anyhow::anyhow!("invalid JWT_PUBLIC_KEY_PEM: {e:?}"))?;
             decode::<AccessClaims>(token, &key, &validation)
         }
         Algorithm::HS256 => decode::<AccessClaims>(
