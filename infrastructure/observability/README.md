@@ -30,7 +30,13 @@ host memory, host CPU, and RabbitMQ backlog.
 
 The Prometheus rules also calculate 99.9%-SLO error-budget burn signals using
 short and long windows. These are internal engineering signals, not an external
-availability claim.
+availability claim. Grafana now includes concurrency-utilization and overload-
+rejection panels so operators can distinguish downstream latency from deliberate
+load shedding.
+
+The blackbox probe set also checks Alertmanager readiness and Grafana health.
+This makes loss of the observability control plane visible from Prometheus
+instead of silently removing the operator cockpit.
 
 ## What is measured
 
@@ -50,7 +56,10 @@ exposes active realtime notification subscriber count.
 
 The request metrics deliberately keep labels low-cardinality: service and status
 class are exported, but raw request paths and object IDs are not metric labels.
-Request IDs remain in structured logs/responses for correlation.
+Request IDs remain in structured logs/responses for correlation. Identity,
+Marketplace and Community allow a bounded safe `x-request-id` through CORS and
+expose the response header, so browser clients can report the exact correlation
+ID when a request fails.
 
 RabbitMQ queue lag, provider-specific latency and richer domain metrics should
 continue to be added from real code paths rather than invented at the dashboard

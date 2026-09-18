@@ -74,6 +74,8 @@ scrape_configs:
           - http://www:3000/api/health
           - http://meilisearch:7700/health
           - http://minio:9002/minio/health/ready
+          - http://alertmanager:9093/-/ready
+          - http://grafana:3000/api/health
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

@@ -1186,7 +1186,9 @@ async fn main() -> anyhow::Result<()> {
             header::ACCEPT,
             HeaderName::from_static("x-forwarded-for"),
             HeaderName::from_static("x-real-ip"),
-        ]);
+            HeaderName::from_static("x-request-id"),
+        ])
+        .expose_headers([HeaderName::from_static("x-request-id")]);
 
     let configured_origins = parse_cors_origins();
     if !configured_origins.is_empty() {

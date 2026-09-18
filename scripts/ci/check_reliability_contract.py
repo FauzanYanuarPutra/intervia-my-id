@@ -483,6 +483,25 @@ for path in (
 
 
 for path in (
+    "services/identity_service/src/main.rs",
+    "services/marketplace_service/src/main.rs",
+    "services/community_service/src/main.rs",
+):
+    source = read(path)
+    if source.count('HeaderName::from_static("x-request-id")') < 2:
+        errors.append(f"{path} must allow and expose x-request-id through CORS")
+    if ".expose_headers([HeaderName::from_static(\"x-request-id\")])" not in source:
+        errors.append(f"{path} must expose x-request-id to browser clients")
+
+for marker in (
+    "http://alertmanager:9093/-/ready",
+    "http://grafana:3000/api/health",
+):
+    if marker not in prometheus_config:
+        errors.append(f"observability self-monitoring probe missing: {marker}")
+
+
+for path in (
     "services/identity_service/src/routes/health.rs",
     "services/marketplace_service/src/main.rs",
     "services/community_service/src/main.rs",

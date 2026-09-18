@@ -494,7 +494,9 @@ async fn main() -> Result<()> {
             header::CONTENT_TYPE,
             header::ACCEPT,
             HeaderName::from_static("x-requested-with"),
+            HeaderName::from_static("x-request-id"),
         ])
+        .expose_headers([HeaderName::from_static("x-request-id")])
         .allow_credentials(true);
 
     let configured_origins: Vec<HeaderValue> = cfg
