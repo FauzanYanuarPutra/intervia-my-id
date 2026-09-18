@@ -56,6 +56,8 @@ require(
         "normalize_news_language",
         "websearch_to_tsquery",
         "normalize_news_category_filter",
+        "normalize_news_search_query",
+        "search query has too many terms",
         "tags @> ARRAY[$2]::text[]",
         "''::text AS body",
         "search query is too long",
@@ -257,6 +259,10 @@ require(
         "Top artikel 7 hari",
     ),
 )
+
+news_lib = read("frontend/apps/www/src/lib/news.ts")
+if "owner_id" in news_lib or "ownerId" in news_lib:
+    errors.append("public News frontend contract must not expose contributor identity")
 
 require(
     "frontend/apps/www/src/lib/news.ts",
