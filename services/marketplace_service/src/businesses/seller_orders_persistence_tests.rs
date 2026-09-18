@@ -11,6 +11,7 @@ struct SeededOrderContext {
     organization_id: Uuid,
     business_id: Uuid,
     order_id: Uuid,
+    product_id: Uuid,
 }
 
 async fn seed_order_context(pool: &PgPool, status: &str) -> SeededOrderContext {
@@ -20,6 +21,7 @@ async fn seed_order_context(pool: &PgPool, status: &str) -> SeededOrderContext {
     let business_id = Uuid::new_v4();
     let store_id = Uuid::new_v4();
     let order_id = Uuid::new_v4();
+    let product_id = Uuid::new_v4();
 
     sqlx::query(
         r#"
@@ -64,6 +66,50 @@ async fn seed_order_context(pool: &PgPool, status: &str) -> SeededOrderContext {
 
     sqlx::query(
         r#"
+        INSERT INTO business_products (
+          id, business_id, organization_id, name, category, price_label, status, source_type
+        ) VALUES ($1,$2,$3,'Jus Alpukat','Minuman','Rp1.000','active','owned')
+        "#,
+    )
+    .bind(product_id)
+    .bind(business_id)
+    .bind(organization_id)
+    .execute(pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO umkm_products (
+          id, store_id, name, slug, category, price_cents, stock_qty, is_available, metadata
+        ) VALUES ($1,$2,'Jus Alpukat',$3,'Minuman',100000,5,TRUE,'{}'::jsonb)
+        "#,
+    )
+    .bind(product_id)
+    .bind(store_id)
+    .bind(format!("jus-alpukat-{}", &product_id.simple().to_string()[..8]))
+    .execute(pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_inventory (
+          id, product_id, business_id, organization_id, stock_count,
+          stock_unit, min_stock_alert, stock_mode
+        ) VALUES ($1,$2,$3,$4,5,'pcs',1,'manual')
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(product_id)
+    .bind(business_id)
+    .bind(organization_id)
+    .execute(pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
         INSERT INTO orders (
           id, order_number, user_id, merchant_id, business_id,
           category_type, base_status, payment_status, currency,
@@ -92,12 +138,13 @@ async fn seed_order_context(pool: &PgPool, status: &str) -> SeededOrderContext {
     sqlx::query(
         r#"
         INSERT INTO order_items (
-          id, order_id, item_name, quantity, unit_price, line_total, metadata
-        ) VALUES ($1,$2,'Jus Alpukat',1,100000,100000,'{}'::jsonb)
+          id, order_id, product_id, item_name, quantity, unit_price, line_total, metadata
+        ) VALUES ($1,$2,$3,'Jus Alpukat',1,100000,100000,'{}'::jsonb)
         "#,
     )
     .bind(Uuid::new_v4())
     .bind(order_id)
+    .bind(product_id)
     .execute(pool)
     .await
     .unwrap();
@@ -107,7 +154,30 @@ async fn seed_order_context(pool: &PgPool, status: &str) -> SeededOrderContext {
         organization_id,
         business_id,
         order_id,
+        product_id,
     }
+}
+
+async fn seed_reservation(
+    pool: &PgPool,
+    seeded: &SeededOrderContext,
+    quantity: i64,
+) {
+    sqlx::query(
+        r#"
+        INSERT INTO business_order_stock_reservations (
+          organization_id, business_id, order_id, product_id, quantity, expires_at
+        ) VALUES ($1,$2,$3,$4,$5,NOW()+INTERVAL '30 minutes')
+        "#,
+    )
+    .bind(seeded.organization_id)
+    .bind(seeded.business_id)
+    .bind(seeded.order_id)
+    .bind(seeded.product_id)
+    .bind(Decimal::from(quantity))
+    .execute(pool)
+    .await
+    .unwrap();
 }
 
 fn transition_request(expected_version: i64, next_status: &str) -> TransitionSellerOrderRequest {
@@ -171,6 +241,108 @@ async fn seller_transition_is_atomic_and_replay_safe(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(outbox_count, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn processing_consumes_reservation_and_stock_exactly_once(pool: PgPool) {
+    let seeded = seed_order_context(&pool, "PAID").await;
+    seed_reservation(&pool, &seeded, 2).await;
+    let repository = SellerOrderRepository::new(pool.clone());
+    let key = Uuid::new_v4();
+
+    let first = repository
+        .transition(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            seeded.order_id,
+            key,
+            transition_request(1, "PROCESSING"),
+        )
+        .await
+        .unwrap();
+    let replay = repository
+        .transition(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            seeded.order_id,
+            key,
+            transition_request(1, "PROCESSING"),
+        )
+        .await
+        .unwrap();
+
+    assert!(!first.replayed);
+    assert!(replay.replayed);
+
+    let stock: Option<f64> = sqlx::query_scalar(
+        "SELECT stock_count FROM business_inventory WHERE product_id=$1",
+    )
+    .bind(seeded.product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stock, Some(3.0));
+
+    let public_stock: i32 =
+        sqlx::query_scalar("SELECT stock_qty FROM umkm_products WHERE id=$1")
+            .bind(seeded.product_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(public_stock, 3);
+
+    let reservation: (String, Option<chrono::DateTime<chrono::Utc>>) = sqlx::query_as(
+        "SELECT state, consumed_at FROM business_order_stock_reservations WHERE order_id=$1 AND product_id=$2",
+    )
+    .bind(seeded.order_id)
+    .bind(seeded.product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reservation.0, "consumed");
+    assert!(reservation.1.is_some());
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn rejecting_unpaid_order_releases_hold_without_consuming_stock(pool: PgPool) {
+    let seeded = seed_order_context(&pool, "PENDING_PAYMENT").await;
+    seed_reservation(&pool, &seeded, 2).await;
+    let repository = SellerOrderRepository::new(pool.clone());
+
+    let outcome = repository
+        .transition(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            seeded.order_id,
+            Uuid::new_v4(),
+            transition_request(1, "REJECTED"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome.order.order.base_status, "REJECTED");
+
+    let stock: Option<f64> = sqlx::query_scalar(
+        "SELECT stock_count FROM business_inventory WHERE product_id=$1",
+    )
+    .bind(seeded.product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stock, Some(5.0));
+
+    let reservation: (String, Option<chrono::DateTime<chrono::Utc>>) = sqlx::query_as(
+        "SELECT state, released_at FROM business_order_stock_reservations WHERE order_id=$1 AND product_id=$2",
+    )
+    .bind(seeded.order_id)
+    .bind(seeded.product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reservation.0, "released");
+    assert!(reservation.1.is_some());
 }
 
 #[sqlx::test(migrations = "./migrations")]
