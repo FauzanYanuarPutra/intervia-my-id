@@ -209,6 +209,21 @@ export async function getPublishedNewsArticle(slug: string): Promise<LajukanNews
   }
 }
 
+export async function getNewsLanguageAvailability(options: {
+  category?: string;
+  topic?: string;
+  location?: string;
+}): Promise<{ id: boolean; en: boolean }> {
+  const [id, en] = await Promise.all([
+    getPublishedNews({ ...options, language: 'id', limit: 1 }),
+    getPublishedNews({ ...options, language: 'en', limit: 1 }),
+  ]);
+  return {
+    id: id.items.length > 0,
+    en: en.items.length > 0,
+  };
+}
+
 export async function getNewsForSitemap(maxItems = 1000): Promise<LajukanNewsArticle[]> {
   const collected: LajukanNewsArticle[] = [];
   let cursor: string | undefined;

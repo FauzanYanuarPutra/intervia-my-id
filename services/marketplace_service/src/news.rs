@@ -213,6 +213,26 @@ fn normalize_news_language(value: Option<String>) -> Result<Option<String>, &'st
     }
 }
 
+fn normalize_news_category_filter(
+    value: Option<String>,
+) -> Result<Option<String>, &'static str> {
+    let Some(category) = trimmed(value) else {
+        return Ok(None);
+    };
+    let canonical = match category.to_ascii_lowercase().as_str() {
+        "ekonomi" => "Ekonomi",
+        "bisnis" => "Bisnis",
+        "umkm" => "UMKM",
+        "teknologi" => "Teknologi",
+        "keuangan" => "Keuangan",
+        "regulasi" => "Regulasi",
+        "industri" => "Industri",
+        "daerah" => "Daerah",
+        _ => return Err("unsupported news category"),
+    };
+    Ok(Some(canonical.to_string()))
+}
+
 fn public_news_metadata(metadata: &Value, source_urls: Option<&[String]>) -> Value {
     let source = metadata.get("news").and_then(Value::as_object);
     let mut public = serde_json::Map::new();
@@ -1082,14 +1102,29 @@ async fn list_news(
         );
     }
 
-    let category = trimmed(query.category);
-    let topic = trimmed(query.topic);
+    let category = match normalize_news_category_filter(query.category) {
+        Ok(category) => category,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let topic = trimmed(query.topic).map(|value| value.to_ascii_lowercase());
     let location = trimmed(query.location);
     let language = match normalize_news_language(query.language) {
         Ok(language) => language,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
     let q = trimmed(query.q);
+    if category.as_ref().is_some_and(|value| value.len() > 80) {
+        return response_error(StatusCode::BAD_REQUEST, "category filter is too long");
+    }
+    if topic.as_ref().is_some_and(|value| value.len() > 80) {
+        return response_error(StatusCode::BAD_REQUEST, "topic filter is too long");
+    }
+    if location.as_ref().is_some_and(|value| value.len() > 120) {
+        return response_error(StatusCode::BAD_REQUEST, "location filter is too long");
+    }
+    if q.as_ref().is_some_and(|value| value.len() > 160) {
+        return response_error(StatusCode::BAD_REQUEST, "search query is too long");
+    }
     let cursor = match parse_news_cursor(query.cursor.as_deref()) {
         Ok(cursor) => cursor,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
@@ -1100,7 +1135,7 @@ async fn list_news(
     let rows = sqlx::query_as::<_, NewsRow>(
         r#"
         SELECT
-            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
+            id, owner_id, slug, title, summary, ''::text AS body, tags, cover_image, metadata,
             content_status, published_at, created_at, updated_at
         FROM content_items
         WHERE content_type = 'news'
@@ -1108,15 +1143,11 @@ async fn list_news(
           AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'published') = 'published'
           AND (
             $1::text IS NULL OR
-            lower(COALESCE(metadata->'news'->>'category', '')) = lower($1)
+            metadata->'news'->>'category' = $1
           )
           AND (
             $2::text IS NULL OR
-            EXISTS (
-              SELECT 1
-              FROM unnest(COALESCE(tags, ARRAY[]::text[])) AS tag
-              WHERE lower(tag) = lower($2)
-            )
+            tags @> ARRAY[$2]::text[]
           )
           AND (
             $3::text IS NULL OR
@@ -1124,14 +1155,14 @@ async fn list_news(
           )
           AND (
             $4::text IS NULL OR
-            lower(COALESCE(NULLIF(metadata->'news'->>'language', ''), 'id')) = lower($4)
+            COALESCE(NULLIF(metadata->'news'->>'language', ''), 'id') = $4
           )
           AND (
             $5::text IS NULL OR
-            title ILIKE ('%' || $5 || '%') OR
-            COALESCE(summary, '') ILIKE ('%' || $5 || '%') OR
-            body ILIKE ('%' || $5 || '%') OR
-            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $5 || '%')
+            to_tsvector(
+              'simple'::regconfig,
+              COALESCE(title, '') || ' ' || COALESCE(summary, '') || ' ' || COALESCE(body, '')
+            ) @@ websearch_to_tsquery('simple'::regconfig, $5)
           )
           AND (
             $6::timestamptz IS NULL OR
@@ -2297,8 +2328,9 @@ async fn list_editorial_history(
 mod tests {
     use super::{
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
-        moderation_target, normalize_news_language, normalize_queue_status, parse_news_cursor,
-        public_news_metadata, source_domain, validate_submission_payload,
+        moderation_target, normalize_news_category_filter, normalize_news_language,
+        normalize_queue_status, parse_news_cursor, public_news_metadata, source_domain,
+        validate_submission_payload,
     };
     use serde_json::json;
 
@@ -2410,6 +2442,20 @@ mod tests {
             "https://user:pass@example.com/source"
         ));
         assert!(!is_allowed_news_source_url("file:///etc/passwd"));
+    }
+
+    #[test]
+    fn news_category_filter_canonicalizes_supported_values() {
+        assert_eq!(
+            normalize_news_category_filter(Some("umkm".to_string())).unwrap(),
+            Some("UMKM".to_string())
+        );
+        assert_eq!(
+            normalize_news_category_filter(Some("Bisnis".to_string())).unwrap(),
+            Some("Bisnis".to_string())
+        );
+        assert!(normalize_news_category_filter(Some("unknown".to_string())).is_err());
+        assert_eq!(normalize_news_category_filter(None).unwrap(), None);
     }
 
     #[test]

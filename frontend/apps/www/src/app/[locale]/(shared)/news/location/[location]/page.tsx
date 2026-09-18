@@ -2,21 +2,26 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, MapPin } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { buildNewsFacetUrl, buildNewsPath, getPublishedNews } from '@/lib/news';
+import { buildNewsFacetPath, buildNewsFacetUrl, buildNewsPath, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
-type Props = { params: Promise<{ locale: string; location: string }> };
+type Props = {
+  params: Promise<{ locale: string; location: string }>;
+  searchParams: Promise<{ cursor?: string }>;
+};
 
 function cleanFacet(value: string): string {
   return value.trim().slice(0, 120);
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { locale, location } = await params;
+  const filters = await searchParams;
   const value = cleanFacet(location);
   if (!value) return { robots: { index: false, follow: true } };
   const canonical = buildNewsFacetUrl(locale, 'location', value);
-  const { items } = await getPublishedNews({ location: value, language: locale === 'en' ? 'en' : 'id', limit: 1 });
-  const indexable = items.length > 0;
+  const availability = await getNewsLanguageAvailability({ location: value });
+  const currentLanguage = locale === 'en' ? 'en' : 'id';
+  const indexable = availability[currentLanguage];
   return {
     title: `${value} | Berita Daerah Lajukan`,
     description: locale === 'id'
@@ -25,25 +30,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical,
       languages: {
-        id: buildNewsFacetUrl('id', 'location', value),
-        en: buildNewsFacetUrl('en', 'location', value),
-        'x-default': buildNewsFacetUrl('id', 'location', value),
+        ...(availability.id ? { id: buildNewsFacetUrl('id', 'location', value) } : {}),
+        ...(availability.en ? { en: buildNewsFacetUrl('en', 'location', value) } : {}),
+        ...(availability.id
+          ? { 'x-default': buildNewsFacetUrl('id', 'location', value) }
+          : availability.en
+            ? { 'x-default': buildNewsFacetUrl('en', 'location', value) }
+            : {}),
       },
     },
     robots: {
-      index: indexable,
+      index: indexable && !filters.cursor?.trim(),
       follow: true,
-      googleBot: { index: indexable, follow: true, 'max-image-preview': 'large' },
+      googleBot: { index: indexable && !filters.cursor?.trim(), follow: true, 'max-image-preview': 'large' },
     },
   };
 }
 
-export default async function NewsLocationPage({ params }: Props) {
+export default async function NewsLocationPage({ params, searchParams }: Props) {
   const { locale, location } = await params;
+  const filters = await searchParams;
   const value = cleanFacet(location);
   if (!value) notFound();
   const isId = locale === 'id';
-  const { items } = await getPublishedNews({ location: value, language: isId ? 'id' : 'en', limit: 48 });
+  const cursor = filters.cursor?.trim() || undefined;
+  const { items, nextCursor } = await getPublishedNews({ location: value, language: isId ? 'id' : 'en', cursor, limit: 48 });
 
   return (
     <main className="page-shell page-rhythm pb-12 pt-6">
@@ -69,6 +80,13 @@ export default async function NewsLocationPage({ params }: Props) {
       ) : (
         <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">{isId ? 'Belum ada berita untuk wilayah ini.' : 'No news for this location yet.'}</div>
       )}
+      {nextCursor ? (
+        <nav aria-label={isId ? 'Navigasi berita daerah' : 'Local news navigation'} className="flex justify-center">
+          <Link href={`${buildNewsFacetPath('location', value)}?cursor=${encodeURIComponent(nextCursor)}`} rel="next" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+            {isId ? 'Berikutnya' : 'Next'}<ArrowRight className="h-4 w-4" />
+          </Link>
+        </nav>
+      ) : null}
     </main>
   );
 }

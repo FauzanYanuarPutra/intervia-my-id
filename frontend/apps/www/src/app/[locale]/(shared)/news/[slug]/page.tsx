@@ -55,7 +55,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: buildNewsUrl(article.language, article.slug),
       siteName: 'Lajukan',
       type: 'article',
-      locale: locale === 'en' ? 'en_US' : 'id_ID',
+      locale: article.language === 'en' ? 'en_US' : 'id_ID',
       publishedTime: article.publishedAt,
       modifiedTime: article.updatedAt,
       images: article.coverImage
