@@ -1,6 +1,8 @@
 use axum::http::{header, HeaderMap, StatusCode};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
+use std::{env, sync::OnceLock};
 
 use crate::{ApiError, ApiResult, AppState};
 
@@ -32,6 +34,78 @@ pub(crate) struct AuthActor {
     pub(crate) name: Option<String>,
 }
 
+static RS256_DECODING_KEY: OnceLock<Result<DecodingKey, String>> = OnceLock::new();
+
+fn access_token_algorithm() -> Option<Algorithm> {
+    match env::var("JWT_ACCESS_ALG")
+        .unwrap_or_else(|_| "HS256".to_string())
+        .trim()
+        .to_ascii_uppercase()
+        .as_str()
+    {
+        "HS256" => Some(Algorithm::HS256),
+        "RS256" => Some(Algorithm::RS256),
+        _ => None,
+    }
+}
+
+fn rs256_decoding_key() -> Option<&'static DecodingKey> {
+    RS256_DECODING_KEY
+        .get_or_init(|| {
+            let encoded = env::var("JWT_PUBLIC_KEY_PEM_B64")
+                .map_err(|_| "JWT_PUBLIC_KEY_PEM_B64 is required for RS256".to_string())?;
+            let pem = STANDARD
+                .decode(encoded.trim())
+                .map_err(|_| "JWT_PUBLIC_KEY_PEM_B64 is not valid base64".to_string())?;
+            DecodingKey::from_rsa_pem(&pem)
+                .map_err(|_| "JWT_PUBLIC_KEY_PEM_B64 is not a valid RSA public key".to_string())
+        })
+        .as_ref()
+        .ok()
+}
+
+fn validation(algorithm: Algorithm) -> Validation {
+    let mut validation = Validation::new(algorithm);
+    validation.validate_exp = true;
+
+    if algorithm == Algorithm::RS256 {
+        if let Ok(issuer) = env::var("JWT_ISSUER") {
+            let issuer = issuer.trim();
+            if !issuer.is_empty() {
+                validation.set_issuer(&[issuer]);
+            }
+        }
+        if let Ok(audience) = env::var("JWT_AUDIENCE") {
+            let audience = audience.trim();
+            if !audience.is_empty() {
+                validation.set_audience(&[audience]);
+            }
+        }
+    }
+
+    validation
+}
+
+fn decode_access_claims(token: &str, jwt_secret: &str) -> Option<AccessClaims> {
+    let algorithm = access_token_algorithm()?;
+    match algorithm {
+        Algorithm::RS256 => {
+            let key = rs256_decoding_key()?;
+            decode::<AccessClaims>(token, key, &validation(algorithm))
+                .ok()
+                .map(|decoded| decoded.claims)
+        }
+        Algorithm::HS256 => decode::<AccessClaims>(
+            token,
+            &DecodingKey::from_secret(jwt_secret.as_bytes()),
+            &validation(algorithm),
+        )
+        .ok()
+        .map(|decoded| decoded.claims),
+        _ => None,
+    }
+}
+
 fn bearer_token(headers: &HeaderMap) -> Option<String> {
     headers
         .get(header::AUTHORIZATION)
@@ -44,15 +118,7 @@ fn bearer_token(headers: &HeaderMap) -> Option<String> {
 
 pub(crate) fn optional_actor(headers: &HeaderMap, state: &AppState) -> Option<AuthActor> {
     let token = bearer_token(headers)?;
-    let mut validation = Validation::new(Algorithm::HS256);
-    validation.validate_exp = true;
-    let claims = decode::<AccessClaims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &validation,
-    )
-    .ok()?
-    .claims;
+    let claims = decode_access_claims(&token, &state.jwt_secret)?;
 
     Some(AuthActor {
         user_id: claims.sub,
@@ -101,5 +167,10 @@ mod tests {
             name: None,
         };
         assert!(is_moderator(&actor));
+    }
+
+    #[test]
+    fn malformed_tokens_do_not_authenticate() {
+        assert!(decode_access_claims("not-a-jwt", "test-secret").is_none());
     }
 }
