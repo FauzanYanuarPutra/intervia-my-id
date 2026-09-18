@@ -6,23 +6,81 @@ pub(crate) enum TransactionStateError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OrderState {
     Draft,
-    Confirmed,
-    InProgress,
+    PendingPayment,
+    Paid,
+    Processing,
+    Shipped,
+    InService,
+    Delivered,
     Completed,
     Cancelled,
+    Rejected,
+    Expired,
+    Refunded,
 }
 
 impl OrderState {
+    pub(crate) const fn as_db(self) -> &'static str {
+        match self {
+            Self::Draft => "DRAFT",
+            Self::PendingPayment => "PENDING_PAYMENT",
+            Self::Paid => "PAID",
+            Self::Processing => "PROCESSING",
+            Self::Shipped => "SHIPPED",
+            Self::InService => "IN_SERVICE",
+            Self::Delivered => "DELIVERED",
+            Self::Completed => "COMPLETED",
+            Self::Cancelled => "CANCELLED",
+            Self::Rejected => "REJECTED",
+            Self::Expired => "EXPIRED",
+            Self::Refunded => "REFUNDED",
+        }
+    }
+
+    pub(crate) fn from_db(value: &str) -> Option<Self> {
+        match value {
+            "DRAFT" => Some(Self::Draft),
+            "PENDING_PAYMENT" => Some(Self::PendingPayment),
+            "PAID" => Some(Self::Paid),
+            "PROCESSING" => Some(Self::Processing),
+            "SHIPPED" => Some(Self::Shipped),
+            "IN_SERVICE" => Some(Self::InService),
+            "DELIVERED" => Some(Self::Delivered),
+            "COMPLETED" => Some(Self::Completed),
+            "CANCELLED" => Some(Self::Cancelled),
+            "REJECTED" => Some(Self::Rejected),
+            "EXPIRED" => Some(Self::Expired),
+            "REFUNDED" => Some(Self::Refunded),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn can_transition_to(self, next: Self) -> bool {
         matches!(
             (self, next),
-            (Self::Draft, Self::Confirmed)
+            (Self::Draft, Self::PendingPayment)
                 | (Self::Draft, Self::Cancelled)
-                | (Self::Confirmed, Self::InProgress)
-                | (Self::Confirmed, Self::Completed)
-                | (Self::Confirmed, Self::Cancelled)
-                | (Self::InProgress, Self::Completed)
-                | (Self::InProgress, Self::Cancelled)
+                | (Self::PendingPayment, Self::Paid)
+                | (Self::PendingPayment, Self::Expired)
+                | (Self::PendingPayment, Self::Cancelled)
+                | (Self::PendingPayment, Self::Rejected)
+                | (Self::Paid, Self::Processing)
+                | (Self::Paid, Self::Cancelled)
+                | (Self::Paid, Self::Refunded)
+                | (Self::Processing, Self::Shipped)
+                | (Self::Processing, Self::InService)
+                | (Self::Processing, Self::Delivered)
+                | (Self::Processing, Self::Cancelled)
+                | (Self::Processing, Self::Refunded)
+                | (Self::Shipped, Self::Delivered)
+                | (Self::Shipped, Self::Completed)
+                | (Self::Shipped, Self::Refunded)
+                | (Self::InService, Self::Delivered)
+                | (Self::InService, Self::Completed)
+                | (Self::InService, Self::Cancelled)
+                | (Self::InService, Self::Refunded)
+                | (Self::Delivered, Self::Completed)
+                | (Self::Delivered, Self::Refunded)
         )
     }
 
