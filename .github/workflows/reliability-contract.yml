@@ -37,9 +37,10 @@ jobs:
         shell: bash
         run: |
           docker run --rm \
+            --entrypoint promtool \
             -v "$PWD/infrastructure/observability:/etc/prometheus:ro" \
             prom/prometheus:v3.14.0 \
-            promtool check config /etc/prometheus/prometheus.yml
+            check config /etc/prometheus/prometheus.yml
 
       - name: Validate production Caddy configuration
         shell: bash
@@ -49,7 +50,7 @@ jobs:
             -e ADMIN_EMAIL=ops@lajukan.test \
             -v "$PWD/infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine \
-            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Validate observability Compose contract
         env:
