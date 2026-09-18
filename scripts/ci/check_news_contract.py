@@ -56,6 +56,8 @@ require(
         "normalize_news_language",
         "websearch_to_tsquery",
         "normalize_news_category_filter",
+        "normalize_news_search_query",
+        "search query has too many terms",
         "tags @> ARRAY[$2]::text[]",
         "''::text AS body",
         "search query is too long",
@@ -66,6 +68,11 @@ require(
         "validate_submission_payload",
         "news summary must be 20-1000 characters",
         "only public HTTP(S) source URLs can be verified",
+        "removes_verified_source",
+        "published news requires a verified source; verify a replacement or retract first",
+        "INSERT INTO news_source_review_events",
+        '"source_reviews": source_reviews',
+        "news.source.reviewed",
         "let is_retracted = editorial_status",
         "include_body && !is_retracted",
         'matches!(action.as_str(), "approve" | "correct")',
@@ -90,6 +97,18 @@ require(
         "'news'",
         "idx_content_items_news_cursor",
         "idx_event_log_news_engagement",
+    ),
+)
+
+require(
+    "services/marketplace_service/migrations/20260919003000_news_source_review_history.up.sql",
+    (
+        "CREATE TABLE IF NOT EXISTS news_source_review_events",
+        "reviewer_id UUID NOT NULL",
+        "from_verification_status",
+        "to_verification_status",
+        "idx_news_source_review_events_content_created",
+        "ON DELETE SET NULL",
     ),
 )
 
@@ -277,11 +296,19 @@ require(
         "requiresVerifiedSource",
         "isSafeExternalSourceUrl",
         "requiresVerifiedSource && !hasVerifiedSource",
+        "wouldBreakPublishedProvenance",
+        "Verifikasi sumber pengganti atau retract artikel",
+        "Jejak review sumber",
+        "record.source_reviews",
         "Approve & publish",
         "Versi artikel",
         "Top artikel 7 hari",
     ),
 )
+
+news_lib = read("frontend/apps/www/src/lib/news.ts")
+if "owner_id" in news_lib or "ownerId" in news_lib:
+    errors.append("public News frontend contract must not expose contributor identity")
 
 require(
     "frontend/apps/www/src/lib/news.ts",

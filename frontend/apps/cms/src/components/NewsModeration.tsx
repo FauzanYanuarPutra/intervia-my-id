@@ -38,6 +38,18 @@ type NewsSource = {
   checked_at?: string | null;
 };
 
+type NewsSourceReview = {
+  id: string;
+  source_id?: string | null;
+  reviewer_id: string;
+  from_source_kind: NewsSource['source_kind'];
+  to_source_kind: NewsSource['source_kind'];
+  from_verification_status: NewsSource['verification_status'];
+  to_verification_status: NewsSource['verification_status'];
+  note?: string | null;
+  created_at: string;
+};
+
 type NewsroomMetrics = {
   queue?: Array<{ key: string; value: number }>;
   engagement_24h?: Array<{ key: string; value: number }>;
@@ -139,6 +151,7 @@ export default function NewsModeration() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [versions, setVersions] = useState<NewsVersion[]>([]);
   const [sources, setSources] = useState<NewsSource[]>([]);
+  const [sourceReviews, setSourceReviews] = useState<NewsSourceReview[]>([]);
   const [metrics, setMetrics] = useState<NewsroomMetrics>({});
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [sourceUpdating, setSourceUpdating] = useState('');
@@ -162,12 +175,18 @@ export default function NewsModeration() {
         setHistory(Array.isArray(record.items) ? (record.items as EditorialEvent[]) : []);
         setVersions(Array.isArray(record.versions) ? (record.versions as NewsVersion[]) : []);
         setSources(Array.isArray(record.sources) ? (record.sources as NewsSource[]) : []);
+        setSourceReviews(
+          Array.isArray(record.source_reviews)
+            ? (record.source_reviews as NewsSourceReview[])
+            : [],
+        );
       })
       .catch(() => {
         if (!active) return;
         setHistory([]);
         setVersions([]);
         setSources([]);
+        setSourceReviews([]);
       })
       .finally(() => {
         if (active) setHistoryLoading(false);
@@ -206,6 +225,11 @@ export default function NewsModeration() {
       const payload = await newsApi.history(accessToken, selected.id);
       const record = readRecord(payload);
       setSources(Array.isArray(record.sources) ? (record.sources as NewsSource[]) : []);
+      setSourceReviews(
+        Array.isArray(record.source_reviews)
+          ? (record.source_reviews as NewsSourceReview[])
+          : [],
+      );
       setSuccess(`Status sumber diperbarui: ${source.source_domain || source.source_url}`);
       void loadMetrics();
     } catch (err) {
@@ -332,11 +356,32 @@ export default function NewsModeration() {
   const kind = readString(newsMeta.article_kind) || 'news';
   const location = readString(newsMeta.location) || '-';
   const requiresVerifiedSource = kind !== 'press_release';
+  const editorialStatus =
+    readString(newsMeta.editorial_status) ||
+    (selected?.content_status === 'active'
+      ? 'published'
+      : selected?.content_status === 'archived'
+        ? 'rejected'
+        : 'pending_review');
   const hasVerifiedSource = sources.some(
     source =>
       source.verification_status === 'verified' &&
       isSafeExternalSourceUrl(source.source_url),
   );
+  const wouldBreakPublishedProvenance = (
+    source: NewsSource,
+    nextStatus: NewsSource['verification_status'],
+  ) =>
+    editorialStatus === 'published' &&
+    requiresVerifiedSource &&
+    source.verification_status === 'verified' &&
+    nextStatus !== 'verified' &&
+    !sources.some(
+      candidate =>
+        candidate.id !== source.id &&
+        candidate.verification_status === 'verified' &&
+        isSafeExternalSourceUrl(candidate.source_url),
+    );
   const sourceUrls = Array.isArray(newsMeta.source_urls)
     ? newsMeta.source_urls
         .map(readString)
@@ -476,9 +521,17 @@ export default function NewsModeration() {
                             <button
                               key={value}
                               type="button"
-                              disabled={sourceUpdating === source.id}
+                              disabled={
+                                sourceUpdating === source.id ||
+                                wouldBreakPublishedProvenance(source, value)
+                              }
+                              title={
+                                wouldBreakPublishedProvenance(source, value)
+                                  ? 'Verifikasi sumber pengganti atau retract artikel sebelum menurunkan verified terakhir.'
+                                  : undefined
+                              }
                               onClick={() => void reviewSource(source, value)}
-                              className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${source.verification_status === value ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white' : 'border-[color:var(--color-border)] text-[color:var(--color-text-soft)]'}`}
+                              className={`rounded-full border px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${source.verification_status === value ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white' : 'border-[color:var(--color-border)] text-[color:var(--color-text-soft)]'}`}
                             >
                               {value}
                             </button>
@@ -500,6 +553,11 @@ export default function NewsModeration() {
               {requiresVerifiedSource && !hasVerifiedSource ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">
                   Minimal satu sumber harus ditandai <strong>verified</strong> sebelum berita/analisis dapat dipublish.
+                </div>
+              ) : null}
+              {editorialStatus === 'published' && requiresVerifiedSource ? (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs font-semibold leading-5 text-sky-900">
+                  Artikel published harus selalu mempertahankan minimal satu sumber public-safe yang verified. Jika verified terakhir bermasalah, verifikasi sumber pengganti atau retract artikel lebih dulu.
                 </div>
               ) : null}
 
@@ -545,6 +603,33 @@ export default function NewsModeration() {
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-[color:var(--color-text-soft)]">Snapshot versi akan muncul setelah migration hardening diterapkan.</p>
+                )}
+              </section>
+
+              <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-soft)]">Jejak review sumber</p>
+                    <p className="mt-1 text-xs text-[color:var(--color-text-soft)]">Perubahan klasifikasi dan status verifikasi sumber disimpan append-only untuk audit provenance.</p>
+                  </div>
+                  <span className="rounded-full bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--color-text-soft)]">{sourceReviews.length} review</span>
+                </div>
+                {sourceReviews.length ? (
+                  <div className="mt-3 space-y-2">
+                    {sourceReviews.slice(0, 12).map(review => (
+                      <div key={review.id} className="rounded-xl bg-[color:var(--color-surface-muted)] p-3">
+                        <p className="text-xs font-semibold text-[color:var(--color-text)]">
+                          {review.from_verification_status} → {review.to_verification_status}
+                        </p>
+                        <p className="mt-1 text-[10px] text-[color:var(--color-text-soft)]">
+                          {review.from_source_kind} → {review.to_source_kind} · {formatDate(review.created_at)}
+                        </p>
+                        {review.note ? <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[color:var(--color-text)]">{review.note}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-[color:var(--color-text-soft)]">Belum ada perubahan review sumber yang tercatat.</p>
                 )}
               </section>
 

@@ -161,6 +161,20 @@ struct NewsSourceRow {
     last_seen_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+struct NewsSourceReviewEventRow {
+    id: Uuid,
+    content_id: Uuid,
+    source_id: Option<Uuid>,
+    reviewer_id: Uuid,
+    from_source_kind: String,
+    to_source_kind: String,
+    from_verification_status: String,
+    to_verification_status: String,
+    note: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Deserialize)]
 struct UpdateNewsSourceRequest {
     source_kind: Option<String>,
@@ -211,6 +225,21 @@ fn normalize_news_language(value: Option<String>) -> Result<Option<String>, &'st
     } else {
         Err("unsupported news language")
     }
+}
+
+fn normalize_news_search_query(
+    value: Option<String>,
+) -> Result<Option<String>, &'static str> {
+    let Some(query) = trimmed(value) else {
+        return Ok(None);
+    };
+    if query.len() > 160 {
+        return Err("search query is too long");
+    }
+    if query.split_whitespace().count() > 24 {
+        return Err("search query has too many terms");
+    }
+    Ok(Some(query))
 }
 
 fn normalize_news_category_filter(
@@ -674,6 +703,11 @@ fn moderation_action_requires_note(action: &str) -> bool {
     matches!(action, "needs_revision" | "reject" | "correct" | "retract")
 }
 
+fn removes_verified_source(current_status: &str, next_status: Option<&str>) -> bool {
+    current_status == "verified"
+        && next_status.is_some_and(|status| status != "verified")
+}
+
 fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
     if row.summary.as_deref().map(str::trim).unwrap_or("").len() < 20 {
         return Err("published news requires a meaningful summary");
@@ -936,22 +970,6 @@ async fn enqueue_news_outbox_tx(
     Ok(())
 }
 
-async fn load_news_by_id(db: &PgPool, content_id: Uuid) -> Result<Option<NewsRow>, sqlx::Error> {
-    sqlx::query_as::<_, NewsRow>(
-        r#"
-        SELECT
-            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
-            content_status, published_at, created_at, updated_at
-        FROM content_items
-        WHERE id = $1 AND content_type = 'news' AND content_status <> 'deleted'
-        LIMIT 1
-        "#,
-    )
-    .bind(content_id)
-    .fetch_optional(db)
-    .await
-}
-
 pub(crate) async fn after_submission_created(
     state: &Arc<AppState>,
     content_id: Uuid,
@@ -1115,7 +1133,10 @@ async fn list_news(
         Ok(language) => language,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
-    let q = trimmed(query.q);
+    let q = match normalize_news_search_query(query.q) {
+        Ok(query) => query,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
     if category.as_ref().is_some_and(|value| value.len() > 80) {
         return response_error(StatusCode::BAD_REQUEST, "category filter is too long");
     }
@@ -1124,9 +1145,6 @@ async fn list_news(
     }
     if location.as_ref().is_some_and(|value| value.len() > 120) {
         return response_error(StatusCode::BAD_REQUEST, "location filter is too long");
-    }
-    if q.as_ref().is_some_and(|value| value.len() > 160) {
-        return response_error(StatusCode::BAD_REQUEST, "search query is too long");
     }
     let cursor = match parse_news_cursor(query.cursor.as_deref()) {
         Ok(cursor) => cursor,
@@ -2171,34 +2189,110 @@ async fn update_news_source(
         return response_error(StatusCode::BAD_REQUEST, "source note is too long");
     }
 
-    if verification_status.as_deref() == Some("verified") {
-        let source_url = match sqlx::query_scalar::<_, String>(
-            "SELECT source_url FROM news_source_references WHERE id = $1 AND content_id = $2",
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("update_news_source begin transaction error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update news source",
+            );
+        }
+    };
+
+    // Serialize source review with moderation/revision so publication provenance
+    // cannot change underneath an editorial state transition.
+    let article = match load_news_for_review(&mut tx, content_id).await {
+        Ok(Some(article)) => article,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news article not found"),
+        Err(error) => {
+            tracing::error!("update_news_source article lock error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to lock news article",
+            );
+        }
+    };
+
+    let current_source = match sqlx::query_as::<_, NewsSourceRow>(
+        r#"
+        SELECT
+          id, content_id, position, source_url, source_domain, source_kind,
+          verification_status, editor_note, checked_at, first_seen_at, last_seen_at
+        FROM news_source_references
+        WHERE id = $1 AND content_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(source_id)
+    .bind(content_id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(source)) => source,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
+        Err(error) => {
+            tracing::error!("update_news_source source lock error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to lock news source",
+            );
+        }
+    };
+
+    if verification_status.as_deref() == Some("verified")
+        && !is_allowed_news_source_url(&current_source.source_url)
+    {
+        return response_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "only public HTTP(S) source URLs can be verified",
+        );
+    }
+
+    let published_requires_source =
+        editorial_status(&article.content_status, &article.metadata) == "published"
+            && !is_press_release(&article.metadata);
+    if published_requires_source
+        && removes_verified_source(
+            &current_source.verification_status,
+            verification_status.as_deref(),
         )
-        .bind(source_id)
+    {
+        let other_verified_urls = match sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT source_url
+            FROM news_source_references
+            WHERE content_id = $1
+              AND id <> $2
+              AND verification_status = 'verified'
+            "#,
+        )
         .bind(content_id)
-        .fetch_optional(&state.db)
+        .bind(source_id)
+        .fetch_all(&mut *tx)
         .await
         {
-            Ok(Some(source_url)) => source_url,
-            Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
+            Ok(urls) => urls,
             Err(error) => {
-                tracing::error!("update_news_source validation error: {:?}", error);
+                tracing::error!("update_news_source provenance check error: {:?}", error);
                 return response_error(
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "failed to validate news source",
+                    "failed to validate publication provenance",
                 );
             }
         };
-        if !is_allowed_news_source_url(&source_url) {
+        if !other_verified_urls
+            .iter()
+            .any(|source_url| is_allowed_news_source_url(source_url))
+        {
             return response_error(
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "only public HTTP(S) source URLs can be verified",
+                StatusCode::CONFLICT,
+                "published news requires a verified source; verify a replacement or retract first",
             );
         }
     }
 
-    let updated = sqlx::query_as::<_, NewsSourceRow>(
+    let updated = match sqlx::query_as::<_, NewsSourceRow>(
         r#"
         UPDATE news_source_references
         SET
@@ -2215,13 +2309,12 @@ async fn update_news_source(
     )
     .bind(source_id)
     .bind(content_id)
-    .bind(source_kind)
-    .bind(verification_status)
-    .bind(note)
-    .fetch_optional(&state.db)
-    .await;
-
-    let updated = match updated {
+    .bind(&source_kind)
+    .bind(&verification_status)
+    .bind(&note)
+    .fetch_optional(&mut *tx)
+    .await
+    {
         Ok(Some(row)) => row,
         Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
         Err(error) => {
@@ -2233,18 +2326,57 @@ async fn update_news_source(
         }
     };
 
-    if let Ok(Some(article)) = load_news_by_id(&state.db, content_id).await {
-        if let Ok(mut tx) = state.db.begin().await {
-            let _ = enqueue_news_outbox_tx(
-                &mut tx,
-                &article,
-                Some(reviewer_id),
-                "news.source.reviewed",
-                "news.editorial.changed",
-            )
-            .await;
-            let _ = tx.commit().await;
-        }
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO news_source_review_events (
+          content_id, source_id, reviewer_id,
+          from_source_kind, to_source_kind,
+          from_verification_status, to_verification_status,
+          note
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        "#,
+    )
+    .bind(content_id)
+    .bind(source_id)
+    .bind(reviewer_id)
+    .bind(&current_source.source_kind)
+    .bind(&updated.source_kind)
+    .bind(&current_source.verification_status)
+    .bind(&updated.verification_status)
+    .bind(&note)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("update_news_source audit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news source review",
+        );
+    }
+
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &article,
+        Some(reviewer_id),
+        "news.source.reviewed",
+        "news.editorial.changed",
+    )
+    .await
+    {
+        tracing::error!("update_news_source outbox error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue news source review",
+        );
+    }
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("update_news_source commit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to update news source",
+        );
     }
 
     (StatusCode::OK, Json(updated)).into_response()
@@ -2307,12 +2439,30 @@ async fn list_editorial_history(
             .fetch_all(&state.db)
             .await
             .unwrap_or_default();
+            let source_reviews = sqlx::query_as::<_, NewsSourceReviewEventRow>(
+                r#"
+                SELECT
+                  id, content_id, source_id, reviewer_id,
+                  from_source_kind, to_source_kind,
+                  from_verification_status, to_verification_status,
+                  note, created_at
+                FROM news_source_review_events
+                WHERE content_id = $1
+                ORDER BY created_at DESC, id DESC
+                LIMIT 100
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
             (
                 StatusCode::OK,
                 Json(json!({
                     "items": items,
                     "versions": versions,
-                    "sources": sources
+                    "sources": sources,
+                    "source_reviews": source_reviews
                 })),
             )
                 .into_response()
@@ -2332,7 +2482,8 @@ mod tests {
     use super::{
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
         moderation_target, normalize_news_category_filter, normalize_news_language,
-        normalize_queue_status, parse_news_cursor, public_news_metadata, source_domain,
+        normalize_news_search_query, normalize_queue_status, parse_news_cursor,
+        public_news_metadata, removes_verified_source, source_domain,
         validate_submission_payload,
     };
     use serde_json::json;
@@ -2433,6 +2584,16 @@ mod tests {
     }
 
     #[test]
+    fn published_source_guard_only_triggers_on_verified_downgrade() {
+        assert!(removes_verified_source("verified", Some("broken")));
+        assert!(removes_verified_source("verified", Some("rejected")));
+        assert!(removes_verified_source("verified", Some("unverified")));
+        assert!(!removes_verified_source("verified", Some("verified")));
+        assert!(!removes_verified_source("verified", None));
+        assert!(!removes_verified_source("unverified", Some("broken")));
+    }
+
+    #[test]
     fn public_source_policy_rejects_local_or_credentialed_urls() {
         assert!(is_allowed_news_source_url(
             "https://www.bi.go.id/id/publikasi"
@@ -2459,6 +2620,20 @@ mod tests {
         );
         assert!(normalize_news_category_filter(Some("unknown".to_string())).is_err());
         assert_eq!(normalize_news_category_filter(None).unwrap(), None);
+    }
+
+    #[test]
+    fn news_search_query_bounds_full_text_cost() {
+        assert_eq!(
+            normalize_news_search_query(Some("  ekonomi   umkm  ".to_string())).unwrap(),
+            Some("ekonomi   umkm".to_string())
+        );
+        assert!(normalize_news_search_query(Some("x".repeat(161))).is_err());
+        assert!(normalize_news_search_query(Some(
+            (0..25).map(|index| format!("term{index}")).collect::<Vec<_>>().join(" ")
+        ))
+        .is_err());
+        assert_eq!(normalize_news_search_query(None).unwrap(), None);
     }
 
     #[test]

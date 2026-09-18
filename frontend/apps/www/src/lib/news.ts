@@ -9,7 +9,6 @@ type UnknownRecord = Record<string, unknown>;
 
 type RawNewsRow = {
   id?: unknown;
-  owner_id?: unknown;
   slug?: unknown;
   title?: unknown;
   summary?: unknown;
@@ -25,7 +24,6 @@ type RawNewsRow = {
 
 export type LajukanNewsArticle = {
   id: string;
-  ownerId: string;
   slug: string;
   title: string;
   summary: string;
@@ -129,7 +127,6 @@ export function normalizeNewsArticle(row: RawNewsRow): LajukanNewsArticle | null
 
   return {
     id,
-    ownerId: readString(row.owner_id),
     slug,
     title,
     summary: readString(row.summary),
