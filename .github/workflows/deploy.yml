@@ -289,6 +289,13 @@ jobs:
           docker compose "${compose[@]}" pull
           deployment_started=1
           docker compose "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420
+
+          # Caddyfile is bind-mounted. Compose does not recreate/reload Caddy merely
+          # because the mounted file contents changed, so activate the checked-out
+          # edge contract explicitly on every release.
+          docker compose "${compose[@]}" exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker compose "${compose[@]}" exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+
           if [[ "$TARGET_ENV" == production ]]; then
             bash scripts/ops/minio_storage_probe.sh "${compose[@]}"
           fi
@@ -314,9 +321,22 @@ jobs:
 
           # Then verify the real public path through DNS/CDN/tunnel. This catches the
           # exact failure mode where local Caddy is healthy but www is unreachable.
-          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 3 --max-time 20 "https://www.${app_domain}/api/health" >/dev/null
-          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 3 --max-time 20 "https://www.${app_domain}/id/news" >/dev/null
-          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 3 --max-time 20 "https://api.${app_domain}/ready" >/dev/null
+          public_edge_ready() {
+            curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "https://www.${app_domain}/api/health" >/dev/null &&
+            curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "https://www.${app_domain}/id/news" >/dev/null &&
+            curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "https://api.${app_domain}/ready" >/dev/null
+          }
+
+          if ! public_edge_ready; then
+            if [[ ",${compose_profiles}," == *",tunnel,"* ]]; then
+              echo "Public edge is not reachable although local origin checks passed; restarting cloudflared once." >&2
+              docker compose "${compose[@]}" restart cloudflared
+              public_edge_ready
+            else
+              echo "Public edge is not reachable and the tunnel profile is not enabled." >&2
+              false
+            fi
+          fi
           printf '%s\n' "$IMAGE_TAG" > "$release_marker"
           trap - ERR
           docker compose "${compose[@]}" ps
