@@ -89,6 +89,44 @@ for marker in ("http_2xx", "tcp_connect"):
     if marker not in blackbox_config:
         errors.append(f"blackbox config missing module: {marker}")
 
+for marker in (
+    "IDENTITY_DB_MAX_CONNECTIONS",
+    "IDENTITY_DB_MIN_CONNECTIONS",
+    "IDENTITY_DB_ACQUIRE_TIMEOUT_SECONDS",
+    "MARKETPLACE_DB_MAX_CONNECTIONS",
+    "MARKETPLACE_DB_MIN_CONNECTIONS",
+    "MARKETPLACE_DB_ACQUIRE_TIMEOUT_SECONDS",
+    "COMMUNITY_DB_MAX_CONNECTIONS",
+    "COMMUNITY_DB_MIN_CONNECTIONS",
+    "COMMUNITY_DB_ACQUIRE_TIMEOUT_SECONDS",
+):
+    if marker not in base_compose:
+        errors.append(f"base compose missing DB pool budget variable: {marker}")
+
+for path, markers in {
+    "services/identity_service/src/db/postgres.rs": (
+        "cfg.db_max_connections",
+        "cfg.db_min_connections",
+        "cfg.db_acquire_timeout_seconds",
+    ),
+    "services/marketplace_service/src/main.rs": (
+        "MARKETPLACE_DB_MAX_CONNECTIONS",
+        "MARKETPLACE_DB_MIN_CONNECTIONS",
+        "MARKETPLACE_DB_ACQUIRE_TIMEOUT_SECONDS",
+    ),
+    "services/community_service/src/main.rs": (
+        "COMMUNITY_DB_MAX_CONNECTIONS",
+        "COMMUNITY_DB_MIN_CONNECTIONS",
+        "COMMUNITY_DB_ACQUIRE_TIMEOUT_SECONDS",
+        "DatabasePoolPurpose::Migration",
+    ),
+}.items():
+    source = read(path)
+    for marker in markers:
+        if marker not in source:
+            errors.append(f"{path} missing DB pool budget marker: {marker}")
+
+
 if "SCYLLA_NODES: ${SCYLLA_NODES:?" not in prod_compose:
     errors.append("production chat must fail closed when SCYLLA_NODES is absent")
 
