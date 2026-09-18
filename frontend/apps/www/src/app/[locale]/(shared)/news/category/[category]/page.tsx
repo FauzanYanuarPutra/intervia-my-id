@@ -23,7 +23,6 @@ type Props = {
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { locale, category } = await params;
   const filters = await searchParams;
-  const filters = await searchParams;
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) return { robots: { index: false, follow: true } };
   const canonical = `${buildNewsUrl(locale)}/category/${category.toLowerCase()}`;
@@ -61,6 +60,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function NewsCategoryPage({ params, searchParams }: Props) {
   const { locale, category } = await params;
+  const filters = await searchParams;
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) notFound();
   const isId = locale === 'id';
