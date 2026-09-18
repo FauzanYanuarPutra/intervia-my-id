@@ -49,6 +49,28 @@ impl OrganizationSummary {
         )
     }
 
+    pub(crate) fn can_view_orders(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin"
+                | "org_manager"
+                | "manager"
+                | "org_cashier"
+                | "cashier"
+                | "org_accounting"
+                | "accounting"
+                | "org_viewer"
+                | "viewer"
+        )
+    }
+
+    pub(crate) fn can_manage_orders(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager" | "org_cashier" | "cashier"
+        )
+    }
+
     pub(crate) fn can_view_sale_costs(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
@@ -240,15 +262,6 @@ mod tests {
     }
 
     #[test]
-    fn identity_timeout_is_bounded_by_constructor_contract() {
-        // The production behavior is environment-driven; bounds are enforced in
-        // IdentityClient::new so a bad deployment value cannot create an
-        // effectively unbounded synchronous dependency.
-        assert_eq!(Duration::from_millis(250).as_millis(), 250);
-        assert_eq!(Duration::from_millis(10_000).as_secs(), 10);
-    }
-
-    #[test]
     fn organization_list_parses_identity_public_role_values() {
         let body = r#"{"data":{"count":3,"items":[{"id":"76b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"manager"},{"id":"86b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"cashier"},{"id":"96b836f4-3032-433f-8ac7-04a88f1a8511","current_user_role":"viewer"}]}}"#;
         let organizations = parse_organization_list(body).expect("identity response");
@@ -310,6 +323,20 @@ mod tests {
         assert!(!organization("org_inventory").can_view_sales());
         assert!(!organization("viewer").can_record_sales());
         assert!(!organization("org_accounting").can_record_sales());
+    }
+
+    #[test]
+    fn order_permissions_match_usaha_roles() {
+        for role in ["org_admin", "org_manager", "manager", "org_cashier", "cashier"] {
+            assert!(organization(role).can_view_orders());
+            assert!(organization(role).can_manage_orders());
+        }
+        for role in ["org_accounting", "accounting", "org_viewer", "viewer"] {
+            assert!(organization(role).can_view_orders());
+            assert!(!organization(role).can_manage_orders());
+        }
+        assert!(!organization("org_inventory").can_view_orders());
+        assert!(!organization("org_inventory").can_manage_orders());
     }
 
     #[test]

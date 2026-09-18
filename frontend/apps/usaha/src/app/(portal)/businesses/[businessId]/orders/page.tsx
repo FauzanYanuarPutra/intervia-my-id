@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getCurrentWave2CashShift } from '@/lib/business-wave2-server';
-import { listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
+import { listControlOrders, listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
 import { jakartaDateKey } from '@/lib/business-control/insights';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -65,14 +65,16 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
   const business = activeBusiness;
   if (!business) notFound();
 
+  const canViewOrders = hasPermission(business, 'viewOrders');
   const canManageOrders = hasPermission(business, 'manageOrders');
   const canCreateSales = hasPermission(business, 'createSales');
   const canViewTransactions = hasPermission(business, 'viewTransactions');
   const canCloseCashShift = hasPermission(business, 'closeCashShift');
   const canViewCosting = hasPermission(business, 'viewCosting');
-  const [sales, currentShift] = await Promise.all([
+  const [sales, currentShift, canonicalOrders] = await Promise.all([
     canViewTransactions ? listControlSales(business.id) : Promise.resolve([]),
     canCloseCashShift ? getCurrentWave2CashShift(business.id) : Promise.resolve(null),
+    canViewOrders ? listControlOrders(business.id) : Promise.resolve([]),
   ]);
 
   const saleProducts = business.products.filter(product => product.status === 'live').map(product => ({
@@ -87,7 +89,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
   const availableViews = [
     ...(canCreateSales ? [{ id: 'kasir', label: 'Kasir' }] : []),
     ...(canViewTransactions ? [{ id: 'transaksi', label: 'Transaksi', badge: sales.length }] : []),
-    ...((canManageOrders || business.orders.length) ? [{ id: 'pesanan', label: 'Pesanan', badge: business.orders.length }] : []),
+    ...(canViewOrders ? [{ id: 'pesanan', label: 'Pesanan', badge: canonicalOrders.length }] : []),
   ];
   const requested = query.view;
   const activeView = availableViews.some(item => item.id === requested)
@@ -98,9 +100,12 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
     href: `/businesses/${business.id}/orders?view=${item.id}`,
   }));
 
-  const newOrders = business.orders.filter(order => order.status === 'baru').length;
-  const processingOrders = business.orders.filter(order => order.status === 'diproses' || order.status === 'siap kirim').length;
-  const completedOrders = business.orders.filter(order => order.status === 'selesai').length;
+  const newOrders = canonicalOrders.filter(order => order.order.base_status === 'PAID').length;
+  const processingOrders = canonicalOrders.filter(order =>
+    ['PROCESSING', 'SHIPPED', 'IN_SERVICE', 'DELIVERED'].includes(order.order.base_status),
+  ).length;
+  const completedOrders = canonicalOrders.filter(order => order.order.base_status === 'COMPLETED').length;
+  const actionOrders = canonicalOrders.filter(order => order.allowed_next_statuses.length > 0).length;
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="orders">
@@ -149,9 +154,13 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
             { label: 'Baru', value: newOrders, note: 'Belum diproses' },
             { label: 'Berjalan', value: processingOrders, note: 'Diproses / siap kirim' },
             { label: 'Selesai', value: completedOrders, note: 'Sudah ditutup' },
-            { label: 'Akses', value: canManageOrders ? 'Kelola' : 'Pantau', note: 'Pesanan kanal' },
+            { label: 'Perlu aksi', value: actionOrders, note: canManageOrders ? 'Bisa ditindaklanjuti' : 'Untuk dipantau' },
           ]} />
-          <OrderInboxWorkspace orders={business.orders} canManageOrders={canManageOrders} />
+          <OrderInboxWorkspace
+            businessId={business.id}
+            orders={canonicalOrders}
+            canManageOrders={canManageOrders}
+          />
         </div>
       ) : null}
     </PortalShell>

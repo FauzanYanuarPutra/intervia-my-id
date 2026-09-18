@@ -62,6 +62,9 @@ mod sales_incomplete_cost_persistence_tests;
 #[cfg(test)]
 mod sales_persistence_tests;
 mod sales_routes;
+mod seller_orders;
+#[cfg(test)]
+mod seller_orders_persistence_tests;
 #[cfg(test)]
 mod sales_schema_tests;
 mod service;

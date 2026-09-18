@@ -10,27 +10,60 @@ use super::{
 };
 
 #[test]
-fn order_state_machine_rejects_reopening_terminal_orders() {
+fn order_state_machine_matches_canonical_order_statuses() {
     assert_eq!(
-        OrderState::Draft.transition(OrderState::Confirmed),
-        Ok(OrderState::Confirmed)
+        OrderState::Draft.transition(OrderState::PendingPayment),
+        Ok(OrderState::PendingPayment)
     );
     assert_eq!(
-        OrderState::Confirmed.transition(OrderState::InProgress),
-        Ok(OrderState::InProgress)
+        OrderState::PendingPayment.transition(OrderState::Paid),
+        Ok(OrderState::Paid)
     );
     assert_eq!(
-        OrderState::InProgress.transition(OrderState::Completed),
+        OrderState::Paid.transition(OrderState::Processing),
+        Ok(OrderState::Processing)
+    );
+    assert_eq!(
+        OrderState::Processing.transition(OrderState::Shipped),
+        Ok(OrderState::Shipped)
+    );
+    assert_eq!(
+        OrderState::Shipped.transition(OrderState::Delivered),
+        Ok(OrderState::Delivered)
+    );
+    assert_eq!(
+        OrderState::Delivered.transition(OrderState::Completed),
         Ok(OrderState::Completed)
     );
     assert_eq!(
-        OrderState::Completed.transition(OrderState::Confirmed),
+        OrderState::Completed.transition(OrderState::Paid),
         Err(TransactionStateError::InvalidTransition)
     );
     assert_eq!(
         OrderState::Cancelled.transition(OrderState::Draft),
         Err(TransactionStateError::InvalidTransition)
     );
+}
+
+#[test]
+fn canonical_order_state_round_trips_database_labels() {
+    for state in [
+        OrderState::Draft,
+        OrderState::PendingPayment,
+        OrderState::Paid,
+        OrderState::Processing,
+        OrderState::Shipped,
+        OrderState::InService,
+        OrderState::Delivered,
+        OrderState::Completed,
+        OrderState::Cancelled,
+        OrderState::Rejected,
+        OrderState::Expired,
+        OrderState::Refunded,
+    ] {
+        assert_eq!(OrderState::from_db(state.as_db()), Some(state));
+    }
+    assert_eq!(OrderState::from_db("UNKNOWN"), None);
 }
 
 #[test]

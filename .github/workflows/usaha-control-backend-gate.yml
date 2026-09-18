@@ -74,6 +74,10 @@ jobs:
         run: cargo test --locked businesses::wave2_migration_tests
       - name: Wave 2 persistence tests
         run: cargo test --locked businesses::wave2_persistence_tests
+      - name: Seller order domain and persistence tests
+        run: |
+          cargo test --locked businesses::seller_orders::tests
+          cargo test --locked businesses::seller_orders_persistence_tests
       - name: Ingredient management integrity tests
         run: cargo test --locked businesses::ingredient_management
       - name: Incomplete-cost sale integrity tests
@@ -117,3 +121,7 @@ jobs:
           test -s migrations/20260918124500_business_sale_request_hash.down.sql
           grep -q 'request_hash' migrations/20260918124500_business_sale_request_hash.up.sql
           grep -q 'business_sales_request_hash_check' migrations/20260918124500_business_sale_request_hash.up.sql
+          test -s migrations/20260918150000_business_order_transition_idempotency.up.sql
+          test -s migrations/20260918150000_business_order_transition_idempotency.down.sql
+          grep -q 'idempotency_key UUID' migrations/20260918150000_business_order_transition_idempotency.up.sql
+          grep -q 'idx_order_state_transitions_idempotency_key' migrations/20260918150000_business_order_transition_idempotency.up.sql

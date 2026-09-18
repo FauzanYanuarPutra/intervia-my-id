@@ -27,6 +27,9 @@ use super::{
     recipes::{RecipeRepository, RecipeRepositoryError},
     repository::BusinessRepository,
     service::{BusinessService, BusinessServiceError},
+    seller_orders::{
+        SellerOrderRepository, SellerOrderRepositoryError, TransitionSellerOrderRequest,
+    },
     settlement::{CreateSettlementRequest, SettlementRepository, SettlementRepositoryError},
 };
 
@@ -75,6 +78,14 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route(
             "/v1/businesses/{business_id}/settlements",
             get(list_settlements).post(create_settlement),
+        )
+        .route(
+            "/v1/businesses/{business_id}/orders",
+            get(list_business_orders),
+        )
+        .route(
+            "/v1/businesses/{business_id}/orders/{order_id}/transition",
+            post(transition_business_order),
         )
 }
 
@@ -590,6 +601,87 @@ async fn create_settlement(
     }
 }
 
+async fn list_business_orders(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(business_id): Path<Uuid>,
+) -> Response {
+    let (_, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ViewOrders,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+
+    match SellerOrderRepository::new(state.db.clone())
+        .list(business_id, organization_id, 200)
+        .await
+    {
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({ "data": { "count": items.len(), "items": items } })),
+        )
+            .into_response(),
+        Err(error) => seller_order_error_response(error),
+    }
+}
+
+async fn transition_business_order(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((business_id, order_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<TransitionSellerOrderRequest>,
+) -> Response {
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::ManageOrders,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let idempotency_key = match parse_idempotency_key(
+        headers
+            .get("idempotency-key")
+            .and_then(|value| value.to_str().ok()),
+    ) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
+
+    match SellerOrderRepository::new(state.db.clone())
+        .transition(
+            actor_id,
+            business_id,
+            organization_id,
+            order_id,
+            idempotency_key,
+            payload,
+        )
+        .await
+    {
+        Ok(outcome) => (
+            StatusCode::OK,
+            Json(json!({
+                "data": {
+                    "order": outcome.order,
+                    "replayed": outcome.replayed
+                }
+            })),
+        )
+            .into_response(),
+        Err(error) => seller_order_error_response(error),
+    }
+}
+
 async fn provision(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -666,6 +758,8 @@ enum BusinessControlAccess {
     ManageCosting,
     Channels,
     Finance,
+    ViewOrders,
+    ManageOrders,
 }
 
 impl BusinessControlAccess {
@@ -676,6 +770,8 @@ impl BusinessControlAccess {
             Self::ViewCosting | Self::ManageCosting => organization.can_view_sale_costs(),
             Self::Channels => organization.can_manage_channels(),
             Self::Finance => organization.can_view_finance_controls(),
+            Self::ViewOrders => organization.can_view_orders(),
+            Self::ManageOrders => organization.can_manage_orders(),
         }
     }
 }
@@ -776,6 +872,28 @@ fn recipe_error_response(error: RecipeRepositoryError) -> Response {
     }
 }
 
+fn seller_order_error_response(error: SellerOrderRepositoryError) -> Response {
+    match error {
+        SellerOrderRepositoryError::NotFound => {
+            api_error(StatusCode::NOT_FOUND, "business_order_not_found")
+        }
+        SellerOrderRepositoryError::Validation(code) => api_error(StatusCode::BAD_REQUEST, code),
+        SellerOrderRepositoryError::InvalidTransition => {
+            api_error(StatusCode::CONFLICT, "business_order_invalid_transition")
+        }
+        SellerOrderRepositoryError::VersionConflict => {
+            api_error(StatusCode::CONFLICT, "business_order_version_conflict")
+        }
+        SellerOrderRepositoryError::IdempotencyConflict => {
+            api_error(StatusCode::CONFLICT, "idempotency_key_payload_mismatch")
+        }
+        SellerOrderRepositoryError::Database => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_order_storage_unavailable",
+        ),
+    }
+}
+
 fn settlement_error_response(error: SettlementRepositoryError) -> Response {
     match error {
         SettlementRepositoryError::Validation(error) => {
@@ -849,17 +967,23 @@ mod tests {
     #[test]
     fn invited_role_control_access_is_operation_specific() {
         let cashier = organization("cashier");
+        assert!(BusinessControlAccess::ViewOrders.allows(&cashier));
+        assert!(BusinessControlAccess::ManageOrders.allows(&cashier));
         assert!(!BusinessControlAccess::ViewInventory.allows(&cashier));
         assert!(!BusinessControlAccess::ManageInventory.allows(&cashier));
         assert!(!BusinessControlAccess::ViewCosting.allows(&cashier));
         assert!(!BusinessControlAccess::Finance.allows(&cashier));
 
         let viewer = organization("viewer");
+        assert!(BusinessControlAccess::ViewOrders.allows(&viewer));
+        assert!(!BusinessControlAccess::ManageOrders.allows(&viewer));
         assert!(!BusinessControlAccess::ViewInventory.allows(&viewer));
         assert!(!BusinessControlAccess::ManageInventory.allows(&viewer));
         assert!(!BusinessControlAccess::Channels.allows(&viewer));
 
         let manager = organization("manager");
+        assert!(BusinessControlAccess::ViewOrders.allows(&manager));
+        assert!(BusinessControlAccess::ManageOrders.allows(&manager));
         assert!(BusinessControlAccess::ViewInventory.allows(&manager));
         assert!(BusinessControlAccess::ManageInventory.allows(&manager));
         assert!(BusinessControlAccess::ViewCosting.allows(&manager));
@@ -868,14 +992,34 @@ mod tests {
         assert!(BusinessControlAccess::Finance.allows(&manager));
 
         let inventory = organization("org_inventory");
+        assert!(!BusinessControlAccess::ViewOrders.allows(&inventory));
+        assert!(!BusinessControlAccess::ManageOrders.allows(&inventory));
         assert!(BusinessControlAccess::ViewInventory.allows(&inventory));
         assert!(BusinessControlAccess::ManageInventory.allows(&inventory));
         assert!(!BusinessControlAccess::ViewCosting.allows(&inventory));
         assert!(!BusinessControlAccess::Finance.allows(&inventory));
 
         let accounting = organization("org_accounting");
+        assert!(BusinessControlAccess::ViewOrders.allows(&accounting));
+        assert!(!BusinessControlAccess::ManageOrders.allows(&accounting));
         assert!(BusinessControlAccess::Finance.allows(&accounting));
         assert!(!BusinessControlAccess::ViewInventory.allows(&accounting));
+    }
+
+    #[test]
+    fn seller_order_conflicts_use_stable_http_codes() {
+        assert_eq!(
+            seller_order_error_response(SellerOrderRepositoryError::InvalidTransition).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            seller_order_error_response(SellerOrderRepositoryError::VersionConflict).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            seller_order_error_response(SellerOrderRepositoryError::IdempotencyConflict).status(),
+            StatusCode::CONFLICT
+        );
     }
 
     #[test]
