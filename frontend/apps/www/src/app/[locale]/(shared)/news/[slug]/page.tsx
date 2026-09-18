@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { ArrowLeft, BookOpenText, CalendarDays, ExternalLink, Hash, MapPin, Store } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
@@ -86,10 +86,14 @@ export default async function NewsArticlePage({ params }: PageProps) {
   const isId = locale === 'id';
   const article = await getPublishedNewsArticle(slug);
   if (!article) notFound();
+  const requestedLanguage = locale === 'en' ? 'en' : 'id';
+  if (article.language !== requestedLanguage) {
+    permanentRedirect(`/${article.language}${buildNewsPath(article.slug)}`);
+  }
   const isRetracted = article.editorialStatus === 'retracted';
   const relatedArticles = isRetracted
     ? []
-    : (await getPublishedNews({ category: article.category, limit: 8 })).items
+    : (await getPublishedNews({ category: article.category, language: article.language, limit: 8 })).items
         .filter(item => item.id !== article.id)
         .slice(0, 3);
 
