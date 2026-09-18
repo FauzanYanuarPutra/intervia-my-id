@@ -333,6 +333,27 @@ def validate_contract(
     if "true" in fail_open_values:
         errors.append("Rate limiting must fail closed; RATE_LIMIT_FAIL_OPEN=true is forbidden.")
 
+    if environment in {"production", "staging"}:
+        personal_ai_file_store = {
+            str(www_environment.get("PERSONAL_AI_ALLOW_FILE_STORE", "")).strip().lower(),
+            env_values.get("PERSONAL_AI_ALLOW_FILE_STORE", "").strip().lower(),
+        }
+        if personal_ai_file_store & {"1", "true", "yes", "on"}:
+            errors.append(
+                "Local WWW filesystem state is forbidden outside development; "
+                "PERSONAL_AI_ALLOW_FILE_STORE must remain disabled."
+            )
+
+        ai_learning_enabled = {
+            str(www_environment.get("AI_LEARNING_ENABLED", "")).strip().lower(),
+            env_values.get("AI_LEARNING_ENABLED", "").strip().lower(),
+        }
+        if ai_learning_enabled & {"1", "true", "yes", "on"}:
+            errors.append(
+                "AI_LEARNING_ENABLED must remain disabled outside development "
+                "until learning state uses a shared durable store."
+            )
+
     redis_url = www_environment.get("REDIS_URL")
     redis_host = urlparse(redis_url).hostname if non_empty(redis_url) else None
     if redis_host != "redis_cache":

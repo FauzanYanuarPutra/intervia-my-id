@@ -334,6 +334,44 @@ async fn idempotent_retry_reuses_order_items_and_outbox(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn idempotency_key_rejects_a_different_order_payload(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(10)).await;
+    let buyer_id = Uuid::new_v4();
+    let idempotency_key = Uuid::new_v4();
+    let repository = PublicCommerceRepository::new(pool.clone());
+
+    repository
+        .create_product_order(
+            buyer_id,
+            idempotency_key,
+            order_request(vec![(seeded.product_id, 1)]),
+        )
+        .await
+        .unwrap();
+
+    let error = repository
+        .create_product_order(
+            buyer_id,
+            idempotency_key,
+            order_request(vec![(seeded.product_id, 2)]),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, PublicCommerceError::IdempotencyConflict);
+
+    let stored_hash: Option<String> = sqlx::query_scalar(
+        "SELECT category_specific_metadata->>'idempotency_request_hash' FROM orders WHERE user_id=$1 AND idempotency_key=$2",
+    )
+    .bind(buyer_id)
+    .bind(idempotency_key.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(stored_hash.is_some_and(|value| value.len() == 64));
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: PgPool) {
     let seeded = seed_public_product(&pool, 1_250_000, Some(10)).await;
     let repository = PublicCommerceRepository::new(pool.clone());
