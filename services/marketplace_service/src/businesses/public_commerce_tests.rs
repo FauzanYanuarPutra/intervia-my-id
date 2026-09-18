@@ -371,6 +371,173 @@ async fn idempotency_key_rejects_a_different_order_payload(pool: PgPool) {
     assert!(stored_hash.is_some_and(|value| value.len() == 64));
 }
 
+#[test]
+fn stock_reservation_migration_is_tenant_scoped_and_fail_closed() {
+    let migration =
+        include_str!("../../migrations/20260918173000_business_order_stock_reservations.up.sql");
+    let rollback =
+        include_str!("../../migrations/20260918173000_business_order_stock_reservations.down.sql");
+
+    for marker in [
+        "organization_id UUID NOT NULL",
+        "business_id UUID NOT NULL",
+        "order_id UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT",
+        "UNIQUE (order_id, product_id)",
+        "state IN ('reserved', 'released', 'consumed')",
+        "idx_business_order_stock_reservations_active",
+    ] {
+        assert!(migration.contains(marker), "missing reservation invariant: {marker}");
+    }
+    assert!(rollback.contains("refusing to drop business_order_stock_reservations"));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn active_reservations_prevent_overselling_without_consuming_on_hand(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(2)).await;
+    let repository = PublicCommerceRepository::new(pool.clone());
+
+    let first = repository
+        .create_product_order(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            order_request(vec![(seeded.product_id, 2)]),
+        )
+        .await
+        .unwrap();
+
+    let error = repository
+        .create_product_order(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            order_request(vec![(seeded.product_id, 1)]),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error, PublicCommerceError::InsufficientStock);
+
+    let reservation: (Decimal, String) = sqlx::query_as(
+        "SELECT quantity, state FROM business_order_stock_reservations WHERE order_id=$1 AND product_id=$2",
+    )
+    .bind(first.order.id)
+    .bind(seeded.product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reservation.0, Decimal::from(2));
+    assert_eq!(reservation.1, "reserved");
+
+    let stock: Option<f64> = sqlx::query_scalar(
+        "SELECT stock_count FROM business_inventory WHERE product_id=$1 AND business_id=$2",
+    )
+    .bind(seeded.product_id)
+    .bind(seeded.business_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stock, Some(2.0));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn expired_reservation_no_longer_blocks_checkout(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(2)).await;
+    let repository = PublicCommerceRepository::new(pool.clone());
+
+    let first = repository
+        .create_product_order(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            order_request(vec![(seeded.product_id, 2)]),
+        )
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE business_order_stock_reservations SET expires_at=NOW()-INTERVAL '1 second' WHERE order_id=$1",
+    )
+    .bind(first.order.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let second = repository
+        .create_product_order(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            order_request(vec![(seeded.product_id, 2)]),
+        )
+        .await
+        .unwrap();
+    assert_ne!(first.order.id, second.order.id);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn concurrent_buyers_cannot_both_reserve_the_last_unit(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(1)).await;
+    let repository = PublicCommerceRepository::new(pool.clone());
+    let first = repository.create_product_order(
+        Uuid::new_v4(),
+        Uuid::new_v4(),
+        order_request(vec![(seeded.product_id, 1)]),
+    );
+    let second = repository.create_product_order(
+        Uuid::new_v4(),
+        Uuid::new_v4(),
+        order_request(vec![(seeded.product_id, 1)]),
+    );
+
+    let (first, second) = tokio::join!(first, second);
+    let successes = usize::from(first.is_ok()) + usize::from(second.is_ok());
+    assert_eq!(successes, 1);
+    let failures = [first.err(), second.err()]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    assert_eq!(failures, vec![PublicCommerceError::InsufficientStock]);
+
+    let reservation_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_order_stock_reservations WHERE business_id=$1 AND product_id=$2 AND state='reserved'",
+    )
+    .bind(seeded.business_id)
+    .bind(seeded.product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reservation_count, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn concurrent_identical_retries_share_one_order_and_one_reservation(pool: PgPool) {
+    let seeded = seed_public_product(&pool, 1_250_000, Some(1)).await;
+    let repository = PublicCommerceRepository::new(pool.clone());
+    let buyer_id = Uuid::new_v4();
+    let idempotency_key = Uuid::new_v4();
+
+    let first = repository.create_product_order(
+        buyer_id,
+        idempotency_key,
+        order_request(vec![(seeded.product_id, 1)]),
+    );
+    let second = repository.create_product_order(
+        buyer_id,
+        idempotency_key,
+        order_request(vec![(seeded.product_id, 1)]),
+    );
+
+    let (first, second) = tokio::join!(first, second);
+    let first = first.unwrap();
+    let second = second.unwrap();
+    assert_eq!(first.order.id, second.order.id);
+    assert_ne!(first.replayed, second.replayed);
+
+    let reservation_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_order_stock_reservations WHERE order_id=$1",
+    )
+    .bind(first.order.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reservation_count, 1);
+}
+
 #[sqlx::test(migrations = "./migrations")]
 async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: PgPool) {
     let seeded = seed_public_product(&pool, 1_250_000, Some(10)).await;
@@ -418,6 +585,17 @@ async fn order_creation_does_not_consume_inventory_or_create_sale_finance(pool: 
     assert_eq!(before, after);
     assert_eq!(sale_count, 0);
     assert_eq!(finance_count, 0);
+
+    let reservation: (Decimal, String) = sqlx::query_as(
+        "SELECT quantity, state FROM business_order_stock_reservations WHERE business_id=$1 AND product_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(seeded.product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reservation.0, Decimal::from(2));
+    assert_eq!(reservation.1, "reserved");
 }
 
 #[sqlx::test(migrations = "./migrations")]

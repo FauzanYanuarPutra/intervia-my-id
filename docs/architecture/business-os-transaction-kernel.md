@@ -16,12 +16,19 @@ Commercial, financial, fulfillment, and reconciliation state are separate facts.
 Canonical commercial order lifecycle:
 
 ```text
-DRAFT -> CONFIRMED -> IN_PROGRESS -> COMPLETED
-   \         \             \
-    +-------> CANCELLED <-----+
+DRAFT
+  -> PENDING_PAYMENT
+      -> PAID
+          -> PROCESSING
+              -> SHIPPED -> DELIVERED -> COMPLETED
+              -> IN_SERVICE -> DELIVERED -> COMPLETED
+              -> DELIVERED -> COMPLETED
+
+Controlled terminal/exception states:
+  CANCELLED | REJECTED | EXPIRED | REFUNDED
 ```
 
-Terminal order states are never reopened by direct status mutation.
+Payment-authoritative code moves `PENDING_PAYMENT -> PAID/EXPIRED` and refund-authoritative code owns `REFUNDED`. Seller operations only receive the transitions permitted by the seller-order policy; UI clients consume `allowed_next_statuses` rather than inventing transitions. Terminal order states are never reopened by direct status mutation.
 
 Canonical invoice lifecycle:
 
@@ -70,20 +77,45 @@ Rules:
 
 Public commerce order creation now records the canonical request hash in immutable creation metadata for new orders and rejects mismatched retries. Legacy rows created before this contract remain replay-compatible when no stored hash exists.
 
+## Stock reservation contract
+
+Tracked product stock uses the availability invariant:
+
+```text
+available = on_hand - active_reserved
+```
+
+Public checkout creates a short-lived reservation inside the same PostgreSQL transaction as order creation. Creating a reservation does not reduce `on_hand`; it prevents another concurrent checkout from reserving the same units.
+
+Reservation rules:
+
+1. Canonical `business_inventory` rows are locked in deterministic product-id order before availability is accepted.
+2. Active reservations are tenant-scoped by organization + business + product.
+3. Concurrent buyers cannot both reserve the last tracked unit.
+4. Same idempotency key + same checkout payload replays one order and one reservation, even when requests race.
+5. Expired reservations no longer reduce available stock.
+6. Seller `REJECTED`/`CANCELLED` releases the reservation without reducing on-hand stock.
+7. Seller `PROCESSING` consumes the reservation and decrements canonical stock in the same database transaction as the order transition.
+8. A replayed transition never consumes stock twice.
+9. NULL/untracked inventory preserves the existing unknown/unlimited-stock compatibility behavior until that product is explicitly stock-managed.
+10. Reservation history is retained; the down migration refuses destructive removal while reservation rows exist.
+
+The public `umkm_products.stock_qty` projection is updated when a reservation is consumed, but `business_inventory` remains the canonical product-stock source.
+
 ## Compatibility and migration
 
-Existing public commerce currently stores legacy order values such as `PENDING_PAYMENT`. Wave 1 does not rewrite historical rows or force a breaking enum migration. Later migrations should introduce explicit canonical commercial/payment/fulfillment projections and map historical values with reconciliation tests.
+Existing public commerce already uses canonical order states such as `PENDING_PAYMENT`; historical rows are not rewritten merely to adopt the shared transaction kernel. Compatibility mappings stay explicit and reconciliation-tested.
 
-No important historical transaction should be hard-deleted. Corrections use explicit compensating facts.
+No important historical transaction, reservation, movement, payment, or document fact should be hard-deleted. Corrections use explicit compensating facts.
 
 ## Next integration targets
 
-1. merchant/POS order commands;
-2. payment capture and callback processing;
-3. invoice posting and allocation;
-4. refund/return case execution;
-5. settlement reconciliation;
-6. outbox event consumers;
-7. accounting projection.
+1. payment capture/callback authority consuming or releasing the same reservation contract where appropriate;
+2. invoice posting and payment allocation;
+3. refund/return case execution and restock semantics;
+4. settlement reconciliation;
+5. outbox convergence and consumer idempotency;
+6. accounting projection;
+7. procurement and inter-location reservation/transfer semantics.
 
 Each integration should call the shared kernel rather than duplicating lifecycle or amount checks.

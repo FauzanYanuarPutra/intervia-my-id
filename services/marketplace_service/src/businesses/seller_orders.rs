@@ -7,7 +7,13 @@ use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::{kernel::command::canonical_request_hash, transactions::state::OrderState};
+use super::{
+    kernel::command::canonical_request_hash,
+    stock_reservations::{
+        consume_for_order_tx, release_for_order_tx, StockReservationError,
+    },
+    transactions::state::OrderState,
+};
 
 const MAX_SELLER_ORDERS: i64 = 200;
 const MAX_REASON_LEN: usize = 500;
@@ -72,6 +78,7 @@ pub(crate) enum SellerOrderRepositoryError {
     InvalidTransition,
     VersionConflict,
     IdempotencyConflict,
+    InsufficientStock,
     Database,
 }
 
@@ -270,6 +277,32 @@ impl SellerOrderRepository {
             .transition(next_status)
             .map_err(|_| SellerOrderRepositoryError::InvalidTransition)?;
 
+        let mut reservations_consumed = 0u64;
+        let mut reservations_released = 0u64;
+        match next_status {
+            OrderState::Processing => {
+                reservations_consumed = consume_for_order_tx(
+                    &mut tx,
+                    order_id,
+                    business_id,
+                    organization_id,
+                )
+                .await
+                .map_err(map_stock_reservation_error)?;
+            }
+            OrderState::Cancelled | OrderState::Rejected => {
+                reservations_released = release_for_order_tx(
+                    &mut tx,
+                    order_id,
+                    business_id,
+                    organization_id,
+                )
+                .await
+                .map_err(map_stock_reservation_error)?;
+            }
+            _ => {}
+        }
+
         let updated = sqlx::query_as::<_, SellerOrderRecord>(
             r#"
             UPDATE orders
@@ -381,6 +414,8 @@ impl SellerOrderRepository {
             "version": updated.version,
             "actor_id": actor_id,
             "reason": reason,
+            "stock_reservations_consumed": reservations_consumed,
+            "stock_reservations_released": reservations_released,
         }))
         .bind(event_key)
         .execute(&mut *tx)
@@ -398,6 +433,13 @@ impl SellerOrderRepository {
             },
             replayed: false,
         })
+    }
+}
+
+fn map_stock_reservation_error(error: StockReservationError) -> SellerOrderRepositoryError {
+    match error {
+        StockReservationError::InsufficientStock => SellerOrderRepositoryError::InsufficientStock,
+        StockReservationError::Database => SellerOrderRepositoryError::Database,
     }
 }
 

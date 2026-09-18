@@ -69,6 +69,7 @@ mod seller_orders;
 mod seller_orders_persistence_tests;
 mod service;
 pub(crate) mod settlement;
+mod stock_reservations;
 pub(crate) mod transactions;
 mod wave2;
 #[cfg(test)]
