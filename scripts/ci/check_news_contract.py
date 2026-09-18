@@ -81,6 +81,39 @@ dead_block = proxy[dead_start:dead_end] if dead_start >= 0 and dead_end >= 0 els
 if "'news'" in dead_block or '"news"' in dead_block:
     errors.append("News public route must not be listed as dead in frontend proxy")
 
+for marker in (
+    "redirectToTemporaryLocalizedTarget",
+    "NextResponse.redirect(url, 307)",
+    "Cache-Control', 'private, no-store, max-age=0, must-revalidate",
+):
+    if marker not in proxy:
+        errors.append(f"frontend/apps/www/src/proxy.ts missing temporary redirect safety marker: {marker}")
+
+if "DEAD_ROUTE_SEGMENTS.has(routeSegment)" in proxy and (
+    "return redirectToLocalizedTarget(req, locale, '/home');" in proxy
+):
+    errors.append("feature/dead-route gating must not use permanent localized redirects")
+
+if "route?.isDisabled" in proxy and (
+    "return redirectToLocalizedTarget(req, locale, '/home');" in proxy
+):
+    errors.append("disabled-route gating must not use permanent localized redirects")
+
+deploy = read(".github/workflows/deploy.yml")
+for marker in (
+    "Validate deployment connection contract",
+    "assert_http_200",
+    'assert_http_200 "Local News"',
+    'assert_http_200 "Public News"',
+    "/id/news?release=${IMAGE_TAG}",
+):
+    if marker not in deploy:
+        errors.append(f".github/workflows/deploy.yml missing News deployment marker: {marker}")
+
+if 'curl --fail --silent --show-error' in deploy and '"https://www.${app_domain}/id/news"' in deploy:
+    errors.append("News deployment verification must assert exact HTTP 200, not curl --fail alone")
+
+
 require(
     "frontend/apps/www/src/lib/routes.ts",
     (
