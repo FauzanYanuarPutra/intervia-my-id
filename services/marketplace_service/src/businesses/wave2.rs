@@ -5,7 +5,12 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    control::canonical_manual_finance_entry_type, kernel::command::canonical_request_hash,
+    control::canonical_manual_finance_entry_type,
+    execution_policy::{
+        allocate_document_number_tx, load_execution_policy_tx, resolve_operational_location_tx,
+        ExecutionPolicyError,
+    },
+    kernel::command::canonical_request_hash,
 };
 
 #[derive(Debug)]
@@ -109,6 +114,8 @@ pub(crate) struct CreatePurchaseRequest {
     pub(crate) total_amount: i64,
     #[serde(default = "default_cash")]
     pub(crate) account_key: String,
+    #[serde(default)]
+    pub(crate) location_id: Option<Uuid>,
     pub(crate) occurred_on: NaiveDate,
     #[serde(default)]
     pub(crate) note: String,
@@ -119,6 +126,11 @@ pub(crate) struct PurchaseRecord {
     pub(crate) id: Uuid,
     pub(crate) business_id: Uuid,
     pub(crate) organization_id: Uuid,
+    pub(crate) location_id: Uuid,
+    pub(crate) currency: String,
+    pub(crate) document_number: String,
+    pub(crate) correlation_id: Uuid,
+    pub(crate) policy_snapshot: serde_json::Value,
     pub(crate) ingredient_id: Uuid,
     pub(crate) idempotency_key: Uuid,
     pub(crate) stock_quantity_delta: Decimal,
@@ -439,9 +451,11 @@ impl Wave2Repository {
             "stock_quantity_delta": request.stock_quantity_delta.normalize().to_string(),
             "total_amount": request.total_amount,
             "account_key": &account_key,
+            "location_id": request.location_id,
             "occurred_on": request.occurred_on,
             "note": &note,
         }))?;
+
         if let Some(existing) = load_purchase(&self.db, business_id, idempotency_key).await? {
             ensure_request_hash(
                 &self.db,
@@ -456,10 +470,75 @@ impl Wave2Repository {
                 replayed: true,
             });
         }
+
         let mut tx = self.db.begin().await?;
+        let policy = load_execution_policy_tx(&mut tx, business_id, organization_id)
+            .await
+            .map_err(map_execution_policy_error)?;
+        let location_id = resolve_operational_location_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            &policy,
+            request.location_id,
+        )
+        .await
+        .map_err(map_execution_policy_error)?;
         let purchase_id = Uuid::new_v4();
-        let inserted=sqlx::query_scalar::<_,Uuid>(r#"INSERT INTO business_purchases (id,business_id,organization_id,ingredient_id,idempotency_key,request_hash,stock_quantity_delta,total_amount,account_key,occurred_on,note,created_by_user_id) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 WHERE EXISTS (SELECT 1 FROM business_ingredients WHERE id=$4 AND business_id=$2 AND organization_id=$3 AND status='active') ON CONFLICT (business_id,idempotency_key) DO NOTHING RETURNING id"#)
-            .bind(purchase_id).bind(business_id).bind(organization_id).bind(request.ingredient_id).bind(idempotency_key).bind(&request_hash).bind(request.stock_quantity_delta).bind(request.total_amount).bind(&account_key).bind(request.occurred_on).bind(&note).bind(actor_id).fetch_optional(&mut *tx).await?;
+        let correlation_id = Uuid::new_v4();
+        let document_number = allocate_document_number_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            "purchase",
+            &policy.document_prefix,
+        )
+        .await
+        .map_err(map_execution_policy_error)?;
+        let policy_snapshot = policy.snapshot();
+
+        let inserted = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO business_purchases (
+              id, business_id, organization_id, location_id, currency, document_number,
+              correlation_id, policy_snapshot, ingredient_id, idempotency_key, request_hash,
+              stock_quantity_delta, total_amount, account_key, occurred_on, note,
+              created_by_user_id
+            )
+            SELECT
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+            WHERE EXISTS (
+              SELECT 1
+              FROM business_ingredients
+              WHERE id=$9
+                AND business_id=$2
+                AND organization_id=$3
+                AND status='active'
+            )
+            ON CONFLICT (business_id,idempotency_key) DO NOTHING
+            RETURNING id
+            "#,
+        )
+        .bind(purchase_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(location_id)
+        .bind(&policy.currency)
+        .bind(&document_number)
+        .bind(correlation_id)
+        .bind(policy_snapshot.clone())
+        .bind(request.ingredient_id)
+        .bind(idempotency_key)
+        .bind(&request_hash)
+        .bind(request.stock_quantity_delta)
+        .bind(request.total_amount)
+        .bind(&account_key)
+        .bind(request.occurred_on)
+        .bind(&note)
+        .bind(actor_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
         if inserted.is_none() {
             tx.rollback().await?;
             ensure_request_hash(
@@ -478,21 +557,156 @@ impl Wave2Repository {
             }
             return Err(Wave2RepositoryError::NotFound);
         }
-        let (before, after)=sqlx::query_as::<_,(Decimal,Decimal)>(r#"UPDATE business_ingredients SET stock_quantity=stock_quantity+$4,updated_at=NOW() WHERE id=$1 AND business_id=$2 AND organization_id=$3 RETURNING stock_quantity-$4,stock_quantity"#)
-            .bind(request.ingredient_id).bind(business_id).bind(organization_id).bind(request.stock_quantity_delta).fetch_one(&mut *tx).await?;
-        sqlx::query(r#"INSERT INTO business_inventory_movements (business_id,organization_id,ingredient_id,movement_type,quantity_delta,quantity_before,quantity_after,source_type,source_id,note,created_by_user_id) VALUES ($1,$2,$3,'purchase_receipt',$4,$5,$6,'business_purchase',$7,$8,$9)"#)
-            .bind(business_id).bind(organization_id).bind(request.ingredient_id).bind(request.stock_quantity_delta).bind(before).bind(after).bind(purchase_id).bind(if note.is_empty(){"Belanja stok"}else{&note}).bind(actor_id).execute(&mut *tx).await?;
-        let finance_id:Uuid=sqlx::query_scalar(r#"INSERT INTO business_finance_entries (business_id,organization_id,entry_type,account_key,amount,occurred_on,note,source_type,source_id,created_by_user_id) VALUES ($1,$2,'inventory_expense',$3,$4,$5,$6,'business_purchase',$7,$8) RETURNING id"#)
-            .bind(business_id).bind(organization_id).bind(&account_key).bind(request.total_amount).bind(request.occurred_on).bind(if note.is_empty(){"Belanja stok"}else{&note}).bind(purchase_id).bind(actor_id).fetch_one(&mut *tx).await?;
+
+        let seed = sqlx::query_as::<_, (Decimal, bool)>(
+            r#"
+            SELECT ingredient.stock_quantity, location.is_primary
+            FROM business_ingredients ingredient
+            JOIN business_locations location
+              ON location.id=$4
+             AND location.business_id=ingredient.business_id
+             AND location.organization_id=ingredient.organization_id
+            WHERE ingredient.id=$1
+              AND ingredient.business_id=$2
+              AND ingredient.organization_id=$3
+              AND ingredient.status='active'
+              AND location.status <> 'closed'
+            FOR SHARE
+            "#,
+        )
+        .bind(request.ingredient_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(location_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Wave2RepositoryError::NotFound)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_ingredient_balances (
+              organization_id, business_id, location_id, ingredient_id, quantity
+            ) VALUES ($1,$2,$3,$4,$5)
+            ON CONFLICT (location_id, ingredient_id) DO NOTHING
+            "#,
+        )
+        .bind(organization_id)
+        .bind(business_id)
+        .bind(location_id)
+        .bind(request.ingredient_id)
+        .bind(if seed.1 { seed.0 } else { Decimal::ZERO })
+        .execute(&mut *tx)
+        .await?;
+
+        let (before, after) = sqlx::query_as::<_, (Decimal, Decimal)>(
+            r#"
+            UPDATE business_ingredient_balances
+            SET quantity=quantity+$5,
+                version=version+1,
+                updated_at=NOW()
+            WHERE business_id=$1
+              AND organization_id=$2
+              AND location_id=$3
+              AND ingredient_id=$4
+            RETURNING quantity-$5, quantity
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(location_id)
+        .bind(request.ingredient_id)
+        .bind(request.stock_quantity_delta)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_inventory_movements (
+              business_id, organization_id, location_id, ingredient_id, movement_type,
+              quantity_delta, quantity_before, quantity_after,
+              source_type, source_id, note, created_by_user_id
+            ) VALUES (
+              $1,$2,$3,$4,'purchase_receipt',$5,$6,$7,
+              'business_purchase',$8,$9,$10
+            )
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(location_id)
+        .bind(request.ingredient_id)
+        .bind(request.stock_quantity_delta)
+        .bind(before)
+        .bind(after)
+        .bind(purchase_id)
+        .bind(if note.is_empty() { "Belanja stok" } else { &note })
+        .bind(actor_id)
+        .execute(&mut *tx)
+        .await?;
+
+        let finance_entry_type = policy.purchase_finance_entry_type();
+        let finance_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO business_finance_entries (
+              business_id,organization_id,entry_type,account_key,amount,occurred_on,
+              note,source_type,source_id,created_by_user_id
+            ) VALUES (
+              $1,$2,$3,$4,$5,$6,$7,'business_purchase',$8,$9
+            )
+            RETURNING id
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(finance_entry_type)
+        .bind(&account_key)
+        .bind(request.total_amount)
+        .bind(request.occurred_on)
+        .bind(if note.is_empty() { "Belanja stok" } else { &note })
+        .bind(purchase_id)
+        .bind(actor_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
         sqlx::query("UPDATE business_purchases SET finance_entry_id=$2 WHERE id=$1")
             .bind(purchase_id)
             .bind(finance_id)
             .execute(&mut *tx)
             .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO events.event_outbox (
+              aggregate_type, aggregate_id, event_type, payload, routing_key
+            ) VALUES (
+              'business_purchase', $1, 'marketplace.business.purchase_received', $2,
+              'marketplace.business.purchase_received'
+            )
+            "#,
+        )
+        .bind(purchase_id.to_string())
+        .bind(serde_json::json!({
+            "event_version": 1,
+            "purchase_id": purchase_id,
+            "business_id": business_id,
+            "organization_id": organization_id,
+            "location_id": location_id,
+            "document_number": document_number,
+            "currency": policy.currency,
+            "correlation_id": correlation_id,
+            "occurred_on": request.occurred_on,
+            "total_amount": request.total_amount,
+            "accounting_mode": policy.accounting_mode,
+            "finance_entry_type": finance_entry_type,
+        }))
+        .execute(&mut *tx)
+        .await?;
+
         let purchase = load_purchase_tx(&mut tx, purchase_id)
             .await?
             .ok_or(Wave2RepositoryError::Database)?;
         tx.commit().await?;
+
         Ok(PurchaseOutcome {
             purchase,
             replayed: false,
@@ -816,6 +1030,20 @@ impl Wave2Repository {
     }
 }
 
+fn map_execution_policy_error(error: ExecutionPolicyError) -> Wave2RepositoryError {
+    match error {
+        ExecutionPolicyError::LocationRequired => {
+            Wave2RepositoryError::Validation("purchase_location_required")
+        }
+        ExecutionPolicyError::LocationNotFound => {
+            Wave2RepositoryError::Validation("invalid_purchase_location")
+        }
+        ExecutionPolicyError::MissingProfile
+        | ExecutionPolicyError::InvalidDocumentType
+        | ExecutionPolicyError::Database => Wave2RepositoryError::Database,
+    }
+}
+
 fn wave2_request_hash(value: serde_json::Value) -> Result<String, Wave2RepositoryError> {
     canonical_request_hash(&value).map_err(|_| Wave2RepositoryError::Database)
 }
@@ -1041,13 +1269,13 @@ async fn load_purchase(
     business_id: Uuid,
     key: Uuid,
 ) -> Result<Option<PurchaseRecord>, Wave2RepositoryError> {
-    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE business_id=$1 AND idempotency_key=$2").bind(business_id).bind(key).fetch_optional(pool).await.map_err(Into::into)
+    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,location_id,currency,document_number,correlation_id,policy_snapshot,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE business_id=$1 AND idempotency_key=$2").bind(business_id).bind(key).fetch_optional(pool).await.map_err(Into::into)
 }
 async fn load_purchase_tx(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
 ) -> Result<Option<PurchaseRecord>, Wave2RepositoryError> {
-    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE id=$1").bind(id).fetch_optional(&mut **tx).await.map_err(Into::into)
+    sqlx::query_as::<_,PurchaseRecord>("SELECT id,business_id,organization_id,location_id,currency,document_number,correlation_id,policy_snapshot,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,finance_entry_id,created_by_user_id,created_at FROM business_purchases WHERE id=$1").bind(id).fetch_optional(&mut **tx).await.map_err(Into::into)
 }
 
 #[cfg(test)]
