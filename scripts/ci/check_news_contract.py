@@ -57,7 +57,9 @@ require(
         "verification_status = 'verified'",
         "unsupported news source URL",
         "only public HTTP(S) source URLs can be verified",
-        "include_body.then_some(row.body)",
+        "let is_retracted = editorial_status",
+        "include_body && !is_retracted",
+        'matches!(action.as_str(), "approve" | "correct")',
         'news.remove("location")',
     ),
 )
@@ -224,6 +226,7 @@ require(
         "hasVerifiedSource",
         "requiresVerifiedSource",
         "isSafeExternalSourceUrl",
+        "requiresVerifiedSource && !hasVerifiedSource",
         "Approve & publish",
         "Versi artikel",
         "Top artikel 7 hari",
