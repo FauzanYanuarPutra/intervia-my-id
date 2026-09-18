@@ -1,5 +1,0 @@
-DROP INDEX IF EXISTS idx_content_items_news_location_language_cursor;
-DROP INDEX IF EXISTS idx_content_items_news_category_language_cursor;
-DROP INDEX IF EXISTS idx_content_items_news_language_cursor;
-DROP INDEX IF EXISTS idx_content_items_news_tags;
-DROP INDEX IF EXISTS idx_content_items_news_search;
