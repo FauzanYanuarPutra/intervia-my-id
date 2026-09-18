@@ -12,6 +12,7 @@ import {
 } from '@/lib/business-templates';
 import type { LatLng } from '@/lib/maps';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 
 const categoryOptions = [
   { value: 'Makanan dan minuman', label: 'Makanan & minuman' },
@@ -86,7 +87,7 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
       });
       const result = (await response.json()) as { error?: string; redirectTo?: string };
       if (!response.ok || !result.redirectTo) {
-        throw new Error(result.error || 'Usaha belum berhasil dibuat.');
+        throw new Error(businessApiErrorMessage(result, 'Usaha belum berhasil dibuat.', response.status));
       }
       startTransition(() => {
         router.push(result.redirectTo!);
