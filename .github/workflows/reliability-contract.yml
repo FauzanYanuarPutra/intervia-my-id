@@ -89,6 +89,15 @@ jobs:
             caddy:2-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
+      - name: Validate local and tunnel Caddy configuration
+        shell: bash
+        run: |
+          docker run --rm \
+            -e APP_DOMAIN=lajukan.test \
+            -v "$PWD/infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
       - name: Validate observability Compose contract
         env:
           IMAGE_TAG: sha-ci
