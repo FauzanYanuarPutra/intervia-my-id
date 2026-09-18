@@ -60,6 +60,26 @@ Expected degraded behavior is part of the product contract.
 | One stateless replica | Load balancer removes it; remaining replicas serve within measured spare capacity. |
 | One availability zone | Healthy zones keep enough pre-provisioned capacity for the agreed SLO. |
 
+## Implemented reliability baseline
+
+The repository now includes:
+
+- low-cardinality HTTP RED metrics for Identity, Marketplace and Community;
+- private Prometheus/exporter/blackbox/Alertmanager runtime;
+- Git-provisioned Grafana operator cockpit;
+- 99.9%-target error-budget burn recording/alert rules for internal engineering;
+- transactional outbox backlog and database-pool saturation alerts;
+- bounded PostgreSQL pool configuration;
+- graceful shutdown for core Rust serving processes and the edge;
+- sanitized per-request correlation IDs in core Rust services;
+- structured Caddy access logs with sensitive query-value redaction;
+- outbox crash-recovery leases and multi-replica-safe Community rate limiting;
+- backup creation/verification helpers;
+- a non-production multi-replica rehearsal script.
+
+These are repository/runtime capabilities, not evidence that production is
+already multi-host or highly available.
+
 ## Evolution phases
 
 ### Phase 0 — make the single-host system measurable
@@ -170,13 +190,14 @@ capacity.
 
 ## Required next implementation slices
 
-1. Make the reliability CI contract mandatory in repository governance.
-2. Activate production-grade metrics/logs/traces and alert delivery.
-3. Establish representative read/write/WebSocket load tests in staging.
-4. Measure and tune connection pools, timeouts and queue worker concurrency.
-5. Extract Marketplace and Community responsibilities incrementally so hot domains can later scale independently without changing public contracts.
-6. Build a two-node stateless production rehearsal before changing the data plane.
-7. Rehearse PostgreSQL failover/PITR and object-storage recovery before calling the platform highly available.
+1. Run the observability profile in staging and calibrate thresholds from measured traffic.
+2. Exercise `scripts/ops/staging_scale_rehearsal.sh` and record multi-replica evidence.
+3. Add end-to-end trace propagation beyond request IDs when cross-service latency evidence justifies an OTLP backend.
+4. Build a two-node stateless production rehearsal with a health-aware external load balancer.
+5. Rehearse PostgreSQL promotion/PITR and object-storage recovery on isolated infrastructure.
+6. Move Redis/RabbitMQ/object storage to verified HA topologies before depending on their uptime for platform availability.
+7. Introduce cells/sharding only from measured database or blast-radius pressure.
+
 
 This document is a migration contract, not a claim that every target is already
 implemented.
