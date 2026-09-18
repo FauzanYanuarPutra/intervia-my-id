@@ -46,7 +46,6 @@ const CORS_ALLOWED_ORIGINS = new Set([
 ]);
 const DEAD_ROUTE_SEGMENTS = new Set([
   'pricing',
-  'news',
   'travel',
   'wellness',
   'vendor',
