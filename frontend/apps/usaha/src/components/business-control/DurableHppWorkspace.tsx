@@ -18,6 +18,7 @@ import {
   calculateRecipeCost,
   type IngredientCostInput,
 } from '@/lib/business-control/costing';
+import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
 
 type Ingredient = {
   id: string;
@@ -128,6 +129,9 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
+  const [pendingProductId, setPendingProductId] = useState<string | null>(null);
+  const [retireOpen, setRetireOpen] = useState(false);
+  const [retireReason, setRetireReason] = useState('');
 
   const product = products.find(item => item.id === productId) ?? products[0];
   const sellingPrice = priceFromLabel(product?.priceLabel);
@@ -226,12 +230,20 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const grossProfit = sellingPrice - recipeCost.totalCost;
   const margin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
 
-  function selectProduct(nextId: string) {
-    if (nextId === productId) return;
-    if (hasUnsavedChanges && !window.confirm('Perubahan resep belum disimpan. Pindah produk tanpa menyimpan?')) return;
+  function switchProduct(nextId: string) {
     setProductId(nextId);
     setProductSearch('');
     setMessage('');
+    setPendingProductId(null);
+  }
+
+  function selectProduct(nextId: string) {
+    if (nextId === productId) return;
+    if (hasUnsavedChanges) {
+      setPendingProductId(nextId);
+      return;
+    }
+    switchProduct(nextId);
   }
 
   function addIngredient(ingredientId: string) {
@@ -307,17 +319,21 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
     }
   }
 
-  async function retireActiveRecipe() {
+  function retireActiveRecipe() {
     if (!items.length) {
       setMessage('Belum ada resep aktif untuk dihapus.');
       return;
     }
-    const reason = window.prompt('Alasan menghapus resep aktif? Alasan ini masuk riwayat PIC.', 'Resep salah input');
-    if (!reason || reason.trim().length < 3) {
+    setRetireReason('');
+    setRetireOpen(true);
+  }
+
+  async function confirmRetireActiveRecipe() {
+    const reason = retireReason.trim();
+    if (reason.length < 3) {
       setMessage('Alasan penghapusan wajib diisi agar riwayat PIC jelas.');
       return;
     }
-    if (!window.confirm(`Hapus resep aktif untuk ${product?.name ?? 'produk ini'}? Riwayat dan PIC tetap tersimpan.`)) return;
     setDeleting(true);
     setMessage('');
     try {
@@ -331,6 +347,8 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       const emptyItems: RecipeItem[] = [];
       setItems(emptyItems);
       setInitialSignature(recipeSignature(recipeName, servings, emptyItems));
+      setRetireOpen(false);
+      setRetireReason('');
       setMessage('Resep aktif dihapus. Riwayat dan PIC tetap tercatat untuk audit internal.');
       await refreshHistory();
     } catch (error) {
@@ -471,6 +489,33 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
           )) : <p className="py-3 text-xs text-portal-soft">Belum ada riwayat. Setelah resep disimpan atau dihapus, PIC dan alasannya tampil di sini.</p>}
         </div>
       </section>
+
+      <SensitiveActionConfirm
+        open={Boolean(pendingProductId)}
+        title="Pindah produk tanpa menyimpan?"
+        description="Perubahan resep saat ini belum disimpan. Jika dilanjutkan, perubahan draft akan ditinggalkan."
+        confirmLabel="Pindah produk"
+        onCancel={() => setPendingProductId(null)}
+        onConfirm={() => pendingProductId && switchProduct(pendingProductId)}
+      />
+
+      <SensitiveActionConfirm
+        open={retireOpen}
+        title="Hapus resep aktif?"
+        description={`Resep aktif ${product?.name ?? 'produk ini'} akan dinonaktifkan. Riwayat, PIC, dan alasan tetap tersimpan untuk audit.`}
+        confirmLabel="Hapus resep aktif"
+        busy={deleting}
+        requireText
+        value={retireReason}
+        onValueChange={setRetireReason}
+        onCancel={() => {
+          if (!deleting) {
+            setRetireOpen(false);
+            setRetireReason('');
+          }
+        }}
+        onConfirm={() => void confirmRetireActiveRecipe()}
+      />
 
       {hasUnsavedChanges ? (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-portal-line bg-white/95 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
