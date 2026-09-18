@@ -17,10 +17,17 @@ trap cleanup EXIT INT TERM
 docker run -d   --name "$source_container"   -e POSTGRES_USER=postgres   -e POSTGRES_PASSWORD=restore-source-test   -e POSTGRES_DB=postgres   "$image" >/dev/null
 
 ready=0
-for _ in $(seq 1 60); do
-  if docker exec "$source_container" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
-    ready=1
-    break
+ready_streak=0
+for _ in $(seq 1 90); do
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$source_container" 2>/dev/null || true)" == "true" ]] \
+    && docker exec "$source_container" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+    ready_streak=$((ready_streak + 1))
+    if (( ready_streak >= 3 )); then
+      ready=1
+      break
+    fi
+  else
+    ready_streak=0
   fi
   sleep 1
 done

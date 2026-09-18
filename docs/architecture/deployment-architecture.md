@@ -6,6 +6,10 @@ Status: verified against repository HEAD on 2026-08-22.
 
 Images are built once and addressed by immutable `sha-<40-character-commit>` tags. Staging and production must deploy the same candidate SHA; production must not rebuild a different artifact.
 
+A successful `Build Images` run for a push to `main` automatically deploys that immutable SHA to **staging**, never directly to production. Promotion to production is a separate manual `workflow_dispatch` using the exact same `sha-<40-character-commit>` tag.
+Production promotion additionally rejects any release SHA that is not reachable from the repository's `main` history.
+Before production SSH/deploy begins, the workflow also requires successful Build Images, Quality Gates, Security, Reliability Contract, Frontend Runtime Gate, KYC Runtime Contract, and News Contract runs for that exact SHA.
+
 Production deployment remains manual through a protected GitHub environment. The remote deployment performs:
 
 1. immutable tag and Compose contract validation;
