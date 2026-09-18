@@ -12,8 +12,8 @@ use futures_util::StreamExt;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use lapin::{
     options::{
-        BasicAckOptions, BasicConsumeOptions, BasicNackOptions, ExchangeDeclareOptions,
-        QueueBindOptions, QueueDeclareOptions,
+        BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicQosOptions,
+        ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions,
     },
     types::FieldTable,
     ExchangeKind,
@@ -3299,6 +3299,12 @@ async fn configure_identity_profile_consumer(
             FieldTable::default(),
         )
         .await?;
+
+    let prefetch = env_u32_bounded("COMMUNITY_IDENTITY_PREFETCH", 100, 1, 1_000) as u16;
+    channel
+        .basic_qos(prefetch, BasicQosOptions::default())
+        .await?;
+
     Ok(())
 }
 

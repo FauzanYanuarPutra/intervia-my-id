@@ -102,6 +102,14 @@ for marker in (
         errors.append(f"Community multi-replica inbox claim contract missing: {marker}")
 
 for marker in (
+    "COMMUNITY_IDENTITY_PREFETCH",
+    "BasicQosOptions",
+    ".basic_qos(prefetch",
+):
+    if marker not in community_main_source:
+        errors.append(f"Community RabbitMQ backpressure contract missing: {marker}")
+
+for marker in (
     'promtool", "query", "instant", "http://localhost:9090", "up"',
     'amtool", "--alertmanager.url=http://localhost:9093", "config", "show"',
 ):
