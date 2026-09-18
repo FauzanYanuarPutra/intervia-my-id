@@ -184,7 +184,7 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
             className="portal-input pl-9"
           />
           {isSearching && shouldQuerySuggestions ? (
-            <span className="absolute right-3 top-3 text-xs text-portal-soft">Mencari...</span>
+            <span role="status" aria-live="polite" className="absolute right-3 top-3 text-xs text-portal-soft">Mencari...</span>
           ) : null}
         </div>
         <p className="text-xs leading-5 text-portal-soft">
@@ -258,8 +258,8 @@ export function InviteMemberQuickForm({ businessId }: InviteMemberQuickFormProps
         </div>
       </section>
 
-      {error ? <p className="text-sm text-portal-ember">{error}</p> : null}
-      {success ? <p className="text-sm text-portal-forest">{success}</p> : null}
+      {error ? <p role="alert" className="text-sm text-portal-ember">{error}</p> : null}
+      {success ? <p role="status" aria-live="polite" className="text-sm text-portal-forest">{success}</p> : null}
 
       <button type="submit" disabled={isPending || !selectedUser} className="portal-button-primary">
         <Send className="h-4 w-4" />
