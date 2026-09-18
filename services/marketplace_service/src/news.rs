@@ -2158,9 +2158,11 @@ async fn list_editorial_history(
 #[cfg(test)]
 mod tests {
     use super::{
-        moderation_action_allowed, moderation_action_requires_note, moderation_target,
-        normalize_queue_status, parse_news_cursor, source_domain,
+        is_allowed_news_source_url, moderation_action_allowed,
+        moderation_action_requires_note, moderation_target, normalize_news_language,
+        normalize_queue_status, parse_news_cursor, public_news_metadata, source_domain,
     };
+    use serde_json::json;
 
     #[test]
     fn moderation_actions_map_to_publication_states() {
@@ -2218,6 +2220,64 @@ mod tests {
             source_domain("http://example.com:8080/path"),
             Some("example.com".to_string())
         );
+    }
+
+    #[test]
+    fn public_metadata_does_not_leak_editorial_private_fields() {
+        let metadata = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "news",
+                "language": "id",
+                "location": "Banten",
+                "business_impact": "Dampak publik",
+                "contributor_id": "11111111-1111-1111-1111-111111111111",
+                "reviewer_id": "22222222-2222-2222-2222-222222222222",
+                "review_note": "catatan internal",
+                "previous_review_note": "catatan lama",
+                "source_urls": ["https://unverified.example/"]
+            }
+        });
+        let verified_sources = vec!["https://www.bi.go.id/".to_string()];
+        let public = public_news_metadata(&metadata, Some(&verified_sources));
+
+        assert_eq!(
+            public.pointer("/news/category").and_then(|value| value.as_str()),
+            Some("Ekonomi")
+        );
+        assert_eq!(
+            public.pointer("/news/source_urls/0").and_then(|value| value.as_str()),
+            Some("https://www.bi.go.id/")
+        );
+        assert!(public.pointer("/news/contributor_id").is_none());
+        assert!(public.pointer("/news/reviewer_id").is_none());
+        assert!(public.pointer("/news/review_note").is_none());
+        assert!(public.pointer("/news/previous_review_note").is_none());
+    }
+
+    #[test]
+    fn public_source_policy_rejects_local_or_credentialed_urls() {
+        assert!(is_allowed_news_source_url("https://www.bi.go.id/id/publikasi"));
+        assert!(!is_allowed_news_source_url("http://127.0.0.1/admin"));
+        assert!(!is_allowed_news_source_url("http://10.10.0.1/internal"));
+        assert!(!is_allowed_news_source_url("http://localhost:8080/private"));
+        assert!(!is_allowed_news_source_url("http://[::1]/private"));
+        assert!(!is_allowed_news_source_url("https://user:pass@example.com/source"));
+        assert!(!is_allowed_news_source_url("file:///etc/passwd"));
+    }
+
+    #[test]
+    fn news_language_filter_accepts_only_supported_locales() {
+        assert_eq!(
+            normalize_news_language(Some("ID".to_string())).unwrap(),
+            Some("id".to_string())
+        );
+        assert_eq!(
+            normalize_news_language(Some("en".to_string())).unwrap(),
+            Some("en".to_string())
+        );
+        assert!(normalize_news_language(Some("fr".to_string())).is_err());
+        assert_eq!(normalize_news_language(None).unwrap(), None);
     }
 
     #[test]
