@@ -48,6 +48,28 @@ impl OrganizationSummary {
         )
     }
 
+    pub(crate) fn can_view_orders(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin"
+                | "org_manager"
+                | "manager"
+                | "org_cashier"
+                | "cashier"
+                | "org_accounting"
+                | "accounting"
+                | "org_viewer"
+                | "viewer"
+        )
+    }
+
+    pub(crate) fn can_manage_orders(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager" | "org_cashier" | "cashier"
+        )
+    }
+
     pub(crate) fn can_view_sale_costs(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
@@ -291,6 +313,20 @@ mod tests {
         assert!(!organization("org_inventory").can_view_sales());
         assert!(!organization("viewer").can_record_sales());
         assert!(!organization("org_accounting").can_record_sales());
+    }
+
+    #[test]
+    fn order_permissions_match_usaha_roles() {
+        for role in ["org_admin", "org_manager", "manager", "org_cashier", "cashier"] {
+            assert!(organization(role).can_view_orders());
+            assert!(organization(role).can_manage_orders());
+        }
+        for role in ["org_accounting", "accounting", "org_viewer", "viewer"] {
+            assert!(organization(role).can_view_orders());
+            assert!(!organization(role).can_manage_orders());
+        }
+        assert!(!organization("org_inventory").can_view_orders());
+        assert!(!organization("org_inventory").can_manage_orders());
     }
 
     #[test]
