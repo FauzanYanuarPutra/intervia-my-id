@@ -249,6 +249,19 @@ if "SCYLLA_NODES: ${SCYLLA_NODES:?" not in prod_compose:
 if "MINIO_DATA_VOLUME:?" not in prod_compose:
     errors.append("production object storage must require an explicitly resolved existing volume")
 
+if "COMMUNITY_UPLOADS_VOLUME:?" not in prod_compose:
+    errors.append("production community media must require an explicitly resolved existing volume")
+
+for marker in (
+    'configured_community_volume',
+    'active_community_volumes',
+    'COMMUNITY_UPLOADS_VOLUME',
+    '/app/uploads/forum',
+    'Refusing storage switch',
+):
+    if marker not in deploy:
+        errors.append(f"deploy workflow missing Community media storage guard: {marker}")
+
 if "development-database" not in prod_compose:
     errors.append("production compose must keep single-node Scylla out of the normal production profile")
 
