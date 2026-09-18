@@ -213,6 +213,21 @@ fn normalize_news_language(value: Option<String>) -> Result<Option<String>, &'st
     }
 }
 
+fn normalize_news_search_query(
+    value: Option<String>,
+) -> Result<Option<String>, &'static str> {
+    let Some(query) = trimmed(value) else {
+        return Ok(None);
+    };
+    if query.len() > 160 {
+        return Err("search query is too long");
+    }
+    if query.split_whitespace().count() > 24 {
+        return Err("search query has too many terms");
+    }
+    Ok(Some(query))
+}
+
 fn normalize_news_category_filter(
     value: Option<String>,
 ) -> Result<Option<String>, &'static str> {
@@ -1115,7 +1130,10 @@ async fn list_news(
         Ok(language) => language,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
-    let q = trimmed(query.q);
+    let q = match normalize_news_search_query(query.q) {
+        Ok(query) => query,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
     if category.as_ref().is_some_and(|value| value.len() > 80) {
         return response_error(StatusCode::BAD_REQUEST, "category filter is too long");
     }
@@ -1124,9 +1142,6 @@ async fn list_news(
     }
     if location.as_ref().is_some_and(|value| value.len() > 120) {
         return response_error(StatusCode::BAD_REQUEST, "location filter is too long");
-    }
-    if q.as_ref().is_some_and(|value| value.len() > 160) {
-        return response_error(StatusCode::BAD_REQUEST, "search query is too long");
     }
     let cursor = match parse_news_cursor(query.cursor.as_deref()) {
         Ok(cursor) => cursor,
