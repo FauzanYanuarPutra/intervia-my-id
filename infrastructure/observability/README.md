@@ -58,8 +58,11 @@ The request metrics deliberately keep labels low-cardinality: service and status
 class are exported, but raw request paths and object IDs are not metric labels.
 Request IDs remain in structured logs/responses for correlation. Identity,
 Marketplace and Community allow a bounded safe `x-request-id` through CORS and
-expose the response header, so browser clients can report the exact correlation
-ID when a request fails.
+expose the response header. The WWW API gateway now validates or generates the
+same bounded ID, forwards it into route handlers, exposes it to browser clients,
+and preserves backend IDs on API errors/proxy responses. This gives support and
+incident responders a concrete correlation value instead of relying on timestamps
+alone.
 
 RabbitMQ queue lag, provider-specific latency and richer domain metrics should
 continue to be added from real code paths rather than invented at the dashboard

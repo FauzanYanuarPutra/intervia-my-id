@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { normalizeContentMediaUrl } from '@/lib/content/catalog';
 import { fetchWithTimeout } from '@/lib/server/fetchWithTimeout';
+import { normalizeRequestId } from '@/lib/requestId';
 
 function getCommunityBackendBase(): string | null {
   const base =
@@ -111,6 +112,11 @@ export async function proxyCommunityBackend(
     headers.Authorization = `Bearer ${token}`;
   }
 
+  const requestId = normalizeRequestId(req.headers.get('x-request-id'));
+  if (requestId) {
+    headers['X-Request-ID'] = requestId;
+  }
+
   const forwardedFor =
     req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
   if (forwardedFor) {
@@ -162,6 +168,11 @@ export async function proxyCommunityBackend(
     if (cacheControl) {
       responseHeaders['cache-control'] = cacheControl;
     }
+    const responseRequestId =
+      normalizeRequestId(response.headers.get('x-request-id')) || requestId;
+    if (responseRequestId) {
+      responseHeaders['x-request-id'] = responseRequestId;
+    }
     const isJsonContent = contentType
       .toLowerCase()
       .includes('application/json');
@@ -205,6 +216,7 @@ export async function proxyCommunityBackend(
           error instanceof DOMException && error.name === 'AbortError'
             ? 504
             : 503,
+        headers: requestId ? { 'x-request-id': requestId } : undefined,
       },
     );
   }
