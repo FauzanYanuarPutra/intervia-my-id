@@ -66,7 +66,7 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
   const isId = locale === 'id';
   const category = filters.category?.trim() || undefined;
   const query = filters.q?.trim() || undefined;
-  const { items } = await getPublishedNews({ category, query, limit: 36 });
+  const { items } = await getPublishedNews({ category, query, language: isId ? 'id' : 'en', limit: 36 });
   const featured = items[0];
   const rest = items.slice(1);
 

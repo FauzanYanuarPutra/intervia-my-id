@@ -39,6 +39,7 @@ export default function SubmitNewsForm({ locale }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          language: isId ? 'id' : 'en',
           topics: form.topics.split(',').map(value => value.trim()).filter(Boolean),
           source_urls: form.source_urls.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
         }),

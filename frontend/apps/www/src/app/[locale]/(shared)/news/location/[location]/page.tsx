@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const value = cleanFacet(location);
   if (!value) return { robots: { index: false, follow: true } };
   const canonical = buildNewsFacetUrl(locale, 'location', value);
-  const { items } = await getPublishedNews({ location: value, limit: 1 });
+  const { items } = await getPublishedNews({ location: value, language: locale === 'en' ? 'en' : 'id', limit: 1 });
   const indexable = items.length > 0;
   return {
     title: `${value} | Berita Daerah Lajukan`,
@@ -43,7 +43,7 @@ export default async function NewsLocationPage({ params }: Props) {
   const value = cleanFacet(location);
   if (!value) notFound();
   const isId = locale === 'id';
-  const { items } = await getPublishedNews({ location: value, limit: 48 });
+  const { items } = await getPublishedNews({ location: value, language: isId ? 'id' : 'en', limit: 48 });
 
   return (
     <main className="page-shell page-rhythm pb-12 pt-6">

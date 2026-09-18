@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) return { robots: { index: false, follow: true } };
   const canonical = `${buildNewsUrl(locale)}/category/${category.toLowerCase()}`;
-  const { items } = await getPublishedNews({ category: label, limit: 1 });
+  const { items } = await getPublishedNews({ category: label, language: locale === 'en' ? 'en' : 'id', limit: 1 });
   const indexable = items.length > 0;
   return {
     title: `${label} | Lajukan News`,
@@ -50,7 +50,7 @@ export default async function NewsCategoryPage({ params }: Props) {
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) notFound();
   const isId = locale === 'id';
-  const { items } = await getPublishedNews({ category: label, limit: 48 });
+  const { items } = await getPublishedNews({ category: label, language: isId ? 'id' : 'en', limit: 48 });
 
   return <main className="page-shell page-rhythm pb-12 pt-6">
     <Link href="/news" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"><ArrowLeft className="h-3.5 w-3.5"/>Lajukan News</Link>

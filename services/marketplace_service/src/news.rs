@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 use uuid::Uuid;
 
 use crate::{
@@ -54,7 +54,33 @@ struct NewsRow {
 }
 
 #[derive(Debug, Serialize)]
+struct PublicNewsRow {
+    id: Uuid,
+    slug: Option<String>,
+    title: String,
+    summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    body: Option<String>,
+    tags: Option<Vec<String>>,
+    cover_image: Option<String>,
+    metadata: Value,
+    content_status: String,
+    published_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
 struct NewsListResponse {
+    items: Vec<PublicNewsRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+    next_cursor: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct EditorialNewsListResponse {
     items: Vec<NewsRow>,
     limit: i64,
     offset: i64,
@@ -69,6 +95,7 @@ struct ListNewsQuery {
     category: Option<String>,
     topic: Option<String>,
     location: Option<String>,
+    language: Option<String>,
     q: Option<String>,
     cursor: Option<String>,
 }
@@ -174,6 +201,164 @@ fn trimmed(value: Option<String>) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn normalize_news_language(value: Option<String>) -> Result<Option<String>, &'static str> {
+    let Some(language) = trimmed(value) else {
+        return Ok(None);
+    };
+    let language = language.to_ascii_lowercase();
+    if matches!(language.as_str(), "id" | "en") {
+        Ok(Some(language))
+    } else {
+        Err("unsupported news language")
+    }
+}
+
+fn public_news_metadata(metadata: &Value, source_urls: Option<&[String]>) -> Value {
+    let source = metadata.get("news").and_then(Value::as_object);
+    let mut public = serde_json::Map::new();
+    for key in [
+        "category",
+        "article_kind",
+        "language",
+        "location",
+        "editorial_status",
+        "business_impact",
+        "correction_note",
+        "retraction_note",
+        "byline",
+        "disclosure",
+        "published_at",
+    ] {
+        if let Some(value) = source.and_then(|news| news.get(key)) {
+            public.insert(key.to_string(), value.clone());
+        }
+    }
+    if let Some(source_urls) = source_urls {
+        public.insert("source_urls".to_string(), json!(source_urls));
+    }
+    json!({ "news": Value::Object(public) })
+}
+
+fn public_news_row(
+    row: NewsRow,
+    source_urls: Option<&[String]>,
+    include_body: bool,
+) -> PublicNewsRow {
+    let is_retracted = editorial_status(&row.content_status, &row.metadata) == "retracted";
+    let public_sources = if is_retracted { None } else { source_urls };
+    PublicNewsRow {
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        summary: if is_retracted { None } else { row.summary },
+        body: if include_body && !is_retracted {
+            Some(row.body)
+        } else {
+            None
+        },
+        tags: if is_retracted { None } else { row.tags },
+        cover_image: if is_retracted { None } else { row.cover_image },
+        metadata: public_news_metadata(&row.metadata, public_sources),
+        content_status: row.content_status,
+        published_at: row.published_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    }
+}
+
+fn is_allowed_news_source_url(raw: &str) -> bool {
+    if raw.len() > 2_048 {
+        return false;
+    }
+    let Ok(url) = reqwest::Url::parse(raw) else {
+        return false;
+    };
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return false;
+    }
+    let Some(host) = url
+        .host_str()
+        .map(str::trim)
+        .filter(|host| !host.is_empty())
+    else {
+        return false;
+    };
+    let host_lower = host.to_ascii_lowercase();
+    if host_lower == "localhost"
+        || host_lower.ends_with(".localhost")
+        || host_lower.ends_with(".local")
+    {
+        return false;
+    }
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return match ip {
+            IpAddr::V4(ip) => {
+                !(ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified())
+            }
+            IpAddr::V6(ip) => {
+                !(ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_unique_local()
+                    || ip.is_unicast_link_local())
+            }
+        };
+    }
+    true
+}
+
+fn sanitize_news_source_urls(
+    value: Option<Vec<String>>,
+) -> Result<Option<Vec<String>>, &'static str> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let mut urls = Vec::new();
+    for raw in value {
+        let raw = raw.trim();
+        if raw.is_empty() {
+            continue;
+        }
+        if !is_allowed_news_source_url(raw) {
+            return Err("unsupported news source URL");
+        }
+        let normalized = reqwest::Url::parse(raw)
+            .map_err(|_| "unsupported news source URL")?
+            .to_string();
+        if !urls.iter().any(|existing| existing == &normalized) {
+            urls.push(normalized);
+        }
+        if urls.len() > 10 {
+            return Err("too many news source URLs");
+        }
+    }
+    Ok(Some(urls))
+}
+
+fn public_topics_from_tags(tags: Option<&[String]>) -> Vec<String> {
+    let reserved = [
+        "news",
+        "analysis",
+        "press_release",
+        "ekonomi",
+        "bisnis",
+        "umkm",
+        "teknologi",
+        "keuangan",
+        "regulasi",
+        "industri",
+        "daerah",
+    ];
+    tags.into_iter()
+        .flatten()
+        .map(|tag| tag.trim().to_lowercase())
+        .filter(|tag| !tag.is_empty() && !reserved.contains(&tag.as_str()))
+        .take(8)
+        .collect()
+}
+
 pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -> Value {
     if !metadata.is_object() {
         metadata = json!({});
@@ -196,6 +381,56 @@ pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -
         "contributor_id".to_string(),
         Value::String(owner_id.to_string()),
     );
+    let language = news
+        .get("language")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| matches!(*value, "id" | "en"))
+        .unwrap_or("id")
+        .to_string();
+    news.insert("language".to_string(), Value::String(language));
+
+    let raw_sources = news
+        .get("source_urls")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let safe_sources = raw_sources
+        .into_iter()
+        .filter(|source| is_allowed_news_source_url(source.trim()))
+        .filter_map(|source| reqwest::Url::parse(source.trim()).ok())
+        .map(|url| url.to_string())
+        .fold(Vec::<String>::new(), |mut urls, source| {
+            if urls.len() < 10 && !urls.iter().any(|existing| existing == &source) {
+                urls.push(source);
+            }
+            urls
+        });
+    news.insert("source_urls".to_string(), json!(safe_sources));
+
+    let kind = news
+        .get("article_kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("news");
+    if kind == "press_release" {
+        news.insert(
+            "disclosure".to_string(),
+            Value::String(
+                "Submitted by a business or its representative; editorially reviewed before publication."
+                    .to_string(),
+            ),
+        );
+    } else {
+        news.remove("disclosure");
+    }
+
     news.entry("submitted_at".to_string())
         .or_insert_with(|| Value::String(Utc::now().to_rfc3339()));
     metadata
@@ -269,19 +504,21 @@ async fn has_verified_source_tx(
     tx: &mut Transaction<'_, Postgres>,
     content_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    sqlx::query_scalar::<_, bool>(
+    let urls = sqlx::query_scalar::<_, String>(
         r#"
-        SELECT EXISTS(
-          SELECT 1
-          FROM news_source_references
-          WHERE content_id = $1
-            AND verification_status = 'verified'
-        )
+        SELECT source_url
+        FROM news_source_references
+        WHERE content_id = $1
+          AND verification_status = 'verified'
         "#,
     )
     .bind(content_id)
-    .fetch_one(&mut **tx)
-    .await
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(urls
+        .iter()
+        .any(|source_url| is_allowed_news_source_url(source_url)))
 }
 
 fn editorial_status(content_status: &str, metadata: &Value) -> String {
@@ -383,21 +620,9 @@ fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
 }
 
 fn source_domain(source_url: &str) -> Option<String> {
-    let without_scheme = source_url
-        .strip_prefix("https://")
-        .or_else(|| source_url.strip_prefix("http://"))
-        .unwrap_or(source_url);
-    let authority = without_scheme.split('/').next()?.trim();
-    if authority.is_empty() {
-        return None;
-    }
-    let host = authority
-        .rsplit('@')
-        .next()
-        .unwrap_or(authority)
-        .split(':')
-        .next()
-        .unwrap_or(authority)
+    let url = reqwest::Url::parse(source_url).ok()?;
+    let host = url
+        .host_str()?
         .trim()
         .trim_start_matches("www.")
         .to_ascii_lowercase();
@@ -417,19 +642,22 @@ fn news_source_urls(metadata: &Value) -> Vec<String> {
         .map(|items| {
             let mut urls = Vec::new();
             for item in items {
-                let Some(url) = item
+                let Some(raw) = item
                     .as_str()
                     .map(str::trim)
                     .filter(|value| !value.is_empty())
                 else {
                     continue;
                 };
-                if !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2048
-                {
+                if !is_allowed_news_source_url(raw) {
                     continue;
                 }
-                if !urls.iter().any(|existing| existing == url) {
-                    urls.push(url.to_string());
+                let Ok(parsed) = reqwest::Url::parse(raw) else {
+                    continue;
+                };
+                let normalized = parsed.to_string();
+                if !urls.iter().any(|existing| existing == &normalized) {
+                    urls.push(normalized);
                 }
                 if urls.len() >= 10 {
                     break;
@@ -438,6 +666,29 @@ fn news_source_urls(metadata: &Value) -> Vec<String> {
             urls
         })
         .unwrap_or_default()
+}
+
+async fn public_verified_source_urls(
+    pool: &PgPool,
+    content_id: Uuid,
+) -> Result<Vec<String>, sqlx::Error> {
+    let urls = sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT source_url
+        FROM news_source_references
+        WHERE content_id = $1
+          AND verification_status = 'verified'
+        ORDER BY position ASC, id ASC
+        "#,
+    )
+    .bind(content_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(urls
+        .into_iter()
+        .filter(|url| is_allowed_news_source_url(url))
+        .collect())
 }
 
 fn format_news_cursor(row: &NewsRow) -> String {
@@ -757,6 +1008,10 @@ async fn list_news(
     let category = trimmed(query.category);
     let topic = trimmed(query.topic);
     let location = trimmed(query.location);
+    let language = match normalize_news_language(query.language) {
+        Ok(language) => language,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
     let q = trimmed(query.q);
     let cursor = match parse_news_cursor(query.cursor.as_deref()) {
         Ok(cursor) => cursor,
@@ -792,22 +1047,27 @@ async fn list_news(
           )
           AND (
             $4::text IS NULL OR
-            title ILIKE ('%' || $4 || '%') OR
-            COALESCE(summary, '') ILIKE ('%' || $4 || '%') OR
-            body ILIKE ('%' || $4 || '%') OR
-            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $4 || '%')
+            lower(COALESCE(NULLIF(metadata->'news'->>'language', ''), 'id')) = lower($4)
           )
           AND (
-            $5::timestamptz IS NULL OR
-            (COALESCE(published_at, created_at), id) < ($5, $6::uuid)
+            $5::text IS NULL OR
+            title ILIKE ('%' || $5 || '%') OR
+            COALESCE(summary, '') ILIKE ('%' || $5 || '%') OR
+            body ILIKE ('%' || $5 || '%') OR
+            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $5 || '%')
+          )
+          AND (
+            $6::timestamptz IS NULL OR
+            (COALESCE(published_at, created_at), id) < ($6, $7::uuid)
           )
         ORDER BY COALESCE(published_at, created_at) DESC, id DESC
-        LIMIT $7 OFFSET $8
+        LIMIT $8 OFFSET $9
         "#,
     )
     .bind(category)
     .bind(topic)
     .bind(location)
+    .bind(language)
     .bind(q)
     .bind(cursor_at)
     .bind(cursor_id)
@@ -827,10 +1087,14 @@ async fn list_news(
             } else {
                 None
             };
+            let public_items = items
+                .into_iter()
+                .map(|item| public_news_row(item, None, false))
+                .collect();
             (
                 StatusCode::OK,
                 Json(NewsListResponse {
-                    items,
+                    items: public_items,
                     limit,
                     offset: effective_offset,
                     has_more,
@@ -879,7 +1143,23 @@ async fn get_news(
     .await;
 
     match row {
-        Ok(Some(item)) => (StatusCode::OK, Json(item)).into_response(),
+        Ok(Some(item)) => {
+            let sources = match public_verified_source_urls(&state.db, item.id).await {
+                Ok(sources) => sources,
+                Err(error) => {
+                    tracing::error!("get_news public source query error: {:?}", error);
+                    return response_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to load news article sources",
+                    );
+                }
+            };
+            (
+                StatusCode::OK,
+                Json(public_news_row(item, Some(&sources), true)),
+            )
+                .into_response()
+        }
         Ok(None) => response_error(StatusCode::NOT_FOUND, "news article not found"),
         Err(error) => {
             tracing::error!("get_news query error: {:?}", error);
@@ -984,7 +1264,7 @@ async fn update_news_submission(
     let summary = trimmed(payload.summary).or_else(|| current.summary.clone());
     if summary
         .as_ref()
-        .is_some_and(|value| value.len() < 20 || value.len() > 1000)
+        .is_none_or(|value| value.len() < 20 || value.len() > 1000)
     {
         return response_error(
             StatusCode::BAD_REQUEST,
@@ -996,102 +1276,137 @@ async fn update_news_submission(
         return response_error(StatusCode::BAD_REQUEST, "body must be 120-20000 characters");
     }
 
+    let requested_topics = match sanitize_topics(payload.topics) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let requested_sources = match sanitize_news_source_urls(payload.source_urls) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let topics =
+        requested_topics.unwrap_or_else(|| public_topics_from_tags(current.tags.as_deref()));
+
     let mut metadata = current.metadata.clone();
     if !metadata.is_object() {
         metadata = json!({});
     }
-    let root = metadata
-        .as_object_mut()
-        .expect("metadata object was initialized");
-    let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
-    if !news.is_object() {
-        *news = json!({});
-    }
-    let news = news
-        .as_object_mut()
-        .expect("news metadata object was initialized");
 
-    if let Some(category) = trimmed(payload.category) {
-        if !valid_news_category(&category) {
-            return response_error(StatusCode::BAD_REQUEST, "unsupported news category");
+    let final_category: String;
+    let final_kind: String;
+    {
+        let root = metadata
+            .as_object_mut()
+            .expect("metadata object was initialized");
+        let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
+        if !news.is_object() {
+            *news = json!({});
         }
-        news.insert("category".to_string(), Value::String(category));
-    }
-    if let Some(kind) = trimmed(payload.article_kind) {
-        if !valid_article_kind(&kind) {
-            return response_error(StatusCode::BAD_REQUEST, "unsupported article kind");
+        let news = news
+            .as_object_mut()
+            .expect("news metadata object was initialized");
+
+        if let Some(category) = trimmed(payload.category) {
+            if !valid_news_category(&category) {
+                return response_error(StatusCode::BAD_REQUEST, "unsupported news category");
+            }
+            news.insert("category".to_string(), Value::String(category));
         }
-        news.insert("article_kind".to_string(), Value::String(kind));
-    }
-    if let Some(location) = trimmed(payload.location) {
-        if location.len() > 120 {
-            return response_error(StatusCode::BAD_REQUEST, "location is too long");
+        if let Some(kind) = trimmed(payload.article_kind) {
+            if !valid_article_kind(&kind) {
+                return response_error(StatusCode::BAD_REQUEST, "unsupported article kind");
+            }
+            news.insert("article_kind".to_string(), Value::String(kind));
         }
-        news.insert("location".to_string(), Value::String(location));
-    }
-    if let Some(topics) = match sanitize_topics(payload.topics) {
-        Ok(value) => value,
-        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
-    } {
-        let category_tag = news
+        if let Some(raw_location) = payload.location {
+            let location = raw_location.trim();
+            if location.is_empty() {
+                news.remove("location");
+            } else {
+                if location.len() > 120 {
+                    return response_error(StatusCode::BAD_REQUEST, "location is too long");
+                }
+                news.insert("location".to_string(), Value::String(location.to_string()));
+            }
+        }
+        if let Some(source_urls) = requested_sources {
+            news.insert("source_urls".to_string(), json!(source_urls));
+        }
+
+        final_category = news
             .get("category")
             .and_then(Value::as_str)
             .map(str::trim)
+            .filter(|value| valid_news_category(value))
             .unwrap_or("Ekonomi")
-            .to_lowercase();
-        let article_kind_tag = news
+            .to_string();
+        final_kind = news
             .get("article_kind")
             .and_then(Value::as_str)
             .map(str::trim)
+            .filter(|value| valid_article_kind(value))
             .unwrap_or("news")
             .to_string();
-        let mut tags = vec!["news".to_string(), category_tag, article_kind_tag];
-        for topic in topics {
-            if !tags.iter().any(|existing| existing == &topic) {
-                tags.push(topic);
-            }
-        }
-        if let Err(error) = sqlx::query(
-            "UPDATE content_items SET tags = $2 WHERE id = $1 AND owner_id = $3 AND content_type = 'news'",
-        )
-        .bind(content_id)
-        .bind(tags)
-        .bind(owner_id)
-        .execute(&mut *tx)
-        .await
-        {
-            tracing::error!("update_news_submission topic update error: {:?}", error);
-            return response_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to update news topics",
+
+        let language = news
+            .get("language")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| matches!(*value, "id" | "en"))
+            .unwrap_or("id")
+            .to_string();
+        news.insert("language".to_string(), Value::String(language));
+
+        if final_kind == "press_release" {
+            news.insert(
+                "disclosure".to_string(),
+                Value::String(
+                    "Submitted by a business or its representative; editorially reviewed before publication."
+                        .to_string(),
+                ),
             );
+        } else {
+            news.remove("disclosure");
+        }
+
+        if let Some(previous_note) = news.remove("review_note") {
+            news.insert("previous_review_note".to_string(), previous_note);
+        }
+        news.insert(
+            "editorial_status".to_string(),
+            Value::String("pending_review".to_string()),
+        );
+        news.insert(
+            "resubmitted_at".to_string(),
+            Value::String(Utc::now().to_rfc3339()),
+        );
+        news.insert(
+            "contributor_id".to_string(),
+            Value::String(owner_id.to_string()),
+        );
+    }
+
+    let final_sources = news_source_urls(&metadata);
+    if final_kind != "press_release" && final_sources.is_empty() {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "news and analysis require at least one valid public source URL",
+        );
+    }
+    if let Some(news) = metadata.get_mut("news").and_then(Value::as_object_mut) {
+        news.insert("source_urls".to_string(), json!(final_sources));
+    }
+
+    let mut tags = vec![
+        "news".to_string(),
+        final_category.to_lowercase(),
+        final_kind.clone(),
+    ];
+    for topic in topics {
+        if !tags.iter().any(|existing| existing == &topic) {
+            tags.push(topic);
         }
     }
-    if let Some(source_urls) = payload.source_urls {
-        let cleaned: Vec<Value> = source_urls
-            .into_iter()
-            .filter_map(|source| trimmed(Some(source)))
-            .filter(|source| source.len() <= 2048)
-            .take(10)
-            .map(Value::String)
-            .collect();
-        news.insert("source_urls".to_string(), Value::Array(cleaned));
-    }
-    if let Some(previous_note) = news.remove("review_note") {
-        news.insert("previous_review_note".to_string(), previous_note);
-    }
-    news.insert(
-        "editorial_status".to_string(),
-        Value::String("pending_review".to_string()),
-    );
-    news.insert(
-        "resubmitted_at".to_string(),
-        Value::String(Utc::now().to_rfc3339()),
-    );
-    news.insert(
-        "contributor_id".to_string(),
-        Value::String(owner_id.to_string()),
-    );
 
     let updated = sqlx::query_as::<_, NewsRow>(
         r#"
@@ -1100,14 +1415,15 @@ async fn update_news_submission(
             title = $2,
             summary = $3,
             body = $4,
-            metadata = $5,
+            tags = $5,
+            metadata = $6,
             content_status = 'draft',
             listing_status = 'draft',
             updated_at = NOW(),
             last_saved_at = NOW(),
             draft_version = draft_version + 1
         WHERE id = $1
-          AND owner_id = $6
+          AND owner_id = $7
           AND content_type = 'news'
         RETURNING
             id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
@@ -1118,6 +1434,7 @@ async fn update_news_submission(
     .bind(title)
     .bind(summary)
     .bind(body)
+    .bind(tags)
     .bind(metadata)
     .bind(owner_id)
     .fetch_one(&mut *tx)
@@ -1268,7 +1585,7 @@ async fn list_editorial_queue(
             }
             (
                 StatusCode::OK,
-                Json(NewsListResponse {
+                Json(EditorialNewsListResponse {
                     items,
                     limit,
                     offset,
@@ -1375,7 +1692,7 @@ async fn moderate_news(
             return response_error(StatusCode::UNPROCESSABLE_ENTITY, message);
         }
     }
-    if action == "approve" && !is_press_release(&current.metadata) {
+    if matches!(action.as_str(), "approve" | "correct") && !is_press_release(&current.metadata) {
         match has_verified_source_tx(&mut tx, current.id).await {
             Ok(true) => {}
             Ok(false) => {
@@ -1743,6 +2060,33 @@ async fn update_news_source(
         return response_error(StatusCode::BAD_REQUEST, "source note is too long");
     }
 
+    if verification_status.as_deref() == Some("verified") {
+        let source_url = match sqlx::query_scalar::<_, String>(
+            "SELECT source_url FROM news_source_references WHERE id = $1 AND content_id = $2",
+        )
+        .bind(source_id)
+        .bind(content_id)
+        .fetch_optional(&state.db)
+        .await
+        {
+            Ok(Some(source_url)) => source_url,
+            Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
+            Err(error) => {
+                tracing::error!("update_news_source validation error: {:?}", error);
+                return response_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate news source",
+                );
+            }
+        };
+        if !is_allowed_news_source_url(&source_url) {
+            return response_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "only public HTTP(S) source URLs can be verified",
+            );
+        }
+    }
+
     let updated = sqlx::query_as::<_, NewsSourceRow>(
         r#"
         UPDATE news_source_references
@@ -1875,9 +2219,11 @@ async fn list_editorial_history(
 #[cfg(test)]
 mod tests {
     use super::{
-        moderation_action_allowed, moderation_action_requires_note, moderation_target,
-        normalize_queue_status, parse_news_cursor, source_domain,
+        is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
+        moderation_target, normalize_news_language, normalize_queue_status, parse_news_cursor,
+        public_news_metadata, source_domain,
     };
+    use serde_json::json;
 
     #[test]
     fn moderation_actions_map_to_publication_states() {
@@ -1935,6 +2281,72 @@ mod tests {
             source_domain("http://example.com:8080/path"),
             Some("example.com".to_string())
         );
+    }
+
+    #[test]
+    fn public_metadata_does_not_leak_editorial_private_fields() {
+        let metadata = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "news",
+                "language": "id",
+                "location": "Banten",
+                "business_impact": "Dampak publik",
+                "contributor_id": "11111111-1111-1111-1111-111111111111",
+                "reviewer_id": "22222222-2222-2222-2222-222222222222",
+                "review_note": "catatan internal",
+                "previous_review_note": "catatan lama",
+                "source_urls": ["https://unverified.example/"]
+            }
+        });
+        let verified_sources = vec!["https://www.bi.go.id/".to_string()];
+        let public = public_news_metadata(&metadata, Some(&verified_sources));
+
+        assert_eq!(
+            public
+                .pointer("/news/category")
+                .and_then(|value| value.as_str()),
+            Some("Ekonomi")
+        );
+        assert_eq!(
+            public
+                .pointer("/news/source_urls/0")
+                .and_then(|value| value.as_str()),
+            Some("https://www.bi.go.id/")
+        );
+        assert!(public.pointer("/news/contributor_id").is_none());
+        assert!(public.pointer("/news/reviewer_id").is_none());
+        assert!(public.pointer("/news/review_note").is_none());
+        assert!(public.pointer("/news/previous_review_note").is_none());
+    }
+
+    #[test]
+    fn public_source_policy_rejects_local_or_credentialed_urls() {
+        assert!(is_allowed_news_source_url(
+            "https://www.bi.go.id/id/publikasi"
+        ));
+        assert!(!is_allowed_news_source_url("http://127.0.0.1/admin"));
+        assert!(!is_allowed_news_source_url("http://10.10.0.1/internal"));
+        assert!(!is_allowed_news_source_url("http://localhost:8080/private"));
+        assert!(!is_allowed_news_source_url("http://[::1]/private"));
+        assert!(!is_allowed_news_source_url(
+            "https://user:pass@example.com/source"
+        ));
+        assert!(!is_allowed_news_source_url("file:///etc/passwd"));
+    }
+
+    #[test]
+    fn news_language_filter_accepts_only_supported_locales() {
+        assert_eq!(
+            normalize_news_language(Some("ID".to_string())).unwrap(),
+            Some("id".to_string())
+        );
+        assert_eq!(
+            normalize_news_language(Some("en".to_string())).unwrap(),
+            Some("en".to_string())
+        );
+        assert!(normalize_news_language(Some("fr".to_string())).is_err());
+        assert_eq!(normalize_news_language(None).unwrap(), None);
     }
 
     #[test]

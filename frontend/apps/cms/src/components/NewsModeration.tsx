@@ -73,6 +73,54 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function isSafeExternalSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+      return false;
+    }
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (
+      !host ||
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local')
+    ) {
+      return false;
+    }
+    if (
+      host.includes(':') &&
+      (host === '::' ||
+        host === '::1' ||
+        host.startsWith('fc') ||
+        host.startsWith('fd') ||
+        /^fe[89ab]/.test(host))
+    ) {
+      return false;
+    }
+    const parts = host.split('.').map(Number);
+    if (
+      parts.length === 4 &&
+      parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255)
+    ) {
+      const [a, b] = parts;
+      if (
+        a === 10 ||
+        a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        a === 0
+      ) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function formatDate(value?: string | null) {
   if (!value) return '-';
   const date = new Date(value);
@@ -284,9 +332,15 @@ export default function NewsModeration() {
   const kind = readString(newsMeta.article_kind) || 'news';
   const location = readString(newsMeta.location) || '-';
   const requiresVerifiedSource = kind !== 'press_release';
-  const hasVerifiedSource = sources.some(source => source.verification_status === 'verified');
+  const hasVerifiedSource = sources.some(
+    source =>
+      source.verification_status === 'verified' &&
+      isSafeExternalSourceUrl(source.source_url),
+  );
   const sourceUrls = Array.isArray(newsMeta.source_urls)
-    ? newsMeta.source_urls.map(readString).filter(Boolean)
+    ? newsMeta.source_urls
+        .map(readString)
+        .filter(url => Boolean(url) && isSafeExternalSourceUrl(url))
     : [];
 
   return (
@@ -465,7 +519,7 @@ export default function NewsModeration() {
                 <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('reject')}>Tolak</Button>
                 {status === 'published' || selected.content_status === 'active' ? (
                   <>
-                    <Button disabled={acting || !note.trim()} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
+                    <Button disabled={acting || !note.trim() || (requiresVerifiedSource && !hasVerifiedSource)} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
                     <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('retract')}>Tarik publikasi</Button>
                   </>
                 ) : null}
