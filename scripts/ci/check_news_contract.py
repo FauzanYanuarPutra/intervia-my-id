@@ -93,7 +93,7 @@ require(
 )
 
 require(
-    "services/marketplace_service/migrations/20260918174500_news_search_index.up.sql",
+    "services/marketplace_service/migrations/20260918233500_news_search_index.up.sql",
     (
         "idx_content_items_news_search",
         "idx_content_items_news_tags",
