@@ -484,17 +484,9 @@ impl PublicCommerceRepository {
         .await
         .map_err(storage_error)?;
 
-        sqlx::query(
-            r#"
-            INSERT INTO outbox_events (
-              id, aggregate_type, aggregate_id, event_type, payload, event_key
-            ) VALUES ($1,'order',$2,'order.created',$3,$4)
-            ON CONFLICT (event_key) DO NOTHING
-            "#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(inserted_id)
-        .bind(json!({
+        let event_type = "order.created";
+        let event_key = format!("{}:order.created:v1", inserted_id);
+        let event_payload = json!({
             "order_id": inserted_id,
             "order_number": order_number,
             "buyer_id": buyer_id,
@@ -510,8 +502,39 @@ impl PublicCommerceRepository {
             "source_surface": source_surface,
             "stock_reservation_count": reservation.count,
             "stock_reservation_expires_at": reservation.expires_at
-        }))
-        .bind(format!("{}:order.created:v1", inserted_id))
+        });
+
+        // Keep the legacy Business OS outbox during migration, while also writing
+        // the canonical publisher outbox in the same transaction.
+        sqlx::query(
+            r#"
+            INSERT INTO outbox_events (
+              id, aggregate_type, aggregate_id, event_type, payload, event_key
+            ) VALUES ($1,'order',$2,$3,$4,$5)
+            ON CONFLICT (event_key) DO NOTHING
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(inserted_id)
+        .bind(event_type)
+        .bind(&event_payload)
+        .bind(&event_key)
+        .execute(&mut *tx)
+        .await
+        .map_err(storage_error)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO events.event_outbox (
+              id, aggregate_type, aggregate_id, event_type, payload, routing_key
+            ) VALUES ($1,'order',$2,$3,$4,$5)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(inserted_id.to_string())
+        .bind(event_type)
+        .bind(&event_payload)
+        .bind(event_type)
         .execute(&mut *tx)
         .await
         .map_err(storage_error)?;
