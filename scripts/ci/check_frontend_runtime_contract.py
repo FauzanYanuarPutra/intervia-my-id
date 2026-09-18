@@ -232,15 +232,40 @@ def check_client_module_boundaries() -> None:
             )
 
 
+def check_tailwind_content_globs() -> None:
+    for app in ("cms", "crm"):
+        path = FRONTEND / "apps" / app / "tailwind.config.ts"
+        if not path.is_file():
+            fail(f"missing Tailwind config: {path.relative_to(ROOT)}")
+        source = path.read_text(encoding="utf-8")
+        if "../../packages/**/*" in source:
+            fail(
+                f"{path.relative_to(ROOT)} must not scan all frontend/packages; "
+                "use explicit shared source directories so packages/node_modules and tests "
+                "do not enter Tailwind content discovery"
+            )
+        for marker in (
+            "../../packages/ui/**/*",
+            "../../packages/product-configuration/**/*",
+            "../../packages/utils/**/*",
+        ):
+            if marker not in source:
+                fail(
+                    f"{path.relative_to(ROOT)} missing bounded shared Tailwind source: "
+                    f"{marker}"
+                )
+
+
 def main() -> int:
     check_node_runtime_alignment()
     check_shared_package()
     for app in APPS:
         check_app(app)
     check_client_module_boundaries()
+    check_tailwind_content_globs()
     print(
         "Frontend runtime contract OK: Node 22, www, usaha, cms, crm, "
-        "and client module debt ceilings"
+        "client module debt ceilings, and bounded Tailwind content scans"
     )
     return 0
 
