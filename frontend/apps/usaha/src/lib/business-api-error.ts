@@ -39,6 +39,23 @@ const messages: Record<string, string> = {
   invalid_json_response: 'Respons layanan tidak valid. Coba lagi.',
   invalid_sale_response: 'Respons transaksi tidak valid. Coba lagi.',
   invalid_finance_summary_response: 'Ringkasan keuangan belum dapat dibaca. Coba lagi.',
+  business_wave2_resource_not_found: 'Data operasional tidak ditemukan atau sudah berubah. Muat ulang halaman.',
+  business_wave2_conflict: 'Aksi ini bentrok dengan kondisi terbaru. Muat ulang halaman lalu coba lagi.',
+  business_wave2_storage_unavailable: 'Penyimpanan kontrol usaha sedang tidak tersedia. Coba lagi sebentar.',
+  invalid_opening_cash: 'Kas awal harus nol atau lebih.',
+  invalid_actual_cash: 'Uang fisik harus nol atau lebih.',
+  cash_shift_note_too_long: 'Catatan shift kas terlalu panjang.',
+  cash_shift_amount_overflow: 'Nilai kas terlalu besar untuk diproses.',
+  invalid_primary_material_yield: 'Perkiraan bahan utama dan hasil harus lebih dari nol.',
+  invalid_purchase: 'Data belanja belum lengkap atau tidak valid.',
+  invalid_yield_observation: 'Data hasil nyata belum lengkap atau tidak valid.',
+  invalid_finance_account: 'Akun pembayaran tidak valid.',
+  invalid_finance_allocation: 'Pembagian uang tidak valid.',
+  finance_allocation_exceeds_100_percent: 'Total target pembagian uang tidak boleh melebihi 100%.',
+  invalid_obligation: 'Data tagihan belum lengkap atau tidak valid.',
+  invalid_obligation_entry_type: 'Kategori tagihan tidak valid.',
+  obligation_must_be_expense: 'Tagihan rutin harus menggunakan kategori pengeluaran.',
+  obligation_due_overflow: 'Jadwal tagihan terlalu jauh untuk diproses.',
 };
 
 function errorRecord(error: unknown): Record<string, unknown> | null {
