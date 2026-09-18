@@ -29,6 +29,7 @@ load_script = read("scripts/load/k6-read-paths.js")
 capacity_runner = read("scripts/load/run-capacity-baseline.sh")
 capacity_workflow = read(".github/workflows/capacity-baseline.yml")
 capacity_doc = read("docs/operations/capacity-testing.md")
+outbox_requeue_script = read("scripts/ops/requeue_marketplace_outbox_event.sh")
 quality_workflow = read(".github/workflows/quality.yml")
 read("docs/operations/backup-and-disaster-recovery.md")
 observability_compose = read("docker-compose.observability.yml")
@@ -574,6 +575,16 @@ for marker in (
 ):
     if marker not in capacity_workflow:
         errors.append(f"capacity workflow missing safety/evidence marker: {marker}")
+
+for marker in (
+    "CONFIRM_REQUEUE=I_UNDERSTAND_REQUEUE",
+    "status = 'failed'",
+    "status = 'pending'",
+    "retry_count = 0",
+    "Set exactly one of EVENT_ID or EVENT_KEY",
+):
+    if marker not in outbox_requeue_script:
+        errors.append(f"marketplace outbox requeue script missing safety marker: {marker}")
 
 for marker in (
     "measured evidence",
