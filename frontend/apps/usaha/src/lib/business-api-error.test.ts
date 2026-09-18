@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeBusinessApiError } from './business-api-error';
+import { businessApiErrorMessage, normalizeBusinessApiError } from './business-api-error';
 
 describe('business API error normalization', () => {
   it('preserves retryable upstream status and a safe user message', () => {
@@ -11,7 +11,30 @@ describe('business API error normalization', () => {
       status: 503,
       code: 'identity_unavailable',
       message: 'Layanan akun sedang tidak tersedia. Coba lagi sebentar.',
-    });
+      it('turns raw client error codes into human guidance', () => {
+    expect(businessApiErrorMessage(
+      { error: 'inventory_insufficient_stock' },
+      'Gagal mengubah stok.',
+      409,
+    )).toBe('Stok tidak cukup untuk perubahan ini.');
+  });
+
+  it('never leaks an unknown snake-case backend code to the user', () => {
+    expect(businessApiErrorMessage(
+      { error: 'some_internal_backend_code' },
+      'Operasi belum berhasil.',
+      400,
+    )).toBe('Operasi belum berhasil.');
+  });
+
+  it('uses a safe generic message for server failures', () => {
+    expect(businessApiErrorMessage(
+      { error: 'database_pool_failed' },
+      'Operasi belum berhasil.',
+      503,
+    )).toBe('Layanan sedang bermasalah. Coba lagi sebentar.');
+  });
+});
   });
 
   it('turns optimistic concurrency failures into an actionable conflict', () => {
