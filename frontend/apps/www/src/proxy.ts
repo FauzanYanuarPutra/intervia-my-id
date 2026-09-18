@@ -205,6 +205,16 @@ function applyNoIndexHeader(res: NextResponse) {
   return res;
 }
 
+function applyTemporaryRedirectHeaders(res: NextResponse) {
+  res.headers.set(
+    'Cache-Control',
+    'private, no-store, max-age=0, must-revalidate',
+  );
+  res.headers.set('Pragma', 'no-cache');
+  res.headers.set('Expires', '0');
+  return res;
+}
+
 function shouldNoIndexRoute(routePath: string) {
   return isAuthRoutePath(routePath) || isProtectedRoutePath(routePath);
 }
@@ -307,6 +317,23 @@ function redirectToLocalizedTarget(
   url.search = query ? `?${query}` : '';
   return applyLocaleCookies(
     applySecurityHeaders(NextResponse.redirect(url, status)),
+    locale,
+  );
+}
+
+function redirectToTemporaryLocalizedTarget(
+  req: NextRequest,
+  locale: Locale,
+  target: string,
+) {
+  const url = req.nextUrl.clone();
+  const [pathname, query = ''] = target.split('?');
+  url.pathname = localizeInternalPath(pathname, locale);
+  url.search = query ? `?${query}` : '';
+  return applyLocaleCookies(
+    applyTemporaryRedirectHeaders(
+      applySecurityHeaders(NextResponse.redirect(url, 307)),
+    ),
     locale,
   );
 }
@@ -770,7 +797,9 @@ export async function proxy(req: NextRequest) {
   const routePath = '/' + segments.slice(2).join('/');
   const routeSegment = segments[2] || '';
   if (DEAD_ROUTE_SEGMENTS.has(routeSegment)) {
-    return redirectToLocalizedTarget(req, locale, '/home');
+    // Feature/dead-route gating is operational state, not a canonical URL move.
+    // Never cache it permanently: a route (such as News) can be restored later.
+    return redirectToTemporaryLocalizedTarget(req, locale, '/home');
   }
 
   if (routePath === '/search') {
@@ -855,7 +884,9 @@ export async function proxy(req: NextRequest) {
 
   const route = findRouteConfig(routePath, routes);
   if (route?.isDisabled) {
-    return redirectToLocalizedTarget(req, locale, '/home');
+    // Disabled routes may be re-enabled; a permanent 308 here can strand
+    // browsers on /home even after the route is restored.
+    return redirectToTemporaryLocalizedTarget(req, locale, '/home');
   }
 
   const auth = await getUserRole(req);
