@@ -2541,5 +2541,6 @@ mod tests {
         let cursor = "2026-09-18T00:00:00+00:00|11111111-1111-1111-1111-111111111111";
         assert!(parse_news_cursor(Some(cursor)).unwrap().is_some());
         assert!(parse_news_cursor(Some("broken")).is_err());
+        assert!(parse_news_cursor(Some(&"x".repeat(97))).is_err());
     }
 }
