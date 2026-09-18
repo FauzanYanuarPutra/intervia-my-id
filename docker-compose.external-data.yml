@@ -1,0 +1,75 @@
+services:
+  # Local single-node data services are disabled in external mode. They remain
+  # available only when an operator explicitly enables the local-data-plane profile.
+  identity_db:
+    profiles: [local-data-plane]
+  marketplace_db:
+    profiles: [local-data-plane]
+  community_db:
+    profiles: [local-data-plane]
+  redis_cache:
+    profiles: [local-data-plane]
+  rabbitmq:
+    profiles: [local-data-plane]
+  meilisearch:
+    profiles: [local-data-plane]
+  minio:
+    profiles: [local-data-plane]
+
+  identity_service:
+    environment:
+      IDENTITY_DATABASE_URL: ${IDENTITY_DATABASE_URL:?IDENTITY_DATABASE_URL is required in external data-plane mode}
+      POSTGRES_HOST: ${IDENTITY_POSTGRES_HOST:?IDENTITY_POSTGRES_HOST is required in external data-plane mode}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required in external data-plane mode}
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required in external data-plane mode}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in external data-plane mode}
+      RABBITMQ_URL: ${RABBITMQ_URL:?RABBITMQ_URL is required in external data-plane mode}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?RABBITMQ_HOST is required in external data-plane mode}
+      RABBITMQ_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required in external data-plane mode}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required in external data-plane mode}
+    depends_on: !override {}
+
+  marketplace_service:
+    environment:
+      MARKETPLACE_DATABASE_URL: ${MARKETPLACE_DATABASE_URL:?MARKETPLACE_DATABASE_URL is required in external data-plane mode}
+      MEILI_URL: ${MEILI_URL:?MEILI_URL is required in external data-plane mode}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY is required in external data-plane mode}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required in external data-plane mode}
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required in external data-plane mode}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in external data-plane mode}
+      RABBITMQ_URL: ${RABBITMQ_URL:?RABBITMQ_URL is required in external data-plane mode}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?RABBITMQ_HOST is required in external data-plane mode}
+      RABBITMQ_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required in external data-plane mode}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required in external data-plane mode}
+    depends_on: !override {}
+
+  community_service:
+    environment:
+      COMMUNITY_DATABASE_URL: ${COMMUNITY_DATABASE_URL:?COMMUNITY_DATABASE_URL is required in external data-plane mode}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required in external data-plane mode}
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required in external data-plane mode}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in external data-plane mode}
+      RABBITMQ_URL: ${RABBITMQ_URL:?RABBITMQ_URL is required in external data-plane mode}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?RABBITMQ_HOST is required in external data-plane mode}
+      RABBITMQ_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required in external data-plane mode}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required in external data-plane mode}
+    depends_on: !override {}
+    # Community media remains a filesystem contract. Multi-host production must
+    # mount COMMUNITY_UPLOADS_VOLUME from genuinely shared/replicated storage.
+
+  chat_service:
+    environment:
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required in external data-plane mode}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in external data-plane mode}
+      RABBITMQ_URL: ${RABBITMQ_URL:?RABBITMQ_URL is required in external data-plane mode}
+    depends_on: !override
+      scylla_migrate: { condition: service_completed_successfully }
+
+  www:
+    environment:
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required in external data-plane mode}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:?MINIO_ENDPOINT is required in external data-plane mode}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required in external data-plane mode}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required in external data-plane mode}
+      MINIO_BUCKET: ${MINIO_BUCKET:-laju-chat}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:?MINIO_PUBLIC_URL is required in external data-plane mode}
