@@ -1883,17 +1883,28 @@ fn request_ip(headers: &HeaderMap) -> String {
 async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool_size = state.db.size();
     let pool_idle = state.db.num_idle();
-    let (outbox_backlog, metrics_query_ok) = match timeout(
+    let pool_max = state.db.options().get_max_connections();
+    let pool_active = pool_size.saturating_sub(pool_idle.min(pool_size as usize) as u32);
+    let (outbox_backlog, outbox_oldest_age_seconds, metrics_query_ok) = match timeout(
         Duration::from_secs(2),
-        sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*)::bigint FROM events.event_outbox WHERE status <> 'published'",
+        sqlx::query_as::<_, (i64, f64)>(
+            r#"
+            SELECT
+              COUNT(*)::bigint,
+              COALESCE(
+                EXTRACT(EPOCH FROM (NOW() - MIN(created_at))),
+                0
+              )::double precision
+            FROM events.event_outbox
+            WHERE status <> 'published'
+            "#,
         )
         .fetch_one(&state.db),
     )
     .await
     {
-        Ok(Ok(value)) => (value, 1),
-        Ok(Err(_)) | Err(_) => (0, 0),
+        Ok(Ok((backlog, oldest_age_seconds))) => (backlog, oldest_age_seconds.max(0.0), 1),
+        Ok(Err(_)) | Err(_) => (0, 0.0, 0),
     };
 
     let mut body = format!(
@@ -1905,14 +1916,25 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
             "# TYPE lajukan_db_pool_connections gauge\n",
             "lajukan_db_pool_connections{{service=\"community_service\",state=\"total\"}} {}\n",
             "lajukan_db_pool_connections{{service=\"community_service\",state=\"idle\"}} {}\n",
+            "lajukan_db_pool_connections{{service=\"community_service\",state=\"active\"}} {}\n",
+            "lajukan_db_pool_connections{{service=\"community_service\",state=\"max\"}} {}\n",
             "# HELP lajukan_outbox_backlog Pending or failed transactional outbox events.\n",
             "# TYPE lajukan_outbox_backlog gauge\n",
             "lajukan_outbox_backlog{{service=\"community_service\"}} {}\n",
+            "# HELP lajukan_outbox_oldest_age_seconds Age in seconds of the oldest unpublished transactional outbox event.\n",
+            "# TYPE lajukan_outbox_oldest_age_seconds gauge\n",
+            "lajukan_outbox_oldest_age_seconds{{service=\"community_service\"}} {}\n",
             "# HELP lajukan_metrics_db_query_ok Whether the metrics DB query succeeded.\n",
             "# TYPE lajukan_metrics_db_query_ok gauge\n",
             "lajukan_metrics_db_query_ok{{service=\"community_service\"}} {}\n"
         ),
-        pool_size, pool_idle, outbox_backlog, metrics_query_ok
+        pool_size,
+        pool_idle,
+        pool_active,
+        pool_max,
+        outbox_backlog,
+        outbox_oldest_age_seconds,
+        metrics_query_ok
     );
 
     body.push_str(&runtime_metrics::render("community_service"));
