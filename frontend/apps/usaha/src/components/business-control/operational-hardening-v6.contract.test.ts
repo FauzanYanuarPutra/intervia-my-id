@@ -56,6 +56,31 @@ describe('Usaha operational hardening V6', () => {
     expect(migration).toContain('close_request_hash');
   });
 
+  it('requires client-stable idempotency keys for all Wave2 money and stock effects', () => {
+    const proxy = read('src/app/api/businesses/[businessId]/wave2/route.ts');
+    const finance = read('src/components/business-control/FinancePlanningWorkspace.tsx');
+    const stock = read('src/components/business-control/StockPurchaseYieldWorkspace.tsx');
+
+    expect(proxy).not.toContain('randomUUID');
+    expect(proxy.match(/missing_idempotency_key/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+
+    for (const action of [
+      'create_obligation',
+      'pay_obligation',
+      'purchase',
+      'open_cash_shift',
+      'close_cash_shift',
+      'create_yield_observation',
+    ]) {
+      expect(proxy).toContain(`action === '${action}'`);
+    }
+
+    expect(finance).toContain('resolveIdempotencyAttempt');
+    expect(finance).toContain("'Idempotency-Key': attempt.key");
+    expect(stock).toContain('resolveIdempotencyAttempt');
+    expect(stock).toContain('attempt.key');
+  });
+
   it('normalizes remaining async API errors before presenting them to users', () => {
     const files = [
       'src/components/business-control/DurableHppWorkspace.tsx',
