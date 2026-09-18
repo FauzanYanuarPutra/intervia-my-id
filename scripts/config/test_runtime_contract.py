@@ -19,9 +19,6 @@ def base_model(liveness_source: Path) -> dict:
                     "GOOGLE_CLIENT_SECRET": "",
                     "WWW_GOOGLE_REDIRECT_URI": "",
                 },
-                "depends_on": {
-                    "redis_cache": {"condition": "service_healthy"},
-                },
             },
             "usaha": {
                 "environment": {
@@ -197,6 +194,19 @@ class GoogleOauthRuntimeContractTests(unittest.TestCase):
         google_errors = [error for error in errors if "Google OAuth" in error]
         self.assertEqual(google_errors, [], google_errors)
 
+
+
+    def test_www_redis_contract_does_not_require_startup_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = base_model(Path(tmp))
+            model["services"]["www"].pop("depends_on", None)
+
+            errors = validate_contract(model, {}, "development", set())
+
+        self.assertFalse(
+            any("redis_cache" in error and "wait" in error.lower() for error in errors),
+            errors,
+        )
 
 class KycRuntimeContractTests(unittest.TestCase):
     def test_kyc_rejects_empty_liveness_model_directory(self) -> None:
