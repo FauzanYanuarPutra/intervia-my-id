@@ -41,7 +41,11 @@ scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
 community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
+ai_runtime_metrics = read("services/ai_service/src/runtime_metrics.rs")
 community_main_source = read("services/community_service/src/main.rs")
+production_env_example = read(".env.production.example")
+staging_env_example = read(".env.staging.example")
+development_env_example = read(".env.development.example")
 marketplace_identity_client = read("services/marketplace_service/src/businesses/identity_client.rs")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
@@ -71,9 +75,23 @@ for marker in (
     "IDENTITY_HTTP_MAX_IN_FLIGHT",
     "MARKETPLACE_HTTP_MAX_IN_FLIGHT",
     "COMMUNITY_HTTP_MAX_IN_FLIGHT",
+    "AI_MAX_CONCURRENT",
 ):
     if marker not in base_compose:
         errors.append(f"base compose missing overload budget: {marker}")
+
+if base_compose.count("LOG_FORMAT: ${LOG_FORMAT:-}") < 4:
+    errors.append("base compose must pass LOG_FORMAT into all Rust HTTP services")
+
+for env_name, env_source, expected in (
+    ("production", production_env_example, "LOG_FORMAT=json"),
+    ("staging", staging_env_example, "LOG_FORMAT=json"),
+    ("development", development_env_example, "LOG_FORMAT=text"),
+):
+    if expected not in env_source:
+        errors.append(f"{env_name} env example missing logging format contract: {expected}")
+    if "AI_MAX_CONCURRENT=" not in env_source:
+        errors.append(f"{env_name} env example missing AI concurrency budget")
 
 for prefix in ("IDENTITY", "MARKETPLACE", "COMMUNITY"):
     for suffix in ("DB_IDLE_TIMEOUT_SECONDS", "DB_MAX_LIFETIME_SECONDS"):
@@ -178,6 +196,7 @@ for marker in (
     "identity_app",
     "marketplace_app",
     "community_app",
+    "ai_app",
 ):
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
@@ -482,6 +501,19 @@ for path in (
             errors.append(f"{path} missing RED metrics marker: {marker}")
 
 
+for marker in (
+    "lajukan_http_requests_total",
+    "lajukan_http_responses_total",
+    "lajukan_http_in_flight_requests",
+    "lajukan_http_concurrency_limit",
+    "lajukan_http_overload_rejections_total",
+    "lajukan_http_request_duration_seconds_bucket",
+    "record_overload_rejection",
+):
+    if marker not in ai_runtime_metrics:
+        errors.append(f"AI runtime metrics missing marker: {marker}")
+
+
 for path in (
     "services/identity_service/src/main.rs",
     "services/marketplace_service/src/main.rs",
@@ -589,6 +621,38 @@ for path in (
     source = read(path)
     if '"json"' not in source:
         errors.append(f"{path} must enable tracing-subscriber JSON logging support")
+
+
+ai_main_source = read("services/ai_service/src/main.rs")
+for marker in (
+    'route("/metrics"',
+    "runtime_metrics::track_request",
+    "runtime_metrics::record_overload_rejection",
+    "with_graceful_shutdown",
+    "fn init_tracing()",
+    'env::var("LOG_FORMAT")',
+    ".json()",
+    ".flatten_event(true)",
+    ".with_current_span(true)",
+    ".with_span_list(true)",
+):
+    if marker not in ai_main_source:
+        errors.append(f"AI runtime reliability contract missing marker: {marker}")
+
+ai_cargo = read("services/ai_service/Cargo.toml")
+for marker in ('tracing = "0.1"', '"json"'):
+    if marker not in ai_cargo:
+        errors.append(f"AI Cargo observability support missing marker: {marker}")
+
+for path in (
+    "services/identity_service/Cargo.lock",
+    "services/marketplace_service/Cargo.lock",
+    "services/community_service/Cargo.lock",
+    "services/ai_service/Cargo.lock",
+):
+    source = read(path)
+    if 'name = "tracing-serde"' not in source:
+        errors.append(f"{path} is not synchronized for tracing-subscriber JSON support")
 
 
 for path, markers in {

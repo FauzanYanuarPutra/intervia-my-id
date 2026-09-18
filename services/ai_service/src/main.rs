@@ -19,6 +19,9 @@ use std::{
 };
 use tokio::sync::Semaphore;
 use tower_http::cors::CorsLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+mod runtime_metrics;
 
 const SERVICE_NAME: &str = "lajukan-ai-orchestrator";
 const SERVICE_VERSION: &str = "2.0.3";
@@ -266,9 +269,49 @@ impl AiTask {
     }
 }
 
+fn init_tracing() {
+    let app_env = env::var("APP_ENV")
+        .or_else(|_| env::var("ENV"))
+        .unwrap_or_else(|_| "development".to_string());
+    let structured = match env::var("LOG_FORMAT")
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "json" => true,
+        "text" | "pretty" => false,
+        _ => {
+            app_env.eq_ignore_ascii_case("production")
+                || app_env.eq_ignore_ascii_case("staging")
+        }
+    };
+    let filter = tracing_subscriber::EnvFilter::new(
+        env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+    );
+
+    if structured {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .json()
+                    .flatten_event(true)
+                    .with_current_span(true)
+                    .with_span_list(true),
+            )
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
+}
+
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    init_tracing();
 
     let config = Config::from_env();
     let configured_origins = parse_cors_origins();
@@ -305,6 +348,7 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(handle_health))
         .route("/ready", get(handle_ready))
+        .route("/metrics", get(handle_metrics))
         .route("/v1/capabilities", get(handle_capabilities))
         .route("/v1/chat", post(handle_chat))
         .route("/v1/assist", post(handle_assist))
@@ -322,20 +366,53 @@ async fn main() {
         .route("/v1/dispute/summarize", post(handle_dispute_summary))
         .route("/v1/taxonomy/classify", post(handle_taxonomy_classify))
         .route("/v1/verify", post(handle_verification))
+        .layer(axum::middleware::from_fn(runtime_metrics::track_request))
         .layer(DefaultBodyLimit::max(config.max_body_bytes))
         .layer(cors)
         .with_state(state);
 
     let port = env_u16("PORT", 8080);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    println!("{} {} listening on {}", SERVICE_NAME, SERVICE_VERSION, addr);
+    tracing::info!(
+        service = SERVICE_NAME,
+        version = SERVICE_VERSION,
+        address = %addr,
+        "AI service listening"
+    );
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("failed to bind AI service");
     axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("AI service exited unexpectedly");
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("shutdown signal received");
 }
 
 impl Config {
@@ -420,6 +497,18 @@ impl Config {
             max_output_tokens: env_u32("AI_MAX_OUTPUT_TOKENS", 1_600, 128, 8_000),
         }
     }
+}
+
+async fn handle_metrics(State(state): State<Arc<AppState>>) -> Response {
+    (
+        StatusCode::OK,
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
+        runtime_metrics::render("ai_service", state.config.max_concurrent_ai),
+    )
+        .into_response()
 }
 
 async fn handle_health(State(state): State<Arc<AppState>>) -> Json<Value> {
@@ -592,6 +681,7 @@ async fn run_ai_endpoint(
     {
         Ok(Ok(permit)) => permit,
         _ => {
+            runtime_metrics::record_overload_rejection();
             return json_response_with_request_id(
                 StatusCode::TOO_MANY_REQUESTS,
                 &request_id,
@@ -2090,6 +2180,7 @@ async fn handle_verification(
     {
         Ok(Ok(permit)) => permit,
         _ => {
+            runtime_metrics::record_overload_rejection();
             return json_response_with_request_id(
                 StatusCode::TOO_MANY_REQUESTS,
                 &request_id,

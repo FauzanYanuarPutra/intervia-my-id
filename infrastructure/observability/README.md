@@ -52,7 +52,10 @@ Identity, Marketplace and Community expose internal Prometheus metrics for
 database pool total/idle connections, transactional outbox backlog, oldest
 unpublished outbox-event age, metrics-query health, HTTP request/response
 counts, in-flight requests and request-duration histograms. Marketplace also
-exposes active realtime notification subscriber count.
+exposes active realtime notification subscriber count. AI exposes the same
+low-cardinality HTTP RED metrics plus its configured concurrency budget and
+overload-rejection counter, so model/provider saturation is visible separately
+from ordinary API traffic.
 
 The request metrics deliberately keep labels low-cardinality: service and status
 class are exported, but raw request paths and object IDs are not metric labels.
@@ -113,3 +116,13 @@ which makes centralized log search deterministic without turning request paths
 into Prometheus labels. Keep log collectors on stdout/stderr and redact secrets
 at the application boundary; JSON formatting is not permission to log tokens,
 cookies, OTPs or raw identity documents.
+
+
+## AI reliability surface
+
+The AI orchestrator is scraped as `ai_app`. Its request middleware preserves
+the existing `x-request-id` contract, exports RED metrics, and records explicit
+concurrency-limit rejections. The service handles SIGTERM/Ctrl+C through Axum
+graceful shutdown so deploy replacement does not deliberately cut active
+requests. `AI_MAX_CONCURRENT` remains a bounded runtime budget; raise it only
+after measuring model-provider latency, memory, CPU and upstream rate limits.

@@ -212,6 +212,7 @@ services:
       APP_PORT: "8080"
       APP_VERSION: ${APP_VERSION:-0.1.0}
       RUST_LOG: ${RUST_LOG:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-}
       HTTP_MAX_IN_FLIGHT: ${IDENTITY_HTTP_MAX_IN_FLIGHT:-512}
       IDENTITY_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@identity_db:5432/identity_db
       IDENTITY_DB_MAX_CONNECTIONS: ${IDENTITY_DB_MAX_CONNECTIONS:-10}
@@ -265,6 +266,7 @@ services:
       ENV: ${ENV:-development}
       APP_PORT: "8081"
       RUST_LOG: ${RUST_LOG:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-}
       HTTP_MAX_IN_FLIGHT: ${MARKETPLACE_HTTP_MAX_IN_FLIGHT:-512}
       MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
       MARKETPLACE_DB_MAX_CONNECTIONS: ${MARKETPLACE_DB_MAX_CONNECTIONS:-20}
@@ -331,6 +333,7 @@ services:
       APP_NAME: ${APP_NAME:-Lajukan}
       APP_PORT: "8082"
       RUST_LOG: ${RUST_LOG:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-}
       HTTP_MAX_IN_FLIGHT: ${COMMUNITY_HTTP_MAX_IN_FLIGHT:-512}
       COMMUNITY_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@community_db:5432/community_db
       COMMUNITY_DB_MAX_CONNECTIONS: ${COMMUNITY_DB_MAX_CONNECTIONS:-20}
@@ -419,6 +422,9 @@ services:
     environment:
       ENV: ${ENV:-development}
       APP_ENV: ${APP_ENV:-development}
+      RUST_LOG: ${RUST_LOG:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-}
+      AI_MAX_CONCURRENT: ${AI_MAX_CONCURRENT:-8}
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
       RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-}
       VLLM_URL: ${VLLM_URL:-http://ollama:11434/v1}
