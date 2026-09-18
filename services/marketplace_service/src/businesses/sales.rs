@@ -580,7 +580,9 @@ struct SaleRequestFingerprint {
     occurred_on: NaiveDate,
     channel_key: Option<String>,
     account_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     location_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     source_order_id: Option<Uuid>,
     lines: Vec<SaleLineFingerprint>,
 }

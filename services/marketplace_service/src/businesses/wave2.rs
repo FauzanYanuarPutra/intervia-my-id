@@ -446,15 +446,18 @@ impl Wave2Repository {
         }
         let account_key = normalized_account(&request.account_key)?;
         let note = normalized_optional_text(&request.note, 2000, "purchase_note_too_long")?;
-        let request_hash = wave2_request_hash(serde_json::json!({
+        let mut fingerprint = serde_json::json!({
             "ingredient_id": request.ingredient_id,
             "stock_quantity_delta": request.stock_quantity_delta.normalize().to_string(),
             "total_amount": request.total_amount,
             "account_key": &account_key,
-            "location_id": request.location_id,
             "occurred_on": request.occurred_on,
             "note": &note,
-        }))?;
+        });
+        if let Some(location_id) = request.location_id {
+            fingerprint["location_id"] = serde_json::Value::String(location_id.to_string());
+        }
+        let request_hash = wave2_request_hash(fingerprint)?;
 
         if let Some(existing) = load_purchase(&self.db, business_id, idempotency_key).await? {
             ensure_request_hash(

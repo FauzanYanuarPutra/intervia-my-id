@@ -70,11 +70,13 @@ def main() -> int:
         'sale_location_required', 'business_product_balances',
         'business_ingredient_balances', 'marketplace.business.sale_recorded',
         'source_order_not_ready_for_sale',
+        '#[serde(skip_serializing_if = "Option::is_none")]',
     )
     require(
         'services/marketplace_service/src/businesses/wave2.rs',
         'purchase_location_required', 'purchase_finance_entry_type',
         'business_ingredient_balances', 'marketplace.business.purchase_received',
+        'if let Some(location_id) = request.location_id',
     )
     require('frontend/apps/www/src/lib/usahaWorkspace.ts', 'NEXT_PUBLIC_USAHA_URL')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
