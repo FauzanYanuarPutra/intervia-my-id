@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { EffectPreview } from '@/components/interaction/EffectPreview';
@@ -183,6 +184,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<FeedbackTone>('info');
 
   const [correctingId, setCorrectingId] = useState<string | null>(null);
   const [correctionMode, setCorrectionMode] = useState<'correct' | 'void'>('correct');
@@ -296,6 +298,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   async function save() {
     const parsedAmount = Math.round(Number(entryAmount));
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setMessageTone('error');
       setMessage('Isi nominal lebih dari Rp0.');
       return;
     }
@@ -330,8 +333,10 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
       setNote('');
       setChannelKey('');
       setAllocationBucket('');
+      setMessageTone('success');
       setMessage('Tersimpan satu kali. Saldo, kantong, dan riwayat sudah diperbarui.');
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan transaksi.');
     } finally {
       setSaving(false);
@@ -353,11 +358,13 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
 
   async function submitCorrection(entry: Entry) {
     if (correctionReason.trim().length < 3) {
+      setMessageTone('error');
       setMessage('Alasan koreksi wajib diisi minimal 3 karakter.');
       return;
     }
     const parsedAmount = Math.round(Number(correctionAmount));
     if (correctionMode === 'correct' && (!Number.isFinite(parsedAmount) || parsedAmount <= 0)) {
+      setMessageTone('error');
       setMessage('Nominal pengganti harus lebih dari Rp0.');
       return;
     }
@@ -397,12 +404,14 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
       setCorrectingId(null);
       await reloadAll(true);
       correctionAttemptRef.current = null;
+      setMessageTone('success');
       setMessage(
         correctionMode === 'void'
           ? 'Transaksi dibatalkan lewat reversal. Catatan asli tetap tersimpan.'
           : 'Koreksi tersimpan sebagai reversal + transaksi pengganti. Histori asli tidak dihapus.',
       );
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal mengoreksi transaksi.');
     } finally {
       setCorrecting(false);
@@ -412,6 +421,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   async function moveAllocation() {
     const parsedAmount = Math.round(Number(allocationAmount));
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0 || allocationReason.trim().length < 3) {
+      setMessageTone('error');
       setMessage('Isi nominal dan alasan pemindahan kantong dengan benar.');
       return;
     }
@@ -441,8 +451,10 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
       allocationAttemptRef.current = null;
       setAllocationAmount('');
       setAllocationReason('');
+      setMessageTone('success');
       setMessage('Dana kantong berhasil dipindahkan. Kas usaha tidak berubah.');
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal memindahkan dana antar kantong.');
     } finally {
       setMovingAllocation(false);
@@ -461,7 +473,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
             <p className="mt-1 text-3xl font-black text-portal-ink">{money.format(liquidCash)}</p>
             <p className="mt-1 text-xs text-portal-soft">Kas + bank + e-wallet dari seluruh ledger, bukan daftar transaksi yang sedang tampil.</p>
           </div>
-          <button type="button" onClick={() => reloadAll().catch(error => setMessage(error instanceof Error ? error.message : 'Gagal memuat ulang.'))} disabled={refreshing} className="portal-button-secondary px-3 disabled:opacity-50">
+          <button type="button" onClick={() => reloadAll().catch(error => { setMessageTone('error'); setMessage(error instanceof Error ? error.message : 'Gagal memuat ulang.'); })} disabled={refreshing} className="portal-button-secondary px-3 disabled:opacity-50">
             {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
             <span className="hidden sm:inline">Muat ulang</span>
           </button>
@@ -602,7 +614,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         </div>
       </details>
 
-      {message ? <div role="status" className="rounded-xl border border-portal-line bg-white px-4 py-3 text-xs font-semibold text-portal-soft">{message}</div> : null}
+      {message ? <FeedbackNotice message={message} tone={messageTone} /> : null}
 
       <section className="portal-panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-portal-line px-4 py-3 sm:px-5"><div><h2 className="font-bold text-portal-ink">Riwayat transaksi</h2><p className="mt-0.5 text-[11px] text-portal-soft">Catatan asli tidak dihapus saat koreksi.</p></div><span className="text-xs font-semibold text-portal-soft">{entries.length} terbaru</span></div>
