@@ -156,6 +156,24 @@ groups:
           summary: "Lajukan transactional outbox backlog is critical"
           description: "{{ $labels.service }} has more than 1000 unpublished outbox events for 10 minutes. Business writes may be committed while downstream projections are stale."
 
+      - alert: LajukanOutboxOldestEventStale
+        expr: lajukan_outbox_oldest_age_seconds > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan transactional outbox has stale unpublished events"
+          description: "{{ $labels.service }} has an unpublished outbox event older than 5 minutes. Check broker availability, publisher leases and retry state."
+
+      - alert: LajukanOutboxOldestEventCritical
+        expr: lajukan_outbox_oldest_age_seconds > 1800
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lajukan transactional outbox is critically stale"
+          description: "{{ $labels.service }} has an unpublished outbox event older than 30 minutes. Downstream projections may be materially stale."
+
       - alert: LajukanMetricsDbQueryFailed
         expr: lajukan_metrics_db_query_ok == 0
         for: 2m
