@@ -1,9 +1,4 @@
-use axum::{
-    extract::Request,
-    http::HeaderValue,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, http::HeaderValue, middleware::Next, response::Response};
 use std::{
     sync::atomic::{AtomicI64, AtomicU64, Ordering},
     time::Instant,
@@ -61,8 +56,8 @@ pub async fn track_request(mut request: Request, next: Next) -> Response {
     }
 
     let request_id = resolve_request_id(&request);
-    let request_id_header =
-        HeaderValue::from_str(&request_id).expect("validated/generated request id is a valid header");
+    let request_id_header = HeaderValue::from_str(&request_id)
+        .expect("validated/generated request id is a valid header");
     request
         .headers_mut()
         .insert("x-request-id", request_id_header.clone());

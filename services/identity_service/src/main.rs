@@ -24,7 +24,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use identity_service::config::{AppState, Config};
 use identity_service::db;
-use identity_service::runtime_metrics;
 use identity_service::organizations::invitations::{
     accept_organization_invitation, create_organization_invitation,
     list_my_organization_invitations, reject_organization_invitation,
@@ -39,6 +38,7 @@ use identity_service::routes::{
     login_phone, logout, me, oauth_google, ready_check, refresh_token, register, reset_password,
     service_metrics, update_me_profile,
 };
+use identity_service::runtime_metrics;
 
 #[derive(Debug, FromRow)]
 struct IdentityOutboxEventRow {
