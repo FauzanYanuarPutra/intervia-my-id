@@ -56,6 +56,8 @@ require(
         "public_verified_source_urls",
         "verification_status = 'verified'",
         "unsupported news source URL",
+        "only public HTTP(S) source URLs can be verified",
+        "include_body.then_some(row.body)",
         'news.remove("location")',
     ),
 )
@@ -221,6 +223,7 @@ require(
         "Source provenance",
         "hasVerifiedSource",
         "requiresVerifiedSource",
+        "isSafeExternalSourceUrl",
         "Approve & publish",
         "Versi artikel",
         "Top artikel 7 hari",
@@ -234,6 +237,7 @@ require(
         "params.set('language', options.language)",
         "let cursor: string | undefined",
         "page.nextCursor",
+        "page.nextCursor === cursor",
     ),
 )
 
