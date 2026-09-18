@@ -1042,14 +1042,9 @@ async fn connect_database_pool(
             .min_connections(0)
             .acquire_timeout(Duration::from_secs(10)),
         DatabasePoolPurpose::Application => {
-            let max_connections =
-                env_u32_bounded("COMMUNITY_DB_MAX_CONNECTIONS", 20, 2, 100);
-            let min_connections = env_u32_bounded(
-                "COMMUNITY_DB_MIN_CONNECTIONS",
-                2,
-                0,
-                max_connections,
-            );
+            let max_connections = env_u32_bounded("COMMUNITY_DB_MAX_CONNECTIONS", 20, 2, 100);
+            let min_connections =
+                env_u32_bounded("COMMUNITY_DB_MIN_CONNECTIONS", 2, 0, max_connections);
             let acquire_timeout_seconds =
                 env_u64_bounded("COMMUNITY_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
             PgPoolOptions::new()
@@ -1135,7 +1130,12 @@ async fn main() -> anyhow::Result<()> {
     // thundering herd against Identity.
     let startup_identity_reconcile = env::var("COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED")
         .ok()
-        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
         .unwrap_or(false);
     if startup_identity_reconcile {
         let identity_sync_db = db.clone();
