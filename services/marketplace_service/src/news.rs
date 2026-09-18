@@ -43,8 +43,7 @@ struct NewsRow {
     slug: Option<String>,
     title: String,
     summary: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    body: Option<String>,
+    body: String,
     tags: Option<Vec<String>>,
     cover_image: Option<String>,
     metadata: Value,
@@ -60,7 +59,8 @@ struct PublicNewsRow {
     slug: Option<String>,
     title: String,
     summary: Option<String>,
-    body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    body: Option<String>,
     tags: Option<Vec<String>>,
     cover_image: Option<String>,
     metadata: Value,
