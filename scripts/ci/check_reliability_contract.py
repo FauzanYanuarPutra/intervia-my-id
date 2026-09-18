@@ -38,6 +38,9 @@ blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
 scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
+identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
+marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
+community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -61,6 +64,32 @@ for marker in ("rabbitmq_management", "rabbitmq_prometheus"):
 for marker in ("stop_grace_period: 30s", "stop_grace_period: 60s"):
     if marker not in base_compose:
         errors.append(f"base compose missing graceful shutdown budget: {marker}")
+
+for marker in (
+    "IDENTITY_HTTP_MAX_IN_FLIGHT",
+    "MARKETPLACE_HTTP_MAX_IN_FLIGHT",
+    "COMMUNITY_HTTP_MAX_IN_FLIGHT",
+):
+    if marker not in base_compose:
+        errors.append(f"base compose missing overload budget: {marker}")
+
+if not (
+    identity_runtime_metrics
+    == marketplace_runtime_metrics
+    == community_runtime_metrics
+):
+    errors.append("core Rust runtime_metrics implementations drifted; keep request-id, RED metrics and overload shedding semantics identical")
+
+for marker in (
+    'env::var("HTTP_MAX_IN_FLIGHT")',
+    "Semaphore",
+    "try_acquire_request_permit",
+    "StatusCode::SERVICE_UNAVAILABLE",
+    "header::RETRY_AFTER",
+    "lajukan_http_overload_rejections_total",
+):
+    if marker not in identity_runtime_metrics:
+        errors.append(f"core Rust overload protection missing runtime marker: {marker}")
 
 for marker in (
     'promtool", "query", "instant", "http://localhost:9090", "up"',
@@ -96,7 +125,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanOutboxOldestEventStale", "LajukanOutboxOldestEventCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanOutboxOldestEventStale", "LajukanOutboxOldestEventCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated", "LajukanHttpOverloadShedding"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 

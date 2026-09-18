@@ -106,6 +106,15 @@ groups:
           summary: "Lajukan HTTP in-flight requests are high"
           description: "{{ $labels.service }} has more than 100 in-flight requests for 10 minutes; validate against measured capacity."
 
+      - alert: LajukanHttpOverloadShedding
+        expr: increase(lajukan_http_overload_rejections_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan is shedding HTTP load"
+          description: "{{ $labels.service }} has rejected requests because its in-process concurrency budget was exhausted. Inspect latency, DB pool pressure and downstream saturation before raising the limit."
+
 
       - alert: LajukanRabbitMqBacklogHigh
         expr: sum(rabbitmq_queue_messages_ready) > 1000
