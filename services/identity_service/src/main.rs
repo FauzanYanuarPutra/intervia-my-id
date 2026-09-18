@@ -24,6 +24,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use identity_service::config::{AppState, Config};
 use identity_service::db;
+use identity_service::runtime_metrics;
 use identity_service::organizations::invitations::{
     accept_organization_invitation, create_organization_invitation,
     list_my_organization_invitations, reject_organization_invitation,
@@ -560,6 +561,7 @@ async fn main() -> Result<()> {
             "/organization-invitations/{id}/reject",
             post(reject_organization_invitation),
         )
+        .layer(axum::middleware::from_fn(runtime_metrics::track_request))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .layer(CompressionLayer::new())
