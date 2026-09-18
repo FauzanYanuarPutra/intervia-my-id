@@ -62,9 +62,16 @@ cAdvisor requires elevated host visibility. Keep the observability network and
 UIs private. Never expose Prometheus, Alertmanager, cAdvisor, exporters, database
 credentials or Docker host mounts directly to the public Internet.
 
-Alertmanager currently uses a local null receiver so rules can evaluate without
-committing notification credentials to Git. Configure a server-managed private
-receiver before relying on alerts for paging.
+Alertmanager uses the repository's local null receiver only as a safe
+development/staging default so rules can evaluate without committing paging
+credentials to Git.
+
+If production enables the `observability` Compose profile, deployment now
+fails closed unless `ALERTMANAGER_CONFIG_PATH` points to an existing
+server-managed config outside the repository default. The deploy gate also
+rejects configs that still contain the `local-null` receiver. Keep receiver
+credentials and webhook URLs in server-managed configuration or a secret store,
+not in Git.
 
 ## Operational checks
 
