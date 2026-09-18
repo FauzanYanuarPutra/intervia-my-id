@@ -365,6 +365,48 @@ pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -
         .unwrap_or("id")
         .to_string();
     news.insert("language".to_string(), Value::String(language));
+
+    let raw_sources = news
+        .get("source_urls")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let safe_sources = raw_sources
+        .into_iter()
+        .filter(|source| is_allowed_news_source_url(source.trim()))
+        .filter_map(|source| reqwest::Url::parse(source.trim()).ok())
+        .map(|url| url.to_string())
+        .fold(Vec::<String>::new(), |mut urls, source| {
+            if urls.len() < 10 && !urls.iter().any(|existing| existing == &source) {
+                urls.push(source);
+            }
+            urls
+        });
+    news.insert("source_urls".to_string(), json!(safe_sources));
+
+    let kind = news
+        .get("article_kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("news");
+    if kind == "press_release" {
+        news.insert(
+            "disclosure".to_string(),
+            Value::String(
+                "Submitted by a business or its representative; editorially reviewed before publication."
+                    .to_string(),
+            ),
+        );
+    } else {
+        news.remove("disclosure");
+    }
+
     news.entry("submitted_at".to_string())
         .or_insert_with(|| Value::String(Utc::now().to_rfc3339()));
     metadata
