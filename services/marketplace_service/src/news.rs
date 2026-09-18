@@ -232,9 +232,7 @@ fn normalize_news_language(value: Option<String>) -> Result<Option<String>, &'st
     }
 }
 
-fn normalize_news_search_query(
-    value: Option<String>,
-) -> Result<Option<String>, &'static str> {
+fn normalize_news_search_query(value: Option<String>) -> Result<Option<String>, &'static str> {
     let Some(query) = trimmed(value) else {
         return Ok(None);
     };
@@ -246,7 +244,6 @@ fn normalize_news_search_query(
     }
     Ok(Some(query))
 }
-
 
 fn normalize_fact_check_status(value: Option<String>) -> Result<Option<String>, &'static str> {
     let Some(status) = trimmed(value) else {
@@ -312,9 +309,7 @@ fn parse_requested_publish_at(
     Ok(Some(if publish_at < now { now } else { publish_at }))
 }
 
-fn normalize_news_category_filter(
-    value: Option<String>,
-) -> Result<Option<String>, &'static str> {
+fn normalize_news_category_filter(value: Option<String>) -> Result<Option<String>, &'static str> {
     let Some(category) = trimmed(value) else {
         return Ok(None);
     };
@@ -717,7 +712,6 @@ async fn has_verified_source_tx(
         .any(|source_url| is_allowed_news_source_url(source_url)))
 }
 
-
 async fn has_independent_verified_source_review_tx(
     tx: &mut Transaction<'_, Postgres>,
     content_id: Uuid,
@@ -800,8 +794,7 @@ fn moderation_action_requires_note(action: &str) -> bool {
 }
 
 fn removes_verified_source(current_status: &str, next_status: Option<&str>) -> bool {
-    current_status == "verified"
-        && next_status.is_some_and(|status| status != "verified")
+    current_status == "verified" && next_status.is_some_and(|status| status != "verified")
 }
 
 fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
@@ -1147,11 +1140,8 @@ async fn notify_editorial_result(
     action: &str,
     note: Option<&str>,
 ) {
-    let is_scheduled = action == "approve"
-        && row
-            .published_at
-            .as_ref()
-            .is_some_and(|at| at > &Utc::now());
+    let is_scheduled =
+        action == "approve" && row.published_at.as_ref().is_some_and(|at| at > &Utc::now());
     let (event_type, title, message) = if is_scheduled {
         (
             "news.scheduled",
@@ -1979,22 +1969,37 @@ async fn moderate_news(
     let is_press_release = is_press_release(&current.metadata);
     let existing_news = current.metadata.get("news").and_then(Value::as_object);
     let final_priority = editorial_priority.unwrap_or_else(|| {
-        existing_news.and_then(|news| news.get("editorial_priority")).and_then(Value::as_str)
+        existing_news
+            .and_then(|news| news.get("editorial_priority"))
+            .and_then(Value::as_str)
             .filter(|value| matches!(*value, "low" | "normal" | "high" | "urgent"))
-            .unwrap_or("normal").to_string()
+            .unwrap_or("normal")
+            .to_string()
     });
     let final_sensitivity = sensitivity.unwrap_or_else(|| {
-        existing_news.and_then(|news| news.get("sensitivity")).and_then(Value::as_str)
+        existing_news
+            .and_then(|news| news.get("sensitivity"))
+            .and_then(Value::as_str)
             .filter(|value| matches!(*value, "normal" | "high"))
-            .unwrap_or("normal").to_string()
+            .unwrap_or("normal")
+            .to_string()
     });
     let final_fact_check_status = fact_check_status.unwrap_or_else(|| {
-        existing_news.and_then(|news| news.get("fact_check_status")).and_then(Value::as_str)
+        existing_news
+            .and_then(|news| news.get("fact_check_status"))
+            .and_then(Value::as_str)
             .filter(|value| matches!(*value, "pending" | "verified" | "not_required"))
-            .unwrap_or(if is_press_release { "not_required" } else { "pending" }).to_string()
+            .unwrap_or(if is_press_release {
+                "not_required"
+            } else {
+                "pending"
+            })
+            .to_string()
     });
     let final_legal_review_status = legal_review_status.unwrap_or_else(|| {
-        existing_news.and_then(|news| news.get("legal_review_status")).and_then(Value::as_str)
+        existing_news
+            .and_then(|news| news.get("legal_review_status"))
+            .and_then(Value::as_str)
             .filter(|value| matches!(*value, "pending" | "approved" | "not_required"))
             .unwrap_or(if final_sensitivity == "high" {
                 "pending"
@@ -2018,18 +2023,15 @@ async fn moderate_news(
             );
         }
         if final_sensitivity == "high" && !is_press_release {
-            match has_independent_verified_source_review_tx(
-                &mut tx,
-                current.id,
-                reviewer_id,
-            )
-            .await
+            match has_independent_verified_source_review_tx(&mut tx, current.id, reviewer_id).await
             {
                 Ok(true) => {}
-                Ok(false) => return response_error(
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    "high-sensitivity publication requires independent source review",
-                ),
+                Ok(false) => {
+                    return response_error(
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        "high-sensitivity publication requires independent source review",
+                    )
+                }
                 Err(error) => {
                     tracing::error!(
                         "moderate_news independent source review check error: {:?}",
@@ -2095,10 +2097,7 @@ async fn moderate_news(
         "editorial_priority".to_string(),
         Value::String(final_priority),
     );
-    news.insert(
-        "sensitivity".to_string(),
-        Value::String(final_sensitivity),
-    );
+    news.insert("sensitivity".to_string(), Value::String(final_sensitivity));
     if let Some(note) = note.as_ref() {
         news.insert("review_note".to_string(), Value::String(note.clone()));
     } else {
@@ -2517,9 +2516,9 @@ async fn update_news_source(
         );
     }
 
-    let published_requires_source =
-        editorial_status(&article.content_status, &article.metadata) == "published"
-            && !is_press_release(&article.metadata);
+    let published_requires_source = editorial_status(&article.content_status, &article.metadata)
+        == "published"
+        && !is_press_release(&article.metadata);
     if published_requires_source
         && removes_verified_source(
             &current_source.verification_status,
@@ -2900,7 +2899,10 @@ mod tests {
         );
         assert!(normalize_news_search_query(Some("x".repeat(161))).is_err());
         assert!(normalize_news_search_query(Some(
-            (0..25).map(|index| format!("term{index}")).collect::<Vec<_>>().join(" ")
+            (0..25)
+                .map(|index| format!("term{index}"))
+                .collect::<Vec<_>>()
+                .join(" ")
         ))
         .is_err());
         assert_eq!(normalize_news_search_query(None).unwrap(), None);
@@ -2980,7 +2982,6 @@ mod tests {
         )
         .is_ok());
     }
-
 
     #[test]
     fn editorial_readiness_and_schedule_values_are_bounded() {

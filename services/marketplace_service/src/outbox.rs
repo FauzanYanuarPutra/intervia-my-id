@@ -230,13 +230,8 @@ async fn publish_outbox_batch(
                 }
             }
             Err(err) => {
-                mark_publish_failure(
-                    db,
-                    event,
-                    format!("publish_failed: {err:?}"),
-                    max_retries,
-                )
-                .await?;
+                mark_publish_failure(db, event, format!("publish_failed: {err:?}"), max_retries)
+                    .await?;
                 continue;
             }
         }
