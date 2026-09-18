@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { buildNewsPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
+import { buildNewsPath, buildNewsUrl, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
 const CATEGORY_BY_SLUG: Record<string, string> = {
   ekonomi: 'Ekonomi',
@@ -22,8 +22,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) return { robots: { index: false, follow: true } };
   const canonical = `${buildNewsUrl(locale)}/category/${category.toLowerCase()}`;
-  const { items } = await getPublishedNews({ category: label, language: locale === 'en' ? 'en' : 'id', limit: 1 });
-  const indexable = items.length > 0;
+  const availability = await getNewsLanguageAvailability({ category: label });
+  const currentLanguage = locale === 'en' ? 'en' : 'id';
+  const indexable = availability[currentLanguage];
   return {
     title: `${label} | Lajukan News`,
     description: locale === 'id'
@@ -32,9 +33,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical,
       languages: {
-        id: `${buildNewsUrl('id')}/category/${category.toLowerCase()}`,
-        en: `${buildNewsUrl('en')}/category/${category.toLowerCase()}`,
-        'x-default': `${buildNewsUrl('id')}/category/${category.toLowerCase()}`,
+        ...(availability.id
+          ? { id: `${buildNewsUrl('id')}/category/${category.toLowerCase()}` }
+          : {}),
+        ...(availability.en
+          ? { en: `${buildNewsUrl('en')}/category/${category.toLowerCase()}` }
+          : {}),
+        'x-default': availability.id
+          ? `${buildNewsUrl('id')}/category/${category.toLowerCase()}`
+          : `${buildNewsUrl('en')}/category/${category.toLowerCase()}`,
       },
     },
     robots: {
