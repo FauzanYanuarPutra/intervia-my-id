@@ -488,7 +488,8 @@ for path, markers in {
         "available_at = NOW() + INTERVAL '2 minutes'",
     ),
     "services/community_service/src/main.rs": (
-        "status = 'processing' AND available_at <= now()",
+        "FOR UPDATE SKIP LOCKED",
+        "status IN ('pending', 'failed', 'processing')",
         "available_at = now() + INTERVAL '2 minutes'",
     ),
 }.items():
