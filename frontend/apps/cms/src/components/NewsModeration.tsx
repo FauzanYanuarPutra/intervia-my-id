@@ -519,7 +519,7 @@ export default function NewsModeration() {
                 <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('reject')}>Tolak</Button>
                 {status === 'published' || selected.content_status === 'active' ? (
                   <>
-                    <Button disabled={acting || !note.trim()} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
+                    <Button disabled={acting || !note.trim() || (requiresVerifiedSource && !hasVerifiedSource)} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
                     <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('retract')}>Tarik publikasi</Button>
                   </>
                 ) : null}
