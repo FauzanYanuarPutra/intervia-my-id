@@ -1,6 +1,5 @@
 use crate::config::Config;
-use deadpool_redis::{Config as RedisConfig, Pool};
-use redis::AsyncCommands;
+use deadpool_redis::{redis::AsyncCommands, Config as RedisConfig, Pool};
 use tokio::time::{sleep, timeout, Duration};
 
 pub async fn init_redis(cfg: &Config) -> Pool {
