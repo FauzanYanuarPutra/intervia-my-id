@@ -254,6 +254,8 @@ require(
         "requiresVerifiedSource",
         "isSafeExternalSourceUrl",
         "requiresVerifiedSource && !hasVerifiedSource",
+        "wouldBreakPublishedProvenance",
+        "Verifikasi sumber pengganti atau retract artikel",
         "Approve & publish",
         "Versi artikel",
         "Top artikel 7 hari",
