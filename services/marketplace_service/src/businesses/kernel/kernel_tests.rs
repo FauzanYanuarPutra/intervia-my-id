@@ -79,7 +79,10 @@ fn money_parses_currency_and_rejects_cross_currency_math() {
 #[test]
 fn money_rejects_negative_insufficient_and_overflow_values() {
     assert!(Money::idr(-1).is_err());
-    assert!(Money::idr(100).unwrap().checked_sub(Money::idr(101).unwrap()).is_err());
+    assert!(Money::idr(100)
+        .unwrap()
+        .checked_sub(Money::idr(101).unwrap())
+        .is_err());
     assert!(Money::idr(i64::MAX)
         .unwrap()
         .checked_add(Money::idr(1).unwrap())

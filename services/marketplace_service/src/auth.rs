@@ -115,8 +115,7 @@ pub(crate) fn user_id_from_token_string(token: &str, jwt_secret: &str) -> Option
         return None;
     }
 
-    decode_access_claims(cleaned, jwt_secret)
-        .and_then(|decoded| Uuid::parse_str(&decoded.sub).ok())
+    decode_access_claims(cleaned, jwt_secret).and_then(|decoded| Uuid::parse_str(&decoded.sub).ok())
 }
 
 #[cfg(test)]

@@ -240,7 +240,10 @@ async fn advanced_accounting_purchase_preserves_inventory_asset_semantics(pool: 
     .await
     .unwrap();
     assert_eq!(entry_type, "inventory_purchase");
-    assert_eq!(created.purchase.policy_snapshot["accounting_mode"], "advanced");
+    assert_eq!(
+        created.purchase.policy_snapshot["accounting_mode"],
+        "advanced"
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
