@@ -284,6 +284,14 @@ for marker in (
         errors.append(f"frontend/apps/www/src/app/sitemap.ts missing News sitemap marker: {marker}")
 
 require(
+    "frontend/packages/index.ts",
+    (
+        "isSafeExternalHttpUrl",
+        "normalizeSafeExternalHttpUrl",
+    ),
+)
+
+require(
     "frontend/packages/utils/externalUrl.ts",
     (
         "isSafeExternalHttpUrl",
@@ -311,7 +319,7 @@ require(
         "Berita dan analisis membutuhkan minimal satu URL sumber.",
         "topics",
         "editorial_status: 'pending_review'",
-        "isPrivateSourceHost",
+        "normalizeSafeExternalHttpUrl",
         "language,",
     ),
 )
