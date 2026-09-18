@@ -186,7 +186,7 @@ jobs:
           set -euo pipefail
           overlay="docker-compose.${TARGET_ENV}.yml"
           [[ "$TARGET_ENV" == "production" ]] && overlay="docker-compose.prod.yml"
-          tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" docker-compose.observability.yml infrastructure/caddy infrastructure/observability infrastructure/rabbitmq services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh scripts/ops/postgres_logical_backup.sh scripts/ops/verify_backup_set.sh scripts/ops/postgres_isolated_restore_drill.sh scripts/ops/community_media_backup.sh scripts/ops/verify_community_media_backup.sh
+          tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" docker-compose.observability.yml infrastructure/caddy infrastructure/observability infrastructure/rabbitmq services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh scripts/ops/postgres_logical_backup.sh scripts/ops/verify_backup_set.sh scripts/ops/postgres_isolated_restore_drill.sh scripts/ops/community_media_backup.sh scripts/ops/verify_community_media_backup.sh scripts/ops/verify_jwt_access_keypair.sh scripts/ops/postgres_pitr_preflight.sh
       - name: Upload deployment contract
         shell: bash
         env:
@@ -221,6 +221,29 @@ jobs:
           cd "$DEPLOY_PATH"
           if [[ "$TARGET_ENV" == production ]]; then overlay=docker-compose.prod.yml; env_file=.env.production; else overlay=docker-compose.staging.yml; env_file=.env.staging; fi
           [[ -f "$env_file" ]] || { echo "Missing server-managed $DEPLOY_PATH/$env_file" >&2; exit 1; }
+
+          read_env_value() {
+            local key="$1"
+            local line
+            line="$(grep -m1 "^$key=" "$env_file" || true)"
+            printf '%s' "${line#*=}"
+          }
+
+          jwt_access_alg="$(read_env_value JWT_ACCESS_ALG)"
+          jwt_access_alg="${jwt_access_alg:-HS256}"
+          if [[ "$jwt_access_alg" == "RS256" ]]; then
+            export JWT_PRIVATE_KEY_PEM="$(read_env_value JWT_PRIVATE_KEY_PEM)"
+            export JWT_PUBLIC_KEY_PEM="$(read_env_value JWT_PUBLIC_KEY_PEM)"
+            [[ -n "$JWT_PRIVATE_KEY_PEM" && -n "$JWT_PUBLIC_KEY_PEM" ]] || {
+              echo "RS256 deployment requires JWT_PRIVATE_KEY_PEM and JWT_PUBLIC_KEY_PEM in $env_file." >&2
+              exit 1
+            }
+            bash scripts/ops/verify_jwt_access_keypair.sh
+            unset JWT_PRIVATE_KEY_PEM JWT_PUBLIC_KEY_PEM
+          elif [[ "$jwt_access_alg" != "HS256" ]]; then
+            echo "Unsupported JWT_ACCESS_ALG in $env_file: $jwt_access_alg" >&2
+            exit 1
+          fi
 
           # Production paging must never silently use the repository's null
           # Alertmanager receiver when observability is enabled.
