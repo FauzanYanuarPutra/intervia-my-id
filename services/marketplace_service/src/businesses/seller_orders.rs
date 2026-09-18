@@ -19,6 +19,7 @@ const MAX_REASON_LEN: usize = 500;
 pub(crate) struct SellerOrderRecord {
     pub(crate) id: Uuid,
     pub(crate) order_number: String,
+    pub(crate) user_id: Uuid,
     pub(crate) business_id: Uuid,
     pub(crate) category_type: String,
     pub(crate) base_status: String,
@@ -111,6 +112,7 @@ impl SellerOrderRepository {
             SELECT
               o.id,
               o.order_number,
+              o.user_id,
               o.business_id,
               o.category_type::text AS category_type,
               o.base_status::text AS base_status,
@@ -288,6 +290,7 @@ impl SellerOrderRepository {
             RETURNING
               id,
               order_number,
+              user_id,
               business_id,
               category_type::text AS category_type,
               base_status::text AS base_status,
@@ -564,6 +567,7 @@ mod tests {
         SellerOrderRecord {
             id: Uuid::new_v4(),
             order_number: "LJK-TEST".to_owned(),
+            user_id: Uuid::new_v4(),
             business_id: Uuid::new_v4(),
             category_type: category.to_owned(),
             base_status: status.to_owned(),
