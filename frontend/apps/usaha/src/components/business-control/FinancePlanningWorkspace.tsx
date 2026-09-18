@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import type {
   Wave2FinancePlan,
   Wave2Obligation,
@@ -113,6 +114,8 @@ export function FinancePlanningWorkspace({
   const [intervalDays, setIntervalDays] = useState('30');
   const [nextDueOn, setNextDueOn] = useState(jakartaDateKey());
   const [accountKey, setAccountKey] = useState('cash');
+  const obligationAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
+  const paymentAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const todayValue = jakartaDateKey();
   const totalBps = Object.values(plan).reduce((sum, value) => sum + value, 0);
@@ -206,25 +209,33 @@ export function FinancePlanningWorkspace({
       setMessage('Isi nama tagihan, nominal, dan interval dengan benar.');
       return;
     }
+    const requestBody = {
+      action: 'create_obligation',
+      label: label.trim(),
+      entry_type: billType,
+      account_key: accountKey,
+      amount,
+      interval_days: interval,
+      next_due_on: nextDueOn,
+    };
+    const attempt = resolveIdempotencyAttempt(obligationAttemptRef.current, requestBody);
+    obligationAttemptRef.current = attempt;
+
     setSavingBill(true);
     setMessage('');
     try {
       const response = await fetch(`/api/businesses/${businessId}/wave2`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create_obligation',
-          label: label.trim(),
-          entry_type: billType,
-          account_key: accountKey,
-          amount,
-          interval_days: interval,
-          next_due_on: nextDueOn,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': attempt.key,
+        },
+        body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal menambah tagihan.');
       await reloadFinancePlan();
+      obligationAttemptRef.current = null;
       setLabel('');
       setBillAmount('');
       setMessage('Tagihan rutin tersimpan. Belum mengurangi kas sampai dibayar.');
@@ -236,21 +247,29 @@ export function FinancePlanningWorkspace({
   }
 
   async function payBill(obligationId: string) {
+    const requestBody = {
+      action: 'pay_obligation',
+      obligation_id: obligationId,
+      paid_on: todayValue,
+    };
+    const attempt = resolveIdempotencyAttempt(paymentAttemptRef.current, requestBody);
+    paymentAttemptRef.current = attempt;
+
     setPayingId(obligationId);
     setMessage('');
     try {
       const response = await fetch(`/api/businesses/${businessId}/wave2`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'pay_obligation',
-          obligation_id: obligationId,
-          paid_on: todayValue,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': attempt.key,
+        },
+        body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal mencatat pembayaran.');
       await Promise.all([reloadFinancePlan(), reloadFinanceCore()]);
+      paymentAttemptRef.current = null;
       setMessage('Pembayaran tercatat. Saldo authoritative sudah dimuat ulang.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal mencatat pembayaran.');

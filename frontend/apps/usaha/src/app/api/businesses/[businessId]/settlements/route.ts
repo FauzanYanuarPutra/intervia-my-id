@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
   BusinessControlHttpError,
@@ -32,7 +33,8 @@ export async function POST(
   const { businessId } = await context.params;
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const payload = await createControlSettlement(businessId, body);
+    const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+    const payload = await createControlSettlement(businessId, body, idempotencyKey);
     return NextResponse.json(payload, { status: 201 });
   } catch (error) {
     return errorResponse(error, 'Gagal menyimpan settlement platform.');

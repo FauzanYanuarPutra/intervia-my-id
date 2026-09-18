@@ -228,6 +228,115 @@ async fn posting_sale_persists_snapshot_and_exactly_one_finance_effect(pool: PgP
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn same_idempotency_key_with_changed_payload_is_rejected(pool: PgPool) {
+    let seeded = seed_costed_product(&pool).await;
+    let repository = SaleRepository::new(pool.clone());
+    let idempotency_key = Uuid::new_v4();
+
+    let first = repository
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            idempotency_key,
+            sale_request(seeded.product_id),
+        )
+        .await
+        .unwrap();
+
+    let mut changed = sale_request(seeded.product_id);
+    changed.lines[0].quantity = Decimal::ONE;
+
+    let error = repository
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            idempotency_key,
+            changed,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error, SaleRepositoryError::IdempotencyConflict);
+
+    let sale_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_sales WHERE business_id=$1 AND idempotency_key=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(idempotency_key)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(sale_count, 1);
+
+    let movement_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM business_inventory_movements WHERE business_id=$1 AND source_type='business_sale' AND source_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(first.sale.sale.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(movement_count, 1);
+
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stock, Decimal::from(4_700));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn canonical_sale_hash_ignores_legacy_client_price_hint(pool: PgPool) {
+    let seeded = seed_costed_product(&pool).await;
+    let repository = SaleRepository::new(pool.clone());
+    let idempotency_key = Uuid::new_v4();
+
+    let first = repository
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            idempotency_key,
+            sale_request(seeded.product_id),
+        )
+        .await
+        .unwrap();
+
+    let mut replay_request = sale_request(seeded.product_id);
+    replay_request.lines[0].unit_price_amount = 999_999;
+
+    let replay = repository
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            idempotency_key,
+            replay_request,
+        )
+        .await
+        .unwrap();
+
+    assert!(replay.replayed);
+    assert_eq!(replay.sale.sale.id, first.sale.sale.id);
+
+    let request_hash: String = sqlx::query_scalar(
+        "SELECT request_hash FROM business_sales WHERE business_id=$1 AND idempotency_key=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(idempotency_key)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(request_hash.len(), 64);
+    assert!(request_hash
+        .chars()
+        .all(|character| character.is_ascii_hexdigit()));
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn historical_cogs_snapshot_does_not_drift_after_purchase_price_changes(pool: PgPool) {
     let seeded = seed_costed_product(&pool).await;
     let repository = SaleRepository::new(pool.clone());

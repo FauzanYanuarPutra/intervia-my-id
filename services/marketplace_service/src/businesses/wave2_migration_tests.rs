@@ -1,6 +1,65 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+#[test]
+fn wave2_creation_idempotency_migration_has_business_scoped_unique_keys() {
+    let migration =
+        include_str!("../../migrations/20260918074000_wave2_creation_idempotency.up.sql");
+
+    for table in [
+        "business_recurring_obligations",
+        "business_material_yield_observations",
+    ] {
+        assert!(migration.contains(table), "missing idempotency table {table}");
+    }
+    assert_eq!(
+        migration
+            .matches("ON business_recurring_obligations (business_id, idempotency_key)")
+            .count(),
+        1
+    );
+    assert_eq!(
+        migration
+            .matches("ON business_material_yield_observations (business_id, idempotency_key)")
+            .count(),
+        1
+    );
+    assert_eq!(
+        migration
+            .matches("ALTER COLUMN idempotency_key SET NOT NULL")
+            .count(),
+        2
+    );
+}
+
+
+#[test]
+fn retry_request_hash_migration_covers_retry_sensitive_business_writes() {
+    let migration =
+        include_str!("../../migrations/20260918133000_business_retry_request_hashes.up.sql");
+
+    for table in [
+        "business_settlements",
+        "business_recurring_obligations",
+        "business_obligation_payments",
+        "business_purchases",
+        "business_material_yield_observations",
+    ] {
+        assert!(
+            migration.contains(&format!("ALTER TABLE {table}")),
+            "missing request hash storage for {table}"
+        );
+    }
+    assert_eq!(
+        migration.matches("ADD COLUMN IF NOT EXISTS request_hash TEXT").count(),
+        5
+    );
+    assert_eq!(
+        migration.matches("char_length(request_hash) = 64").count(),
+        5
+    );
+}
+
 #[sqlx::test(migrations = "./migrations")]
 async fn wave2_operating_tables_exist(pool: PgPool) {
     for table in [

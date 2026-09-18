@@ -559,13 +559,31 @@ async fn create_settlement(
         Ok(value) => value,
         Err(response) => return response,
     };
+    let key = match parse_idempotency_key(
+        headers
+            .get("idempotency-key")
+            .and_then(|value| value.to_str().ok()),
+    ) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
+
     match SettlementRepository::new(state.db.clone())
-        .create(actor_id, business_id, organization_id, payload)
+        .create(actor_id, business_id, organization_id, key, payload)
         .await
     {
-        Ok(item) => (
-            StatusCode::CREATED,
-            Json(json!({ "data": { "settlement": item } })),
+        Ok(outcome) => (
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
+            Json(json!({
+                "data": {
+                    "settlement": outcome.settlement,
+                    "replayed": outcome.replayed
+                }
+            })),
         )
             .into_response(),
         Err(error) => settlement_error_response(error),
@@ -766,6 +784,10 @@ fn settlement_error_response(error: SettlementRepositoryError) -> Response {
         SettlementRepositoryError::NotFound => api_error(
             StatusCode::NOT_FOUND,
             "business_settlement_resource_not_found",
+        ),
+        SettlementRepositoryError::Conflict => api_error(
+            StatusCode::CONFLICT,
+            "business_settlement_command_conflict",
         ),
         SettlementRepositoryError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,

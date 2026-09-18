@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::control::canonical_manual_finance_entry_type;
+use super::{
+    control::canonical_manual_finance_entry_type,
+    kernel::command::canonical_request_hash,
+};
 
 #[derive(Debug)]
 pub(crate) enum Wave2RepositoryError {
@@ -70,6 +73,12 @@ pub(crate) struct ObligationRecord {
     pub(crate) created_by_user_id: Uuid,
     pub(crate) created_at: DateTime<Utc>,
     pub(crate) updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ObligationOutcome {
+    pub(crate) obligation: ObligationRecord,
+    pub(crate) replayed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
@@ -207,6 +216,12 @@ pub(crate) struct YieldObservationRecord {
     pub(crate) created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct YieldObservationOutcome {
+    pub(crate) observation: YieldObservationRecord,
+    pub(crate) replayed: bool,
+}
+
 #[derive(Clone)]
 pub(crate) struct Wave2Repository {
     db: PgPool,
@@ -261,20 +276,72 @@ impl Wave2Repository {
         actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
+        idempotency_key: Uuid,
         request: CreateObligationRequest,
-    ) -> Result<ObligationRecord, Wave2RepositoryError> {
+    ) -> Result<ObligationOutcome, Wave2RepositoryError> {
         let entry_type = canonical_expense_type(&request.entry_type)?;
         let label = normalized_text(&request.label, 160, "invalid_obligation_label")?;
         let account_key = normalized_account(&request.account_key)?;
         if request.amount <= 0 || request.interval_days <= 0 || request.interval_days > 3660 {
             return Err(Wave2RepositoryError::Validation("invalid_obligation"));
         }
-        sqlx::query_as::<_, ObligationRecord>(r#"
-          INSERT INTO business_recurring_obligations (business_id,organization_id,label,entry_type,account_key,amount,interval_days,next_due_on,created_by_user_id)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        let request_hash = wave2_request_hash(serde_json::json!({
+            "label": &label,
+            "entry_type": entry_type,
+            "account_key": &account_key,
+            "amount": request.amount,
+            "interval_days": request.interval_days,
+            "next_due_on": request.next_due_on,
+        }))?;
+
+        if let Some(existing) =
+            load_obligation(&self.db, business_id, organization_id, idempotency_key).await?
+        {
+            ensure_request_hash(
+                &self.db,
+                "business_recurring_obligations",
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
+            return Ok(ObligationOutcome {
+                obligation: existing,
+                replayed: true,
+            });
+        }
+
+        let inserted = sqlx::query_as::<_, ObligationRecord>(r#"
+          INSERT INTO business_recurring_obligations (business_id,organization_id,idempotency_key,request_hash,label,entry_type,account_key,amount,interval_days,next_due_on,created_by_user_id)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          ON CONFLICT (business_id,idempotency_key) DO NOTHING
           RETURNING id,business_id,organization_id,label,entry_type,account_key,amount,interval_days,next_due_on,active,last_paid_at,created_by_user_id,created_at,updated_at
-        "#).bind(business_id).bind(organization_id).bind(label).bind(entry_type).bind(account_key).bind(request.amount).bind(request.interval_days).bind(request.next_due_on).bind(actor_id)
-        .fetch_one(&self.db).await.map_err(Into::into)
+        "#).bind(business_id).bind(organization_id).bind(idempotency_key).bind(&request_hash).bind(label).bind(entry_type).bind(account_key).bind(request.amount).bind(request.interval_days).bind(request.next_due_on).bind(actor_id)
+        .fetch_optional(&self.db).await?;
+
+        if let Some(obligation) = inserted {
+            return Ok(ObligationOutcome {
+                obligation,
+                replayed: false,
+            });
+        }
+
+        ensure_request_hash(
+            &self.db,
+            "business_recurring_obligations",
+            business_id,
+            idempotency_key,
+            &request_hash,
+        )
+        .await?;
+        let obligation =
+            load_obligation(&self.db, business_id, organization_id, idempotency_key)
+                .await?
+                .ok_or(Wave2RepositoryError::Conflict)?;
+        Ok(ObligationOutcome {
+            obligation,
+            replayed: true,
+        })
     }
 
     pub(crate) async fn pay_obligation(
@@ -286,7 +353,19 @@ impl Wave2Repository {
         idempotency_key: Uuid,
         paid_on: NaiveDate,
     ) -> Result<ObligationPaymentOutcome, Wave2RepositoryError> {
+        let request_hash = wave2_request_hash(serde_json::json!({
+            "obligation_id": obligation_id,
+            "paid_on": paid_on,
+        }))?;
         if let Some(existing) = load_payment(&self.db, business_id, idempotency_key).await? {
+            ensure_request_hash(
+                &self.db,
+                "business_obligation_payments",
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
             return Ok(ObligationPaymentOutcome {
                 payment: existing,
                 replayed: true,
@@ -300,10 +379,18 @@ impl Wave2Repository {
             .next_due_on
             .checked_add_days(chrono::Days::new(obligation.interval_days as u64))
             .ok_or(Wave2RepositoryError::Validation("obligation_due_overflow"))?;
-        let inserted = sqlx::query_scalar::<_, Uuid>(r#"INSERT INTO business_obligation_payments (id,business_id,organization_id,obligation_id,idempotency_key,paid_amount,paid_on,due_on_before,due_on_after,created_by_user_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (business_id,idempotency_key) DO NOTHING RETURNING id"#)
-            .bind(payment_id).bind(business_id).bind(organization_id).bind(obligation_id).bind(idempotency_key).bind(obligation.amount).bind(paid_on).bind(obligation.next_due_on).bind(due_after).bind(actor_id).fetch_optional(&mut *tx).await?;
+        let inserted = sqlx::query_scalar::<_, Uuid>(r#"INSERT INTO business_obligation_payments (id,business_id,organization_id,obligation_id,idempotency_key,request_hash,paid_amount,paid_on,due_on_before,due_on_after,created_by_user_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (business_id,idempotency_key) DO NOTHING RETURNING id"#)
+            .bind(payment_id).bind(business_id).bind(organization_id).bind(obligation_id).bind(idempotency_key).bind(&request_hash).bind(obligation.amount).bind(paid_on).bind(obligation.next_due_on).bind(due_after).bind(actor_id).fetch_optional(&mut *tx).await?;
         if inserted.is_none() {
             tx.rollback().await?;
+            ensure_request_hash(
+                &self.db,
+                "business_obligation_payments",
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
             let existing = load_payment(&self.db, business_id, idempotency_key)
                 .await?
                 .ok_or(Wave2RepositoryError::Conflict)?;
@@ -343,7 +430,23 @@ impl Wave2Repository {
         }
         let account_key = normalized_account(&request.account_key)?;
         let note = normalized_optional_text(&request.note, 2000, "purchase_note_too_long")?;
+        let request_hash = wave2_request_hash(serde_json::json!({
+            "ingredient_id": request.ingredient_id,
+            "stock_quantity_delta": request.stock_quantity_delta.normalize().to_string(),
+            "total_amount": request.total_amount,
+            "account_key": &account_key,
+            "occurred_on": request.occurred_on,
+            "note": &note,
+        }))?;
         if let Some(existing) = load_purchase(&self.db, business_id, idempotency_key).await? {
+            ensure_request_hash(
+                &self.db,
+                "business_purchases",
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
             return Ok(PurchaseOutcome {
                 purchase: existing,
                 replayed: true,
@@ -351,10 +454,18 @@ impl Wave2Repository {
         }
         let mut tx = self.db.begin().await?;
         let purchase_id = Uuid::new_v4();
-        let inserted=sqlx::query_scalar::<_,Uuid>(r#"INSERT INTO business_purchases (id,business_id,organization_id,ingredient_id,idempotency_key,stock_quantity_delta,total_amount,account_key,occurred_on,note,created_by_user_id) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11 WHERE EXISTS (SELECT 1 FROM business_ingredients WHERE id=$4 AND business_id=$2 AND organization_id=$3 AND status='active') ON CONFLICT (business_id,idempotency_key) DO NOTHING RETURNING id"#)
-            .bind(purchase_id).bind(business_id).bind(organization_id).bind(request.ingredient_id).bind(idempotency_key).bind(request.stock_quantity_delta).bind(request.total_amount).bind(&account_key).bind(request.occurred_on).bind(&note).bind(actor_id).fetch_optional(&mut *tx).await?;
+        let inserted=sqlx::query_scalar::<_,Uuid>(r#"INSERT INTO business_purchases (id,business_id,organization_id,ingredient_id,idempotency_key,request_hash,stock_quantity_delta,total_amount,account_key,occurred_on,note,created_by_user_id) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 WHERE EXISTS (SELECT 1 FROM business_ingredients WHERE id=$4 AND business_id=$2 AND organization_id=$3 AND status='active') ON CONFLICT (business_id,idempotency_key) DO NOTHING RETURNING id"#)
+            .bind(purchase_id).bind(business_id).bind(organization_id).bind(request.ingredient_id).bind(idempotency_key).bind(&request_hash).bind(request.stock_quantity_delta).bind(request.total_amount).bind(&account_key).bind(request.occurred_on).bind(&note).bind(actor_id).fetch_optional(&mut *tx).await?;
         if inserted.is_none() {
             tx.rollback().await?;
+            ensure_request_hash(
+                &self.db,
+                "business_purchases",
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
             if let Some(existing) = load_purchase(&self.db, business_id, idempotency_key).await? {
                 return Ok(PurchaseOutcome {
                     purchase: existing,
@@ -463,8 +574,9 @@ impl Wave2Repository {
         actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
+        idempotency_key: Uuid,
         request: CreateYieldObservationRequest,
-    ) -> Result<YieldObservationRecord, Wave2RepositoryError> {
+    ) -> Result<YieldObservationOutcome, Wave2RepositoryError> {
         if request.input_quantity <= Decimal::ZERO || request.output_units <= Decimal::ZERO {
             return Err(Wave2RepositoryError::Validation(
                 "invalid_yield_observation",
@@ -472,8 +584,99 @@ impl Wave2Repository {
         }
         let input_unit = normalized_text(&request.input_unit, 40, "invalid_yield_unit")?;
         let note = normalized_optional_text(&request.note, 2000, "yield_note_too_long")?;
-        sqlx::query_as::<_,YieldObservationRecord>(r#"INSERT INTO business_material_yield_observations (business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10 WHERE EXISTS(SELECT 1 FROM business_ingredients WHERE id=$4 AND business_id=$1 AND organization_id=$2 AND status='active') AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM business_products WHERE id=$3 AND business_id=$1 AND organization_id=$2 AND status='active')) RETURNING id,business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id,created_at"#)
-            .bind(business_id).bind(organization_id).bind(request.product_id).bind(request.ingredient_id).bind(request.input_quantity).bind(request.output_units).bind(input_unit).bind(request.observed_on).bind(note).bind(actor_id).fetch_optional(&self.db).await?.ok_or(Wave2RepositoryError::NotFound)
+        let request_hash = wave2_request_hash(serde_json::json!({
+            "product_id": request.product_id,
+            "ingredient_id": request.ingredient_id,
+            "input_quantity": request.input_quantity.normalize().to_string(),
+            "output_units": request.output_units.normalize().to_string(),
+            "input_unit": &input_unit,
+            "observed_on": request.observed_on,
+            "note": &note,
+        }))?;
+
+        if let Some(existing) =
+            load_yield_observation(&self.db, business_id, organization_id, idempotency_key).await?
+        {
+            ensure_request_hash(
+                &self.db,
+                "business_material_yield_observations",
+                business_id,
+                idempotency_key,
+                &request_hash,
+            )
+            .await?;
+            return Ok(YieldObservationOutcome {
+                observation: existing,
+                replayed: true,
+            });
+        }
+
+        let inserted = sqlx::query_as::<_,YieldObservationRecord>(r#"INSERT INTO business_material_yield_observations (business_id,organization_id,idempotency_key,request_hash,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 WHERE EXISTS(SELECT 1 FROM business_ingredients WHERE id=$5 AND business_id=$1 AND organization_id=$2 AND status='active') AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM business_products WHERE id=$4 AND business_id=$1 AND organization_id=$2 AND status='active')) ON CONFLICT (business_id,idempotency_key) DO NOTHING RETURNING id,business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id,created_at"#)
+            .bind(business_id).bind(organization_id).bind(idempotency_key).bind(&request_hash).bind(request.product_id).bind(request.ingredient_id).bind(request.input_quantity).bind(request.output_units).bind(input_unit).bind(request.observed_on).bind(note).bind(actor_id).fetch_optional(&self.db).await?;
+
+        if let Some(observation) = inserted {
+            return Ok(YieldObservationOutcome {
+                observation,
+                replayed: false,
+            });
+        }
+
+        ensure_request_hash(
+            &self.db,
+            "business_material_yield_observations",
+            business_id,
+            idempotency_key,
+            &request_hash,
+        )
+        .await?;
+        let observation =
+            load_yield_observation(&self.db, business_id, organization_id, idempotency_key)
+                .await?
+                .ok_or(Wave2RepositoryError::Conflict)?;
+        Ok(YieldObservationOutcome {
+            observation,
+            replayed: true,
+        })
+    }
+}
+
+
+fn wave2_request_hash(value: serde_json::Value) -> Result<String, Wave2RepositoryError> {
+    canonical_request_hash(&value).map_err(|_| Wave2RepositoryError::Database)
+}
+
+async fn ensure_request_hash(
+    pool: &PgPool,
+    table: &'static str,
+    business_id: Uuid,
+    key: Uuid,
+    expected_hash: &str,
+) -> Result<(), Wave2RepositoryError> {
+    let query = match table {
+        "business_recurring_obligations" => {
+            "SELECT request_hash FROM business_recurring_obligations WHERE business_id=$1 AND idempotency_key=$2"
+        }
+        "business_obligation_payments" => {
+            "SELECT request_hash FROM business_obligation_payments WHERE business_id=$1 AND idempotency_key=$2"
+        }
+        "business_purchases" => {
+            "SELECT request_hash FROM business_purchases WHERE business_id=$1 AND idempotency_key=$2"
+        }
+        "business_material_yield_observations" => {
+            "SELECT request_hash FROM business_material_yield_observations WHERE business_id=$1 AND idempotency_key=$2"
+        }
+        _ => return Err(Wave2RepositoryError::Database),
+    };
+
+    let stored: Option<Option<String>> = sqlx::query_scalar(query)
+        .bind(business_id)
+        .bind(key)
+        .fetch_optional(pool)
+        .await?;
+
+    match stored {
+        Some(Some(actual)) if actual == expected_hash => Ok(()),
+        _ => Err(Wave2RepositoryError::Conflict),
     }
 }
 
@@ -548,6 +751,36 @@ fn is_unique_violation(error: &sqlx::Error) -> bool {
     matches!(error,sqlx::Error::Database(db) if db.is_unique_violation())
 }
 
+async fn load_obligation(
+    pool: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+    key: Uuid,
+) -> Result<Option<ObligationRecord>, Wave2RepositoryError> {
+    sqlx::query_as::<_, ObligationRecord>("SELECT id,business_id,organization_id,label,entry_type,account_key,amount,interval_days,next_due_on,active,last_paid_at,created_by_user_id,created_at,updated_at FROM business_recurring_obligations WHERE business_id=$1 AND organization_id=$2 AND idempotency_key=$3")
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(key)
+        .fetch_optional(pool)
+        .await
+        .map_err(Into::into)
+}
+
+async fn load_yield_observation(
+    pool: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+    key: Uuid,
+) -> Result<Option<YieldObservationRecord>, Wave2RepositoryError> {
+    sqlx::query_as::<_, YieldObservationRecord>("SELECT id,business_id,organization_id,product_id,ingredient_id,input_quantity,output_units,input_unit,observed_on,note,created_by_user_id,created_at FROM business_material_yield_observations WHERE business_id=$1 AND organization_id=$2 AND idempotency_key=$3")
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(key)
+        .fetch_optional(pool)
+        .await
+        .map_err(Into::into)
+}
+
 async fn load_payment(
     pool: &PgPool,
     business_id: Uuid,
@@ -601,5 +834,20 @@ mod tests {
             canonical_expense_type("utilities").unwrap(),
             "utilities_expense"
         );
+    }
+
+    #[test]
+    fn request_hash_is_semantic_and_stable_for_decimal_formatting() {
+        let left = wave2_request_hash(serde_json::json!({
+            "quantity": Decimal::new(100, 2).normalize().to_string(),
+            "note": "stok",
+        }))
+        .unwrap();
+        let right = wave2_request_hash(serde_json::json!({
+            "note": "stok",
+            "quantity": Decimal::ONE.normalize().to_string(),
+        }))
+        .unwrap();
+        assert_eq!(left, right);
     }
 }

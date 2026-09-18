@@ -167,18 +167,32 @@ async fn create_obligation(
         Ok(value) => value,
         Err(response) => return response,
     };
+    let idempotency_key = match parse_idempotency_key(&headers) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
     match Wave2Repository::new(state.db.clone())
         .create_obligation(
             access.actor_id,
             business_id,
             access.organization_id,
+            idempotency_key,
             payload,
         )
         .await
     {
-        Ok(obligation) => (
-            StatusCode::CREATED,
-            Json(json!({ "data": { "obligation": obligation } })),
+        Ok(outcome) => (
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
+            Json(json!({
+                "data": {
+                    "obligation": outcome.obligation,
+                    "replayed": outcome.replayed
+                }
+            })),
         )
             .into_response(),
         Err(error) => wave2_error_response(error),
@@ -427,18 +441,32 @@ async fn create_yield_observation(
             Ok(value) => value,
             Err(response) => return response,
         };
+    let idempotency_key = match parse_idempotency_key(&headers) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
     match Wave2Repository::new(state.db.clone())
         .create_yield_observation(
             access.actor_id,
             business_id,
             access.organization_id,
+            idempotency_key,
             payload,
         )
         .await
     {
-        Ok(observation) => (
-            StatusCode::CREATED,
-            Json(json!({ "data": { "observation": observation } })),
+        Ok(outcome) => (
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
+            Json(json!({
+                "data": {
+                    "observation": outcome.observation,
+                    "replayed": outcome.replayed
+                }
+            })),
         )
             .into_response(),
         Err(error) => wave2_error_response(error),
