@@ -184,10 +184,12 @@ export async function getCurrentWave2CashShift(businessId: string) {
 
 export async function openWave2CashShift(
   businessId: string,
+  idempotencyKey: string,
   input: Record<string, unknown>,
 ) {
   const payload = await requestWave2(path(businessId, '/cash-shifts/open'), {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(input),
   });
   return (data(payload).shift as Wave2CashShift | undefined) ?? null;
@@ -196,11 +198,16 @@ export async function openWave2CashShift(
 export async function closeWave2CashShift(
   businessId: string,
   shiftId: string,
+  idempotencyKey: string,
   input: Record<string, unknown>,
 ) {
   const payload = await requestWave2(
     path(businessId, `/cash-shifts/${encodeURIComponent(shiftId)}/close`),
-    { method: 'POST', body: JSON.stringify(input) },
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(input),
+    },
   );
   return (data(payload).shift as Wave2CashShift | undefined) ?? null;
 }
