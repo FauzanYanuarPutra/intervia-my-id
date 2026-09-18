@@ -2,6 +2,7 @@
 import type { NextRequest } from 'next/server';
 import { routes, Role } from '@/lib/routes';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+import { resolveRequestId } from '@/lib/requestId';
 import {
   AUTH_ROUTE_PATHS,
   isAuthRoutePath,
@@ -191,6 +192,11 @@ function syncAuthPresenceCookie(
 
 function applySecurityHeaders(res: NextResponse) {
   SECURITY_HEADERS.forEach(({ key, value }) => res.headers.set(key, value));
+  return res;
+}
+
+function applyRequestId(res: NextResponse, requestId: string) {
+  res.headers.set('X-Request-ID', requestId);
   return res;
 }
 
@@ -636,6 +642,12 @@ export async function proxy(req: NextRequest) {
 
   // 1. API CORS Gateway
   if (pathname.startsWith('/api')) {
+    const requestId = resolveRequestId(req.headers.get('x-request-id'));
+    const finalizeApiResponse = (response: NextResponse) =>
+      applyRequestId(
+        applyNoIndexHeader(applySecurityHeaders(response)),
+        requestId,
+      );
     const origin = req.headers.get('origin') || '';
     const secFetchSite = (
       req.headers.get('sec-fetch-site') || ''
@@ -644,23 +656,19 @@ export async function proxy(req: NextRequest) {
     const isMutation = MUTATION_METHODS.has(req.method.toUpperCase());
 
     if (isMutation && secFetchSite === 'cross-site') {
-      return applyNoIndexHeader(
-        applySecurityHeaders(
-          NextResponse.json(
-            { error: 'Cross-site request blocked by security policy.' },
-            { status: 403 },
-          ),
+      return finalizeApiResponse(
+        NextResponse.json(
+          { error: 'Cross-site request blocked by security policy.' },
+          { status: 403 },
         ),
       );
     }
 
     if (isMutation && origin && !isAllowedOrigin) {
-      return applyNoIndexHeader(
-        applySecurityHeaders(
-          NextResponse.json(
-            { error: 'Origin is not allowed.' },
-            { status: 403 },
-          ),
+      return finalizeApiResponse(
+        NextResponse.json(
+          { error: 'Origin is not allowed.' },
+          { status: 403 },
         ),
       );
     }
@@ -669,26 +677,25 @@ export async function proxy(req: NextRequest) {
       isMutation &&
       !isTrustedCookieMutationWithoutOrigin(req, origin, secFetchSite)
     ) {
-      return applyNoIndexHeader(
-        applySecurityHeaders(
-          NextResponse.json(
-            { error: 'A trusted request origin is required.' },
-            { status: 403 },
-          ),
+      return finalizeApiResponse(
+        NextResponse.json(
+          { error: 'A trusted request origin is required.' },
+          { status: 403 },
         ),
       );
     }
 
     const isPreflight = req.method === 'OPTIONS';
     if (isPreflight && origin && !isAllowedOrigin) {
-      return applyNoIndexHeader(
-        applySecurityHeaders(new NextResponse(null, { status: 403 })),
-      );
+      return finalizeApiResponse(new NextResponse(null, { status: 403 }));
     }
+
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set('x-request-id', requestId);
 
     const response = isPreflight
       ? new NextResponse(null, { status: 204 })
-      : NextResponse.next();
+      : NextResponse.next({ request: { headers: requestHeaders } });
 
     if (isAllowedOrigin) {
       response.headers.set('Access-Control-Allow-Origin', origin);
@@ -705,11 +712,12 @@ export async function proxy(req: NextRequest) {
     );
     response.headers.set(
       'Access-Control-Allow-Headers',
-      'Authorization,Content-Type,Accept,X-Requested-With,X-Idempotency-Key,X-CSRF-Token',
+      'Authorization,Content-Type,Accept,X-Requested-With,X-Idempotency-Key,X-CSRF-Token,X-Request-ID',
     );
+    response.headers.set('Access-Control-Expose-Headers', 'X-Request-ID');
     response.headers.set('Access-Control-Max-Age', '600');
 
-    return applyNoIndexHeader(applySecurityHeaders(response));
+    return finalizeApiResponse(response);
   }
 
   if (

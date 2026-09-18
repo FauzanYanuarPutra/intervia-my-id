@@ -33,7 +33,11 @@ export async function apiRequest<T>(
     const payload = await parseBody<T>(response);
 
     if (!response.ok) {
-      const error = toApiHttpError(response.status, payload);
+      const error = toApiHttpError(
+        response.status,
+        payload,
+        response.headers.get('x-request-id') || undefined,
+      );
       onUnauthorized(error);
       return { ok: false, error, response };
     }

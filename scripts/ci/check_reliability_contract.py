@@ -501,6 +501,28 @@ for marker in (
         errors.append(f"observability self-monitoring probe missing: {marker}")
 
 
+www_proxy = read("frontend/apps/www/src/proxy.ts")
+request_id_helper = read("frontend/apps/www/src/lib/requestId.ts")
+community_backend_proxy = read("frontend/apps/www/src/lib/community/backendProxy.ts")
+www_http_client = read("frontend/apps/www/src/lib/http/client.ts")
+for marker in (
+    "resolveRequestId(req.headers.get('x-request-id'))",
+    "requestHeaders.set('x-request-id', requestId)",
+    "Access-Control-Expose-Headers', 'X-Request-ID'",
+    "X-CSRF-Token,X-Request-ID",
+):
+    if marker not in www_proxy:
+        errors.append(f"WWW API correlation contract missing marker: {marker}")
+for marker in ("REQUEST_ID_PATTERN", "crypto.randomUUID()"):
+    if marker not in request_id_helper:
+        errors.append(f"WWW request ID helper missing marker: {marker}")
+for marker in ("headers['X-Request-ID'] = requestId", "responseHeaders['x-request-id']"):
+    if marker not in community_backend_proxy:
+        errors.append(f"Community BFF proxy correlation contract missing marker: {marker}")
+if "response.headers.get('x-request-id')" not in www_http_client:
+    errors.append("WWW HTTP client must retain backend request IDs on API errors")
+
+
 for path in (
     "services/identity_service/src/routes/health.rs",
     "services/marketplace_service/src/main.rs",
