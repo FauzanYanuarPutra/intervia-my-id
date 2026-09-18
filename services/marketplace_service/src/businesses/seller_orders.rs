@@ -7,10 +7,7 @@ use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::{
-    kernel::command::canonical_request_hash,
-    transactions::state::OrderState,
-};
+use super::{kernel::command::canonical_request_hash, transactions::state::OrderState};
 
 const MAX_SELLER_ORDERS: i64 = 200;
 const MAX_REASON_LEN: usize = 500;
@@ -195,7 +192,11 @@ impl SellerOrderRepository {
         idempotency_key: Uuid,
         request: TransitionSellerOrderRequest,
     ) -> Result<TransitionSellerOrderOutcome, SellerOrderRepositoryError> {
-        if actor_id.is_nil() || business_id.is_nil() || order_id.is_nil() || idempotency_key.is_nil() {
+        if actor_id.is_nil()
+            || business_id.is_nil()
+            || order_id.is_nil()
+            || idempotency_key.is_nil()
+        {
             return Err(SellerOrderRepositoryError::Validation(
                 "invalid_order_transition_identity",
             ));
@@ -206,8 +207,9 @@ impl SellerOrderRepository {
             ));
         }
 
-        let next_status = OrderState::from_db(request.next_status.trim())
-            .ok_or(SellerOrderRepositoryError::Validation("invalid_order_status"))?;
+        let next_status = OrderState::from_db(request.next_status.trim()).ok_or(
+            SellerOrderRepositoryError::Validation("invalid_order_status"),
+        )?;
         let reason = normalize_reason(request.reason.as_deref())?;
         let request_hash = canonical_request_hash(&json!({
             "business_id": business_id,
@@ -244,8 +246,7 @@ impl SellerOrderRepository {
             {
                 return Err(SellerOrderRepositoryError::IdempotencyConflict);
             }
-            let order =
-                load_aggregate_tx(&mut tx, business_id, organization_id, order_id).await?;
+            let order = load_aggregate_tx(&mut tx, business_id, organization_id, order_id).await?;
             tx.commit().await?;
             return Ok(TransitionSellerOrderOutcome {
                 order,
@@ -253,13 +254,15 @@ impl SellerOrderRepository {
             });
         }
 
-        let current = load_order_for_update(&mut tx, business_id, organization_id, order_id).await?;
+        let current =
+            load_order_for_update(&mut tx, business_id, organization_id, order_id).await?;
         if current.version != request.expected_version {
             return Err(SellerOrderRepositoryError::VersionConflict);
         }
 
-        let current_state = OrderState::from_db(&current.base_status)
-            .ok_or(SellerOrderRepositoryError::Validation("invalid_stored_order_status"))?;
+        let current_state = OrderState::from_db(&current.base_status).ok_or(
+            SellerOrderRepositoryError::Validation("invalid_stored_order_status"),
+        )?;
         if !allowed_seller_transitions(&current).contains(&next_status) {
             return Err(SellerOrderRepositoryError::InvalidTransition);
         }
@@ -596,12 +599,9 @@ mod tests {
             allowed_seller_status_labels(&order("PAID", "PHYSICAL_GOODS", "pickup")),
             vec!["PROCESSING"]
         );
-        assert!(allowed_seller_status_labels(&order(
-            "REFUNDED",
-            "PHYSICAL_GOODS",
-            "pickup"
-        ))
-        .is_empty());
+        assert!(
+            allowed_seller_status_labels(&order("REFUNDED", "PHYSICAL_GOODS", "pickup")).is_empty()
+        );
     }
 
     #[test]
