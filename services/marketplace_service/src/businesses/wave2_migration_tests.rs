@@ -35,7 +35,6 @@ fn wave2_creation_idempotency_migration_has_business_scoped_unique_keys() {
     );
 }
 
-
 #[test]
 fn retry_request_hash_migration_covers_retry_sensitive_business_writes() {
     let migration =
