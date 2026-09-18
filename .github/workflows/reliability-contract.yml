@@ -55,6 +55,7 @@ jobs:
           bash -n scripts/ops/postgres_logical_backup.sh
           bash -n scripts/ops/verify_backup_set.sh
           bash -n scripts/ops/staging_scale_rehearsal.sh
+          bash -n scripts/ops/dependency_degradation_rehearsal.sh
       - name: Validate Grafana dashboard JSON
         run: python -m json.tool infrastructure/observability/grafana/dashboards/lajukan-overview.json >/dev/null
 
