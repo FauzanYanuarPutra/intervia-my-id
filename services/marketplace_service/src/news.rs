@@ -5,7 +5,7 @@ use axum::{
     routing::{get, patch},
     Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
@@ -112,6 +112,11 @@ struct ModerateNewsRequest {
     action: String,
     note: Option<String>,
     business_impact: Option<String>,
+    publish_at: Option<String>,
+    fact_check_status: Option<String>,
+    legal_review_status: Option<String>,
+    editorial_priority: Option<String>,
+    sensitivity: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -240,6 +245,61 @@ fn normalize_news_search_query(
         return Err("search query has too many terms");
     }
     Ok(Some(query))
+}
+
+
+fn normalize_fact_check_status(value: Option<String>) -> Result<Option<String>, &'static str> {
+    let Some(status) = trimmed(value) else { return Ok(None); };
+    let status = status.to_ascii_lowercase();
+    if matches!(status.as_str(), "pending" | "verified" | "not_required") {
+        Ok(Some(status))
+    } else {
+        Err("unsupported fact-check status")
+    }
+}
+
+fn normalize_legal_review_status(value: Option<String>) -> Result<Option<String>, &'static str> {
+    let Some(status) = trimmed(value) else { return Ok(None); };
+    let status = status.to_ascii_lowercase();
+    if matches!(status.as_str(), "pending" | "approved" | "not_required") {
+        Ok(Some(status))
+    } else {
+        Err("unsupported legal review status")
+    }
+}
+
+fn normalize_editorial_priority(value: Option<String>) -> Result<Option<String>, &'static str> {
+    let Some(priority) = trimmed(value) else { return Ok(None); };
+    let priority = priority.to_ascii_lowercase();
+    if matches!(priority.as_str(), "low" | "normal" | "high" | "urgent") {
+        Ok(Some(priority))
+    } else {
+        Err("unsupported editorial priority")
+    }
+}
+
+fn normalize_editorial_sensitivity(value: Option<String>) -> Result<Option<String>, &'static str> {
+    let Some(sensitivity) = trimmed(value) else { return Ok(None); };
+    let sensitivity = sensitivity.to_ascii_lowercase();
+    if matches!(sensitivity.as_str(), "normal" | "high") {
+        Ok(Some(sensitivity))
+    } else {
+        Err("unsupported editorial sensitivity")
+    }
+}
+
+fn parse_requested_publish_at(
+    value: Option<String>,
+    now: DateTime<Utc>,
+) -> Result<Option<DateTime<Utc>>, &'static str> {
+    let Some(raw) = trimmed(value) else { return Ok(None); };
+    let publish_at = DateTime::parse_from_rfc3339(&raw)
+        .map_err(|_| "publish_at must be an RFC3339 timestamp")?
+        .with_timezone(&Utc);
+    if publish_at > now.clone() + Duration::days(90) {
+        return Err("scheduled publication cannot be more than 90 days ahead");
+    }
+    Ok(Some(if publish_at < now { now } else { publish_at }))
 }
 
 fn normalize_news_category_filter(
@@ -647,6 +707,32 @@ async fn has_verified_source_tx(
         .any(|source_url| is_allowed_news_source_url(source_url)))
 }
 
+
+async fn has_independent_verified_source_review_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    content_id: Uuid,
+    reviewer_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM news_source_references source
+          JOIN news_source_review_events review
+            ON review.source_id = source.id
+           AND review.to_verification_status = 'verified'
+          WHERE source.content_id = $1
+            AND source.verification_status = 'verified'
+            AND review.reviewer_id <> $2
+        )
+        "#,
+    )
+    .bind(content_id)
+    .bind(reviewer_id)
+    .fetch_one(&mut **tx)
+    .await
+}
+
 fn editorial_status(content_status: &str, metadata: &Value) -> String {
     metadata
         .get("news")
@@ -1051,33 +1137,23 @@ async fn notify_editorial_result(
     action: &str,
     note: Option<&str>,
 ) {
-    let (event_type, title, message) = match action {
-        "approve" => (
-            "news.published",
-            "Berita diterbitkan",
-            "Kirimanmu sudah lolos review dan diterbitkan di Lajukan News.",
-        ),
-        "needs_revision" => (
-            "news.needs_revision",
-            "Berita perlu revisi",
-            "Editor meminta perubahan sebelum berita dapat diterbitkan.",
-        ),
-        "reject" => (
-            "news.rejected",
-            "Kiriman berita ditolak",
-            "Kiriman belum dapat diterbitkan. Lihat catatan editor untuk detail.",
-        ),
-        "correct" => (
-            "news.corrected",
-            "Koreksi berita dicatat",
-            "Koreksi editorial untuk beritamu telah dicatat.",
-        ),
-        "retract" => (
-            "news.retracted",
-            "Berita ditarik",
-            "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail.",
-        ),
-        _ => return,
+    let is_scheduled =
+        action == "approve" && row.published_at.is_some_and(|at| at > Utc::now());
+    let (event_type, title, message) = if is_scheduled {
+        (
+            "news.scheduled",
+            "Berita dijadwalkan",
+            "Kirimanmu sudah lolos review dan dijadwalkan terbit otomatis di Lajukan News.",
+        )
+    } else {
+        match action {
+            "approve" => ("news.published", "Berita diterbitkan", "Kirimanmu sudah lolos review dan diterbitkan di Lajukan News."),
+            "needs_revision" => ("news.needs_revision", "Berita perlu revisi", "Editor meminta perubahan sebelum berita dapat diterbitkan."),
+            "reject" => ("news.rejected", "Kiriman berita ditolak", "Kiriman belum dapat diterbitkan. Lihat catatan editor untuk detail."),
+            "correct" => ("news.corrected", "Koreksi berita dicatat", "Koreksi editorial untuk beritamu telah dicatat."),
+            "retract" => ("news.retracted", "Berita ditarik", "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail."),
+            _ => return,
+        }
     };
     push_notification_best_effort(
         state,
@@ -1091,6 +1167,7 @@ async fn notify_editorial_result(
             "slug": row.slug,
             "action": action,
             "note": note,
+            "publish_at": row.published_at,
             "href": "/news/submissions",
             "editorial_status": editorial_status(&row.content_status, &row.metadata)
         }),
@@ -1162,6 +1239,7 @@ async fn list_news(
         WHERE content_type = 'news'
           AND content_status = 'active'
           AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'published') = 'published'
+          AND (published_at IS NULL OR published_at <= NOW())
           AND (
             $1::text IS NULL OR
             metadata->'news'->>'category' = $1
@@ -1256,6 +1334,7 @@ async fn get_news(
             (
               content_status = 'active'
               AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'published') = 'published'
+              AND (published_at IS NULL OR published_at <= NOW())
             )
             OR (
               content_status = 'archived'
@@ -1774,6 +1853,30 @@ async fn moderate_news(
     };
     let note = trimmed(payload.note);
     let business_impact = trimmed(payload.business_impact);
+    let fact_check_status = match normalize_fact_check_status(payload.fact_check_status) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let legal_review_status = match normalize_legal_review_status(payload.legal_review_status) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let editorial_priority = match normalize_editorial_priority(payload.editorial_priority) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let sensitivity = match normalize_editorial_sensitivity(payload.sensitivity) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let requested_publish_at = if action == "approve" {
+        match parse_requested_publish_at(payload.publish_at, Utc::now()) {
+            Ok(value) => value,
+            Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+        }
+    } else {
+        None
+    };
     if business_impact
         .as_ref()
         .is_some_and(|value| value.len() > 2_000)
@@ -1840,6 +1943,61 @@ async fn moderate_news(
         }
     }
 
+    let is_press_release = is_press_release(&current.metadata);
+    let existing_news = current.metadata.get("news").and_then(Value::as_object);
+    let final_priority = editorial_priority.unwrap_or_else(|| {
+        existing_news.and_then(|news| news.get("editorial_priority")).and_then(Value::as_str)
+            .filter(|value| matches!(*value, "low" | "normal" | "high" | "urgent"))
+            .unwrap_or("normal").to_string()
+    });
+    let final_sensitivity = sensitivity.unwrap_or_else(|| {
+        existing_news.and_then(|news| news.get("sensitivity")).and_then(Value::as_str)
+            .filter(|value| matches!(*value, "normal" | "high"))
+            .unwrap_or("normal").to_string()
+    });
+    let final_fact_check_status = fact_check_status.unwrap_or_else(|| {
+        existing_news.and_then(|news| news.get("fact_check_status")).and_then(Value::as_str)
+            .filter(|value| matches!(*value, "pending" | "verified" | "not_required"))
+            .unwrap_or(if is_press_release { "not_required" } else { "pending" }).to_string()
+    });
+    let final_legal_review_status = legal_review_status.unwrap_or_else(|| {
+        existing_news.and_then(|news| news.get("legal_review_status")).and_then(Value::as_str)
+            .filter(|value| matches!(*value, "pending" | "approved" | "not_required"))
+            .unwrap_or(if final_sensitivity == "high" { "pending" } else { "not_required" }).to_string()
+    });
+
+    if matches!(action.as_str(), "approve" | "correct") {
+        if !is_press_release && final_fact_check_status != "verified" {
+            return response_error(StatusCode::UNPROCESSABLE_ENTITY, "fact check must be verified before publication");
+        }
+        if final_sensitivity == "high" && final_legal_review_status != "approved" {
+            return response_error(StatusCode::UNPROCESSABLE_ENTITY, "high-sensitivity publication requires legal approval");
+        }
+        if final_sensitivity == "high" && !is_press_release {
+            match has_independent_verified_source_review_tx(&mut tx, current.id, reviewer_id).await {
+                Ok(true) => {}
+                Ok(false) => return response_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "high-sensitivity publication requires independent source review",
+                ),
+                Err(error) => {
+                    tracing::error!("moderate_news independent source review check error: {:?}", error);
+                    return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to validate independent source review");
+                }
+            }
+        }
+    }
+
+    let approved_publish_at = if action == "approve" {
+        Some(
+            current.published_at.clone()
+                .or(requested_publish_at.clone())
+                .unwrap_or_else(|| reviewed_at.clone()),
+        )
+    } else {
+        None
+    };
+
     let mut metadata = current.metadata.clone();
     if !metadata.is_object() {
         metadata = json!({});
@@ -1867,6 +2025,10 @@ async fn moderate_news(
         "reviewer_id".to_string(),
         Value::String(reviewer_id.to_string()),
     );
+    news.insert("fact_check_status".to_string(), Value::String(final_fact_check_status));
+    news.insert("legal_review_status".to_string(), Value::String(final_legal_review_status));
+    news.insert("editorial_priority".to_string(), Value::String(final_priority));
+    news.insert("sensitivity".to_string(), Value::String(final_sensitivity));
     if let Some(note) = note.as_ref() {
         news.insert("review_note".to_string(), Value::String(note.clone()));
     } else {
@@ -1878,11 +2040,17 @@ async fn moderate_news(
             Value::String(business_impact),
         );
     }
-    if action == "approve" && current.published_at.is_none() {
-        news.insert(
-            "published_at".to_string(),
-            Value::String(reviewed_at.to_rfc3339()),
-        );
+    if action == "approve" {
+        if let Some(publish_at) = approved_publish_at.as_ref() {
+            news.insert("published_at".to_string(), Value::String(publish_at.to_rfc3339()));
+            if publish_at > &reviewed_at {
+                news.insert("scheduled_for".to_string(), Value::String(publish_at.to_rfc3339()));
+                news.insert("scheduled_by".to_string(), Value::String(reviewer_id.to_string()));
+            } else {
+                news.remove("scheduled_for");
+                news.remove("scheduled_by");
+            }
+        }
     }
     if action == "correct" {
         if let Some(note) = note.as_ref() {
@@ -1911,7 +2079,7 @@ async fn moderate_news(
             END,
             metadata = $3,
             published_at = CASE
-                WHEN $4::boolean THEN COALESCE(published_at, NOW())
+                WHEN $4::timestamptz IS NOT NULL THEN COALESCE(published_at, $4)
                 ELSE published_at
             END,
             updated_at = NOW(),
@@ -1926,7 +2094,7 @@ async fn moderate_news(
     .bind(content_id)
     .bind(content_status)
     .bind(metadata)
-    .bind(matches!(action.as_str(), "approve" | "correct"))
+    .bind(approved_publish_at)
     .fetch_one(&mut *tx)
     .await;
 
@@ -2055,13 +2223,32 @@ async fn get_editorial_metrics(
     .unwrap_or_default();
 
     let published_24h = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '24 hours'",
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '24 hours' AND published_at <= NOW()",
     )
     .fetch_one(&state.db)
     .await
     .unwrap_or(0);
     let published_7d = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '7 days'",
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '7 days' AND published_at <= NOW()",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let scheduled = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at > NOW()",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let stale_review_24h = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*) FROM content_items
+        WHERE content_type = 'news'
+          AND content_status = 'draft'
+          AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'pending_review')
+              IN ('pending_review', 'needs_revision')
+          AND updated_at < NOW() - interval '24 hours'
+        "#,
     )
     .fetch_one(&state.db)
     .await
@@ -2130,6 +2317,8 @@ async fn get_editorial_metrics(
             "engagement_24h": engagement_24h,
             "published_24h": published_24h,
             "published_7d": published_7d,
+            "scheduled": scheduled,
+            "stale_review_24h": stale_review_24h,
             "avg_review_minutes": avg_review_minutes,
             "versions": versions,
             "sources": {
@@ -2481,11 +2670,13 @@ async fn list_editorial_history(
 mod tests {
     use super::{
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
-        moderation_target, normalize_news_category_filter, normalize_news_language,
-        normalize_news_search_query, normalize_queue_status, parse_news_cursor,
-        public_news_metadata, removes_verified_source, source_domain,
-        validate_submission_payload,
+        moderation_target, normalize_editorial_priority, normalize_editorial_sensitivity,
+        normalize_fact_check_status, normalize_legal_review_status, normalize_news_category_filter,
+        normalize_news_language, normalize_news_search_query, normalize_queue_status,
+        parse_news_cursor, parse_requested_publish_at, public_news_metadata,
+        removes_verified_source, source_domain, validate_submission_payload,
     };
+    use chrono::{Duration, Utc};
     use serde_json::json;
 
     #[test]
@@ -2709,6 +2900,28 @@ mod tests {
             &press_release,
         )
         .is_ok());
+    }
+
+
+    #[test]
+    fn editorial_readiness_and_schedule_values_are_bounded() {
+        assert!(normalize_fact_check_status(Some("verified".into())).is_ok());
+        assert!(normalize_fact_check_status(Some("truthy".into())).is_err());
+        assert!(normalize_legal_review_status(Some("approved".into())).is_ok());
+        assert!(normalize_legal_review_status(Some("skipped".into())).is_err());
+        assert!(normalize_editorial_priority(Some("urgent".into())).is_ok());
+        assert!(normalize_editorial_priority(Some("critical".into())).is_err());
+        assert!(normalize_editorial_sensitivity(Some("high".into())).is_ok());
+        assert!(normalize_editorial_sensitivity(Some("extreme".into())).is_err());
+
+        let now = Utc::now();
+        let past = (now.clone() - Duration::hours(1)).to_rfc3339();
+        assert_eq!(
+            parse_requested_publish_at(Some(past), now.clone()).unwrap(),
+            Some(now)
+        );
+        let too_far = (Utc::now() + Duration::days(91)).to_rfc3339();
+        assert!(parse_requested_publish_at(Some(too_far), Utc::now()).is_err());
     }
 
     #[test]
