@@ -192,7 +192,11 @@ export async function openWave2CashShift(
     headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(input),
   });
-  return (data(payload).shift as Wave2CashShift | undefined) ?? null;
+  const body = data(payload);
+  return {
+    shift: (body.shift as Wave2CashShift | undefined) ?? null,
+    replayed: body.replayed === true,
+  };
 }
 
 export async function closeWave2CashShift(
@@ -209,7 +213,11 @@ export async function closeWave2CashShift(
       body: JSON.stringify(input),
     },
   );
-  return (data(payload).shift as Wave2CashShift | undefined) ?? null;
+  const body = data(payload);
+  return {
+    shift: (body.shift as Wave2CashShift | undefined) ?? null,
+    replayed: body.replayed === true,
+  };
 }
 
 export async function setWave2PrimaryMaterial(
