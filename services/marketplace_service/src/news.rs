@@ -161,6 +161,20 @@ struct NewsSourceRow {
     last_seen_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+struct NewsSourceReviewEventRow {
+    id: Uuid,
+    content_id: Uuid,
+    source_id: Option<Uuid>,
+    reviewer_id: Uuid,
+    from_source_kind: String,
+    to_source_kind: String,
+    from_verification_status: String,
+    to_verification_status: String,
+    note: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Deserialize)]
 struct UpdateNewsSourceRequest {
     source_kind: Option<String>,
@@ -2311,9 +2325,9 @@ async fn update_news_source(
     )
     .bind(source_id)
     .bind(content_id)
-    .bind(source_kind)
-    .bind(verification_status)
-    .bind(note)
+    .bind(&source_kind)
+    .bind(&verification_status)
+    .bind(&note)
     .fetch_optional(&mut *tx)
     .await
     {
@@ -2327,6 +2341,35 @@ async fn update_news_source(
             );
         }
     };
+
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO news_source_review_events (
+          content_id, source_id, reviewer_id,
+          from_source_kind, to_source_kind,
+          from_verification_status, to_verification_status,
+          note
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        "#,
+    )
+    .bind(content_id)
+    .bind(source_id)
+    .bind(reviewer_id)
+    .bind(&current_source.source_kind)
+    .bind(&updated.source_kind)
+    .bind(&current_source.verification_status)
+    .bind(&updated.verification_status)
+    .bind(&note)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("update_news_source audit error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news source review",
+        );
+    }
 
     if let Err(error) = enqueue_news_outbox_tx(
         &mut tx,
@@ -2412,12 +2455,30 @@ async fn list_editorial_history(
             .fetch_all(&state.db)
             .await
             .unwrap_or_default();
+            let source_reviews = sqlx::query_as::<_, NewsSourceReviewEventRow>(
+                r#"
+                SELECT
+                  id, content_id, source_id, reviewer_id,
+                  from_source_kind, to_source_kind,
+                  from_verification_status, to_verification_status,
+                  note, created_at
+                FROM news_source_review_events
+                WHERE content_id = $1
+                ORDER BY created_at DESC, id DESC
+                LIMIT 100
+                "#,
+            )
+            .bind(content_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
             (
                 StatusCode::OK,
                 Json(json!({
                     "items": items,
                     "versions": versions,
-                    "sources": sources
+                    "sources": sources,
+                    "source_reviews": source_reviews
                 })),
             )
                 .into_response()
