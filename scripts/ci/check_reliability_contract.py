@@ -46,6 +46,8 @@ marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_met
 community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
 ai_runtime_metrics = read("services/ai_service/src/runtime_metrics.rs")
 community_main_source = read("services/community_service/src/main.rs")
+marketplace_schema_contract = read("services/marketplace_service/src/schema_contract.rs")
+community_schema_contract = read("services/community_service/src/schema_contract.rs")
 production_env_example = read(".env.production.example")
 staging_env_example = read(".env.staging.example")
 development_env_example = read(".env.development.example")
@@ -506,8 +508,8 @@ for destructive in ("http.post(", "http.put(", "http.patch(", "http.del(", "http
         errors.append(f"default load-test harness must stay read-only: found {destructive}")
 
 for path, warning_threshold, hard_ceiling in (
-    ("services/marketplace_service/src/main.rs", 250_000, 840_000),
-    ("services/community_service/src/main.rs", 200_000, 325_000),
+    ("services/marketplace_service/src/main.rs", 750_000, 830_000),
+    ("services/community_service/src/main.rs", 275_000, 310_000),
 ):
     target = ROOT / path
     if not target.is_file():
@@ -524,6 +526,26 @@ for path, warning_threshold, hard_ceiling in (
             f"{path} is {size:,} bytes; continue responsibility-based extraction "
             "before scale-driven service splits"
         )
+
+for path, source, main_source in (
+    (
+        "services/marketplace_service/src/schema_contract.rs",
+        marketplace_schema_contract,
+        marketplace_source,
+    ),
+    (
+        "services/community_service/src/schema_contract.rs",
+        community_schema_contract,
+        community_main_source,
+    ),
+):
+    for marker in ("ensure_runtime_schema", "verify_schema_contract"):
+        if marker not in source:
+            errors.append(f"{path} missing schema-contract responsibility: {marker}")
+    if "mod schema_contract;" not in main_source:
+        errors.append(f"{path} is no longer wired from the service composition root")
+    if "async fn ensure_runtime_schema" in main_source:
+        errors.append(f"{path} migration characterization leaked back into main.rs")
 
 if not re.search(r"image:\s+\$\{DOCKERHUB_NAMESPACE", prod_compose):
     errors.append("production services must continue using registry image references")
