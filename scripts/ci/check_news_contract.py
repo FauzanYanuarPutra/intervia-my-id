@@ -50,6 +50,13 @@ require(
         '"retracted"',
         "record_version_tx",
         "sync_source_references_tx",
+        "struct PublicNewsRow",
+        "public_news_metadata",
+        "normalize_news_language",
+        "public_verified_source_urls",
+        "verification_status = 'verified'",
+        "unsupported news source URL",
+        'news.remove("location")',
     ),
 )
 
@@ -142,6 +149,8 @@ require(
         'data-news-action="source_clicked"',
         'data-news-action="related_clicked"',
         "relatedArticles",
+        "permanentRedirect",
+        "language: article.language",
     ),
 )
 
@@ -190,6 +199,8 @@ require(
         "Berita dan analisis membutuhkan minimal satu URL sumber.",
         "topics",
         "editorial_status: 'pending_review'",
+        "isPrivateSourceHost",
+        "language,",
     ),
 )
 
@@ -199,6 +210,8 @@ require(
         "sanitizeTopics",
         "source_urls",
         "topics",
+        "evaluateTrustSafety",
+        "isPrivateSourceHost",
     ),
 )
 
@@ -213,6 +226,33 @@ require(
         "Top artikel 7 hari",
     ),
 )
+
+require(
+    "frontend/apps/www/src/lib/news.ts",
+    (
+        "language?: 'id' | 'en'",
+        "params.set('language', options.language)",
+        "let cursor: string | undefined",
+        "page.nextCursor",
+    ),
+)
+
+require(
+    "frontend/apps/www/src/app/[locale]/(shared)/news/submit/SubmitNewsForm.tsx",
+    (
+        "language: isId ? 'id' : 'en'",
+    ),
+)
+
+require(
+    "frontend/apps/www/src/app/news/rss.xml/route.ts",
+    (
+        "getPublishedNews({ language: 'id', limit: 50 })",
+    ),
+)
+
+if "const localizedNews = newsItems.filter(article => article.language === lang);" not in sitemap:
+    errors.append("main sitemap must scope News facets to the article language")
 
 require(
     "frontend/apps/www/src/lib/analytics/eventTaxonomy.ts",
