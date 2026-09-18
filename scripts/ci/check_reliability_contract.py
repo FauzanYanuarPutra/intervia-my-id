@@ -411,8 +411,8 @@ for path in (
     source = read(path)
     for marker in (
         "get_max_connections()",
-        'state="active"',
-        'state="max"',
+        'state=\\\"active\\\"',
+        'state=\\\"max\\\"',
     ):
         if marker not in source:
             errors.append(f"{path} missing DB pool capacity metric marker: {marker}")
