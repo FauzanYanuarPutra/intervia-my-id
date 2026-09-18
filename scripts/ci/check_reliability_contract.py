@@ -42,6 +42,7 @@ identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.r
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
 community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
 community_main_source = read("services/community_service/src/main.rs")
+marketplace_identity_client = read("services/marketplace_service/src/businesses/identity_client.rs")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -108,6 +109,14 @@ for marker in (
 ):
     if marker not in community_main_source:
         errors.append(f"Community RabbitMQ backpressure contract missing: {marker}")
+
+for marker in (
+    "MARKETPLACE_IDENTITY_TIMEOUT_MS",
+    ".clamp(250, 10_000)",
+    ".timeout(self.request_timeout)",
+):
+    if marker not in marketplace_identity_client:
+        errors.append(f"Marketplace Identity dependency deadline missing: {marker}")
 
 for marker in (
     'promtool", "query", "instant", "http://localhost:9090", "up"',

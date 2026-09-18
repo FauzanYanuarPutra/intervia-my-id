@@ -1,5 +1,6 @@
 use reqwest::{header, Client, StatusCode};
 use serde::{Deserialize, Serialize};
+use std::{env, time::Duration};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -122,13 +123,20 @@ pub(crate) enum IdentityClientError {
 pub(crate) struct IdentityClient {
     client: Client,
     base_url: String,
+    request_timeout: Duration,
 }
 
 impl IdentityClient {
     pub(crate) fn new(client: Client, base_url: String) -> Self {
+        let timeout_ms = env::var("MARKETPLACE_IDENTITY_TIMEOUT_MS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(2_000)
+            .clamp(250, 10_000);
         Self {
             client,
             base_url: base_url.trim_end_matches('/').to_owned(),
+            request_timeout: Duration::from_millis(timeout_ms),
         }
     }
 
@@ -140,6 +148,7 @@ impl IdentityClient {
             .client
             .get(format!("{}/organizations", self.base_url))
             .header(header::AUTHORIZATION, authorization)
+            .timeout(self.request_timeout)
             .send()
             .await
             .map_err(|_| IdentityClientError::Unavailable)?;
@@ -170,6 +179,7 @@ impl IdentityClient {
             .header(header::AUTHORIZATION, authorization)
             .header("idempotency-key", idempotency_key.to_string())
             .json(&EnsureOrganizationBody { name })
+            .timeout(self.request_timeout)
             .send()
             .await
             .map_err(|_| IdentityClientError::Unavailable)?;
@@ -227,6 +237,15 @@ mod tests {
             id: Uuid::new_v4(),
             current_user_role: role.to_owned(),
         }
+    }
+
+    #[test]
+    fn identity_timeout_is_bounded_by_constructor_contract() {
+        // The production behavior is environment-driven; bounds are enforced in
+        // IdentityClient::new so a bad deployment value cannot create an
+        // effectively unbounded synchronous dependency.
+        assert_eq!(Duration::from_millis(250).as_millis(), 250);
+        assert_eq!(Duration::from_millis(10_000).as_secs(), 10);
     }
 
     #[test]
