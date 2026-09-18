@@ -41,6 +41,7 @@ scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
 community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
+community_main_source = read("services/community_service/src/main.rs")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -90,6 +91,14 @@ for marker in (
 ):
     if marker not in identity_runtime_metrics:
         errors.append(f"core Rust overload protection missing runtime marker: {marker}")
+
+for marker in (
+    "FOR UPDATE SKIP LOCKED",
+    "RETURNING inbox.id, inbox.payload, inbox.available_at AS lease_until",
+    "AND available_at = $2",
+):
+    if marker not in community_main_source:
+        errors.append(f"Community multi-replica inbox claim contract missing: {marker}")
 
 for marker in (
     'promtool", "query", "instant", "http://localhost:9090", "up"',
