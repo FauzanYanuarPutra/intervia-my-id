@@ -7,6 +7,7 @@ import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { ProductModifierEditor } from '@/components/forms/ProductModifierEditor';
 import type { ProductRecord } from '@/lib/portal-types';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 
 type Props = {
   businessId: string;
@@ -40,7 +41,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
       body: JSON.stringify(body),
     });
     const result = (await response.json()) as { error?: string };
-    if (!response.ok) throw new Error(result.error || 'Perubahan belum berhasil disimpan.');
+    if (!response.ok) throw new Error(businessApiErrorMessage(result, 'Perubahan belum berhasil disimpan.', response.status));
   }
 
   function begin(action: Exclude<PendingAction, null>) {
