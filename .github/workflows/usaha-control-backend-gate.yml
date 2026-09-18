@@ -125,3 +125,9 @@ jobs:
           test -s migrations/20260918150000_business_order_transition_idempotency.down.sql
           grep -q 'idempotency_key UUID' migrations/20260918150000_business_order_transition_idempotency.up.sql
           grep -q 'idx_order_state_transitions_idempotency_key' migrations/20260918150000_business_order_transition_idempotency.up.sql
+          test -s migrations/20260918173000_business_order_stock_reservations.up.sql
+          test -s migrations/20260918173000_business_order_stock_reservations.down.sql
+          grep -q 'business_order_stock_reservations' migrations/20260918173000_business_order_stock_reservations.up.sql
+          grep -q "state IN ('reserved', 'released', 'consumed')" migrations/20260918173000_business_order_stock_reservations.up.sql
+          grep -q 'ON DELETE RESTRICT' migrations/20260918173000_business_order_stock_reservations.up.sql
+          grep -q 'refusing to drop business_order_stock_reservations' migrations/20260918173000_business_order_stock_reservations.down.sql
