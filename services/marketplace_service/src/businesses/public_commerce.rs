@@ -486,7 +486,12 @@ impl PublicCommerceRepository {
 
         let event_type = "order.created";
         let event_key = format!("{}:order.created:v1", inserted_id);
+        let event_id = Uuid::new_v4();
         let event_payload = json!({
+            "event_id": event_id,
+            "event_key": &event_key,
+            "event_type": event_type,
+            "schema_version": 1,
             "order_id": inserted_id,
             "order_number": order_number,
             "buyer_id": buyer_id,
@@ -514,7 +519,7 @@ impl PublicCommerceRepository {
             ON CONFLICT (event_key) DO NOTHING
             "#,
         )
-        .bind(Uuid::new_v4())
+        .bind(event_id)
         .bind(inserted_id)
         .bind(event_type)
         .bind(&event_payload)
@@ -526,15 +531,17 @@ impl PublicCommerceRepository {
         sqlx::query(
             r#"
             INSERT INTO events.event_outbox (
-              id, aggregate_type, aggregate_id, event_type, payload, routing_key
-            ) VALUES ($1,'order',$2,$3,$4,$5)
+              id, aggregate_type, aggregate_id, event_type, payload, routing_key, event_key
+            ) VALUES ($1,'order',$2,$3,$4,$5,$6)
+            ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING
             "#,
         )
-        .bind(Uuid::new_v4())
+        .bind(event_id)
         .bind(inserted_id.to_string())
         .bind(event_type)
         .bind(&event_payload)
         .bind(event_type)
+        .bind(&event_key)
         .execute(&mut *tx)
         .await
         .map_err(storage_error)?;

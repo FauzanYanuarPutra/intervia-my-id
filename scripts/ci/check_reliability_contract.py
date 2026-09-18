@@ -26,6 +26,10 @@ scale_doc = read("docs/architecture/scale-reliability-v1.md")
 slo_doc = read("docs/operations/slo-capacity-overload.md")
 incident_doc = read("docs/operations/incident-response.md")
 load_script = read("scripts/load/k6-read-paths.js")
+capacity_runner = read("scripts/load/run-capacity-baseline.sh")
+capacity_workflow = read(".github/workflows/capacity-baseline.yml")
+capacity_doc = read("docs/operations/capacity-testing.md")
+outbox_requeue_script = read("scripts/ops/requeue_marketplace_outbox_event.sh")
 quality_workflow = read(".github/workflows/quality.yml")
 read("docs/operations/backup-and-disaster-recovery.md")
 observability_compose = read("docker-compose.observability.yml")
@@ -206,7 +210,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanOutboxOldestEventStale", "LajukanOutboxOldestEventCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated", "LajukanHttpOverloadShedding"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanOutboxDeliveryFailed", "LajukanOutboxOldestEventStale", "LajukanOutboxOldestEventCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated", "LajukanHttpOverloadShedding"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
@@ -280,6 +284,7 @@ marketplace_outbox_source = read("services/marketplace_service/src/outbox.rs")
 marketplace_health_source = read("services/marketplace_service/src/health.rs")
 marketplace_public_commerce_source = read("services/marketplace_service/src/businesses/public_commerce.rs")
 marketplace_seller_orders_source = read("services/marketplace_service/src/businesses/seller_orders.rs")
+marketplace_outbox_identity_migration = read("services/marketplace_service/migrations/20260918190000_marketplace_outbox_event_identity.up.sql")
 for marker in (
     "tokio::spawn(async move",
     "run_outbox_publisher",
@@ -295,6 +300,10 @@ for marker in (
     "OUTBOX_POLL_INTERVAL_MS",
     "normalize_batch_size",
     "normalize_poll_ms",
+    "OUTBOX_MAX_RETRIES",
+    "normalize_max_retries",
+    "with_message_id",
+    "status = CASE WHEN retry_count + 1 >= $4 THEN 'failed' ELSE 'pending' END",
 ):
     if marker not in marketplace_outbox_source:
         errors.append(f"Marketplace outbox configuration contract missing marker: {marker}")
@@ -307,11 +316,41 @@ for path, source in (
         "INSERT INTO outbox_events",
         "INSERT INTO events.event_outbox",
         "routing_key",
+        "event_key",
+        "event_id",
+        "schema_version",
+        "ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING",
     ):
         if required_marker not in source:
             errors.append(
                 f"{path} lost Business OS outbox convergence marker: {required_marker}"
             )
+
+for marker in (
+    "ADD COLUMN IF NOT EXISTS event_key",
+    "uq_marketplace_event_outbox_event_key",
+    "WHERE event_key IS NOT NULL",
+):
+    if marker not in marketplace_outbox_identity_migration:
+        errors.append(f"Marketplace canonical outbox identity migration missing: {marker}")
+
+for marker in (
+    "lajukan_outbox_failed",
+    "lajukan_outbox_max_retry_count",
+):
+    if marker not in marketplace_health_source:
+        errors.append(f"Marketplace outbox observability missing metric: {marker}")
+
+if "OUTBOX_MAX_RETRIES: ${OUTBOX_MAX_RETRIES:-20}" not in base_compose:
+    errors.append("base compose missing marketplace outbox retry budget")
+
+for env_name, env_source in (
+    ("production", production_env_example),
+    ("staging", staging_env_example),
+    ("development", development_env_example),
+):
+    if "OUTBOX_MAX_RETRIES=20" not in env_source:
+        errors.append(f"{env_name} env example missing marketplace outbox retry budget")
 
 
 community_compose_start = base_compose.find("\n  community_service:")
@@ -506,6 +545,54 @@ if "127.0.0.1" not in load_script:
 for destructive in ("http.post(", "http.put(", "http.patch(", "http.del(", "http.delete("):
     if destructive in load_script:
         errors.append(f"default load-test harness must stay read-only: found {destructive}")
+
+for marker in (
+    "productionHosts",
+    "ALLOW_PRODUCTION_LOAD",
+    "RAMP_DURATION",
+    "HOLD_DURATION",
+):
+    if marker not in load_script:
+        errors.append(f"read-only k6 harness missing safety/capacity marker: {marker}")
+
+for marker in (
+    "I_UNDERSTAND_HIGH_LOAD",
+    "I_UNDERSTAND_PRODUCTION_LOAD",
+    "peak_rps=5000",
+    "--summary-export",
+    "grafana/k6:0.54.0",
+):
+    if marker not in capacity_runner:
+        errors.append(f"capacity runner missing guarded evidence marker: {marker}")
+
+for marker in (
+    "workflow_dispatch:",
+    "allow_production:",
+    "confirm_high_load:",
+    "confirm_production:",
+    "actions/upload-artifact@v4",
+    "scripts/load/run-capacity-baseline.sh",
+):
+    if marker not in capacity_workflow:
+        errors.append(f"capacity workflow missing safety/evidence marker: {marker}")
+
+for marker in (
+    "CONFIRM_REQUEUE=I_UNDERSTAND_REQUEUE",
+    "status = 'failed'",
+    "status = 'pending'",
+    "retry_count = 0",
+    "Set exactly one of EVENT_ID or EVENT_KEY",
+):
+    if marker not in outbox_requeue_script:
+        errors.append(f"marketplace outbox requeue script missing safety marker: {marker}")
+
+for marker in (
+    "measured evidence",
+    "terminal failures",
+    "Do not introduce Kubernetes",
+):
+    if marker not in capacity_doc:
+        errors.append(f"capacity runbook missing decision marker: {marker}")
 
 for path, warning_threshold, hard_ceiling in (
     ("services/marketplace_service/src/main.rs", 750_000, 830_000),

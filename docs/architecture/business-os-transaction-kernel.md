@@ -108,13 +108,33 @@ Existing public commerce already uses canonical order states such as `PENDING_PA
 
 No important historical transaction, reservation, movement, payment, or document fact should be hard-deleted. Corrections use explicit compensating facts.
 
+## Canonical event delivery
+
+Business OS order creation and seller state transitions now write the legacy `outbox_events`
+record and the canonical `events.event_outbox` record in the same database transaction.
+Both rows share one event UUID and one deterministic `event_key`. The canonical table
+enforces a partial unique index on `event_key`, the RabbitMQ publisher uses that key as
+the AMQP message ID, and the event payload carries `event_id`, `event_key`,
+`event_type`, and `schema_version`.
+
+The publisher has a bounded retry budget. Exhausted events enter `failed` state and stay
+visible in backlog/age metrics plus the dedicated `lajukan_outbox_failed` alert. They are
+not silently discarded. Requeue is an explicit operator action after the downstream cause
+is fixed. Operators use `scripts/ops/requeue_marketplace_outbox_event.sh`, which only
+requeues one failed event selected by UUID or event key and requires
+`CONFIRM_REQUEUE=I_UNDERSTAND_REQUEUE`.
+
+The legacy outbox remains temporarily for compatibility. It should only be retired after
+all downstream consumers use canonical event identity and durable consumer inbox/dedupe
+semantics.
+
 ## Next integration targets
 
 1. payment capture/callback authority consuming or releasing the same reservation contract where appropriate;
 2. invoice posting and payment allocation;
 3. refund/return case execution and restock semantics;
 4. settlement reconciliation;
-5. outbox convergence and consumer idempotency;
+5. durable consumer inbox/idempotency and retirement of the legacy Business OS outbox;
 6. accounting projection;
 7. procurement and inter-location reservation/transfer semantics.
 

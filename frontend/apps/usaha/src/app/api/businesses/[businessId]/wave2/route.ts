@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
   BusinessWave2HttpError,
@@ -66,7 +65,10 @@ export async function POST(
       return NextResponse.json({ data: { plan } });
     }
     if (action === 'create_obligation') {
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+      if (!idempotencyKey) {
+        return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+      }
       const obligation = await createWave2Obligation(businessId, idempotencyKey, input);
       return NextResponse.json({ data: { obligation } }, { status: 201 });
     }
@@ -76,18 +78,26 @@ export async function POST(
       if (!obligationId || !paidOn) {
         return NextResponse.json({ error: 'invalid_obligation_payment' }, { status: 400 });
       }
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+      if (!idempotencyKey) {
+        return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+      }
       const result = await payWave2Obligation(
         businessId,
         obligationId,
-        request.headers.get('idempotency-key')?.trim() || randomUUID(),
+        idempotencyKey,
         paidOn,
       );
       return NextResponse.json(result);
     }
     if (action === 'purchase') {
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+      if (!idempotencyKey) {
+        return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+      }
       const result = await createWave2Purchase(
         businessId,
-        request.headers.get('idempotency-key')?.trim() || randomUUID(),
+        idempotencyKey,
         input,
       );
       return NextResponse.json(result, { status: 201 });
@@ -124,7 +134,10 @@ export async function POST(
       return NextResponse.json(result);
     }
     if (action === 'create_yield_observation') {
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+      if (!idempotencyKey) {
+        return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+      }
       const observation = await createWave2YieldObservation(businessId, idempotencyKey, input);
       return NextResponse.json({ data: { observation } }, { status: 201 });
     }

@@ -169,6 +169,15 @@ groups:
           summary: "Lajukan transactional outbox backlog is critical"
           description: "{{ $labels.service }} has more than 1000 unpublished outbox events for 10 minutes. Business writes may be committed while downstream projections are stale."
 
+      - alert: LajukanOutboxDeliveryFailed
+        expr: lajukan_outbox_failed > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lajukan transactional outbox has terminal delivery failures"
+          description: "{{ $labels.service }} has outbox events that exhausted their retry budget. Reconcile the downstream consumer and explicitly requeue only after the cause is fixed."
+
       - alert: LajukanOutboxOldestEventStale
         expr: lajukan_outbox_oldest_age_seconds > 300
         for: 10m

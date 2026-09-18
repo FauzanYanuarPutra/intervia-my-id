@@ -1,0 +1,73 @@
+name: Capacity Baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Target base URL. Use staging by default."
+        required: true
+        type: string
+      paths:
+        description: "Comma-separated read-only paths"
+        required: true
+        default: "/,/id/news"
+        type: string
+      profile:
+        description: "Load profile"
+        required: true
+        default: "baseline"
+        type: choice
+        options:
+          - smoke
+          - baseline
+          - stress
+          - extreme
+      allow_production:
+        description: "Allow a production target only with the production confirmation token"
+        required: true
+        default: false
+        type: boolean
+      confirm_high_load:
+        description: "For stress/extreme enter I_UNDERSTAND_HIGH_LOAD"
+        required: false
+        type: string
+      confirm_production:
+        description: "For production enter I_UNDERSTAND_PRODUCTION_LOAD"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capacity-${{ github.ref }}-${{ inputs.base_url }}
+  cancel-in-progress: false
+
+jobs:
+  capacity:
+    name: Read-only capacity baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run guarded capacity profile
+        shell: bash
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          PATHS: ${{ inputs.paths }}
+          PROFILE: ${{ inputs.profile }}
+          ALLOW_PRODUCTION_LOAD: ${{ inputs.allow_production && '1' || '0' }}
+          HIGH_LOAD_CONFIRM: ${{ inputs.confirm_high_load }}
+          PRODUCTION_LOAD_CONFIRM: ${{ inputs.confirm_production }}
+          CAPACITY_ARTIFACT_DIR: ${{ github.workspace }}/.runtime/capacity/current
+        run: bash scripts/load/run-capacity-baseline.sh
+
+      - name: Upload capacity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capacity-${{ inputs.profile }}-${{ github.sha }}
+          path: .runtime/capacity/current/
+          if-no-files-found: error
+          retention-days: 30
