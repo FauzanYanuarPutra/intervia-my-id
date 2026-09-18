@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, Loader2, Save } from 'lucide-react';
 import { buildChannelBusinessSummary } from '@/lib/business-control/channel-ux';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { channelSimulationReadiness } from '@/lib/business-control/progressive-disclosure';
 
 type Channel = {
@@ -113,7 +114,7 @@ export function ChannelSettingsWorkspace({
         }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan pengaturan.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan pengaturan.', response.status));
       setMessage(`${row.displayName} tersimpan.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan pengaturan.');

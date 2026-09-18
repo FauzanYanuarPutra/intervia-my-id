@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History } from 'lucide-react';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 
 export function ReconcileBusinessButton() {
   const router = useRouter();
@@ -25,7 +26,7 @@ export function ReconcileBusinessButton() {
         body: JSON.stringify({ idempotencyKey: attempt.key }),
       });
       const result = (await response.json()) as { error?: string; redirectTo?: string };
-      if (!response.ok || !result.redirectTo) throw new Error(result.error || 'Usaha lama belum ditemukan.');
+      if (!response.ok || !result.redirectTo) throw new Error(businessApiErrorMessage(result, 'Usaha lama belum ditemukan.', response.status));
       router.push(result.redirectTo);
       router.refresh();
     } catch (cause) {

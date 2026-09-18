@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { MapPin, Plus, Save, Trash2, X } from 'lucide-react';
 import { BusinessLocationField } from '@/components/forms/BusinessLocationField';
 import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type { BusinessLocation } from '@/lib/portal-types';
 import type { LatLng } from '@/lib/maps';
 
@@ -57,7 +58,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
         body: JSON.stringify({ locations: next }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Lokasi belum berhasil disimpan.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Lokasi belum berhasil disimpan.', response.status));
       setLocations(next);
       setEditing(null);
       return true;

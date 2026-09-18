@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type { BusinessImageValue } from '@/lib/media-crop';
 
 type ProductQuickFormProps = { businessId: string };
@@ -79,7 +80,7 @@ export function ProductQuickForm({ businessId }: ProductQuickFormProps) {
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
-        setError(result.error ?? 'Produk belum berhasil ditambahkan. Coba lagi.');
+        setError(businessApiErrorMessage(result, 'Produk belum berhasil ditambahkan. Coba lagi.', response.status));
         return;
       }
 

@@ -184,7 +184,7 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
           {selectedProduct ? (
             <div className="min-w-0">
               <Link href={listHref} className="portal-button-ghost mb-3 lg:hidden">← Kembali ke produk</Link>
-              <ProductEditorWorkspace businessId={business.id} product={selectedProduct} />
+              <ProductEditorWorkspace key={selectedProduct.id} businessId={business.id} product={selectedProduct} />
             </div>
           ) : null}
         </div>

@@ -13,6 +13,7 @@ type SearchPickerProps<T> = {
   emptyLabel: string;
   disabled?: boolean;
   ariaLabel: string;
+  maxVisible?: number;
 };
 
 export function SearchPicker<T>({
@@ -28,15 +29,23 @@ export function SearchPicker<T>({
   emptyLabel,
   disabled = false,
   ariaLabel,
+  maxVisible = 50,
 }: SearchPickerProps<T>) {
   const needle = query.trim().toLocaleLowerCase('id-ID');
-  const visible = needle
+  const matches = needle
     ? items.filter(item =>
         `${getLabel(item)} ${getMeta?.(item) ?? ''}`
           .toLocaleLowerCase('id-ID')
           .includes(needle),
       )
     : items;
+  const selected = matches.find(item => getKey(item) === value);
+  const limit = Math.max(1, maxVisible);
+  const limited = matches.slice(0, limit);
+  const visible = selected && !limited.some(item => getKey(item) === value)
+    ? [selected, ...limited.slice(0, Math.max(0, limit - 1))]
+    : limited;
+  const hiddenCount = Math.max(0, matches.length - visible.length);
 
   return (
     <div aria-label={ariaLabel}>
@@ -49,6 +58,12 @@ export function SearchPicker<T>({
         role="searchbox"
         aria-label={`Cari ${ariaLabel.toLocaleLowerCase('id-ID')}`}
       />
+
+      {hiddenCount ? (
+        <p className="mt-2 text-[11px] text-portal-soft">
+          Menampilkan {visible.length} dari {matches.length}. Ketik pencarian agar hasil lebih spesifik.
+        </p>
+      ) : null}
 
       <div role="listbox" aria-label={`${ariaLabel} pilihan`} className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-portal-line bg-white">
         {visible.length ? (

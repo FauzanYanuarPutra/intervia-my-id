@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type {
   Wave2FinancePlan,
   Wave2Obligation,
@@ -108,6 +110,7 @@ export function FinancePlanningWorkspace({
   const [savingBill, setSavingBill] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<FeedbackTone>('info');
   const [label, setLabel] = useState('');
   const [billType, setBillType] = useState('utilities_expense');
   const [billAmount, setBillAmount] = useState('');
@@ -143,7 +146,7 @@ export function FinancePlanningWorkspace({
       cache: 'no-store',
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error || 'Gagal memuat saldo authoritative.');
+    if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memuat saldo authoritative.', response.status));
     setSummary(payload?.data?.summary ?? null);
   }
 
@@ -152,7 +155,7 @@ export function FinancePlanningWorkspace({
       cache: 'no-store',
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error || 'Gagal memuat rencana uang.');
+    if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memuat rencana uang.', response.status));
     setPlan(defaultPlan(payload?.data?.plan ?? null));
     setObligations(Array.isArray(payload?.data?.obligations) ? payload.data.obligations : []);
   }
@@ -163,7 +166,7 @@ export function FinancePlanningWorkspace({
     fetch(`/api/businesses/${businessId}/finance-core/summary`, { cache: 'no-store' })
       .then(async response => {
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload?.error || 'Gagal memuat saldo authoritative.');
+        if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memuat saldo authoritative.', response.status));
         return payload?.data?.summary ?? null;
       })
       .then(nextSummary => {
@@ -180,6 +183,7 @@ export function FinancePlanningWorkspace({
 
   async function savePlan() {
     if (totalBps > 10_000) {
+      setMessageTone('error');
       setMessage('Total target tidak boleh lebih dari 100%.');
       return;
     }
@@ -192,10 +196,12 @@ export function FinancePlanningWorkspace({
         body: JSON.stringify({ action: 'save_finance_plan', ...plan }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan target pembagian.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan target pembagian.', response.status));
       await reloadFinancePlan();
+      setMessageTone('success');
       setMessage('Target persentase tersimpan. Saldo kantong lama tidak berubah.');
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan target pembagian.');
     } finally {
       setSavingPlan(false);
@@ -206,6 +212,7 @@ export function FinancePlanningWorkspace({
     const amount = Math.round(Number(billAmount));
     const interval = Math.round(Number(intervalDays));
     if (!label.trim() || amount <= 0 || interval <= 0) {
+      setMessageTone('error');
       setMessage('Isi nama tagihan, nominal, dan interval dengan benar.');
       return;
     }
@@ -233,13 +240,15 @@ export function FinancePlanningWorkspace({
         body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menambah tagihan.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menambah tagihan.', response.status));
       await reloadFinancePlan();
       obligationAttemptRef.current = null;
       setLabel('');
       setBillAmount('');
+      setMessageTone('success');
       setMessage('Tagihan rutin tersimpan. Belum mengurangi kas sampai dibayar.');
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menambah tagihan.');
     } finally {
       setSavingBill(false);
@@ -267,11 +276,13 @@ export function FinancePlanningWorkspace({
         body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal mencatat pembayaran.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal mencatat pembayaran.', response.status));
       await Promise.all([reloadFinancePlan(), reloadFinanceCore()]);
       paymentAttemptRef.current = null;
+      setMessageTone('success');
       setMessage('Pembayaran tercatat. Saldo authoritative sudah dimuat ulang.');
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal mencatat pembayaran.');
     } finally {
       setPayingId(null);
@@ -328,7 +339,7 @@ export function FinancePlanningWorkspace({
         <div className="border-t border-portal-line p-4 sm:p-5"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><label className="text-xs font-semibold text-portal-soft">Nama tagihan<input value={label} onChange={event => setLabel(event.target.value)} placeholder="Contoh: Sewa kios" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft"><span>Kategori</span><div className="mt-1"><ChoiceChips value={billType} onChange={setBillType} ariaLabel="Kategori tagihan" options={billTypeOptions} /></div></div><label className="text-xs font-semibold text-portal-soft">Nominal<input type="number" min="1" value={billAmount} onChange={event => setBillAmount(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Tiap berapa hari<input type="number" min="1" value={intervalDays} onChange={event => setIntervalDays(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><label className="text-xs font-semibold text-portal-soft">Jatuh tempo berikutnya<input type="date" value={nextDueOn} onChange={event => setNextDueOn(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-portal-line bg-white px-3" /></label><div className="text-xs font-semibold text-portal-soft"><span>Bayar lewat</span><div className="mt-1"><ChoiceChips value={accountKey} onChange={setAccountKey} ariaLabel="Akun tagihan" options={billAccountOptions} /></div></div></div><button type="button" onClick={addBill} disabled={savingBill} className="portal-button-primary mt-3 disabled:opacity-50">{savingBill ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Tambah tagihan</button></div>
       </details>
 
-      {message ? <div role="status" className="rounded-xl border border-portal-line bg-white px-4 py-3 text-xs font-semibold text-portal-soft">{message}</div> : null}
+      {message ? <FeedbackNotice message={message} tone={messageTone} /> : null}
     </div>
   );
 }

@@ -13,6 +13,7 @@ const provision = readFileSync('src/components/forms/NewBusinessQuickForm.tsx', 
 const reconcile = readFileSync('src/components/forms/ReconcileBusinessButton.tsx', 'utf8');
 const productEditor = readFileSync('src/components/forms/ProductEditorWorkspace.tsx', 'utf8');
 const cashShift = readFileSync('src/components/business-control/CashShiftWorkspace.tsx', 'utf8');
+const feedbackNotice = readFileSync('src/components/interaction/FeedbackNotice.tsx', 'utf8');
 
 describe('Usaha hardening V4 contracts', () => {
   it('uses Jakarta business dates instead of UTC date slicing', () => {
@@ -85,9 +86,9 @@ describe('Usaha hardening V4 contracts', () => {
   });
 
   it('announces cash shift and settlement mutation feedback', () => {
-    expect(cashShift).toContain('role="status"');
-    expect(cashShift).toContain('aria-live="polite"');
-    expect(settlement).toContain('role="status"');
-    expect(settlement).toContain('aria-live="polite"');
+    expect(cashShift).toContain('FeedbackNotice');
+    expect(settlement).toContain('FeedbackNotice');
+    expect(feedbackNotice).toContain("role={isError ? 'alert' : 'status'}");
+    expect(feedbackNotice).toContain("aria-live={isError ? 'assertive' : 'polite'}");
   });
 });
