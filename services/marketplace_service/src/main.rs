@@ -10,7 +10,6 @@ use axum::{
 };
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use futures_util::StreamExt;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client, RequestBuilder,
@@ -32,6 +31,7 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod auth;
 mod businesses;
 mod health;
 mod identity_projection;
@@ -40,6 +40,7 @@ mod order_engine;
 mod outbox;
 mod runtime_metrics;
 mod schema_contract;
+use auth::{auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims};
 use health::{health, ready, service_metrics};
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
@@ -146,18 +147,6 @@ fn parse_cors_origins() -> Vec<HeaderValue> {
     raw.split(',')
         .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
         .collect()
-}
-
-#[derive(Debug, Deserialize)]
-struct AccessClaims {
-    sub: String,
-    #[allow(dead_code)]
-    exp: usize,
-    #[serde(default)]
-    roles: Vec<String>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    perms: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -6379,50 +6368,6 @@ fn make_slug(input: &str) -> String {
     } else {
         out
     }
-}
-
-fn auth_claims_from_headers(headers: &HeaderMap, jwt_secret: &str) -> Option<AccessClaims> {
-    let header = headers
-        .get("authorization")
-        .or_else(|| headers.get("Authorization"))
-        .and_then(|v| v.to_str().ok())?;
-    if !header.starts_with("Bearer ") {
-        return None;
-    }
-    let token = header.trim_start_matches("Bearer ").trim();
-    let mut validation = Validation::new(Algorithm::HS256);
-    validation.validate_exp = true;
-    decode::<AccessClaims>(
-        token,
-        &DecodingKey::from_secret(jwt_secret.as_bytes()),
-        &validation,
-    )
-    .ok()
-    .map(|d| d.claims)
-}
-
-fn user_id_from_auth(headers: &HeaderMap, jwt_secret: &str) -> Option<Uuid> {
-    auth_claims_from_headers(headers, jwt_secret).and_then(|c| Uuid::parse_str(&c.sub).ok())
-}
-
-fn user_id_from_token_string(token: &str, jwt_secret: &str) -> Option<Uuid> {
-    let cleaned = token
-        .trim()
-        .trim_start_matches("Bearer ")
-        .trim_start_matches("bearer ")
-        .trim();
-    if cleaned.is_empty() {
-        return None;
-    }
-    let mut validation = Validation::new(Algorithm::HS256);
-    validation.validate_exp = true;
-    decode::<AccessClaims>(
-        cleaned,
-        &DecodingKey::from_secret(jwt_secret.as_bytes()),
-        &validation,
-    )
-    .ok()
-    .and_then(|decoded| Uuid::parse_str(&decoded.claims.sub).ok())
 }
 
 fn header_str(headers: &HeaderMap, name: &str) -> Option<String> {
