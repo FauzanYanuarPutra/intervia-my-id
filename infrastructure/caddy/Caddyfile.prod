@@ -1,5 +1,24 @@
 {
     email {$ADMIN_EMAIL}
+    grace_period 30s
+}
+
+(access_log) {
+    log {
+        output stdout
+        format filter {
+            request>uri query {
+                replace token REDACTED
+                replace access_token REDACTED
+                replace id_token REDACTED
+                replace code REDACTED
+                replace state REDACTED
+                replace otp REDACTED
+                replace signature REDACTED
+            }
+            wrap json
+        }
+    }
 }
 
 (security_headers) {
@@ -15,10 +34,12 @@
 }
 
 {$APP_DOMAIN} {
+    import access_log
     redir https://www.{$APP_DOMAIN}{uri} permanent
 }
 
 www.{$APP_DOMAIN} {
+    import access_log
     import security_headers
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
@@ -29,6 +50,7 @@ www.{$APP_DOMAIN} {
 }
 
 usaha.{$APP_DOMAIN} {
+    import access_log
     import security_headers
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
@@ -39,6 +61,7 @@ usaha.{$APP_DOMAIN} {
 }
 
 api.{$APP_DOMAIN} {
+    import access_log
     import security_headers
 
     # Service metrics are private; Prometheus reaches them over the internal network.
@@ -67,6 +90,7 @@ api.{$APP_DOMAIN} {
 }
 
 chat.{$APP_DOMAIN} {
+    import access_log
     import security_headers
     @socket path /socket /socket/*
     @health path /api/health /api/ready
@@ -82,18 +106,21 @@ chat.{$APP_DOMAIN} {
 }
 
 cms.{$APP_DOMAIN} {
+    import access_log
     import security_headers
     reverse_proxy cms:3001
     encode zstd gzip
 }
 
 crm.{$APP_DOMAIN} {
+    import access_log
     import security_headers
     reverse_proxy crm:3002
     encode zstd gzip
 }
 
 media.{$APP_DOMAIN} {
+    import access_log
     import security_headers
     reverse_proxy minio:9002
     encode zstd gzip
@@ -101,6 +128,7 @@ media.{$APP_DOMAIN} {
 
 # Legacy alias retained while callers migrate to media.*.
 cdn.{$APP_DOMAIN} {
+    import access_log
     import security_headers
     reverse_proxy minio:9002
     encode zstd gzip

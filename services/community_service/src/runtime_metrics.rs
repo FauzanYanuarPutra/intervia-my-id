@@ -1,8 +1,15 @@
-use axum::{extract::Request, middleware::Next, response::Response};
+use axum::{
+    extract::Request,
+    http::HeaderValue,
+    middleware::Next,
+    response::Response,
+};
 use std::{
     sync::atomic::{AtomicI64, AtomicU64, Ordering},
     time::Instant,
 };
+use tracing::Instrument;
+use uuid::Uuid;
 
 static HTTP_REQUESTS_TOTAL: AtomicU64 = AtomicU64::new(0);
 static HTTP_RESPONSES_2XX: AtomicU64 = AtomicU64::new(0);
@@ -22,6 +29,24 @@ static HTTP_DURATION_LE_2_5S: AtomicU64 = AtomicU64::new(0);
 static HTTP_DURATION_LE_5S: AtomicU64 = AtomicU64::new(0);
 static HTTP_DURATION_INF: AtomicU64 = AtomicU64::new(0);
 
+fn valid_request_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+}
+
+fn resolve_request_id(request: &Request) -> String {
+    request
+        .headers()
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| valid_request_id(value))
+        .map(str::to_owned)
+        .unwrap_or_else(|| Uuid::new_v4().to_string())
+}
+
 struct InFlightGuard;
 
 impl Drop for InFlightGuard {
@@ -30,15 +55,31 @@ impl Drop for InFlightGuard {
     }
 }
 
-pub async fn track_request(request: Request, next: Next) -> Response {
+pub async fn track_request(mut request: Request, next: Next) -> Response {
     if request.uri().path() == "/metrics" {
         return next.run(request).await;
     }
 
+    let request_id = resolve_request_id(&request);
+    let request_id_header =
+        HeaderValue::from_str(&request_id).expect("validated/generated request id is a valid header");
+    request
+        .headers_mut()
+        .insert("x-request-id", request_id_header.clone());
+
+    let method = request.method().clone();
+    let path = request.uri().path().to_owned();
+    let span = tracing::info_span!(
+        "http_request",
+        request_id = %request_id,
+        method = %method,
+        path = %path
+    );
+
     HTTP_IN_FLIGHT.fetch_add(1, Ordering::Relaxed);
     let _guard = InFlightGuard;
     let started = Instant::now();
-    let response = next.run(request).await;
+    let mut response = next.run(request).instrument(span.clone()).await;
     let elapsed_micros = started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64;
 
     HTTP_REQUESTS_TOTAL.fetch_add(1, Ordering::Relaxed);
@@ -60,6 +101,17 @@ pub async fn track_request(request: Request, next: Next) -> Response {
             counter.fetch_add(1, Ordering::Relaxed);
         }
     }
+
+    tracing::info!(
+        parent: &span,
+        status = response.status().as_u16(),
+        duration_ms = started.elapsed().as_secs_f64() * 1000.0,
+        "request_completed"
+    );
+
+    response
+        .headers_mut()
+        .insert("x-request-id", request_id_header);
 
     match response.status().as_u16() / 100 {
         2 => {
@@ -136,6 +188,14 @@ pub fn render(service: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn request_id_validation_rejects_unbounded_or_unsafe_values() {
+        assert!(valid_request_id("edge-abc_123.456"));
+        assert!(!valid_request_id(""));
+        assert!(!valid_request_id("contains space"));
+        assert!(!valid_request_id(&"a".repeat(65)));
+    }
 
     #[test]
     fn render_exposes_low_cardinality_red_metrics() {

@@ -690,6 +690,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-ops@example.com}

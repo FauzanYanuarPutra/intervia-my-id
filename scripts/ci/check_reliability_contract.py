@@ -29,6 +29,10 @@ read("docs/operations/backup-and-disaster-recovery.md")
 observability_compose = read("docker-compose.observability.yml")
 prometheus_config = read("infrastructure/observability/prometheus.yml")
 alerts_config = read("infrastructure/observability/alerts.yml")
+slo_rules_config = read("infrastructure/observability/slo-rules.yml")
+grafana_datasource = read("infrastructure/observability/grafana/provisioning/datasources/prometheus.yml")
+grafana_dashboard_provider = read("infrastructure/observability/grafana/provisioning/dashboards/default.yml")
+grafana_dashboard = read("infrastructure/observability/grafana/dashboards/lajukan-overview.json")
 blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
@@ -71,6 +75,7 @@ for marker in (
     "prom/blackbox-exporter:v0.28.0",
     "quay.io/prometheuscommunity/postgres-exporter:v0.20.1",
     "oliver006/redis_exporter:v1.91.1",
+    "grafana/grafana:13.2.1",
 ):
     if marker not in observability_compose:
         errors.append(f"observability overlay missing pinned component/profile: {marker}")
@@ -261,6 +266,18 @@ for marker in (
     if marker not in deploy:
         errors.append(f"deploy workflow missing reliability marker: {marker}")
 
+for marker in (
+    "grace_period 30s",
+    "(access_log)",
+    "output stdout",
+    "format filter",
+    "replace access_token REDACTED",
+    "replace code REDACTED",
+    "wrap json",
+):
+    if marker not in caddy:
+        errors.append(f"production edge missing structured access log/safety marker: {marker}")
+
 if "reverse_proxy" not in caddy:
     errors.append("production Caddy config has no reverse proxy")
 if "@internal_metrics path /metrics" not in caddy:
@@ -393,6 +410,38 @@ for marker in ("PRIMARY KEY (rate_key, window_bucket)", "expires_at"):
         errors.append(f"Community shared rate limiter migration missing marker: {marker}")
 if "Mutex<RateLimitStore>" in community_source:
     errors.append("Community rate limiting must not regress to per-replica in-memory state")
+
+for marker in (
+    "lajukan:http_requests_per_second:rate5m",
+    "lajukan:http_5xx_ratio:rate5m",
+    "lajukan:http_5xx_ratio:rate1h",
+    "lajukan:http_5xx_ratio:rate6h",
+    "LajukanSloFastBurn",
+    "LajukanSloSlowBurn",
+):
+    if marker not in slo_rules_config:
+        errors.append(f"SLO recording/alert rules missing: {marker}")
+
+for marker in ("type: prometheus", "url: http://prometheus:9090", "isDefault: true"):
+    if marker not in grafana_datasource:
+        errors.append(f"Grafana datasource provisioning missing: {marker}")
+
+for marker in ("path: /var/lib/grafana/dashboards", "disableDeletion: true"):
+    if marker not in grafana_dashboard_provider:
+        errors.append(f"Grafana dashboard provider missing: {marker}")
+
+for marker in (
+    "Lajukan Platform Overview",
+    "lajukan:http_requests_per_second:rate5m",
+    "probe_success",
+    "pg_up",
+    "rabbitmq_queue_messages_ready",
+):
+    if marker not in grafana_dashboard:
+        errors.append(f"Grafana overview dashboard missing: {marker}")
+
+if '127.0.0.1:${GRAFANA_PORT:-3005}:3000' not in observability_compose:
+    errors.append("Grafana must remain loopback-only in the observability overlay")
 
 for warning in warnings:
     print(f"WARNING: {warning}", file=sys.stderr)

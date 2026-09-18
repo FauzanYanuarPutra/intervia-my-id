@@ -1,0 +1,67 @@
+groups:
+  - name: lajukan-slo-recording
+    interval: 30s
+    rules:
+      - record: lajukan:http_requests_per_second:rate5m
+        expr: sum by (service) (rate(lajukan_http_requests_total[5m]))
+
+      - record: lajukan:http_5xx_ratio:rate5m
+        expr: |
+          sum by (service) (rate(lajukan_http_responses_total{class="5xx"}[5m]))
+          /
+          clamp_min(sum by (service) (rate(lajukan_http_requests_total[5m])), 0.001)
+
+      - record: lajukan:http_5xx_ratio:rate30m
+        expr: |
+          sum by (service) (rate(lajukan_http_responses_total{class="5xx"}[30m]))
+          /
+          clamp_min(sum by (service) (rate(lajukan_http_requests_total[30m])), 0.001)
+
+      - record: lajukan:http_5xx_ratio:rate1h
+        expr: |
+          sum by (service) (rate(lajukan_http_responses_total{class="5xx"}[1h]))
+          /
+          clamp_min(sum by (service) (rate(lajukan_http_requests_total[1h])), 0.001)
+
+      - record: lajukan:http_5xx_ratio:rate6h
+        expr: |
+          sum by (service) (rate(lajukan_http_responses_total{class="5xx"}[6h]))
+          /
+          clamp_min(sum by (service) (rate(lajukan_http_requests_total[6h])), 0.001)
+
+      - record: lajukan:http_request_duration_seconds:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (service, le) (
+              rate(lajukan_http_request_duration_seconds_bucket[5m])
+            )
+          )
+
+  - name: lajukan-slo-burn
+    rules:
+      - alert: LajukanSloFastBurn
+        expr: |
+          lajukan:http_5xx_ratio:rate5m > (14.4 * 0.001)
+          and
+          lajukan:http_5xx_ratio:rate1h > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          slo: "99.9"
+        annotations:
+          summary: "Lajukan service is rapidly burning its error budget"
+          description: "{{ $labels.service }} is above the 14.4x burn threshold in both 5m and 1h windows."
+
+      - alert: LajukanSloSlowBurn
+        expr: |
+          lajukan:http_5xx_ratio:rate30m > (6 * 0.001)
+          and
+          lajukan:http_5xx_ratio:rate6h > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          slo: "99.9"
+        annotations:
+          summary: "Lajukan service is persistently burning its error budget"
+          description: "{{ $labels.service }} is above the 6x burn threshold in both 30m and 6h windows."
