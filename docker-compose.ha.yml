@@ -1,0 +1,74 @@
+# Optional high-availability data-plane overlay.
+#
+# Usage:
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.ha.yml up -d --remove-orphans --wait
+#
+# This overlay deliberately disables the single-host stateful services and
+# requires externally managed/replicated endpoints. It is opt-in so the
+# existing single-host production topology remains backward compatible.
+services:
+  identity_db:
+    profiles: [local-data]
+
+  marketplace_db:
+    profiles: [local-data]
+
+  community_db:
+    profiles: [local-data]
+
+  redis_cache:
+    profiles: [local-data]
+
+  rabbitmq:
+    profiles: [local-data]
+
+  minio:
+    profiles: [local-data]
+
+  meilisearch:
+    profiles: [local-data]
+
+  identity_service:
+    environment:
+      IDENTITY_DATABASE_URL: ${HA_IDENTITY_DATABASE_URL:?HA_IDENTITY_DATABASE_URL is required}
+      REDIS_URL: ${HA_REDIS_URL:?HA_REDIS_URL is required}
+      RABBITMQ_URL: ${HA_RABBITMQ_URL:?HA_RABBITMQ_URL is required}
+    depends_on: !override []
+
+  marketplace_service:
+    environment:
+      MARKETPLACE_DATABASE_URL: ${HA_MARKETPLACE_DATABASE_URL:?HA_MARKETPLACE_DATABASE_URL is required}
+      REDIS_URL: ${HA_REDIS_URL:?HA_REDIS_URL is required}
+      RABBITMQ_URL: ${HA_RABBITMQ_URL:?HA_RABBITMQ_URL is required}
+      MEILI_URL: ${HA_MEILI_URL:?HA_MEILI_URL is required}
+      MEILI_MASTER_KEY: ${HA_MEILI_MASTER_KEY:?HA_MEILI_MASTER_KEY is required}
+    depends_on: !override []
+
+  community_service:
+    environment:
+      COMMUNITY_DATABASE_URL: ${HA_COMMUNITY_DATABASE_URL:?HA_COMMUNITY_DATABASE_URL is required}
+      REDIS_URL: ${HA_REDIS_URL:?HA_REDIS_URL is required}
+      RABBITMQ_URL: ${HA_RABBITMQ_URL:?HA_RABBITMQ_URL is required}
+    depends_on: !override []
+    volumes: !override []
+
+  chat_service:
+    environment:
+      REDIS_HOST: ${HA_REDIS_HOST:?HA_REDIS_HOST is required}
+      REDIS_PASSWORD: ${HA_REDIS_PASSWORD:?HA_REDIS_PASSWORD is required}
+      RABBITMQ_URL: ${HA_RABBITMQ_URL:?HA_RABBITMQ_URL is required}
+    depends_on: !override
+      scylla_migrate: { condition: service_completed_successfully }
+
+  www:
+    environment:
+      REDIS_URL: ${HA_REDIS_URL:?HA_REDIS_URL is required}
+      MINIO_ENDPOINT: ${HA_OBJECT_STORAGE_ENDPOINT:?HA_OBJECT_STORAGE_ENDPOINT is required}
+      MINIO_ACCESS_KEY: ${HA_OBJECT_STORAGE_ACCESS_KEY:?HA_OBJECT_STORAGE_ACCESS_KEY is required}
+      MINIO_SECRET_KEY: ${HA_OBJECT_STORAGE_SECRET_KEY:?HA_OBJECT_STORAGE_SECRET_KEY is required}
+      MINIO_BUCKET: ${HA_OBJECT_STORAGE_BUCKET:?HA_OBJECT_STORAGE_BUCKET is required}
+      MINIO_PUBLIC_URL: ${HA_OBJECT_STORAGE_PUBLIC_URL:?HA_OBJECT_STORAGE_PUBLIC_URL is required}
+    volumes: !override []
