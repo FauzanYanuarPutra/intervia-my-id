@@ -63,7 +63,30 @@ describe('UX V3 primitives', () => {
     expect(html).toContain('Cari bahan');
     expect(html).toContain('Alpukat');
     expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('role="listbox"');
+    expect(html).toContain('aria-label="Pilih bahan pilihan"');
     expect(html).not.toContain('<select');
+  });
+
+  it('announces empty search results politely', () => {
+    const html = renderToStaticMarkup(
+      <SearchPicker
+        items={[{ id: 'a', name: 'Alpukat' }]}
+        value=""
+        query="mangga"
+        onQueryChange={() => {}}
+        onChange={() => {}}
+        getKey={item => item.id}
+        getLabel={item => item.name}
+        placeholder="Cari bahan"
+        emptyLabel="Tidak ditemukan"
+        ariaLabel="Pilih bahan"
+      />,
+    );
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('Tidak ditemukan');
   });
 
   it('renders a short explicit sensitive confirmation', () => {
