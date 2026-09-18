@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 use uuid::Uuid;
 
 use crate::{
@@ -54,8 +54,24 @@ struct NewsRow {
 }
 
 #[derive(Debug, Serialize)]
+struct PublicNewsRow {
+    id: Uuid,
+    slug: Option<String>,
+    title: String,
+    summary: Option<String>,
+    body: String,
+    tags: Option<Vec<String>>,
+    cover_image: Option<String>,
+    metadata: Value,
+    content_status: String,
+    published_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
 struct NewsListResponse {
-    items: Vec<NewsRow>,
+    items: Vec<PublicNewsRow>,
     limit: i64,
     offset: i64,
     has_more: bool,
@@ -69,6 +85,7 @@ struct ListNewsQuery {
     category: Option<String>,
     topic: Option<String>,
     location: Option<String>,
+    language: Option<String>,
     q: Option<String>,
     cursor: Option<String>,
 }
@@ -174,6 +191,150 @@ fn trimmed(value: Option<String>) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn normalize_news_language(value: Option<String>) -> Result<Option<String>, &'static str> {
+    let Some(language) = trimmed(value) else {
+        return Ok(None);
+    };
+    let language = language.to_ascii_lowercase();
+    if matches!(language.as_str(), "id" | "en") {
+        Ok(Some(language))
+    } else {
+        Err("unsupported news language")
+    }
+}
+
+fn public_news_metadata(metadata: &Value, source_urls: Option<&[String]>) -> Value {
+    let source = metadata.get("news").and_then(Value::as_object);
+    let mut public = serde_json::Map::new();
+    for key in [
+        "category",
+        "article_kind",
+        "language",
+        "location",
+        "editorial_status",
+        "business_impact",
+        "correction_note",
+        "retraction_note",
+        "byline",
+        "disclosure",
+        "published_at",
+    ] {
+        if let Some(value) = source.and_then(|news| news.get(key)) {
+            public.insert(key.to_string(), value.clone());
+        }
+    }
+    if let Some(source_urls) = source_urls {
+        public.insert("source_urls".to_string(), json!(source_urls));
+    }
+    json!({ "news": Value::Object(public) })
+}
+
+fn public_news_row(row: NewsRow, source_urls: Option<&[String]>) -> PublicNewsRow {
+    PublicNewsRow {
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        summary: row.summary,
+        body: row.body,
+        tags: row.tags,
+        cover_image: row.cover_image,
+        metadata: public_news_metadata(&row.metadata, source_urls),
+        content_status: row.content_status,
+        published_at: row.published_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    }
+}
+
+fn is_allowed_news_source_url(raw: &str) -> bool {
+    if raw.len() > 2_048 {
+        return false;
+    }
+    let Ok(url) = reqwest::Url::parse(raw) else {
+        return false;
+    };
+    if !matches!(url.scheme(), "http" | "https") || !url.username().is_empty() || url.password().is_some() {
+        return false;
+    }
+    let Some(host) = url.host_str().map(str::trim).filter(|host| !host.is_empty()) else {
+        return false;
+    };
+    let host_lower = host.to_ascii_lowercase();
+    if host_lower == "localhost"
+        || host_lower.ends_with(".localhost")
+        || host_lower.ends_with(".local")
+    {
+        return false;
+    }
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return match ip {
+            IpAddr::V4(ip) => {
+                !(ip.is_private()
+                    || ip.is_loopback()
+                    || ip.is_link_local()
+                    || ip.is_unspecified())
+            }
+            IpAddr::V6(ip) => {
+                !(ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_unique_local()
+                    || ip.is_unicast_link_local())
+            }
+        };
+    }
+    true
+}
+
+fn sanitize_news_source_urls(
+    value: Option<Vec<String>>,
+) -> Result<Option<Vec<String>>, &'static str> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let mut urls = Vec::new();
+    for raw in value {
+        let raw = raw.trim();
+        if raw.is_empty() {
+            continue;
+        }
+        if !is_allowed_news_source_url(raw) {
+            return Err("unsupported news source URL");
+        }
+        let normalized = reqwest::Url::parse(raw)
+            .map_err(|_| "unsupported news source URL")?
+            .to_string();
+        if !urls.iter().any(|existing| existing == &normalized) {
+            urls.push(normalized);
+        }
+        if urls.len() > 10 {
+            return Err("too many news source URLs");
+        }
+    }
+    Ok(Some(urls))
+}
+
+fn public_topics_from_tags(tags: Option<&Vec<String>>) -> Vec<String> {
+    let reserved = [
+        "news",
+        "analysis",
+        "press_release",
+        "ekonomi",
+        "bisnis",
+        "umkm",
+        "teknologi",
+        "keuangan",
+        "regulasi",
+        "industri",
+        "daerah",
+    ];
+    tags.into_iter()
+        .flatten()
+        .map(|tag| tag.trim().to_lowercase())
+        .filter(|tag| !tag.is_empty() && !reserved.contains(&tag.as_str()))
+        .take(8)
+        .collect()
+}
+
 pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -> Value {
     if !metadata.is_object() {
         metadata = json!({});
@@ -196,6 +357,14 @@ pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -
         "contributor_id".to_string(),
         Value::String(owner_id.to_string()),
     );
+    let language = news
+        .get("language")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| matches!(*value, "id" | "en"))
+        .unwrap_or("id")
+        .to_string();
+    news.insert("language".to_string(), Value::String(language));
     news.entry("submitted_at".to_string())
         .or_insert_with(|| Value::String(Utc::now().to_rfc3339()));
     metadata
