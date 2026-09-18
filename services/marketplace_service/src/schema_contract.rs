@@ -33,6 +33,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
           event_type TEXT NOT NULL,
           payload JSONB NOT NULL,
           routing_key TEXT NOT NULL,
+          event_key TEXT NULL,
           status TEXT NOT NULL DEFAULT 'pending',
           retry_count INT NOT NULL DEFAULT 0,
           available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
