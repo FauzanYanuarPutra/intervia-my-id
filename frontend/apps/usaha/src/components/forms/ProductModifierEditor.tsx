@@ -1,5 +1,7 @@
 'use client';
 
+import { businessApiErrorMessage } from '@/lib/business-api-error';
+
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Plus, Save, Trash2 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
@@ -155,7 +157,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
     try {
       const response = await fetch(`/api/businesses/${businessId}/products/${productId}/modifiers`, { cache: 'no-store' });
       const body = (await response.json().catch(() => ({}))) as { data?: { groups?: ModifierGroup[] }; error?: string };
-      if (!response.ok) throw new Error(body.error || 'Pilihan pelanggan belum bisa dimuat.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(body, 'Pilihan pelanggan belum bisa dimuat.', response.status));
       setGroups(normalizeGroups(Array.isArray(body.data?.groups) ? body.data.groups : []));
       setDirty(false);
       setLoaded(true);
@@ -172,7 +174,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
     try {
       const response = await fetch(`/api/businesses/${businessId}/ingredients`, { cache: 'no-store' });
       const body = (await response.json().catch(() => ({}))) as { data?: { items?: Ingredient[] }; error?: string };
-      if (!response.ok) throw new Error(body.error || 'Bahan belum bisa dimuat.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(body, 'Bahan belum bisa dimuat.', response.status));
       setIngredients((Array.isArray(body.data?.items) ? body.data.items : []).filter(item => item.status !== 'inactive'));
       setIngredientsLoaded(true);
     } catch (value) {
@@ -271,7 +273,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
         body: JSON.stringify({ groups }),
       });
       const body = (await response.json().catch(() => ({}))) as { error?: string; data?: { groups?: ModifierGroup[] } };
-      if (!response.ok) throw new Error(body.error || 'Pilihan pelanggan belum tersimpan.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(body, 'Pilihan pelanggan belum tersimpan.', response.status));
       if (Array.isArray(body.data?.groups)) setGroups(normalizeGroups(body.data.groups));
       setDirty(false);
       setMessage('Pilihan pelanggan tersimpan dan siap dipakai di Kasir serta toko.');
