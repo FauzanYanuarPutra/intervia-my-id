@@ -5,6 +5,7 @@ import {
   getReelMediaStyle,
   getReelStudioEffect,
   getStudioDurationMs,
+  isStudioEffect,
   REELS_STUDIO_DURATIONS,
   REELS_STUDIO_SPEEDS,
 } from './reels-studio-helpers';
@@ -23,6 +24,8 @@ describe('reels studio helpers', () => {
   });
 
   it('reads studio effects from compatible metadata shapes', () => {
+    expect(isStudioEffect('scan')).toBe(true);
+    expect(isStudioEffect('unknown')).toBe(false);
     expect(getReelStudioEffect({ metadata: { effect: 'scan' } })).toBe('scan');
     expect(
       getReelStudioEffect({ metadata: { studio: { effect: 'dog' } } }),
