@@ -212,7 +212,7 @@ impl SellerOrderRepository {
             "order_id": order_id,
             "expected_version": request.expected_version,
             "next_status": next_status.as_db(),
-            "reason": reason,
+            "reason": reason.as_deref(),
         }))
         .map_err(|_| SellerOrderRepositoryError::Database)?;
 
@@ -338,8 +338,8 @@ impl SellerOrderRepository {
         .bind(json!({
             "business_id": business_id,
             "organization_id": organization_id,
-            "source_type": current.source_type,
-            "source_surface": current.source_surface,
+            "source_type": current.source_type.as_deref(),
+            "source_surface": current.source_surface.as_deref(),
         }))
         .bind(idempotency_key)
         .bind(&request_hash)
@@ -366,12 +366,12 @@ impl SellerOrderRepository {
         .bind(&event_type)
         .bind(json!({
             "order_id": order_id,
-            "order_number": updated.order_number,
+            "order_number": &updated.order_number,
             "business_id": business_id,
             "organization_id": organization_id,
             "from_status": current_state.as_db(),
             "to_status": next_status.as_db(),
-            "payment_status": updated.payment_status,
+            "payment_status": &updated.payment_status,
             "version": updated.version,
             "actor_id": actor_id,
             "reason": reason,
