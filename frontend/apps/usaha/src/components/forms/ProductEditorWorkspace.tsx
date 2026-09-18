@@ -4,6 +4,7 @@ import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Archive, CheckCircle2, Save } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
 import { BusinessImageCropUpload } from '@/components/media/BusinessImageCropUpload';
 import { ProductModifierEditor } from '@/components/forms/ProductModifierEditor';
 import type { ProductRecord } from '@/lib/portal-types';
@@ -32,6 +33,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const busy = pendingAction !== null;
 
   async function request(path: string, body: Record<string, unknown>) {
@@ -122,7 +124,16 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
       setError(value instanceof Error ? value.message : 'Status produk belum berhasil diperbarui.');
     } finally {
       setPendingAction(null);
+      setArchiveConfirmOpen(false);
     }
+  }
+
+  function requestStatusSave() {
+    if (status === 'draft' && product.status === 'live') {
+      setArchiveConfirmOpen(true);
+      return;
+    }
+    void saveStatus();
   }
 
   return (
@@ -211,7 +222,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
                 ]}
               />
             </div>
-            <button type="button" onClick={saveStatus} disabled={busy} className="portal-button-secondary mt-3">
+            <button type="button" onClick={requestStatusSave} disabled={busy} className="portal-button-secondary mt-3">
               {pendingAction === 'status' ? 'Menyimpan status...' : 'Simpan status'}
             </button>
           </div>
@@ -220,6 +231,18 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
         {error ? <p role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-semibold text-portal-ember">{error}</p> : null}
         {success ? <p role="status" aria-live="polite" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
       </div>
+
+      <SensitiveActionConfirm
+        open={archiveConfirmOpen}
+        title="Arsipkan produk?"
+        description={`${product.name} akan disembunyikan dari penjualan baru. Riwayat transaksi dan data produk tetap tersimpan, dan produk bisa diaktifkan kembali kapan saja.`}
+        confirmLabel="Arsipkan produk"
+        busy={pendingAction === 'status'}
+        onCancel={() => {
+          if (!busy) setArchiveConfirmOpen(false);
+        }}
+        onConfirm={() => void saveStatus()}
+      />
     </section>
   );
 }
