@@ -931,6 +931,10 @@ async fn list_news(
     let category = trimmed(query.category);
     let topic = trimmed(query.topic);
     let location = trimmed(query.location);
+    let language = match normalize_news_language(query.language) {
+        Ok(language) => language,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
     let q = trimmed(query.q);
     let cursor = match parse_news_cursor(query.cursor.as_deref()) {
         Ok(cursor) => cursor,
@@ -966,22 +970,27 @@ async fn list_news(
           )
           AND (
             $4::text IS NULL OR
-            title ILIKE ('%' || $4 || '%') OR
-            COALESCE(summary, '') ILIKE ('%' || $4 || '%') OR
-            body ILIKE ('%' || $4 || '%') OR
-            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $4 || '%')
+            lower(COALESCE(NULLIF(metadata->'news'->>'language', ''), 'id')) = lower($4)
           )
           AND (
-            $5::timestamptz IS NULL OR
-            (COALESCE(published_at, created_at), id) < ($5, $6::uuid)
+            $5::text IS NULL OR
+            title ILIKE ('%' || $5 || '%') OR
+            COALESCE(summary, '') ILIKE ('%' || $5 || '%') OR
+            body ILIKE ('%' || $5 || '%') OR
+            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $5 || '%')
+          )
+          AND (
+            $6::timestamptz IS NULL OR
+            (COALESCE(published_at, created_at), id) < ($6, $7::uuid)
           )
         ORDER BY COALESCE(published_at, created_at) DESC, id DESC
-        LIMIT $7 OFFSET $8
+        LIMIT $8 OFFSET $9
         "#,
     )
     .bind(category)
     .bind(topic)
     .bind(location)
+    .bind(language)
     .bind(q)
     .bind(cursor_at)
     .bind(cursor_id)
@@ -1001,10 +1010,14 @@ async fn list_news(
             } else {
                 None
             };
+            let public_items = items
+                .into_iter()
+                .map(|item| public_news_row(item, None))
+                .collect();
             (
                 StatusCode::OK,
                 Json(NewsListResponse {
-                    items,
+                    items: public_items,
                     limit,
                     offset: effective_offset,
                     has_more,
@@ -1053,7 +1066,19 @@ async fn get_news(
     .await;
 
     match row {
-        Ok(Some(item)) => (StatusCode::OK, Json(item)).into_response(),
+        Ok(Some(item)) => {
+            let sources = match public_verified_source_urls(&state.db, item.id).await {
+                Ok(sources) => sources,
+                Err(error) => {
+                    tracing::error!("get_news public source query error: {:?}", error);
+                    return response_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to load news article sources",
+                    );
+                }
+            };
+            (StatusCode::OK, Json(public_news_row(item, Some(&sources)))).into_response()
+        }
         Ok(None) => response_error(StatusCode::NOT_FOUND, "news article not found"),
         Err(error) => {
             tracing::error!("get_news query error: {:?}", error);
