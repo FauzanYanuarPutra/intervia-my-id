@@ -33,6 +33,18 @@ jobs:
         run: |
           bash -n scripts/ops/postgres_logical_backup.sh
           bash -n scripts/ops/verify_backup_set.sh
+      - name: Validate Grafana dashboard JSON
+        run: python -m json.tool infrastructure/observability/grafana/dashboards/lajukan-overview.json >/dev/null
+
+      - name: Validate SLO recording and burn-rate rules
+        shell: bash
+        run: |
+          docker run --rm \
+            --entrypoint promtool \
+            -v "$PWD/infrastructure/observability:/etc/prometheus:ro" \
+            prom/prometheus:v3.14.0 \
+            check rules /etc/prometheus/slo-rules.yml
+
       - name: Validate Prometheus configuration and rules
         shell: bash
         run: |
