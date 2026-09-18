@@ -2328,8 +2328,9 @@ async fn list_editorial_history(
 mod tests {
     use super::{
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
-        moderation_target, normalize_news_language, normalize_queue_status, parse_news_cursor,
-        public_news_metadata, source_domain, validate_submission_payload,
+        moderation_target, normalize_news_category_filter, normalize_news_language,
+        normalize_queue_status, parse_news_cursor, public_news_metadata, source_domain,
+        validate_submission_payload,
     };
     use serde_json::json;
 
@@ -2441,6 +2442,20 @@ mod tests {
             "https://user:pass@example.com/source"
         ));
         assert!(!is_allowed_news_source_url("file:///etc/passwd"));
+    }
+
+    #[test]
+    fn news_category_filter_canonicalizes_supported_values() {
+        assert_eq!(
+            normalize_news_category_filter(Some("umkm".to_string())).unwrap(),
+            Some("UMKM".to_string())
+        );
+        assert_eq!(
+            normalize_news_category_filter(Some("Bisnis".to_string())).unwrap(),
+            Some("Bisnis".to_string())
+        );
+        assert!(normalize_news_category_filter(Some("unknown".to_string())).is_err());
+        assert_eq!(normalize_news_category_filter(None).unwrap(), None);
     }
 
     #[test]
