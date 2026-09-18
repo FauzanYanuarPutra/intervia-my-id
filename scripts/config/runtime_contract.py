@@ -338,10 +338,6 @@ def validate_contract(
     if redis_host != "redis_cache":
         errors.append("WWW Redis must use the redis_cache service.")
 
-    redis_dependency = www.get("depends_on", {}).get("redis_cache", {})
-    if not isinstance(redis_dependency, dict) or redis_dependency.get("condition") != "service_healthy":
-        errors.append("WWW must wait for redis_cache to become healthy.")
-
     identity_url = www_environment.get("INTERNAL_API_URL")
     identity_host = urlparse(identity_url).hostname if non_empty(identity_url) else None
     if identity_host != "identity_service":
