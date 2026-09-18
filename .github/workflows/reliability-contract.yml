@@ -54,6 +54,7 @@ jobs:
         run: |
           bash -n scripts/ops/postgres_logical_backup.sh
           bash -n scripts/ops/verify_backup_set.sh
+          bash -n scripts/ops/postgres_isolated_restore_drill.sh
           bash -n scripts/ops/staging_scale_rehearsal.sh
           bash -n scripts/ops/dependency_degradation_rehearsal.sh
           bash -n scripts/ops/community_media_backup.sh

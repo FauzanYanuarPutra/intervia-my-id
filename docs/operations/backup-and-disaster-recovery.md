@@ -261,6 +261,22 @@ bash scripts/ops/verify_backup_set.sh \
   /var/backups/lajukan/lajukan-YYYYMMDDTHHMMSSZ "${compose[@]}"
 ```
 
-This helper is only the logical/inspection recovery tier. Production RPO targets
-still require off-host base backups plus uninterrupted WAL archiving/PITR, and
-the full recovery contract still requires an isolated restore drill.
+The catalog/checksum helper is only the logical/inspection recovery tier. For a
+full disposable logical restore rehearsal, run:
+
+```bash
+bash scripts/ops/postgres_isolated_restore_drill.sh \
+  /var/backups/lajukan/lajukan-YYYYMMDDTHHMMSSZ
+```
+
+The restore drill creates a temporary PostgreSQL 16 container and named volume
+without publishing a host port, verifies the backup checksums, restores Identity,
+Marketplace and Community with `pg_restore --exit-on-error`, verifies that each
+restored database contains user tables, performs a schema-only re-dump, and then
+removes the temporary container and volume. Set `KEEP_RESTORE_DRILL=1` only when
+an operator intentionally needs to inspect the isolated result.
+
+This closes the gap between "the dump catalog is readable" and "PostgreSQL can
+actually restore the dump". It still does not replace application-invariant
+validation, off-host immutable copies, production PITR/WAL recovery, Scylla
+recovery or object-storage recovery drills.

@@ -37,6 +37,7 @@ grafana_dashboard = read("infrastructure/observability/grafana/dashboards/lajuka
 blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
+restore_drill_script = read("scripts/ops/postgres_isolated_restore_drill.sh")
 scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
@@ -690,6 +691,18 @@ for marker in (
 for marker in ("sha256sum -c", "pg_restore --list", "This does not replace an isolated restore drill"):
     if marker not in backup_verify_script:
         errors.append(f"backup verification script missing marker: {marker}")
+
+for marker in (
+    "sha256sum -c checksums.sha256",
+    'label "lajukan.restore-drill=true"',
+    "pg_restore",
+    "--exit-on-error",
+    "pg_dump -U postgres",
+    "no published network port",
+    "docker volume rm",
+):
+    if marker not in restore_drill_script:
+        errors.append(f"isolated PostgreSQL restore drill missing safety/validation marker: {marker}")
 
 for marker in (
     "probe_surviving_replicas",
