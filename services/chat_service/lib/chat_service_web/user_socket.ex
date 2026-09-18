@@ -1,7 +1,7 @@
 defmodule ChatServiceWeb.UserSocket do
   use Phoenix.Socket
 
-  alias ChatService.{Repo, PresenceCache, Guardian, IdentityClient}
+  alias ChatService.{Repo, PresenceCache, Auth, IdentityClient}
   require Logger
 
   # Channel definitions
@@ -11,7 +11,6 @@ defmodule ChatServiceWeb.UserSocket do
 
   # Configuration Constants
   # 5 menit toleransi
-  @max_clock_skew 300
   @audit_log_prefix "[Socket Auth]"
 
   # =========================================================
@@ -65,54 +64,7 @@ defmodule ChatServiceWeb.UserSocket do
   # =========================================================
   # JWT SECURITY LAYER
   # =========================================================
-  defp verify_and_validate_jwt(token) do
-    # 1. Decode & Verify Signature
-    case Guardian.decode_and_verify(token) do
-      {:ok, claims} ->
-        # 2. Deep Validation (Iss, Exp, Aud)
-        validate_strict_claims(claims)
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp validate_strict_claims(claims) do
-    now = System.system_time(:second)
-    issuer = Application.get_env(:chat_service, :jwt_issuer, "laju")
-    audiences = Application.get_env(:chat_service, :jwt_audiences, ["chat_service", "laju_users"])
-    claim_iss = claims["iss"]
-    claim_aud = claims["aud"]
-    claim_exp = claims["exp"]
-
-    cond do
-      # Validate issuer only when present to keep backward compatibility
-      is_binary(claim_iss) and claim_iss != issuer ->
-        {:error, :invalid_issuer}
-
-      # Validate Expiry with clock-skew tolerance
-      not is_integer(claim_exp) ->
-        {:error, :invalid_exp}
-
-      claim_exp < now - @max_clock_skew ->
-        {:error, :token_expired}
-
-      # Validate audience only when present
-      not is_nil(claim_aud) and not audience_allowed?(claim_aud, audiences) ->
-        {:error, :invalid_audience}
-
-      true ->
-        {:ok, claims}
-    end
-  end
-
-  defp audience_allowed?(aud, allowed) when is_list(aud),
-    do: Enum.any?(aud, &(&1 in allowed))
-
-  defp audience_allowed?(aud, allowed) when is_binary(aud),
-    do: aud in allowed
-
-  defp audience_allowed?(_, _), do: false
+  defp verify_and_validate_jwt(token), do: Auth.verify_jwt(token)
 
   # =========================================================
   # USER CONTEXT & ENRICHMENT
