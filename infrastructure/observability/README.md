@@ -42,13 +42,19 @@ availability claim.
 - application/data readiness through blackbox HTTP/TCP probes;
 - Prometheus self-health and alert-rule evaluation.
 
-Identity, Marketplace and Community expose a deliberately small internal
-Prometheus surface: database pool total/idle connections, transactional outbox
-backlog and metrics-query health. Marketplace also exposes active realtime
-notification subscriber count. This is not a complete application metric
-surface. Request latency/count/error metrics, queue lag and richer domain
-metrics remain later slices and must be added from real code paths rather than
-invented at the dashboard layer.
+Identity, Marketplace and Community expose internal Prometheus metrics for
+database pool total/idle connections, transactional outbox backlog, oldest
+unpublished outbox-event age, metrics-query health, HTTP request/response
+counts, in-flight requests and request-duration histograms. Marketplace also
+exposes active realtime notification subscriber count.
+
+The request metrics deliberately keep labels low-cardinality: service and status
+class are exported, but raw request paths and object IDs are not metric labels.
+Request IDs remain in structured logs/responses for correlation.
+
+RabbitMQ queue lag, provider-specific latency and richer domain metrics should
+continue to be added from real code paths rather than invented at the dashboard
+layer.
 
 ## Security
 
