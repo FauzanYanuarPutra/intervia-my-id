@@ -15,7 +15,7 @@ private_file="$tmp_dir/private.pem"
 public_file="$tmp_dir/public.pem"
 derived_public="$tmp_dir/derived-public.pem"
 
-printf '%b' "${JWT_PUBLIC_KEY_PEM//\\n/\\n}" > "$public_file"
+printf '%b' "$JWT_PUBLIC_KEY_PEM" > "$public_file"
 openssl pkey -pubin -in "$public_file" -noout >/dev/null 2>&1 || {
   echo "JWT public key is not valid PEM RSA key material" >&2
   exit 1
@@ -27,7 +27,7 @@ if [[ "$VERIFY_PUBLIC_ONLY" == "1" ]]; then
 fi
 
 : "${JWT_PRIVATE_KEY_PEM:?JWT_PRIVATE_KEY_PEM is required unless VERIFY_PUBLIC_ONLY=1}"
-printf '%b' "${JWT_PRIVATE_KEY_PEM//\\n/\\n}" > "$private_file"
+printf '%b' "$JWT_PRIVATE_KEY_PEM" > "$private_file"
 
 openssl pkey -in "$private_file" -check -noout >/dev/null 2>&1 || {
   echo "JWT private signing key is invalid" >&2
