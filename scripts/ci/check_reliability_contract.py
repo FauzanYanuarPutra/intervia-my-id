@@ -380,6 +380,7 @@ for marker in (
     "rollback_on_error",
     "--wait --wait-timeout",
     "docker-compose.observability.yml",
+    "scripts/ops/postgres_isolated_restore_drill.sh",
     "infrastructure/observability",
     "ALERTMANAGER_CONFIG_PATH",
     "local-null Alertmanager config",
