@@ -78,6 +78,14 @@ def main() -> int:
         'business_ingredient_balances', 'marketplace.business.purchase_received',
         'if let Some(location_id) = request.location_id',
     )
+    require(
+        'docs/architecture/business-execution-kernel.md',
+        'Business Execution Kernel', 'multi-branch businesses',
+        'policy_snapshot', 'business_day_cutoff',
+        'marketplace.business.sale_recorded',
+        'marketplace.business.purchase_received',
+        'sealed additive migration',
+    )
     require('frontend/apps/www/src/lib/usahaWorkspace.ts', 'NEXT_PUBLIC_USAHA_URL')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
