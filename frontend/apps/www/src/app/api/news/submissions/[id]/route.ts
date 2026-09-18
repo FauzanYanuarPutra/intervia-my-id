@@ -156,7 +156,12 @@ export async function PATCH(
   if (location !== undefined && location.length > 120) {
     return NextResponse.json({ error: 'Lokasi terlalu panjang.' }, { status: 422 });
   }
-  if (sources !== undefined && kind !== 'press_release' && sources.length === 0) {
+  if (
+    sources !== undefined &&
+    kind !== undefined &&
+    kind !== 'press_release' &&
+    sources.length === 0
+  ) {
     return NextResponse.json(
       { error: 'Berita dan analisis membutuhkan minimal satu URL sumber.' },
       { status: 422 },
