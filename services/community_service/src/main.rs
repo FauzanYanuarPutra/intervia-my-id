@@ -1003,6 +1003,22 @@ struct ReelsFeedResponse {
     stores: i64,
 }
 
+fn env_u32_bounded(name: &str, default: u32, min: u32, max: u32) -> u32 {
+    env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(default)
+        .clamp(min, max)
+}
+
+fn env_u64_bounded(name: &str, default: u64, min: u64, max: u64) -> u64 {
+    env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(default)
+        .clamp(min, max)
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum DatabasePoolPurpose {
     Migration,
@@ -1020,7 +1036,28 @@ async fn connect_database_pool(
     database_url: &str,
     purpose: DatabasePoolPurpose,
 ) -> anyhow::Result<PgPool> {
-    let options = PgPoolOptions::new().max_connections(20).min_connections(2);
+    let options = match purpose {
+        DatabasePoolPurpose::Migration => PgPoolOptions::new()
+            .max_connections(2)
+            .min_connections(0)
+            .acquire_timeout(Duration::from_secs(10)),
+        DatabasePoolPurpose::Application => {
+            let max_connections =
+                env_u32_bounded("COMMUNITY_DB_MAX_CONNECTIONS", 20, 2, 100);
+            let min_connections = env_u32_bounded(
+                "COMMUNITY_DB_MIN_CONNECTIONS",
+                2,
+                0,
+                max_connections,
+            );
+            let acquire_timeout_seconds =
+                env_u64_bounded("COMMUNITY_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
+            PgPoolOptions::new()
+                .max_connections(max_connections)
+                .min_connections(min_connections)
+                .acquire_timeout(Duration::from_secs(acquire_timeout_seconds))
+        }
+    };
     let options = if let Some(statement) = database_session_setup(purpose) {
         options.after_connect(move |conn, _meta| {
             Box::pin(async move {
