@@ -77,6 +77,11 @@ The News domain also maintains durability and observability primitives:
 - News and analysis require at least one editor-verified source before first publication. Business press releases remain explicitly labeled and follow their separate disclosure policy.
 - Retracted articles keep their canonical URL as a noindex retraction tombstone instead of silently becoming a 404. The original body is not shown on the tombstone.
 - Public topic tags exclude internal routing tags such as `news`, category slugs, and article-kind markers; empty topic/location/category facets are noindex to avoid thin-page crawl growth.
+- Public News responses use an explicit metadata allowlist. Contributor IDs, reviewer IDs, review notes, resubmission timestamps, and other newsroom-only fields never leave the editorial boundary.
+- Public article pages expose only editor-verified source references; broken, rejected, unverified, private-network, credentialed, or non-HTTP(S) source URLs are not rendered as public citations.
+- News listing, category, topic, location, related-article, RSS, and sitemap flows are language-aware. Missing legacy language defaults to Indonesian, while canonical article URLs redirect mismatched locale paths to the stored article language.
+- Contributor revisions re-run content safety checks, source validation, tag normalization, disclosure rules, and source requirements before returning to the editorial queue.
+- Public list responses omit full article bodies to keep feed payloads bounded; the complete body is returned only by the article detail endpoint.
 
 ### Source policy
 
