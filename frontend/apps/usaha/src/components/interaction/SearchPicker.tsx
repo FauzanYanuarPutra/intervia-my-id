@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+
 type SearchPickerProps<T> = {
   items: T[];
   value: string;
@@ -31,6 +33,9 @@ export function SearchPicker<T>({
   ariaLabel,
   maxVisible = 50,
 }: SearchPickerProps<T>) {
+  const reactId = useId().replaceAll(':', '');
+  const listboxId = `search-picker-${reactId}`;
+  const [activeIndex, setActiveIndex] = useState(-1);
   const needle = query.trim().toLocaleLowerCase('id-ID');
   const matches = needle
     ? items.filter(item =>
@@ -46,16 +51,59 @@ export function SearchPicker<T>({
     ? [selected, ...limited.slice(0, Math.max(0, limit - 1))]
     : limited;
   const hiddenCount = Math.max(0, matches.length - visible.length);
+  const activeItem = activeIndex >= 0 ? visible[activeIndex] : undefined;
+  const activeOptionId = activeItem ? `${listboxId}-option-${activeIndex}` : undefined;
+
+  useEffect(() => {
+    setActiveIndex(current => {
+      if (!visible.length) return -1;
+      return current >= visible.length ? visible.length - 1 : current;
+    });
+  }, [query, visible.length]);
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (disabled) return;
+
+    if (event.key === 'ArrowDown') {
+      if (!visible.length) return;
+      event.preventDefault();
+      setActiveIndex(current => current < 0 ? 0 : (current + 1) % visible.length);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      if (!visible.length) return;
+      event.preventDefault();
+      setActiveIndex(current => current < 0 ? visible.length - 1 : (current - 1 + visible.length) % visible.length);
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (!activeItem) return;
+      event.preventDefault();
+      onChange(getKey(activeItem));
+      return;
+    }
+    if (event.key === 'Escape') {
+      setActiveIndex(-1);
+    }
+  }
 
   return (
     <div aria-label={ariaLabel}>
       <input
         value={query}
         disabled={disabled}
-        onChange={event => onQueryChange(event.target.value)}
+        onChange={event => {
+          onQueryChange(event.target.value);
+          setActiveIndex(-1);
+        }}
+        onKeyDown={onKeyDown}
         placeholder={placeholder}
         className="portal-input w-full"
-        role="searchbox"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={visible.length > 0}
+        aria-controls={listboxId}
+        aria-activedescendant={activeOptionId}
         aria-label={`Cari ${ariaLabel.toLocaleLowerCase('id-ID')}`}
       />
 
@@ -65,22 +113,31 @@ export function SearchPicker<T>({
         </p>
       ) : null}
 
-      <div role="listbox" aria-label={`${ariaLabel} pilihan`} className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-portal-line bg-white">
+      <div
+        id={listboxId}
+        role="listbox"
+        aria-label={`${ariaLabel} pilihan`}
+        className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-portal-line bg-white"
+      >
         {visible.length ? (
-          visible.map(item => {
+          visible.map((item, index) => {
             const key = getKey(item);
-            const selected = key === value;
+            const isSelected = key === value;
+            const isActive = index === activeIndex;
 
             return (
               <button
+                id={`${listboxId}-option-${index}`}
                 key={key}
                 type="button"
                 role="option"
-                aria-selected={selected}
+                aria-selected={isSelected}
+                tabIndex={-1}
                 disabled={disabled}
+                onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => onChange(key)}
                 className={`block w-full border-b border-portal-line px-3 py-2.5 text-left last:border-b-0 ${
-                  selected ? 'bg-portal-mist' : 'bg-white hover:bg-[#fafbf9]'
+                  isSelected || isActive ? 'bg-portal-mist' : 'bg-white hover:bg-[#fafbf9]'
                 }`}
               >
                 <span className="block text-sm font-bold text-portal-ink">{getLabel(item)}</span>
