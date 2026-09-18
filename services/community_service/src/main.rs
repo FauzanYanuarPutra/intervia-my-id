@@ -35,6 +35,8 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod runtime_metrics;
+
 const MAX_TITLE_LEN: usize = 140;
 const MAX_CATEGORY_TITLE_LEN: usize = 72;
 const MAX_BODY_LEN: usize = 6_200;
@@ -1236,6 +1238,7 @@ async fn main() -> anyhow::Result<()> {
             patch(update_post).delete(delete_post),
         )
         .route("/v1/forum/posts/{post_id}/vote", post(vote_post))
+        .layer(axum::middleware::from_fn(runtime_metrics::track_request))
         .layer(cors)
         .with_state(state);
 
@@ -1843,7 +1846,7 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
         Ok(Err(_)) | Err(_) => (0, 0),
     };
 
-    let body = format!(
+    let mut body = format!(
         concat!(
             "# HELP lajukan_service_info Static service identity.\n",
             "# TYPE lajukan_service_info gauge\n",
@@ -1861,6 +1864,8 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
         ),
         pool_size, pool_idle, outbox_backlog, metrics_query_ok
     );
+
+    body.push_str(&runtime_metrics::render("community_service"));
 
     (
         [(
