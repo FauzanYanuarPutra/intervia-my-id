@@ -249,6 +249,8 @@ async fn sale_uses_effective_recipe_version_for_snapshot_and_consumption(pool: P
                 occurred_on: NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
                 channel_key: Some("offline".into()),
                 account_key: "cash".into(),
+                location_id: None,
+                source_order_id: None,
                 lines: vec![CreateSaleLineRequest {
                     product_id: seeded.product_id,
                     quantity: Decimal::from(2),
@@ -310,6 +312,8 @@ async fn sale_before_first_immutable_version_does_not_use_legacy_projection(pool
                 occurred_on: NaiveDate::from_ymd_opt(2026, 8, 31).unwrap(),
                 channel_key: Some("offline".into()),
                 account_key: "cash".into(),
+                location_id: None,
+                source_order_id: None,
                 lines: vec![CreateSaleLineRequest {
                     product_id: seeded.product_id,
                     quantity: Decimal::ONE,
@@ -452,6 +456,8 @@ async fn current_day_sale_uses_version_effective_at_posting_time(pool: PgPool) {
                 occurred_on,
                 channel_key: Some("offline".into()),
                 account_key: "cash".into(),
+                location_id: None,
+                source_order_id: None,
                 lines: vec![CreateSaleLineRequest {
                     product_id: seeded.product_id,
                     quantity: Decimal::ONE,

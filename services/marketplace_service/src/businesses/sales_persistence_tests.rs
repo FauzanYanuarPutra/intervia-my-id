@@ -154,6 +154,8 @@ fn sale_request(product_id: Uuid) -> CreateSaleRequest {
         occurred_on: NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
         channel_key: Some("offline".into()),
         account_key: "cash".into(),
+        location_id: None,
+        source_order_id: None,
         lines: vec![CreateSaleLineRequest {
             product_id,
             quantity: Decimal::from(2),

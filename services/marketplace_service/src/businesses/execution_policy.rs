@@ -34,7 +34,7 @@ impl BusinessExecutionPolicy {
         })
     }
 
-    pub(crate) const fn purchase_finance_entry_type(&self) -> &'static str {
+    pub(crate) fn purchase_finance_entry_type(&self) -> &'static str {
         if self.accounting_mode == "advanced" {
             "inventory_purchase"
         } else {

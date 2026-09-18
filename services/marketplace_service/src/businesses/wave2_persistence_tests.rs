@@ -107,6 +107,7 @@ fn purchase_request(ingredient_id: Uuid) -> CreatePurchaseRequest {
         stock_quantity_delta: Decimal::from(3),
         total_amount: 90_000,
         account_key: "cash".into(),
+        location_id: None,
         occurred_on: NaiveDate::from_ymd_opt(2026, 9, 13).unwrap(),
         note: "Belanja alpukat".into(),
     }
