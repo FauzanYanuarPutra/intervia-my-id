@@ -376,7 +376,13 @@ for marker in (
 if "development-database" not in prod_compose:
     errors.append("production compose must keep single-node Scylla out of the normal production profile")
 
+if "github.event_name == 'workflow_run' && 'production'" in deploy:
+    errors.append("Build Images workflow_run must never auto-target production")
+if "target_env=production\n            release_sha=\"$WORKFLOW_HEAD_SHA\"" in deploy:
+    errors.append("automatic Build Images deployment must target staging, not production")
 for marker in (
+    "github.event_name == 'workflow_run' && 'staging'",
+    "target_env=staging",
     "sha-[0-9a-f]{40}",
     ".last-successful-",
     "rollback_on_error",
