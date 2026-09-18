@@ -17,6 +17,10 @@ pub struct Config {
     pub redis_url: String,
     pub rabbitmq_url: String,
     pub jwt_secret: String,
+    pub jwt_private_key_pem: Option<String>,
+    pub jwt_public_key_pem: Option<String>,
+    pub jwt_key_id: String,
+    pub jwt_allow_legacy_hs256: bool,
     pub jwt_issuer: String,
     pub jwt_audience: String,
     pub env: String,
@@ -62,6 +66,20 @@ impl Config {
             .clamp(min, max)
     }
 
+    fn optional_pem_env(name: &str) -> Option<String> {
+        env::var(name)
+            .ok()
+            .map(|value| value.replace("\\n", "\n").trim().to_string())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn bool_env(name: &str, default: bool) -> bool {
+        env::var(name)
+            .ok()
+            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(default)
+    }
+
     pub fn from_env() -> Self {
         dotenv().ok();
 
@@ -76,6 +94,14 @@ impl Config {
         let db_max_lifetime_seconds =
             Self::parse_u64_env("IDENTITY_DB_MAX_LIFETIME_SECONDS", 1_800, 300, 86_400);
         let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set for security");
+        let jwt_private_key_pem = Self::optional_pem_env("JWT_PRIVATE_KEY_PEM");
+        let jwt_public_key_pem = Self::optional_pem_env("JWT_PUBLIC_KEY_PEM");
+        let jwt_key_id = env::var("JWT_KEY_ID")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "lajukan-primary".to_string());
+        let jwt_allow_legacy_hs256 = Self::bool_env("JWT_ALLOW_LEGACY_HS256", true);
         let strict_secrets =
             app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
         let normalized_secret = jwt_secret.trim().to_ascii_lowercase();
@@ -87,6 +113,13 @@ impl Config {
                 ))
         {
             panic!("JWT_SECRET must be at least 32 characters and not a placeholder");
+        }
+
+        if strict_secrets && jwt_private_key_pem.is_some() != jwt_public_key_pem.is_some() {
+            panic!("JWT_PRIVATE_KEY_PEM and JWT_PUBLIC_KEY_PEM must be configured together");
+        }
+        if strict_secrets && !jwt_allow_legacy_hs256 && jwt_private_key_pem.is_none() {
+            panic!("JWT_PRIVATE_KEY_PEM is required when legacy HS256 verification is disabled");
         }
 
         Self {
@@ -107,6 +140,10 @@ impl Config {
             rabbitmq_url: env::var("RABBITMQ_URL")
                 .unwrap_or_else(|_| "amqp://guest:guest@localhost:5672/".into()),
             jwt_secret,
+            jwt_private_key_pem,
+            jwt_public_key_pem,
+            jwt_key_id,
+            jwt_allow_legacy_hs256,
             jwt_issuer: env::var("JWT_ISSUER").unwrap_or_else(|_| "laju".into()),
             jwt_audience: env::var("JWT_AUDIENCE").unwrap_or_else(|_| "laju_users".into()),
             env: app_env,

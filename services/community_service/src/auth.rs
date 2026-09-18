@@ -1,6 +1,7 @@
 use axum::http::{header, HeaderMap, StatusCode};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
+use std::env;
 
 use crate::{ApiError, ApiResult, AppState};
 
@@ -32,6 +33,69 @@ pub(crate) struct AuthActor {
     pub(crate) name: Option<String>,
 }
 
+#[derive(Clone)]
+pub(crate) struct JwtVerifier {
+    legacy_secret: String,
+    public_key_pem: Option<String>,
+    allow_legacy_hs256: bool,
+}
+
+impl JwtVerifier {
+    pub(crate) fn from_env(legacy_secret: String) -> anyhow::Result<Self> {
+        let public_key_pem = env::var("JWT_PUBLIC_KEY_PEM")
+            .ok()
+            .map(|value| value.replace("\\n", "\n").trim().to_string())
+            .filter(|value| !value.is_empty());
+        let allow_legacy_hs256 = env::var("JWT_ALLOW_LEGACY_HS256")
+            .ok()
+            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(true);
+
+        if let Some(public_key_pem) = public_key_pem.as_deref() {
+            DecodingKey::from_rsa_pem(public_key_pem.as_bytes())
+                .map_err(|error| anyhow::anyhow!("invalid JWT_PUBLIC_KEY_PEM: {error:?}"))?;
+        } else if !allow_legacy_hs256 {
+            anyhow::bail!("JWT_PUBLIC_KEY_PEM is required when legacy HS256 verification is disabled");
+        }
+
+        Ok(Self {
+            legacy_secret,
+            public_key_pem,
+            allow_legacy_hs256,
+        })
+    }
+
+    fn decode_claims(&self, token: &str) -> Option<AccessClaims> {
+        let header = decode_header(token).ok()?;
+        match header.alg {
+            Algorithm::RS256 => {
+                let public_key_pem = self.public_key_pem.as_deref()?;
+                let mut validation = Validation::new(Algorithm::RS256);
+                validation.validate_exp = true;
+                decode::<AccessClaims>(
+                    token,
+                    &DecodingKey::from_rsa_pem(public_key_pem.as_bytes()).ok()?,
+                    &validation,
+                )
+                .ok()
+                .map(|decoded| decoded.claims)
+            }
+            Algorithm::HS256 if self.allow_legacy_hs256 => {
+                let mut validation = Validation::new(Algorithm::HS256);
+                validation.validate_exp = true;
+                decode::<AccessClaims>(
+                    token,
+                    &DecodingKey::from_secret(self.legacy_secret.as_bytes()),
+                    &validation,
+                )
+                .ok()
+                .map(|decoded| decoded.claims)
+            }
+            _ => None,
+        }
+    }
+}
+
 fn bearer_token(headers: &HeaderMap) -> Option<String> {
     headers
         .get(header::AUTHORIZATION)
@@ -44,15 +108,7 @@ fn bearer_token(headers: &HeaderMap) -> Option<String> {
 
 pub(crate) fn optional_actor(headers: &HeaderMap, state: &AppState) -> Option<AuthActor> {
     let token = bearer_token(headers)?;
-    let mut validation = Validation::new(Algorithm::HS256);
-    validation.validate_exp = true;
-    let claims = decode::<AccessClaims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &validation,
-    )
-    .ok()?
-    .claims;
+    let claims = state.jwt_verifier.decode_claims(&token)?;
 
     Some(AuthActor {
         user_id: claims.sub,

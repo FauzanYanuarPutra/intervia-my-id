@@ -24,6 +24,29 @@ if config_env() == :prod do
     raise "JWT_SECRET must be at least 32 characters"
   end
 
+  jwt_public_key_pem =
+    case System.get_env("JWT_PUBLIC_KEY_PEM") do
+      nil -> nil
+      value ->
+        value
+        |> String.replace("\\n", "\n")
+        |> String.trim()
+        |> case do
+          "" -> nil
+          pem -> pem
+        end
+    end
+
+  jwt_allow_legacy_hs256 =
+    (System.get_env("JWT_ALLOW_LEGACY_HS256") || "true")
+    |> String.trim()
+    |> String.downcase()
+    |> then(&(&1 in ["1", "true", "yes", "on"]))
+
+  if is_nil(jwt_public_key_pem) and not jwt_allow_legacy_hs256 do
+    raise "JWT_PUBLIC_KEY_PEM is required when legacy HS256 verification is disabled"
+  end
+
   jwt_issuer = System.get_env("JWT_ISSUER") || "laju"
 
   jwt_audiences =
@@ -49,6 +72,9 @@ if config_env() == :prod do
   config :chat_service,
     jwt_issuer: jwt_issuer,
     jwt_audiences: jwt_audiences,
+    jwt_legacy_secret: jwt_secret,
+    jwt_public_key_pem: jwt_public_key_pem,
+    jwt_allow_legacy_hs256: jwt_allow_legacy_hs256,
     identity_service_url:
       System.get_env("INTERNAL_API_URL") ||
         System.get_env("IDENTITY_SERVICE_URL") ||

@@ -42,6 +42,7 @@ mod runtime_metrics;
 mod schema_contract;
 use auth::{
     auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims,
+    JwtVerifier,
 };
 use health::{health, ready, service_metrics};
 use identity_projection::{
@@ -54,6 +55,7 @@ use outbox::{run_outbox_publisher, OutboxPublisherConfig};
 struct AppState {
     db: PgPool,
     jwt_secret: String,
+    jwt_verifier: JwtVerifier,
     http_client: Client,
     identity_service_url: String,
     notification_tx: broadcast::Sender<RealtimeNotificationEnvelope>,
@@ -2136,6 +2138,7 @@ async fn main() -> anyhow::Result<()> {
     {
         anyhow::bail!("JWT_SECRET must be at least 32 characters and not a placeholder");
     }
+    let jwt_verifier = JwtVerifier::from_env(jwt_secret.clone())?;
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
     let migrate_only = env::var("MIGRATE_ONLY")
@@ -2187,6 +2190,7 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         db,
         jwt_secret,
+        jwt_verifier,
         http_client,
         identity_service_url: env::var("IDENTITY_SERVICE_URL")
             .unwrap_or_else(|_| "http://identity_service:8080".to_owned()),
@@ -2563,7 +2567,7 @@ async fn collect_events(
         );
     }
 
-    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_verifier);
     let mut events = Vec::with_capacity(raw_events.len());
 
     for event in raw_events {
@@ -2709,7 +2713,7 @@ async fn get_ai_os_overview(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(claims) => claims,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -2906,7 +2910,7 @@ async fn list_learning_courses(
     headers: HeaderMap,
     Query(query): Query<ListLearningCoursesQuery>,
 ) -> impl IntoResponse {
-    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let claims = auth_claims_from_headers(&headers, &state.jwt_verifier);
     let actor_user_id = claims
         .as_ref()
         .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
@@ -3083,7 +3087,7 @@ async fn get_learning_course(
     headers: HeaderMap,
     Path(course_ref): Path<String>,
 ) -> impl IntoResponse {
-    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let claims = auth_claims_from_headers(&headers, &state.jwt_verifier);
     let actor_user_id = claims
         .as_ref()
         .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
@@ -3172,7 +3176,7 @@ async fn create_learning_course(
     headers: HeaderMap,
     Json(payload): Json<UpsertLearningCourseRequest>,
 ) -> impl IntoResponse {
-    let creator_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let creator_user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -3308,7 +3312,7 @@ async fn update_learning_course(
     Path(course_ref): Path<String>,
     Json(payload): Json<UpsertLearningCourseRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(claims) => claims,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -3493,7 +3497,7 @@ async fn create_learning_module(
     Path(course_id): Path<Uuid>,
     Json(payload): Json<CreateLearningModuleRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(claims) => claims,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -3556,7 +3560,7 @@ async fn create_learning_lesson(
     Path(course_id): Path<Uuid>,
     Json(payload): Json<CreateLearningLessonRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(claims) => claims,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -3836,7 +3840,7 @@ async fn get_reward_balance(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -3878,7 +3882,7 @@ async fn claim_daily_login_reward(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -8896,7 +8900,7 @@ async fn list_lajukan_requests(
     let limit = query.limit.unwrap_or(24).clamp(1, 60);
     let owner_filter = match resolve_lajukan_request_owner_filter(
         query.mine.unwrap_or(false),
-        user_id_from_auth(&headers, &state.jwt_secret),
+        user_id_from_auth(&headers, &state.jwt_verifier),
     ) {
         Ok(owner_filter) => owner_filter,
         Err(status) => return err(status, "authentication required").into_response(),
@@ -9244,7 +9248,7 @@ async fn create_umkm_store(
     Json(payload): Json<CreateUmkmStoreRequest>,
 ) -> impl IntoResponse {
     let actor_user_id = match authorize_umkm_owner(
-        user_id_from_auth(&headers, &state.jwt_secret),
+        user_id_from_auth(&headers, &state.jwt_verifier),
         payload.owner_user_id,
     ) {
         Ok(user_id) => user_id,
@@ -9341,7 +9345,7 @@ async fn update_umkm_store(
     };
 
     match authorize_umkm_owner(
-        user_id_from_auth(&headers, &state.jwt_secret),
+        user_id_from_auth(&headers, &state.jwt_verifier),
         existing.owner_user_id,
     ) {
         Ok(_) => {}
@@ -9545,7 +9549,7 @@ async fn create_umkm_product(
     };
 
     match authorize_umkm_owner(
-        user_id_from_auth(&headers, &state.jwt_secret),
+        user_id_from_auth(&headers, &state.jwt_verifier),
         store.owner_user_id,
     ) {
         Ok(_) => {}
@@ -9936,7 +9940,7 @@ async fn create_creation_draft(
     headers: HeaderMap,
     Json(payload): Json<CreateCreationDraftRequest>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10128,7 +10132,7 @@ async fn get_creation_draft(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10154,7 +10158,7 @@ async fn patch_creation_draft(
     Path(id): Path<String>,
     Json(payload): Json<PatchCreationDraftRequest>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10322,7 +10326,7 @@ async fn discard_creation_draft(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10357,7 +10361,7 @@ async fn consume_creation_draft(
     Path(id): Path<String>,
     Json(payload): Json<ConsumeCreationDraftRequest>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10477,7 +10481,7 @@ async fn list_listing_drafts(
     headers: HeaderMap,
     Query(query): Query<ListListingDraftsQuery>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10550,7 +10554,7 @@ async fn get_listing_draft(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10569,7 +10573,7 @@ async fn create_listing_draft(
     headers: HeaderMap,
     Json(payload): Json<CreateListingDraftRequest>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10738,7 +10742,7 @@ async fn patch_listing_draft(
     Path(id): Path<Uuid>,
     Json(payload): Json<PatchListingDraftRequest>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10867,7 +10871,7 @@ async fn delete_listing_draft(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -10902,7 +10906,7 @@ async fn publish_listing_draft(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -11295,7 +11299,7 @@ async fn list_content(
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
     let owner_id = query.owner_id;
-    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let claims = auth_claims_from_headers(&headers, &state.jwt_verifier);
     let actor_user_id = claims
         .as_ref()
         .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
@@ -11622,7 +11626,7 @@ async fn get_content(
 ) -> impl IntoResponse {
     match find_content(&state.db, &id).await {
         Ok(Some(row)) => {
-            let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+            let actor_user_id = user_id_from_auth(&headers, &state.jwt_verifier);
             if !can_view_content_detail(&row.content_status, row.owner_id, actor_user_id) {
                 return err(StatusCode::NOT_FOUND, "content not found").into_response();
             }
@@ -11675,7 +11679,7 @@ async fn get_content_like_state(
         }
     };
 
-    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_verifier);
     match fetch_content_like_state(&state.db, content_id, actor_user_id).await {
         Ok(state) => (StatusCode::OK, Json(state)).into_response(),
         Err(error) => {
@@ -11695,7 +11699,7 @@ async fn update_content_like(
     Path(id): Path<String>,
     Json(payload): Json<ContentLikeRequest>,
 ) -> impl IntoResponse {
-    let actor_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let actor_user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -11848,7 +11852,7 @@ async fn list_content_likes(
 
     let limit = query.limit.unwrap_or(50).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
-    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_verifier);
 
     let total: i64 = match sqlx::query_scalar(
         r#"
@@ -11994,7 +11998,7 @@ async fn get_umkm_store_gallery_like_state(
         }
     };
 
-    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_verifier);
     match fetch_umkm_store_gallery_like_state(&state.db, store.id, actor_user_id).await {
         Ok(state) => (StatusCode::OK, Json(state)).into_response(),
         Err(error) => {
@@ -12015,7 +12019,7 @@ async fn update_umkm_store_gallery_like(
     Json(payload): Json<UmkmStoreGalleryLikeRequest>,
 ) -> impl IntoResponse {
     let UmkmStoreGalleryLikeRequest { media_key, liked } = payload;
-    let actor_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let actor_user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -12153,7 +12157,7 @@ async fn create_content(
     headers: HeaderMap,
     Json(payload): Json<UpsertContentRequest>,
 ) -> impl IntoResponse {
-    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -12607,7 +12611,7 @@ async fn update_content(
     Path(id): Path<String>,
     Json(payload): Json<UpsertContentRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -12952,7 +12956,7 @@ async fn delete_content(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -13553,7 +13557,7 @@ async fn create_offer(
     Path(id): Path<String>,
     Json(payload): Json<CreateOfferRequest>,
 ) -> impl IntoResponse {
-    let buyer_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let buyer_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -13816,7 +13820,7 @@ async fn counter_offer_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<CreateCounterOfferRequest>,
 ) -> impl IntoResponse {
-    let actor_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let actor_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14105,7 +14109,7 @@ async fn list_transactions(
     headers: HeaderMap,
     Query(query): Query<ListTransactionsQuery>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14179,7 +14183,7 @@ async fn get_transaction(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14270,7 +14274,7 @@ async fn fund_transaction(
     payload: Option<Json<FundTransactionRequest>>,
 ) -> impl IntoResponse {
     let payload = payload.map(|Json(value)| value).unwrap_or_default();
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14514,7 +14518,7 @@ async fn accept_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateTransactionRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14542,7 +14546,7 @@ async fn cancel_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateTransactionRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14577,7 +14581,7 @@ async fn start_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateTransactionRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14602,7 +14606,7 @@ async fn deliver_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<DeliverTransactionRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14750,7 +14754,7 @@ async fn review_delivery_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<ReviewDeliveryRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -14959,7 +14963,7 @@ async fn dispute_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<DisputeTransactionRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -15017,7 +15021,7 @@ async fn resolve_transaction_dispute(
     Path(id): Path<Uuid>,
     Json(payload): Json<ResolveDisputeRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -15461,7 +15465,7 @@ async fn complete_transaction(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateTransactionRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -15491,7 +15495,7 @@ async fn get_wallet_balances(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -15547,7 +15551,7 @@ async fn list_wallet_topups(
     headers: HeaderMap,
     Query(query): Query<ListWalletTopupsQuery>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -15646,7 +15650,7 @@ async fn list_wallet_ledger(
     headers: HeaderMap,
     Query(query): Query<ListWalletLedgerQuery>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -15721,7 +15725,7 @@ async fn list_wallet_withdrawals(
     headers: HeaderMap,
     Query(query): Query<ListWalletWithdrawalsQuery>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -15799,7 +15803,7 @@ async fn create_wallet_withdrawal(
     headers: HeaderMap,
     Json(payload): Json<CreateWalletWithdrawalRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -16045,7 +16049,7 @@ async fn cancel_wallet_withdrawal(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -16227,7 +16231,7 @@ async fn list_notifications(
     headers: HeaderMap,
     Query(query): Query<ListNotificationsQuery>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -16298,7 +16302,7 @@ async fn get_notification_unread_count(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -16327,7 +16331,7 @@ async fn mark_notification_read(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -16389,7 +16393,7 @@ async fn mark_all_notifications_read(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -16446,8 +16450,8 @@ async fn notification_stream_socket(
     let user_id = query
         .token
         .as_deref()
-        .and_then(|token| user_id_from_token_string(token, &state.jwt_secret))
-        .or_else(|| user_id_from_auth(&headers, &state.jwt_secret));
+        .and_then(|token| user_id_from_token_string(token, &state.jwt_verifier))
+        .or_else(|| user_id_from_auth(&headers, &state.jwt_verifier));
 
     match user_id {
         Some(id) => ws.on_upgrade(move |socket| notification_stream_loop(socket, state, id)),
@@ -16515,7 +16519,7 @@ async fn create_wallet_topup(
     headers: HeaderMap,
     Json(payload): Json<CreateWalletTopupRequest>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -16899,7 +16903,7 @@ async fn settle_wallet_topup_dev(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -17089,7 +17093,7 @@ async fn sync_wallet_topup_status(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -17506,7 +17510,7 @@ async fn cancel_wallet_topup(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -19652,7 +19656,7 @@ async fn create_review(
     Path(id): Path<Uuid>,
     Json(payload): Json<CreateReviewRequest>,
 ) -> impl IntoResponse {
-    let reviewer_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+    let reviewer_id = match user_id_from_auth(&headers, &state.jwt_verifier) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -19735,7 +19739,7 @@ async fn create_support_ticket(
     headers: HeaderMap,
     Json(payload): Json<CreateSupportTicketRequest>,
 ) -> impl IntoResponse {
-    let auth_claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let auth_claims = auth_claims_from_headers(&headers, &state.jwt_verifier);
     let requester_user_id = auth_claims
         .as_ref()
         .and_then(|c| Uuid::parse_str(&c.sub).ok());
@@ -19850,7 +19854,7 @@ async fn list_support_tickets(
     headers: HeaderMap,
     Query(query): Query<ListSupportTicketsQuery>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -19974,7 +19978,7 @@ async fn get_support_ticket(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -20068,7 +20072,7 @@ async fn update_support_ticket(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateSupportTicketRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -20139,7 +20143,7 @@ async fn create_support_reply(
     Path(id): Path<Uuid>,
     Json(payload): Json<CreateSupportReplyRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -20728,7 +20732,7 @@ async fn list_crm_leads(
     headers: HeaderMap,
     Query(query): Query<ListCrmLeadsQuery>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -20808,7 +20812,7 @@ async fn get_crm_lead(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -20853,7 +20857,7 @@ async fn create_crm_lead(
     headers: HeaderMap,
     Json(payload): Json<CreateCrmLeadRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21091,7 +21095,7 @@ async fn update_crm_lead(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateCrmLeadRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21214,7 +21218,7 @@ async fn list_crm_activities(
     headers: HeaderMap,
     Query(query): Query<ListCrmActivitiesQuery>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21296,7 +21300,7 @@ async fn list_super_app_orders(
     headers: HeaderMap,
     Query(query): Query<ListSuperAppOrdersQuery>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21374,7 +21378,7 @@ async fn get_super_app_order(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21452,7 +21456,7 @@ async fn update_super_app_order(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateSuperAppOrderRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21586,7 +21590,7 @@ async fn list_super_app_trust_profiles(
     headers: HeaderMap,
     Query(query): Query<ListSuperAppTrustProfilesQuery>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21656,7 +21660,7 @@ async fn get_super_app_trust_profile(
     headers: HeaderMap,
     Path(target_user_id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -21705,7 +21709,7 @@ async fn upsert_super_app_trust_profile(
     Path(target_user_id): Path<Uuid>,
     Json(payload): Json<UpsertSuperAppTrustProfileRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -22376,7 +22380,7 @@ async fn create_sector(
     headers: HeaderMap,
     Json(payload): Json<CreateSectorRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -22441,7 +22445,7 @@ async fn update_sector(
     Path(id): Path<String>,
     Json(payload): Json<UpdateSectorRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -22511,7 +22515,7 @@ async fn delete_sector(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -22638,7 +22642,7 @@ async fn create_banner(
     headers: HeaderMap,
     Json(payload): Json<CreateBannerRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -22704,7 +22708,7 @@ async fn update_banner(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateBannerRequest>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };
@@ -22793,7 +22797,7 @@ async fn delete_banner(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_verifier) {
         Some(c) => c,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     };

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify, type JWTPayload } from 'jose';
+import {
+  decodeProtectedHeader,
+  importSPKI,
+  jwtVerify,
+  type JWTPayload,
+  type KeyLike,
+} from 'jose';
 
 export type AuthContext = {
   token: string;
@@ -12,6 +18,9 @@ export type AuthContext = {
 export type AuthGuardResult =
   | { ok: true; ctx: AuthContext }
   | { ok: false; res: NextResponse };
+
+let cachedPublicKeySource = '';
+let cachedPublicKey: Promise<KeyLike> | null = null;
 
 function getAppEnv(): string {
   return process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV || 'development';
@@ -61,6 +70,50 @@ function getEmailFromPayload(payload: JWTPayload): string | undefined {
   return undefined;
 }
 
+function allowLegacyHs256(): boolean {
+  const raw = (process.env.JWT_ALLOW_LEGACY_HS256 || 'true').trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(raw);
+}
+
+function publicKeyPem(): string | undefined {
+  const value = process.env.JWT_PUBLIC_KEY_PEM?.replaceAll('\\n', '\n').trim();
+  return value || undefined;
+}
+
+function getPublicKey(pem: string): Promise<KeyLike> {
+  if (!cachedPublicKey || cachedPublicKeySource !== pem) {
+    cachedPublicKeySource = pem;
+    cachedPublicKey = importSPKI(pem, 'RS256');
+  }
+  return cachedPublicKey;
+}
+
+async function verifyAccessToken(token: string): Promise<JWTPayload> {
+  const protectedHeader = decodeProtectedHeader(token);
+
+  if (protectedHeader.alg === 'RS256') {
+    const pem = publicKeyPem();
+    if (!pem) throw new Error('JWT public key is not configured');
+    const { payload } = await jwtVerify(token, await getPublicKey(pem), {
+      algorithms: ['RS256'],
+    });
+    return payload;
+  }
+
+  if (protectedHeader.alg === 'HS256' && allowLegacyHs256()) {
+    const secretRaw = process.env.JWT_SECRET;
+    if (!secretRaw) throw new Error('JWT legacy secret is not configured');
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoder().encode(secretRaw),
+      { algorithms: ['HS256'] },
+    );
+    return payload;
+  }
+
+  throw new Error('Unsupported JWT algorithm');
+}
+
 export async function requireAuth(req: NextRequest): Promise<AuthGuardResult> {
   const appEnv = getAppEnv();
   const isDev = appEnv !== 'production';
@@ -69,7 +122,9 @@ export async function requireAuth(req: NextRequest): Promise<AuthGuardResult> {
   const bearerToken = getBearerToken(req);
 
   const allowBearerInProd = process.env.ALLOW_BEARER_AUTH === 'true';
-  const token = isDev ? bearerToken || cookieToken : cookieToken || (allowBearerInProd ? bearerToken : undefined);
+  const token = isDev
+    ? bearerToken || cookieToken
+    : cookieToken || (allowBearerInProd ? bearerToken : undefined);
 
   if (!token) {
     return {
@@ -81,8 +136,7 @@ export async function requireAuth(req: NextRequest): Promise<AuthGuardResult> {
     };
   }
 
-  const secretRaw = process.env.JWT_SECRET;
-  if (!secretRaw) {
+  if (!process.env.JWT_SECRET && !publicKeyPem()) {
     return {
       ok: false,
       res: NextResponse.json({ error: 'Service unavailable' }, { status: 503 }),
@@ -90,8 +144,7 @@ export async function requireAuth(req: NextRequest): Promise<AuthGuardResult> {
   }
 
   try {
-    const secret = new TextEncoder().encode(secretRaw);
-    const { payload } = await jwtVerify(token, secret);
+    const payload = await verifyAccessToken(token);
 
     const userId = getUserIdFromPayload(payload);
     if (!userId) {

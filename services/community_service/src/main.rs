@@ -40,7 +40,7 @@ mod rate_limit;
 mod runtime_metrics;
 mod schema_contract;
 
-use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
+use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor, JwtVerifier};
 use health::{health, ready, root, service_metrics};
 use rate_limit::{enforce_rate_limit, mutation_rate_limit, run_rate_limit_cleanup};
 
@@ -69,7 +69,7 @@ type ApiResult<T> = Result<T, ApiError>;
 
 struct AppState {
     db: PgPool,
-    jwt_secret: String,
+    jwt_verifier: JwtVerifier,
 }
 
 #[derive(Debug)]
@@ -1112,6 +1112,7 @@ async fn main() -> anyhow::Result<()> {
     {
         anyhow::bail!("JWT_SECRET must be at least 32 characters and not a placeholder");
     }
+    let jwt_verifier = JwtVerifier::from_env(jwt_secret.clone())?;
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
     let migrate_only = env::var("MIGRATE_ONLY")
@@ -1181,7 +1182,7 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
-    let state = Arc::new(AppState { db, jwt_secret });
+    let state = Arc::new(AppState { db, jwt_verifier });
 
     tokio::spawn(run_rate_limit_cleanup(state.db.clone()));
 

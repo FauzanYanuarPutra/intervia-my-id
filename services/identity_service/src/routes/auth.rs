@@ -20,7 +20,9 @@ use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite}; // ✅ Gunakan A
 
 use deadpool_redis::redis::AsyncCommands;
 
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{
+    decode, decode_header, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation,
+};
 
 use rand::{distributions::Alphanumeric, Rng};
 
@@ -36,7 +38,7 @@ use chrono::{DateTime, Duration, Utc}; // ✅ Serde enabled via Cargo.toml
 
 use uuid::Uuid;
 
-use crate::config::AppState;
+use crate::config::{AppState, Config};
 use crate::routes::proofs::{consume_phone_otp_proof, validate_phone_otp_proof};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
@@ -809,9 +811,9 @@ async fn find_and_verify_session(
 // -------------------- Helper: create access token -----------------
 // (Unchanged)
 fn create_access_token(
-    secret: &str,
+    config: &Config,
     user_id: Uuid,
-    username: String, // Tambahkan parameter ini
+    username: String,
     expiry_hours: i64,
     roles: Vec<String>,
     permissions: Vec<String>,
@@ -822,27 +824,59 @@ fn create_access_token(
         exp,
         roles,
         perms: permissions,
-        username, // Masukkan ke claims
+        username,
     };
+
+    if let Some(private_key_pem) = config.jwt_private_key_pem.as_deref() {
+        let mut header = Header::new(Algorithm::RS256);
+        header.kid = Some(config.jwt_key_id.clone());
+        return encode(
+            &header,
+            &claims,
+            &EncodingKey::from_rsa_pem(private_key_pem.as_bytes())
+                .map_err(|e| anyhow::anyhow!("invalid JWT private key: {:?}", e))?,
+        )
+        .map_err(|e| anyhow::anyhow!("jwt encode error: {:?}", e));
+    }
+
     let header = Header::new(Algorithm::HS256);
-    let token = encode(
+    encode(
         &header,
         &claims,
-        &EncodingKey::from_secret(secret.as_bytes()),
+        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
     )
-    .map_err(|e| anyhow::anyhow!("jwt encode error: {:?}", e))?;
-    Ok(token)
+    .map_err(|e| anyhow::anyhow!("jwt encode error: {:?}", e))
 }
 
-// (Unchanged)
-fn decode_access_token(secret: &str, token: &str) -> Result<AccessClaims, anyhow::Error> {
-    let validation = Validation::new(Algorithm::HS256);
-    let data = decode::<AccessClaims>(
-        token,
-        &DecodingKey::from_secret(secret.as_bytes()),
-        &validation,
-    )
+fn decode_access_token(config: &Config, token: &str) -> Result<AccessClaims, anyhow::Error> {
+    let header = decode_header(token).map_err(|e| anyhow::anyhow!("jwt header error: {:?}", e))?;
+
+    let data = match header.alg {
+        Algorithm::RS256 => {
+            let public_key_pem = config
+                .jwt_public_key_pem
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("JWT public key is not configured"))?;
+            let validation = Validation::new(Algorithm::RS256);
+            decode::<AccessClaims>(
+                token,
+                &DecodingKey::from_rsa_pem(public_key_pem.as_bytes())
+                    .map_err(|e| anyhow::anyhow!("invalid JWT public key: {:?}", e))?,
+                &validation,
+            )
+        }
+        Algorithm::HS256 if config.jwt_allow_legacy_hs256 => {
+            let validation = Validation::new(Algorithm::HS256);
+            decode::<AccessClaims>(
+                token,
+                &DecodingKey::from_secret(config.jwt_secret.as_bytes()),
+                &validation,
+            )
+        }
+        _ => return Err(anyhow::anyhow!("unsupported JWT algorithm")),
+    }
     .map_err(|e| anyhow::anyhow!("jwt decode error: {:?}", e))?;
+
     Ok(data.claims)
 }
 // ------------------------------------------------------------------
@@ -1140,7 +1174,7 @@ pub async fn register(
             permissions: vec![],
         });
     let access_token = match create_access_token(
-        &state.config.jwt_secret,
+        &state.config,
         user_id,
         username.clone(),
         ACCESS_TOKEN_EXP_HOURS,
@@ -1429,7 +1463,7 @@ pub async fn login(
         });
 
     let access_token = create_access_token(
-        &state.config.jwt_secret,
+        &state.config,
         user_data.id,
         user_data
             .username
@@ -1748,7 +1782,7 @@ pub async fn login_phone(
         });
 
     let access_token = create_access_token(
-        &state.config.jwt_secret,
+        &state.config,
         user_data.id,
         user_data
             .username
@@ -2147,7 +2181,7 @@ pub async fn oauth_google(
     };
 
     let access_token = match create_access_token(
-        &state.config.jwt_secret,
+        &state.config,
         user_id,
         username,
         ACCESS_TOKEN_EXP_HOURS,
@@ -2292,7 +2326,7 @@ pub async fn refresh_token(
 
                     // Buat access token JWT
                     match create_access_token(
-                        &state.config.jwt_secret,
+                        &state.config,
                         user_id,
                         username,
                         ACCESS_TOKEN_EXP_HOURS,
@@ -2518,7 +2552,7 @@ pub async fn change_password(
     }
 
     let token = auth_header.trim_start_matches("Bearer ").trim();
-    let claims = match decode_access_token(&state.config.jwt_secret, token) {
+    let claims = match decode_access_token(&state.config, token) {
         Ok(c) => c,
         Err(_) => {
             return (
@@ -2806,8 +2840,7 @@ pub async fn me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> impl 
     let token = auth_header.trim_start_matches("Bearer ").trim();
 
     // Decode dan validasi JWT
-    let secret = state.config.jwt_secret.clone();
-    let claims = match decode_access_token(&secret, token) {
+    let claims = match decode_access_token(&state.config, token) {
         Ok(c) => c,
         Err(_) => {
             return (

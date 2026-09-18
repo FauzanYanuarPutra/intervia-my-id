@@ -47,12 +47,18 @@ restore_drill_script = read("scripts/ops/postgres_isolated_restore_drill.sh")
 restore_drill_test = read("scripts/ci/test_postgres_restore_drill.sh")
 scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
+identity_auth_source = read("services/identity_service/src/routes/auth.rs")
+identity_config_source = read("services/identity_service/src/config/mod.rs")
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
 community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
 ai_runtime_metrics = read("services/ai_service/src/runtime_metrics.rs")
 community_main_source = read("services/community_service/src/main.rs")
 marketplace_auth_source = read("services/marketplace_service/src/auth.rs")
 community_auth_source = read("services/community_service/src/auth.rs")
+chat_auth_source = read("services/chat_service/lib/chat_service/auth.ex")
+chat_runtime_config = read("services/chat_service/config/runtime.exs")
+chat_socket_source = read("services/chat_service/lib/chat_service_web/user_socket.ex")
+www_server_auth = read("frontend/apps/www/src/lib/serverAuth.ts")
 community_health_source = read("services/community_service/src/health.rs")
 community_rate_limit_source = read("services/community_service/src/rate_limit.rs")
 marketplace_schema_contract = read("services/marketplace_service/src/schema_contract.rs")
@@ -61,6 +67,100 @@ production_env_example = read(".env.production.example")
 staging_env_example = read(".env.staging.example")
 development_env_example = read(".env.development.example")
 marketplace_identity_client = read("services/marketplace_service/src/businesses/identity_client.rs")
+
+if base_compose.count("JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}") != 1:
+    errors.append("base compose must expose JWT_PRIVATE_KEY_PEM to Identity only")
+
+for marker in (
+    "JWT_PUBLIC_KEY_PEM",
+    "JWT_KEY_ID",
+    "JWT_ALLOW_LEGACY_HS256",
+):
+    if base_compose.count(marker) < 3:
+        errors.append(f"base compose must pass asymmetric JWT rollout setting to all core services: {marker}")
+
+for env_name, env_source in (
+    ("production", production_env_example),
+    ("staging", staging_env_example),
+    ("development", development_env_example),
+):
+    for marker in (
+        "JWT_PRIVATE_KEY_PEM=",
+        "JWT_PUBLIC_KEY_PEM=",
+        "JWT_KEY_ID=",
+        "JWT_ALLOW_LEGACY_HS256=",
+    ):
+        if marker not in env_source:
+            errors.append(f"{env_name} env example missing asymmetric JWT rollout marker: {marker}")
+
+for marker in (
+    "Algorithm::RS256",
+    "EncodingKey::from_rsa_pem",
+    "decode_header",
+    "jwt_allow_legacy_hs256",
+):
+    if marker not in identity_auth_source:
+        errors.append(f"Identity access-token implementation missing asymmetric JWT marker: {marker}")
+
+for marker in (
+    "jwt_private_key_pem",
+    "jwt_public_key_pem",
+    "jwt_key_id",
+    "jwt_allow_legacy_hs256",
+):
+    if marker not in identity_config_source:
+        errors.append(f"Identity config missing asymmetric JWT setting: {marker}")
+
+for path, source in (
+    ("services/marketplace_service/src/auth.rs", marketplace_auth_source),
+    ("services/community_service/src/auth.rs", community_auth_source),
+):
+    for marker in (
+        "JwtVerifier",
+        "JWT_PUBLIC_KEY_PEM",
+        "JWT_ALLOW_LEGACY_HS256",
+        "decode_header",
+        "Algorithm::RS256",
+        "Algorithm::HS256",
+    ):
+        if marker not in source:
+            errors.append(f"{path} missing asymmetric JWT verification marker: {marker}")
+
+for marker in (
+    "JOSE.JWT.verify_strict",
+    '["RS256"]',
+    '["HS256"]',
+    ":jwt_public_key_pem",
+    ":jwt_allow_legacy_hs256",
+):
+    if marker not in chat_auth_source:
+        errors.append(f"Chat JWT verifier missing asymmetric rollout marker: {marker}")
+
+for marker in (
+    "JWT_PUBLIC_KEY_PEM",
+    "JWT_ALLOW_LEGACY_HS256",
+    "jwt_public_key_pem",
+    "jwt_allow_legacy_hs256",
+):
+    if marker not in chat_runtime_config:
+        errors.append(f"Chat runtime config missing asymmetric JWT marker: {marker}")
+
+if "Auth.verify_jwt(token)" not in chat_socket_source:
+    errors.append("Chat websocket must share the central dual-algorithm JWT verifier")
+if "Guardian.decode_and_verify(token)" in chat_socket_source:
+    errors.append("Chat websocket must not bypass the central JWT verifier")
+
+for marker in (
+    "decodeProtectedHeader",
+    "importSPKI",
+    "JWT_PUBLIC_KEY_PEM",
+    "JWT_ALLOW_LEGACY_HS256",
+    "algorithms: ['RS256']",
+    "algorithms: ['HS256']",
+):
+    if marker not in www_server_auth:
+        errors.append(f"WWW server auth missing asymmetric JWT marker: {marker}")
+
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
