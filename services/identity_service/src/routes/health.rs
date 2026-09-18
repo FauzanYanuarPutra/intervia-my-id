@@ -58,7 +58,7 @@ pub async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRes
         Ok(Err(_)) | Err(_) => (0, 0),
     };
 
-    let body = format!(
+    let mut body = format!(
         concat!(
             "# HELP lajukan_service_info Static service identity.\n",
             "# TYPE lajukan_service_info gauge\n",
@@ -76,6 +76,8 @@ pub async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRes
         ),
         pool_size, pool_idle, outbox_backlog, metrics_query_ok
     );
+
+    body.push_str(&crate::runtime_metrics::render("identity_service"));
 
     (
         [(
