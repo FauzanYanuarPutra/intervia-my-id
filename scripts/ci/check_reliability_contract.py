@@ -38,6 +38,7 @@ blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
 restore_drill_script = read("scripts/ops/postgres_isolated_restore_drill.sh")
+restore_drill_test = read("scripts/ci/test_postgres_restore_drill.sh")
 scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
@@ -704,6 +705,16 @@ for marker in (
 ):
     if marker not in restore_drill_script:
         errors.append(f"isolated PostgreSQL restore drill missing safety/validation marker: {marker}")
+
+for marker in (
+    "pg_dump",
+    "restore_contract_",
+    "sha256sum postgres/*.dump",
+    "postgres_isolated_restore_drill.sh",
+    "Synthetic end-to-end PostgreSQL restore drill passed.",
+):
+    if marker not in restore_drill_test:
+        errors.append(f"PostgreSQL restore drill CI self-test missing marker: {marker}")
 
 for marker in (
     "probe_surviving_replicas",
