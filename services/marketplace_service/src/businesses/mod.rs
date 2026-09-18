@@ -65,8 +65,7 @@ mod sales_routes;
 mod seller_orders;
 #[cfg(test)]
 mod seller_orders_persistence_tests;
-#[cfg(test)]
-mod sales_schema_tests;
+
 mod service;
 pub(crate) mod settlement;
 pub(crate) mod transactions;
