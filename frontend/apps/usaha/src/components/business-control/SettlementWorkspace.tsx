@@ -3,7 +3,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Save, TriangleAlert } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { jakartaDateKey } from '@/lib/business-control/insights';
 import { reconcileSettlement } from '@/lib/business-control/settlement';
 
@@ -72,6 +74,7 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<FeedbackTone>('info');
   const saveAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const preview = useMemo(() => {
@@ -84,10 +87,12 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
 
   async function save() {
     if (!preview) {
+      setMessageTone('error');
       setMessage('Periksa angka. Total potongan tidak boleh lebih besar dari omzet kotor.');
       return;
     }
     if (!periodStart || !periodEnd || periodEnd < periodStart) {
+      setMessageTone('error');
       setMessage('Periode settlement tidak valid.');
       return;
     }
@@ -118,12 +123,13 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
         body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Gagal menyimpan settlement.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan settlement.', response.status));
       const saved = payload?.data?.settlement as SettlementRecord | undefined;
       const replayed = payload?.data?.replayed === true;
       if (saved) {
         setRecords(current => [saved, ...current.filter(item => item.id !== saved.id)]);
       }
+      setMessageTone(replayed || saved?.status === 'matched' ? 'success' : 'warning');
       setMessage(
         replayed
           ? 'Settlement ini sudah tersimpan. Retry tidak membuat catatan ganda.'
@@ -132,6 +138,7 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
             : 'Settlement tersimpan. Ada selisih yang perlu diperiksa.',
       );
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan settlement.');
     } finally {
       setSaving(false);
@@ -203,7 +210,7 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
           <div className="text-xs leading-5 text-portal-soft">{preview?.status === 'matched' ? 'Angka cocok.' : preview ? 'Ada selisih. Simpan agar bisa ditindaklanjuti.' : 'Total potongan melebihi omzet kotor.'}</div>
           <button type="button" onClick={save} disabled={saving} className="portal-button-primary justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan settlement</button>
         </div>
-        {message ? <p role="status" aria-live="polite" className="border-t border-portal-line px-4 py-3 text-xs text-portal-soft sm:px-5">{message}</p> : null}
+        {message ? <div className="border-t border-portal-line p-4 sm:p-5"><FeedbackNotice message={message} tone={messageTone} /></div> : null}
       </section>
 
       <section className="portal-panel overflow-hidden">
