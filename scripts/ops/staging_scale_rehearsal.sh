@@ -59,7 +59,46 @@ for service in identity_service marketplace_service community_service www; do
   assert_replica_health "$service" "$REPLICAS"
 done
 
+probe_surviving_replicas() {
+  local target_service="$1"
+  local probe_service="$2"
+  local probe_url="$3"
+
+  local -a ids
+  mapfile -t ids < <("${compose[@]}" ps -q "$target_service")
+  [[ "${#ids[@]}" -ge 2 ]] || {
+    echo "$target_service requires at least two replicas for failover rehearsal." >&2
+    return 1
+  }
+
+  local victim="${ids[0]}"
+  echo "Stopping one $target_service replica to verify service-discovery failover: $victim"
+  docker stop --time 10 "$victim" >/dev/null
+  sleep 2
+
+  local attempt
+  for attempt in $(seq 1 12); do
+    if ! "${compose[@]}" exec -T "$probe_service" curl -fsS --max-time 5 "$probe_url" >/dev/null; then
+      echo "$target_service failover probe failed on attempt $attempt while one replica was stopped." >&2
+      "${compose[@]}" up -d --scale "$target_service=$REPLICAS" --wait --wait-timeout 180 >/dev/null || true
+      return 1
+    fi
+  done
+
+  echo "Restoring $target_service to $REPLICAS replicas."
+  "${compose[@]}" up -d --scale "$target_service=$REPLICAS" --wait --wait-timeout 180 >/dev/null
+  assert_replica_health "$target_service" "$REPLICAS"
+}
+
+# Probe through Docker service discovery from a different serving service. This
+# catches single-replica assumptions and stale service-discovery behavior while
+# remaining independent of public DNS/CDN configuration.
+probe_surviving_replicas identity_service marketplace_service http://identity_service:8080/ready
+probe_surviving_replicas marketplace_service identity_service http://marketplace_service:8081/ready
+probe_surviving_replicas community_service identity_service http://community_service:8082/ready
+probe_surviving_replicas www identity_service http://www:3000/api/health
+
 "${compose[@]}" ps
 
-echo "Multi-replica rehearsal passed for identity, marketplace, community and www."
-echo "This validates process-level replica startup only; it is not a multi-host or multi-AZ availability test."
+echo "Multi-replica startup and single-replica failover rehearsal passed for identity, marketplace, community and www."
+echo "This validates single-host process/service-discovery failover only; it is not a multi-host or multi-AZ availability test."
