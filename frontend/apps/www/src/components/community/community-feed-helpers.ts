@@ -19,6 +19,10 @@ export type ParsedPoll = {
   options: string[];
 };
 
+type CommunitySearchPayload = Omit<Partial<CommunitySearchResponse>, 'kind'> & {
+  kind?: string | null;
+};
+
 export function resolveCommunityMediaSrc(value?: string | null): string {
   const clean = normalizeContentMediaUrl(String(value || '').trim());
   if (!clean) return '';
@@ -221,7 +225,7 @@ export function parseCommunityPoll(
 }
 
 export function sanitizeCommunitySearchResults(
-  payload: Partial<CommunitySearchResponse>,
+  payload: CommunitySearchPayload,
 ): CommunitySearchResponse {
   const posts = communityDiscussionItems(payload.posts);
   const people = Array.isArray(payload.people) ? payload.people : [];
