@@ -623,7 +623,7 @@ export default function NewsModeration() {
                         <p className="text-xs font-semibold text-[color:var(--color-text)]">
                           {review.from_verification_status} → {review.to_verification_status}
                         </p>
-                        {review.source_url_snapshot ? (
+                        {review.source_url_snapshot && isSafeExternalSourceUrl(review.source_url_snapshot) ? (
                           <a
                             href={review.source_url_snapshot}
                             target="_blank"
@@ -632,6 +632,10 @@ export default function NewsModeration() {
                           >
                             {review.source_domain_snapshot || review.source_url_snapshot}
                           </a>
+                        ) : review.source_url_snapshot ? (
+                          <p className="mt-1 break-all text-[10px] text-[color:var(--color-text-soft)]">
+                            Snapshot URL tidak ditautkan karena tidak memenuhi kebijakan URL publik: {review.source_url_snapshot}
+                          </p>
                         ) : (
                           <p className="mt-1 text-[10px] text-[color:var(--color-text-soft)]">URL snapshot tidak tersedia untuk event legacy.</p>
                         )}
