@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::{
-    money::{NonNegativeAmount, PositiveAmount},
+    money::{CurrencyCode, NonNegativeAmount, PositiveAmount, ScaledMoney},
     scope::BusinessScope,
     time::BusinessDateContext,
 };
@@ -48,6 +48,43 @@ fn positive_amount_rejects_zero_and_negative_values() {
     assert!(PositiveAmount::new(-1).is_err());
     assert!(PositiveAmount::new(0).is_err());
     assert_eq!(PositiveAmount::new(1).unwrap().value(), 1);
+}
+
+#[test]
+fn currency_code_is_canonical_and_strict() {
+    assert_eq!(CurrencyCode::new(" idr ").unwrap().as_str(), "IDR");
+    assert!(CurrencyCode::new("RP").is_err());
+    assert!(CurrencyCode::new("IDR1").is_err());
+}
+
+#[test]
+fn scaled_money_rejects_mixed_currency_and_scale() {
+    let idr = ScaledMoney::new(10_000, "IDR", 0).unwrap();
+    let usd = ScaledMoney::new(10_000, "USD", 2).unwrap();
+    let scaled_idr = ScaledMoney::new(10_000, "IDR", 2).unwrap();
+
+    assert!(idr.checked_add(&usd).is_err());
+    assert!(idr.checked_add(&scaled_idr).is_err());
+}
+
+#[test]
+fn scaled_money_uses_checked_arithmetic_and_exact_decimal_conversion() {
+    let unit = ScaledMoney::positive(12_345, "IDR", 2).unwrap();
+    let line = unit.checked_mul_i64(3).unwrap();
+    assert_eq!(line.minor_units(), 37_035);
+    assert_eq!(line.currency(), "IDR");
+    assert_eq!(line.scale(), 2);
+    assert_eq!(line.to_decimal().to_string(), "370.35");
+
+    let subtotal = ScaledMoney::zero("IDR", 2)
+        .unwrap()
+        .checked_add(&line)
+        .unwrap();
+    assert_eq!(subtotal.to_decimal().to_string(), "370.35");
+    assert!(ScaledMoney::new(i64::MAX, "IDR", 0)
+        .unwrap()
+        .checked_add(&ScaledMoney::new(1, "IDR", 0).unwrap())
+        .is_err());
 }
 
 #[test]

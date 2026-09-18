@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::{auth_claims_from_headers, AppState};
 
 use super::{
-    kernel::command::canonical_request_hash,
+    kernel::{command::canonical_request_hash, money::ScaledMoney},
     modifier_resolution::{
         resolve_modifier_selection as resolve_shared_modifier_selection, ModifierResolutionError,
         ModifierSelectionInput, ModifierSnapshot, ResolvedModifierSelection,
@@ -334,7 +334,8 @@ impl PublicCommerceRepository {
         }
 
         let mut resolved_items = Vec::with_capacity(request.items.len());
-        let mut subtotal = Decimal::ZERO;
+        let mut subtotal_money = ScaledMoney::zero("IDR", 2)
+            .map_err(|_| PublicCommerceError::Validation("invalid_money_contract"))?;
         for item in &request.items {
             let product = products
                 .get(&item.product_id)
@@ -345,14 +346,18 @@ impl PublicCommerceRepository {
                 .price_cents
                 .checked_add(modifier_selection.price_delta_cents)
                 .ok_or(PublicCommerceError::Validation("invalid_configured_price"))?;
-            if resolved_price_cents <= 0 {
-                return Err(PublicCommerceError::Validation("invalid_configured_price"));
-            }
+            let unit_money = ScaledMoney::positive(resolved_price_cents, "IDR", 2)
+                .map_err(|_| PublicCommerceError::Validation("invalid_configured_price"))?;
+            let line_money = unit_money
+                .checked_mul_i64(i64::from(item.quantity))
+                .map_err(|_| PublicCommerceError::Validation("order_total_overflow"))?;
+            subtotal_money = subtotal_money
+                .checked_add(&line_money)
+                .map_err(|_| PublicCommerceError::Validation("order_total_overflow"))?;
 
             let quantity = Decimal::from(item.quantity);
-            let unit_price = Decimal::new(resolved_price_cents, 2);
-            let line_total = (quantity * unit_price).round_dp(2);
-            subtotal += line_total;
+            let unit_price = unit_money.to_decimal();
+            let line_total = line_money.to_decimal();
             resolved_items.push(ResolvedOrderItem {
                 product_id: product.product_id,
                 item_name: product.product_name.clone(),
@@ -366,7 +371,7 @@ impl PublicCommerceRepository {
                 ),
             });
         }
-        subtotal = subtotal.round_dp(2);
+        let subtotal = subtotal_money.to_decimal();
 
         let source_surface = normalize_optional_text(request.source_surface.as_deref());
         let order_note = normalize_optional_text(request.note.as_deref());
