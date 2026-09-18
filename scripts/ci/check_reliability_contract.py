@@ -288,6 +288,7 @@ marketplace_source = read("services/marketplace_service/src/main.rs")
 marketplace_outbox_source = read("services/marketplace_service/src/outbox.rs")
 marketplace_health_source = read("services/marketplace_service/src/health.rs")
 marketplace_public_commerce_source = read("services/marketplace_service/src/businesses/public_commerce.rs")
+marketplace_money_source = read("services/marketplace_service/src/businesses/kernel/money.rs")
 marketplace_seller_orders_source = read("services/marketplace_service/src/businesses/seller_orders.rs")
 marketplace_outbox_identity_migration = read("services/marketplace_service/migrations/20260918190000_marketplace_outbox_event_identity.up.sql")
 for marker in (
@@ -312,6 +313,31 @@ for marker in (
 ):
     if marker not in marketplace_outbox_source:
         errors.append(f"Marketplace outbox configuration contract missing marker: {marker}")
+
+for marker in (
+    "struct CurrencyCode",
+    "struct ScaledMoney",
+    "checked_add",
+    "checked_sub",
+    "checked_mul_i64",
+    "AmountOverflow",
+    "CurrencyMismatch",
+    "MoneyScaleMismatch",
+    "to_decimal",
+):
+    if marker not in marketplace_money_source:
+        errors.append(f"Marketplace money kernel missing canonical money marker: {marker}")
+
+for marker in (
+    "money::ScaledMoney",
+    'ScaledMoney::zero("IDR", 2)',
+    "ScaledMoney::positive(resolved_price_cents",
+    ".checked_mul_i64(i64::from(item.quantity))",
+    ".checked_add(&line_money)",
+    '"order_total_overflow"',
+):
+    if marker not in marketplace_public_commerce_source:
+        errors.append(f"Public commerce checkout missing checked money contract: {marker}")
 
 for path, source in (
     ("services/marketplace_service/src/businesses/public_commerce.rs", marketplace_public_commerce_source),
