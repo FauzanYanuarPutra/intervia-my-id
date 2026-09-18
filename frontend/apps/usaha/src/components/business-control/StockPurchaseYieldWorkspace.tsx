@@ -5,8 +5,10 @@ import { Loader2, PackagePlus, Scale } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { EffectPreview } from '@/components/interaction/EffectPreview';
+import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { SearchPicker } from '@/components/interaction/SearchPicker';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type { Wave2YieldObservation } from '@/lib/business-wave2-server';
 import {
   previewObservedYield,
@@ -85,6 +87,7 @@ export function StockPurchaseYieldWorkspace({
   const [expectedOutput, setExpectedOutput] = useState('');
   const [savingPrimary, setSavingPrimary] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<FeedbackTone>('info');
   const purchaseAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
   const yieldAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
@@ -121,7 +124,7 @@ export function StockPurchaseYieldWorkspace({
       body: JSON.stringify(input),
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan.');
+    if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan.', response.status));
     return payload;
   }
 
@@ -129,6 +132,7 @@ export function StockPurchaseYieldWorkspace({
     const parsedQuantity = Number(quantity);
     const parsedAmount = Math.round(Number(totalAmount));
     if (!ingredientId || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0 || parsedAmount <= 0) {
+      setMessageTone('error');
       setMessage('Pilih bahan, isi jumlah, dan total belanja dengan benar.');
       return;
     }
@@ -152,9 +156,11 @@ export function StockPurchaseYieldWorkspace({
       setQuantity('');
       setTotalAmount('');
       setNote('');
+      setMessageTone('success');
       setMessage('Belanja tersimpan. Stok bertambah dan uang keluar tercatat sekali.');
       router.refresh();
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan belanja.');
     } finally {
       setBuying(false);
@@ -165,6 +171,7 @@ export function StockPurchaseYieldWorkspace({
     const input = Number(inputQuantity);
     const output = Number(outputUnits);
     if (!yieldIngredientId || !currentYieldPreview.valid) {
+      setMessageTone('error');
       setMessage('Isi bahan, jumlah bahan, dan hasil nyata dengan benar.');
       return;
     }
@@ -189,9 +196,11 @@ export function StockPurchaseYieldWorkspace({
       setInputQuantity('');
       setOutputUnits('');
       setYieldNote('');
+      setMessageTone('success');
       setMessage('Hasil nyata tersimpan. Lajukan akan belajar dari observasi berikutnya.');
       router.refresh();
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan hasil nyata.');
     } finally {
       setSavingYield(false);
@@ -202,6 +211,7 @@ export function StockPurchaseYieldWorkspace({
     const input = Number(expectedInput);
     const output = Number(expectedOutput);
     if (!primaryProductId || !primaryIngredientId || input <= 0 || output <= 0) {
+      setMessageTone('error');
       setMessage('Pilih produk dan bahan utama, lalu isi perkiraan input serta hasil.');
       return;
     }
@@ -215,9 +225,11 @@ export function StockPurchaseYieldWorkspace({
         expected_input_quantity: input,
         expected_output_units: output,
       });
+      setMessageTone('success');
       setMessage('Hubungan bahan utama tersimpan.');
       router.refresh();
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menyimpan bahan utama.');
     } finally {
       setSavingPrimary(false);
@@ -536,9 +548,7 @@ export function StockPurchaseYieldWorkspace({
         </div>
       </details>
 
-      {message ? (
-        <p className="rounded-xl border border-portal-line bg-white px-4 py-3 text-xs text-portal-soft">{message}</p>
-      ) : null}
+      {message ? <FeedbackNotice message={message} tone={messageTone} /> : null}
     </div>
   );
 }
