@@ -78,14 +78,14 @@ export async function POST(
       if (!obligationId || !paidOn) {
         return NextResponse.json({ error: 'invalid_obligation_payment' }, { status: 400 });
       }
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+      if (!idempotencyKey) {
+        return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+      }
       const result = await payWave2Obligation(
         businessId,
         obligationId,
-        (() => {
-          const idempotencyKey = request.headers.get('idempotency-key')?.trim();
-          if (!idempotencyKey) throw new BusinessWave2HttpError(400, 'missing_idempotency_key');
-          return idempotencyKey;
-        })(),
+        idempotencyKey,
         paidOn,
       );
       return NextResponse.json(result);
