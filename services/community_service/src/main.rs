@@ -1042,14 +1042,9 @@ async fn connect_database_pool(
             .min_connections(0)
             .acquire_timeout(Duration::from_secs(10)),
         DatabasePoolPurpose::Application => {
-            let max_connections =
-                env_u32_bounded("COMMUNITY_DB_MAX_CONNECTIONS", 20, 2, 100);
-            let min_connections = env_u32_bounded(
-                "COMMUNITY_DB_MIN_CONNECTIONS",
-                2,
-                0,
-                max_connections,
-            );
+            let max_connections = env_u32_bounded("COMMUNITY_DB_MAX_CONNECTIONS", 20, 2, 100);
+            let min_connections =
+                env_u32_bounded("COMMUNITY_DB_MIN_CONNECTIONS", 2, 0, max_connections);
             let acquire_timeout_seconds =
                 env_u64_bounded("COMMUNITY_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
             PgPoolOptions::new()
@@ -1130,12 +1125,24 @@ async fn main() -> anyhow::Result<()> {
     verify_schema_contract(&db).await?;
 
     // Identity enrichment is best-effort and must not delay Community readiness.
-    // Event consumers keep the projection fresh after startup; this bounded
-    // reconciliation only repairs older rows opportunistically.
-    let identity_sync_db = db.clone();
-    tokio::spawn(async move {
-        sync_forum_users_from_identity(&identity_sync_db).await;
-    });
+    // Event consumers keep the projection fresh. Bulk HTTP reconciliation is an
+    // explicit repair operation so every replica does not create a startup
+    // thundering herd against Identity.
+    let startup_identity_reconcile = env::var("COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED")
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
+        .unwrap_or(false);
+    if startup_identity_reconcile {
+        let identity_sync_db = db.clone();
+        tokio::spawn(async move {
+            sync_forum_users_from_identity(&identity_sync_db).await;
+        });
+    }
 
     let state = Arc::new(AppState { db, jwt_secret });
 

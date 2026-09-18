@@ -64,14 +64,9 @@ impl Config {
         dotenv().ok();
 
         let app_env = env::var("ENV").unwrap_or_else(|_| "development".into());
-        let db_max_connections =
-            Self::parse_u32_env("IDENTITY_DB_MAX_CONNECTIONS", 10, 2, 100);
-        let db_min_connections = Self::parse_u32_env(
-            "IDENTITY_DB_MIN_CONNECTIONS",
-            1,
-            0,
-            db_max_connections,
-        );
+        let db_max_connections = Self::parse_u32_env("IDENTITY_DB_MAX_CONNECTIONS", 10, 2, 100);
+        let db_min_connections =
+            Self::parse_u32_env("IDENTITY_DB_MIN_CONNECTIONS", 1, 0, db_max_connections);
         let db_acquire_timeout_seconds =
             Self::parse_u64_env("IDENTITY_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
         let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set for security");

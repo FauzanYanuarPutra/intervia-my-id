@@ -88,13 +88,84 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
 for marker in ("http_2xx", "tcp_connect"):
     if marker not in blackbox_config:
         errors.append(f"blackbox config missing module: {marker}")
+
+frontend_service_order = ("www", "cms", "crm", "usaha", "caddy")
+for index, frontend_name in enumerate(frontend_service_order[:-1]):
+    start = base_compose.find(f"\n  {frontend_name}:")
+    end = base_compose.find(f"\n  {frontend_service_order[index + 1]}:", start)
+    if start < 0 or end < 0:
+        errors.append(f"unable to locate frontend Compose block: {frontend_name}")
+        continue
+    frontend_block = base_compose[start:end]
+    if "depends_on:" in frontend_block:
+        errors.append(
+            f"Frontend process startup must remain independent from backend health: {frontend_name}"
+        )
+
+
+identity_compose_start = base_compose.find("\n  identity_service:")
+identity_compose_end = base_compose.find("\n  marketplace_service:", identity_compose_start)
+if identity_compose_start < 0 or identity_compose_end < 0:
+    errors.append("unable to locate Identity Compose service block")
+else:
+    identity_compose = base_compose[identity_compose_start:identity_compose_end]
+    for required_dependency in (
+        "identity_db: { condition: service_healthy }",
+        "redis_cache: { condition: service_healthy }",
+    ):
+        if required_dependency not in identity_compose:
+            errors.append(f"Identity startup missing required dependency: {required_dependency}")
+    if "rabbitmq: { condition: service_healthy }" in identity_compose:
+        errors.append("Identity startup must remain isolated from RabbitMQ availability")
+
+identity_state_source = read("services/identity_service/src/config/state.rs")
+if "rabbitmq" in identity_state_source.lower():
+    errors.append("Identity request state must not hold a RabbitMQ connection")
+
+identity_main_source = read("services/identity_service/src/main.rs")
+for marker in (
+    "RabbitMQ is intentionally not part of request-serving readiness.",
+    "run_identity_outbox_publisher",
+):
+    if marker not in identity_main_source:
+        errors.append(f"Identity broker-degradation contract missing marker: {marker}")
+
+
+marketplace_compose_start = base_compose.find("\n  marketplace_service:")
+marketplace_compose_end = base_compose.find("\n  community_service:", marketplace_compose_start)
+if marketplace_compose_start < 0 or marketplace_compose_end < 0:
+    errors.append("unable to locate Marketplace Compose service block")
+else:
+    marketplace_compose = base_compose[marketplace_compose_start:marketplace_compose_end]
+    if "marketplace_db: { condition: service_healthy }" not in marketplace_compose:
+        errors.append("Marketplace startup must remain gated on its owned database")
+    for forbidden_dependency in (
+        "redis_cache: { condition: service_healthy }",
+        "rabbitmq: { condition: service_healthy }",
+        "meilisearch: { condition: service_healthy }",
+        "identity_service: { condition: service_healthy }",
+    ):
+        if forbidden_dependency in marketplace_compose:
+            errors.append(
+                f"Marketplace startup must remain isolated from degradable dependency: {forbidden_dependency}"
+            )
+
+marketplace_source = read("services/marketplace_service/src/main.rs")
+for marker in (
+    "tokio::spawn(async move",
+    "run_outbox_publisher",
+    "run_identity_event_consumer",
+):
+    if marker not in marketplace_source:
+        errors.append(f"Marketplace degraded-startup contract missing marker: {marker}")
+
 
 community_compose_start = base_compose.find("\n  community_service:")
 community_compose_end = base_compose.find("\n  chat_service:", community_compose_start)
@@ -117,11 +188,16 @@ else:
 community_source = read("services/community_service/src/main.rs")
 for marker in (
     "Identity enrichment is best-effort and must not delay Community readiness.",
+    "COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED",
     "tokio::spawn(async move",
     "run_identity_profile_consumer",
 ):
     if marker not in community_source:
         errors.append(f"Community degraded-startup contract missing marker: {marker}")
+
+
+if "COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED" not in base_compose:
+    errors.append("base compose missing explicit Community identity reconciliation repair flag")
 
 
 for marker in (

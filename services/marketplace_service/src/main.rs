@@ -2318,23 +2318,16 @@ async fn main() -> anyhow::Result<()> {
     let port = env::var("APP_PORT").unwrap_or_else(|_| "8081".to_string());
     let addr = format!("0.0.0.0:{port}");
 
-    let db_max_connections =
-        env_u32_bounded("MARKETPLACE_DB_MAX_CONNECTIONS", 20, 2, 100);
-    let db_min_connections = env_u32_bounded(
-        "MARKETPLACE_DB_MIN_CONNECTIONS",
-        2,
-        0,
-        db_max_connections,
-    );
+    let db_max_connections = env_u32_bounded("MARKETPLACE_DB_MAX_CONNECTIONS", 20, 2, 100);
+    let db_min_connections =
+        env_u32_bounded("MARKETPLACE_DB_MIN_CONNECTIONS", 2, 0, db_max_connections);
     let db_acquire_timeout_seconds =
         env_u64_bounded("MARKETPLACE_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
 
     let db = PgPoolOptions::new()
         .max_connections(db_max_connections)
         .min_connections(db_min_connections)
-        .acquire_timeout(std::time::Duration::from_secs(
-            db_acquire_timeout_seconds,
-        ))
+        .acquire_timeout(std::time::Duration::from_secs(db_acquire_timeout_seconds))
         .after_connect(|conn, _meta| {
             Box::pin(async move {
                 sqlx::query("SET search_path TO public, events")

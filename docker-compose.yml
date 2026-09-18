@@ -244,7 +244,6 @@ services:
     depends_on:
       identity_db: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
     expose: ["8080"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
@@ -306,10 +305,6 @@ services:
       WALLET_MIDTRANS_ERROR_REDIRECT_URL: ${WALLET_MIDTRANS_ERROR_REDIRECT_URL:-}
     depends_on:
       marketplace_db: { condition: service_healthy }
-      redis_cache: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
-      meilisearch: { condition: service_healthy }
-      identity_service: { condition: service_healthy }
     expose: ["8081"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8081/ready"]
@@ -342,6 +337,7 @@ services:
       RABBITMQ_PASSWORD: ${RABBIT_PASS}
       IDENTITY_OUTBOX_EXCHANGE: ${IDENTITY_OUTBOX_EXCHANGE:-identity.outbox}
       COMMUNITY_IDENTITY_QUEUE: ${COMMUNITY_IDENTITY_QUEUE:-community.identity.profile}
+      COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED: ${COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED:-false}
       JWT_SECRET: ${JWT_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum
@@ -610,14 +606,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
-      marketplace_service: { condition: service_healthy }
-      community_service: { condition: service_healthy }
-      chat_service: { condition: service_healthy }
-      ai_service: { condition: service_healthy }
-      redis_cache: { condition: service_healthy }
-      minio: { condition: service_healthy }
     networks: [app, cache, media]
 
   cms:
@@ -639,8 +627,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
     networks: [app]
 
   crm:
@@ -666,8 +652,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
     networks: [app]
 
   usaha:
@@ -698,10 +682,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
-      marketplace_service: { condition: service_healthy }
-      community_service: { condition: service_healthy }
     networks: [app]
 
   # ---------------------------------------------------------------------------

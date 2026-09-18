@@ -24,7 +24,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use identity_service::config::{AppState, Config};
 use identity_service::db;
-use identity_service::runtime_metrics;
 use identity_service::organizations::invitations::{
     accept_organization_invitation, create_organization_invitation,
     list_my_organization_invitations, reject_organization_invitation,
@@ -450,13 +449,13 @@ async fn main() -> Result<()> {
 
     println!("Initializing Redis...");
     let redis_pool = db::init_redis(&cfg).await;
-    println!("Initializing RabbitMQ...");
-    let rabbitmq_conn = db::init_rabbitmq(&cfg).await;
 
+    // RabbitMQ is intentionally not part of request-serving readiness.
+    // The transactional outbox publisher owns its broker connection and retries
+    // independently, so authentication remains available during broker outages.
     let app_state = Arc::new(AppState {
         db: db_pool,
         redis: redis_pool,
-        rabbitmq: rabbitmq_conn,
         config: cfg.clone(),
     });
 

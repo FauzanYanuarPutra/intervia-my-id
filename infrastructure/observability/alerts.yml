@@ -11,7 +11,7 @@ groups:
           description: "{{ $labels.instance }} has failed readiness/connectivity probes for more than 2 minutes."
 
       - alert: LajukanExporterDown
-        expr: up{job=~"node|cadvisor|postgres_.*|redis"} == 0
+        expr: up{job=~"node|cadvisor|postgres_.*|redis|rabbitmq"} == 0
         for: 2m
         labels:
           severity: warning
@@ -124,3 +124,13 @@ groups:
         annotations:
           summary: "Lajukan RabbitMQ has backlog with no consumers"
           description: "RabbitMQ has queued work but reports no queue consumers for 5 minutes."
+
+
+      - alert: LajukanRabbitMqMetricsDown
+        expr: up{job="rabbitmq"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lajukan RabbitMQ metrics are unavailable"
+          description: "Prometheus cannot scrape the RabbitMQ metrics endpoint for 2 minutes; broker health or visibility may be impaired."
