@@ -1128,7 +1128,14 @@ async fn main() -> anyhow::Result<()> {
     let db = connect_database_pool(&database_url, DatabasePoolPurpose::Application).await?;
 
     verify_schema_contract(&db).await?;
-    sync_forum_users_from_identity(&db).await;
+
+    // Identity enrichment is best-effort and must not delay Community readiness.
+    // Event consumers keep the projection fresh after startup; this bounded
+    // reconciliation only repairs older rows opportunistically.
+    let identity_sync_db = db.clone();
+    tokio::spawn(async move {
+        sync_forum_users_from_identity(&identity_sync_db).await;
+    });
 
     let state = Arc::new(AppState { db, jwt_secret });
 
