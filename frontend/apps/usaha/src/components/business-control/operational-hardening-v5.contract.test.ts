@@ -16,6 +16,9 @@ describe('Usaha operational hardening', () => {
       'src/components/forms/ProductEditorWorkspace.tsx',
       'src/components/forms/ProductModifierEditor.tsx',
       'src/components/forms/BusinessLocationsManager.tsx',
+      'src/components/forms/NewBusinessQuickForm.tsx',
+      'src/components/forms/ProductQuickFormSimple.tsx',
+      'src/components/forms/ReconcileBusinessButton.tsx',
     ];
 
     for (const file of files) {
