@@ -8,10 +8,15 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::{auth_claims_from_headers, has_agent_access, AppState};
+use crate::{
+    auth_claims_from_headers,
+    businesses::transactions::state::OrderState,
+    has_agent_access,
+    AppState,
+};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -268,41 +273,30 @@ fn payment_status_label(value: OrderPaymentStatus) -> &'static str {
     }
 }
 
-fn allowed_transitions() -> HashMap<OrderBaseStatus, Vec<OrderBaseStatus>> {
-    use OrderBaseStatus::*;
-    HashMap::from([
-        (Draft, vec![PendingPayment, Cancelled]),
-        (PendingPayment, vec![Paid, Expired, Cancelled, Rejected]),
-        (Paid, vec![Processing, Cancelled, Refunded]),
-        (
-            Processing,
-            vec![Shipped, InService, Delivered, Cancelled, Refunded],
-        ),
-        (Shipped, vec![Delivered, Completed, Refunded]),
-        (InService, vec![Delivered, Completed, Cancelled, Refunded]),
-        (Delivered, vec![Completed, Refunded]),
-        (Completed, vec![]),
-        (Cancelled, vec![]),
-        (Rejected, vec![]),
-        (Expired, vec![]),
-        (Refunded, vec![]),
-    ])
-}
-
 fn assert_transition_allowed(
     from: OrderBaseStatus,
     to: OrderBaseStatus,
 ) -> Result<(), OrderEngineError> {
-    let allowed = allowed_transitions().remove(&from).unwrap_or_default();
-    if allowed.contains(&to) {
-        Ok(())
-    } else {
-        Err(OrderEngineError::InvalidTransition(format!(
+    let from_state = OrderState::from_db(base_status_label(from)).ok_or_else(|| {
+        OrderEngineError::Validation(format!(
+            "unknown canonical order status: {}",
+            base_status_label(from)
+        ))
+    })?;
+    let to_state = OrderState::from_db(base_status_label(to)).ok_or_else(|| {
+        OrderEngineError::Validation(format!(
+            "unknown canonical order status: {}",
+            base_status_label(to)
+        ))
+    })?;
+    from_state.transition(to_state).map_err(|_| {
+        OrderEngineError::InvalidTransition(format!(
             "illegal transition: {} -> {}",
             base_status_label(from),
             base_status_label(to)
-        )))
-    }
+        ))
+    })?;
+    Ok(())
 }
 
 async fn append_outbox_event(
