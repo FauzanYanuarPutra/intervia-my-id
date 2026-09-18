@@ -66,7 +66,8 @@ export async function POST(
       return NextResponse.json({ data: { plan } });
     }
     if (action === 'create_obligation') {
-      const obligation = await createWave2Obligation(businessId, input);
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const obligation = await createWave2Obligation(businessId, idempotencyKey, input);
       return NextResponse.json({ data: { obligation } }, { status: 201 });
     }
     if (action === 'pay_obligation') {
@@ -112,7 +113,8 @@ export async function POST(
       return NextResponse.json(result);
     }
     if (action === 'create_yield_observation') {
-      const observation = await createWave2YieldObservation(businessId, input);
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const observation = await createWave2YieldObservation(businessId, idempotencyKey, input);
       return NextResponse.json({ data: { observation } }, { status: 201 });
     }
 
