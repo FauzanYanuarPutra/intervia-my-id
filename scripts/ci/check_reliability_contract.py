@@ -50,6 +50,10 @@ marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_met
 community_runtime_metrics = read("services/community_service/src/runtime_metrics.rs")
 ai_runtime_metrics = read("services/ai_service/src/runtime_metrics.rs")
 community_main_source = read("services/community_service/src/main.rs")
+marketplace_auth_source = read("services/marketplace_service/src/auth.rs")
+community_auth_source = read("services/community_service/src/auth.rs")
+community_health_source = read("services/community_service/src/health.rs")
+community_rate_limit_source = read("services/community_service/src/rate_limit.rs")
 marketplace_schema_contract = read("services/marketplace_service/src/schema_contract.rs")
 community_schema_contract = read("services/community_service/src/schema_contract.rs")
 production_env_example = read(".env.production.example")
@@ -595,8 +599,8 @@ for marker in (
         errors.append(f"capacity runbook missing decision marker: {marker}")
 
 for path, warning_threshold, hard_ceiling in (
-    ("services/marketplace_service/src/main.rs", 750_000, 830_000),
-    ("services/community_service/src/main.rs", 275_000, 310_000),
+    ("services/marketplace_service/src/main.rs", 750_000, 827_000),
+    ("services/community_service/src/main.rs", 280_000, 302_000),
 ):
     target = ROOT / path
     if not target.is_file():
@@ -633,6 +637,80 @@ for path, source, main_source in (
         errors.append(f"{path} is no longer wired from the service composition root")
     if "async fn ensure_runtime_schema" in main_source:
         errors.append(f"{path} migration characterization leaked back into main.rs")
+
+for path, source, main_source, required_markers, forbidden_markers in (
+    (
+        "services/marketplace_service/src/auth.rs",
+        marketplace_auth_source,
+        marketplace_source,
+        (
+            "auth_claims_from_headers",
+            "user_id_from_auth",
+            "user_id_from_token_string",
+            "Validation::new",
+        ),
+        (
+            "fn auth_claims_from_headers",
+            "use jsonwebtoken::{",
+        ),
+    ),
+    (
+        "services/community_service/src/auth.rs",
+        community_auth_source,
+        community_main_source,
+        (
+            "optional_actor",
+            "require_actor",
+            "is_moderator",
+            "request_ip",
+            "Validation::new",
+        ),
+        (
+            "fn optional_actor",
+            "use jsonwebtoken::{",
+        ),
+    ),
+    (
+        "services/community_service/src/health.rs",
+        community_health_source,
+        community_main_source,
+        (
+            "pub(crate) async fn ready",
+            "pub(crate) async fn service_metrics",
+            "lajukan_outbox_backlog",
+        ),
+        (
+            "async fn service_metrics",
+            "async fn ready(",
+        ),
+    ),
+    (
+        "services/community_service/src/rate_limit.rs",
+        community_rate_limit_source,
+        community_main_source,
+        (
+            "enforce_rate_limit",
+            "run_rate_limit_cleanup",
+            "mutation_rate_limit",
+            "FOR UPDATE SKIP LOCKED",
+        ),
+        (
+            "async fn enforce_rate_limit",
+            "async fn run_rate_limit_cleanup",
+        ),
+    ),
+):
+    for marker in required_markers:
+        if marker not in source:
+            errors.append(f"{path} missing extracted responsibility marker: {marker}")
+    module_name = Path(path).stem
+    if f"mod {module_name};" not in main_source:
+        errors.append(f"{path} is no longer wired from the service composition root")
+    for marker in forbidden_markers:
+        if marker in main_source:
+            errors.append(
+                f"{path} responsibility leaked back into main.rs: {marker}"
+            )
 
 if not re.search(r"image:\s+\$\{DOCKERHUB_NAMESPACE", prod_compose):
     errors.append("production services must continue using registry image references")
