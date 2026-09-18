@@ -78,8 +78,8 @@ export function PendingOrganizationInvitations({ showEmpty = false }: PendingOrg
 
   return (
     <div className="grid gap-3">
-      {error ? <p className="rounded-xl border border-portal-ember/20 bg-portal-ember/5 px-3 py-2 text-sm text-portal-ember">{error}</p> : null}
-      {notice ? <p className="rounded-xl border border-portal-forest/20 bg-portal-forest/5 px-3 py-2 text-sm text-portal-forest">{notice}</p> : null}
+      {error ? <p role="alert" className="rounded-xl border border-portal-ember/20 bg-portal-ember/5 px-3 py-2 text-sm text-portal-ember">{error}</p> : null}
+      {notice ? <p role="status" aria-live="polite" className="rounded-xl border border-portal-forest/20 bg-portal-forest/5 px-3 py-2 text-sm text-portal-forest">{notice}</p> : null}
       {!items.length && showEmpty ? (
         <div className="rounded-2xl border border-dashed border-portal-line bg-white p-6 text-center">
           <MailCheck className="mx-auto h-6 w-6 text-portal-forest" />

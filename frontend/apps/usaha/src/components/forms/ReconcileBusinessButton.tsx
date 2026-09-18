@@ -40,7 +40,7 @@ export function ReconcileBusinessButton() {
       <button type="button" onClick={reconcile} disabled={pending} className="portal-button-secondary">
         <History className="h-4 w-4" /> {pending ? 'Mencari usaha...' : 'Pulihkan usaha lama'}
       </button>
-      {error ? <p className="mt-2 text-xs text-portal-ember">{error}</p> : null}
+      {error ? <p role="alert" className="mt-2 text-xs text-portal-ember">{error}</p> : null}
     </div>
   );
 }

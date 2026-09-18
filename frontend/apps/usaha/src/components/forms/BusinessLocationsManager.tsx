@@ -219,7 +219,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
               Ini satu-satunya lokasi. Tambahkan lokasi lain sebelum menghapusnya.
             </p>
           ) : null}
-          {error ? <p className="mt-3 text-sm text-portal-ember">{error}</p> : null}
+          {error ? <p role="alert" className="mt-3 text-sm text-portal-ember">{error}</p> : null}
 
           <div className="mt-4 flex flex-wrap justify-between gap-2">
             {editingExists ? (

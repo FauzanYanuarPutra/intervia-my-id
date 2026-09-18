@@ -50,7 +50,7 @@ export function SearchPicker<T>({
         aria-label={`Cari ${ariaLabel.toLocaleLowerCase('id-ID')}`}
       />
 
-      <div role="listbox" className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-portal-line bg-white">
+      <div role="listbox" aria-label={`${ariaLabel} pilihan`} className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-portal-line bg-white">
         {visible.length ? (
           visible.map(item => {
             const key = getKey(item);
@@ -74,7 +74,7 @@ export function SearchPicker<T>({
             );
           })
         ) : (
-          <p className="px-3 py-4 text-sm text-portal-soft">{emptyLabel}</p>
+          <p role="status" aria-live="polite" className="px-3 py-4 text-sm text-portal-soft">{emptyLabel}</p>
         )}
       </div>
     </div>

@@ -71,8 +71,8 @@ export function LoginQuickForm() {
         />
       </label>
 
-      {error ? <p className="text-sm text-portal-ember">{error}</p> : null}
-      {success ? <p className="text-sm text-portal-forest">{success}</p> : null}
+      {error ? <p role="alert" className="text-sm text-portal-ember">{error}</p> : null}
+      {success ? <p role="status" aria-live="polite" className="text-sm text-portal-forest">{success}</p> : null}
 
       <button type="submit" disabled={isPending} className="portal-button-primary">
         {isPending ? 'Masuk...' : 'Masuk sekarang'}
