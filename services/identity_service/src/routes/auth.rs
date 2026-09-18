@@ -20,6 +20,7 @@ use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite}; // ✅ Gunakan A
 
 use deadpool_redis::redis::AsyncCommands;
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 
 use rand::{distributions::Alphanumeric, Rng};
@@ -29,7 +30,7 @@ use serde_json::{json, Value};
 
 use sqlx::{FromRow, Row};
 
-use std::sync::Arc;
+use std::{env, sync::Arc};
 use tokio::task;
 
 use chrono::{DateTime, Duration, Utc}; // ✅ Serde enabled via Cargo.toml
@@ -120,6 +121,10 @@ struct AccessClaims {
     pub roles: Vec<String>,
     pub perms: Vec<String>,
     pub username: String,
+    #[serde(default)]
+    pub iss: Option<String>,
+    #[serde(default)]
+    pub aud: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -807,42 +812,102 @@ async fn find_and_verify_session(
 // ------------------------------------------------------------------
 
 // -------------------- Helper: create access token -----------------
-// (Unchanged)
+fn access_token_algorithm() -> Result<Algorithm, anyhow::Error> {
+    match env::var("JWT_ACCESS_ALG")
+        .unwrap_or_else(|_| "HS256".to_string())
+        .trim()
+        .to_ascii_uppercase()
+        .as_str()
+    {
+        "HS256" => Ok(Algorithm::HS256),
+        "RS256" => Ok(Algorithm::RS256),
+        value => anyhow::bail!("unsupported JWT_ACCESS_ALG: {value}"),
+    }
+}
+
+fn decode_key_material(name: &str) -> Result<Vec<u8>, anyhow::Error> {
+    let encoded = env::var(name).map_err(|_| anyhow::anyhow!("{name} is required"))?;
+    STANDARD
+        .decode(encoded.trim())
+        .map_err(|_| anyhow::anyhow!("{name} is not valid base64"))
+}
+
 fn create_access_token(
     secret: &str,
     user_id: Uuid,
-    username: String, // Tambahkan parameter ini
+    username: String,
     expiry_hours: i64,
     roles: Vec<String>,
     permissions: Vec<String>,
 ) -> Result<String, anyhow::Error> {
+    let algorithm = access_token_algorithm()?;
     let exp = (Utc::now() + chrono::Duration::hours(expiry_hours)).timestamp() as usize;
+    let asymmetric = algorithm == Algorithm::RS256;
     let claims = AccessClaims {
         sub: user_id.to_string(),
         exp,
         roles,
         perms: permissions,
-        username, // Masukkan ke claims
+        username,
+        iss: asymmetric.then(|| env::var("JWT_ISSUER").unwrap_or_else(|_| "laju".to_string())),
+        aud: asymmetric.then(|| env::var("JWT_AUDIENCE").unwrap_or_else(|_| "laju_users".to_string())),
     };
-    let header = Header::new(Algorithm::HS256);
-    let token = encode(
-        &header,
-        &claims,
-        &EncodingKey::from_secret(secret.as_bytes()),
-    )
-    .map_err(|e| anyhow::anyhow!("jwt encode error: {:?}", e))?;
+
+    let mut header = Header::new(algorithm);
+    if asymmetric {
+        header.kid = env::var("JWT_KEY_ID")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+    }
+
+    let token = match algorithm {
+        Algorithm::RS256 => {
+            let private_pem = decode_key_material("JWT_PRIVATE_KEY_PEM_B64")?;
+            let key = EncodingKey::from_rsa_pem(&private_pem)
+                .map_err(|e| anyhow::anyhow!("invalid JWT_PRIVATE_KEY_PEM_B64: {e:?}"))?;
+            encode(&header, &claims, &key)
+        }
+        Algorithm::HS256 => encode(
+            &header,
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        ),
+        _ => unreachable!("access_token_algorithm only permits HS256 or RS256"),
+    }
+    .map_err(|e| anyhow::anyhow!("jwt encode error: {e:?}"))?;
+
     Ok(token)
 }
 
-// (Unchanged)
 fn decode_access_token(secret: &str, token: &str) -> Result<AccessClaims, anyhow::Error> {
-    let validation = Validation::new(Algorithm::HS256);
-    let data = decode::<AccessClaims>(
-        token,
-        &DecodingKey::from_secret(secret.as_bytes()),
-        &validation,
-    )
-    .map_err(|e| anyhow::anyhow!("jwt decode error: {:?}", e))?;
+    let algorithm = access_token_algorithm()?;
+    let mut validation = Validation::new(algorithm);
+    validation.validate_exp = true;
+
+    if algorithm == Algorithm::RS256 {
+        let issuer = env::var("JWT_ISSUER").unwrap_or_else(|_| "laju".to_string());
+        let audience = env::var("JWT_AUDIENCE").unwrap_or_else(|_| "laju_users".to_string());
+        validation.set_issuer(&[issuer]);
+        validation.set_audience(&[audience]);
+    }
+
+    let data = match algorithm {
+        Algorithm::RS256 => {
+            let public_pem = decode_key_material("JWT_PUBLIC_KEY_PEM_B64")?;
+            let key = DecodingKey::from_rsa_pem(&public_pem)
+                .map_err(|e| anyhow::anyhow!("invalid JWT_PUBLIC_KEY_PEM_B64: {e:?}"))?;
+            decode::<AccessClaims>(token, &key, &validation)
+        }
+        Algorithm::HS256 => decode::<AccessClaims>(
+            token,
+            &DecodingKey::from_secret(secret.as_bytes()),
+            &validation,
+        ),
+        _ => unreachable!("access_token_algorithm only permits HS256 or RS256"),
+    }
+    .map_err(|e| anyhow::anyhow!("jwt decode error: {e:?}"))?;
+
     Ok(data.claims)
 }
 // ------------------------------------------------------------------
