@@ -1183,7 +1183,7 @@ async fn update_news_submission(
     let summary = trimmed(payload.summary).or_else(|| current.summary.clone());
     if summary
         .as_ref()
-        .is_some_and(|value| value.len() < 20 || value.len() > 1000)
+        .is_none_or(|value| value.len() < 20 || value.len() > 1000)
     {
         return response_error(
             StatusCode::BAD_REQUEST,
@@ -1195,102 +1195,142 @@ async fn update_news_submission(
         return response_error(StatusCode::BAD_REQUEST, "body must be 120-20000 characters");
     }
 
+    let requested_topics = match sanitize_topics(payload.topics) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let requested_sources = match sanitize_news_source_urls(payload.source_urls) {
+        Ok(value) => value,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let topics = requested_topics.unwrap_or_else(|| public_topics_from_tags(current.tags.as_ref()));
+
     let mut metadata = current.metadata.clone();
     if !metadata.is_object() {
         metadata = json!({});
     }
-    let root = metadata
-        .as_object_mut()
-        .expect("metadata object was initialized");
-    let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
-    if !news.is_object() {
-        *news = json!({});
-    }
-    let news = news
-        .as_object_mut()
-        .expect("news metadata object was initialized");
 
-    if let Some(category) = trimmed(payload.category) {
-        if !valid_news_category(&category) {
-            return response_error(StatusCode::BAD_REQUEST, "unsupported news category");
+    let final_category: String;
+    let final_kind: String;
+    {
+        let root = metadata
+            .as_object_mut()
+            .expect("metadata object was initialized");
+        let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
+        if !news.is_object() {
+            *news = json!({});
         }
-        news.insert("category".to_string(), Value::String(category));
-    }
-    if let Some(kind) = trimmed(payload.article_kind) {
-        if !valid_article_kind(&kind) {
-            return response_error(StatusCode::BAD_REQUEST, "unsupported article kind");
+        let news = news
+            .as_object_mut()
+            .expect("news metadata object was initialized");
+
+        if let Some(category) = trimmed(payload.category) {
+            if !valid_news_category(&category) {
+                return response_error(StatusCode::BAD_REQUEST, "unsupported news category");
+            }
+            news.insert("category".to_string(), Value::String(category));
         }
-        news.insert("article_kind".to_string(), Value::String(kind));
-    }
-    if let Some(location) = trimmed(payload.location) {
-        if location.len() > 120 {
-            return response_error(StatusCode::BAD_REQUEST, "location is too long");
+        if let Some(kind) = trimmed(payload.article_kind) {
+            if !valid_article_kind(&kind) {
+                return response_error(StatusCode::BAD_REQUEST, "unsupported article kind");
+            }
+            news.insert("article_kind".to_string(), Value::String(kind));
         }
-        news.insert("location".to_string(), Value::String(location));
-    }
-    if let Some(topics) = match sanitize_topics(payload.topics) {
-        Ok(value) => value,
-        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
-    } {
-        let category_tag = news
+        if let Some(raw_location) = payload.location {
+            let location = raw_location.trim();
+            if location.is_empty() {
+                news.remove("location");
+            } else {
+                if location.len() > 120 {
+                    return response_error(StatusCode::BAD_REQUEST, "location is too long");
+                }
+                news.insert(
+                    "location".to_string(),
+                    Value::String(location.to_string()),
+                );
+            }
+        }
+        if let Some(source_urls) = requested_sources {
+            news.insert("source_urls".to_string(), json!(source_urls));
+        }
+
+        final_category = news
             .get("category")
             .and_then(Value::as_str)
             .map(str::trim)
+            .filter(|value| valid_news_category(value))
             .unwrap_or("Ekonomi")
-            .to_lowercase();
-        let article_kind_tag = news
+            .to_string();
+        final_kind = news
             .get("article_kind")
             .and_then(Value::as_str)
             .map(str::trim)
+            .filter(|value| valid_article_kind(value))
             .unwrap_or("news")
             .to_string();
-        let mut tags = vec!["news".to_string(), category_tag, article_kind_tag];
-        for topic in topics {
-            if !tags.iter().any(|existing| existing == &topic) {
-                tags.push(topic);
-            }
-        }
-        if let Err(error) = sqlx::query(
-            "UPDATE content_items SET tags = $2 WHERE id = $1 AND owner_id = $3 AND content_type = 'news'",
-        )
-        .bind(content_id)
-        .bind(tags)
-        .bind(owner_id)
-        .execute(&mut *tx)
-        .await
-        {
-            tracing::error!("update_news_submission topic update error: {:?}", error);
-            return response_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "failed to update news topics",
+
+        let language = news
+            .get("language")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| matches!(*value, "id" | "en"))
+            .unwrap_or("id")
+            .to_string();
+        news.insert("language".to_string(), Value::String(language));
+
+        if final_kind == "press_release" {
+            news.insert(
+                "disclosure".to_string(),
+                Value::String(
+                    "Submitted by a business or its representative; editorially reviewed before publication."
+                        .to_string(),
+                ),
             );
+        } else {
+            news.remove("disclosure");
+        }
+
+        if let Some(previous_note) = news.remove("review_note") {
+            news.insert("previous_review_note".to_string(), previous_note);
+        }
+        news.insert(
+            "editorial_status".to_string(),
+            Value::String("pending_review".to_string()),
+        );
+        news.insert(
+            "resubmitted_at".to_string(),
+            Value::String(Utc::now().to_rfc3339()),
+        );
+        news.insert(
+            "contributor_id".to_string(),
+            Value::String(owner_id.to_string()),
+        );
+    }
+
+    let final_sources = news_source_urls(&metadata);
+    if final_kind != "press_release" && final_sources.is_empty() {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "news and analysis require at least one valid public source URL",
+        );
+    }
+    if let Some(news) = metadata
+        .get_mut("news")
+        .and_then(Value::as_object_mut)
+    {
+        news.insert("source_urls".to_string(), json!(final_sources));
+    }
+
+    let mut tags = vec![
+        "news".to_string(),
+        final_category.to_lowercase(),
+        final_kind.clone(),
+    ];
+    for topic in topics {
+        if !tags.iter().any(|existing| existing == &topic) {
+            tags.push(topic);
         }
     }
-    if let Some(source_urls) = payload.source_urls {
-        let cleaned: Vec<Value> = source_urls
-            .into_iter()
-            .filter_map(|source| trimmed(Some(source)))
-            .filter(|source| source.len() <= 2048)
-            .take(10)
-            .map(Value::String)
-            .collect();
-        news.insert("source_urls".to_string(), Value::Array(cleaned));
-    }
-    if let Some(previous_note) = news.remove("review_note") {
-        news.insert("previous_review_note".to_string(), previous_note);
-    }
-    news.insert(
-        "editorial_status".to_string(),
-        Value::String("pending_review".to_string()),
-    );
-    news.insert(
-        "resubmitted_at".to_string(),
-        Value::String(Utc::now().to_rfc3339()),
-    );
-    news.insert(
-        "contributor_id".to_string(),
-        Value::String(owner_id.to_string()),
-    );
 
     let updated = sqlx::query_as::<_, NewsRow>(
         r#"
@@ -1299,14 +1339,15 @@ async fn update_news_submission(
             title = $2,
             summary = $3,
             body = $4,
-            metadata = $5,
+            tags = $5,
+            metadata = $6,
             content_status = 'draft',
             listing_status = 'draft',
             updated_at = NOW(),
             last_saved_at = NOW(),
             draft_version = draft_version + 1
         WHERE id = $1
-          AND owner_id = $6
+          AND owner_id = $7
           AND content_type = 'news'
         RETURNING
             id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
@@ -1317,6 +1358,7 @@ async fn update_news_submission(
     .bind(title)
     .bind(summary)
     .bind(body)
+    .bind(tags)
     .bind(metadata)
     .bind(owner_id)
     .fetch_one(&mut *tx)
