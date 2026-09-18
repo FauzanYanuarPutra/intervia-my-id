@@ -1,5 +1,8 @@
 'use client';
 
+import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
+
 import { useState } from 'react';
 import { ChevronDown, Loader2, LockKeyhole, UnlockKeyhole } from 'lucide-react';
 import type { Wave2CashShift } from '@/lib/business-wave2-server';
@@ -25,6 +28,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<FeedbackTone>('info');
 
   async function post(input: Record<string, unknown>) {
     const response = await fetch(`/api/businesses/${businessId}/wave2`, {
@@ -33,13 +37,14 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
       body: JSON.stringify(input),
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan shift kas.');
+    if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan shift kas.', response.status));
     return payload;
   }
 
   async function openShift() {
     const amount = Math.round(Number(openingCash));
     if (!Number.isFinite(amount) || amount < 0) {
+      setMessageTone('error');
       setMessage('Isi kas awal minimal Rp0.');
       return;
     }
@@ -50,8 +55,10 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
       setShift(payload?.data?.shift ?? null);
       setLastClosed(null);
       setActualCash('');
+      setMessageTone('success');
       setMessage('Kas dibuka.');
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal membuka kas.');
     } finally {
       setSaving(false);
@@ -62,6 +69,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
     if (!shift) return;
     const amount = Math.round(Number(actualCash));
     if (!Number.isFinite(amount) || amount < 0) {
+      setMessageTone('error');
       setMessage('Isi jumlah uang fisik di laci.');
       return;
     }
@@ -80,8 +88,10 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
       setOpeningCash('');
       setActualCash('');
       setNote('');
+      setMessageTone('success');
       setMessage('Kas ditutup.');
     } catch (error) {
+      setMessageTone('error');
       setMessage(error instanceof Error ? error.message : 'Gagal menutup kas.');
     } finally {
       setSaving(false);
@@ -161,7 +171,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
         </div>
       ) : null}
 
-      {message ? <p role="status" aria-live="polite" className="border-t border-portal-line px-4 py-3 text-xs text-portal-soft sm:px-5">{message}</p> : null}
+      {message ? <div className="border-t border-portal-line p-4 sm:p-5"><FeedbackNotice message={message} tone={messageTone} /></div> : null}
     </section>
   );
 }
