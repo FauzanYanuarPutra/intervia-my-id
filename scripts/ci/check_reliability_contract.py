@@ -276,6 +276,8 @@ else:
 marketplace_source = read("services/marketplace_service/src/main.rs")
 marketplace_outbox_source = read("services/marketplace_service/src/outbox.rs")
 marketplace_health_source = read("services/marketplace_service/src/health.rs")
+marketplace_public_commerce_source = read("services/marketplace_service/src/businesses/public_commerce.rs")
+marketplace_seller_orders_source = read("services/marketplace_service/src/businesses/seller_orders.rs")
 for marker in (
     "tokio::spawn(async move",
     "run_outbox_publisher",
@@ -294,6 +296,20 @@ for marker in (
 ):
     if marker not in marketplace_outbox_source:
         errors.append(f"Marketplace outbox configuration contract missing marker: {marker}")
+
+for path, source in (
+    ("services/marketplace_service/src/businesses/public_commerce.rs", marketplace_public_commerce_source),
+    ("services/marketplace_service/src/businesses/seller_orders.rs", marketplace_seller_orders_source),
+):
+    for required_marker in (
+        "INSERT INTO outbox_events",
+        "INSERT INTO events.event_outbox",
+        "routing_key",
+    ):
+        if required_marker not in source:
+            errors.append(
+                f"{path} lost Business OS outbox convergence marker: {required_marker}"
+            )
 
 
 community_compose_start = base_compose.find("\n  community_service:")
