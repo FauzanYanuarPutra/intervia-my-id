@@ -29,6 +29,7 @@ type SubmissionBody = {
   body?: unknown;
   category?: unknown;
   article_kind?: unknown;
+  language?: unknown;
   location?: unknown;
   topics?: unknown;
   source_urls?: unknown;
@@ -59,6 +60,29 @@ function readTopics(value: unknown): string[] {
   return topics;
 }
 
+function isPrivateSourceHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) {
+    return true;
+  }
+  if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) {
+    return true;
+  }
+  const parts = host.split('.').map(Number);
+  if (parts.length === 4 && parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255)) {
+    const [a, b] = parts;
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a === 0
+    );
+  }
+  return false;
+}
+
 function readSources(value: unknown): string[] {
   const raw = Array.isArray(value)
     ? value
@@ -69,12 +93,21 @@ function readSources(value: unknown): string[] {
   const sources: string[] = [];
   for (const entry of raw) {
     const source = readString(entry);
-    if (!source || seen.has(source)) continue;
+    if (!source || source.length > 2048 || seen.has(source)) continue;
     try {
       const parsed = new URL(source);
-      if (!['http:', 'https:'].includes(parsed.protocol)) continue;
-      seen.add(source);
-      sources.push(source);
+      if (
+        !['http:', 'https:'].includes(parsed.protocol) ||
+        parsed.username ||
+        parsed.password ||
+        isPrivateSourceHost(parsed.hostname)
+      ) {
+        continue;
+      }
+      const normalized = parsed.toString();
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      sources.push(normalized);
       if (sources.length >= 10) break;
     } catch {
       continue;
@@ -144,6 +177,7 @@ export async function POST(request: NextRequest) {
   const rawBody = readString(payload.body);
   const category = readString(payload.category) || 'Ekonomi';
   const articleKind = readString(payload.article_kind) || 'news';
+  const language = readString(payload.language) || 'id';
   const location = readString(payload.location);
   const topics = readTopics(payload.topics);
   const sourceUrls = readSources(payload.source_urls);
@@ -162,6 +196,9 @@ export async function POST(request: NextRequest) {
   }
   if (!ARTICLE_KINDS.has(articleKind)) {
     return NextResponse.json({ error: 'Jenis konten tidak didukung.' }, { status: 422 });
+  }
+  if (!['id', 'en'].includes(language)) {
+    return NextResponse.json({ error: 'Bahasa berita tidak didukung.' }, { status: 422 });
   }
   if (location.length > 120) {
     return NextResponse.json({ error: 'Lokasi terlalu panjang.' }, { status: 422 });
@@ -208,7 +245,7 @@ export async function POST(request: NextRequest) {
         news: {
           category,
           article_kind: articleKind,
-          language: 'id',
+          language,
           location: location || null,
           source_urls: sourceUrls,
           submitted_at: submittedAt,
