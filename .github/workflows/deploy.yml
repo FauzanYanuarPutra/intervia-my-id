@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
           overlay="docker-compose.${TARGET_ENV}.yml"
           [[ "$TARGET_ENV" == "production" ]] && overlay="docker-compose.prod.yml"
-          tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" docker-compose.observability.yml infrastructure/caddy infrastructure/observability infrastructure/rabbitmq services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh scripts/ops/postgres_logical_backup.sh scripts/ops/verify_backup_set.sh
+          tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" docker-compose.observability.yml infrastructure/caddy infrastructure/observability infrastructure/rabbitmq services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh scripts/ops/postgres_logical_backup.sh scripts/ops/verify_backup_set.sh scripts/ops/community_media_backup.sh scripts/ops/verify_community_media_backup.sh
       - name: Upload deployment contract
         shell: bash
         env:
