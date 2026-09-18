@@ -37,6 +37,8 @@ grafana_dashboard = read("infrastructure/observability/grafana/dashboards/lajuka
 blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
+restore_drill_script = read("scripts/ops/postgres_isolated_restore_drill.sh")
+restore_drill_test = read("scripts/ci/test_postgres_restore_drill.sh")
 scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
@@ -108,7 +110,7 @@ for marker in (
 
 for path in (
     "services/identity_service/src/db/postgres.rs",
-    "services/marketplace_service/src/main.rs",
+    "services/marketplace_service/src/health.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
@@ -392,6 +394,7 @@ for marker in (
     "rollback_on_error",
     "--wait --wait-timeout",
     "docker-compose.observability.yml",
+    "scripts/ops/postgres_isolated_restore_drill.sh",
     "infrastructure/observability",
     "ALERTMANAGER_CONFIG_PATH",
     "local-null Alertmanager config",
@@ -570,7 +573,7 @@ if "response.headers.get('x-request-id')" not in www_http_client:
 
 for path in (
     "services/identity_service/src/routes/health.rs",
-    "services/marketplace_service/src/health.rs",
+    "services/marketplace_service/src/main.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
@@ -585,7 +588,7 @@ for path in (
 
 for path in (
     "services/identity_service/src/routes/health.rs",
-    "services/marketplace_service/src/health.rs",
+    "services/marketplace_service/src/main.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
@@ -703,6 +706,28 @@ for marker in (
 for marker in ("sha256sum -c", "pg_restore --list", "This does not replace an isolated restore drill"):
     if marker not in backup_verify_script:
         errors.append(f"backup verification script missing marker: {marker}")
+
+for marker in (
+    "sha256sum -c checksums.sha256",
+    'label "lajukan.restore-drill=true"',
+    "pg_restore",
+    "--exit-on-error",
+    "pg_dump -U postgres",
+    "no published network port",
+    "docker volume rm",
+):
+    if marker not in restore_drill_script:
+        errors.append(f"isolated PostgreSQL restore drill missing safety/validation marker: {marker}")
+
+for marker in (
+    "pg_dump",
+    "restore_contract_",
+    "sha256sum postgres/*.dump",
+    "postgres_isolated_restore_drill.sh",
+    "Synthetic end-to-end PostgreSQL restore drill passed.",
+):
+    if marker not in restore_drill_test:
+        errors.append(f"PostgreSQL restore drill CI self-test missing marker: {marker}")
 
 for marker in (
     "probe_surviving_replicas",
