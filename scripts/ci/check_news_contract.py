@@ -28,6 +28,7 @@ require(
         'if content_type == "news"',
         'content_status = "draft".to_string()',
         "news::prepare_submission_metadata",
+        "news::validate_submission_payload",
         "news::after_submission_created",
         "news content must be edited through the news submission workflow",
         "duplicate news submission; revise the existing submission instead",
@@ -56,6 +57,8 @@ require(
         "public_verified_source_urls",
         "verification_status = 'verified'",
         "unsupported news source URL",
+        "validate_submission_payload",
+        "news summary must be 20-1000 characters",
         "only public HTTP(S) source URLs can be verified",
         "let is_retracted = editorial_status",
         "include_body && !is_retracted",
@@ -174,6 +177,7 @@ require(
         "48 * 60 * 60 * 1000",
         "news:publication_date",
         "news:title",
+        "s-maxage=60",
     ),
 )
 
@@ -241,6 +245,8 @@ require(
         "let cursor: string | undefined",
         "page.nextCursor",
         "page.nextCursor === cursor",
+        "next: { revalidate: 30 }",
+        "cache: 'no-store'",
     ),
 )
 
@@ -255,6 +261,7 @@ require(
     "frontend/apps/www/src/app/news/rss.xml/route.ts",
     (
         "getPublishedNews({ language: 'id', limit: 50 })",
+        "s-maxage=60",
     ),
 )
 
