@@ -1114,28 +1114,48 @@ async fn main() -> anyhow::Result<()> {
     }
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
-    let mut migrator = sqlx::migrate!("./migrations");
-    let migration_db = connect_database_pool(&database_url, DatabasePoolPurpose::Migration).await?;
-    if !strict_migrations {
-        migrator.set_ignore_missing(true);
-    }
-    if let Err(error) = migrator.run(&migration_db).await {
-        let message = error.to_string();
-        let checksum_mismatch = message.contains("was previously applied but has been modified");
-        let missing_migration =
-            message.contains("was previously applied but is missing in the resolved migrations");
+    let migrate_only = env::var("MIGRATE_ONLY")
+        .ok()
+        .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"));
+    let run_migrations_on_startup = migrate_only
+        || env::var("RUN_MIGRATIONS_ON_STARTUP")
+            .ok()
+            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+            .unwrap_or(!strict_migrations);
 
-        if !strict_migrations && (checksum_mismatch || missing_migration) {
-            tracing::warn!(
-                "Community migration drift in {} (ignored): {}",
-                app_env,
-                message
-            );
-        } else {
-            return Err(error.into());
+    if run_migrations_on_startup {
+        let mut migrator = sqlx::migrate!("./migrations");
+        let migration_db =
+            connect_database_pool(&database_url, DatabasePoolPurpose::Migration).await?;
+        if !strict_migrations {
+            migrator.set_ignore_missing(true);
         }
+        if let Err(error) = migrator.run(&migration_db).await {
+            let message = error.to_string();
+            let checksum_mismatch = message.contains("was previously applied but has been modified");
+            let missing_migration =
+                message.contains("was previously applied but is missing in the resolved migrations");
+
+            if !strict_migrations && (checksum_mismatch || missing_migration) {
+                tracing::warn!(
+                    "Community migration drift in {} (ignored): {}",
+                    app_env,
+                    message
+                );
+            } else {
+                return Err(error.into());
+            }
+        }
+        schema_contract::verify_schema_contract(&migration_db).await?;
+        migration_db.close().await;
+    } else {
+        tracing::info!("startup migrations disabled; expecting release-owned migration step");
     }
-    migration_db.close().await;
+
+    if migrate_only {
+        tracing::info!("community migration-only release step completed");
+        return Ok(());
+    }
 
     let db = connect_database_pool(&database_url, DatabasePoolPurpose::Application).await?;
 

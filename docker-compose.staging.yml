@@ -7,6 +7,7 @@ services:
       ENV: staging
       APP_ENV: staging
       RUST_LOG: ${RUST_LOG:-info}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
 
   marketplace_service:
     build: !reset null
@@ -16,6 +17,7 @@ services:
       ENV: staging
       APP_ENV: staging
       RUST_LOG: ${RUST_LOG:-info}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       ORDER_ENGINE_API_ENABLED: ${ORDER_ENGINE_API_ENABLED:-false}
       WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-false}
@@ -32,6 +34,7 @@ services:
       ENV: staging
       APP_ENV: staging
       RUST_LOG: ${RUST_LOG:-info}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
 
   chat_service:
     build: !reset null
