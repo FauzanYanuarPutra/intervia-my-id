@@ -19,6 +19,7 @@ def read(path: str) -> str:
 
 base_compose = read("docker-compose.yml")
 prod_compose = read("docker-compose.prod.yml")
+staging_compose = read("docker-compose.staging.yml")
 deploy = read(".github/workflows/deploy.yml")
 caddy = read("infrastructure/caddy/Caddyfile.prod")
 caddy_local = read("infrastructure/caddy/Caddyfile")
@@ -454,6 +455,32 @@ if "github.event_name == 'workflow_run' && 'production'" in deploy:
     errors.append("Build Images workflow_run must never auto-target production")
 if "target_env=production\n            release_sha=\"$WORKFLOW_HEAD_SHA\"" in deploy:
     errors.append("automatic Build Images deployment must target staging, not production")
+for env_name, compose_source in (
+    ("production", prod_compose),
+    ("staging", staging_compose),
+):
+    if compose_source.count('RUN_MIGRATIONS_ON_STARTUP: "false"') < 3:
+        errors.append(
+            f"{env_name} compose must disable startup migrations for Identity, Marketplace and Community"
+        )
+
+for service_path, service_source in (
+    ("services/identity_service/src/main.rs", identity_main_source),
+    ("services/marketplace_service/src/main.rs", marketplace_source),
+    ("services/community_service/src/main.rs", community_source),
+):
+    for marker in ("MIGRATE_ONLY", "RUN_MIGRATIONS_ON_STARTUP"):
+        if marker not in service_source:
+            errors.append(f"{service_path} missing release-owned migration marker: {marker}")
+
+for marker in (
+    "for migration_service in identity_service marketplace_service community_service",
+    "-e MIGRATE_ONLY=1",
+    "-e RUN_MIGRATIONS_ON_STARTUP=true",
+):
+    if marker not in deploy:
+        errors.append(f"deploy workflow missing release migration step: {marker}")
+
 for marker in (
     "github.event_name == 'workflow_run' && 'staging'",
     "target_env=staging",
