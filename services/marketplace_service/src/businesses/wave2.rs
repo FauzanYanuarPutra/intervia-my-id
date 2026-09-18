@@ -638,7 +638,6 @@ impl Wave2Repository {
     }
 }
 
-
 fn wave2_request_hash(value: serde_json::Value) -> Result<String, Wave2RepositoryError> {
     canonical_request_hash(&value).map_err(|_| Wave2RepositoryError::Database)
 }
