@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import { fetchInternal } from '@/lib/server-fetch';
 import {
   inventoryAdjustmentPayload,
   productUpdatePayload,
@@ -25,7 +26,7 @@ async function mutate(path: string, body: unknown) {
   const token = await readAccessToken();
   if (!token) throw new Error('AUTH_REQUIRED');
 
-  const response = await fetch(`${MARKETPLACE_URL}${path}`, {
+  const response = await fetchInternal(`${MARKETPLACE_URL}${path}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,

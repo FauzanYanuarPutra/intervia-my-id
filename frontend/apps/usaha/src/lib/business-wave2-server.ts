@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import { fetchInternal } from '@/lib/server-fetch';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL || 'http://marketplace_service:8081';
@@ -79,7 +80,7 @@ async function requestWave2(path: string, init: RequestInit = {}) {
   const token = await readAccessToken();
   if (!token) throw new BusinessWave2HttpError(401, 'auth_required');
 
-  const response = await fetch(`${MARKETPLACE_URL}${path}`, {
+  const response = await fetchInternal(`${MARKETPLACE_URL}${path}`, {
     ...init,
     cache: 'no-store',
     headers: {

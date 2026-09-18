@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import { fetchInternal } from '@/lib/server-fetch';
 import { BusinessControlHttpError } from '@/lib/business-control-server';
 
 const MARKETPLACE_URL =
@@ -39,7 +40,7 @@ async function requestIngredientControl(
   const token = await readAccessToken();
   if (!token) throw new BusinessControlHttpError(401, 'auth_required');
 
-  const response = await fetch(`${MARKETPLACE_URL}${path}`, {
+  const response = await fetchInternal(`${MARKETPLACE_URL}${path}`, {
     ...init,
     cache: 'no-store',
     headers: {

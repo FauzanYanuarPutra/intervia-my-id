@@ -2,6 +2,7 @@ import { parseProductModifierGroups } from 'lajukan-ui/product-configuration';
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import { fetchInternal } from '@/lib/server-fetch';
 import {
   getBusinessTemplatePreset,
   type BusinessTemplateKey,
@@ -114,7 +115,7 @@ export class UpstreamHttpError extends Error {
 }
 
 async function requestJson(url: string, init: RequestInit = {}): Promise<unknown> {
-  const response = await fetch(url, { ...init, cache: 'no-store' });
+  const response = await fetchInternal(url, { ...init, cache: 'no-store' });
   const text = await response.text();
   let payload: unknown = {};
   try {

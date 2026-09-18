@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import { fetchInternal } from '@/lib/server-fetch';
 import {
   parseOrganizationInvitations,
   parseOrganizationMembers,
@@ -16,7 +17,7 @@ const IDENTITY_URL =
   'http://identity_service:8080';
 
 async function requestIdentity(path: string, token: string): Promise<unknown> {
-  const response = await fetch(`${IDENTITY_URL}${path}`, {
+  const response = await fetchInternal(`${IDENTITY_URL}${path}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',

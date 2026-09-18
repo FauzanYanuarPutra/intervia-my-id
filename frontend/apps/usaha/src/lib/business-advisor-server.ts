@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import { fetchInternal } from '@/lib/server-fetch';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL || 'http://marketplace_service:8081';
@@ -28,7 +29,7 @@ export async function getBusinessAdvisorSummary(
 ): Promise<BusinessAdvisorSummary | null> {
   const token = await readAccessToken();
   if (!token) return null;
-  const response = await fetch(
+  const response = await fetchInternal(
     `${MARKETPLACE_URL}/v1/businesses/${encodeURIComponent(businessId)}/advisor/summary`,
     {
       cache: 'no-store',
