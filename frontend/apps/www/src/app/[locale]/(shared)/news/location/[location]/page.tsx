@@ -28,9 +28,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       languages: {
         ...(availability.id ? { id: buildNewsFacetUrl('id', 'location', value) } : {}),
         ...(availability.en ? { en: buildNewsFacetUrl('en', 'location', value) } : {}),
-        'x-default': availability.id
-          ? buildNewsFacetUrl('id', 'location', value)
-          : buildNewsFacetUrl('en', 'location', value),
+        ...(availability.id
+          ? { 'x-default': buildNewsFacetUrl('id', 'location', value) }
+          : availability.en
+            ? { 'x-default': buildNewsFacetUrl('en', 'location', value) }
+            : {}),
       },
     },
     robots: {
