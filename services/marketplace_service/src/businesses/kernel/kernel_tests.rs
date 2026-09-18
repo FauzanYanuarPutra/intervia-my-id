@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::{
-    money::{NonNegativeAmount, PositiveAmount},
+    money::{Currency, Money, NonNegativeAmount, PositiveAmount},
     scope::BusinessScope,
     time::BusinessDateContext,
 };
@@ -48,6 +48,31 @@ fn positive_amount_rejects_zero_and_negative_values() {
     assert!(PositiveAmount::new(-1).is_err());
     assert!(PositiveAmount::new(0).is_err());
     assert_eq!(PositiveAmount::new(1).unwrap().value(), 1);
+}
+
+
+#[test]
+fn money_keeps_currency_and_uses_checked_arithmetic() {
+    let first = Money::idr(12_500).unwrap();
+    let second = Money::idr(7_500).unwrap();
+
+    let total = first.checked_add(second).unwrap();
+    assert_eq!(total.minor_units(), 20_000);
+    assert_eq!(total.currency(), Currency::Idr);
+    assert_eq!(total.currency().code(), "IDR");
+
+    let remaining = total.checked_sub(Money::idr(5_000).unwrap()).unwrap();
+    assert_eq!(remaining.minor_units(), 15_000);
+}
+
+#[test]
+fn money_rejects_negative_insufficient_and_overflow_values() {
+    assert!(Money::idr(-1).is_err());
+    assert!(Money::idr(100).unwrap().checked_sub(Money::idr(101).unwrap()).is_err());
+    assert!(Money::idr(i64::MAX)
+        .unwrap()
+        .checked_add(Money::idr(1).unwrap())
+        .is_err());
 }
 
 #[test]
