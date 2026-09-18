@@ -485,19 +485,21 @@ async fn has_verified_source_tx(
     tx: &mut Transaction<'_, Postgres>,
     content_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    sqlx::query_scalar::<_, bool>(
+    let urls = sqlx::query_scalar::<_, String>(
         r#"
-        SELECT EXISTS(
-          SELECT 1
-          FROM news_source_references
-          WHERE content_id = $1
-            AND verification_status = 'verified'
-        )
+        SELECT source_url
+        FROM news_source_references
+        WHERE content_id = $1
+          AND verification_status = 'verified'
         "#,
     )
     .bind(content_id)
-    .fetch_one(&mut **tx)
-    .await
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(urls
+        .iter()
+        .any(|source_url| is_allowed_news_source_url(source_url)))
 }
 
 fn editorial_status(content_status: &str, metadata: &Value) -> String {
@@ -2034,6 +2036,33 @@ async fn update_news_source(
     let note = trimmed(payload.note);
     if note.as_ref().is_some_and(|value| value.len() > 4_000) {
         return response_error(StatusCode::BAD_REQUEST, "source note is too long");
+    }
+
+    if verification_status.as_deref() == Some("verified") {
+        let source_url = match sqlx::query_scalar::<_, String>(
+            "SELECT source_url FROM news_source_references WHERE id = $1 AND content_id = $2",
+        )
+        .bind(source_id)
+        .bind(content_id)
+        .fetch_optional(&state.db)
+        .await
+        {
+            Ok(Some(source_url)) => source_url,
+            Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
+            Err(error) => {
+                tracing::error!("update_news_source validation error: {:?}", error);
+                return response_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate news source",
+                );
+            }
+        };
+        if !is_allowed_news_source_url(&source_url) {
+            return response_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "only public HTTP(S) source URLs can be verified",
+            );
+        }
     }
 
     let updated = sqlx::query_as::<_, NewsSourceRow>(
