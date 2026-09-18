@@ -40,7 +40,9 @@ mod order_engine;
 mod outbox;
 mod runtime_metrics;
 mod schema_contract;
-use auth::{auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims};
+use auth::{
+    auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims,
+};
 use health::{health, ready, service_metrics};
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
