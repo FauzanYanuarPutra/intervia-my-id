@@ -1,9 +1,4 @@
-use axum::{
-    extract::Request,
-    http::HeaderValue,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, http::HeaderValue, middleware::Next, response::Response};
 use std::{
     sync::atomic::{AtomicI64, AtomicU64, Ordering},
     time::Instant,
@@ -33,9 +28,9 @@ static HTTP_REJECTED_OVERLOAD_TOTAL: AtomicU64 = AtomicU64::new(0);
 fn valid_request_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 120
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
 }
 
 fn resolve_request_id(request: &Request) -> String {
