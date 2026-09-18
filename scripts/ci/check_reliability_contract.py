@@ -21,6 +21,7 @@ base_compose = read("docker-compose.yml")
 prod_compose = read("docker-compose.prod.yml")
 deploy = read(".github/workflows/deploy.yml")
 caddy = read("infrastructure/caddy/Caddyfile.prod")
+caddy_local = read("infrastructure/caddy/Caddyfile")
 scale_doc = read("docs/architecture/scale-reliability-v1.md")
 slo_doc = read("docs/operations/slo-capacity-overload.md")
 incident_doc = read("docs/operations/incident-response.md")
@@ -36,6 +37,7 @@ grafana_dashboard = read("infrastructure/observability/grafana/dashboards/lajuka
 blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
+scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -69,6 +71,7 @@ for marker in (
 
 for marker in (
     "profiles: [observability]",
+    "ALERTMANAGER_CONFIG_PATH",
     "prom/prometheus:v3.14.0",
     "prom/node-exporter:v1.12.1",
     "gcr.io/cadvisor/cadvisor:v0.60.5",
@@ -272,6 +275,9 @@ for marker in (
     "--wait --wait-timeout",
     "docker-compose.observability.yml",
     "infrastructure/observability",
+    "ALERTMANAGER_CONFIG_PATH",
+    "local-null Alertmanager config",
+    "Refusing silent alert discard",
     "https://www.",
     "https://api.",
     "https://chat.",
@@ -295,6 +301,8 @@ if "reverse_proxy" not in caddy:
     errors.append("production Caddy config has no reverse proxy")
 if "@internal_metrics path /metrics" not in caddy:
     errors.append("production edge must block private /metrics endpoints")
+if caddy_local.count("@internal_metrics path /metrics") < 2:
+    errors.append("local/tunnel edge must block private /metrics on API and auth hosts")
 if "127.0.0.1" in caddy or "localhost:" in caddy:
     errors.append("production Caddy upstreams must use internal service discovery, not localhost")
 
@@ -463,6 +471,15 @@ for marker in (
 for marker in ("sha256sum -c", "pg_restore --list", "This does not replace an isolated restore drill"):
     if marker not in backup_verify_script:
         errors.append(f"backup verification script missing marker: {marker}")
+
+for marker in (
+    "probe_surviving_replicas",
+    "docker stop --time 10",
+    "single-replica failover rehearsal",
+    "Refusing multi-replica rehearsal against production",
+):
+    if marker not in scale_rehearsal_script:
+        errors.append(f"staging scale rehearsal missing failover marker: {marker}")
 
 community_source = read("services/community_service/src/main.rs")
 community_rate_limit_migration = read(

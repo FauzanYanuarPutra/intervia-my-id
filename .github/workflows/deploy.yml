@@ -87,6 +87,42 @@ jobs:
           if [[ "$TARGET_ENV" == production ]]; then overlay=docker-compose.prod.yml; env_file=.env.production; else overlay=docker-compose.staging.yml; env_file=.env.staging; fi
           [[ -f "$env_file" ]] || { echo "Missing server-managed $DEPLOY_PATH/$env_file" >&2; exit 1; }
 
+          # Production paging must never silently use the repository's null
+          # Alertmanager receiver when observability is enabled.
+          compose_profiles="$(awk -F= '$1 == "COMPOSE_PROFILES" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
+          alertmanager_config_path="$(awk -F= '$1 == "ALERTMANAGER_CONFIG_PATH" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
+          if [[ "$TARGET_ENV" == production && ",$compose_profiles," == *",observability,"* ]]; then
+            [[ -n "$alertmanager_config_path" ]] || {
+              echo "Production observability requires ALERTMANAGER_CONFIG_PATH in $env_file." >&2
+              exit 1
+            }
+
+            case "$alertmanager_config_path" in
+              ./infrastructure/observability/alertmanager.yml|infrastructure/observability/alertmanager.yml)
+                echo "Production observability refuses the repository local-null Alertmanager config. Point ALERTMANAGER_CONFIG_PATH to a server-managed paging config." >&2
+                exit 1
+                ;;
+            esac
+
+            if [[ "$alertmanager_config_path" = /* ]]; then
+              resolved_alertmanager_config="$alertmanager_config_path"
+            else
+              resolved_alertmanager_config="$DEPLOY_PATH/${alertmanager_config_path#./}"
+            fi
+
+            [[ -f "$resolved_alertmanager_config" ]] || {
+              echo "Server-managed Alertmanager config does not exist: $resolved_alertmanager_config" >&2
+              exit 1
+            }
+
+            if grep -Eq 'name:[[:space:]]*local-null' "$resolved_alertmanager_config"; then
+              echo "Production Alertmanager config still contains the local-null receiver. Refusing silent alert discard." >&2
+              exit 1
+            fi
+
+            export ALERTMANAGER_CONFIG_PATH="$resolved_alertmanager_config"
+          fi
+
           # Resolve production media storage before Compose evaluates the overlay.
           # Never source the server env file: read only the single non-secret value we need.
           if [[ "$TARGET_ENV" == production ]]; then
