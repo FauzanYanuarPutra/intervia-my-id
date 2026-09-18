@@ -302,9 +302,8 @@
       },
       "targets": [
         {
-          "refId": "A",
-          "expr": "1 - (lajukan_db_pool_connections{state=\"idle\"} / clamp_min(lajukan_db_pool_connections{state=\"total\"}, 1))",
-          "legendFormat": "{{service}}"
+          "expr": "lajukan_db_pool_connections{state=\"active\"} / clamp_min(lajukan_db_pool_connections{state=\"max\"}, 1)",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
