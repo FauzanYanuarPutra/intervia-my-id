@@ -185,12 +185,9 @@ groups:
 
       - alert: LajukanDbPoolSaturated
         expr: |
-          1 -
-          (
-            lajukan_db_pool_connections{state="idle"}
-            /
-            clamp_min(lajukan_db_pool_connections{state="total"}, 1)
-          )
+          lajukan_db_pool_connections{state="active"}
+          /
+          clamp_min(lajukan_db_pool_connections{state="max"}, 1)
           > 0.90
         for: 10m
         labels:
