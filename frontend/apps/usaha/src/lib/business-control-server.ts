@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { readAccessToken } from '@/lib/auth-session';
+import type { SellerOrderAggregate } from '@/lib/business-control/seller-orders';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL || 'http://marketplace_service:8081';
@@ -379,3 +380,40 @@ export async function createControlSale(
   }
   return { sale, replayed: data.replayed === true };
 }
+
+export async function listControlOrders(businessId: string) {
+  return items<SellerOrderAggregate>(
+    await requestControl(businessPath(businessId, '/orders')),
+  );
+}
+
+export async function transitionControlOrder(
+  businessId: string,
+  orderId: string,
+  idempotencyKey: string,
+  input: {
+    expected_version: number;
+    next_status: string;
+    reason?: string | null;
+  },
+): Promise<{ order: SellerOrderAggregate; replayed: boolean }> {
+  const payload = await requestControl(
+    businessPath(
+      businessId,
+      `/orders/${encodeURIComponent(orderId)}/transition`,
+    ),
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(input),
+    },
+  );
+  const root = record(payload) ?? {};
+  const data = record(root.data) ?? root;
+  const order = data.order as SellerOrderAggregate | undefined;
+  if (!order) {
+    throw new BusinessControlHttpError(502, 'invalid_order_response');
+  }
+  return { order, replayed: data.replayed === true };
+}
+
