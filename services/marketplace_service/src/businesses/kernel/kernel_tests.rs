@@ -50,7 +50,6 @@ fn positive_amount_rejects_zero_and_negative_values() {
     assert_eq!(PositiveAmount::new(1).unwrap().value(), 1);
 }
 
-
 #[test]
 fn money_keeps_currency_and_uses_checked_arithmetic() {
     let first = Money::idr(12_500).unwrap();
@@ -63,6 +62,18 @@ fn money_keeps_currency_and_uses_checked_arithmetic() {
 
     let remaining = total.checked_sub(Money::idr(5_000).unwrap()).unwrap();
     assert_eq!(remaining.minor_units(), 15_000);
+}
+
+#[test]
+fn money_parses_currency_and_rejects_cross_currency_math() {
+    assert_eq!(Currency::parse(" idr "), Some(Currency::Idr));
+    assert_eq!(Currency::parse("USD"), Some(Currency::Usd));
+    assert_eq!(Currency::parse("EUR"), None);
+
+    let idr = Money::idr(10_000).unwrap();
+    let usd = Money::usd(10_000).unwrap();
+    assert!(idr.checked_add(usd).is_err());
+    assert!(idr.checked_sub(usd).is_err());
 }
 
 #[test]
