@@ -39,19 +39,20 @@ SET location_id = location.id,
       'branch_mode', profile.branch_mode,
       'negative_stock_policy', profile.negative_stock_policy
     )
-FROM business_profiles profile
-JOIN business_locations location
-  ON location.business_id = profile.business_id
- AND location.organization_id = profile.organization_id
- AND location.is_primary
-JOIN (
-  SELECT id, ROW_NUMBER() OVER (
-    PARTITION BY business_id ORDER BY occurred_on, created_at, id
-  ) AS sequence_number
-  FROM business_sales
-) ranked ON ranked.id = sale.id
+FROM business_profiles profile,
+     business_locations location,
+     (
+       SELECT id, ROW_NUMBER() OVER (
+         PARTITION BY business_id ORDER BY occurred_on, created_at, id
+       ) AS sequence_number
+       FROM business_sales
+     ) ranked
 WHERE profile.business_id = sale.business_id
-  AND profile.organization_id = sale.organization_id;
+  AND profile.organization_id = sale.organization_id
+  AND location.business_id = profile.business_id
+  AND location.organization_id = profile.organization_id
+  AND location.is_primary
+  AND ranked.id = sale.id;
 
 DO $$
 BEGIN
@@ -105,19 +106,20 @@ SET location_id = location.id,
       'branch_mode', profile.branch_mode,
       'negative_stock_policy', profile.negative_stock_policy
     )
-FROM business_profiles profile
-JOIN business_locations location
-  ON location.business_id = profile.business_id
- AND location.organization_id = profile.organization_id
- AND location.is_primary
-JOIN (
-  SELECT id, ROW_NUMBER() OVER (
-    PARTITION BY business_id ORDER BY occurred_on, created_at, id
-  ) AS sequence_number
-  FROM business_purchases
-) ranked ON ranked.id = purchase.id
+FROM business_profiles profile,
+     business_locations location,
+     (
+       SELECT id, ROW_NUMBER() OVER (
+         PARTITION BY business_id ORDER BY occurred_on, created_at, id
+       ) AS sequence_number
+       FROM business_purchases
+     ) ranked
 WHERE profile.business_id = purchase.business_id
-  AND profile.organization_id = purchase.organization_id;
+  AND profile.organization_id = purchase.organization_id
+  AND location.business_id = profile.business_id
+  AND location.organization_id = profile.organization_id
+  AND location.is_primary
+  AND ranked.id = purchase.id;
 
 DO $$
 BEGIN
