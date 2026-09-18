@@ -60,6 +60,7 @@ jobs:
           bash -n scripts/ops/dependency_degradation_rehearsal.sh
           bash -n scripts/ops/community_media_backup.sh
           bash -n scripts/ops/verify_community_media_backup.sh
+          bash -n scripts/ops/requeue_marketplace_outbox_event.sh
           bash -n scripts/load/run-capacity-baseline.sh
       - name: Exercise isolated PostgreSQL restore drill
         shell: bash
