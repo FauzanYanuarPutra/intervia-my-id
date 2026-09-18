@@ -305,7 +305,7 @@ jobs:
           apex_location="$(
             curl --silent --show-error --head --retry 5 --retry-all-errors --max-time 20 \
               --resolve "${app_domain}:443:127.0.0.1" "https://${app_domain}/" |
-              awk 'BEGIN { IGNORECASE=1 } /^location:/ { sub(/\r$/, "", $0); sub(/^[^:]+:[[:space:]]*/, "", $0); print $0; exit }'
+              awk 'tolower($0) ~ /^location:/ { sub(/\r$/, "", $0); sub(/^[^:]+:[[:space:]]*/, "", $0); print $0; exit }'
           )"
           [[ "$apex_location" == "https://www.${app_domain}/" ]] || {
             echo "Apex redirect is invalid: expected https://www.${app_domain}/, got '${apex_location:-<none>}'." >&2
