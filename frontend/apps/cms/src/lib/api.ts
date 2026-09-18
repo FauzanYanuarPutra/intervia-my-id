@@ -293,6 +293,11 @@ export const newsApi = {
       action: 'approve' | 'needs_revision' | 'reject' | 'retract' | 'correct';
       note?: string;
       business_impact?: string;
+      publish_at?: string;
+      fact_check_status?: 'pending' | 'verified' | 'not_required';
+      legal_review_status?: 'pending' | 'approved' | 'not_required';
+      editorial_priority?: 'low' | 'normal' | 'high' | 'urgent';
+      sensitivity?: 'normal' | 'high';
     },
   ) => {
     return fetchWithAuth(`${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/moderate`, {

@@ -25,6 +25,7 @@ type NewsVersion = {
   editorial_status?: string | null;
   title: string;
   summary?: string | null;
+  body: string;
   created_at: string;
 };
 
@@ -55,6 +56,8 @@ type NewsroomMetrics = {
   engagement_24h?: Array<{ key: string; value: number }>;
   published_24h?: number;
   published_7d?: number;
+  scheduled?: number;
+  stale_review_24h?: number;
   avg_review_minutes?: number | null;
   versions?: number;
   sources?: { total?: number; verified?: number; flagged?: number };
@@ -139,6 +142,14 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('id-ID');
 }
 
+function toDateTimeLocal(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return shifted.toISOString().slice(0, 16);
+}
+
 export default function NewsModeration() {
   const { isAuthenticated, loading: authLoading } = useRequireAuth();
   const { accessToken } = useAuth();
@@ -147,6 +158,12 @@ export default function NewsModeration() {
   const [selectedId, setSelectedId] = useState('');
   const [note, setNote] = useState('');
   const [businessImpact, setBusinessImpact] = useState('');
+  const [queueQuery, setQueueQuery] = useState('');
+  const [factCheckStatus, setFactCheckStatus] = useState<'pending' | 'verified' | 'not_required'>('pending');
+  const [legalReviewStatus, setLegalReviewStatus] = useState<'pending' | 'approved' | 'not_required'>('not_required');
+  const [editorialPriority, setEditorialPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
+  const [sensitivity, setSensitivity] = useState<'normal' | 'high'>('normal');
+  const [publishAt, setPublishAt] = useState('');
   const [history, setHistory] = useState<EditorialEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [versions, setVersions] = useState<NewsVersion[]>([]);
@@ -164,6 +181,54 @@ export default function NewsModeration() {
     () => items.find(item => item.id === selectedId) || items[0] || null,
     [items, selectedId],
   );
+
+  const visibleItems = useMemo(() => {
+    const query = queueQuery.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter(item => {
+      const meta = readRecord(readRecord(item.metadata).news);
+      return [
+        item.title,
+        item.summary || '',
+        item.owner_id,
+        readString(meta.category),
+        readString(meta.location),
+        readString(meta.article_kind),
+      ].some(value => value.toLowerCase().includes(query));
+    });
+  }, [items, queueQuery]);
+
+  useEffect(() => {
+    const meta = selected ? readRecord(readRecord(selected.metadata).news) : {};
+    const selectedKind = readString(meta.article_kind) || 'news';
+    const fact = readString(meta.fact_check_status);
+    const legal = readString(meta.legal_review_status);
+    const priority = readString(meta.editorial_priority);
+    const selectedSensitivity = readString(meta.sensitivity);
+    setBusinessImpact(readString(meta.business_impact));
+    setFactCheckStatus(
+      fact === 'verified' || fact === 'not_required'
+        ? fact
+        : selectedKind === 'press_release'
+          ? 'not_required'
+          : 'pending',
+    );
+    setLegalReviewStatus(
+      legal === 'approved' || legal === 'pending' || legal === 'not_required'
+        ? legal
+        : selectedSensitivity === 'high'
+          ? 'pending'
+          : 'not_required',
+    );
+    setEditorialPriority(
+      priority === 'low' || priority === 'high' || priority === 'urgent'
+        ? priority
+        : 'normal',
+    );
+    setSensitivity(selectedSensitivity === 'high' ? 'high' : 'normal');
+    const scheduledFor = readString(meta.scheduled_for);
+    setPublishAt(scheduledFor ? toDateTimeLocal(scheduledFor) : '');
+  }, [selected?.id]);
 
   useEffect(() => {
     if (!accessToken || !selected?.id) return;
@@ -324,11 +389,35 @@ export default function NewsModeration() {
       setError('Catatan editor wajib untuk revisi, penolakan, koreksi, atau penarikan publikasi.');
       return;
     }
+    if (action === 'approve' || action === 'correct') {
+      const selectedMeta = readRecord(readRecord(selected.metadata).news);
+      const selectedKind = readString(selectedMeta.article_kind) || 'news';
+      if (selectedKind !== 'press_release' && factCheckStatus !== 'verified') {
+        setError('Fact-check wajib berstatus verified sebelum publikasi.');
+        return;
+      }
+      if (sensitivity === 'high' && legalReviewStatus !== 'approved') {
+        setError('Konten sensitivitas tinggi membutuhkan legal review approved.');
+        return;
+      }
+    }
     setActing(true);
     setError('');
     setSuccess('');
     try {
-      await newsApi.moderate(accessToken, selected.id, { action, note: note.trim() || undefined, business_impact: businessImpact.trim() || undefined });
+      await newsApi.moderate(accessToken, selected.id, {
+        action,
+        note: note.trim() || undefined,
+        business_impact: businessImpact.trim() || undefined,
+        publish_at:
+          action === 'approve' && publishAt
+            ? new Date(publishAt).toISOString()
+            : undefined,
+        fact_check_status: factCheckStatus,
+        legal_review_status: legalReviewStatus,
+        editorial_priority: editorialPriority,
+        sensitivity,
+      });
       setSuccess(`Aksi "${action}" berhasil untuk: ${selected.title}`);
       setNote('');
       await load();
@@ -338,6 +427,11 @@ export default function NewsModeration() {
         setHistory(Array.isArray(record.items) ? (record.items as EditorialEvent[]) : []);
         setVersions(Array.isArray(record.versions) ? (record.versions as NewsVersion[]) : []);
         setSources(Array.isArray(record.sources) ? (record.sources as NewsSource[]) : []);
+        setSourceReviews(
+          Array.isArray(record.source_reviews)
+            ? (record.source_reviews as NewsSourceReview[])
+            : [],
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memoderasi berita');
@@ -367,6 +461,17 @@ export default function NewsModeration() {
     source =>
       source.verification_status === 'verified' &&
       isSafeExternalSourceUrl(source.source_url),
+  );
+  const factCheckReady =
+    kind === 'press_release'
+      ? factCheckStatus !== 'pending'
+      : factCheckStatus === 'verified';
+  const legalReady = sensitivity !== 'high' || legalReviewStatus === 'approved';
+  const publicationReady =
+    factCheckReady && legalReady && (!requiresVerifiedSource || hasVerifiedSource);
+  const selectedIsScheduled = Boolean(
+    selected?.published_at &&
+      new Date(selected.published_at).getTime() > Date.now(),
   );
   const wouldBreakPublishedProvenance = (
     source: NewsSource,
@@ -405,10 +510,12 @@ export default function NewsModeration() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {success ? <Alert tone="success">{success}</Alert> : null}
 
-      <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         {[
           { label: 'Terbit 24 jam', value: metrics.published_24h ?? 0 },
           { label: 'Terbit 7 hari', value: metrics.published_7d ?? 0 },
+          { label: 'Terjadwal', value: metrics.scheduled ?? 0 },
+          { label: 'Queue >24 jam', value: metrics.stale_review_24h ?? 0 },
           { label: 'Rata-rata review', value: metrics.avg_review_minutes == null ? '-' : `${Math.round(metrics.avg_review_minutes)} mnt` },
           { label: 'Sumber verified', value: metrics.sources?.verified ?? 0 },
           { label: 'Sumber bermasalah', value: metrics.sources?.flagged ?? 0 },
@@ -433,17 +540,32 @@ export default function NewsModeration() {
         ))}
       </div>
 
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-[color:var(--color-text-soft)]">
+          Cari antrean
+          <input
+            value={queueQuery}
+            onChange={event => setQueueQuery(event.target.value)}
+            placeholder="Judul, kategori, lokasi, jenis, atau owner…"
+            className="mt-2 min-h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-sm text-[color:var(--color-text)]"
+          />
+        </label>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[minmax(300px,0.75fr)_minmax(0,1.25fr)]">
-        <Card title={`Antrean (${items.length})`}>
+        <Card title={`Antrean (${visibleItems.length}/${items.length})`}>
           {loading ? (
             <p className="text-sm text-[color:var(--color-text-soft)]">Memuat...</p>
-          ) : items.length === 0 ? (
-            <p className="text-sm text-[color:var(--color-text-soft)]">Tidak ada item pada status ini.</p>
+          ) : visibleItems.length === 0 ? (
+            <p className="text-sm text-[color:var(--color-text-soft)]">Tidak ada item yang cocok dengan filter ini.</p>
           ) : (
             <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-              {items.map(item => {
+              {visibleItems.map(item => {
                 const meta = readRecord(readRecord(item.metadata).news);
                 const editorialStatus = readString(meta.editorial_status) || item.content_status;
+                const scheduled =
+                  Boolean(item.published_at) &&
+                  new Date(item.published_at || '').getTime() > Date.now();
                 return (
                   <button
                     key={item.id}
@@ -454,6 +576,7 @@ export default function NewsModeration() {
                       setHistory([]);
                       setVersions([]);
                       setSources([]);
+                      setSourceReviews([]);
                       setHistoryLoading(true);
                       setNote('');
                       setSuccess('');
@@ -463,7 +586,7 @@ export default function NewsModeration() {
                     <p className="text-sm font-semibold text-[color:var(--color-text)]">{item.title}</p>
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--color-text-soft)]">{item.summary || 'Tanpa ringkasan'}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold text-[color:var(--color-text-soft)]">
-                      <span>{editorialStatus}</span><span>•</span><span>{formatDate(item.updated_at)}</span>
+                      <span>{scheduled ? 'scheduled' : editorialStatus}</span><span>•</span><span>{formatDate(item.updated_at)}</span>
                     </div>
                   </button>
                 );
@@ -561,6 +684,48 @@ export default function NewsModeration() {
                 </div>
               ) : null}
 
+              <section className="rounded-2xl border border-[color:var(--color-border)] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-soft)]">Editorial readiness</p>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--color-text-soft)]">Fact-check, legal gate, sensitivitas, prioritas, dan jadwal publikasi ikut tersimpan dalam snapshot editorial.</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${publicationReady ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>
+                    {publicationReady ? 'ready' : 'belum siap'}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-[color:var(--color-text)]">Fact-check
+                    <select value={factCheckStatus} onChange={event => setFactCheckStatus(event.target.value as 'pending' | 'verified' | 'not_required')} className="mt-1 min-h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-sm">
+                      <option value="pending">pending</option><option value="verified">verified</option><option value="not_required">not required</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-[color:var(--color-text)]">Legal review
+                    <select value={legalReviewStatus} onChange={event => setLegalReviewStatus(event.target.value as 'pending' | 'approved' | 'not_required')} className="mt-1 min-h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-sm">
+                      <option value="pending">pending</option><option value="approved">approved</option><option value="not_required">not required</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-[color:var(--color-text)]">Prioritas
+                    <select value={editorialPriority} onChange={event => setEditorialPriority(event.target.value as 'low' | 'normal' | 'high' | 'urgent')} className="mt-1 min-h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-sm">
+                      <option value="low">low</option><option value="normal">normal</option><option value="high">high</option><option value="urgent">urgent</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-[color:var(--color-text)]">Sensitivitas
+                    <select value={sensitivity} onChange={event => setSensitivity(event.target.value as 'normal' | 'high')} className="mt-1 min-h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-sm">
+                      <option value="normal">normal</option><option value="high">high</option>
+                    </select>
+                  </label>
+                </div>
+                {editorialStatus === 'pending_review' ? (
+                  <label className="mt-3 block text-xs font-semibold text-[color:var(--color-text)]">Jadwal terbit / embargo
+                    <input type="datetime-local" value={publishAt} onChange={event => setPublishAt(event.target.value)} className="mt-1 min-h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-sm" />
+                    <span className="mt-1 block font-normal text-[color:var(--color-text-soft)]">Kosongkan untuk terbit langsung. Maksimum 90 hari ke depan.</span>
+                  </label>
+                ) : null}
+                {sensitivity === 'high' ? <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">Sensitivitas tinggi memerlukan legal approval dan minimal satu sumber verified yang direview editor lain sebelum publish.</p> : null}
+                {selectedIsScheduled ? <p className="mt-3 rounded-xl bg-sky-50 p-3 text-xs font-semibold text-sky-900">Sudah disetujui dan dijadwalkan terbit {formatDate(selected?.published_at)}.</p> : null}
+              </section>
+
               <label className="block text-sm font-semibold text-[color:var(--color-text)]">
                 Dampak untuk pelaku usaha
                 <textarea value={businessImpact} onChange={event => setBusinessImpact(event.target.value)} rows={4} maxLength={2000} className="mt-2 w-full rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 text-sm" placeholder="Jelaskan implikasi praktis berita ini untuk UMKM/pelaku usaha..." />
@@ -572,12 +737,12 @@ export default function NewsModeration() {
               </label>
 
               <div className="flex flex-wrap gap-2">
-                <Button disabled={acting || (requiresVerifiedSource && !hasVerifiedSource)} variant="primary" onClick={() => void moderate('approve')}>Approve & publish</Button>
+                <Button disabled={acting || !publicationReady} variant="primary" onClick={() => void moderate('approve')}>{publishAt ? 'Approve & schedule' : 'Approve & publish'}</Button>
                 <Button disabled={acting || !note.trim()} variant="secondary" onClick={() => void moderate('needs_revision')}>Minta revisi</Button>
                 <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('reject')}>Tolak</Button>
                 {status === 'published' || selected.content_status === 'active' ? (
                   <>
-                    <Button disabled={acting || !note.trim() || (requiresVerifiedSource && !hasVerifiedSource)} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
+                    <Button disabled={acting || !note.trim() || !publicationReady} variant="secondary" onClick={() => void moderate('correct')}>Catat koreksi</Button>
                     <Button disabled={acting || !note.trim()} variant="danger" onClick={() => void moderate('retract')}>Tarik publikasi</Button>
                   </>
                 ) : null}
@@ -594,11 +759,12 @@ export default function NewsModeration() {
                 {versions.length ? (
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {versions.slice(0, 8).map(version => (
-                      <div key={version.id} className="rounded-xl bg-[color:var(--color-surface-muted)] p-3">
-                        <p className="text-xs font-semibold text-[color:var(--color-text)]">v{version.version_number} · {version.action.replaceAll('_', ' ')}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-[color:var(--color-text-soft)]">{version.title}</p>
+                      <details key={version.id} className="rounded-xl bg-[color:var(--color-surface-muted)] p-3">
+                        <summary className="cursor-pointer text-xs font-semibold text-[color:var(--color-text)]">v{version.version_number} · {version.action.replaceAll('_', ' ')} · {version.title}</summary>
+                        {version.summary ? <p className="mt-2 text-xs font-semibold text-[color:var(--color-text-soft)]">{version.summary}</p> : null}
+                        <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-2 text-xs leading-5 text-[color:var(--color-text)]">{version.body}</div>
                         <p className="mt-2 text-[10px] text-[color:var(--color-text-soft)]">{version.actor_role} · {formatDate(version.created_at)}</p>
-                      </div>
+                      </details>
                     ))}
                   </div>
                 ) : (
