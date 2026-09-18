@@ -12,29 +12,85 @@ on:
         description: Immutable image tag, for example sha-<40-char-git-sha>
         type: string
         required: true
+  workflow_run:
+    workflows: ["Build Images"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ inputs.environment }}
+  group: deploy-${{ github.event_name == 'workflow_run' && 'production' || inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy ${{ inputs.environment }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    name: Deploy ${{ github.event_name == 'workflow_run' && 'production' || inputs.environment }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: ${{ inputs.environment }}
+    environment: ${{ github.event_name == 'workflow_run' && 'production' || inputs.environment }}
     steps:
-      - uses: actions/checkout@v7
-      - name: Validate immutable tag
+      - name: Resolve immutable release
+        id: release
         shell: bash
         env:
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_ENV: ${{ inputs.environment }}
+          MANUAL_IMAGE_TAG: ${{ inputs.image_tag }}
+          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          [[ "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]] || { echo "image_tag must be sha- followed by the full 40-character commit SHA." >&2; exit 1; }
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            [[ "$WORKFLOW_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "Build Images workflow did not expose a valid 40-character head SHA." >&2
+              exit 1
+            }
+            target_env=production
+            release_sha="$WORKFLOW_HEAD_SHA"
+            image_tag="sha-$WORKFLOW_HEAD_SHA"
+          else
+            [[ "$MANUAL_ENV" == "staging" || "$MANUAL_ENV" == "production" ]] || {
+              echo "Manual deployment environment must be staging or production." >&2
+              exit 1
+            }
+            [[ "$MANUAL_IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]] || {
+              echo "image_tag must be sha- followed by the full 40-character commit SHA." >&2
+              exit 1
+            }
+            target_env="$MANUAL_ENV"
+            image_tag="$MANUAL_IMAGE_TAG"
+            release_sha="${MANUAL_IMAGE_TAG#sha-}"
+          fi
+
+          {
+            echo "target_env=$target_env"
+            echo "image_tag=$image_tag"
+            echo "release_sha=$release_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.release_sha }}
+
+      - name: Validate release contract
+        shell: bash
+        env:
+          TARGET_ENV: ${{ steps.release.outputs.target_env }}
+          IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
+          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_ENV" == "staging" || "$TARGET_ENV" == "production" ]] || { echo "Invalid deployment environment." >&2; exit 1; }
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "release_sha must be a full commit SHA." >&2; exit 1; }
+          [[ "$IMAGE_TAG" == "sha-$RELEASE_SHA" ]] || { echo "image_tag and checked-out release SHA must match exactly." >&2; exit 1; }
       - name: Prepare SSH
         shell: bash
         env:
@@ -50,7 +106,7 @@ jobs:
       - name: Package deployment contract
         shell: bash
         env:
-          TARGET_ENV: ${{ inputs.environment }}
+          TARGET_ENV: ${{ steps.release.outputs.target_env }}
         run: |
           set -euo pipefail
           overlay="docker-compose.${TARGET_ENV}.yml"
@@ -74,8 +130,8 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DOCKERHUB_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          TARGET_ENV: ${{ inputs.environment }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          TARGET_ENV: ${{ steps.release.outputs.target_env }}
+          IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
         run: |
           set -euo pipefail
           ssh -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' TARGET_ENV='$TARGET_ENV' IMAGE_TAG='$IMAGE_TAG' DOCKERHUB_NAMESPACE='$DOCKERHUB_NAMESPACE' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash -s" <<'REMOTE'
@@ -233,14 +289,54 @@ jobs:
           docker compose "${compose[@]}" pull
           deployment_started=1
           docker compose "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420
+
+          # Caddyfile is bind-mounted. Compose does not recreate/reload Caddy merely
+          # because the mounted file contents changed, so activate the checked-out
+          # edge contract explicitly on every release.
+          docker compose "${compose[@]}" exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker compose "${compose[@]}" exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+
           if [[ "$TARGET_ENV" == production ]]; then
             bash scripts/ops/minio_storage_probe.sh "${compose[@]}"
           fi
           app_domain="$(awk -F= '$1 == "APP_DOMAIN" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
           [[ "$app_domain" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "APP_DOMAIN is missing or invalid in $env_file." >&2; false; }
+          # First verify the origin/edge stack locally. A healthy container alone is
+          # insufficient: routing, locale handling and the News SSR path must all work.
           curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "www.${app_domain}:443:127.0.0.1" "https://www.${app_domain}/" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "www.${app_domain}:443:127.0.0.1" "https://www.${app_domain}/api/health" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "www.${app_domain}:443:127.0.0.1" "https://www.${app_domain}/id/news" >/dev/null
           curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "api.${app_domain}:443:127.0.0.1" "https://api.${app_domain}/ready" >/dev/null
           curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 20 --resolve "chat.${app_domain}:443:127.0.0.1" "https://chat.${app_domain}/api/ready" >/dev/null
+
+          apex_location="$(
+            curl --silent --show-error --head --retry 5 --retry-all-errors --max-time 20 \
+              --resolve "${app_domain}:443:127.0.0.1" "https://${app_domain}/" |
+              awk 'tolower($0) ~ /^location:/ { sub(/\r$/, "", $0); sub(/^[^:]+:[[:space:]]*/, "", $0); print $0; exit }'
+          )"
+          [[ "$apex_location" == "https://www.${app_domain}/" ]] || {
+            echo "Apex redirect is invalid: expected https://www.${app_domain}/, got '${apex_location:-<none>}'." >&2
+            false
+          }
+
+          # Then verify the real public path through DNS/CDN/tunnel. This catches the
+          # exact failure mode where local Caddy is healthy but www is unreachable.
+          public_edge_ready() {
+            curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "https://www.${app_domain}/api/health" >/dev/null &&
+            curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "https://www.${app_domain}/id/news" >/dev/null &&
+            curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "https://api.${app_domain}/ready" >/dev/null
+          }
+
+          if ! public_edge_ready; then
+            if [[ ",${compose_profiles}," == *",tunnel,"* ]]; then
+              echo "Public edge is not reachable although local origin checks passed; restarting cloudflared once." >&2
+              docker compose "${compose[@]}" restart cloudflared
+              public_edge_ready
+            else
+              echo "Public edge is not reachable and the tunnel profile is not enabled." >&2
+              false
+            fi
+          fi
           printf '%s\n' "$IMAGE_TAG" > "$release_marker"
           trap - ERR
           docker compose "${compose[@]}" ps
