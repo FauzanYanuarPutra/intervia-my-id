@@ -225,6 +225,10 @@ pub(crate) async fn verify_schema_contract(db: &PgPool) -> anyhow::Result<()> {
            AND to_regclass('public.users_read_model') IS NOT NULL
            AND to_regclass('events.event_outbox') IS NOT NULL
            AND to_regclass('events.event_inbox') IS NOT NULL
+           AND to_regclass('public.news_editorial_events') IS NOT NULL
+           AND to_regclass('public.news_article_versions') IS NOT NULL
+           AND to_regclass('public.news_source_references') IS NOT NULL
+           AND to_regclass('public.news_source_review_events') IS NOT NULL
         "#,
     )
     .fetch_one(db)
