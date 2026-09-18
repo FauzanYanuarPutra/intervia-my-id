@@ -313,7 +313,7 @@ fn sanitize_news_source_urls(
     Ok(Some(urls))
 }
 
-fn public_topics_from_tags(tags: Option<&Vec<String>>) -> Vec<String> {
+fn public_topics_from_tags(tags: Option<&[String]>) -> Vec<String> {
     let reserved = [
         "news",
         "analysis",
@@ -1230,7 +1230,7 @@ async fn update_news_submission(
     let summary = trimmed(payload.summary).or_else(|| current.summary.clone());
     if summary
         .as_ref()
-        .map_or(true, |value| value.len() < 20 || value.len() > 1000)
+        .is_none_or(|value| value.len() < 20 || value.len() > 1000)
     {
         return response_error(
             StatusCode::BAD_REQUEST,
@@ -1250,7 +1250,7 @@ async fn update_news_submission(
         Ok(value) => value,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
-    let topics = requested_topics.unwrap_or_else(|| public_topics_from_tags(current.tags.as_ref()));
+    let topics = requested_topics.unwrap_or_else(|| public_topics_from_tags(current.tags.as_deref()));
 
     let mut metadata = current.metadata.clone();
     if !metadata.is_object() {
