@@ -213,6 +213,26 @@ fn normalize_news_language(value: Option<String>) -> Result<Option<String>, &'st
     }
 }
 
+fn normalize_news_category_filter(
+    value: Option<String>,
+) -> Result<Option<String>, &'static str> {
+    let Some(category) = trimmed(value) else {
+        return Ok(None);
+    };
+    let canonical = match category.to_ascii_lowercase().as_str() {
+        "ekonomi" => "Ekonomi",
+        "bisnis" => "Bisnis",
+        "umkm" => "UMKM",
+        "teknologi" => "Teknologi",
+        "keuangan" => "Keuangan",
+        "regulasi" => "Regulasi",
+        "industri" => "Industri",
+        "daerah" => "Daerah",
+        _ => return Err("unsupported news category"),
+    };
+    Ok(Some(canonical.to_string()))
+}
+
 fn public_news_metadata(metadata: &Value, source_urls: Option<&[String]>) -> Value {
     let source = metadata.get("news").and_then(Value::as_object);
     let mut public = serde_json::Map::new();
@@ -917,7 +937,7 @@ async fn load_news_by_id(db: &PgPool, content_id: Uuid) -> Result<Option<NewsRow
     sqlx::query_as::<_, NewsRow>(
         r#"
         SELECT
-            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
+            id, owner_id, slug, title, summary, ''::text AS body, tags, cover_image, metadata,
             content_status, published_at, created_at, updated_at
         FROM content_items
         WHERE id = $1 AND content_type = 'news' AND content_status <> 'deleted'
@@ -1082,8 +1102,11 @@ async fn list_news(
         );
     }
 
-    let category = trimmed(query.category);
-    let topic = trimmed(query.topic);
+    let category = match normalize_news_category_filter(query.category) {
+        Ok(category) => category,
+        Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
+    };
+    let topic = trimmed(query.topic).map(|value| value.to_ascii_lowercase());
     let location = trimmed(query.location);
     let language = match normalize_news_language(query.language) {
         Ok(language) => language,
@@ -1120,15 +1143,11 @@ async fn list_news(
           AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'published') = 'published'
           AND (
             $1::text IS NULL OR
-            lower(COALESCE(metadata->'news'->>'category', '')) = lower($1)
+            metadata->'news'->>'category' = $1
           )
           AND (
             $2::text IS NULL OR
-            EXISTS (
-              SELECT 1
-              FROM unnest(COALESCE(tags, ARRAY[]::text[])) AS tag
-              WHERE lower(tag) = lower($2)
-            )
+            tags @> ARRAY[$2]::text[]
           )
           AND (
             $3::text IS NULL OR
@@ -1136,7 +1155,7 @@ async fn list_news(
           )
           AND (
             $4::text IS NULL OR
-            lower(COALESCE(NULLIF(metadata->'news'->>'language', ''), 'id')) = lower($4)
+            COALESCE(NULLIF(metadata->'news'->>'language', ''), 'id') = $4
           )
           AND (
             $5::text IS NULL OR
