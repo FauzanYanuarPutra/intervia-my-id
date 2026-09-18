@@ -168,7 +168,7 @@ for marker in (
     "community_rate_limit_counters",
     "FOR UPDATE SKIP LOCKED",
 ):
-    if marker not in community_main_source:
+    if marker not in community_rate_limit_source:
         errors.append(f"Community multi-replica cleanup contract missing: {marker}")
 
 for marker in (
@@ -806,7 +806,7 @@ if "response.headers.get('x-request-id')" not in www_http_client:
 for path in (
     "services/identity_service/src/routes/health.rs",
     "services/marketplace_service/src/health.rs",
-    "services/community_service/src/main.rs",
+    "services/community_service/src/health.rs",
 ):
     source = read(path)
     for marker in (
@@ -821,7 +821,7 @@ for path in (
 for path in (
     "services/identity_service/src/routes/health.rs",
     "services/marketplace_service/src/health.rs",
-    "services/community_service/src/main.rs",
+    "services/community_service/src/health.rs",
 ):
     source = read(path)
     for marker in (
@@ -980,7 +980,7 @@ for marker in (
     "ON CONFLICT (rate_key, window_bucket)",
     "run_rate_limit_cleanup",
 ):
-    if marker not in community_source:
+    if marker not in community_rate_limit_source:
         errors.append(f"Community shared rate limiter missing runtime marker: {marker}")
 for marker in ("PRIMARY KEY (rate_key, window_bucket)", "expires_at"):
     if marker not in community_rate_limit_migration:
