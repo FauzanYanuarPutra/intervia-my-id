@@ -96,6 +96,18 @@ require(
 )
 
 require(
+    "services/marketplace_service/migrations/20260919003000_news_source_review_history.up.sql",
+    (
+        "CREATE TABLE IF NOT EXISTS news_source_review_events",
+        "reviewer_id UUID NOT NULL",
+        "from_verification_status",
+        "to_verification_status",
+        "idx_news_source_review_events_content_created",
+        "ON DELETE SET NULL",
+    ),
+)
+
+require(
     "services/marketplace_service/migrations/20260918233500_news_search_index.up.sql",
     (
         "idx_content_items_news_search",
@@ -256,6 +268,8 @@ require(
         "requiresVerifiedSource && !hasVerifiedSource",
         "wouldBreakPublishedProvenance",
         "Verifikasi sumber pengganti atau retract artikel",
+        "Jejak review sumber",
+        "record.source_reviews",
         "Approve & publish",
         "Versi artikel",
         "Top artikel 7 hari",
