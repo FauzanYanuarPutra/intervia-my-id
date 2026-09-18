@@ -31,6 +31,11 @@ capacity_runner = read("scripts/load/run-capacity-baseline.sh")
 capacity_workflow = read(".github/workflows/capacity-baseline.yml")
 capacity_doc = read("docs/operations/capacity-testing.md")
 outbox_requeue_script = read("scripts/ops/requeue_marketplace_outbox_event.sh")
+jwt_keygen_script = read("scripts/ops/generate_jwt_access_keypair.sh")
+jwt_verify_script = read("scripts/ops/verify_jwt_access_keypair.sh")
+pitr_preflight_script = read("scripts/ops/postgres_pitr_preflight.sh")
+jwt_rotation_doc = read("docs/operations/jwt-access-key-rotation.md")
+pitr_readiness_doc = read("docs/operations/pitr-readiness.md")
 quality_workflow = read(".github/workflows/quality.yml")
 read("docs/operations/backup-and-disaster-recovery.md")
 observability_compose = read("docker-compose.observability.yml")
@@ -147,6 +152,43 @@ for marker in ("JWT_PRIVATE_KEY_PEM", "EncodingKey::from_rsa_pem", "JWT_KEY_ID")
 for marker in ("struct Money", "enum Currency", "checked_add", "checked_sub", "AmountOverflow"):
     if marker not in business_money_source:
         errors.append(f"Business Money primitive missing invariant marker: {marker}")
+
+for path, source, markers in (
+    (
+        "scripts/ops/generate_jwt_access_keypair.sh",
+        jwt_keygen_script,
+        ("openssl genpkey", "Refusing to overwrite", "chmod 600"),
+    ),
+    (
+        "scripts/ops/verify_jwt_access_keypair.sh",
+        jwt_verify_script,
+        ("openssl pkey", "JWT private/public keypair mismatch", "VERIFY_PUBLIC_ONLY"),
+    ),
+    (
+        "scripts/ops/postgres_pitr_preflight.sh",
+        pitr_preflight_script,
+        ("SHOW wal_level", "SHOW archive_mode", "SHOW archive_command", "max_wal_senders"),
+    ),
+):
+    for required_marker in markers:
+        if required_marker not in source:
+            errors.append(f"{path} missing operational contract marker: {required_marker}")
+
+for path, source, markers in (
+    (
+        "docs/operations/jwt-access-key-rotation.md",
+        jwt_rotation_doc,
+        ("RS256", "Identity", "private key", "public key", "Rollback"),
+    ),
+    (
+        "docs/operations/pitr-readiness.md",
+        pitr_readiness_doc,
+        ("base backup", "continuous WAL", "requested timestamp", "does not prove"),
+    ),
+):
+    for required_marker in markers:
+        if required_marker not in source:
+            errors.append(f"{path} missing operational documentation marker: {required_marker}")
 
 for prefix in ("IDENTITY", "MARKETPLACE", "COMMUNITY"):
     for suffix in ("DB_IDLE_TIMEOUT_SECONDS", "DB_MAX_LIFETIME_SECONDS"):
