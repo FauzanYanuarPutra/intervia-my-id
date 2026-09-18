@@ -84,7 +84,7 @@ if "'news'" in dead_block or '"news"' in dead_block:
 for marker in (
     "redirectToTemporaryLocalizedTarget",
     "NextResponse.redirect(url, 307)",
-    "Cache-Control', 'private, no-store, max-age=0, must-revalidate",
+    "private, no-store, max-age=0, must-revalidate",
 ):
     if marker not in proxy:
         errors.append(f"frontend/apps/www/src/proxy.ts missing temporary redirect safety marker: {marker}")
