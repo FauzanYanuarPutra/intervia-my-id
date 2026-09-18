@@ -5,8 +5,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    control::canonical_manual_finance_entry_type,
-    kernel::command::canonical_request_hash,
+    control::canonical_manual_finance_entry_type, kernel::command::canonical_request_hash,
 };
 
 #[derive(Debug)]
@@ -334,10 +333,9 @@ impl Wave2Repository {
             &request_hash,
         )
         .await?;
-        let obligation =
-            load_obligation(&self.db, business_id, organization_id, idempotency_key)
-                .await?
-                .ok_or(Wave2RepositoryError::Conflict)?;
+        let obligation = load_obligation(&self.db, business_id, organization_id, idempotency_key)
+            .await?
+            .ok_or(Wave2RepositoryError::Conflict)?;
         Ok(ObligationOutcome {
             obligation,
             replayed: true,
