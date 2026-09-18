@@ -1213,8 +1213,10 @@ function CommunityPoll({
               type="button"
               onClick={() => void handleVote(index)}
               disabled={votingIndex !== null}
+              aria-pressed={selected}
+              aria-busy={voting}
               className={cn(
-                'group relative w-full overflow-hidden rounded-[16px] border bg-white p-3 text-left transition hover:border-[color:var(--app-accent-border)] disabled:cursor-wait',
+                'group relative min-h-11 w-full overflow-hidden rounded-[16px] border bg-white p-3 text-left transition hover:border-[color:var(--app-accent-border)] disabled:cursor-wait dark:bg-slate-900',
                 selected
                   ? 'border-[color:var(--app-accent)] shadow-[0_14px_26px_-24px_rgba(4,120,87,0.72)]'
                   : 'border-[color:var(--app-border)]',
