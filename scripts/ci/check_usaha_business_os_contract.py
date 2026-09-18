@@ -54,7 +54,7 @@ def main() -> int:
     require('services/marketplace_service/migrations/20260823001000_usaha_business_os.down.sql', 'business_locations')
     require('services/marketplace_service/migrations/20260906002000_usaha_business_control_center.up.sql', 'business_ingredients', 'business_recipes', 'business_channel_settings', 'business_finance_entries')
     require(
-        'services/marketplace_service/migrations/20260919010000_business_execution_kernel_v1.up.sql',
+        'services/marketplace_service/migrations/20260919020000_business_execution_kernel_v1.up.sql',
         'business_document_sequences', 'business_product_balances',
         'business_product_inventory_movements', 'source_order_id',
         'policy_snapshot', 'inventory_purchase',
