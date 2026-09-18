@@ -42,7 +42,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_ENV: ${{ inputs.environment }}
-          MANUAL_IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
+          MANUAL_IMAGE_TAG: ${{ inputs.image_tag }}
           WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
