@@ -18,6 +18,7 @@ use uuid::Uuid;
 use crate::{auth_claims_from_headers, AppState};
 
 use super::{
+    kernel::command::canonical_request_hash,
     modifier_resolution::{
         resolve_modifier_selection as resolve_shared_modifier_selection, ModifierResolutionError,
         ModifierSelectionInput, ModifierSnapshot, ResolvedModifierSelection,
@@ -56,7 +57,7 @@ pub(crate) struct PublicModifierSelectionInput {
     pub(crate) option_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct PublicOrderItemInput {
     pub(crate) product_id: Uuid,
     pub(crate) quantity: i32,
@@ -65,7 +66,7 @@ pub(crate) struct PublicOrderItemInput {
     pub(crate) selected_options: Vec<PublicModifierSelectionInput>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub(crate) struct CreatePublicOrderRequest {
     pub(crate) items: Vec<PublicOrderItemInput>,
     pub(crate) fulfillment_mode: Option<PublicFulfillmentMode>,
@@ -112,6 +113,7 @@ pub(crate) enum PublicCommerceError {
     Unavailable,
     InsufficientStock,
     MixedBusiness,
+    IdempotencyConflict,
     Storage,
 }
 
@@ -124,6 +126,7 @@ impl IntoResponse for PublicCommerceError {
             Self::Unavailable => (StatusCode::CONFLICT, "product_unavailable"),
             Self::InsufficientStock => (StatusCode::CONFLICT, "insufficient_stock"),
             Self::MixedBusiness => (StatusCode::BAD_REQUEST, "mixed_store_cart"),
+            Self::IdempotencyConflict => (StatusCode::CONFLICT, "idempotency_key_payload_mismatch"),
             Self::Storage => (StatusCode::INTERNAL_SERVER_ERROR, "order_storage_error"),
         };
         (status, Json(json!({ "error": code }))).into_response()
@@ -180,6 +183,12 @@ impl From<PublicOrderRow> for PublicOrder {
 }
 
 #[derive(Debug, FromRow)]
+struct IdempotentPublicOrderRow {
+    id: Uuid,
+    category_specific_metadata: Value,
+}
+
+#[derive(Debug, FromRow)]
 struct PublicOrderItemRow {
     product_id: Uuid,
     item_name: String,
@@ -226,6 +235,7 @@ impl PublicCommerceRepository {
         request: CreatePublicOrderRequest,
     ) -> Result<PublicOrderBundle, PublicCommerceError> {
         validate_request(&request)?;
+        let request_hash = canonical_request_hash(&request).map_err(|_| PublicCommerceError::Storage)?;
         if buyer_id.is_nil() {
             return Err(PublicCommerceError::Unauthorized);
         }
@@ -235,8 +245,8 @@ impl PublicCommerceRepository {
 
         let mut tx = self.db.begin().await.map_err(storage_error)?;
         let key = idempotency_key.to_string();
-        if let Some(existing_id) = sqlx::query_scalar::<_, Uuid>(
-            "SELECT id FROM orders WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1",
+        if let Some(existing) = sqlx::query_as::<_, IdempotentPublicOrderRow>(
+            "SELECT id, category_specific_metadata FROM orders WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1",
         )
         .bind(buyer_id)
         .bind(&key)
@@ -244,8 +254,9 @@ impl PublicCommerceRepository {
         .await
         .map_err(storage_error)?
         {
+            ensure_idempotency_replay_matches(&existing.category_specific_metadata, &request_hash)?;
             tx.commit().await.map_err(storage_error)?;
-            return load_public_order_bundle(&self.db, existing_id, true).await;
+            return load_public_order_bundle(&self.db, existing.id, true).await;
         }
 
         let product_ids = unique_product_ids(&request.items);
@@ -363,7 +374,8 @@ impl PublicCommerceRepository {
         let metadata = json!({
             "fulfillment_mode": fulfillment_mode.as_str(),
             "note": order_note,
-            "public_commerce_version": 2
+            "public_commerce_version": 2,
+            "idempotency_request_hash": request_hash
         });
 
         let inserted_id = sqlx::query_scalar::<_, Uuid>(
@@ -397,16 +409,17 @@ impl PublicCommerceRepository {
         .map_err(storage_error)?;
 
         let Some(inserted_id) = inserted_id else {
-            let existing_id = sqlx::query_scalar::<_, Uuid>(
-                "SELECT id FROM orders WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1",
+            let existing = sqlx::query_as::<_, IdempotentPublicOrderRow>(
+                "SELECT id, category_specific_metadata FROM orders WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1",
             )
             .bind(buyer_id)
             .bind(&key)
             .fetch_one(&mut *tx)
             .await
             .map_err(storage_error)?;
+            ensure_idempotency_replay_matches(&existing.category_specific_metadata, &request_hash)?;
             tx.commit().await.map_err(storage_error)?;
-            return load_public_order_bundle(&self.db, existing_id, true).await;
+            return load_public_order_bundle(&self.db, existing.id, true).await;
         };
 
         for item in &resolved_items {
@@ -574,6 +587,21 @@ async fn load_public_order_bundle(
         items: items.into_iter().map(Into::into).collect(),
         replayed,
     })
+}
+
+fn ensure_idempotency_replay_matches(
+    metadata: &Value,
+    request_hash: &str,
+) -> Result<(), PublicCommerceError> {
+    if let Some(existing_hash) = metadata
+        .get("idempotency_request_hash")
+        .and_then(Value::as_str)
+    {
+        if existing_hash != request_hash {
+            return Err(PublicCommerceError::IdempotencyConflict);
+        }
+    }
+    Ok(())
 }
 
 fn validate_request(request: &CreatePublicOrderRequest) -> Result<(), PublicCommerceError> {
