@@ -4,11 +4,11 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -31,6 +31,7 @@ const MAX_PUBLIC_ORDER_QUANTITY: i32 = 200;
 const MAX_PUBLIC_ORDER_NOTE_LEN: usize = 500;
 const MAX_PUBLIC_ITEM_NOTE_LEN: usize = 200;
 const MAX_SOURCE_SURFACE_LEN: usize = 120;
+const PUBLIC_ORDER_STOCK_HOLD_MINUTES: i64 = 30;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -138,6 +139,7 @@ struct CheckoutProductRow {
     product_id: Uuid,
     store_id: Uuid,
     business_id: Uuid,
+    organization_id: Uuid,
     merchant_id: Uuid,
     product_name: String,
     price_cents: i64,
@@ -145,7 +147,6 @@ struct CheckoutProductRow {
     store_active: bool,
     online_order_enabled: bool,
     business_status: String,
-    stock_count: Option<f64>,
     product_metadata: Value,
 }
 
@@ -245,6 +246,13 @@ impl PublicCommerceRepository {
         }
 
         let mut tx = self.db.begin().await.map_err(storage_error)?;
+        let lock_key = format!("public-order:{buyer_id}:{idempotency_key}");
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(lock_key)
+            .execute(&mut *tx)
+            .await
+            .map_err(storage_error)?;
+
         let key = idempotency_key.to_string();
         if let Some(existing) = sqlx::query_as::<_, IdempotentPublicOrderRow>(
             "SELECT id, category_specific_metadata FROM orders WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1",
@@ -260,6 +268,7 @@ impl PublicCommerceRepository {
             return load_public_order_bundle(&self.db, existing.id, true).await;
         }
 
+        let requested_quantities = requested_quantity_by_product(&request.items)?;
         let product_ids = unique_product_ids(&request.items);
         let product_rows = sqlx::query_as::<_, CheckoutProductRow>(
             r#"
@@ -267,6 +276,7 @@ impl PublicCommerceRepository {
               p.id AS product_id,
               p.store_id,
               bsl.business_id,
+              b.organization_id,
               s.owner_user_id AS merchant_id,
               p.name AS product_name,
               p.price_cents,
@@ -274,7 +284,6 @@ impl PublicCommerceRepository {
               s.is_active AS store_active,
               s.online_order_enabled,
               b.status AS business_status,
-              bi.stock_count,
               COALESCE(p.metadata, '{}'::jsonb) AS product_metadata
             FROM umkm_products p
             JOIN umkm_stores s
@@ -284,9 +293,6 @@ impl PublicCommerceRepository {
              AND bsl.link_type = 'primary'
             JOIN businesses b
               ON b.id = bsl.business_id
-            LEFT JOIN business_inventory bi
-              ON bi.product_id = p.id
-             AND bi.business_id = bsl.business_id
             WHERE p.id = ANY($1)
             "#,
         )
@@ -313,18 +319,19 @@ impl PublicCommerceRepository {
             .ok_or(PublicCommerceError::NotFound)?;
         let store_id = first.store_id;
         let business_id = first.business_id;
+        let organization_id = first.organization_id;
         let merchant_id = first.merchant_id;
 
         for product in products.values() {
             if product.store_id != store_id
                 || product.business_id != business_id
+                || product.organization_id != organization_id
                 || product.merchant_id != merchant_id
             {
                 return Err(PublicCommerceError::MixedBusiness);
             }
             ensure_product_available(product)?;
         }
-        validate_aggregate_stock(&request.items, &products)?;
 
         let mut resolved_items = Vec::with_capacity(request.items.len());
         let mut subtotal = Decimal::ZERO;
@@ -423,6 +430,15 @@ impl PublicCommerceRepository {
             return load_public_order_bundle(&self.db, existing.id, true).await;
         };
 
+        let reservation = reserve_known_stock_tx(
+            &mut tx,
+            inserted_id,
+            business_id,
+            organization_id,
+            &requested_quantities,
+        )
+        .await?;
+
         for item in &resolved_items {
             sqlx::query(
                 r#"
@@ -479,13 +495,16 @@ impl PublicCommerceRepository {
             "buyer_id": buyer_id,
             "merchant_id": merchant_id,
             "business_id": business_id,
+            "organization_id": organization_id,
             "store_id": store_id,
             "base_status": "PENDING_PAYMENT",
             "payment_status": "UNPAID",
             "currency": "IDR",
             "total_amount": subtotal,
             "source_type": "www",
-            "source_surface": source_surface
+            "source_surface": source_surface,
+            "stock_reservation_count": reservation.count,
+            "stock_reservation_expires_at": reservation.expires_at
         }))
         .bind(format!("{}:order.created:v1", inserted_id))
         .execute(&mut *tx)
@@ -673,21 +692,104 @@ fn requested_quantity_by_product(
     Ok(totals)
 }
 
-fn validate_aggregate_stock(
-    items: &[PublicOrderItemInput],
-    products: &HashMap<Uuid, CheckoutProductRow>,
-) -> Result<(), PublicCommerceError> {
-    for (product_id, requested) in requested_quantity_by_product(items)? {
-        let product = products
-            .get(&product_id)
-            .ok_or(PublicCommerceError::NotFound)?;
-        if let Some(stock_count) = product.stock_count {
-            if !stock_count.is_finite() || stock_count < f64::from(requested) {
-                return Err(PublicCommerceError::InsufficientStock);
-            }
+#[derive(Debug, Clone, Copy)]
+struct StockReservationSummary {
+    count: usize,
+    expires_at: Option<DateTime<Utc>>,
+}
+
+async fn reserve_known_stock_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    order_id: Uuid,
+    business_id: Uuid,
+    organization_id: Uuid,
+    requested_quantities: &HashMap<Uuid, i32>,
+) -> Result<StockReservationSummary, PublicCommerceError> {
+    let mut quantities = requested_quantities
+        .iter()
+        .map(|(product_id, quantity)| (*product_id, *quantity))
+        .collect::<Vec<_>>();
+    quantities.sort_by_key(|(product_id, _)| product_id.as_u128());
+
+    let expires_at = Utc::now() + Duration::minutes(PUBLIC_ORDER_STOCK_HOLD_MINUTES);
+    let mut reservation_count = 0usize;
+
+    for (product_id, requested) in quantities {
+        let stock_count = sqlx::query_scalar::<_, Option<Decimal>>(
+            r#"
+            SELECT stock_count::numeric
+            FROM business_inventory
+            WHERE product_id=$1
+              AND business_id=$2
+              AND organization_id=$3
+            FOR UPDATE
+            "#,
+        )
+        .bind(product_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(storage_error)?;
+
+        let Some(Some(stock_count)) = stock_count else {
+            continue;
+        };
+
+        let active_reserved = sqlx::query_scalar::<_, Decimal>(
+            r#"
+            SELECT COALESCE(SUM(quantity), 0::numeric)
+            FROM business_order_stock_reservations
+            WHERE business_id=$1
+              AND organization_id=$2
+              AND product_id=$3
+              AND state='reserved'
+              AND expires_at > NOW()
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(product_id)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(storage_error)?;
+
+        let requested = Decimal::from(requested);
+        let available = stock_count
+            .checked_sub(active_reserved)
+            .ok_or(PublicCommerceError::Storage)?;
+        if available < requested {
+            return Err(PublicCommerceError::InsufficientStock);
         }
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_order_stock_reservations (
+              organization_id,
+              business_id,
+              order_id,
+              product_id,
+              quantity,
+              expires_at
+            ) VALUES ($1,$2,$3,$4,$5,$6)
+            "#,
+        )
+        .bind(organization_id)
+        .bind(business_id)
+        .bind(order_id)
+        .bind(product_id)
+        .bind(requested)
+        .bind(expires_at)
+        .execute(&mut **tx)
+        .await
+        .map_err(storage_error)?;
+        reservation_count += 1;
     }
-    Ok(())
+
+    Ok(StockReservationSummary {
+        count: reservation_count,
+        expires_at: (reservation_count > 0).then_some(expires_at),
+    })
 }
 
 fn ensure_product_available(product: &CheckoutProductRow) -> Result<(), PublicCommerceError> {
