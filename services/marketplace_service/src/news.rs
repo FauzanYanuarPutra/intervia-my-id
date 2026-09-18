@@ -2347,8 +2347,8 @@ mod tests {
     use super::{
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
         moderation_target, normalize_news_category_filter, normalize_news_language,
-        normalize_queue_status, parse_news_cursor, public_news_metadata, source_domain,
-        validate_submission_payload,
+        normalize_news_search_query, normalize_queue_status, parse_news_cursor,
+        public_news_metadata, source_domain, validate_submission_payload,
     };
     use serde_json::json;
 
@@ -2474,6 +2474,20 @@ mod tests {
         );
         assert!(normalize_news_category_filter(Some("unknown".to_string())).is_err());
         assert_eq!(normalize_news_category_filter(None).unwrap(), None);
+    }
+
+    #[test]
+    fn news_search_query_bounds_full_text_cost() {
+        assert_eq!(
+            normalize_news_search_query(Some("  ekonomi   umkm  ".to_string())).unwrap(),
+            Some("ekonomi   umkm".to_string())
+        );
+        assert!(normalize_news_search_query(Some("x".repeat(161))).is_err());
+        assert!(normalize_news_search_query(Some(
+            (0..25).map(|index| format!("term{index}")).collect::<Vec<_>>().join(" ")
+        ))
+        .is_err());
+        assert_eq!(normalize_news_search_query(None).unwrap(), None);
     }
 
     #[test]
