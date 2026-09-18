@@ -24,11 +24,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: ${{ matrix.image }}
+  build-pr:
+    if: github.event_name == 'pull_request'
+    name: PR build / ${{ matrix.image }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
+    strategy: &image_strategy
       fail-fast: false
       matrix:
         include:
@@ -68,50 +69,60 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-
-      - name: Resolve registry publishing mode
-        id: registry
-        shell: bash
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          EVENT_NAME: ${{ github.event_name }}
-          GIT_REF: ${{ github.ref }}
-        run: |
-          set -euo pipefail
-          if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "namespace=$DOCKERHUB_USERNAME" >> "$GITHUB_OUTPUT"
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              echo "Registry credentials exist, but pull requests are build-only and never publish images."
-            else
-              echo "Docker Hub credentials are configured; this run will build and publish immutable images."
-            fi
-            exit 0
-          fi
-
-          echo "available=false" >> "$GITHUB_OUTPUT"
-          echo "namespace=local" >> "$GITHUB_OUTPUT"
-          if [[ "$EVENT_NAME" == "workflow_dispatch" || ( "$EVENT_NAME" == "push" && "$GIT_REF" == "refs/heads/main" ) ]]; then
-            echo "Main/manual image publication requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN repository/environment secrets." >&2
-            exit 1
-          fi
-          echo "Docker Hub credentials are not configured; pull requests remain build-only and will not publish images."
-
       - uses: docker/setup-buildx-action@v4
-
-      - uses: docker/login-action@v3
-        if: steps.registry.outputs.available == 'true' && github.event_name != 'pull_request'
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build image and publish only on trusted non-PR runs with registry credentials
+      - name: Build image without publishing
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.context }}/${{ matrix.dockerfile }}
-          push: ${{ steps.registry.outputs.available == 'true' && github.event_name != 'pull_request' }}
+          push: false
+          tags: local/${{ matrix.image }}:sha-${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: mode=max
+          sbom: true
+
+  publish:
+    if: github.event_name != 'pull_request'
+    name: Publish / ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy: *image_strategy
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve GHCR namespace
+        id: registry
+        shell: bash
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          owner="${REPOSITORY_OWNER,,}"
+          [[ "$owner" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || {
+            echo "Repository owner cannot be converted to a valid GHCR namespace." >&2
+            exit 1
+          }
+          echo "namespace=ghcr.io/$owner" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and publish immutable image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/${{ matrix.dockerfile }}
+          push: true
           tags: ${{ steps.registry.outputs.namespace }}/${{ matrix.image }}:sha-${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
