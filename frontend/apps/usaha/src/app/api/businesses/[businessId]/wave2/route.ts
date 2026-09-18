@@ -93,7 +93,10 @@ export async function POST(
       return NextResponse.json(result, { status: 201 });
     }
     if (action === 'open_cash_shift') {
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+      if (!idempotencyKey) {
+        return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+      }
       const result = await openWave2CashShift(businessId, idempotencyKey, input);
       return NextResponse.json(
         { data: { shift: result.shift, replayed: result.replayed } },
@@ -105,7 +108,10 @@ export async function POST(
       if (!shiftId) {
         return NextResponse.json({ error: 'invalid_cash_shift' }, { status: 400 });
       }
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+      if (!idempotencyKey) {
+        return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+      }
       const result = await closeWave2CashShift(businessId, shiftId, idempotencyKey, input);
       return NextResponse.json({ data: { shift: result.shift, replayed: result.replayed } });
     }
