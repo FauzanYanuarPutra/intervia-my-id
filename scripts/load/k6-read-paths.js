@@ -11,6 +11,10 @@ const startRps = Number(__ENV.START_RPS || 5);
 const peakRps = Number(__ENV.PEAK_RPS || 50);
 const preAllocatedVUs = Number(__ENV.PREALLOCATED_VUS || 20);
 const maxVUs = Number(__ENV.MAX_VUS || 200);
+const rampDuration = __ENV.RAMP_DURATION || "30s";
+const holdDuration = __ENV.HOLD_DURATION || "2m";
+const cooldownDuration = __ENV.COOLDOWN_DURATION || "30s";
+const productionLoadAllowed = __ENV.ALLOW_PRODUCTION_LOAD === "1";
 
 if (!Number.isFinite(startRps) || startRps <= 0) {
   throw new Error("START_RPS must be a positive number");
@@ -20,6 +24,26 @@ if (!Number.isFinite(peakRps) || peakRps < startRps) {
 }
 if (paths.some((path) => !path.startsWith("/") || path.startsWith("//"))) {
   throw new Error("PATHS must contain only absolute same-origin paths");
+}
+
+const normalizedHost = baseUrl
+  .replace(/^https?:\/\//, "")
+  .split("/")[0]
+  .split(":")[0]
+  .toLowerCase();
+const productionHosts = new Set([
+  "lajukan.com",
+  "www.lajukan.com",
+  "api.lajukan.com",
+  "usaha.lajukan.com",
+  "cms.lajukan.com",
+  "crm.lajukan.com",
+  "chat.lajukan.com",
+]);
+if (productionHosts.has(normalizedHost) && !productionLoadAllowed) {
+  throw new Error(
+    "Refusing capacity test against production. Set ALLOW_PRODUCTION_LOAD=1 only during an approved load window.",
+  );
 }
 
 export const options = {
@@ -32,10 +56,10 @@ export const options = {
       preAllocatedVUs,
       maxVUs,
       stages: [
-        { target: startRps, duration: "30s" },
-        { target: peakRps, duration: "2m" },
-        { target: peakRps, duration: "2m" },
-        { target: startRps, duration: "30s" },
+        { target: startRps, duration: rampDuration },
+        { target: peakRps, duration: rampDuration },
+        { target: peakRps, duration: holdDuration },
+        { target: startRps, duration: cooldownDuration },
       ],
       gracefulStop: "10s",
     },
