@@ -163,7 +163,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-function isStudioEffect(value: unknown): value is ReelsStudioEffect {
+export function isStudioEffect(value: unknown): value is ReelsStudioEffect {
   return (
     typeof value === 'string' &&
     REELS_STUDIO_EFFECTS.some(effect => effect.id === value)
