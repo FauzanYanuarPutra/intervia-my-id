@@ -203,6 +203,9 @@ pub fn render(service: &str) -> String {
             "# HELP lajukan_http_in_flight_requests Current in-flight HTTP requests excluding /metrics.\n",
             "# TYPE lajukan_http_in_flight_requests gauge\n",
             "lajukan_http_in_flight_requests{{service=\"{service}\"}} {in_flight}\n",
+            "# HELP lajukan_http_concurrency_limit Configured maximum non-health in-flight HTTP requests.\n",
+            "# TYPE lajukan_http_concurrency_limit gauge\n",
+            "lajukan_http_concurrency_limit{{service=\"{service}\"}} {concurrency_limit}\n",
             "# HELP lajukan_http_overload_rejections_total Requests rejected by the in-process concurrency limiter.\n",
             "# TYPE lajukan_http_overload_rejections_total counter\n",
             "lajukan_http_overload_rejections_total{{service=\"{service}\"}} {overload_rejections}\n",
@@ -227,6 +230,7 @@ pub fn render(service: &str) -> String {
         responses_4xx = HTTP_RESPONSES_4XX.load(Ordering::Relaxed),
         responses_5xx = HTTP_RESPONSES_5XX.load(Ordering::Relaxed),
         in_flight = HTTP_IN_FLIGHT.load(Ordering::Relaxed),
+        concurrency_limit = max_in_flight(),
         overload_rejections = HTTP_REJECTED_OVERLOAD_TOTAL.load(Ordering::Relaxed),
         le_10ms = HTTP_DURATION_LE_10MS.load(Ordering::Relaxed),
         le_50ms = HTTP_DURATION_LE_50MS.load(Ordering::Relaxed),
@@ -272,6 +276,7 @@ mod tests {
         assert!(body.contains(
             "lajukan_http_request_duration_seconds_bucket{service=\"test_service\",le=\"+Inf\"}"
         ));
+        assert!(body.contains("lajukan_http_concurrency_limit{service=\"test_service\"}"));
         assert!(body.contains("lajukan_http_overload_rejections_total{service=\"test_service\"}"));
         assert!(!body.contains("path="));
     }

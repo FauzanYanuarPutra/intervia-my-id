@@ -87,6 +87,7 @@ for marker in (
     "try_acquire_request_permit",
     "StatusCode::SERVICE_UNAVAILABLE",
     "header::RETRY_AFTER",
+    "lajukan_http_concurrency_limit",
     "lajukan_http_overload_rejections_total",
 ):
     if marker not in identity_runtime_metrics:
