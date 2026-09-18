@@ -642,7 +642,11 @@ impl Wave2Repository {
         .bind(before)
         .bind(after)
         .bind(purchase_id)
-        .bind(if note.is_empty() { "Belanja stok" } else { &note })
+        .bind(if note.is_empty() {
+            "Belanja stok"
+        } else {
+            &note
+        })
         .bind(actor_id)
         .execute(&mut *tx)
         .await?;
@@ -665,7 +669,11 @@ impl Wave2Repository {
         .bind(&account_key)
         .bind(request.total_amount)
         .bind(request.occurred_on)
-        .bind(if note.is_empty() { "Belanja stok" } else { &note })
+        .bind(if note.is_empty() {
+            "Belanja stok"
+        } else {
+            &note
+        })
         .bind(purchase_id)
         .bind(actor_id)
         .fetch_one(&mut *tx)

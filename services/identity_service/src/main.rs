@@ -432,13 +432,21 @@ async fn main() -> Result<()> {
 
     let db_pool = db::init_postgres(&cfg).await;
 
-    let migrate_only = env::var("MIGRATE_ONLY")
-        .ok()
-        .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"));
+    let migrate_only = env::var("MIGRATE_ONLY").ok().is_some_and(|value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes"
+        )
+    });
     let run_migrations_on_startup = migrate_only
         || env::var("RUN_MIGRATIONS_ON_STARTUP")
             .ok()
-            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+            .map(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes"
+                )
+            })
             .unwrap_or(!is_prod);
 
     // Production/staging migrations are release-owned. Normal application
