@@ -167,6 +167,12 @@ pub(crate) struct CashShiftRecord {
     pub(crate) note: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct CashShiftOutcome {
+    pub(crate) shift: CashShiftRecord,
+    pub(crate) replayed: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct SetPrimaryMaterialRequest {
     pub(crate) ingredient_id: Uuid,
@@ -498,14 +504,90 @@ impl Wave2Repository {
         actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
+        idempotency_key: Uuid,
         request: OpenCashShiftRequest,
-    ) -> Result<CashShiftRecord, Wave2RepositoryError> {
+    ) -> Result<CashShiftOutcome, Wave2RepositoryError> {
         if request.opening_cash < 0 {
             return Err(Wave2RepositoryError::Validation("invalid_opening_cash"));
         }
         let note = normalized_optional_text(&request.note, 2000, "cash_shift_note_too_long")?;
-        sqlx::query_as::<_,CashShiftRecord>(r#"INSERT INTO business_cash_shifts (business_id,organization_id,opened_by_user_id,opening_cash,note) VALUES ($1,$2,$3,$4,$5) RETURNING id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,closed_by_user_id,expected_cash,actual_cash,variance,closed_at,note"#)
-            .bind(business_id).bind(organization_id).bind(actor_id).bind(request.opening_cash).bind(note).fetch_one(&self.db).await.map_err(|error| if is_unique_violation(&error){Wave2RepositoryError::Conflict}else{Wave2RepositoryError::Database})
+        let request_hash = wave2_request_hash(serde_json::json!({
+            "opening_cash": request.opening_cash,
+            "note": &note,
+        }))?;
+
+        if let Some(existing) =
+            load_cash_shift_by_open_key(&self.db, business_id, organization_id, idempotency_key)
+                .await?
+        {
+            ensure_cash_shift_request_hash(
+                &self.db,
+                business_id,
+                idempotency_key,
+                "open",
+                &request_hash,
+            )
+            .await?;
+            return Ok(CashShiftOutcome {
+                shift: existing,
+                replayed: true,
+            });
+        }
+
+        let inserted = sqlx::query_as::<_, CashShiftRecord>(
+            r#"
+            INSERT INTO business_cash_shifts (
+              business_id, organization_id, opened_by_user_id, opening_cash, note,
+              open_idempotency_key, open_request_hash
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
+            ON CONFLICT (business_id, open_idempotency_key)
+              WHERE open_idempotency_key IS NOT NULL
+            DO NOTHING
+            RETURNING id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,
+              closed_by_user_id,expected_cash,actual_cash,variance,closed_at,note
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(actor_id)
+        .bind(request.opening_cash)
+        .bind(note)
+        .bind(idempotency_key)
+        .bind(&request_hash)
+        .fetch_optional(&self.db)
+        .await;
+
+        match inserted {
+            Ok(Some(shift)) => Ok(CashShiftOutcome {
+                shift,
+                replayed: false,
+            }),
+            Ok(None) => {
+                ensure_cash_shift_request_hash(
+                    &self.db,
+                    business_id,
+                    idempotency_key,
+                    "open",
+                    &request_hash,
+                )
+                .await?;
+                let shift = load_cash_shift_by_open_key(
+                    &self.db,
+                    business_id,
+                    organization_id,
+                    idempotency_key,
+                )
+                .await?
+                .ok_or(Wave2RepositoryError::Conflict)?;
+                Ok(CashShiftOutcome {
+                    shift,
+                    replayed: true,
+                })
+            }
+            Err(error) if is_unique_violation(&error) => Err(Wave2RepositoryError::Conflict),
+            Err(_) => Err(Wave2RepositoryError::Database),
+        }
     }
 
     pub(crate) async fn close_cash_shift(
@@ -514,23 +596,90 @@ impl Wave2Repository {
         business_id: Uuid,
         organization_id: Uuid,
         shift_id: Uuid,
+        idempotency_key: Uuid,
         request: CloseCashShiftRequest,
-    ) -> Result<CashShiftRecord, Wave2RepositoryError> {
+    ) -> Result<CashShiftOutcome, Wave2RepositoryError> {
         if request.actual_cash < 0 {
             return Err(Wave2RepositoryError::Validation("invalid_actual_cash"));
         }
         let note = normalized_optional_text(&request.note, 2000, "cash_shift_note_too_long")?;
+        let request_hash = wave2_request_hash(serde_json::json!({
+            "shift_id": shift_id,
+            "actual_cash": request.actual_cash,
+            "note": &note,
+        }))?;
         let mut tx = self.db.begin().await?;
-        let shift=sqlx::query_as::<_,CashShiftRecord>("SELECT id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,closed_by_user_id,expected_cash,actual_cash,variance,closed_at,note FROM business_cash_shifts WHERE id=$1 AND business_id=$2 AND organization_id=$3 FOR UPDATE")
-            .bind(shift_id).bind(business_id).bind(organization_id).fetch_optional(&mut *tx).await?.ok_or(Wave2RepositoryError::NotFound)?;
-        if shift.closed_at.is_some() {
+
+        let state = sqlx::query_as::<
+            _,
+            (
+                Option<Uuid>,
+                Option<String>,
+                Option<DateTime<Utc>>,
+                i64,
+                DateTime<Utc>,
+            ),
+        >(
+            r#"
+            SELECT close_idempotency_key, close_request_hash, closed_at, opening_cash, opened_at
+            FROM business_cash_shifts
+            WHERE id=$1 AND business_id=$2 AND organization_id=$3
+            FOR UPDATE
+            "#,
+        )
+        .bind(shift_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Wave2RepositoryError::NotFound)?;
+
+        let (close_key, close_hash, closed_at, opening_cash, opened_at) = state;
+        if close_key == Some(idempotency_key) {
+            if close_hash.as_deref() != Some(request_hash.as_str()) {
+                return Err(Wave2RepositoryError::Conflict);
+            }
+            let shift = load_cash_shift_tx(&mut tx, shift_id)
+                .await?
+                .ok_or(Wave2RepositoryError::NotFound)?;
+            tx.commit().await?;
+            return Ok(CashShiftOutcome {
+                shift,
+                replayed: true,
+            });
+        }
+        if close_key.is_some() || closed_at.is_some() {
             return Err(Wave2RepositoryError::Conflict);
         }
-        let movement:i64=sqlx::query_scalar(r#"SELECT COALESCE(SUM(CASE WHEN entry_type IN ('sale_income','other_income','capital_income','owner_capital','receivable_payment') THEN amount ELSE -amount END),0)::bigint FROM business_finance_entries WHERE business_id=$1 AND organization_id=$2 AND account_key='cash' AND created_at >= $3"#)
-            .bind(business_id).bind(organization_id).bind(shift.opened_at).fetch_one(&mut *tx).await?;
+
+        let movement: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(
+              SUM(
+                CASE
+                  WHEN entry_type IN (
+                    'sale_income','other_income','capital_income',
+                    'owner_capital','receivable_payment'
+                  ) THEN amount
+                  ELSE -amount
+                END
+              ),
+              0
+            )::bigint
+            FROM business_finance_entries
+            WHERE business_id=$1
+              AND organization_id=$2
+              AND account_key='cash'
+              AND created_at >= $3
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(opened_at)
+        .fetch_one(&mut *tx)
+        .await?;
         let expected =
-            shift
-                .opening_cash
+            opening_cash
                 .checked_add(movement)
                 .ok_or(Wave2RepositoryError::Validation(
                     "cash_shift_amount_overflow",
@@ -542,10 +691,39 @@ impl Wave2Repository {
                 .ok_or(Wave2RepositoryError::Validation(
                     "cash_shift_amount_overflow",
                 ))?;
-        let closed=sqlx::query_as::<_,CashShiftRecord>(r#"UPDATE business_cash_shifts SET closed_by_user_id=$2,expected_cash=$3,actual_cash=$4,variance=$5,closed_at=NOW(),note=CASE WHEN $6='' THEN note ELSE $6 END WHERE id=$1 RETURNING id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,closed_by_user_id,expected_cash,actual_cash,variance,closed_at,note"#)
-            .bind(shift_id).bind(actor_id).bind(expected).bind(request.actual_cash).bind(variance).bind(note).fetch_one(&mut *tx).await?;
+
+        let closed = sqlx::query_as::<_, CashShiftRecord>(
+            r#"
+            UPDATE business_cash_shifts
+            SET closed_by_user_id=$2,
+                expected_cash=$3,
+                actual_cash=$4,
+                variance=$5,
+                closed_at=NOW(),
+                note=CASE WHEN $6='' THEN note ELSE $6 END,
+                close_idempotency_key=$7,
+                close_request_hash=$8
+            WHERE id=$1
+            RETURNING id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,
+              closed_by_user_id,expected_cash,actual_cash,variance,closed_at,note
+            "#,
+        )
+        .bind(shift_id)
+        .bind(actor_id)
+        .bind(expected)
+        .bind(request.actual_cash)
+        .bind(variance)
+        .bind(note)
+        .bind(idempotency_key)
+        .bind(&request_hash)
+        .fetch_one(&mut *tx)
+        .await?;
         tx.commit().await?;
-        Ok(closed)
+
+        Ok(CashShiftOutcome {
+            shift: closed,
+            replayed: false,
+        })
     }
 
     pub(crate) async fn set_primary_material(
@@ -746,6 +924,73 @@ fn default_cash() -> String {
 }
 fn is_unique_violation(error: &sqlx::Error) -> bool {
     matches!(error,sqlx::Error::Database(db) if db.is_unique_violation())
+}
+
+async fn ensure_cash_shift_request_hash(
+    pool: &PgPool,
+    business_id: Uuid,
+    key: Uuid,
+    operation: &'static str,
+    expected_hash: &str,
+) -> Result<(), Wave2RepositoryError> {
+    let query = match operation {
+        "open" => {
+            "SELECT open_request_hash FROM business_cash_shifts WHERE business_id=$1 AND open_idempotency_key=$2"
+        }
+        "close" => {
+            "SELECT close_request_hash FROM business_cash_shifts WHERE business_id=$1 AND close_idempotency_key=$2"
+        }
+        _ => return Err(Wave2RepositoryError::Database),
+    };
+    let stored: Option<Option<String>> = sqlx::query_scalar(query)
+        .bind(business_id)
+        .bind(key)
+        .fetch_optional(pool)
+        .await?;
+    match stored {
+        Some(Some(actual)) if actual == expected_hash => Ok(()),
+        _ => Err(Wave2RepositoryError::Conflict),
+    }
+}
+
+async fn load_cash_shift_by_open_key(
+    pool: &PgPool,
+    business_id: Uuid,
+    organization_id: Uuid,
+    key: Uuid,
+) -> Result<Option<CashShiftRecord>, Wave2RepositoryError> {
+    sqlx::query_as::<_, CashShiftRecord>(
+        r#"
+        SELECT id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,
+          closed_by_user_id,expected_cash,actual_cash,variance,closed_at,note
+        FROM business_cash_shifts
+        WHERE business_id=$1 AND organization_id=$2 AND open_idempotency_key=$3
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(key)
+    .fetch_optional(pool)
+    .await
+    .map_err(Into::into)
+}
+
+async fn load_cash_shift_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    shift_id: Uuid,
+) -> Result<Option<CashShiftRecord>, Wave2RepositoryError> {
+    sqlx::query_as::<_, CashShiftRecord>(
+        r#"
+        SELECT id,business_id,organization_id,opened_by_user_id,opening_cash,opened_at,
+          closed_by_user_id,expected_cash,actual_cash,variance,closed_at,note
+        FROM business_cash_shifts
+        WHERE id=$1
+        "#,
+    )
+    .bind(shift_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(Into::into)
 }
 
 async fn load_obligation(

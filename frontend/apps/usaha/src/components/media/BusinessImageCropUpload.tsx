@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Crop, ImagePlus, LoaderCircle, Move, RotateCcw, X } from 'lucide-react';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import {
   computeCoverCrop,
   dragCropPosition,
@@ -240,7 +241,7 @@ export function BusinessImageCropUpload({
       });
       const result = (await response.json()) as { error?: string; media?: BusinessImageValue };
       if (!response.ok || !result.media) {
-        throw new Error(result.error || 'Foto belum berhasil diunggah.');
+        throw new Error(businessApiErrorMessage(result, 'Foto belum berhasil diunggah.', response.status));
       }
       setPreviewOverride({ sourceUrl: currentUrl, url: result.media.url });
       setSuccess(productId || kind !== 'product' ? 'Foto tersimpan.' : 'Foto siap disimpan bersama produk.');

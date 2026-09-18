@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ProductModifierGroup, ProductModifierSelection } from 'lajukan-ui';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { QuickSaleProductConfigurator } from './QuickSaleProductConfigurator';
 import {
   buildQuickSaleRequest,
@@ -357,7 +358,12 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
         error?: string;
         data?: { sale?: { sale?: { id?: string; created_at?: string; final_amount?: number }; lines?: Array<{ unit_price_amount?: number }> } };
       };
-      if (!response.ok) throw new Error(body.error || 'sale_save_failed');
+      if (!response.ok) {
+        if (body.error === 'sale_discount_exceeds_line_total' || body.error === 'sale_inventory_insufficient') {
+          throw new Error(body.error);
+        }
+        throw new Error(businessApiErrorMessage(body, 'Transaksi belum tersimpan. Coba lagi.', response.status));
+      }
 
       const saleId = body.data?.sale?.sale?.id ?? idempotencyKey;
       const createdAt = body.data?.sale?.sale?.created_at ?? new Date().toISOString();

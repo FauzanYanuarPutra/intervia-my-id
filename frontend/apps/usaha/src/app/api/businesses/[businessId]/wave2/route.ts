@@ -93,16 +93,21 @@ export async function POST(
       return NextResponse.json(result, { status: 201 });
     }
     if (action === 'open_cash_shift') {
-      const shift = await openWave2CashShift(businessId, input);
-      return NextResponse.json({ data: { shift } }, { status: 201 });
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const result = await openWave2CashShift(businessId, idempotencyKey, input);
+      return NextResponse.json(
+        { data: { shift: result.shift, replayed: result.replayed } },
+        { status: result.replayed ? 200 : 201 },
+      );
     }
     if (action === 'close_cash_shift') {
       const shiftId = String(body.shift_id || '');
       if (!shiftId) {
         return NextResponse.json({ error: 'invalid_cash_shift' }, { status: 400 });
       }
-      const shift = await closeWave2CashShift(businessId, shiftId, input);
-      return NextResponse.json({ data: { shift } });
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const result = await closeWave2CashShift(businessId, shiftId, idempotencyKey, input);
+      return NextResponse.json({ data: { shift: result.shift, replayed: result.replayed } });
     }
     if (action === 'set_primary_material') {
       const productId = String(body.product_id || '');

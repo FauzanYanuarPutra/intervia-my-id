@@ -319,18 +319,32 @@ async fn open_cash_shift(
             Ok(value) => value,
             Err(response) => return response,
         };
+    let idempotency_key = match parse_idempotency_key(&headers) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
     match Wave2Repository::new(state.db.clone())
         .open_cash_shift(
             access.actor_id,
             business_id,
             access.organization_id,
+            idempotency_key,
             payload,
         )
         .await
     {
-        Ok(shift) => (
-            StatusCode::CREATED,
-            Json(json!({ "data": { "shift": shift } })),
+        Ok(outcome) => (
+            if outcome.replayed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            },
+            Json(json!({
+                "data": {
+                    "shift": outcome.shift,
+                    "replayed": outcome.replayed
+                }
+            })),
         )
             .into_response(),
         Err(error) => wave2_error_response(error),
@@ -348,17 +362,31 @@ async fn close_cash_shift(
             Ok(value) => value,
             Err(response) => return response,
         };
+    let idempotency_key = match parse_idempotency_key(&headers) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
     match Wave2Repository::new(state.db.clone())
         .close_cash_shift(
             access.actor_id,
             business_id,
             access.organization_id,
             shift_id,
+            idempotency_key,
             payload,
         )
         .await
     {
-        Ok(shift) => (StatusCode::OK, Json(json!({ "data": { "shift": shift } }))).into_response(),
+        Ok(outcome) => (
+            StatusCode::OK,
+            Json(json!({
+                "data": {
+                    "shift": outcome.shift,
+                    "replayed": outcome.replayed
+                }
+            })),
+        )
+            .into_response(),
         Err(error) => wave2_error_response(error),
     }
 }
