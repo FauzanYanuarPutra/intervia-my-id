@@ -249,7 +249,9 @@ fn normalize_news_search_query(
 
 
 fn normalize_fact_check_status(value: Option<String>) -> Result<Option<String>, &'static str> {
-    let Some(status) = trimmed(value) else { return Ok(None); };
+    let Some(status) = trimmed(value) else {
+        return Ok(None);
+    };
     let status = status.to_ascii_lowercase();
     if matches!(status.as_str(), "pending" | "verified" | "not_required") {
         Ok(Some(status))
@@ -259,7 +261,9 @@ fn normalize_fact_check_status(value: Option<String>) -> Result<Option<String>, 
 }
 
 fn normalize_legal_review_status(value: Option<String>) -> Result<Option<String>, &'static str> {
-    let Some(status) = trimmed(value) else { return Ok(None); };
+    let Some(status) = trimmed(value) else {
+        return Ok(None);
+    };
     let status = status.to_ascii_lowercase();
     if matches!(status.as_str(), "pending" | "approved" | "not_required") {
         Ok(Some(status))
@@ -269,7 +273,9 @@ fn normalize_legal_review_status(value: Option<String>) -> Result<Option<String>
 }
 
 fn normalize_editorial_priority(value: Option<String>) -> Result<Option<String>, &'static str> {
-    let Some(priority) = trimmed(value) else { return Ok(None); };
+    let Some(priority) = trimmed(value) else {
+        return Ok(None);
+    };
     let priority = priority.to_ascii_lowercase();
     if matches!(priority.as_str(), "low" | "normal" | "high" | "urgent") {
         Ok(Some(priority))
@@ -279,7 +285,9 @@ fn normalize_editorial_priority(value: Option<String>) -> Result<Option<String>,
 }
 
 fn normalize_editorial_sensitivity(value: Option<String>) -> Result<Option<String>, &'static str> {
-    let Some(sensitivity) = trimmed(value) else { return Ok(None); };
+    let Some(sensitivity) = trimmed(value) else {
+        return Ok(None);
+    };
     let sensitivity = sensitivity.to_ascii_lowercase();
     if matches!(sensitivity.as_str(), "normal" | "high") {
         Ok(Some(sensitivity))
@@ -292,7 +300,9 @@ fn parse_requested_publish_at(
     value: Option<String>,
     now: DateTime<Utc>,
 ) -> Result<Option<DateTime<Utc>>, &'static str> {
-    let Some(raw) = trimmed(value) else { return Ok(None); };
+    let Some(raw) = trimmed(value) else {
+        return Ok(None);
+    };
     let publish_at = DateTime::parse_from_rfc3339(&raw)
         .map_err(|_| "publish_at must be an RFC3339 timestamp")?
         .with_timezone(&Utc);
@@ -1150,11 +1160,31 @@ async fn notify_editorial_result(
         )
     } else {
         match action {
-            "approve" => ("news.published", "Berita diterbitkan", "Kirimanmu sudah lolos review dan diterbitkan di Lajukan News."),
-            "needs_revision" => ("news.needs_revision", "Berita perlu revisi", "Editor meminta perubahan sebelum berita dapat diterbitkan."),
-            "reject" => ("news.rejected", "Kiriman berita ditolak", "Kiriman belum dapat diterbitkan. Lihat catatan editor untuk detail."),
-            "correct" => ("news.corrected", "Koreksi berita dicatat", "Koreksi editorial untuk beritamu telah dicatat."),
-            "retract" => ("news.retracted", "Berita ditarik", "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail."),
+            "approve" => (
+                "news.published",
+                "Berita diterbitkan",
+                "Kirimanmu sudah lolos review dan diterbitkan di Lajukan News.",
+            ),
+            "needs_revision" => (
+                "news.needs_revision",
+                "Berita perlu revisi",
+                "Editor meminta perubahan sebelum berita dapat diterbitkan.",
+            ),
+            "reject" => (
+                "news.rejected",
+                "Kiriman berita ditolak",
+                "Kiriman belum dapat diterbitkan. Lihat catatan editor untuk detail.",
+            ),
+            "correct" => (
+                "news.corrected",
+                "Koreksi berita dicatat",
+                "Koreksi editorial untuk beritamu telah dicatat.",
+            ),
+            "retract" => (
+                "news.retracted",
+                "Berita ditarik",
+                "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail.",
+            ),
             _ => return,
         }
     };
@@ -1966,26 +1996,49 @@ async fn moderate_news(
     let final_legal_review_status = legal_review_status.unwrap_or_else(|| {
         existing_news.and_then(|news| news.get("legal_review_status")).and_then(Value::as_str)
             .filter(|value| matches!(*value, "pending" | "approved" | "not_required"))
-            .unwrap_or(if final_sensitivity == "high" { "pending" } else { "not_required" }).to_string()
+            .unwrap_or(if final_sensitivity == "high" {
+                "pending"
+            } else {
+                "not_required"
+            })
+            .to_string()
     });
 
     if matches!(action.as_str(), "approve" | "correct") {
         if !is_press_release && final_fact_check_status != "verified" {
-            return response_error(StatusCode::UNPROCESSABLE_ENTITY, "fact check must be verified before publication");
+            return response_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "fact check must be verified before publication",
+            );
         }
         if final_sensitivity == "high" && final_legal_review_status != "approved" {
-            return response_error(StatusCode::UNPROCESSABLE_ENTITY, "high-sensitivity publication requires legal approval");
+            return response_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "high-sensitivity publication requires legal approval",
+            );
         }
         if final_sensitivity == "high" && !is_press_release {
-            match has_independent_verified_source_review_tx(&mut tx, current.id, reviewer_id).await {
+            match has_independent_verified_source_review_tx(
+                &mut tx,
+                current.id,
+                reviewer_id,
+            )
+            .await
+            {
                 Ok(true) => {}
                 Ok(false) => return response_error(
                     StatusCode::UNPROCESSABLE_ENTITY,
                     "high-sensitivity publication requires independent source review",
                 ),
                 Err(error) => {
-                    tracing::error!("moderate_news independent source review check error: {:?}", error);
-                    return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to validate independent source review");
+                    tracing::error!(
+                        "moderate_news independent source review check error: {:?}",
+                        error
+                    );
+                    return response_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to validate independent source review",
+                    );
                 }
             }
         }
@@ -2030,10 +2083,22 @@ async fn moderate_news(
         "reviewer_id".to_string(),
         Value::String(reviewer_id.to_string()),
     );
-    news.insert("fact_check_status".to_string(), Value::String(final_fact_check_status));
-    news.insert("legal_review_status".to_string(), Value::String(final_legal_review_status));
-    news.insert("editorial_priority".to_string(), Value::String(final_priority));
-    news.insert("sensitivity".to_string(), Value::String(final_sensitivity));
+    news.insert(
+        "fact_check_status".to_string(),
+        Value::String(final_fact_check_status),
+    );
+    news.insert(
+        "legal_review_status".to_string(),
+        Value::String(final_legal_review_status),
+    );
+    news.insert(
+        "editorial_priority".to_string(),
+        Value::String(final_priority),
+    );
+    news.insert(
+        "sensitivity".to_string(),
+        Value::String(final_sensitivity),
+    );
     if let Some(note) = note.as_ref() {
         news.insert("review_note".to_string(), Value::String(note.clone()));
     } else {
@@ -2047,10 +2112,19 @@ async fn moderate_news(
     }
     if action == "approve" {
         if let Some(publish_at) = approved_publish_at.as_ref() {
-            news.insert("published_at".to_string(), Value::String(publish_at.to_rfc3339()));
+            news.insert(
+                "published_at".to_string(),
+                Value::String(publish_at.to_rfc3339()),
+            );
             if publish_at > &reviewed_at {
-                news.insert("scheduled_for".to_string(), Value::String(publish_at.to_rfc3339()));
-                news.insert("scheduled_by".to_string(), Value::String(reviewer_id.to_string()));
+                news.insert(
+                    "scheduled_for".to_string(),
+                    Value::String(publish_at.to_rfc3339()),
+                );
+                news.insert(
+                    "scheduled_by".to_string(),
+                    Value::String(reviewer_id.to_string()),
+                );
             } else {
                 news.remove("scheduled_for");
                 news.remove("scheduled_by");
