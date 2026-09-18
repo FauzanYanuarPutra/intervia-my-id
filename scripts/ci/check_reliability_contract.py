@@ -383,6 +383,10 @@ if "target_env=production\n            release_sha=\"$WORKFLOW_HEAD_SHA\"" in de
 for marker in (
     "github.event_name == 'workflow_run' && 'staging'",
     "target_env=staging",
+    "fetch-depth: 0",
+    'git fetch --no-tags origin main',
+    'git merge-base --is-ancestor "$RELEASE_SHA" origin/main',
+    "Production promotion requires a release SHA that is reachable from main.",
     "sha-[0-9a-f]{40}",
     ".last-successful-",
     "rollback_on_error",

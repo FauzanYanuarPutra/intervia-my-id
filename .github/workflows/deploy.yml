@@ -82,6 +82,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.release.outputs.release_sha }}
+          fetch-depth: 0
 
       - name: Validate release contract
         shell: bash
@@ -94,6 +95,13 @@ jobs:
           [[ "$TARGET_ENV" == "staging" || "$TARGET_ENV" == "production" ]] || { echo "Invalid deployment environment." >&2; exit 1; }
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "release_sha must be a full commit SHA." >&2; exit 1; }
           [[ "$IMAGE_TAG" == "sha-$RELEASE_SHA" ]] || { echo "image_tag and checked-out release SHA must match exactly." >&2; exit 1; }
+          if [[ "$TARGET_ENV" == "production" ]]; then
+            git fetch --no-tags origin main
+            git merge-base --is-ancestor "$RELEASE_SHA" origin/main || {
+              echo "Production promotion requires a release SHA that is reachable from main." >&2
+              exit 1
+            }
+          fi
       - name: Prepare SSH
         shell: bash
         env:
