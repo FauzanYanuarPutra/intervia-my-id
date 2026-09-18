@@ -174,11 +174,16 @@ else:
 community_source = read("services/community_service/src/main.rs")
 for marker in (
     "Identity enrichment is best-effort and must not delay Community readiness.",
+    "COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED",
     "tokio::spawn(async move",
     "run_identity_profile_consumer",
 ):
     if marker not in community_source:
         errors.append(f"Community degraded-startup contract missing marker: {marker}")
+
+
+if "COMMUNITY_STARTUP_IDENTITY_RECONCILE_ENABLED" not in base_compose:
+    errors.append("base compose missing explicit Community identity reconciliation repair flag")
 
 
 for marker in (
