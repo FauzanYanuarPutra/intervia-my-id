@@ -313,6 +313,12 @@ jobs:
         run: bash scripts/ci/smoke_compose.sh start
       - name: Probe development runtime endpoints
         run: bash scripts/ci/smoke_compose.sh probe
+      - name: Exercise degradable dependency isolation
+        env:
+          ENV_FILE: .env.development.example
+          OVERLAY: docker-compose.dev.yml
+          SETTLE_SECONDS: "1"
+        run: bash scripts/ops/dependency_degradation_rehearsal.sh
       - name: Capture failure diagnostics
         if: failure()
         run: |

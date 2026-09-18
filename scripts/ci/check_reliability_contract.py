@@ -26,6 +26,7 @@ scale_doc = read("docs/architecture/scale-reliability-v1.md")
 slo_doc = read("docs/operations/slo-capacity-overload.md")
 incident_doc = read("docs/operations/incident-response.md")
 load_script = read("scripts/load/k6-read-paths.js")
+quality_workflow = read(".github/workflows/quality.yml")
 read("docs/operations/backup-and-disaster-recovery.md")
 observability_compose = read("docker-compose.observability.yml")
 prometheus_config = read("infrastructure/observability/prometheus.yml")
@@ -440,6 +441,14 @@ for marker in ("Error budget", "Retry budget", "Overload behavior", "Capacity re
 for marker in ("SEV-1", "rollback", "PostgreSQL", "Payment provider", "Recovery validation"):
     if marker not in incident_doc:
         errors.append(f"incident runbook missing recovery concept: {marker}")
+
+for marker in (
+    "Exercise degradable dependency isolation",
+    "dependency_degradation_rehearsal.sh",
+    "ENV_FILE: .env.development.example",
+):
+    if marker not in quality_workflow:
+        errors.append(f"Quality runtime smoke missing dependency-degradation gate: {marker}")
 
 if "127.0.0.1" not in load_script:
     errors.append("load-test harness must default to loopback")
