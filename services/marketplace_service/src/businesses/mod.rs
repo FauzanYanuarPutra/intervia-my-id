@@ -3,6 +3,7 @@ mod advisor_routes;
 #[cfg(test)]
 mod availability_persistence_tests;
 pub(crate) mod control;
+mod execution_policy;
 pub(crate) mod domain;
 mod finance_core;
 mod finance_core_routes;
