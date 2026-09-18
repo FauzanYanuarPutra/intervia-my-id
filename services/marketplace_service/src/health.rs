@@ -40,26 +40,46 @@ pub(crate) async fn service_metrics(State(state): State<Arc<AppState>>) -> impl 
     let pool_max = state.db.options().get_max_connections();
     let pool_active = pool_size.saturating_sub(pool_idle.min(pool_size as usize) as u32);
     let notification_subscribers = state.notification_tx.receiver_count();
-    let (outbox_backlog, outbox_oldest_age_seconds, metrics_query_ok) = match timeout(
+    let (
+        outbox_backlog,
+        outbox_oldest_age_seconds,
+        outbox_failed,
+        outbox_max_retry_count,
+        metrics_query_ok,
+    ) = match timeout(
         Duration::from_secs(2),
-        sqlx::query_as::<_, (i64, f64)>(
+        sqlx::query_as::<_, (i64, f64, i64, i64)>(
             r#"
             SELECT
-              COUNT(*)::bigint,
+              COUNT(*) FILTER (WHERE status <> 'published')::bigint,
               COALESCE(
-                EXTRACT(EPOCH FROM (NOW() - MIN(created_at))),
+                EXTRACT(
+                  EPOCH FROM (
+                    NOW() - MIN(created_at) FILTER (WHERE status <> 'published')
+                  )
+                ),
                 0
-              )::double precision
+              )::double precision,
+              COUNT(*) FILTER (WHERE status = 'failed')::bigint,
+              COALESCE(
+                MAX(retry_count) FILTER (WHERE status <> 'published'),
+                0
+              )::bigint
             FROM events.event_outbox
-            WHERE status <> 'published'
             "#,
         )
         .fetch_one(&state.db),
     )
     .await
     {
-        Ok(Ok((backlog, oldest_age_seconds))) => (backlog, oldest_age_seconds.max(0.0), 1),
-        Ok(Err(_)) | Err(_) => (0, 0.0, 0),
+        Ok(Ok((backlog, oldest_age_seconds, failed, max_retry_count))) => (
+            backlog,
+            oldest_age_seconds.max(0.0),
+            failed,
+            max_retry_count,
+            1,
+        ),
+        Ok(Err(_)) | Err(_) => (0, 0.0, 0, 0, 0),
     };
 
     let mut body = format!(
@@ -79,6 +99,12 @@ pub(crate) async fn service_metrics(State(state): State<Arc<AppState>>) -> impl 
             "# HELP lajukan_outbox_oldest_age_seconds Age in seconds of the oldest unpublished transactional outbox event.\n",
             "# TYPE lajukan_outbox_oldest_age_seconds gauge\n",
             "lajukan_outbox_oldest_age_seconds{{service=\"marketplace_service\"}} {}\n",
+            "# HELP lajukan_outbox_failed Transactional outbox events that exhausted their publish retry budget.\n",
+            "# TYPE lajukan_outbox_failed gauge\n",
+            "lajukan_outbox_failed{{service=\"marketplace_service\"}} {}\n",
+            "# HELP lajukan_outbox_max_retry_count Maximum retry count among unpublished outbox events.\n",
+            "# TYPE lajukan_outbox_max_retry_count gauge\n",
+            "lajukan_outbox_max_retry_count{{service=\"marketplace_service\"}} {}\n",
             "# HELP lajukan_metrics_db_query_ok Whether the metrics DB query succeeded.\n",
             "# TYPE lajukan_metrics_db_query_ok gauge\n",
             "lajukan_metrics_db_query_ok{{service=\"marketplace_service\"}} {}\n",
@@ -92,6 +118,8 @@ pub(crate) async fn service_metrics(State(state): State<Arc<AppState>>) -> impl 
         pool_max,
         outbox_backlog,
         outbox_oldest_age_seconds,
+        outbox_failed,
+        outbox_max_retry_count,
         metrics_query_ok,
         notification_subscribers
     );
