@@ -130,6 +130,7 @@
     getReelStudioEffect,
     getStudioDurationMs,
     isPlayableReelsVideoFile,
+    isStudioEffect,
     REEL_FILTER_PRESETS,
     REELS_MUSIC_TRACKS,
     REELS_STUDIO_DURATIONS,
