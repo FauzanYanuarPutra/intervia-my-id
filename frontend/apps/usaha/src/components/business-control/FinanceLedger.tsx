@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { EffectPreview } from '@/components/interaction/EffectPreview';
 import {
   financeChannelOptions,
@@ -252,8 +253,8 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
       ]);
       const historyPayload = await historyResponse.json().catch(() => ({}));
       const summaryPayload = await summaryResponse.json().catch(() => ({}));
-      if (!historyResponse.ok) throw new Error(historyPayload?.error || 'Gagal memuat riwayat transaksi.');
-      if (!summaryResponse.ok) throw new Error(summaryPayload?.error || 'Gagal memuat ringkasan uang.');
+      if (!historyResponse.ok) throw new Error(businessApiErrorMessage(historyPayload, 'Gagal memuat riwayat transaksi.', historyResponse.status));
+      if (!summaryResponse.ok) throw new Error(businessApiErrorMessage(summaryPayload, 'Gagal memuat ringkasan uang.', summaryResponse.status));
       setEntries(Array.isArray(historyPayload?.data?.items) ? historyPayload.data.items : []);
       setSummary(summaryPayload?.data?.summary ?? null);
     } finally {
@@ -322,7 +323,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan transaksi.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan transaksi.', response.status));
       await reloadAll(true);
       createAttemptRef.current = null;
       setEntryAmount('');
@@ -392,7 +393,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         },
       );
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal mengoreksi transaksi.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal mengoreksi transaksi.', response.status));
       setCorrectingId(null);
       await reloadAll(true);
       correctionAttemptRef.current = null;
@@ -435,7 +436,7 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal memindahkan dana antar kantong.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memindahkan dana antar kantong.', response.status));
       await reloadAll(true);
       allocationAttemptRef.current = null;
       setAllocationAmount('');
