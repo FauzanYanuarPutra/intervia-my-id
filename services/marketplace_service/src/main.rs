@@ -41,6 +41,7 @@ mod businesses;
 mod identity_projection;
 mod news;
 mod order_engine;
+mod runtime_metrics;
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
 };
@@ -2681,6 +2682,7 @@ async fn main() -> anyhow::Result<()> {
             "/v1/banners/{id}",
             get(get_banner).patch(update_banner).delete(delete_banner),
         )
+        .layer(axum::middleware::from_fn(runtime_metrics::track_request))
         .layer(cors)
         .with_state(state);
 
@@ -2759,7 +2761,7 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
         Ok(Err(_)) | Err(_) => (0, 0),
     };
 
-    let body = format!(
+    let mut body = format!(
         concat!(
             "# HELP lajukan_service_info Static service identity.\n",
             "# TYPE lajukan_service_info gauge\n",
@@ -2780,6 +2782,8 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
         ),
         pool_size, pool_idle, outbox_backlog, metrics_query_ok, notification_subscribers
     );
+
+    body.push_str(&runtime_metrics::render("marketplace_service"));
 
     (
         [(
