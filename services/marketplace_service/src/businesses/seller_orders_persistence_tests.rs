@@ -87,7 +87,10 @@ async fn seed_order_context(pool: &PgPool, status: &str) -> SeededOrderContext {
     )
     .bind(product_id)
     .bind(store_id)
-    .bind(format!("jus-alpukat-{}", &product_id.simple().to_string()[..8]))
+    .bind(format!(
+        "jus-alpukat-{}",
+        &product_id.simple().to_string()[..8]
+    ))
     .execute(pool)
     .await
     .unwrap();
@@ -158,11 +161,7 @@ async fn seed_order_context(pool: &PgPool, status: &str) -> SeededOrderContext {
     }
 }
 
-async fn seed_reservation(
-    pool: &PgPool,
-    seeded: &SeededOrderContext,
-    quantity: i64,
-) {
+async fn seed_reservation(pool: &PgPool, seeded: &SeededOrderContext, quantity: i64) {
     sqlx::query(
         r#"
         INSERT INTO business_order_stock_reservations (
@@ -276,21 +275,19 @@ async fn processing_consumes_reservation_and_stock_exactly_once(pool: PgPool) {
     assert!(!first.replayed);
     assert!(replay.replayed);
 
-    let stock: Option<f64> = sqlx::query_scalar(
-        "SELECT stock_count FROM business_inventory WHERE product_id=$1",
-    )
-    .bind(seeded.product_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(stock, Some(3.0));
-
-    let public_stock: i32 =
-        sqlx::query_scalar("SELECT stock_qty FROM umkm_products WHERE id=$1")
+    let stock: Option<f64> =
+        sqlx::query_scalar("SELECT stock_count FROM business_inventory WHERE product_id=$1")
             .bind(seeded.product_id)
             .fetch_one(&pool)
             .await
             .unwrap();
+    assert_eq!(stock, Some(3.0));
+
+    let public_stock: i32 = sqlx::query_scalar("SELECT stock_qty FROM umkm_products WHERE id=$1")
+        .bind(seeded.product_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(public_stock, 3);
 
     let reservation: (String, Option<chrono::DateTime<chrono::Utc>>) = sqlx::query_as(
@@ -324,13 +321,12 @@ async fn rejecting_unpaid_order_releases_hold_without_consuming_stock(pool: PgPo
         .unwrap();
     assert_eq!(outcome.order.order.base_status, "REJECTED");
 
-    let stock: Option<f64> = sqlx::query_scalar(
-        "SELECT stock_count FROM business_inventory WHERE product_id=$1",
-    )
-    .bind(seeded.product_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let stock: Option<f64> =
+        sqlx::query_scalar("SELECT stock_count FROM business_inventory WHERE product_id=$1")
+            .bind(seeded.product_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(stock, Some(5.0));
 
     let reservation: (String, Option<chrono::DateTime<chrono::Utc>>) = sqlx::query_as(

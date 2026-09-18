@@ -9,9 +9,7 @@ use uuid::Uuid;
 
 use super::{
     kernel::command::canonical_request_hash,
-    stock_reservations::{
-        consume_for_order_tx, release_for_order_tx, StockReservationError,
-    },
+    stock_reservations::{consume_for_order_tx, release_for_order_tx, StockReservationError},
     transactions::state::OrderState,
 };
 
@@ -281,24 +279,16 @@ impl SellerOrderRepository {
         let mut reservations_released = 0u64;
         match next_status {
             OrderState::Processing => {
-                reservations_consumed = consume_for_order_tx(
-                    &mut tx,
-                    order_id,
-                    business_id,
-                    organization_id,
-                )
-                .await
-                .map_err(map_stock_reservation_error)?;
+                reservations_consumed =
+                    consume_for_order_tx(&mut tx, order_id, business_id, organization_id)
+                        .await
+                        .map_err(map_stock_reservation_error)?;
             }
             OrderState::Cancelled | OrderState::Rejected => {
-                reservations_released = release_for_order_tx(
-                    &mut tx,
-                    order_id,
-                    business_id,
-                    organization_id,
-                )
-                .await
-                .map_err(map_stock_reservation_error)?;
+                reservations_released =
+                    release_for_order_tx(&mut tx, order_id, business_id, organization_id)
+                        .await
+                        .map_err(map_stock_reservation_error)?;
             }
             _ => {}
         }

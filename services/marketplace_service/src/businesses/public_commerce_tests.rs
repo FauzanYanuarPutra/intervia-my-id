@@ -386,7 +386,10 @@ fn stock_reservation_migration_is_tenant_scoped_and_fail_closed() {
         "state IN ('reserved', 'released', 'consumed')",
         "idx_business_order_stock_reservations_active",
     ] {
-        assert!(migration.contains(marker), "missing reservation invariant: {marker}");
+        assert!(
+            migration.contains(marker),
+            "missing reservation invariant: {marker}"
+        );
     }
     assert!(rollback.contains("refusing to drop business_order_stock_reservations"));
 }
