@@ -4,6 +4,7 @@ import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, MailCheck, X } from 'lucide-react';
 import { organizationRoleLabel } from '@/lib/business-collaboration';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import {
   INVITATIONS_CHANGED_EVENT,
   invitationExpiryLabel,
@@ -53,7 +54,7 @@ export function PendingOrganizationInvitations({ showEmpty = false }: PendingOrg
         body: JSON.stringify({ action }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Undangan belum berhasil diproses.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Undangan belum berhasil diproses.', response.status));
       setItems(current => current.filter(item => item.id !== invitationId));
       setNotice(
         action === 'accept'

@@ -2,8 +2,12 @@
 
 import { FeedbackNotice, type FeedbackTone } from '@/components/interaction/FeedbackNotice';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
+import {
+  resolveIdempotencyAttempt,
+  type ClientIdempotencyAttempt,
+} from '@/lib/client-idempotency';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronDown, Loader2, LockKeyhole, UnlockKeyhole } from 'lucide-react';
 import type { Wave2CashShift } from '@/lib/business-wave2-server';
 
@@ -29,15 +33,22 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState<FeedbackTone>('info');
+  const shiftAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   async function post(input: Record<string, unknown>) {
+    const attempt = resolveIdempotencyAttempt(shiftAttemptRef.current, input);
+    shiftAttemptRef.current = attempt;
     const response = await fetch(`/api/businesses/${businessId}/wave2`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': attempt.key,
+      },
       body: JSON.stringify(input),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan shift kas.', response.status));
+    shiftAttemptRef.current = null;
     return payload;
   }
 

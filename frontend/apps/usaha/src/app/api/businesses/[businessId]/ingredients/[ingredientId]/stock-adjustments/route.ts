@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { BusinessControlHttpError } from '@/lib/business-control-server';
 import { adjustControlIngredientStock } from '@/lib/ingredient-management-server';
@@ -21,6 +20,10 @@ export async function POST(
 ) {
   const { businessId, ingredientId } = await context.params;
   try {
+    const idempotencyKey = request.headers.get('idempotency-key')?.trim();
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
+    }
     const body = (await request.json()) as Record<string, unknown>;
     const locationId = typeof body.location_id === 'string' ? body.location_id : '';
     const action = typeof body.action === 'string' ? (body.action as StockAction) : null;
@@ -83,7 +86,7 @@ export async function POST(
     const result = await adjustControlIngredientStock(
       businessId,
       locationId,
-      randomUUID(),
+      idempotencyKey,
       payload,
     );
     return NextResponse.json(result);
