@@ -244,15 +244,17 @@ fn public_news_row(
     source_urls: Option<&[String]>,
     include_body: bool,
 ) -> PublicNewsRow {
+    let is_retracted = editorial_status(&row.content_status, &row.metadata) == "retracted";
+    let public_sources = if is_retracted { None } else { source_urls };
     PublicNewsRow {
         id: row.id,
         slug: row.slug,
         title: row.title,
-        summary: row.summary,
-        body: include_body.then_some(row.body),
-        tags: row.tags,
-        cover_image: row.cover_image,
-        metadata: public_news_metadata(&row.metadata, source_urls),
+        summary: (!is_retracted).then_some(row.summary).flatten(),
+        body: (include_body && !is_retracted).then_some(row.body),
+        tags: if is_retracted { None } else { row.tags },
+        cover_image: if is_retracted { None } else { row.cover_image },
+        metadata: public_news_metadata(&row.metadata, public_sources),
         content_status: row.content_status,
         published_at: row.published_at,
         created_at: row.created_at,
@@ -1679,7 +1681,9 @@ async fn moderate_news(
             return response_error(StatusCode::UNPROCESSABLE_ENTITY, message);
         }
     }
-    if action == "approve" && !is_press_release(&current.metadata) {
+    if matches!(action.as_str(), "approve" | "correct")
+        && !is_press_release(&current.metadata)
+    {
         match has_verified_source_tx(&mut tx, current.id).await {
             Ok(true) => {}
             Ok(false) => {
