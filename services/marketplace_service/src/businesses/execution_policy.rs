@@ -1,3 +1,4 @@
+use chrono::NaiveTime;
 use serde::Serialize;
 use serde_json::{json, Value};
 use sqlx::{FromRow, Postgres, Transaction};
@@ -8,6 +9,7 @@ pub(crate) struct BusinessExecutionPolicy {
     pub(crate) profile_version: i64,
     pub(crate) currency: String,
     pub(crate) timezone: String,
+    pub(crate) business_day_cutoff: NaiveTime,
     pub(crate) costing_policy: String,
     pub(crate) accounting_mode: String,
     pub(crate) approval_policy: String,
@@ -22,6 +24,7 @@ impl BusinessExecutionPolicy {
             "profile_version": self.profile_version,
             "currency": self.currency,
             "timezone": self.timezone,
+            "business_day_cutoff": self.business_day_cutoff,
             "costing_policy": self.costing_policy,
             "accounting_mode": self.accounting_mode,
             "approval_policy": self.approval_policy,
@@ -66,6 +69,7 @@ pub(crate) async fn load_execution_policy_tx(
           version AS profile_version,
           currency,
           timezone,
+          business_day_cutoff,
           costing_policy,
           accounting_mode,
           approval_policy,
@@ -180,6 +184,7 @@ mod tests {
             profile_version: 1,
             currency: "IDR".into(),
             timezone: "Asia/Jakarta".into(),
+            business_day_cutoff: NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
             costing_policy: "weighted_average".into(),
             accounting_mode: mode.into(),
             approval_policy: "owner_managed".into(),
@@ -206,6 +211,7 @@ mod tests {
         let snapshot = policy("advanced").snapshot();
         assert_eq!(snapshot["currency"], "IDR");
         assert_eq!(snapshot["accounting_mode"], "advanced");
+        assert_eq!(snapshot["business_day_cutoff"], "00:00:00");
         assert_eq!(snapshot["negative_stock_policy"], "deny");
     }
 }
