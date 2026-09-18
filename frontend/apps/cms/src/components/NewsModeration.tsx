@@ -332,11 +332,32 @@ export default function NewsModeration() {
   const kind = readString(newsMeta.article_kind) || 'news';
   const location = readString(newsMeta.location) || '-';
   const requiresVerifiedSource = kind !== 'press_release';
+  const editorialStatus =
+    readString(newsMeta.editorial_status) ||
+    (selected?.content_status === 'active'
+      ? 'published'
+      : selected?.content_status === 'archived'
+        ? 'rejected'
+        : 'pending_review');
   const hasVerifiedSource = sources.some(
     source =>
       source.verification_status === 'verified' &&
       isSafeExternalSourceUrl(source.source_url),
   );
+  const wouldBreakPublishedProvenance = (
+    source: NewsSource,
+    nextStatus: NewsSource['verification_status'],
+  ) =>
+    editorialStatus === 'published' &&
+    requiresVerifiedSource &&
+    source.verification_status === 'verified' &&
+    nextStatus !== 'verified' &&
+    !sources.some(
+      candidate =>
+        candidate.id !== source.id &&
+        candidate.verification_status === 'verified' &&
+        isSafeExternalSourceUrl(candidate.source_url),
+    );
   const sourceUrls = Array.isArray(newsMeta.source_urls)
     ? newsMeta.source_urls
         .map(readString)
@@ -476,9 +497,17 @@ export default function NewsModeration() {
                             <button
                               key={value}
                               type="button"
-                              disabled={sourceUpdating === source.id}
+                              disabled={
+                                sourceUpdating === source.id ||
+                                wouldBreakPublishedProvenance(source, value)
+                              }
+                              title={
+                                wouldBreakPublishedProvenance(source, value)
+                                  ? 'Verifikasi sumber pengganti atau retract artikel sebelum menurunkan verified terakhir.'
+                                  : undefined
+                              }
                               onClick={() => void reviewSource(source, value)}
-                              className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${source.verification_status === value ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white' : 'border-[color:var(--color-border)] text-[color:var(--color-text-soft)]'}`}
+                              className={`rounded-full border px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${source.verification_status === value ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white' : 'border-[color:var(--color-border)] text-[color:var(--color-text-soft)]'}`}
                             >
                               {value}
                             </button>
@@ -500,6 +529,11 @@ export default function NewsModeration() {
               {requiresVerifiedSource && !hasVerifiedSource ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">
                   Minimal satu sumber harus ditandai <strong>verified</strong> sebelum berita/analisis dapat dipublish.
+                </div>
+              ) : null}
+              {editorialStatus === 'published' && requiresVerifiedSource ? (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs font-semibold leading-5 text-sky-900">
+                  Artikel published harus selalu mempertahankan minimal satu sumber public-safe yang verified. Jika verified terakhir bermasalah, verifikasi sumber pengganti atau retract artikel lebih dulu.
                 </div>
               ) : null}
 
