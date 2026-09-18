@@ -24,7 +24,7 @@ serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 tower-http = { version = "0.6", features = ["cors"] }
 lapin = "3.7.1"

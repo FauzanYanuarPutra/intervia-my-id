@@ -381,22 +381,57 @@ async fn run_identity_outbox_publisher(
     }
 }
 
+fn init_tracing() {
+    let app_env = env::var("ENV")
+        .or_else(|_| env::var("APP_ENV"))
+        .unwrap_or_else(|_| "development".to_string());
+    let structured = match env::var("LOG_FORMAT")
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "json" => true,
+        "text" | "pretty" => false,
+        _ => {
+            app_env.eq_ignore_ascii_case("production")
+                || app_env.eq_ignore_ascii_case("staging")
+        }
+    };
+    let filter = tracing_subscriber::EnvFilter::new(
+        env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+    );
+
+    if structured {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .json()
+                    .flatten_event(true)
+                    .with_current_span(true)
+                    .with_span_list(true),
+            )
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // 1. Logging
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
-        ))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    init_tracing();
 
     // 2. Load Config & Infra
     let cfg = Config::from_env();
 
     // Sinkronisasi dengan config.rs (Gunakan cfg.env)
     let is_prod = cfg.env == "production" || cfg.env == "staging";
-    println!("🚀 Starting Identity Service in {} mode", cfg.env);
+    tracing::info!(environment = %cfg.env, "starting identity service");
 
     let db_pool = db::init_postgres(&cfg).await;
 
@@ -448,7 +483,7 @@ async fn main() -> Result<()> {
 
     verify_identity_schema(&db_pool).await?;
 
-    println!("Initializing Redis...");
+    tracing::info!("initializing Redis");
     let redis_pool = db::init_redis(&cfg).await;
 
     // RabbitMQ is intentionally not part of request-serving readiness.
@@ -596,7 +631,7 @@ async fn main() -> Result<()> {
     // 6. Server Startup
     let addr = format!("0.0.0.0:{}", cfg.app_port);
     let listener = TcpListener::bind(&addr).await?;
-    println!("📡 Listening on {}", addr);
+    tracing::info!(address = %addr, "identity service listening");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -628,5 +663,5 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
 
-    println!("Shutdown signal received");
+    tracing::info!("shutdown signal received");
 }

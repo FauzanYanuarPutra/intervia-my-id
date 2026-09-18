@@ -27,7 +27,7 @@ deadpool-redis = { version = "0.22.0", features = ["serde"] }
 dotenvy = "0.15"
 
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json"] }
 
 lapin = "3.7.1"
 

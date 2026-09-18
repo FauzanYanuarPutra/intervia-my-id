@@ -1073,14 +1073,49 @@ async fn connect_database_pool(
     Ok(options.connect(database_url).await?)
 }
 
+fn init_tracing() {
+    let app_env = env::var("ENV")
+        .or_else(|_| env::var("APP_ENV"))
+        .unwrap_or_else(|_| "development".to_string());
+    let structured = match env::var("LOG_FORMAT")
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "json" => true,
+        "text" | "pretty" => false,
+        _ => {
+            app_env.eq_ignore_ascii_case("production")
+                || app_env.eq_ignore_ascii_case("staging")
+        }
+    };
+    let filter = tracing_subscriber::EnvFilter::new(
+        env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+    );
+
+    if structured {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .json()
+                    .flatten_event(true)
+                    .with_current_span(true)
+                    .with_span_list(true),
+            )
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
-        ))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    init_tracing();
 
     let database_url =
         env::var("COMMUNITY_DATABASE_URL").expect("COMMUNITY_DATABASE_URL must be set");
@@ -1302,7 +1337,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state);
 
     let listener = TcpListener::bind(&addr).await?;
-    println!("community_service listening on {}", addr);
+    tracing::info!(address = %addr, "community service listening");
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

@@ -564,6 +564,33 @@ for path in (
             errors.append(f"{path} missing runtime reliability marker: {marker}")
 
 
+for path in (
+    "services/identity_service/src/main.rs",
+    "services/marketplace_service/src/main.rs",
+    "services/community_service/src/main.rs",
+):
+    source = read(path)
+    for marker in (
+        "fn init_tracing()",
+        'env::var("LOG_FORMAT")',
+        ".json()",
+        ".flatten_event(true)",
+        ".with_current_span(true)",
+        ".with_span_list(true)",
+    ):
+        if marker not in source:
+            errors.append(f"{path} missing structured logging marker: {marker}")
+
+for path in (
+    "services/identity_service/Cargo.toml",
+    "services/marketplace_service/Cargo.toml",
+    "services/community_service/Cargo.toml",
+):
+    source = read(path)
+    if '"json"' not in source:
+        errors.append(f"{path} must enable tracing-subscriber JSON logging support")
+
+
 for path, markers in {
     "services/identity_service/src/main.rs": (
         "FOR UPDATE SKIP LOCKED",

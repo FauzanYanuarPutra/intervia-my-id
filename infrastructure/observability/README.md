@@ -101,3 +101,15 @@ Prometheus should show these primary targets as healthy:
 
 A blackbox failure is different from an exporter failure: the former indicates
 a serving/dependency readiness problem; the latter indicates lost visibility.
+
+
+## Structured application logs
+
+Identity, Marketplace and Community default to JSON tracing output in staging
+and production while keeping human-readable text logs in development.
+`LOG_FORMAT=json` or `LOG_FORMAT=text` can explicitly override that default.
+Request spans include the bounded correlation ID, method, status and duration,
+which makes centralized log search deterministic without turning request paths
+into Prometheus labels. Keep log collectors on stdout/stderr and redact secrets
+at the application boundary; JSON formatting is not permission to log tokens,
+cookies, OTPs or raw identity documents.
