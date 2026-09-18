@@ -2771,6 +2771,8 @@ async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let pool_size = state.db.size();
     let pool_idle = state.db.num_idle();
+    let pool_max = state.db.options().get_max_connections();
+    let pool_active = pool_size.saturating_sub(pool_idle.min(pool_size as usize) as u32);
     let notification_subscribers = state.notification_tx.receiver_count();
     let (outbox_backlog, outbox_oldest_age_seconds, metrics_query_ok) = match timeout(
         Duration::from_secs(2),
@@ -2803,6 +2805,8 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
             "# TYPE lajukan_db_pool_connections gauge\n",
             "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"total\"}} {}\n",
             "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"idle\"}} {}\n",
+            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"active\"}} {}\n",
+            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"max\"}} {}\n",
             "# HELP lajukan_outbox_backlog Pending or failed transactional outbox events.\n",
             "# TYPE lajukan_outbox_backlog gauge\n",
             "lajukan_outbox_backlog{{service=\"marketplace_service\"}} {}\n",
@@ -2818,6 +2822,8 @@ async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoRespons
         ),
         pool_size,
         pool_idle,
+        pool_active,
+        pool_max,
         outbox_backlog,
         outbox_oldest_age_seconds,
         metrics_query_ok,
