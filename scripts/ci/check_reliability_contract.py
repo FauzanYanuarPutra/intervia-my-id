@@ -55,6 +55,9 @@ marketplace_auth_source = read("services/marketplace_service/src/auth.rs")
 community_auth_source = read("services/community_service/src/auth.rs")
 community_health_source = read("services/community_service/src/health.rs")
 community_rate_limit_source = read("services/community_service/src/rate_limit.rs")
+identity_auth_source = read("services/identity_service/src/routes/auth.rs")
+chat_runtime_config = read("services/chat_service/config/runtime.exs")
+business_money_source = read("services/marketplace_service/src/businesses/kernel/money.rs")
 marketplace_schema_contract = read("services/marketplace_service/src/schema_contract.rs")
 community_schema_contract = read("services/community_service/src/schema_contract.rs")
 production_env_example = read(".env.production.example")
@@ -106,6 +109,44 @@ for env_name, env_source, expected in (
         errors.append(f"{env_name} env example missing logging format contract: {expected}")
     if "AI_MAX_CONCURRENT=" not in env_source:
         errors.append(f"{env_name} env example missing AI concurrency budget")
+
+for env_name, env_source, expected_alg in (
+    ("production", production_env_example, "JWT_ACCESS_ALG=RS256"),
+    ("staging", staging_env_example, "JWT_ACCESS_ALG=RS256"),
+    ("development", development_env_example, "JWT_ACCESS_ALG=HS256"),
+):
+    if expected_alg not in env_source:
+        errors.append(f"{env_name} env example missing access-token algorithm contract: {expected_alg}")
+
+for marker in (
+    "JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:-HS256}",
+    "JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:-}",
+    "JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}",
+    "JWT_VERIFICATION_SECRET: ${JWT_VERIFICATION_SECRET:-}",
+):
+    if marker not in base_compose:
+        errors.append(f"base compose missing asymmetric JWT rollout marker: {marker}")
+
+if base_compose.count("JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}") != 1:
+    errors.append("JWT private signing key must be exposed only to Identity")
+
+for path, source in (
+    ("services/identity_service/src/routes/auth.rs", identity_auth_source),
+    ("services/marketplace_service/src/auth.rs", marketplace_auth_source),
+    ("services/community_service/src/auth.rs", community_auth_source),
+    ("services/chat_service/config/runtime.exs", chat_runtime_config),
+):
+    for marker in ("RS256", "JWT_ACCESS_ALG", "JWT_PUBLIC_KEY_PEM"):
+        if marker not in source:
+            errors.append(f"{path} missing asymmetric JWT verification marker: {marker}")
+
+for marker in ("JWT_PRIVATE_KEY_PEM", "EncodingKey::from_rsa_pem", "JWT_KEY_ID"):
+    if marker not in identity_auth_source:
+        errors.append(f"Identity access-token signing boundary missing marker: {marker}")
+
+for marker in ("struct Money", "enum Currency", "checked_add", "checked_sub", "AmountOverflow"):
+    if marker not in business_money_source:
+        errors.append(f"Business Money primitive missing invariant marker: {marker}")
 
 for prefix in ("IDENTITY", "MARKETPLACE", "COMMUNITY"):
     for suffix in ("DB_IDLE_TIMEOUT_SECONDS", "DB_MAX_LIFETIME_SECONDS"):
