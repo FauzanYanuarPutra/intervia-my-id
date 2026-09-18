@@ -351,9 +351,6 @@ services:
       - community_uploads:/app/uploads/forum
     depends_on:
       community_db: { condition: service_healthy }
-      redis_cache: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
-      identity_service: { condition: service_healthy }
     expose: ["8082"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8082/ready"]
