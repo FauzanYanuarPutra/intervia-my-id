@@ -31,6 +31,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const busy = pendingAction !== null;
 
   async function request(path: string, body: Record<string, unknown>) {
     const response = await fetch(path, {
@@ -164,7 +165,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
             <input className="portal-input" value={stockUnit} onChange={event => setStockUnit(event.target.value)} maxLength={40} required />
           </label>
           <div className="sm:col-span-2">
-            <button type="submit" disabled={pendingAction === 'detail'} className="portal-button-primary">
+            <button type="submit" disabled={busy} className="portal-button-primary">
               <Save className="h-4 w-4" /> {pendingAction === 'detail' ? 'Menyimpan...' : 'Simpan detail'}
             </button>
           </div>
@@ -176,7 +177,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
               Stok saat ini
               <input className="portal-input" type="number" min="0" step="any" value={stockCount} onChange={event => setStockCount(event.target.value)} placeholder="Kosong = belum diketahui" />
             </label>
-            <button type="button" onClick={saveStock} disabled={pendingAction === 'stock'} className="portal-button-secondary sm:mb-0.5">
+            <button type="button" onClick={saveStock} disabled={busy} className="portal-button-secondary sm:mb-0.5">
               <Save className="h-4 w-4" /> {pendingAction === 'stock' ? 'Menyimpan...' : 'Update stok'}
             </button>
           </div>
@@ -202,20 +203,21 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
                 value={status}
                 onChange={setStatus}
                 ariaLabel="Status produk"
+                disabled={busy}
                 options={[
                   { value: 'live', label: 'Aktif' },
                   { value: 'draft', label: 'Diarsipkan' },
                 ]}
               />
             </div>
-            <button type="button" onClick={saveStatus} disabled={pendingAction === 'status'} className="portal-button-secondary mt-3">
+            <button type="button" onClick={saveStatus} disabled={busy} className="portal-button-secondary mt-3">
               {pendingAction === 'status' ? 'Menyimpan status...' : 'Simpan status'}
             </button>
           </div>
         </section>
 
-        {error ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-semibold text-portal-ember">{error}</p> : null}
-        {success ? <p role="status" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
+        {error ? <p role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-semibold text-portal-ember">{error}</p> : null}
+        {success ? <p role="status" aria-live="polite" className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-portal-forest">{success}</p> : null}
       </div>
     </section>
   );

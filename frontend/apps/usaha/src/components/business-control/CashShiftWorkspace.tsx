@@ -161,7 +161,7 @@ export function CashShiftWorkspace({ businessId, initialShift }: Props) {
         </div>
       ) : null}
 
-      {message ? <p role="status" className="border-t border-portal-line px-4 py-3 text-xs text-portal-soft sm:px-5">{message}</p> : null}
+      {message ? <p role="status" aria-live="polite" className="border-t border-portal-line px-4 py-3 text-xs text-portal-soft sm:px-5">{message}</p> : null}
     </section>
   );
 }
