@@ -797,6 +797,9 @@ fn parse_news_cursor(raw: Option<&str>) -> Result<Option<(DateTime<Utc>, Uuid)>,
     let Some(raw) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(None);
     };
+    if raw.len() > 96 {
+        return Err("news cursor is too long");
+    }
     let Some((timestamp, id)) = raw.rsplit_once('|') else {
         return Err("invalid news cursor");
     };
