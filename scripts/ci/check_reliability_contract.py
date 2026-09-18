@@ -55,6 +55,10 @@ ai_runtime_metrics = read("services/ai_service/src/runtime_metrics.rs")
 community_main_source = read("services/community_service/src/main.rs")
 marketplace_auth_source = read("services/marketplace_service/src/auth.rs")
 community_auth_source = read("services/community_service/src/auth.rs")
+chat_auth_source = read("services/chat_service/lib/chat_service/auth.ex")
+chat_runtime_config = read("services/chat_service/config/runtime.exs")
+chat_socket_source = read("services/chat_service/lib/chat_service_web/user_socket.ex")
+www_server_auth = read("frontend/apps/www/src/lib/serverAuth.ts")
 community_health_source = read("services/community_service/src/health.rs")
 community_rate_limit_source = read("services/community_service/src/rate_limit.rs")
 marketplace_schema_contract = read("services/marketplace_service/src/schema_contract.rs")
@@ -121,6 +125,42 @@ for path, source in (
     ):
         if marker not in source:
             errors.append(f"{path} missing asymmetric JWT verification marker: {marker}")
+
+for marker in (
+    "JOSE.JWT.verify_strict",
+    '["RS256"]',
+    '["HS256"]',
+    ":jwt_public_key_pem",
+    ":jwt_allow_legacy_hs256",
+):
+    if marker not in chat_auth_source:
+        errors.append(f"Chat JWT verifier missing asymmetric rollout marker: {marker}")
+
+for marker in (
+    "JWT_PUBLIC_KEY_PEM",
+    "JWT_ALLOW_LEGACY_HS256",
+    "jwt_public_key_pem",
+    "jwt_allow_legacy_hs256",
+):
+    if marker not in chat_runtime_config:
+        errors.append(f"Chat runtime config missing asymmetric JWT marker: {marker}")
+
+if "Auth.verify_jwt(token)" not in chat_socket_source:
+    errors.append("Chat websocket must share the central dual-algorithm JWT verifier")
+if "Guardian.decode_and_verify(token)" in chat_socket_source:
+    errors.append("Chat websocket must not bypass the central JWT verifier")
+
+for marker in (
+    "decodeProtectedHeader",
+    "importSPKI",
+    "JWT_PUBLIC_KEY_PEM",
+    "JWT_ALLOW_LEGACY_HS256",
+    "algorithms: ['RS256']",
+    "algorithms: ['HS256']",
+):
+    if marker not in www_server_auth:
+        errors.append(f"WWW server auth missing asymmetric JWT marker: {marker}")
+
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
