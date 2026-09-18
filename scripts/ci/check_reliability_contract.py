@@ -206,7 +206,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanOutboxOldestEventStale", "LajukanOutboxOldestEventCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated", "LajukanHttpOverloadShedding"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers", "LajukanRabbitMqMetricsDown", "LajukanOutboxBacklogHigh", "LajukanOutboxBacklogCritical", "LajukanOutboxDeliveryFailed", "LajukanOutboxOldestEventStale", "LajukanOutboxOldestEventCritical", "LajukanMetricsDbQueryFailed", "LajukanDbPoolSaturated", "LajukanHttpOverloadShedding"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
@@ -280,6 +280,7 @@ marketplace_outbox_source = read("services/marketplace_service/src/outbox.rs")
 marketplace_health_source = read("services/marketplace_service/src/health.rs")
 marketplace_public_commerce_source = read("services/marketplace_service/src/businesses/public_commerce.rs")
 marketplace_seller_orders_source = read("services/marketplace_service/src/businesses/seller_orders.rs")
+marketplace_outbox_identity_migration = read("services/marketplace_service/migrations/20260918190000_marketplace_outbox_event_identity.up.sql")
 for marker in (
     "tokio::spawn(async move",
     "run_outbox_publisher",
@@ -295,6 +296,10 @@ for marker in (
     "OUTBOX_POLL_INTERVAL_MS",
     "normalize_batch_size",
     "normalize_poll_ms",
+    "OUTBOX_MAX_RETRIES",
+    "normalize_max_retries",
+    "with_message_id",
+    "status = CASE WHEN retry_count + 1 >= $4 THEN 'failed' ELSE 'pending' END",
 ):
     if marker not in marketplace_outbox_source:
         errors.append(f"Marketplace outbox configuration contract missing marker: {marker}")
@@ -307,11 +312,41 @@ for path, source in (
         "INSERT INTO outbox_events",
         "INSERT INTO events.event_outbox",
         "routing_key",
+        "event_key",
+        "event_id",
+        "schema_version",
+        "ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING",
     ):
         if required_marker not in source:
             errors.append(
                 f"{path} lost Business OS outbox convergence marker: {required_marker}"
             )
+
+for marker in (
+    "ADD COLUMN IF NOT EXISTS event_key",
+    "uq_marketplace_event_outbox_event_key",
+    "WHERE event_key IS NOT NULL",
+):
+    if marker not in marketplace_outbox_identity_migration:
+        errors.append(f"Marketplace canonical outbox identity migration missing: {marker}")
+
+for marker in (
+    "lajukan_outbox_failed",
+    "lajukan_outbox_max_retry_count",
+):
+    if marker not in marketplace_health_source:
+        errors.append(f"Marketplace outbox observability missing metric: {marker}")
+
+if "OUTBOX_MAX_RETRIES: ${OUTBOX_MAX_RETRIES:-20}" not in base_compose:
+    errors.append("base compose missing marketplace outbox retry budget")
+
+for env_name, env_source in (
+    ("production", production_env_example),
+    ("staging", staging_env_example),
+    ("development", development_env_example),
+):
+    if "OUTBOX_MAX_RETRIES=20" not in env_source:
+        errors.append(f"{env_name} env example missing marketplace outbox retry budget")
 
 
 community_compose_start = base_compose.find("\n  community_service:")
