@@ -12,6 +12,8 @@ pub async fn init_postgres(cfg: &Config) -> sqlx::Pool<sqlx::Postgres> {
             .max_connections(cfg.db_max_connections)
             .min_connections(cfg.db_min_connections)
             .acquire_timeout(Duration::from_secs(cfg.db_acquire_timeout_seconds))
+            .idle_timeout(Duration::from_secs(cfg.db_idle_timeout_seconds))
+            .max_lifetime(Duration::from_secs(cfg.db_max_lifetime_seconds))
             .after_connect(|conn, _meta| {
                 Box::pin(async move {
                     sqlx::query("SET search_path TO core, identity, public, events, audit")

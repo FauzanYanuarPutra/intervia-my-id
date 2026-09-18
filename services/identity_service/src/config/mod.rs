@@ -12,6 +12,8 @@ pub struct Config {
     pub db_max_connections: u32,
     pub db_min_connections: u32,
     pub db_acquire_timeout_seconds: u64,
+    pub db_idle_timeout_seconds: u64,
+    pub db_max_lifetime_seconds: u64,
     pub redis_url: String,
     pub rabbitmq_url: String,
     pub jwt_secret: String,
@@ -69,6 +71,10 @@ impl Config {
             Self::parse_u32_env("IDENTITY_DB_MIN_CONNECTIONS", 1, 0, db_max_connections);
         let db_acquire_timeout_seconds =
             Self::parse_u64_env("IDENTITY_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
+        let db_idle_timeout_seconds =
+            Self::parse_u64_env("IDENTITY_DB_IDLE_TIMEOUT_SECONDS", 300, 30, 3_600);
+        let db_max_lifetime_seconds =
+            Self::parse_u64_env("IDENTITY_DB_MAX_LIFETIME_SECONDS", 1_800, 300, 86_400);
         let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set for security");
         let strict_secrets =
             app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
@@ -95,6 +101,8 @@ impl Config {
             db_max_connections,
             db_min_connections,
             db_acquire_timeout_seconds,
+            db_idle_timeout_seconds,
+            db_max_lifetime_seconds,
             redis_url: env::var("REDIS_URL").expect("REDIS_URL not set"),
             rabbitmq_url: env::var("RABBITMQ_URL")
                 .unwrap_or_else(|_| "amqp://guest:guest@localhost:5672/".into()),

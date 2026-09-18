@@ -75,6 +75,22 @@ for marker in (
     if marker not in base_compose:
         errors.append(f"base compose missing overload budget: {marker}")
 
+for prefix in ("IDENTITY", "MARKETPLACE", "COMMUNITY"):
+    for suffix in ("DB_IDLE_TIMEOUT_SECONDS", "DB_MAX_LIFETIME_SECONDS"):
+        marker = f"{prefix}_{suffix}"
+        if marker not in base_compose:
+            errors.append(f"base compose missing database lifecycle budget: {marker}")
+
+for path in (
+    "services/identity_service/src/db/postgres.rs",
+    "services/marketplace_service/src/main.rs",
+    "services/community_service/src/main.rs",
+):
+    source = read(path)
+    for marker in (".idle_timeout(", ".max_lifetime("):
+        if marker not in source:
+            errors.append(f"{path} missing database connection lifecycle marker: {marker}")
+
 if not (
     identity_runtime_metrics
     == marketplace_runtime_metrics

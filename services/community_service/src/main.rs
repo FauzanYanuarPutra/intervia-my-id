@@ -1047,10 +1047,16 @@ async fn connect_database_pool(
                 env_u32_bounded("COMMUNITY_DB_MIN_CONNECTIONS", 2, 0, max_connections);
             let acquire_timeout_seconds =
                 env_u64_bounded("COMMUNITY_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
+            let idle_timeout_seconds =
+                env_u64_bounded("COMMUNITY_DB_IDLE_TIMEOUT_SECONDS", 300, 30, 3_600);
+            let max_lifetime_seconds =
+                env_u64_bounded("COMMUNITY_DB_MAX_LIFETIME_SECONDS", 1_800, 300, 86_400);
             PgPoolOptions::new()
                 .max_connections(max_connections)
                 .min_connections(min_connections)
                 .acquire_timeout(Duration::from_secs(acquire_timeout_seconds))
+                .idle_timeout(Duration::from_secs(idle_timeout_seconds))
+                .max_lifetime(Duration::from_secs(max_lifetime_seconds))
         }
     };
     let options = if let Some(statement) = database_session_setup(purpose) {
