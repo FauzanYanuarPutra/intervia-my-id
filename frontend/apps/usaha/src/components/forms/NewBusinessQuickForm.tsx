@@ -4,6 +4,7 @@ import { startTransition, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Building2, MapPinned, Phone, Sparkles } from 'lucide-react';
 import { BusinessLocationField } from '@/components/forms/BusinessLocationField';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import {
   BUSINESS_TEMPLATE_PRESETS,
   getBusinessTemplatePreset,
@@ -13,15 +14,15 @@ import type { LatLng } from '@/lib/maps';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 
 const categoryOptions = [
-  'Makanan dan minuman',
-  'Kopi dan cafe',
-  'Laundry',
-  'Toko kelontong',
-  'Jasa',
-  'Retail',
-  'Manufaktur',
-  'Usaha umum',
-];
+  { value: 'Makanan dan minuman', label: 'Makanan & minuman' },
+  { value: 'Kopi dan cafe', label: 'Kopi & cafe' },
+  { value: 'Laundry', label: 'Laundry' },
+  { value: 'Toko kelontong', label: 'Toko kelontong' },
+  { value: 'Jasa', label: 'Jasa' },
+  { value: 'Retail', label: 'Retail' },
+  { value: 'Manufaktur', label: 'Manufaktur' },
+  { value: 'Usaha umum', label: 'Usaha umum' },
+] as const;
 
 type NewBusinessQuickFormProps = {
   initialOwnerName?: string;
@@ -168,19 +169,18 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
               placeholder="Contoh: Lajukan Juice"
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-semibold">
-            Kategori tampilan
-            <select
-              className="portal-input"
+          <div className="grid gap-1.5 text-sm font-semibold">
+            <span>Kategori tampilan</span>
+            <ChoiceChips
               value={category}
-              onChange={event => setCategory(event.target.value)}
-            >
-              {categoryOptions.map(item => <option key={item}>{item}</option>)}
-            </select>
+              onChange={setCategory}
+              ariaLabel="Kategori tampilan usaha"
+              options={categoryOptions}
+            />
             <span className="text-[11px] font-normal text-portal-soft">
               Kategori hanya untuk tampilan/pencarian; tidak mengubah flow {preset.label}.
             </span>
-          </label>
+          </div>
           <label className="grid gap-1.5 text-sm font-semibold">
             Kota
             <input
@@ -236,7 +236,7 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
       </section>
 
       {error ? (
-        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       ) : null}
       <div className="flex justify-end">
         <button type="submit" disabled={pending} className="portal-button-primary">
