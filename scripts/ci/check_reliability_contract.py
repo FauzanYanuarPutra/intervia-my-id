@@ -266,6 +266,18 @@ for marker in (
     if marker not in deploy:
         errors.append(f"deploy workflow missing reliability marker: {marker}")
 
+for marker in (
+    "grace_period 30s",
+    "(access_log)",
+    "output stdout",
+    "format filter",
+    "replace access_token REDACTED",
+    "replace code REDACTED",
+    "wrap json",
+):
+    if marker not in caddy:
+        errors.append(f"production edge missing structured access log/safety marker: {marker}")
+
 if "reverse_proxy" not in caddy:
     errors.append("production Caddy config has no reverse proxy")
 if "@internal_metrics path /metrics" not in caddy:
