@@ -54,6 +54,8 @@ require(
         "struct PublicNewsRow",
         "public_news_metadata",
         "normalize_news_language",
+        "websearch_to_tsquery",
+        "search query is too long",
         "public_verified_source_urls",
         "verification_status = 'verified'",
         "unsupported news source URL",
@@ -84,6 +86,16 @@ require(
         "'news'",
         "idx_content_items_news_cursor",
         "idx_event_log_news_engagement",
+    ),
+)
+
+require(
+    "services/marketplace_service/migrations/20260918174500_news_search_index.up.sql",
+    (
+        "idx_content_items_news_search",
+        "USING GIN",
+        "to_tsvector",
+        "content_type = 'news'",
     ),
 )
 
@@ -245,10 +257,37 @@ require(
         "let cursor: string | undefined",
         "page.nextCursor",
         "page.nextCursor === cursor",
+        "getNewsLanguageAvailability",
         "next: { revalidate: 30 }",
         "cache: 'no-store'",
     ),
 )
+
+require(
+    "frontend/apps/www/src/app/[locale]/(shared)/news/page.tsx",
+    (
+        'role="search"',
+        'name="q"',
+        "nextCursor",
+        'rel="next"',
+        "filters.cursor?.trim()",
+    ),
+)
+
+for facet_path in (
+    "frontend/apps/www/src/app/[locale]/(shared)/news/category/[category]/page.tsx",
+    "frontend/apps/www/src/app/[locale]/(shared)/news/topic/[topic]/page.tsx",
+    "frontend/apps/www/src/app/[locale]/(shared)/news/location/[location]/page.tsx",
+):
+    require(
+        facet_path,
+        (
+            "getNewsLanguageAvailability",
+            "filters.cursor?.trim()",
+            "nextCursor",
+            'rel="next"',
+        ),
+    )
 
 require(
     "frontend/apps/www/src/app/[locale]/(shared)/news/submit/SubmitNewsForm.tsx",
