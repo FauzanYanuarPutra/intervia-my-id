@@ -11,7 +11,8 @@ warnings: list[str] = []
 
 def read(path: str) -> str:
     target = ROOT / path
-    if not target.is_file():
+    if not target.is_file(    "ready_streak >= 3",
+):
         errors.append(f"missing required reliability file: {path}")
         return ""
     return target.read_text(encoding="utf-8")
@@ -26,6 +27,7 @@ scale_doc = read("docs/architecture/scale-reliability-v1.md")
 slo_doc = read("docs/operations/slo-capacity-overload.md")
 incident_doc = read("docs/operations/incident-response.md")
 load_script = read("scripts/load/k6-read-paths.js")
+quality_workflow = read(".github/workflows/quality.yml")
 read("docs/operations/backup-and-disaster-recovery.md")
 observability_compose = read("docker-compose.observability.yml")
 prometheus_config = read("infrastructure/observability/prometheus.yml")
@@ -57,6 +59,10 @@ for service in ("identity_db:", "marketplace_db:", "community_db:"):
 if "restart: unless-stopped" not in base_compose:
     errors.append("base compose must retain process restart policy")
 
+if "github.event_name == 'workflow_run' && 'production'" in deploy:
+    errors.append("Build Images workflow_run must never auto-target production")
+if "target_env=production\n            release_sha=\"$WORKFLOW_HEAD_SHA\"" in deploy:
+    errors.append("automatic Build Images deployment must target staging, not production")
 for marker in (
     "./infrastructure/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro",
     'expose: ["15692"]',
@@ -389,6 +395,22 @@ if "development-database" not in prod_compose:
     errors.append("production compose must keep single-node Scylla out of the normal production profile")
 
 for marker in (
+    "github.event_name == 'workflow_run' && 'staging'",
+    "target_env=staging",
+    "fetch-depth: 0",
+    'git fetch --no-tags origin main',
+    'git merge-base --is-ancestor "$RELEASE_SHA" origin/main',
+    "Production promotion requires a release SHA that is reachable from main.",
+    "actions: read",
+    "Require successful release checks for production",
+    '"Build Images"',
+    '"Quality Gates"',
+    '"Security"',
+    '"Reliability Contract"',
+    '"Frontend Runtime Gate"',
+    '"KYC Runtime Contract"',
+    '"News Contract"',
+    "Production promotion blocked: required workflow",
     "sha-[0-9a-f]{40}",
     ".last-successful-",
     "rollback_on_error",
@@ -453,6 +475,14 @@ for marker in ("Error budget", "Retry budget", "Overload behavior", "Capacity re
 for marker in ("SEV-1", "rollback", "PostgreSQL", "Payment provider", "Recovery validation"):
     if marker not in incident_doc:
         errors.append(f"incident runbook missing recovery concept: {marker}")
+
+for marker in (
+    "Exercise degradable dependency isolation",
+    "dependency_degradation_rehearsal.sh",
+    "ENV_FILE: .env.development.example",
+):
+    if marker not in quality_workflow:
+        errors.append(f"Quality runtime smoke missing dependency-degradation gate: {marker}")
 
 if "127.0.0.1" not in load_script:
     errors.append("load-test harness must default to loopback")
