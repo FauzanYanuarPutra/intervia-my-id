@@ -12643,6 +12643,13 @@ async fn create_content(
     } else {
         metadata
     };
+    if content_type == "news" {
+        if let Err(message) =
+            news::validate_submission_payload(&title, summary.as_deref(), &body, &metadata)
+        {
+            return err(StatusCode::BAD_REQUEST, message).into_response();
+        }
+    }
     let price_unit = if price_cents.is_some() {
         normalize_price_unit(payload.price_unit)
             .or_else(|| infer_price_unit(&content_type, &metadata))
