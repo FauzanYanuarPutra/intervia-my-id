@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
   BusinessWave2HttpError,
@@ -21,6 +20,14 @@ function errorResponse(error: unknown, fallback: string) {
     return NextResponse.json({ error: error.code }, { status: error.status });
   }
   return NextResponse.json({ error: fallback }, { status: 500 });
+}
+
+function requireIdempotencyKey(request: Request) {
+  const key = request.headers.get('idempotency-key')?.trim();
+  if (!key) {
+    throw new BusinessWave2HttpError(400, 'missing_idempotency_key');
+  }
+  return key;
 }
 
 export async function GET(
@@ -66,7 +73,7 @@ export async function POST(
       return NextResponse.json({ data: { plan } });
     }
     if (action === 'create_obligation') {
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = requireIdempotencyKey(request);
       const obligation = await createWave2Obligation(businessId, idempotencyKey, input);
       return NextResponse.json({ data: { obligation } }, { status: 201 });
     }
@@ -79,7 +86,7 @@ export async function POST(
       const result = await payWave2Obligation(
         businessId,
         obligationId,
-        request.headers.get('idempotency-key')?.trim() || randomUUID(),
+        requireIdempotencyKey(request),
         paidOn,
       );
       return NextResponse.json(result);
@@ -87,13 +94,13 @@ export async function POST(
     if (action === 'purchase') {
       const result = await createWave2Purchase(
         businessId,
-        request.headers.get('idempotency-key')?.trim() || randomUUID(),
+        requireIdempotencyKey(request),
         input,
       );
       return NextResponse.json(result, { status: 201 });
     }
     if (action === 'open_cash_shift') {
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = requireIdempotencyKey(request);
       const result = await openWave2CashShift(businessId, idempotencyKey, input);
       return NextResponse.json(
         { data: { shift: result.shift, replayed: result.replayed } },
@@ -105,7 +112,7 @@ export async function POST(
       if (!shiftId) {
         return NextResponse.json({ error: 'invalid_cash_shift' }, { status: 400 });
       }
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = requireIdempotencyKey(request);
       const result = await closeWave2CashShift(businessId, shiftId, idempotencyKey, input);
       return NextResponse.json({ data: { shift: result.shift, replayed: result.replayed } });
     }
@@ -118,7 +125,7 @@ export async function POST(
       return NextResponse.json(result);
     }
     if (action === 'create_yield_observation') {
-      const idempotencyKey = request.headers.get('idempotency-key')?.trim() || randomUUID();
+      const idempotencyKey = requireIdempotencyKey(request);
       const observation = await createWave2YieldObservation(businessId, idempotencyKey, input);
       return NextResponse.json({ data: { observation } }, { status: 201 });
     }

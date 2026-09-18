@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'services/marketplace_service/src/businesses/**'
+      - 'services/marketplace_service/src/order_engine.rs'
+      - 'services/marketplace_service/src/outbox.rs'
       - 'services/marketplace_service/migrations/**'
       - 'services/marketplace_service/tests/**'
       - 'scripts/ci/check_business_os_migration_immutability.py'
@@ -131,3 +133,15 @@ jobs:
           grep -q "state IN ('reserved', 'released', 'consumed')" migrations/20260918173000_business_order_stock_reservations.up.sql
           grep -q 'ON DELETE RESTRICT' migrations/20260918173000_business_order_stock_reservations.up.sql
           grep -q 'refusing to drop business_order_stock_reservations' migrations/20260918173000_business_order_stock_reservations.down.sql
+          test -s migrations/20260918190000_business_outbox_convergence.up.sql
+          test -s migrations/20260918190000_business_outbox_convergence.down.sql
+          grep -q 'event_key TEXT' migrations/20260918190000_business_outbox_convergence.up.sql
+          grep -q 'mirror_legacy_order_outbox_event' migrations/20260918190000_business_outbox_convergence.up.sql
+          grep -q 'INSERT INTO events.event_outbox' src/order_engine.rs
+          grep -q 'INSERT INTO events.event_outbox' src/businesses/seller_orders.rs
+          grep -q 'INSERT INTO events.event_outbox' src/businesses/public_commerce.rs
+          ! grep -q 'INSERT INTO outbox_events' src/order_engine.rs
+          ! grep -q 'INSERT INTO outbox_events' src/businesses/seller_orders.rs
+          ! grep -q 'INSERT INTO outbox_events' src/businesses/public_commerce.rs
+          grep -q 'with_message_id' src/outbox.rs
+          grep -q 'with_type' src/outbox.rs

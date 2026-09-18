@@ -102,6 +102,21 @@ Reservation rules:
 
 The public `umkm_products.stock_qty` projection is updated when a reservation is consumed, but `business_inventory` remains the canonical product-stock source.
 
+## Canonical outbox contract
+
+Business OS order events use the same Marketplace transactional publisher as the rest of the service:
+
+```text
+domain transaction
+  -> events.event_outbox
+  -> RabbitMQ marketplace.outbox
+  -> idempotent consumers/inboxes
+```
+
+New order-event writers attach a stable `event_key` and use the domain event type as the routing key. The canonical publisher emits AMQP `message_id` and `type` metadata so consumers can deduplicate and route without parsing arbitrary payload fields.
+
+The older `public.outbox_events` table remains only as an expand/contract rollback bridge. Migration `20260918190000_business_outbox_convergence` backfills its unpublished rows and mirrors writes from an older rolled-back application release into `events.event_outbox`. New application code must not write the legacy table.
+
 ## Compatibility and migration
 
 Existing public commerce already uses canonical order states such as `PENDING_PAYMENT`; historical rows are not rewritten merely to adopt the shared transaction kernel. Compatibility mappings stay explicit and reconciliation-tested.
@@ -114,7 +129,7 @@ No important historical transaction, reservation, movement, payment, or document
 2. invoice posting and payment allocation;
 3. refund/return case execution and restock semantics;
 4. settlement reconciliation;
-5. outbox convergence and consumer idempotency;
+5. downstream consumer inbox coverage and projection reconciliation;
 6. accounting projection;
 7. procurement and inter-location reservation/transfer semantics.
 

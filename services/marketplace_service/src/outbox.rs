@@ -69,6 +69,8 @@ const fn normalize_poll_ms(value: u64) -> u64 {
 struct OutboxEventRow {
     id: Uuid,
     routing_key: String,
+    event_type: String,
+    event_key: Option<String>,
     payload: Value,
     lease_until: DateTime<Utc>,
 }
@@ -117,6 +119,8 @@ async fn publish_outbox_batch(
         RETURNING
           outbox.id,
           outbox.routing_key,
+          outbox.event_type,
+          outbox.event_key,
           outbox.payload,
           outbox.available_at AS lease_until
         "#,
@@ -139,7 +143,15 @@ async fn publish_outbox_batch(
                 &payload_bytes,
                 BasicProperties::default()
                     .with_content_type("application/json".into())
-                    .with_delivery_mode(2u8),
+                    .with_delivery_mode(2u8)
+                    .with_message_id(
+                        event
+                            .event_key
+                            .clone()
+                            .unwrap_or_else(|| event.id.to_string())
+                            .into(),
+                    )
+                    .with_type(event.event_type.clone().into()),
             )
             .await;
 
@@ -192,7 +204,7 @@ async fn publish_outbox_batch(
             }
         }
 
-        sqlx::query(
+        let published = sqlx::query(
             r#"
             UPDATE events.event_outbox
             SET status = 'published', published_at = NOW(), error_message = NULL
@@ -205,6 +217,28 @@ async fn publish_outbox_batch(
         .bind(event.lease_until)
         .execute(db)
         .await?;
+
+        if published.rows_affected() == 1 {
+            if let Some(event_key) = event.event_key.as_deref() {
+                if let Err(error) = sqlx::query(
+                    r#"
+                    UPDATE public.outbox_events
+                    SET published_at = COALESCE(published_at, NOW())
+                    WHERE event_key = $1
+                    "#,
+                )
+                .bind(event_key)
+                .execute(db)
+                .await
+                {
+                    tracing::warn!(
+                        event_key,
+                        ?error,
+                        "failed to synchronize legacy order outbox publication state"
+                    );
+                }
+            }
+        }
     }
 
     Ok(events.len())

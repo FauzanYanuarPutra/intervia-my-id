@@ -32,6 +32,9 @@ describe('Usaha operational hardening V6', () => {
     expect(workspace).toContain("'Idempotency-Key': attempt.key");
 
     expect(proxy).toContain("request.headers.get('idempotency-key')");
+    expect(proxy).toContain('requireIdempotencyKey');
+    expect(proxy).toContain('missing_idempotency_key');
+    expect(proxy).not.toContain('randomUUID');
     expect(proxy).toContain('openWave2CashShift(businessId, idempotencyKey');
     expect(proxy).toContain('closeWave2CashShift(businessId, shiftId, idempotencyKey');
 

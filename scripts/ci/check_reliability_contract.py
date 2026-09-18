@@ -50,6 +50,12 @@ production_env_example = read(".env.production.example")
 staging_env_example = read(".env.staging.example")
 development_env_example = read(".env.development.example")
 marketplace_identity_client = read("services/marketplace_service/src/businesses/identity_client.rs")
+marketplace_outbox_contract_source = read("services/marketplace_service/src/outbox.rs")
+order_engine_source = read("services/marketplace_service/src/order_engine.rs")
+seller_orders_source = read("services/marketplace_service/src/businesses/seller_orders.rs")
+public_commerce_source = read("services/marketplace_service/src/businesses/public_commerce.rs")
+business_outbox_migration = read("services/marketplace_service/migrations/20260918190000_business_outbox_convergence.up.sql")
+www_next_config = read("frontend/apps/www/next.config.mjs")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -401,6 +407,9 @@ for marker in (
     'git merge-base --is-ancestor "$RELEASE_SHA" origin/main',
     "Production promotion requires a release SHA that is reachable from main.",
     "actions: read",
+    "deployments: write",
+    "staging-verified",
+    "Record verified staging release",
     "Require successful release checks for production",
     '"Build Images"',
     '"Quality Gates"',
@@ -489,9 +498,51 @@ for destructive in ("http.post(", "http.put(", "http.patch(", "http.del(", "http
     if destructive in load_script:
         errors.append(f"default load-test harness must stay read-only: found {destructive}")
 
+for path, source in (
+    ("services/marketplace_service/src/order_engine.rs", order_engine_source),
+    ("services/marketplace_service/src/businesses/seller_orders.rs", seller_orders_source),
+    ("services/marketplace_service/src/businesses/public_commerce.rs", public_commerce_source),
+):
+    if "INSERT INTO events.event_outbox" not in source:
+        errors.append(f"{path} must write Business OS events to the canonical Marketplace outbox")
+    if "INSERT INTO outbox_events" in source:
+        errors.append(f"{path} must not add new writes to the legacy order outbox")
+
+for marker in (
+    "ADD COLUMN IF NOT EXISTS event_key TEXT NULL",
+    "uq_event_outbox_event_key",
+    "mirror_legacy_order_outbox_event",
+    "FROM public.outbox_events AS legacy",
+    "ON CONFLICT (event_key) DO NOTHING",
+):
+    if marker not in business_outbox_migration:
+        errors.append(f"Business OS outbox convergence migration missing marker: {marker}")
+
+for marker in (
+    "outbox.event_type",
+    "outbox.event_key",
+    ".with_message_id(",
+    ".with_type(",
+    "UPDATE public.outbox_events",
+):
+    if marker not in marketplace_outbox_contract_source:
+        errors.append(f"Marketplace canonical outbox publisher missing marker: {marker}")
+
+expected_media_policy = 'Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"'
+if expected_media_policy not in caddy:
+    errors.append("production Caddy must allow same-origin camera/microphone for KYC and realtime media")
+for forbidden_policy in ('camera=()', 'microphone=()'):
+    if forbidden_policy in caddy:
+        errors.append(f"production Caddy must not globally disable browser media: {forbidden_policy}")
+for marker in ("camera=(self)", "microphone=(self)"):
+    if marker not in www_next_config:
+        errors.append(f"WWW permissions policy lost same-origin browser media allowance: {marker}")
+
 for path, warning_threshold, hard_ceiling in (
-    ("services/marketplace_service/src/main.rs", 250_000, 840_000),
-    ("services/community_service/src/main.rs", 200_000, 325_000),
+    ("services/marketplace_service/src/main.rs", 600_000, 830_000),
+    ("services/community_service/src/main.rs", 250_000, 315_000),
+    ("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx", 300_000, 345_000),
+    ("frontend/apps/www/src/components/community/CommunityFeedClient.tsx", 225_000, 270_000),
 ):
     target = ROOT / path
     if not target.is_file():
