@@ -96,6 +96,35 @@ for marker in ("http_2xx", "tcp_connect"):
     if marker not in blackbox_config:
         errors.append(f"blackbox config missing module: {marker}")
 
+marketplace_compose_start = base_compose.find("\n  marketplace_service:")
+marketplace_compose_end = base_compose.find("\n  community_service:", marketplace_compose_start)
+if marketplace_compose_start < 0 or marketplace_compose_end < 0:
+    errors.append("unable to locate Marketplace Compose service block")
+else:
+    marketplace_compose = base_compose[marketplace_compose_start:marketplace_compose_end]
+    if "marketplace_db: { condition: service_healthy }" not in marketplace_compose:
+        errors.append("Marketplace startup must remain gated on its owned database")
+    for forbidden_dependency in (
+        "redis_cache: { condition: service_healthy }",
+        "rabbitmq: { condition: service_healthy }",
+        "meilisearch: { condition: service_healthy }",
+        "identity_service: { condition: service_healthy }",
+    ):
+        if forbidden_dependency in marketplace_compose:
+            errors.append(
+                f"Marketplace startup must remain isolated from degradable dependency: {forbidden_dependency}"
+            )
+
+marketplace_source = read("services/marketplace_service/src/main.rs")
+for marker in (
+    "tokio::spawn(async move",
+    "run_outbox_publisher",
+    "run_identity_event_consumer",
+):
+    if marker not in marketplace_source:
+        errors.append(f"Marketplace degraded-startup contract missing marker: {marker}")
+
+
 community_compose_start = base_compose.find("\n  community_service:")
 community_compose_end = base_compose.find("\n  chat_service:", community_compose_start)
 if community_compose_start < 0 or community_compose_end < 0:
