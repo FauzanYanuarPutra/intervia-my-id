@@ -70,6 +70,7 @@ for marker in (
 
 for marker in (
     "profiles: [observability]",
+    "ALERTMANAGER_CONFIG_PATH",
     "prom/prometheus:v3.14.0",
     "prom/node-exporter:v1.12.1",
     "gcr.io/cadvisor/cadvisor:v0.60.5",
@@ -273,6 +274,9 @@ for marker in (
     "--wait --wait-timeout",
     "docker-compose.observability.yml",
     "infrastructure/observability",
+    "ALERTMANAGER_CONFIG_PATH",
+    "local-null Alertmanager config",
+    "Refusing silent alert discard",
     "https://www.",
     "https://api.",
     "https://chat.",
