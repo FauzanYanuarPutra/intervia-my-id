@@ -85,6 +85,7 @@ The News domain also maintains durability and observability primitives:
 - Article detail fetches are uncached at the Next.js data layer so corrections and retractions are visible immediately; list feeds use a short revalidation window and RSS/Google News sitemap edge caches are capped at one minute.
 - The generic `/v1/content` creation path applies the same structural News quality floor before persistence: title, summary, body, category, article kind, language, location length, and required public source URLs for news/analysis.
 - Public News search uses PostgreSQL full-text search backed by a partial GIN index instead of leading-wildcard scans across article bodies; public category/topic/location/search filters are length-bounded.
+- Active News feeds have dedicated tag, language/cursor, category/language/cursor, and location/language/cursor indexes. Public list queries project an empty body placeholder so Postgres does not transfer full article bodies when rendering cards.
 - The News index exposes server-rendered search and cursor pagination. Category, topic, and location feeds also paginate with cursors; cursor variants remain followable but are noindex with the canonical facet URL.
 - Facet hreflang entries are emitted only for languages that currently have matching published articles, avoiding alternates that resolve to empty/noindex pages.
 
