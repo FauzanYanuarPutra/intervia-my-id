@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { ArrowRight, BarChart3, Building2, Newspaper, Send, Store, TrendingUp } from 'lucide-react';
+import { ArrowRight, BarChart3, Building2, Newspaper, Search, Send, Store, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { buildNewsPath, buildNewsUrl, getPublishedNews } from '@/lib/news';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ category?: string; q?: string }>;
+  searchParams: Promise<{ category?: string; q?: string; cursor?: string }>;
 };
 
 const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regulasi', 'Industri', 'Daerah'] as const;
@@ -13,7 +13,9 @@ const CATEGORIES = ['Ekonomi', 'Bisnis', 'UMKM', 'Teknologi', 'Keuangan', 'Regul
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { locale } = await params;
   const filters = await searchParams;
-  const hasQueryVariant = Boolean(filters.q?.trim() || filters.category?.trim());
+  const hasQueryVariant = Boolean(
+    filters.q?.trim() || filters.category?.trim() || filters.cursor?.trim(),
+  );
   const isId = locale === 'id';
   const title = isId ? 'Lajukan News | Ekonomi, Bisnis, dan UMKM' : 'Lajukan News | Economy, Business, and SMEs';
   const description = isId
@@ -60,15 +62,35 @@ function formatDate(value: string, locale: string) {
   }).format(new Date(value));
 }
 
+function buildNewsIndexHref(filters: {
+  category?: string;
+  query?: string;
+  cursor?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters.category) params.set('category', filters.category);
+  if (filters.query) params.set('q', filters.query);
+  if (filters.cursor) params.set('cursor', filters.cursor);
+  const queryString = params.toString();
+  return queryString ? `/news?${queryString}` : '/news';
+}
+
 export default async function NewsIndexPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   const filters = await searchParams;
   const isId = locale === 'id';
   const category = filters.category?.trim() || undefined;
-  const query = filters.q?.trim() || undefined;
-  const { items } = await getPublishedNews({ category, query, language: isId ? 'id' : 'en', limit: 36 });
-  const featured = items[0];
-  const rest = items.slice(1);
+  const query = filters.q?.trim().slice(0, 160) || undefined;
+  const cursor = filters.cursor?.trim() || undefined;
+  const { items, nextCursor } = await getPublishedNews({
+    category,
+    query,
+    cursor,
+    language: isId ? 'id' : 'en',
+    limit: 36,
+  });
+  const featured = cursor ? undefined : items[0];
+  const rest = cursor ? items : items.slice(1);
 
   return (
     <main className="page-shell page-rhythm pb-12 pt-6">
@@ -129,6 +151,50 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
         ))}
       </nav>
 
+      <form
+        method="get"
+        className="flex flex-col gap-2 rounded-[24px] border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900 sm:flex-row sm:items-center"
+        role="search"
+      >
+        {category ? <input type="hidden" name="category" value={category} /> : null}
+        <label htmlFor="news-search" className="sr-only">
+          {isId ? 'Cari berita' : 'Search news'}
+        </label>
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            id="news-search"
+            name="q"
+            defaultValue={query}
+            maxLength={160}
+            placeholder={isId ? 'Cari judul, ringkasan, atau isi berita…' : 'Search titles, summaries, or article text…'}
+            className="min-h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/10 dark:bg-white/[0.05] dark:text-white"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"
+          >
+            {isId ? 'Cari' : 'Search'}
+          </button>
+          {query ? (
+            <Link
+              href={buildNewsIndexHref({ category })}
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-600 dark:border-white/10 dark:text-slate-300"
+            >
+              {isId ? 'Hapus' : 'Clear'}
+            </Link>
+          ) : null}
+        </div>
+      </form>
+
+      {query ? (
+        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+          {isId ? 'Hasil pencarian untuk' : 'Search results for'} “{query}”
+        </p>
+      ) : null}
+
       {featured ? (
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
           <Link href={buildNewsPath(featured.slug)} className="group rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_22px_54px_-44px_rgba(15,23,42,0.32)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900 sm:p-7">
@@ -183,6 +249,19 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
             </Link>
           ))}
         </section>
+      ) : null}
+
+      {nextCursor ? (
+        <nav aria-label={isId ? 'Navigasi berita' : 'News navigation'} className="flex justify-center">
+          <Link
+            href={buildNewsIndexHref({ category, query, cursor: nextCursor })}
+            rel="next"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
+          >
+            {isId ? 'Berita berikutnya' : 'Next articles'}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </nav>
       ) : null}
     </main>
   );
