@@ -40,6 +40,18 @@ for service in ("identity_db:", "marketplace_db:", "community_db:"):
 if "restart: unless-stopped" not in base_compose:
     errors.append("base compose must retain process restart policy")
 
+for marker in (
+    "./infrastructure/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro",
+    'expose: ["15692"]',
+):
+    if marker not in base_compose:
+        errors.append(f"RabbitMQ observability contract missing: {marker}")
+
+rabbitmq_plugins = read("infrastructure/rabbitmq/enabled_plugins")
+for marker in ("rabbitmq_management", "rabbitmq_prometheus"):
+    if marker not in rabbitmq_plugins:
+        errors.append(f"RabbitMQ enabled_plugins missing: {marker}")
+
 for marker in ("stop_grace_period: 30s", "stop_grace_period: 60s"):
     if marker not in base_compose:
         errors.append(f"base compose missing graceful shutdown budget: {marker}")
@@ -61,6 +73,7 @@ for marker in (
     "blackbox_tcp",
     "postgres_identity",
     "redis",
+    "rabbitmq",
     "identity_app",
     "marketplace_app",
     "community_app",
@@ -68,7 +81,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh", "LajukanRabbitMqBacklogHigh", "LajukanRabbitMqNoConsumers"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
