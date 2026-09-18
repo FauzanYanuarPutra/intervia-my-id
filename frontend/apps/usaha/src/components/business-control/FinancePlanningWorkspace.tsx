@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, ShieldCheck, WalletCards } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import type {
   Wave2FinancePlan,
   Wave2Obligation,
@@ -143,7 +144,7 @@ export function FinancePlanningWorkspace({
       cache: 'no-store',
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error || 'Gagal memuat saldo authoritative.');
+    if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memuat saldo authoritative.', response.status));
     setSummary(payload?.data?.summary ?? null);
   }
 
@@ -152,7 +153,7 @@ export function FinancePlanningWorkspace({
       cache: 'no-store',
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error || 'Gagal memuat rencana uang.');
+    if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memuat rencana uang.', response.status));
     setPlan(defaultPlan(payload?.data?.plan ?? null));
     setObligations(Array.isArray(payload?.data?.obligations) ? payload.data.obligations : []);
   }
@@ -163,7 +164,7 @@ export function FinancePlanningWorkspace({
     fetch(`/api/businesses/${businessId}/finance-core/summary`, { cache: 'no-store' })
       .then(async response => {
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload?.error || 'Gagal memuat saldo authoritative.');
+        if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal memuat saldo authoritative.', response.status));
         return payload?.data?.summary ?? null;
       })
       .then(nextSummary => {
@@ -192,7 +193,7 @@ export function FinancePlanningWorkspace({
         body: JSON.stringify({ action: 'save_finance_plan', ...plan }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan target pembagian.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan target pembagian.', response.status));
       await reloadFinancePlan();
       setMessage('Target persentase tersimpan. Saldo kantong lama tidak berubah.');
     } catch (error) {
@@ -233,7 +234,7 @@ export function FinancePlanningWorkspace({
         body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal menambah tagihan.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menambah tagihan.', response.status));
       await reloadFinancePlan();
       obligationAttemptRef.current = null;
       setLabel('');
@@ -267,7 +268,7 @@ export function FinancePlanningWorkspace({
         body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || 'Gagal mencatat pembayaran.');
+      if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal mencatat pembayaran.', response.status));
       await Promise.all([reloadFinancePlan(), reloadFinanceCore()]);
       paymentAttemptRef.current = null;
       setMessage('Pembayaran tercatat. Saldo authoritative sudah dimuat ulang.');
