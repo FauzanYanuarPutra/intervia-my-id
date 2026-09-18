@@ -179,7 +179,7 @@ export async function getPublishedNews(options: {
 
   try {
     const response = await fetch(`${MARKETPLACE_URL}/v1/news?${params.toString()}`, {
-      next: { revalidate: 120 },
+      next: { revalidate: 30 },
     });
     if (!response.ok) return { items: [], hasMore: false, nextCursor: null };
     const payload = (await response.json()) as NewsListPayload;
@@ -200,7 +200,7 @@ export async function getPublishedNewsArticle(slug: string): Promise<LajukanNews
   if (!slug.trim()) return null;
   try {
     const response = await fetch(`${MARKETPLACE_URL}/v1/news/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 120 },
+      cache: 'no-store',
     });
     if (!response.ok) return null;
     return normalizeNewsArticle((await response.json()) as RawNewsRow);
