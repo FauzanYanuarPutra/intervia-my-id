@@ -219,7 +219,14 @@ export async function getNewsForSitemap(maxItems = 1000): Promise<LajukanNewsArt
       cursor,
     });
     collected.push(...page.items);
-    if (!page.hasMore || page.items.length === 0 || !page.nextCursor) break;
+    if (
+      !page.hasMore ||
+      page.items.length === 0 ||
+      !page.nextCursor ||
+      page.nextCursor === cursor
+    ) {
+      break;
+    }
     cursor = page.nextCursor;
   }
 
