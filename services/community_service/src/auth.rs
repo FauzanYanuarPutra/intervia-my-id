@@ -1,5 +1,4 @@
 use axum::http::{header, HeaderMap, StatusCode};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
 use std::{env, sync::OnceLock};
@@ -52,13 +51,11 @@ fn access_token_algorithm() -> Option<Algorithm> {
 fn rs256_decoding_key() -> Option<&'static DecodingKey> {
     RS256_DECODING_KEY
         .get_or_init(|| {
-            let encoded = env::var("JWT_PUBLIC_KEY_PEM_B64")
-                .map_err(|_| "JWT_PUBLIC_KEY_PEM_B64 is required for RS256".to_string())?;
-            let pem = STANDARD
-                .decode(encoded.trim())
-                .map_err(|_| "JWT_PUBLIC_KEY_PEM_B64 is not valid base64".to_string())?;
-            DecodingKey::from_rsa_pem(&pem)
-                .map_err(|_| "JWT_PUBLIC_KEY_PEM_B64 is not a valid RSA public key".to_string())
+            let pem = env::var("JWT_PUBLIC_KEY_PEM")
+                .map_err(|_| "JWT_PUBLIC_KEY_PEM is required for RS256".to_string())?
+                .replace("\\n", "\n");
+            DecodingKey::from_rsa_pem(pem.as_bytes())
+                .map_err(|_| "JWT_PUBLIC_KEY_PEM is not a valid RSA public key".to_string())
         })
         .as_ref()
         .ok()
