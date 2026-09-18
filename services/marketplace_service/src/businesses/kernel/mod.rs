@@ -8,6 +8,11 @@ pub(crate) mod transaction;
 pub(crate) enum KernelValidationError {
     NegativeAmount,
     NonPositiveAmount,
+    InvalidCurrency,
+    InvalidMoneyScale,
+    CurrencyMismatch,
+    MoneyScaleMismatch,
+    AmountOverflow,
     InvalidTimezone,
 }
 
