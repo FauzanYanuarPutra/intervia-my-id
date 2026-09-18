@@ -203,7 +203,7 @@ export function SettlementWorkspace({ businessId, initialSettlements, initialCha
           <div className="text-xs leading-5 text-portal-soft">{preview?.status === 'matched' ? 'Angka cocok.' : preview ? 'Ada selisih. Simpan agar bisa ditindaklanjuti.' : 'Total potongan melebihi omzet kotor.'}</div>
           <button type="button" onClick={save} disabled={saving} className="portal-button-primary justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan settlement</button>
         </div>
-        {message ? <p className="border-t border-portal-line px-4 py-3 text-xs text-portal-soft sm:px-5">{message}</p> : null}
+        {message ? <p role="status" aria-live="polite" className="border-t border-portal-line px-4 py-3 text-xs text-portal-soft sm:px-5">{message}</p> : null}
       </section>
 
       <section className="portal-panel overflow-hidden">
