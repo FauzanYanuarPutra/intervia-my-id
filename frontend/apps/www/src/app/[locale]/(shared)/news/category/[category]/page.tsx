@@ -15,10 +15,15 @@ const CATEGORY_BY_SLUG: Record<string, string> = {
   daerah: 'Daerah',
 };
 
-type Props = { params: Promise<{ locale: string; category: string }> };
+type Props = {
+  params: Promise<{ locale: string; category: string }>;
+  searchParams: Promise<{ cursor?: string }>;
+};
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { locale, category } = await params;
+  const filters = await searchParams;
+  const filters = await searchParams;
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) return { robots: { index: false, follow: true } };
   const canonical = `${buildNewsUrl(locale)}/category/${category.toLowerCase()}`;
@@ -47,19 +52,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     },
     robots: {
-      index: indexable,
+      index: indexable && !filters.cursor?.trim(),
       follow: true,
-      googleBot: { index: indexable, follow: true, 'max-image-preview': 'large' },
+      googleBot: { index: indexable && !filters.cursor?.trim(), follow: true, 'max-image-preview': 'large' },
     },
   };
 }
 
-export default async function NewsCategoryPage({ params }: Props) {
+export default async function NewsCategoryPage({ params, searchParams }: Props) {
   const { locale, category } = await params;
   const label = CATEGORY_BY_SLUG[category.toLowerCase()];
   if (!label) notFound();
   const isId = locale === 'id';
-  const { items } = await getPublishedNews({ category: label, language: isId ? 'id' : 'en', limit: 48 });
+  const cursor = filters.cursor?.trim() || undefined;
+  const { items, nextCursor } = await getPublishedNews({ category: label, language: isId ? 'id' : 'en', cursor, limit: 48 });
 
   return <main className="page-shell page-rhythm pb-12 pt-6">
     <Link href="/news" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"><ArrowLeft className="h-3.5 w-3.5"/>Lajukan News</Link>
@@ -76,5 +82,6 @@ export default async function NewsCategoryPage({ params }: Props) {
         <span className="mt-auto inline-flex items-center gap-1 pt-5 text-xs font-bold text-emerald-700 dark:text-emerald-300">{isId?'Baca':'Read'}<ArrowRight className="h-3.5 w-3.5"/></span>
       </Link>)}
     </section> : <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">{isId?'Belum ada berita terbit di kategori ini.':'No published news in this category yet.'}</div>}
+    {nextCursor ? <nav aria-label={isId ? 'Navigasi kategori berita' : 'News category navigation'} className="flex justify-center"><Link href={`/news/category/${category.toLowerCase()}?cursor=${encodeURIComponent(nextCursor)}`} rel="next" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">{isId?'Berikutnya':'Next'}<ArrowRight className="h-4 w-4"/></Link></nav> : null}
   </main>;
 }
