@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Hash } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { buildNewsFacetUrl, buildNewsPath, getPublishedNews } from '@/lib/news';
+import { buildNewsFacetUrl, buildNewsPath, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
 type Props = { params: Promise<{ locale: string; topic: string }> };
 
@@ -15,8 +15,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const value = cleanFacet(topic);
   if (!value) return { robots: { index: false, follow: true } };
   const canonical = buildNewsFacetUrl(locale, 'topic', value);
-  const { items } = await getPublishedNews({ topic: value, language: locale === 'en' ? 'en' : 'id', limit: 1 });
-  const indexable = items.length > 0;
+  const availability = await getNewsLanguageAvailability({ topic: value });
+  const currentLanguage = locale === 'en' ? 'en' : 'id';
+  const indexable = availability[currentLanguage];
   return {
     title: `${value} | Topik Lajukan News`,
     description: locale === 'id'
@@ -25,9 +26,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical,
       languages: {
-        id: buildNewsFacetUrl('id', 'topic', value),
-        en: buildNewsFacetUrl('en', 'topic', value),
-        'x-default': buildNewsFacetUrl('id', 'topic', value),
+        ...(availability.id ? { id: buildNewsFacetUrl('id', 'topic', value) } : {}),
+        ...(availability.en ? { en: buildNewsFacetUrl('en', 'topic', value) } : {}),
+        'x-default': availability.id
+          ? buildNewsFacetUrl('id', 'topic', value)
+          : buildNewsFacetUrl('en', 'topic', value),
       },
     },
     robots: {
