@@ -28,7 +28,7 @@ use std::{
 use tokio::{
     io::{AsyncReadExt, AsyncSeekExt},
     net::TcpListener,
-    time::{sleep, timeout, Duration},
+    time::{sleep, Duration},
 };
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -40,7 +40,7 @@ mod rate_limit;
 mod runtime_metrics;
 mod schema_contract;
 
-use auth::{is_moderator, optional_actor, require_actor, AuthActor};
+use auth::{is_moderator, optional_actor, request_ip, require_actor, AuthActor};
 use health::{health, ready, root, service_metrics};
 use rate_limit::{enforce_rate_limit, mutation_rate_limit, run_rate_limit_cleanup};
 
