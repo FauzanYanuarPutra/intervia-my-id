@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Plus, Save, Trash2 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { SearchPicker } from '@/components/interaction/SearchPicker';
 
 type ModifierMode = 'single' | 'multiple';
 type RecipeOperation = 'add' | 'set';
@@ -145,6 +146,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [ingredientQueries, setIngredientQueries] = useState<Record<string, string>>({});
 
   async function loadGroups() {
     if (loaded || loading) return;
@@ -372,14 +374,30 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
                         {loadingIngredients ? <p className="text-xs text-portal-soft">Memuat bahan…</p> : null}
                         {(option.recipe_effects ?? []).map((effect, effectIndex) => {
                           const ingredient = ingredients.find(item => item.id === effect.ingredient_id);
+                          const effectKey = `${group.id}:${option.id}:${effectIndex}`;
+                          const ingredientQuery = ingredientQueries[effectKey] ?? ingredient?.name ?? '';
                           return (
                             <div key={`${option.id}-effect-${effectIndex}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_120px_44px] sm:items-end">
-                              <label className="grid gap-1 text-[11px] font-semibold text-portal-soft">Bahan
-                                <select className="portal-input bg-white" value={effect.ingredient_id} onChange={event => patchEffect(group.id, option, effectIndex, { ingredient_id: event.target.value })}>
-                                  <option value="">Pilih bahan</option>
-                                  {ingredients.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                                </select>
-                              </label>
+                              <div className="grid gap-1 text-[11px] font-semibold text-portal-soft">
+                                <span>Bahan</span>
+                                <SearchPicker
+                                  items={ingredients}
+                                  value={effect.ingredient_id}
+                                  query={ingredientQuery}
+                                  onQueryChange={query => setIngredientQueries(current => ({ ...current, [effectKey]: query }))}
+                                  onChange={ingredientId => {
+                                    patchEffect(group.id, option, effectIndex, { ingredient_id: ingredientId });
+                                    const selected = ingredients.find(item => item.id === ingredientId);
+                                    setIngredientQueries(current => ({ ...current, [effectKey]: selected?.name ?? '' }));
+                                  }}
+                                  getKey={item => item.id}
+                                  getLabel={item => item.name}
+                                  getMeta={item => item.recipe_unit}
+                                  placeholder="Cari bahan"
+                                  emptyLabel="Bahan tidak ditemukan"
+                                  ariaLabel={`Bahan untuk ${option.label || 'opsi'}`}
+                                />
+                              </div>
                               <div className="grid gap-1 text-[11px] font-semibold text-portal-soft">
                                 <span>Efek</span>
                                 <ChoiceChips
