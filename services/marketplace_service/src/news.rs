@@ -385,10 +385,31 @@ pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -
         .get("language")
         .and_then(Value::as_str)
         .map(str::trim)
-        .filter(|value| matches!(*value, "id" | "en"))
+        .filter(|value| !value.is_empty())
         .unwrap_or("id")
-        .to_string();
+        .to_ascii_lowercase();
     news.insert("language".to_string(), Value::String(language));
+
+    let category = news
+        .get("category")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("Ekonomi")
+        .to_string();
+    news.insert("category".to_string(), Value::String(category));
+
+    let article_kind = news
+        .get("article_kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("news")
+        .to_ascii_lowercase();
+    news.insert(
+        "article_kind".to_string(),
+        Value::String(article_kind.clone()),
+    );
 
     let raw_sources = news
         .get("source_urls")
@@ -414,12 +435,7 @@ pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -
         });
     news.insert("source_urls".to_string(), json!(safe_sources));
 
-    let kind = news
-        .get("article_kind")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .unwrap_or("news");
-    if kind == "press_release" {
+    if article_kind == "press_release" {
         news.insert(
             "disclosure".to_string(),
             Value::String(
@@ -452,6 +468,67 @@ fn valid_news_category(value: &str) -> bool {
 
 fn valid_article_kind(value: &str) -> bool {
     matches!(value, "news" | "analysis" | "press_release")
+}
+
+pub(crate) fn validate_submission_payload(
+    title: &str,
+    summary: Option<&str>,
+    body: &str,
+    metadata: &Value,
+) -> Result<(), &'static str> {
+    if title.trim().len() < 10 || title.trim().len() > 180 {
+        return Err("news title must be 10-180 characters");
+    }
+    let summary = summary.map(str::trim).filter(|value| !value.is_empty());
+    if summary.is_none_or(|value| value.len() < 20 || value.len() > 1_000) {
+        return Err("news summary must be 20-1000 characters");
+    }
+    if body.trim().len() < 120 || body.trim().len() > 20_000 {
+        return Err("news body must be 120-20000 characters");
+    }
+
+    let news = metadata
+        .get("news")
+        .and_then(Value::as_object)
+        .ok_or("news metadata is required")?;
+    let category = news
+        .get("category")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("");
+    if !valid_news_category(category) {
+        return Err("unsupported news category");
+    }
+    let article_kind = news
+        .get("article_kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("");
+    if !valid_article_kind(article_kind) {
+        return Err("unsupported news article kind");
+    }
+    let language = news
+        .get("language")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("");
+    if !matches!(language, "id" | "en") {
+        return Err("unsupported news language");
+    }
+    if news
+        .get("location")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .is_some_and(|location| location.len() > 120)
+    {
+        return Err("news location is too long");
+    }
+
+    if article_kind != "press_release" && news_source_urls(metadata).is_empty() {
+        return Err("news and analysis require at least one valid public source URL");
+    }
+
+    Ok(())
 }
 
 fn sanitize_topics(value: Option<Vec<String>>) -> Result<Option<Vec<String>>, &'static str> {
@@ -2221,7 +2298,7 @@ mod tests {
     use super::{
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
         moderation_target, normalize_news_language, normalize_queue_status, parse_news_cursor,
-        public_news_metadata, source_domain,
+        public_news_metadata, source_domain, validate_submission_payload,
     };
     use serde_json::json;
 
@@ -2347,6 +2424,67 @@ mod tests {
         );
         assert!(normalize_news_language(Some("fr".to_string())).is_err());
         assert_eq!(normalize_news_language(None).unwrap(), None);
+    }
+
+    #[test]
+    fn generic_news_submission_requires_editorial_quality_floor() {
+        let valid_metadata = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "news",
+                "language": "id",
+                "source_urls": ["https://www.bi.go.id/id/publikasi"]
+            }
+        });
+        let body = "a".repeat(120);
+
+        assert!(validate_submission_payload(
+            "Judul berita yang valid",
+            Some("Ringkasan berita yang cukup panjang."),
+            &body,
+            &valid_metadata,
+        )
+        .is_ok());
+
+        assert!(validate_submission_payload(
+            "Pendek",
+            Some("Ringkasan berita yang cukup panjang."),
+            &body,
+            &valid_metadata,
+        )
+        .is_err());
+
+        let missing_sources = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "analysis",
+                "language": "id",
+                "source_urls": []
+            }
+        });
+        assert!(validate_submission_payload(
+            "Analisis ekonomi terbaru",
+            Some("Ringkasan analisis yang cukup panjang."),
+            &body,
+            &missing_sources,
+        )
+        .is_err());
+
+        let press_release = json!({
+            "news": {
+                "category": "Bisnis",
+                "article_kind": "press_release",
+                "language": "id",
+                "source_urls": []
+            }
+        });
+        assert!(validate_submission_payload(
+            "Rilis bisnis perusahaan",
+            Some("Ringkasan rilis bisnis yang cukup panjang."),
+            &body,
+            &press_release,
+        )
+        .is_ok());
     }
 
     #[test]

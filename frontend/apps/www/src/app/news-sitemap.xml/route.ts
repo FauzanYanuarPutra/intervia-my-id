@@ -42,7 +42,7 @@ ${urls}
   return new Response(xml, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=600',
+      'Cache-Control': 'public, max-age=30, s-maxage=60, stale-while-revalidate=60',
     },
   });
 }

@@ -82,6 +82,8 @@ The News domain also maintains durability and observability primitives:
 - News listing, category, topic, location, related-article, RSS, and sitemap flows are language-aware. Missing legacy language defaults to Indonesian, while canonical article URLs redirect mismatched locale paths to the stored article language.
 - Contributor revisions re-run content safety checks, source validation, tag normalization, disclosure rules, and source requirements before returning to the editorial queue.
 - Public list responses omit full article bodies to keep feed payloads bounded; the complete body is returned only by the article detail endpoint.
+- Article detail fetches are uncached at the Next.js data layer so corrections and retractions are visible immediately; list feeds use a short revalidation window and RSS/Google News sitemap edge caches are capped at one minute.
+- The generic `/v1/content` creation path applies the same structural News quality floor before persistence: title, summary, body, category, article kind, language, location length, and required public source URLs for news/analysis.
 
 ### Source policy
 
