@@ -133,3 +133,23 @@ synthetic/test identities and must not generate destructive traffic against
 production.
 
 The repository read-load harness defaults to loopback intentionally.
+
+
+## Per-replica database connection budget
+
+Horizontal scaling must budget PostgreSQL connections explicitly. The safe
+planning relationship is:
+
+```text
+service replicas × DB max connections per replica
++ migration/admin/exporter reserve
+< PostgreSQL usable connection budget
+```
+
+Identity, Marketplace and Community expose bounded per-replica pool settings
+through environment variables. Increasing replica count without lowering or
+recalculating these values is not considered a safe scaling action.
+
+Community uses a separate small migration pool so schema migration work does not
+reserve the full application pool during rollout. Pool acquire timeout remains
+bounded so overload becomes an explicit failure instead of an unbounded wait.
