@@ -110,7 +110,7 @@ for marker in (
 
 for path in (
     "services/identity_service/src/db/postgres.rs",
-    "services/marketplace_service/src/health.rs",
+    "services/marketplace_service/src/main.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
@@ -573,7 +573,7 @@ if "response.headers.get('x-request-id')" not in www_http_client:
 
 for path in (
     "services/identity_service/src/routes/health.rs",
-    "services/marketplace_service/src/main.rs",
+    "services/marketplace_service/src/health.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
@@ -588,7 +588,7 @@ for path in (
 
 for path in (
     "services/identity_service/src/routes/health.rs",
-    "services/marketplace_service/src/main.rs",
+    "services/marketplace_service/src/health.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
