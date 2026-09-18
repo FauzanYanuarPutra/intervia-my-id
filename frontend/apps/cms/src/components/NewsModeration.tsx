@@ -228,7 +228,7 @@ export default function NewsModeration() {
     setSensitivity(selectedSensitivity === 'high' ? 'high' : 'normal');
     const scheduledFor = readString(meta.scheduled_for);
     setPublishAt(scheduledFor ? toDateTimeLocal(scheduledFor) : '');
-  }, [selected?.id]);
+  }, [selected]);
 
   useEffect(() => {
     if (!accessToken || !selected?.id) return;

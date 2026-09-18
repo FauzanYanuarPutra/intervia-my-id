@@ -1137,8 +1137,11 @@ async fn notify_editorial_result(
     action: &str,
     note: Option<&str>,
 ) {
-    let is_scheduled =
-        action == "approve" && row.published_at.is_some_and(|at| at > Utc::now());
+    let is_scheduled = action == "approve"
+        && row
+            .published_at
+            .as_ref()
+            .is_some_and(|at| at > &Utc::now());
     let (event_type, title, message) = if is_scheduled {
         (
             "news.scheduled",
@@ -1988,9 +1991,12 @@ async fn moderate_news(
         }
     }
 
+    let reviewed_at = Utc::now();
     let approved_publish_at = if action == "approve" {
         Some(
-            current.published_at.clone()
+            current
+                .published_at
+                .clone()
                 .or(requested_publish_at.clone())
                 .unwrap_or_else(|| reviewed_at.clone()),
         )
@@ -2012,7 +2018,6 @@ async fn moderate_news(
     let news = news
         .as_object_mut()
         .expect("news metadata object was initialized");
-    let reviewed_at = Utc::now();
     news.insert(
         "editorial_status".to_string(),
         Value::String(next_editorial_status.to_string()),

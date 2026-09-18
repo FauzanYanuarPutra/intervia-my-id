@@ -30,11 +30,24 @@ export default function NewsShareActions({
     });
 
   const copyLink = async () => {
-    if (!navigator.clipboard) return;
-    await navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-    void trackShare('copy_link');
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(window.location.href);
+      } else {
+        window.prompt(
+          isId ? 'Salin tautan berita:' : 'Copy article link:',
+          window.location.href,
+        );
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+      void trackShare('copy_link');
+    } catch {
+      window.prompt(
+        isId ? 'Salin tautan berita:' : 'Copy article link:',
+        window.location.href,
+      );
+    }
   };
 
   const shareArticle = async () => {
