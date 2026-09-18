@@ -3043,10 +3043,8 @@ async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::R
           SELECT id
           FROM events.event_inbox
           WHERE source = 'identity_service'
-            AND (
-              (status IN ('pending', 'failed') AND available_at <= now())
-              OR (status = 'processing' AND available_at <= now())
-            )
+            AND status IN ('pending', 'failed', 'processing')
+            AND available_at <= now()
           ORDER BY received_at ASC
           FOR UPDATE SKIP LOCKED
           LIMIT $1
