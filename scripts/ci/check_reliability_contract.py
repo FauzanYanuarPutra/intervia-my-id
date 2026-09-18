@@ -26,6 +26,9 @@ scale_doc = read("docs/architecture/scale-reliability-v1.md")
 slo_doc = read("docs/operations/slo-capacity-overload.md")
 incident_doc = read("docs/operations/incident-response.md")
 load_script = read("scripts/load/k6-read-paths.js")
+capacity_runner = read("scripts/load/run-capacity-baseline.sh")
+capacity_workflow = read(".github/workflows/capacity-baseline.yml")
+capacity_doc = read("docs/operations/capacity-testing.md")
 quality_workflow = read(".github/workflows/quality.yml")
 read("docs/operations/backup-and-disaster-recovery.md")
 observability_compose = read("docker-compose.observability.yml")
@@ -541,6 +544,44 @@ if "127.0.0.1" not in load_script:
 for destructive in ("http.post(", "http.put(", "http.patch(", "http.del(", "http.delete("):
     if destructive in load_script:
         errors.append(f"default load-test harness must stay read-only: found {destructive}")
+
+for marker in (
+    "productionHosts",
+    "ALLOW_PRODUCTION_LOAD",
+    "RAMP_DURATION",
+    "HOLD_DURATION",
+):
+    if marker not in load_script:
+        errors.append(f"read-only k6 harness missing safety/capacity marker: {marker}")
+
+for marker in (
+    "I_UNDERSTAND_HIGH_LOAD",
+    "I_UNDERSTAND_PRODUCTION_LOAD",
+    "peak_rps=5000",
+    "--summary-export",
+    "grafana/k6:0.54.0",
+):
+    if marker not in capacity_runner:
+        errors.append(f"capacity runner missing guarded evidence marker: {marker}")
+
+for marker in (
+    "workflow_dispatch:",
+    "allow_production:",
+    "confirm_high_load:",
+    "confirm_production:",
+    "actions/upload-artifact@v4",
+    "scripts/load/run-capacity-baseline.sh",
+):
+    if marker not in capacity_workflow:
+        errors.append(f"capacity workflow missing safety/evidence marker: {marker}")
+
+for marker in (
+    "measured evidence",
+    "terminal failures",
+    "Do not introduce Kubernetes",
+):
+    if marker not in capacity_doc:
+        errors.append(f"capacity runbook missing decision marker: {marker}")
 
 for path, warning_threshold, hard_ceiling in (
     ("services/marketplace_service/src/main.rs", 750_000, 830_000),
