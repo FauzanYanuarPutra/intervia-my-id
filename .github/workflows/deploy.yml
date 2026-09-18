@@ -128,6 +128,45 @@ jobs:
               }
               echo "Resolved production MINIO_DATA_VOLUME from active MinIO: $MINIO_DATA_VOLUME"
             fi
+
+            configured_community_volume="$(awk -F= '$1 == "COMMUNITY_UPLOADS_VOLUME" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
+            [[ -z "$configured_community_volume" || "$configured_community_volume" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+              echo "COMMUNITY_UPLOADS_VOLUME in $env_file contains an invalid Docker volume name." >&2
+              exit 1
+            }
+
+            mapfile -t active_community_volumes < <(
+              docker ps -q --filter 'label=com.docker.compose.service=community_service' |
+                xargs -r docker inspect --format '{{range .Mounts}}{{if and (eq .Destination "/app/uploads/forum") (eq .Type "volume")}}{{.Name}}{{println}}{{end}}{{end}}' |
+                sed '/^$/d' | sort -u
+            )
+
+            if [[ -n "$configured_community_volume" ]]; then
+              docker volume inspect "$configured_community_volume" >/dev/null 2>&1 || {
+                echo "Configured community uploads volume '$configured_community_volume' does not exist. Refusing to create an empty replacement." >&2
+                exit 1
+              }
+              if ((${#active_community_volumes[@]} > 1)); then
+                printf 'Multiple active Community upload volumes detected: %s\n' "${active_community_volumes[*]}" >&2
+                exit 1
+              fi
+              if ((${#active_community_volumes[@]} == 1)) && [[ "${active_community_volumes[0]}" != "$configured_community_volume" ]]; then
+                echo "Configured COMMUNITY_UPLOADS_VOLUME '$configured_community_volume' differs from active Community upload volume '${active_community_volumes[0]}'. Refusing storage switch." >&2
+                exit 1
+              fi
+              export COMMUNITY_UPLOADS_VOLUME="$configured_community_volume"
+            else
+              if ((${#active_community_volumes[@]} != 1)); then
+                echo "COMMUNITY_UPLOADS_VOLUME is unset and exactly one active named Community uploads volume could not be resolved. Set it explicitly after inventorying production storage." >&2
+                exit 1
+              fi
+              export COMMUNITY_UPLOADS_VOLUME="${active_community_volumes[0]}"
+              docker volume inspect "$COMMUNITY_UPLOADS_VOLUME" >/dev/null 2>&1 || {
+                echo "Resolved active Community uploads volume '$COMMUNITY_UPLOADS_VOLUME' no longer exists." >&2
+                exit 1
+              }
+              echo "Resolved production COMMUNITY_UPLOADS_VOLUME from active Community service: $COMMUNITY_UPLOADS_VOLUME"
+            fi
           fi
 
           compose=(--env-file "$env_file" -f docker-compose.yml -f "$overlay" -f docker-compose.observability.yml)
