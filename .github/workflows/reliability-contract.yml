@@ -20,11 +20,32 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Validate repository reliability invariants
         run: python scripts/ci/check_reliability_contract.py
+      - name: Test migration history checker
+        run: python -m unittest scripts.ci.test_migration_history
+      - name: Validate immutable migration history
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$BEFORE_SHA"
+          fi
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD^)"
+          fi
+          python scripts/ci/check_migration_history.py --base "$base" --head HEAD
       - name: Parse read-only k6 scenario
         shell: bash
         run: node --input-type=module --check < scripts/load/k6-read-paths.js
@@ -34,6 +55,7 @@ jobs:
           bash -n scripts/ops/postgres_logical_backup.sh
           bash -n scripts/ops/verify_backup_set.sh
           bash -n scripts/ops/staging_scale_rehearsal.sh
+          bash -n scripts/ops/dependency_degradation_rehearsal.sh
       - name: Validate Grafana dashboard JSON
         run: python -m json.tool infrastructure/observability/grafana/dashboards/lajukan-overview.json >/dev/null
 

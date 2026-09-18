@@ -249,6 +249,19 @@ if "SCYLLA_NODES: ${SCYLLA_NODES:?" not in prod_compose:
 if "MINIO_DATA_VOLUME:?" not in prod_compose:
     errors.append("production object storage must require an explicitly resolved existing volume")
 
+if "COMMUNITY_UPLOADS_VOLUME:?" not in prod_compose:
+    errors.append("production community media must require an explicitly resolved existing volume")
+
+for marker in (
+    'configured_community_volume',
+    'active_community_volumes',
+    'COMMUNITY_UPLOADS_VOLUME',
+    '/app/uploads/forum',
+    'Refusing storage switch',
+):
+    if marker not in deploy:
+        errors.append(f"deploy workflow missing Community media storage guard: {marker}")
+
 if "development-database" not in prod_compose:
     errors.append("production compose must keep single-node Scylla out of the normal production profile")
 
@@ -318,14 +331,24 @@ for destructive in ("http.post(", "http.put(", "http.patch(", "http.del(", "http
     if destructive in load_script:
         errors.append(f"default load-test harness must stay read-only: found {destructive}")
 
-for path, threshold in (
-    ("services/marketplace_service/src/main.rs", 250_000),
-    ("services/community_service/src/main.rs", 200_000),
+for path, warning_threshold, hard_ceiling in (
+    ("services/marketplace_service/src/main.rs", 250_000, 850_000),
+    ("services/community_service/src/main.rs", 200_000, 325_000),
 ):
     target = ROOT / path
-    if target.is_file() and target.stat().st_size > threshold:
+    if not target.is_file():
+        continue
+    size = target.stat().st_size
+    if size > hard_ceiling:
+        errors.append(
+            f"{path} exceeded the architecture debt ceiling "
+            f"({size:,} > {hard_ceiling:,} bytes); extract a coherent responsibility "
+            "instead of growing the bootstrap module"
+        )
+    elif size > warning_threshold:
         warnings.append(
-            f"{path} is {target.stat().st_size:,} bytes; continue responsibility-based extraction before scale-driven service splits"
+            f"{path} is {size:,} bytes; continue responsibility-based extraction "
+            "before scale-driven service splits"
         )
 
 if not re.search(r"image:\s+\$\{DOCKERHUB_NAMESPACE", prod_compose):

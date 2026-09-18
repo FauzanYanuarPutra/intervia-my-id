@@ -193,6 +193,10 @@ services:
     networks: !override [edge, app, media]
 
 volumes:
+  community_uploads:
+    # Resolve the existing production forum-media volume before Compose is evaluated.
+    # Never silently create an empty replacement during a release.
+    name: ${COMMUNITY_UPLOADS_VOLUME:?COMMUNITY_UPLOADS_VOLUME must resolve to the existing production community uploads volume}
   minio_data:
     # Never silently create/switch production media storage. deploy.yml resolves this
     # to the existing /data named volume before Docker Compose is evaluated.
