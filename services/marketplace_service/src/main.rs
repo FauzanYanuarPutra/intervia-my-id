@@ -11,11 +11,6 @@ use axum::{
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use futures_util::StreamExt;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use lapin::{
-    options::{BasicPublishOptions, ExchangeDeclareOptions},
-    types::FieldTable,
-    BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind,
-};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client, RequestBuilder,
@@ -38,14 +33,18 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
 mod businesses;
+mod health;
 mod identity_projection;
 mod news;
 mod order_engine;
+mod outbox;
 mod runtime_metrics;
+use health::{health, ready, service_metrics};
 use identity_projection::{
     run_identity_event_consumer, run_identity_inbox_processor, IdentityProjectionConfig,
 };
 use order_engine::{create_order, get_order, list_orders, transition_order};
+use outbox::{run_outbox_publisher, OutboxPublisherConfig};
 
 #[derive(Clone)]
 struct AppState {
@@ -56,8 +55,6 @@ struct AppState {
     notification_tx: broadcast::Sender<RealtimeNotificationEnvelope>,
 }
 
-const OUTBOX_DEFAULT_BATCH_SIZE: i64 = 50;
-const OUTBOX_DEFAULT_POLL_MS: u64 = 1500;
 const MAX_TITLE_LEN: usize = 180;
 const MAX_SUMMARY_LEN: usize = 1000;
 const MAX_BODY_LEN: usize = 20_000;
@@ -137,14 +134,6 @@ struct LinkedTransactionFundingOutcome {
     wallet_environment: String,
     amount_cents: i64,
     currency: String,
-}
-
-#[derive(Debug, FromRow, Clone)]
-struct OutboxEventRow {
-    id: Uuid,
-    routing_key: String,
-    payload: Value,
-    lease_until: DateTime<Utc>,
 }
 
 fn parse_cors_origins() -> Vec<HeaderValue> {
@@ -2455,21 +2444,9 @@ async fn main() -> anyhow::Result<()> {
         }
 
         let outbox_db = state.db.clone();
-        let exchange =
-            env::var("OUTBOX_EXCHANGE").unwrap_or_else(|_| "marketplace.outbox".to_string());
-        let batch_size = env::var("OUTBOX_BATCH_SIZE")
-            .ok()
-            .and_then(|v| v.parse::<i64>().ok())
-            .unwrap_or(OUTBOX_DEFAULT_BATCH_SIZE)
-            .clamp(1, 500);
-        let poll_ms = env::var("OUTBOX_POLL_INTERVAL_MS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(OUTBOX_DEFAULT_POLL_MS)
-            .max(250);
-
+        let outbox_config = OutboxPublisherConfig::from_env(rabbitmq_url);
         tokio::spawn(async move {
-            run_outbox_publisher(outbox_db, rabbitmq_url, exchange, batch_size, poll_ms).await;
+            run_outbox_publisher(outbox_db, outbox_config).await;
         });
     } else {
         tracing::warn!("RABBITMQ_URL not set. Transactional outbox publisher is disabled.");
@@ -2789,103 +2766,6 @@ async fn shutdown_signal() {
     }
 
     tracing::info!("shutdown signal received");
-}
-
-async fn health() -> impl IntoResponse {
-    Json(json!({"status":"ok","service":"marketplace_service"}))
-}
-
-async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match timeout(
-        Duration::from_secs(2),
-        sqlx::query_scalar::<_, i32>("SELECT 1").fetch_one(&state.db),
-    )
-    .await
-    {
-        Ok(Ok(1)) => (
-            StatusCode::OK,
-            Json(json!({"status":"ready","service":"marketplace_service"})),
-        )
-            .into_response(),
-        Ok(Ok(_)) | Ok(Err(_)) | Err(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"status":"not_ready","service":"marketplace_service"})),
-        )
-            .into_response(),
-    }
-}
-
-async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let pool_size = state.db.size();
-    let pool_idle = state.db.num_idle();
-    let pool_max = state.db.options().get_max_connections();
-    let pool_active = pool_size.saturating_sub(pool_idle.min(pool_size as usize) as u32);
-    let notification_subscribers = state.notification_tx.receiver_count();
-    let (outbox_backlog, outbox_oldest_age_seconds, metrics_query_ok) = match timeout(
-        Duration::from_secs(2),
-        sqlx::query_as::<_, (i64, f64)>(
-            r#"
-            SELECT
-              COUNT(*)::bigint,
-              COALESCE(
-                EXTRACT(EPOCH FROM (NOW() - MIN(created_at))),
-                0
-              )::double precision
-            FROM events.event_outbox
-            WHERE status <> 'published'
-            "#,
-        )
-        .fetch_one(&state.db),
-    )
-    .await
-    {
-        Ok(Ok((backlog, oldest_age_seconds))) => (backlog, oldest_age_seconds.max(0.0), 1),
-        Ok(Err(_)) | Err(_) => (0, 0.0, 0),
-    };
-
-    let mut body = format!(
-        concat!(
-            "# HELP lajukan_service_info Static service identity.\n",
-            "# TYPE lajukan_service_info gauge\n",
-            "lajukan_service_info{{service=\"marketplace_service\"}} 1\n",
-            "# HELP lajukan_db_pool_connections PostgreSQL pool connections by state.\n",
-            "# TYPE lajukan_db_pool_connections gauge\n",
-            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"total\"}} {}\n",
-            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"idle\"}} {}\n",
-            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"active\"}} {}\n",
-            "lajukan_db_pool_connections{{service=\"marketplace_service\",state=\"max\"}} {}\n",
-            "# HELP lajukan_outbox_backlog Pending or failed transactional outbox events.\n",
-            "# TYPE lajukan_outbox_backlog gauge\n",
-            "lajukan_outbox_backlog{{service=\"marketplace_service\"}} {}\n",
-            "# HELP lajukan_outbox_oldest_age_seconds Age in seconds of the oldest unpublished transactional outbox event.\n",
-            "# TYPE lajukan_outbox_oldest_age_seconds gauge\n",
-            "lajukan_outbox_oldest_age_seconds{{service=\"marketplace_service\"}} {}\n",
-            "# HELP lajukan_metrics_db_query_ok Whether the metrics DB query succeeded.\n",
-            "# TYPE lajukan_metrics_db_query_ok gauge\n",
-            "lajukan_metrics_db_query_ok{{service=\"marketplace_service\"}} {}\n",
-            "# HELP lajukan_notification_subscribers Active realtime notification subscribers.\n",
-            "# TYPE lajukan_notification_subscribers gauge\n",
-            "lajukan_notification_subscribers{{service=\"marketplace_service\"}} {}\n"
-        ),
-        pool_size,
-        pool_idle,
-        pool_active,
-        pool_max,
-        outbox_backlog,
-        outbox_oldest_age_seconds,
-        metrics_query_ok,
-        notification_subscribers
-    );
-
-    body.push_str(&runtime_metrics::render("marketplace_service"));
-
-    (
-        [(
-            header::CONTENT_TYPE,
-            "text/plain; version=0.0.4; charset=utf-8",
-        )],
-        body,
-    )
 }
 
 async fn collect_events(
@@ -23868,171 +23748,6 @@ async fn update_transaction_status(
                 "failed to update transaction",
             )
             .into_response()
-        }
-    }
-}
-
-async fn connect_outbox_channel(rabbitmq_url: &str, exchange: &str) -> anyhow::Result<Channel> {
-    let conn = Connection::connect(rabbitmq_url, ConnectionProperties::default()).await?;
-    let channel = conn.create_channel().await?;
-    channel
-        .exchange_declare(
-            exchange,
-            ExchangeKind::Topic,
-            ExchangeDeclareOptions {
-                durable: true,
-                ..Default::default()
-            },
-            FieldTable::default(),
-        )
-        .await?;
-    Ok(channel)
-}
-
-async fn publish_outbox_batch(
-    db: &PgPool,
-    channel: &Channel,
-    exchange: &str,
-    batch_size: i64,
-) -> anyhow::Result<usize> {
-    let events = sqlx::query_as::<_, OutboxEventRow>(
-        r#"
-        WITH candidate AS (
-          SELECT id
-          FROM events.event_outbox
-          WHERE status IN ('pending', 'processing')
-            AND available_at <= NOW()
-          ORDER BY created_at ASC
-          FOR UPDATE SKIP LOCKED
-          LIMIT $1
-        )
-        UPDATE events.event_outbox AS outbox
-        SET
-          status = 'processing',
-          available_at = NOW() + INTERVAL '2 minutes',
-          error_message = NULL
-        FROM candidate
-        WHERE outbox.id = candidate.id
-        RETURNING
-          outbox.id,
-          outbox.routing_key,
-          outbox.payload,
-          outbox.available_at AS lease_until
-        "#,
-    )
-    .bind(batch_size)
-    .fetch_all(db)
-    .await?;
-
-    if events.is_empty() {
-        return Ok(0);
-    }
-
-    for event in events.iter() {
-        let payload_bytes = serde_json::to_vec(&event.payload)?;
-        let publish_result = channel
-            .basic_publish(
-                exchange,
-                &event.routing_key,
-                BasicPublishOptions::default(),
-                &payload_bytes,
-                BasicProperties::default()
-                    .with_content_type("application/json".into())
-                    .with_delivery_mode(2u8),
-            )
-            .await;
-
-        match publish_result {
-            Ok(confirm) => {
-                if let Err(err) = confirm.await {
-                    let error_text = format!("publish_confirm_failed: {:?}", err);
-                    let _ = sqlx::query(
-                        r#"
-                        UPDATE events.event_outbox
-                        SET
-                          status = 'pending',
-                          retry_count = retry_count + 1,
-                          available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
-                          error_message = $2
-                        WHERE id = $1
-                          AND status = 'processing'
-                          AND available_at = $3
-                        "#,
-                    )
-                    .bind(event.id)
-                    .bind(error_text)
-                    .bind(event.lease_until)
-                    .execute(db)
-                    .await;
-                    continue;
-                }
-            }
-            Err(err) => {
-                let error_text = format!("publish_failed: {:?}", err);
-                let _ = sqlx::query(
-                    r#"
-                    UPDATE events.event_outbox
-                    SET
-                      status = 'pending',
-                      retry_count = retry_count + 1,
-                      available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
-                      error_message = $2
-                    WHERE id = $1
-                      AND status = 'processing'
-                      AND available_at = $3
-                    "#,
-                )
-                .bind(event.id)
-                .bind(error_text)
-                .bind(event.lease_until)
-                .execute(db)
-                .await;
-                continue;
-            }
-        }
-
-        sqlx::query(
-            r#"
-            UPDATE events.event_outbox
-            SET status = 'published', published_at = NOW(), error_message = NULL
-            WHERE id = $1
-              AND status = 'processing'
-              AND available_at = $2
-            "#,
-        )
-        .bind(event.id)
-        .bind(event.lease_until)
-        .execute(db)
-        .await?;
-    }
-
-    Ok(events.len())
-}
-
-async fn run_outbox_publisher(
-    db: PgPool,
-    rabbitmq_url: String,
-    exchange: String,
-    batch_size: i64,
-    poll_ms: u64,
-) {
-    loop {
-        match connect_outbox_channel(&rabbitmq_url, &exchange).await {
-            Ok(channel) => loop {
-                match publish_outbox_batch(&db, &channel, &exchange, batch_size).await {
-                    Ok(0) => sleep(Duration::from_millis(poll_ms)).await,
-                    Ok(_) => {}
-                    Err(error) => {
-                        tracing::warn!("outbox publish error: {:?}", error);
-                        sleep(Duration::from_secs(2)).await;
-                        break;
-                    }
-                }
-            },
-            Err(error) => {
-                tracing::warn!("outbox connection error: {:?}", error);
-                sleep(Duration::from_secs(3)).await;
-            }
         }
     }
 }
