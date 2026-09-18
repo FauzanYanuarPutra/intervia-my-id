@@ -187,6 +187,10 @@ async fn posting_sale_persists_snapshot_and_exactly_one_finance_effect(pool: PgP
     assert!(!first.replayed);
     assert_eq!(first.sale.lines.len(), 1);
     assert_eq!(first.sale.sale.final_amount, 24_000);
+    assert_eq!(first.sale.sale.location_id, seeded.primary_location_id);
+    assert_eq!(first.sale.sale.currency, "IDR");
+    assert!(first.sale.sale.document_number.contains("-SAL-"));
+    assert_eq!(first.sale.sale.policy_snapshot["accounting_mode"], "simple");
     assert!(first.sale.sale.cost_complete);
     assert!(first.sale.sale.cogs_amount.unwrap() > 0);
     assert!(first.sale.lines[0].line_cogs_amount.unwrap() > 0);
@@ -227,6 +231,84 @@ async fn posting_sale_persists_snapshot_and_exactly_one_finance_effect(pool: PgP
     .await
     .unwrap();
     assert_eq!(finance_count, 1);
+
+    let event_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM events.event_outbox WHERE aggregate_type='business_sale' AND aggregate_id=$1 AND event_type='marketplace.business.sale_recorded'",
+    )
+    .bind(first.sale.sale.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(event_count, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn multi_branch_sale_requires_location_and_isolates_stock(pool: PgPool) {
+    let seeded = seed_costed_product(&pool).await;
+    sqlx::query(
+        "UPDATE business_profiles SET branch_mode='multi', updated_at=NOW() WHERE business_id=$1 AND organization_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(seeded.organization_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let missing_location = SaleRepository::new(pool.clone())
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            sale_request(seeded.product_id),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(
+        missing_location,
+        SaleRepositoryError::Validation("sale_location_required")
+    );
+
+    let secondary_location_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO business_locations (
+          id, store_id, organization_id, business_id, name,
+          branch_code, branch_kind, is_primary, public_visibility
+        )
+        SELECT $1, store_id, organization_id, business_id, 'Cabang Dua',
+               'BR-02', 'kiosk', FALSE, TRUE
+        FROM business_locations
+        WHERE id=$2
+        "#,
+    )
+    .bind(secondary_location_id)
+    .bind(seeded.primary_location_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let mut secondary_request = sale_request(seeded.product_id);
+    secondary_request.location_id = Some(secondary_location_id);
+    let no_secondary_stock = SaleRepository::new(pool.clone())
+        .create(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            secondary_request,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(no_secondary_stock, SaleRepositoryError::InsufficientStock);
+
+    let primary_stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(primary_stock, Decimal::from(5_000));
 }
 
 #[sqlx::test(migrations = "./migrations")]

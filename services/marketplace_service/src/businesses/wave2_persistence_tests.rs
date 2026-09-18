@@ -9,6 +9,7 @@ struct SeededPurchaseContext {
     actor_id: Uuid,
     organization_id: Uuid,
     business_id: Uuid,
+    primary_location_id: Uuid,
     ingredient_id: Uuid,
 }
 
@@ -97,6 +98,7 @@ async fn seed_purchase_context(pool: &PgPool) -> SeededPurchaseContext {
         actor_id,
         organization_id,
         business_id,
+        primary_location_id: location_id,
         ingredient_id,
     }
 }
@@ -143,6 +145,10 @@ async fn purchase_writes_stock_and_finance_exactly_once(pool: PgPool) {
     assert!(!first.replayed);
     assert!(replay.replayed);
     assert_eq!(replay.purchase.id, first.purchase.id);
+    assert_eq!(first.purchase.location_id, seeded.primary_location_id);
+    assert_eq!(first.purchase.currency, "IDR");
+    assert!(first.purchase.document_number.contains("-PUR-"));
+    assert_eq!(first.purchase.policy_snapshot["accounting_mode"], "simple");
 
     let stock: Decimal =
         sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
@@ -192,6 +198,124 @@ async fn purchase_writes_stock_and_finance_exactly_once(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(finance_count, 1);
+
+    let event_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM events.event_outbox WHERE aggregate_type='business_purchase' AND aggregate_id=$1 AND event_type='marketplace.business.purchase_received'",
+    )
+    .bind(first.purchase.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(event_count, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn advanced_accounting_purchase_preserves_inventory_asset_semantics(pool: PgPool) {
+    let seeded = seed_purchase_context(&pool).await;
+    sqlx::query(
+        "UPDATE business_profiles SET accounting_mode='advanced', updated_at=NOW() WHERE business_id=$1 AND organization_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(seeded.organization_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let created = Wave2Repository::new(pool.clone())
+        .create_purchase(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            purchase_request(seeded.ingredient_id),
+        )
+        .await
+        .unwrap();
+
+    let entry_type: String = sqlx::query_scalar(
+        "SELECT entry_type FROM business_finance_entries WHERE source_type='business_purchase' AND source_id=$1",
+    )
+    .bind(created.purchase.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(entry_type, "inventory_purchase");
+    assert_eq!(created.purchase.policy_snapshot["accounting_mode"], "advanced");
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn multi_branch_purchase_posts_stock_only_to_selected_location(pool: PgPool) {
+    let seeded = seed_purchase_context(&pool).await;
+    sqlx::query(
+        "UPDATE business_profiles SET branch_mode='multi', updated_at=NOW() WHERE business_id=$1 AND organization_id=$2",
+    )
+    .bind(seeded.business_id)
+    .bind(seeded.organization_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secondary_location_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO business_locations (
+          id, store_id, organization_id, business_id, name,
+          branch_code, branch_kind, is_primary, public_visibility
+        )
+        SELECT $1, store_id, organization_id, business_id, 'Gudang Dua',
+               'WH-02', 'warehouse', FALSE, FALSE
+        FROM business_locations
+        WHERE id=$2
+        "#,
+    )
+    .bind(secondary_location_id)
+    .bind(seeded.primary_location_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let mut request = purchase_request(seeded.ingredient_id);
+    request.location_id = Some(secondary_location_id);
+    let created = Wave2Repository::new(pool.clone())
+        .create_purchase(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            Uuid::new_v4(),
+            request,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(created.purchase.location_id, secondary_location_id);
+
+    let secondary_balance: Decimal = sqlx::query_scalar(
+        "SELECT quantity FROM business_ingredient_balances WHERE location_id=$1 AND ingredient_id=$2",
+    )
+    .bind(secondary_location_id)
+    .bind(seeded.ingredient_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(secondary_balance, Decimal::from(3));
+
+    let primary_balance: Decimal = sqlx::query_scalar(
+        "SELECT quantity FROM business_ingredient_balances WHERE location_id=$1 AND ingredient_id=$2",
+    )
+    .bind(seeded.primary_location_id)
+    .bind(seeded.ingredient_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(primary_balance, Decimal::from(2));
+
+    let legacy_projection: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(legacy_projection, Decimal::from(2));
 }
 
 #[sqlx::test(migrations = "./migrations")]

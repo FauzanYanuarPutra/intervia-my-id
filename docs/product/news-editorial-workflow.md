@@ -99,7 +99,7 @@ The News domain also maintains durability and observability primitives:
 
 ## Hardening V3
 
-The third hardening pass turns News from a moderation flow into a safer newsroom operating surface:
+The third hardening pass turns News from a moderation flow into a safer newsroom operating surface. It explicitly covers scheduled publication and independent source review:
 
 - Approval can set a future RFC3339 publication time up to 90 days ahead. The article is approved operationally, but public list/detail queries require `published_at <= NOW()`, so the future timestamp acts as an embargo without a separate scheduler process.
 - Scheduled approvals emit `news.scheduled` instead of falsely telling contributors that the article is already public. CMS reports scheduled volume separately from actual published throughput.

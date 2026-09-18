@@ -17,8 +17,8 @@ It fails unless:
 - `archive_command` is non-empty and not an obvious no-op;
 - WAL senders are available.
 
-Passing this preflight proves only the database-side prerequisites. It does not
-prove that WAL reaches independent storage, that retention covers the desired
+Passing this preflight proves only the database-side prerequisites; it does not prove
+that WAL reaches independent storage, that retention covers the desired
 RPO, or that a timestamp restore succeeds.
 
 Production PITR is considered **verified** only when all of these have evidence:

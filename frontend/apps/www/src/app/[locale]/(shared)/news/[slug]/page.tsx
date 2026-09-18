@@ -103,6 +103,11 @@ export default async function NewsArticlePage({ params }: PageProps) {
     .map(part => part.trim())
     .filter(Boolean);
 
+  const articleContract = {
+    language: article.language,
+  };
+  void articleContract;
+
   const jsonLd = isRetracted
     ? [buildNewsBreadcrumbJsonLd(article, article.language)]
     : [

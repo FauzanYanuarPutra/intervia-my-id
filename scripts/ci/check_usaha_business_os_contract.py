@@ -53,6 +53,29 @@ def main() -> int:
     require('services/marketplace_service/migrations/20260823001000_usaha_business_os.up.sql', 'organization_id', 'business_locations', 'business_hours', 'public_visibility')
     require('services/marketplace_service/migrations/20260823001000_usaha_business_os.down.sql', 'business_locations')
     require('services/marketplace_service/migrations/20260906002000_usaha_business_control_center.up.sql', 'business_ingredients', 'business_recipes', 'business_channel_settings', 'business_finance_entries')
+    require(
+        'services/marketplace_service/migrations/20260919010000_business_execution_kernel_v1.up.sql',
+        'business_document_sequences', 'business_product_balances',
+        'business_product_inventory_movements', 'source_order_id',
+        'policy_snapshot', 'inventory_purchase',
+    )
+    require(
+        'services/marketplace_service/src/businesses/execution_policy.rs',
+        'BusinessExecutionPolicy', 'business_day_cutoff',
+        'resolve_operational_location_tx', 'allocate_document_number_tx',
+        'purchase_finance_entry_type',
+    )
+    require(
+        'services/marketplace_service/src/businesses/sales.rs',
+        'sale_location_required', 'business_product_balances',
+        'business_ingredient_balances', 'marketplace.business.sale_recorded',
+        'source_order_not_ready_for_sale',
+    )
+    require(
+        'services/marketplace_service/src/businesses/wave2.rs',
+        'purchase_location_required', 'purchase_finance_entry_type',
+        'business_ingredient_balances', 'marketplace.business.purchase_received',
+    )
     require('frontend/apps/www/src/lib/usahaWorkspace.ts', 'NEXT_PUBLIC_USAHA_URL')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
