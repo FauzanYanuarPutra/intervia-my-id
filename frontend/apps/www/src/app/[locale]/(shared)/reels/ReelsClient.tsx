@@ -2768,7 +2768,7 @@
 
             <section
               data-reel-media-frame="9:16"
-              className="relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-black md:w-[min(56.25dvh,600px)] md:flex-none md:ring-1 md:ring-white/[0.06] xl:border-x xl:border-white/10 xl:ring-0"
+              className="relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-black md:w-[min(56.25dvh,680px)] md:flex-none md:ring-1 md:ring-white/[0.06] 2xl:w-[min(56.25dvh,720px)] xl:border-x xl:border-white/10 xl:ring-0"
             >
               <ReelsTopBar
                 locale={locale}
@@ -3509,6 +3509,8 @@
                 type="button"
                 onClick={onFollow}
                 disabled={actionState.loading === 'follow'}
+                aria-pressed={actionState.followed}
+                aria-busy={actionState.loading === 'follow'}
                 className={cn(
                   'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition active:scale-[0.98] disabled:opacity-60',
                   actionState.followed
@@ -4667,6 +4669,8 @@
               type="button"
               onClick={action.onClick}
               disabled={action.loading || action.disabled}
+              aria-pressed={action.active}
+              aria-busy={action.loading}
               aria-label={action.ariaLabel}
               title={action.ariaLabel}
               className="flex max-w-11 flex-col items-center gap-0.5 transition active:scale-95 disabled:opacity-45 min-[390px]:max-w-12"
@@ -5271,6 +5275,8 @@
                 type="button"
                 onClick={() => onAction(reel, 'follow')}
                 disabled={actionState.loading === 'follow'}
+                aria-pressed={actionState.followed}
+                aria-busy={actionState.loading === 'follow'}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold disabled:opacity-60',
                   actionState.followed
@@ -5500,6 +5506,8 @@
                 type="button"
                 onClick={() => onAction(reel, 'follow')}
                 disabled={actionState.loading === 'follow'}
+                aria-pressed={actionState.followed}
+                aria-busy={actionState.loading === 'follow'}
                 className={cn(
                   'inline-flex h-11 items-center justify-center gap-2 rounded-2xl text-sm font-bold disabled:opacity-60',
                   actionState.followed

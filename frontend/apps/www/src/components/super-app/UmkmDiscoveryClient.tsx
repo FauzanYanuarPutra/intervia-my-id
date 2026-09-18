@@ -286,7 +286,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               <button
                 type="button"
                 onClick={handleBack}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200 active:scale-95 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 lg:hidden"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 lg:hidden"
                 aria-label={isId ? 'Kembali' : 'Back'}
               >
                 <ArrowLeft className="h-4.5 w-4.5" />
@@ -317,7 +317,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
 
               <button
                 type="submit"
-                className="inline-flex min-h-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 sm:min-h-[36px] sm:px-3.5"
+                className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3.5 text-[11px] font-bold text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 sm:min-h-11 sm:px-4"
               >
                 {isId ? 'Cari' : 'Search'}
               </button>
@@ -334,7 +334,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               onClick={handleClearCityFilter}
               aria-pressed={!cleanedCity}
               className={cn(
-                'inline-flex min-h-[32px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:min-h-[34px]',
+                'inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
                 cleanedCity
                   ? 'border-white/80 bg-white/92 text-slate-700 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100'
                   : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
@@ -352,7 +352,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                     ? `Hapus filter kota ${cleanedCity}`
                     : `Clear city filter ${cleanedCity}`
                 }
-                className="inline-flex min-h-[32px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] px-2.5 text-[11px] font-bold text-white shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-h-[34px]"
+                className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <MapPin className="h-3.5 w-3.5" />
                 {cleanedCity}
@@ -369,7 +369,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                   aria-pressed={active}
                   onClick={() => handleLanePick(lane)}
                   className={cn(
-                    'inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] sm:min-h-[34px] sm:px-3',
+                    'inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)]',
                     active
                       ? 'cursor-default border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-white'
                       : 'cursor-pointer border-white/80 bg-white/92 text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100',
@@ -384,7 +384,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               type="button"
               onClick={() => setShowAllLanes(current => !current)}
               aria-expanded={showAllLanes}
-              className="inline-flex min-h-[32px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-white/80 bg-white/92 px-2.5 text-[11px] font-bold text-slate-700 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100 sm:min-h-[34px] sm:px-3"
+              className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-white/80 bg-white/92 px-3 text-[11px] font-bold text-slate-700 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100"
             >
               {showAllLanes
                 ? isId

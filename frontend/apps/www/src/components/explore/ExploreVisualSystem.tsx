@@ -334,8 +334,32 @@ export function ExploreModeTabs<T extends string>({
             key={option.value}
             type="button"
             role="tab"
-            aria-selected={active ? true : undefined}
+            aria-selected={active}
+            tabIndex={active ? 0 : -1}
+            data-state={active ? 'active' : 'inactive'}
             onClick={() => onChange(option.value)}
+            onKeyDown={event => {
+              const currentIndex = options.findIndex(item => item.value === option.value);
+              let nextIndex: number | null = null;
+
+              if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                nextIndex = (currentIndex + 1) % options.length;
+              } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                nextIndex = (currentIndex - 1 + options.length) % options.length;
+              } else if (event.key === 'Home') {
+                nextIndex = 0;
+              } else if (event.key === 'End') {
+                nextIndex = options.length - 1;
+              }
+
+              if (nextIndex === null) return;
+              event.preventDefault();
+              onChange(options[nextIndex].value);
+              const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                '[role="tab"]',
+              );
+              tabs?.[nextIndex]?.focus();
+            }}
             className={cn(
               'min-h-11 min-w-0 rounded-[11px] px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/25 sm:px-3',
               active
