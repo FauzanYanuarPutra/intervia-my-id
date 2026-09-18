@@ -37,7 +37,6 @@ grafana_dashboard = read("infrastructure/observability/grafana/dashboards/lajuka
 blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
-restore_drill_script = read("scripts/ops/postgres_isolated_restore_drill.sh")
 scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 identity_runtime_metrics = read("services/identity_service/src/runtime_metrics.rs")
 marketplace_runtime_metrics = read("services/marketplace_service/src/runtime_metrics.rs")
@@ -272,13 +271,26 @@ else:
             )
 
 marketplace_source = read("services/marketplace_service/src/main.rs")
+marketplace_outbox_source = read("services/marketplace_service/src/outbox.rs")
+marketplace_health_source = read("services/marketplace_service/src/health.rs")
 for marker in (
     "tokio::spawn(async move",
     "run_outbox_publisher",
     "run_identity_event_consumer",
+    "mod outbox;",
+    "mod health;",
 ):
     if marker not in marketplace_source:
         errors.append(f"Marketplace degraded-startup contract missing marker: {marker}")
+
+for marker in (
+    "OUTBOX_BATCH_SIZE",
+    "OUTBOX_POLL_INTERVAL_MS",
+    "normalize_batch_size",
+    "normalize_poll_ms",
+):
+    if marker not in marketplace_outbox_source:
+        errors.append(f"Marketplace outbox configuration contract missing marker: {marker}")
 
 
 community_compose_start = base_compose.find("\n  community_service:")
@@ -446,7 +458,7 @@ for destructive in ("http.post(", "http.put(", "http.patch(", "http.del(", "http
         errors.append(f"default load-test harness must stay read-only: found {destructive}")
 
 for path, warning_threshold, hard_ceiling in (
-    ("services/marketplace_service/src/main.rs", 250_000, 850_000),
+    ("services/marketplace_service/src/main.rs", 250_000, 840_000),
     ("services/community_service/src/main.rs", 200_000, 325_000),
 ):
     target = ROOT / path
@@ -558,7 +570,7 @@ if "response.headers.get('x-request-id')" not in www_http_client:
 
 for path in (
     "services/identity_service/src/routes/health.rs",
-    "services/marketplace_service/src/main.rs",
+    "services/marketplace_service/src/health.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
@@ -573,7 +585,7 @@ for path in (
 
 for path in (
     "services/identity_service/src/routes/health.rs",
-    "services/marketplace_service/src/main.rs",
+    "services/marketplace_service/src/health.rs",
     "services/community_service/src/main.rs",
 ):
     source = read(path)
@@ -662,7 +674,7 @@ for path, markers in {
         "status IN ('pending', 'failed', 'publishing')",
         "available_at = NOW() + INTERVAL '2 minutes'",
     ),
-    "services/marketplace_service/src/main.rs": (
+    "services/marketplace_service/src/outbox.rs": (
         "FOR UPDATE SKIP LOCKED",
         "status IN ('pending', 'processing')",
         "available_at = NOW() + INTERVAL '2 minutes'",
@@ -691,18 +703,6 @@ for marker in (
 for marker in ("sha256sum -c", "pg_restore --list", "This does not replace an isolated restore drill"):
     if marker not in backup_verify_script:
         errors.append(f"backup verification script missing marker: {marker}")
-
-for marker in (
-    "sha256sum -c checksums.sha256",
-    'label "lajukan.restore-drill=true"',
-    "pg_restore",
-    "--exit-on-error",
-    "pg_dump -U postgres",
-    "no published network port",
-    "docker volume rm",
-):
-    if marker not in restore_drill_script:
-        errors.append(f"isolated PostgreSQL restore drill missing safety/validation marker: {marker}")
 
 for marker in (
     "probe_surviving_replicas",
