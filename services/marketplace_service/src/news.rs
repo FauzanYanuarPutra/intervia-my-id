@@ -250,8 +250,12 @@ fn public_news_row(
         id: row.id,
         slug: row.slug,
         title: row.title,
-        summary: (!is_retracted).then_some(row.summary).flatten(),
-        body: (include_body && !is_retracted).then_some(row.body),
+        summary: if is_retracted { None } else { row.summary },
+        body: if include_body && !is_retracted {
+            Some(row.body)
+        } else {
+            None
+        },
         tags: if is_retracted { None } else { row.tags },
         cover_image: if is_retracted { None } else { row.cover_image },
         metadata: public_news_metadata(&row.metadata, public_sources),
