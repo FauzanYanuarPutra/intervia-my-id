@@ -120,9 +120,9 @@ struct AccessClaims {
     pub roles: Vec<String>,
     pub perms: Vec<String>,
     pub username: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iss: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aud: Option<String>,
 }
 
