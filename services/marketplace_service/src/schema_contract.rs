@@ -229,6 +229,20 @@ pub(crate) async fn verify_schema_contract(db: &PgPool) -> anyhow::Result<()> {
            AND to_regclass('public.news_article_versions') IS NOT NULL
            AND to_regclass('public.news_source_references') IS NOT NULL
            AND to_regclass('public.news_source_review_events') IS NOT NULL
+           AND EXISTS (
+             SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'news_source_review_events'
+               AND column_name = 'source_url_snapshot'
+           )
+           AND EXISTS (
+             SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'news_source_review_events'
+               AND column_name = 'source_domain_snapshot'
+           )
         "#,
     )
     .fetch_one(db)
