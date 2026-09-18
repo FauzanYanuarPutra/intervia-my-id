@@ -32,7 +32,13 @@ function isPrivateSourceHost(hostname: string): boolean {
   if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) {
     return true;
   }
-  if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) {
+  if (
+    host.includes(':') &&
+    (host === '::1' ||
+      host.startsWith('fc') ||
+      host.startsWith('fd') ||
+      host.startsWith('fe80:'))
+  ) {
     return true;
   }
   const parts = host.split('.').map(Number);
