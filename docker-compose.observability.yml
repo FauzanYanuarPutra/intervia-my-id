@@ -12,6 +12,7 @@ services:
     volumes:
       - ./infrastructure/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./infrastructure/observability/alerts.yml:/etc/prometheus/rules/alerts.yml:ro
+      - ./infrastructure/observability/slo-rules.yml:/etc/prometheus/rules/slo-rules.yml:ro
       - prometheus_data:/prometheus
     expose: ["9090"]
     healthcheck:
@@ -145,6 +146,27 @@ services:
       redis_cache: { condition: service_healthy }
     networks: [cache]
 
+  grafana:
+    profiles: [observability]
+    image: ${GRAFANA_IMAGE:-grafana/grafana:13.2.1}
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required for the observability profile}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ENABLE_GZIP: "true"
+    volumes:
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3005}:3000"
+    depends_on:
+      prometheus: { condition: service_healthy }
+    networks: [app]
+
 volumes:
   prometheus_data:
   alertmanager_data:
+  grafana_data:
