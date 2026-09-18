@@ -105,12 +105,104 @@ def check_app(app: str) -> None:
             )
 
 
+def check_client_module_boundaries() -> None:
+    contracts = (
+        (
+            FRONTEND
+            / "apps"
+            / "www"
+            / "src"
+            / "app"
+            / "[locale]"
+            / "(shared)"
+            / "reels"
+            / "ReelsClient.tsx",
+            FRONTEND
+            / "apps"
+            / "www"
+            / "src"
+            / "app"
+            / "[locale]"
+            / "(shared)"
+            / "reels"
+            / "reels-client-helpers.ts",
+            350_000,
+            (
+                "resolveNotificationReelId",
+                "isReelCommentNotification",
+                "normalizeRecipientName",
+            ),
+        ),
+        (
+            FRONTEND
+            / "apps"
+            / "www"
+            / "src"
+            / "components"
+            / "community"
+            / "CommunityFeedClient.tsx",
+            FRONTEND
+            / "apps"
+            / "www"
+            / "src"
+            / "components"
+            / "community"
+            / "community-feed-helpers.ts",
+            265_000,
+            (
+                "parseCommunityPoll",
+                "sanitizeCommunitySearchResults",
+                "normalizeCommunityMediaItems",
+            ),
+        ),
+    )
+
+    for client_path, helper_path, hard_ceiling, extracted_functions in contracts:
+        if not client_path.is_file():
+            fail(f"missing giant-client boundary file: {client_path.relative_to(ROOT)}")
+        if not helper_path.is_file():
+            fail(f"missing extracted helper module: {helper_path.relative_to(ROOT)}")
+
+        client_source = client_path.read_text(encoding="utf-8")
+        helper_source = helper_path.read_text(encoding="utf-8")
+        client_size = client_path.stat().st_size
+        if client_size > hard_ceiling:
+            fail(
+                f"{client_path.relative_to(ROOT)} exceeded the frontend architecture "
+                f"debt ceiling ({client_size:,} > {hard_ceiling:,} bytes); extract a "
+                "coherent responsibility instead of growing the client component"
+            )
+
+        helper_import = helper_path.stem
+        if helper_import not in client_source:
+            fail(
+                f"{client_path.relative_to(ROOT)} must import its extracted "
+                f"{helper_import} boundary"
+            )
+
+        for function_name in extracted_functions:
+            if function_name not in helper_source:
+                fail(
+                    f"{helper_path.relative_to(ROOT)} lost extracted helper: "
+                    f"{function_name}"
+                )
+            if f"function {function_name}(" in client_source:
+                fail(
+                    f"{client_path.relative_to(ROOT)} leaked extracted helper back "
+                    f"into the giant client: {function_name}"
+                )
+
+
 def main() -> int:
     check_node_runtime_alignment()
     check_shared_package()
     for app in APPS:
         check_app(app)
-    print("Frontend runtime contract OK: Node 22, www, usaha, cms, crm")
+    check_client_module_boundaries()
+    print(
+        "Frontend runtime contract OK: Node 22, www, usaha, cms, crm, "
+        "and client module debt ceilings"
+    )
     return 0
 
 
