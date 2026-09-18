@@ -5,7 +5,6 @@ describe('news SEO normalization', () => {
   it('normalizes editorial metadata and keeps valid citations', () => {
     const article = normalizeNewsArticle({
       id: '11111111-1111-1111-1111-111111111111',
-      owner_id: '22222222-2222-2222-2222-222222222222',
       slug: 'ekonomi-umkm',
       title: 'Ekonomi UMKM bergerak',
       summary: 'Ringkasan berita',
@@ -32,7 +31,6 @@ describe('news SEO normalization', () => {
   it('keeps retraction state while hiding reserved system tags from public topics', () => {
     const article = normalizeNewsArticle({
       id: '11111111-1111-1111-1111-111111111111',
-      owner_id: '22222222-2222-2222-2222-222222222222',
       slug: 'ditarik',
       title: 'Berita yang ditarik',
       summary: 'Ringkasan berita yang sudah ditarik.',
@@ -59,7 +57,6 @@ describe('news SEO normalization', () => {
   it('emits NewsArticle structured data', () => {
     const article = normalizeNewsArticle({
       id: '11111111-1111-1111-1111-111111111111',
-      owner_id: '22222222-2222-2222-2222-222222222222',
       slug: 'contoh',
       title: 'Contoh berita ekonomi',
       summary: 'Ringkasan',
