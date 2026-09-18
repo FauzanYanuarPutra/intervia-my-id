@@ -62,6 +62,14 @@ describe('business API error normalization', () => {
     )).toBe('Operasi belum berhasil.');
   });
 
+  it('maps operational conflict codes to a recovery action', () => {
+    expect(businessApiErrorMessage(
+      { error: 'business_wave2_conflict' },
+      'Operasi belum berhasil.',
+      409,
+    )).toBe('Aksi ini bentrok dengan kondisi terbaru. Muat ulang halaman lalu coba lagi.');
+  });
+
   it('uses a safe generic message for server failures', () => {
     expect(businessApiErrorMessage(
       { error: 'database_pool_failed' },
