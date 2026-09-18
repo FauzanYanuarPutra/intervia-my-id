@@ -12,9 +12,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    auth_claims_from_headers,
-    businesses::transactions::state::OrderState,
-    has_agent_access,
+    auth_claims_from_headers, businesses::transactions::state::OrderState, has_agent_access,
     AppState,
 };
 
