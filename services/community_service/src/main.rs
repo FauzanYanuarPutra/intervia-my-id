@@ -2022,6 +2022,7 @@ async fn run_rate_limit_cleanup(db: PgPool) {
               FROM community_rate_limit_counters
               WHERE expires_at < now() - INTERVAL '1 hour'
               ORDER BY expires_at ASC
+              FOR UPDATE SKIP LOCKED
               LIMIT 5000
             )
             DELETE FROM community_rate_limit_counters AS counters

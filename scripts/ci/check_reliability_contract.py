@@ -134,6 +134,13 @@ for marker in (
         errors.append(f"Community RabbitMQ backpressure contract missing: {marker}")
 
 for marker in (
+    "community_rate_limit_counters",
+    "FOR UPDATE SKIP LOCKED",
+):
+    if marker not in community_main_source:
+        errors.append(f"Community multi-replica cleanup contract missing: {marker}")
+
+for marker in (
     "MARKETPLACE_IDENTITY_TIMEOUT_MS",
     ".clamp(250, 10_000)",
     ".timeout(self.request_timeout)",
