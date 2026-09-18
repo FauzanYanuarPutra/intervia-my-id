@@ -42,5 +42,4 @@ ON content_items (
   id DESC
 )
 WHERE content_type = 'news'
-  AND content_status = 'active'
-  AND COALESCE(metadata->'news'->>'location', '') <> '';
+  AND content_status = 'active';
