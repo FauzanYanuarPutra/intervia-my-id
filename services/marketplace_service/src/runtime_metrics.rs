@@ -93,25 +93,32 @@ pub async fn track_request(mut request: Request, next: Next) -> Response {
     }
 
     let request_path = request.uri().path().to_owned();
-    let _request_permit = match try_acquire_request_permit(&request_path) {
-        Ok(permit) => permit,
-        Err(()) => {
-            HTTP_REJECTED_OVERLOAD_TOTAL.fetch_add(1, Ordering::Relaxed);
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                [(header::RETRY_AFTER, "1")],
-                "service overloaded",
-            )
-                .into_response();
-        }
-    };
-
     let request_id = resolve_request_id(&request);
     let request_id_header = HeaderValue::from_str(&request_id)
         .expect("validated/generated request id is a valid header");
     request
         .headers_mut()
         .insert("x-request-id", request_id_header.clone());
+
+    let _request_permit = match try_acquire_request_permit(&request_path) {
+        Ok(permit) => permit,
+        Err(()) => {
+            HTTP_REQUESTS_TOTAL.fetch_add(1, Ordering::Relaxed);
+            HTTP_RESPONSES_5XX.fetch_add(1, Ordering::Relaxed);
+            HTTP_REJECTED_OVERLOAD_TOTAL.fetch_add(1, Ordering::Relaxed);
+
+            let mut response = (
+                StatusCode::SERVICE_UNAVAILABLE,
+                [(header::RETRY_AFTER, "1")],
+                "service overloaded",
+            )
+                .into_response();
+            response
+                .headers_mut()
+                .insert("x-request-id", request_id_header);
+            return response;
+        }
+    };
 
     let method = request.method().clone();
     let path = request_path;
