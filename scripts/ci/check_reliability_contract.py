@@ -96,6 +96,34 @@ for marker in ("http_2xx", "tcp_connect"):
     if marker not in blackbox_config:
         errors.append(f"blackbox config missing module: {marker}")
 
+community_compose_start = base_compose.find("\n  community_service:")
+community_compose_end = base_compose.find("\n  chat_service:", community_compose_start)
+if community_compose_start < 0 or community_compose_end < 0:
+    errors.append("unable to locate Community Compose service block")
+else:
+    community_compose = base_compose[community_compose_start:community_compose_end]
+    if "community_db: { condition: service_healthy }" not in community_compose:
+        errors.append("Community startup must remain gated on its owned database")
+    for forbidden_dependency in (
+        "redis_cache: { condition: service_healthy }",
+        "rabbitmq: { condition: service_healthy }",
+        "identity_service: { condition: service_healthy }",
+    ):
+        if forbidden_dependency in community_compose:
+            errors.append(
+                f"Community startup must remain isolated from degradable dependency: {forbidden_dependency}"
+            )
+
+community_source = read("services/community_service/src/main.rs")
+for marker in (
+    "Identity enrichment is best-effort and must not delay Community readiness.",
+    "tokio::spawn(async move",
+    "run_identity_profile_consumer",
+):
+    if marker not in community_source:
+        errors.append(f"Community degraded-startup contract missing marker: {marker}")
+
+
 for marker in (
     "IDENTITY_DB_MAX_CONNECTIONS",
     "IDENTITY_DB_MIN_CONNECTIONS",
