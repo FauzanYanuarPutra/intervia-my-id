@@ -62,6 +62,12 @@ require(
         "''::text AS body",
         "search query is too long",
         "news cursor is too long",
+        "PUBLIC_NEWS_MAX_OFFSET: i64 = 1_000",
+        "cursor cannot be combined with offset",
+        "is_public_news_source_ipv4",
+        "is_public_news_source_ipv6",
+        "to_ipv4_mapped",
+        "is_multicast",
         "public_verified_source_urls",
         "verification_status = 'verified'",
         "unsupported news source URL",
@@ -278,6 +284,28 @@ for marker in (
         errors.append(f"frontend/apps/www/src/app/sitemap.ts missing News sitemap marker: {marker}")
 
 require(
+    "frontend/packages/utils/externalUrl.ts",
+    (
+        "isSafeExternalHttpUrl",
+        "normalizeSafeExternalHttpUrl",
+        "100 && b >= 64 && b <= 127",
+        "198 && (b === 18 || b === 19)",
+        "2001:db8:",
+        "64:ff9b:",
+    ),
+)
+
+require(
+    "frontend/packages/test/external-url.test.ts",
+    (
+        "::ffff:127.0.0.1",
+        "169.254.169.254",
+        "198.51.100.1",
+        "2001:db8::1",
+    ),
+)
+
+require(
     "frontend/apps/www/src/app/api/news/submissions/route.ts",
     (
         "Berita dan analisis membutuhkan minimal satu URL sumber.",
@@ -295,7 +323,7 @@ require(
         "source_urls",
         "topics",
         "evaluateTrustSafety",
-        "isPrivateSourceHost",
+        "normalizeSafeExternalHttpUrl",
     ),
 )
 
@@ -305,7 +333,7 @@ require(
         "Source provenance",
         "hasVerifiedSource",
         "requiresVerifiedSource",
-        "isSafeExternalSourceUrl",
+        "isSafeExternalHttpUrl as isSafeExternalSourceUrl",
         "requiresVerifiedSource && !hasVerifiedSource",
         "wouldBreakPublishedProvenance",
         "Verifikasi sumber pengganti atau retract artikel",
@@ -330,6 +358,8 @@ require(
         "page.nextCursor",
         "page.nextCursor === cursor",
         "getNewsLanguageAvailability",
+        "Math.min(1_000",
+        "offset > 0 && !cursor",
         "highCardinalityRequest",
         "options.topic?.trim()",
         "options.location?.trim()",
