@@ -96,6 +96,20 @@ for marker in ("http_2xx", "tcp_connect"):
     if marker not in blackbox_config:
         errors.append(f"blackbox config missing module: {marker}")
 
+frontend_service_order = ("www", "cms", "crm", "usaha", "caddy")
+for index, frontend_name in enumerate(frontend_service_order[:-1]):
+    start = base_compose.find(f"\n  {frontend_name}:")
+    end = base_compose.find(f"\n  {frontend_service_order[index + 1]}:", start)
+    if start < 0 or end < 0:
+        errors.append(f"unable to locate frontend Compose block: {frontend_name}")
+        continue
+    frontend_block = base_compose[start:end]
+    if "depends_on:" in frontend_block:
+        errors.append(
+            f"Frontend process startup must remain independent from backend health: {frontend_name}"
+        )
+
+
 identity_compose_start = base_compose.find("\n  identity_service:")
 identity_compose_end = base_compose.find("\n  marketplace_service:", identity_compose_start)
 if identity_compose_start < 0 or identity_compose_end < 0:
