@@ -8,7 +8,10 @@ on:
       - "services/**"
       - "frontend/**"
       - ".github/workflows/images.yml"
+      - ".github/workflows/deploy.yml"
       - "docker-compose*.yml"
+      - "infrastructure/caddy/**"
+      - "scripts/ops/**"
   pull_request:
     branches: [main]
     paths: *image_paths
@@ -72,6 +75,8 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]]; then
@@ -87,11 +92,11 @@ jobs:
 
           echo "available=false" >> "$GITHUB_OUTPUT"
           echo "namespace=local" >> "$GITHUB_OUTPUT"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "Manual image publication requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN repository/environment secrets." >&2
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || ( "$EVENT_NAME" == "push" && "$GIT_REF" == "refs/heads/main" ) ]]; then
+            echo "Main/manual image publication requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN repository/environment secrets." >&2
             exit 1
           fi
-          echo "Docker Hub credentials are not configured; validating image builds without publishing."
+          echo "Docker Hub credentials are not configured; pull requests remain build-only and will not publish images."
 
       - uses: docker/setup-buildx-action@v4
 
