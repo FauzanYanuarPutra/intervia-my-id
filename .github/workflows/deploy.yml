@@ -368,6 +368,18 @@ jobs:
           export DOCKERHUB_NAMESPACE="$IMAGE_NAMESPACE"
           docker compose "${compose[@]}" config --quiet
           docker compose "${compose[@]}" pull
+
+          # Run schema changes exactly once per release before replacing application
+          # replicas. The normal staging/production service processes have startup
+          # migrations disabled and only verify the resulting schema.
+          for migration_service in identity_service marketplace_service community_service; do
+            echo "Running release migration: $migration_service"
+            docker compose "${compose[@]}" run --rm -T \
+              -e MIGRATE_ONLY=1 \
+              -e RUN_MIGRATIONS_ON_STARTUP=true \
+              "$migration_service"
+          done
+
           deployment_started=1
           docker compose "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420
 
