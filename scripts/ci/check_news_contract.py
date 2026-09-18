@@ -101,6 +101,17 @@ require(
 )
 
 require(
+    "services/marketplace_service/src/schema_contract.rs",
+    (
+        "public.news_editorial_events",
+        "public.news_article_versions",
+        "public.news_source_references",
+        "public.news_source_review_events",
+        "marketplace schema contract is incomplete after migrations",
+    ),
+)
+
+require(
     "services/marketplace_service/migrations/20260919003000_news_source_review_history.up.sql",
     (
         "CREATE TABLE IF NOT EXISTS news_source_review_events",
