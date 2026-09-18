@@ -2298,7 +2298,7 @@ mod tests {
     use super::{
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
         moderation_target, normalize_news_language, normalize_queue_status, parse_news_cursor,
-        public_news_metadata, source_domain,
+        public_news_metadata, source_domain, validate_submission_payload,
     };
     use serde_json::json;
 
@@ -2424,6 +2424,67 @@ mod tests {
         );
         assert!(normalize_news_language(Some("fr".to_string())).is_err());
         assert_eq!(normalize_news_language(None).unwrap(), None);
+    }
+
+    #[test]
+    fn generic_news_submission_requires_editorial_quality_floor() {
+        let valid_metadata = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "news",
+                "language": "id",
+                "source_urls": ["https://www.bi.go.id/id/publikasi"]
+            }
+        });
+        let body = "a".repeat(120);
+
+        assert!(validate_submission_payload(
+            "Judul berita yang valid",
+            Some("Ringkasan berita yang cukup panjang."),
+            &body,
+            &valid_metadata,
+        )
+        .is_ok());
+
+        assert!(validate_submission_payload(
+            "Pendek",
+            Some("Ringkasan berita yang cukup panjang."),
+            &body,
+            &valid_metadata,
+        )
+        .is_err());
+
+        let missing_sources = json!({
+            "news": {
+                "category": "Ekonomi",
+                "article_kind": "analysis",
+                "language": "id",
+                "source_urls": []
+            }
+        });
+        assert!(validate_submission_payload(
+            "Analisis ekonomi terbaru",
+            Some("Ringkasan analisis yang cukup panjang."),
+            &body,
+            &missing_sources,
+        )
+        .is_err());
+
+        let press_release = json!({
+            "news": {
+                "category": "Bisnis",
+                "article_kind": "press_release",
+                "language": "id",
+                "source_urls": []
+            }
+        });
+        assert!(validate_submission_payload(
+            "Rilis bisnis perusahaan",
+            Some("Ringkasan rilis bisnis yang cukup panjang."),
+            &body,
+            &press_release,
+        )
+        .is_ok());
     }
 
     #[test]
