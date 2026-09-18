@@ -273,10 +273,17 @@ fn is_allowed_news_source_url(raw: &str) -> bool {
     let Ok(url) = reqwest::Url::parse(raw) else {
         return false;
     };
-    if !matches!(url.scheme(), "http" | "https") || !url.username().is_empty() || url.password().is_some() {
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
         return false;
     }
-    let Some(host) = url.host_str().map(str::trim).filter(|host| !host.is_empty()) else {
+    let Some(host) = url
+        .host_str()
+        .map(str::trim)
+        .filter(|host| !host.is_empty())
+    else {
         return false;
     };
     let host_lower = host.to_ascii_lowercase();
@@ -289,10 +296,7 @@ fn is_allowed_news_source_url(raw: &str) -> bool {
     if let Ok(ip) = host.parse::<IpAddr>() {
         return match ip {
             IpAddr::V4(ip) => {
-                !(ip.is_private()
-                    || ip.is_loopback()
-                    || ip.is_link_local()
-                    || ip.is_unspecified())
+                !(ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified())
             }
             IpAddr::V6(ip) => {
                 !(ip.is_loopback()
@@ -617,7 +621,11 @@ fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
 
 fn source_domain(source_url: &str) -> Option<String> {
     let url = reqwest::Url::parse(source_url).ok()?;
-    let host = url.host_str()?.trim().trim_start_matches("www.").to_ascii_lowercase();
+    let host = url
+        .host_str()?
+        .trim()
+        .trim_start_matches("www.")
+        .to_ascii_lowercase();
     if host.is_empty() {
         None
     } else {
@@ -1146,7 +1154,11 @@ async fn get_news(
                     );
                 }
             };
-            (StatusCode::OK, Json(public_news_row(item, Some(&sources), true))).into_response()
+            (
+                StatusCode::OK,
+                Json(public_news_row(item, Some(&sources), true)),
+            )
+                .into_response()
         }
         Ok(None) => response_error(StatusCode::NOT_FOUND, "news article not found"),
         Err(error) => {
@@ -1272,7 +1284,8 @@ async fn update_news_submission(
         Ok(value) => value,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
-    let topics = requested_topics.unwrap_or_else(|| public_topics_from_tags(current.tags.as_deref()));
+    let topics =
+        requested_topics.unwrap_or_else(|| public_topics_from_tags(current.tags.as_deref()));
 
     let mut metadata = current.metadata.clone();
     if !metadata.is_object() {
@@ -1313,10 +1326,7 @@ async fn update_news_submission(
                 if location.len() > 120 {
                     return response_error(StatusCode::BAD_REQUEST, "location is too long");
                 }
-                news.insert(
-                    "location".to_string(),
-                    Value::String(location.to_string()),
-                );
+                news.insert("location".to_string(), Value::String(location.to_string()));
             }
         }
         if let Some(source_urls) = requested_sources {
@@ -1383,10 +1393,7 @@ async fn update_news_submission(
             "news and analysis require at least one valid public source URL",
         );
     }
-    if let Some(news) = metadata
-        .get_mut("news")
-        .and_then(Value::as_object_mut)
-    {
+    if let Some(news) = metadata.get_mut("news").and_then(Value::as_object_mut) {
         news.insert("source_urls".to_string(), json!(final_sources));
     }
 
@@ -1685,9 +1692,7 @@ async fn moderate_news(
             return response_error(StatusCode::UNPROCESSABLE_ENTITY, message);
         }
     }
-    if matches!(action.as_str(), "approve" | "correct")
-        && !is_press_release(&current.metadata)
-    {
+    if matches!(action.as_str(), "approve" | "correct") && !is_press_release(&current.metadata) {
         match has_verified_source_tx(&mut tx, current.id).await {
             Ok(true) => {}
             Ok(false) => {
@@ -2214,9 +2219,9 @@ async fn list_editorial_history(
 #[cfg(test)]
 mod tests {
     use super::{
-        is_allowed_news_source_url, moderation_action_allowed,
-        moderation_action_requires_note, moderation_target, normalize_news_language,
-        normalize_queue_status, parse_news_cursor, public_news_metadata, source_domain,
+        is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
+        moderation_target, normalize_news_language, normalize_queue_status, parse_news_cursor,
+        public_news_metadata, source_domain,
     };
     use serde_json::json;
 
@@ -2298,11 +2303,15 @@ mod tests {
         let public = public_news_metadata(&metadata, Some(&verified_sources));
 
         assert_eq!(
-            public.pointer("/news/category").and_then(|value| value.as_str()),
+            public
+                .pointer("/news/category")
+                .and_then(|value| value.as_str()),
             Some("Ekonomi")
         );
         assert_eq!(
-            public.pointer("/news/source_urls/0").and_then(|value| value.as_str()),
+            public
+                .pointer("/news/source_urls/0")
+                .and_then(|value| value.as_str()),
             Some("https://www.bi.go.id/")
         );
         assert!(public.pointer("/news/contributor_id").is_none());
@@ -2313,12 +2322,16 @@ mod tests {
 
     #[test]
     fn public_source_policy_rejects_local_or_credentialed_urls() {
-        assert!(is_allowed_news_source_url("https://www.bi.go.id/id/publikasi"));
+        assert!(is_allowed_news_source_url(
+            "https://www.bi.go.id/id/publikasi"
+        ));
         assert!(!is_allowed_news_source_url("http://127.0.0.1/admin"));
         assert!(!is_allowed_news_source_url("http://10.10.0.1/internal"));
         assert!(!is_allowed_news_source_url("http://localhost:8080/private"));
         assert!(!is_allowed_news_source_url("http://[::1]/private"));
-        assert!(!is_allowed_news_source_url("https://user:pass@example.com/source"));
+        assert!(!is_allowed_news_source_url(
+            "https://user:pass@example.com/source"
+        ));
         assert!(!is_allowed_news_source_url("file:///etc/passwd"));
     }
 
