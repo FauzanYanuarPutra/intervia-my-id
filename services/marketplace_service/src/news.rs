@@ -2438,7 +2438,8 @@ mod tests {
         is_allowed_news_source_url, moderation_action_allowed, moderation_action_requires_note,
         moderation_target, normalize_news_category_filter, normalize_news_language,
         normalize_news_search_query, normalize_queue_status, parse_news_cursor,
-        public_news_metadata, source_domain, validate_submission_payload,
+        public_news_metadata, removes_verified_source, source_domain,
+        validate_submission_payload,
     };
     use serde_json::json;
 
@@ -2535,6 +2536,16 @@ mod tests {
         assert!(public.pointer("/news/reviewer_id").is_none());
         assert!(public.pointer("/news/review_note").is_none());
         assert!(public.pointer("/news/previous_review_note").is_none());
+    }
+
+    #[test]
+    fn published_source_guard_only_triggers_on_verified_downgrade() {
+        assert!(removes_verified_source("verified", Some("broken")));
+        assert!(removes_verified_source("verified", Some("rejected")));
+        assert!(removes_verified_source("verified", Some("unverified")));
+        assert!(!removes_verified_source("verified", Some("verified")));
+        assert!(!removes_verified_source("verified", None));
+        assert!(!removes_verified_source("unverified", Some("broken")));
     }
 
     #[test]
