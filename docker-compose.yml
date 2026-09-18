@@ -606,14 +606,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
-      marketplace_service: { condition: service_healthy }
-      community_service: { condition: service_healthy }
-      chat_service: { condition: service_healthy }
-      ai_service: { condition: service_healthy }
-      redis_cache: { condition: service_healthy }
-      minio: { condition: service_healthy }
     networks: [app, cache, media]
 
   cms:
@@ -635,8 +627,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
     networks: [app]
 
   crm:
@@ -662,8 +652,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
     networks: [app]
 
   usaha:
@@ -694,10 +682,6 @@ services:
       timeout: 8s
       retries: 10
       start_period: 45s
-    depends_on:
-      identity_service: { condition: service_healthy }
-      marketplace_service: { condition: service_healthy }
-      community_service: { condition: service_healthy }
     networks: [app]
 
   # ---------------------------------------------------------------------------
