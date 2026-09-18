@@ -53,7 +53,8 @@ services:
       REDIS_URL: ${HA_REDIS_URL:?HA_REDIS_URL is required}
       RABBITMQ_URL: ${HA_RABBITMQ_URL:?HA_RABBITMQ_URL is required}
     depends_on: !override []
-    volumes: !override []
+    volumes: !override
+      - ${HA_COMMUNITY_MEDIA_MOUNT:?HA_COMMUNITY_MEDIA_MOUNT is required}:/app/uploads/forum
 
   chat_service:
     environment:
