@@ -161,6 +161,7 @@ export async function getPublishedNews(options: {
   category?: string;
   topic?: string;
   location?: string;
+  language?: 'id' | 'en';
   query?: string;
   cursor?: string;
   limit?: number;
@@ -172,6 +173,7 @@ export async function getPublishedNews(options: {
   if (options.category?.trim()) params.set('category', options.category.trim());
   if (options.topic?.trim()) params.set('topic', options.topic.trim());
   if (options.location?.trim()) params.set('location', options.location.trim());
+  if (options.language) params.set('language', options.language);
   if (options.query?.trim()) params.set('q', options.query.trim());
   if (options.cursor?.trim()) params.set('cursor', options.cursor.trim());
 
@@ -209,11 +211,18 @@ export async function getPublishedNewsArticle(slug: string): Promise<LajukanNews
 
 export async function getNewsForSitemap(maxItems = 1000): Promise<LajukanNewsArticle[]> {
   const collected: LajukanNewsArticle[] = [];
-  for (let offset = 0; offset < maxItems; offset += 100) {
-    const page = await getPublishedNews({ limit: 100, offset });
+  let cursor: string | undefined;
+
+  while (collected.length < maxItems) {
+    const page = await getPublishedNews({
+      limit: Math.min(100, maxItems - collected.length),
+      cursor,
+    });
     collected.push(...page.items);
-    if (!page.hasMore || page.items.length === 0) break;
+    if (!page.hasMore || page.items.length === 0 || !page.nextCursor) break;
+    cursor = page.nextCursor;
   }
+
   return collected.slice(0, maxItems);
 }
 
