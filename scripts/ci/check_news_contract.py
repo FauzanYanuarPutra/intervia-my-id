@@ -55,6 +55,9 @@ require(
         "public_news_metadata",
         "normalize_news_language",
         "websearch_to_tsquery",
+        "normalize_news_category_filter",
+        "tags @> ARRAY[$2]::text[]",
+        "''::text AS body",
         "search query is too long",
         "public_verified_source_urls",
         "verification_status = 'verified'",
@@ -93,9 +96,14 @@ require(
     "services/marketplace_service/migrations/20260918174500_news_search_index.up.sql",
     (
         "idx_content_items_news_search",
+        "idx_content_items_news_tags",
+        "idx_content_items_news_language_cursor",
+        "idx_content_items_news_category_language_cursor",
+        "idx_content_items_news_location_language_cursor",
         "USING GIN",
         "to_tsvector",
         "content_type = 'news'",
+        "content_status = 'active'",
     ),
 )
 
