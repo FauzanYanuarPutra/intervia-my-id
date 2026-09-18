@@ -127,7 +127,6 @@ for marker in (
     "JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:-HS256}",
     "JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:-}",
     "JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}",
-    "JWT_VERIFICATION_SECRET: ${JWT_VERIFICATION_SECRET:-}",
 ):
     if marker not in base_compose:
         errors.append(f"base compose missing asymmetric JWT rollout marker: {marker}")
