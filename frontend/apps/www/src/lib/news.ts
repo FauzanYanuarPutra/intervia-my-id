@@ -166,18 +166,20 @@ export async function getPublishedNews(options: {
 } = {}): Promise<{ items: LajukanNewsArticle[]; hasMore: boolean; nextCursor: string | null }> {
   const params = new URLSearchParams();
   params.set('limit', String(Math.min(100, Math.max(1, options.limit || 24))));
-  params.set('offset', String(Math.max(0, options.offset || 0)));
+  const cursor = options.cursor?.trim() || '';
+  const offset = Math.min(1_000, Math.max(0, options.offset || 0));
+  if (offset > 0 && !cursor) params.set('offset', String(offset));
   if (options.category?.trim()) params.set('category', options.category.trim());
   if (options.topic?.trim()) params.set('topic', options.topic.trim());
   if (options.location?.trim()) params.set('location', options.location.trim());
   if (options.language) params.set('language', options.language);
   if (options.query?.trim()) params.set('q', options.query.trim());
-  if (options.cursor?.trim()) params.set('cursor', options.cursor.trim());
+  if (cursor) params.set('cursor', cursor);
 
   const highCardinalityRequest = Boolean(
     options.query?.trim() ||
       options.cursor?.trim() ||
-      (options.offset || 0) > 0 ||
+      offset > 0 ||
       options.topic?.trim() ||
       options.location?.trim(),
   );
