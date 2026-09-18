@@ -1,4 +1,4 @@
-use std::sync::Arc;
+    service::{BusinessService, BusinessServiceError},use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
@@ -26,7 +26,7 @@ use super::{
     },
     recipes::{RecipeRepository, RecipeRepositoryError},
     repository::BusinessRepository,
-    service::{BusinessService, BusinessServiceError},
+
     seller_orders::{
         SellerOrderRepository, SellerOrderRepositoryError, TransitionSellerOrderRequest,
     },
@@ -903,10 +903,9 @@ fn settlement_error_response(error: SettlementRepositoryError) -> Response {
             StatusCode::NOT_FOUND,
             "business_settlement_resource_not_found",
         ),
-        SettlementRepositoryError::Conflict => api_error(
-            StatusCode::CONFLICT,
-            "business_settlement_command_conflict",
-        ),
+        SettlementRepositoryError::Conflict => {
+            api_error(StatusCode::CONFLICT, "business_settlement_command_conflict")
+        }
         SettlementRepositoryError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_settlement_storage_unavailable",
