@@ -68,7 +68,7 @@ for marker in (
     if marker not in prometheus_config:
         errors.append(f"Prometheus config missing required job: {marker}")
 
-for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown"):
+for marker in ("LajukanProbeFailed", "LajukanPostgresDown", "LajukanRedisDown", "LajukanHttp5xxRateHigh", "LajukanHttpP95LatencyHigh"):
     if marker not in alerts_config:
         errors.append(f"Prometheus alert rules missing: {marker}")
 
@@ -151,6 +151,23 @@ for path, threshold in (
 
 if not re.search(r"image:\s+\$\{DOCKERHUB_NAMESPACE", prod_compose):
     errors.append("production services must continue using registry image references")
+
+for path in (
+    "services/identity_service/src/runtime_metrics.rs",
+    "services/marketplace_service/src/runtime_metrics.rs",
+    "services/community_service/src/runtime_metrics.rs",
+):
+    source = read(path)
+    for marker in (
+        "lajukan_http_requests_total",
+        "lajukan_http_responses_total",
+        "lajukan_http_in_flight_requests",
+        "lajukan_http_request_duration_seconds_bucket",
+        'request.uri().path() == "/metrics"',
+    ):
+        if marker not in source:
+            errors.append(f"{path} missing RED metrics marker: {marker}")
+
 
 for path in (
     "services/identity_service/src/main.rs",
