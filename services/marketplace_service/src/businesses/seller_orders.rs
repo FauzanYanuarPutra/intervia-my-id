@@ -458,6 +458,7 @@ async fn load_order_for_update(
         SELECT
           o.id,
           o.order_number,
+          o.user_id,
           o.business_id,
           o.category_type::text AS category_type,
           o.base_status::text AS base_status,
@@ -524,6 +525,7 @@ async fn load_aggregate_tx(
         SELECT
           o.id,
           o.order_number,
+          o.user_id,
           o.business_id,
           o.category_type::text AS category_type,
           o.base_status::text AS base_status,
