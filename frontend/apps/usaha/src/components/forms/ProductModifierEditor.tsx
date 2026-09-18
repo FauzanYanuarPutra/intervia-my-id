@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Plus, Save, Trash2 } from 'lucide-react';
+import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 
 type ModifierMode = 'single' | 'multiple';
 type RecipeOperation = 'add' | 'set';
@@ -50,6 +51,16 @@ type Template = {
   max: number | null;
   options: string[];
 };
+
+const selectionModeOptions = [
+  { value: 'single', label: 'Pilih satu' },
+  { value: 'multiple', label: 'Boleh beberapa' },
+] as const;
+
+const recipeOperationOptions = [
+  { value: 'add', label: 'Tambah' },
+  { value: 'set', label: 'Ganti jumlah' },
+] as const;
 
 const templates: Template[] = [
   { name: 'Tingkat gula', mode: 'single', required: true, max: 1, options: ['Normal', 'Less Sugar', 'Tanpa Gula'] },
@@ -133,6 +144,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [dirty, setDirty] = useState(false);
 
   async function loadGroups() {
     if (loaded || loading) return;
@@ -143,6 +155,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       const body = (await response.json().catch(() => ({}))) as { data?: { groups?: ModifierGroup[] }; error?: string };
       if (!response.ok) throw new Error(body.error || 'Pilihan pelanggan belum bisa dimuat.');
       setGroups(normalizeGroups(Array.isArray(body.data?.groups) ? body.data.groups : []));
+      setDirty(false);
       setLoaded(true);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Pilihan pelanggan belum bisa dimuat.');
@@ -175,9 +188,24 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
 
   const optionCount = useMemo(() => groups.reduce((total, group) => total + group.options.length, 0), [groups]);
 
+  useEffect(() => {
+    if (!dirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [dirty]);
+
+  function markDirty() {
+    setDirty(true);
+    setMessage('');
+  }
+
   function updateGroup(groupId: string, patch: Partial<ModifierGroup>) {
     setGroups(current => current.map(group => (group.id === groupId ? { ...group, ...patch } : group)));
-    setMessage('');
+    markDirty();
   }
 
   function updateOption(groupId: string, optionId: string, patch: Partial<ModifierOption>) {
@@ -185,7 +213,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       ...group,
       options: group.options.map(option => option.id === optionId ? { ...option, ...patch } : option),
     } : group));
-    setMessage('');
+    markDirty();
   }
 
   function chooseDefault(groupId: string, optionId: string, checked: boolean) {
@@ -196,6 +224,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       }
       return { ...group, options: group.options.map(option => option.id === optionId ? { ...option, is_default: checked } : option) };
     }));
+    markDirty();
   }
 
   function addEffect(groupId: string, option: ModifierOption) {
@@ -242,6 +271,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       const body = (await response.json().catch(() => ({}))) as { error?: string; data?: { groups?: ModifierGroup[] } };
       if (!response.ok) throw new Error(body.error || 'Pilihan pelanggan belum tersimpan.');
       if (Array.isArray(body.data?.groups)) setGroups(normalizeGroups(body.data.groups));
+      setDirty(false);
       setMessage('Pilihan pelanggan tersimpan dan siap dipakai di Kasir serta toko.');
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Pilihan pelanggan belum tersimpan.');
@@ -270,7 +300,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
           {!loading ? (
             <div className="flex flex-wrap gap-2">
               {templates.map(template => (
-                <button key={template.name} type="button" className="rounded-full border border-portal-line bg-white px-3 py-2 text-xs font-bold text-portal-ink hover:bg-[#f5f7f4]" onClick={() => setGroups(current => [...current, groupFromTemplate(template)])}>
+                <button key={template.name} type="button" className="rounded-full border border-portal-line bg-white px-3 py-2 text-xs font-bold text-portal-ink hover:bg-[#f5f7f4]" onClick={() => { setGroups(current => [...current, groupFromTemplate(template)]); markDirty(); }}>
                   + {template.name}
                 </button>
               ))}
@@ -285,24 +315,25 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
                     Nama pilihan
                     <input className="portal-input bg-white" value={group.name} onChange={event => updateGroup(group.id, { name: event.target.value })} placeholder="Contoh: Tingkat gula" maxLength={80} />
                   </label>
-                  <label className="grid gap-1.5 text-xs font-semibold text-portal-ink">
-                    Cara pelanggan memilih
-                    <select className="portal-input bg-white" value={group.selection_mode} onChange={event => {
-                      const mode = event.target.value as ModifierMode;
-                      const firstDefault = group.options.findIndex(option => option.is_default);
-                      updateGroup(group.id, {
-                        selection_mode: mode,
-                        min_selections: group.required ? 1 : 0,
-                        max_selections: mode === 'single' ? 1 : Math.max(1, group.max_selections ?? group.options.length),
-                        options: mode === 'single' ? group.options.map((option, index) => ({ ...option, is_default: option.is_default && index === firstDefault })) : group.options,
-                      });
-                    }}>
-                      <option value="single">Pelanggan pilih satu</option>
-                      <option value="multiple">Pelanggan boleh pilih beberapa</option>
-                    </select>
-                  </label>
+                  <div className="grid gap-1.5 text-xs font-semibold text-portal-ink">
+                    <span>Cara pelanggan memilih</span>
+                    <ChoiceChips
+                      value={group.selection_mode}
+                      ariaLabel={`Cara pelanggan memilih ${group.name || `kelompok ${groupIndex + 1}`}`}
+                      options={selectionModeOptions}
+                      onChange={mode => {
+                        const firstDefault = group.options.findIndex(option => option.is_default);
+                        updateGroup(group.id, {
+                          selection_mode: mode,
+                          min_selections: group.required ? 1 : 0,
+                          max_selections: mode === 'single' ? 1 : Math.max(1, group.max_selections ?? group.options.length),
+                          options: mode === 'single' ? group.options.map((option, index) => ({ ...option, is_default: option.is_default && index === firstDefault })) : group.options,
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
-                <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-portal-soft hover:bg-red-50 hover:text-red-700" aria-label={`Hapus kelompok ${group.name || groupIndex + 1}`} onClick={() => setGroups(current => current.filter(item => item.id !== group.id))}>
+                <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-portal-soft hover:bg-red-50 hover:text-red-700" aria-label={`Hapus kelompok ${group.name || groupIndex + 1}`} onClick={() => { setGroups(current => current.filter(item => item.id !== group.id)); markDirty(); }}>
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -349,12 +380,15 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
                                   {ingredients.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                                 </select>
                               </label>
-                              <label className="grid gap-1 text-[11px] font-semibold text-portal-soft">Efek
-                                <select className="portal-input bg-white" value={effect.operation} onChange={event => patchEffect(group.id, option, effectIndex, { operation: event.target.value as RecipeOperation })}>
-                                  <option value="add">Tambah pemakaian</option>
-                                  <option value="set">Ganti jumlah</option>
-                                </select>
-                              </label>
+                              <div className="grid gap-1 text-[11px] font-semibold text-portal-soft">
+                                <span>Efek</span>
+                                <ChoiceChips
+                                  value={effect.operation}
+                                  ariaLabel={`Efek bahan untuk ${option.label || 'opsi'}`}
+                                  options={recipeOperationOptions}
+                                  onChange={operation => patchEffect(group.id, option, effectIndex, { operation })}
+                                />
+                              </div>
                               <label className="grid gap-1 text-[11px] font-semibold text-portal-soft">Jumlah {ingredient?.recipe_unit ? `(${ingredient.recipe_unit})` : ''}
                                 <input className="portal-input bg-white" type="number" min={effect.operation === 'set' ? '0' : '0.0001'} step="any" value={effect.quantity} onChange={event => patchEffect(group.id, option, effectIndex, { quantity: Math.max(0, Number(event.target.value) || 0) })} />
                               </label>
@@ -382,8 +416,14 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
             </div>
           ) : null}
 
+          {dirty ? (
+            <p role="status" className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+              Ada perubahan pilihan pelanggan yang belum disimpan.
+            </p>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="portal-button-secondary" onClick={() => setGroups(current => [...current, groupFromTemplate()])}><Plus className="h-4 w-4" /> Tambah kelompok</button>
+            <button type="button" className="portal-button-secondary" onClick={() => { setGroups(current => [...current, groupFromTemplate()]); markDirty(); }}><Plus className="h-4 w-4" /> Tambah kelompok</button>
             <button type="button" className="portal-button-primary" disabled={saving || loading} onClick={save}><Save className="h-4 w-4" /> {saving ? 'Menyimpan…' : 'Simpan pilihan'}</button>
           </div>
           {error ? <p className="text-sm font-semibold text-portal-ember">{error}</p> : null}

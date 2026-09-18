@@ -194,6 +194,49 @@ async fn purchase_writes_stock_and_finance_exactly_once(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn purchase_rejects_same_idempotency_key_with_different_payload(pool: PgPool) {
+    let seeded = seed_purchase_context(&pool).await;
+    let repository = Wave2Repository::new(pool.clone());
+    let key = Uuid::new_v4();
+
+    repository
+        .create_purchase(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            key,
+            purchase_request(seeded.ingredient_id),
+        )
+        .await
+        .unwrap();
+
+    let mut changed = purchase_request(seeded.ingredient_id);
+    changed.total_amount = 91_000;
+    let result = repository
+        .create_purchase(
+            seeded.actor_id,
+            seeded.business_id,
+            seeded.organization_id,
+            key,
+            changed,
+        )
+        .await;
+
+    assert!(matches!(
+        result,
+        Err(super::wave2::Wave2RepositoryError::Conflict)
+    ));
+
+    let stock: Decimal =
+        sqlx::query_scalar("SELECT stock_quantity FROM business_ingredients WHERE id=$1")
+            .bind(seeded.ingredient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stock, Decimal::from(5), "conflicting replay must not move stock");
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn allocation_plan_never_creates_ledger_effect(pool: PgPool) {
     let seeded = seed_purchase_context(&pool).await;
     let repository = Wave2Repository::new(pool.clone());

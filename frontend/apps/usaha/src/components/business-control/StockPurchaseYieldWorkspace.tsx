@@ -1,17 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Loader2, PackagePlus, Scale } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
 import { EffectPreview } from '@/components/interaction/EffectPreview';
 import { SearchPicker } from '@/components/interaction/SearchPicker';
+import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import type { Wave2YieldObservation } from '@/lib/business-wave2-server';
 import {
   previewObservedYield,
   summarizeObservedYield,
   summarizeStockPurchase,
 } from '@/lib/business-control/finance';
+import { jakartaDateKey } from '@/lib/business-control/insights';
 
 type Ingredient = {
   id: string;
@@ -32,9 +34,6 @@ type Props = {
   canManage: boolean;
 };
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 const money = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -63,7 +62,7 @@ export function StockPurchaseYieldWorkspace({
   const [quantity, setQuantity] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [accountKey, setAccountKey] = useState<'cash' | 'bank' | 'ewallet' | 'payable'>('cash');
-  const [occurredOn, setOccurredOn] = useState(today());
+  const [occurredOn, setOccurredOn] = useState(jakartaDateKey());
   const [note, setNote] = useState('');
   const [buying, setBuying] = useState(false);
 
@@ -74,7 +73,7 @@ export function StockPurchaseYieldWorkspace({
   const [inputQuantity, setInputQuantity] = useState('');
   const [outputUnits, setOutputUnits] = useState('');
   const [inputUnit, setInputUnit] = useState(ingredients[0]?.purchase_unit ?? 'kg');
-  const [observedOn, setObservedOn] = useState(today());
+  const [observedOn, setObservedOn] = useState(jakartaDateKey());
   const [yieldNote, setYieldNote] = useState('');
   const [savingYield, setSavingYield] = useState(false);
 
@@ -86,6 +85,8 @@ export function StockPurchaseYieldWorkspace({
   const [expectedOutput, setExpectedOutput] = useState('');
   const [savingPrimary, setSavingPrimary] = useState(false);
   const [message, setMessage] = useState('');
+  const purchaseAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
+  const yieldAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const selectedIngredient = ingredients.find(item => item.id === ingredientId) ?? ingredients[0];
   const selectedYieldIngredient = ingredients.find(item => item.id === yieldIngredientId) ?? ingredients[0];
@@ -110,10 +111,13 @@ export function StockPurchaseYieldWorkspace({
   );
   const yieldSummary = summarizeObservedYield(selectedYieldRows);
 
-  async function post(input: Record<string, unknown>) {
+  async function post(input: Record<string, unknown>, idempotencyKey?: string) {
     const response = await fetch(`/api/businesses/${businessId}/wave2`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
       body: JSON.stringify(input),
     });
     const payload = await response.json().catch(() => ({}));
@@ -128,18 +132,23 @@ export function StockPurchaseYieldWorkspace({
       setMessage('Pilih bahan, isi jumlah, dan total belanja dengan benar.');
       return;
     }
+    const purchasePayload = {
+      action: 'purchase',
+      ingredient_id: ingredientId,
+      stock_quantity_delta: parsedQuantity,
+      total_amount: parsedAmount,
+      account_key: accountKey,
+      occurred_on: occurredOn,
+      note,
+    };
+    const attempt = resolveIdempotencyAttempt(purchaseAttemptRef.current, purchasePayload);
+    purchaseAttemptRef.current = attempt;
+
     setBuying(true);
     setMessage('');
     try {
-      await post({
-        action: 'purchase',
-        ingredient_id: ingredientId,
-        stock_quantity_delta: parsedQuantity,
-        total_amount: parsedAmount,
-        account_key: accountKey,
-        occurred_on: occurredOn,
-        note,
-      });
+      await post(purchasePayload, attempt.key);
+      purchaseAttemptRef.current = null;
       setQuantity('');
       setTotalAmount('');
       setNote('');
@@ -159,19 +168,24 @@ export function StockPurchaseYieldWorkspace({
       setMessage('Isi bahan, jumlah bahan, dan hasil nyata dengan benar.');
       return;
     }
+    const yieldPayload = {
+      action: 'create_yield_observation',
+      product_id: yieldProductId || null,
+      ingredient_id: yieldIngredientId,
+      input_quantity: input,
+      output_units: output,
+      input_unit: inputUnit,
+      observed_on: observedOn,
+      note: yieldNote,
+    };
+    const attempt = resolveIdempotencyAttempt(yieldAttemptRef.current, yieldPayload);
+    yieldAttemptRef.current = attempt;
+
     setSavingYield(true);
     setMessage('');
     try {
-      await post({
-        action: 'create_yield_observation',
-        product_id: yieldProductId || null,
-        ingredient_id: yieldIngredientId,
-        input_quantity: input,
-        output_units: output,
-        input_unit: inputUnit,
-        observed_on: observedOn,
-        note: yieldNote,
-      });
+      await post(yieldPayload, attempt.key);
+      yieldAttemptRef.current = null;
       setInputQuantity('');
       setOutputUnits('');
       setYieldNote('');

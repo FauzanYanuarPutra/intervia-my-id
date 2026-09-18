@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 import { EffectPreview } from '@/components/interaction/EffectPreview';
 import {
   financeChannelOptions,
@@ -198,6 +199,9 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
   const [allocationAmount, setAllocationAmount] = useState('');
   const [allocationReason, setAllocationReason] = useState('');
   const [movingAllocation, setMovingAllocation] = useState(false);
+  const createAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
+  const correctionAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
+  const allocationAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const legacySummary = useMemo(
     () =>
@@ -294,6 +298,18 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
       setMessage('Isi nominal lebih dari Rp0.');
       return;
     }
+    const requestBody = {
+      entry_type: entryType,
+      account_key: accountKey,
+      amount: parsedAmount,
+      occurred_on: occurredOn,
+      note,
+      channel_key: channelKey || null,
+      allocation_bucket: allocationBucket || null,
+    };
+    const attempt = resolveIdempotencyAttempt(createAttemptRef.current, requestBody);
+    createAttemptRef.current = attempt;
+
     setSaving(true);
     setMessage('');
     try {
@@ -301,21 +317,14 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': attempt.key,
         },
-        body: JSON.stringify({
-          entry_type: entryType,
-          account_key: accountKey,
-          amount: parsedAmount,
-          occurred_on: occurredOn,
-          note,
-          channel_key: channelKey || null,
-          allocation_bucket: allocationBucket || null,
-        }),
+        body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal menyimpan transaksi.');
       await reloadAll(true);
+      createAttemptRef.current = null;
       setEntryAmount('');
       setNote('');
       setChannelKey('');
@@ -365,21 +374,28 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
             channel_key: entry.channel_key,
             allocation_bucket: correctionBucket || null,
           };
+      const requestBody = { reason: correctionReason.trim(), replacement };
+      const attempt = resolveIdempotencyAttempt(
+        correctionAttemptRef.current,
+        { entryId: entry.id, ...requestBody },
+      );
+      correctionAttemptRef.current = attempt;
       const response = await fetch(
         `/api/businesses/${businessId}/finance-core/entries/${entry.id}/correct`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Idempotency-Key': crypto.randomUUID(),
+            'Idempotency-Key': attempt.key,
           },
-          body: JSON.stringify({ reason: correctionReason.trim(), replacement }),
+          body: JSON.stringify(requestBody),
         },
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal mengoreksi transaksi.');
       setCorrectingId(null);
       await reloadAll(true);
+      correctionAttemptRef.current = null;
       setMessage(
         correctionMode === 'void'
           ? 'Transaksi dibatalkan lewat reversal. Catatan asli tetap tersimpan.'
@@ -398,6 +414,15 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
       setMessage('Isi nominal dan alasan pemindahan kantong dengan benar.');
       return;
     }
+    const requestBody = {
+      from_bucket: allocationFrom === 'unallocated' ? null : allocationFrom,
+      to_bucket: allocationTo,
+      amount: parsedAmount,
+      reason: allocationReason.trim(),
+    };
+    const attempt = resolveIdempotencyAttempt(allocationAttemptRef.current, requestBody);
+    allocationAttemptRef.current = attempt;
+
     setMovingAllocation(true);
     setMessage('');
     try {
@@ -405,18 +430,14 @@ export function FinanceLedger({ businessId, initialEntries, channels = [] }: Pro
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': attempt.key,
         },
-        body: JSON.stringify({
-          from_bucket: allocationFrom === 'unallocated' ? null : allocationFrom,
-          to_bucket: allocationTo,
-          amount: parsedAmount,
-          reason: allocationReason.trim(),
-        }),
+        body: JSON.stringify(requestBody),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || 'Gagal memindahkan dana antar kantong.');
       await reloadAll(true);
+      allocationAttemptRef.current = null;
       setAllocationAmount('');
       setAllocationReason('');
       setMessage('Dana kantong berhasil dipindahkan. Kas usaha tidak berubah.');

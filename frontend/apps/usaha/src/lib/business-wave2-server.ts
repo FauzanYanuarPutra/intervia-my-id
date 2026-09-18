@@ -134,10 +134,12 @@ export async function listWave2Obligations(businessId: string) {
 
 export async function createWave2Obligation(
   businessId: string,
+  idempotencyKey: string,
   input: Record<string, unknown>,
 ) {
   const payload = await requestWave2(path(businessId, '/obligations'), {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(input),
   });
   return data(payload).obligation as Wave2Obligation | undefined;
@@ -224,10 +226,12 @@ export async function listWave2YieldObservations(businessId: string) {
 
 export async function createWave2YieldObservation(
   businessId: string,
+  idempotencyKey: string,
   input: Record<string, unknown>,
 ) {
   const payload = await requestWave2(path(businessId, '/yield-observations'), {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(input),
   });
   return data(payload).observation as Wave2YieldObservation | undefined;

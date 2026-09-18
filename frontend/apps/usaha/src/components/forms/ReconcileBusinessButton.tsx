@@ -1,23 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History } from 'lucide-react';
+import { resolveIdempotencyAttempt, type ClientIdempotencyAttempt } from '@/lib/client-idempotency';
 
 export function ReconcileBusinessButton() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const attemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   async function reconcile() {
+    const requestBody = { action: 'reconcile_business' };
+    const attempt = resolveIdempotencyAttempt(attemptRef.current, requestBody);
+    attemptRef.current = attempt;
+
     setPending(true);
     setError('');
-    const idempotencyKey = crypto.randomUUID();
     try {
       const response = await fetch('/api/businesses/reconcile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify({ idempotencyKey }),
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': attempt.key },
+        body: JSON.stringify({ idempotencyKey: attempt.key }),
       });
       const result = (await response.json()) as { error?: string; redirectTo?: string };
       if (!response.ok || !result.redirectTo) throw new Error(result.error || 'Usaha lama belum ditemukan.');
