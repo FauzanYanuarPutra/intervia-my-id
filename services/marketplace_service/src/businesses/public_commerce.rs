@@ -486,13 +486,12 @@ impl PublicCommerceRepository {
 
         sqlx::query(
             r#"
-            INSERT INTO outbox_events (
-              id, aggregate_type, aggregate_id, event_type, payload, event_key
-            ) VALUES ($1,'order',$2,'order.created',$3,$4)
+            INSERT INTO events.event_outbox (
+              aggregate_type, aggregate_id, event_type, payload, routing_key, event_key
+            ) VALUES ('order',$1::text,'order.created',$2,'order.created',$3)
             ON CONFLICT (event_key) DO NOTHING
             "#,
         )
-        .bind(Uuid::new_v4())
         .bind(inserted_id)
         .bind(json!({
             "order_id": inserted_id,

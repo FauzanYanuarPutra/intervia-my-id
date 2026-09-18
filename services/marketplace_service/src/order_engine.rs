@@ -307,9 +307,9 @@ async fn append_outbox_event(
     let event_key = format!("{}:{}:v{}", aggregate_id, event_type, version);
     sqlx::query(
         r#"
-        INSERT INTO outbox_events (
-            aggregate_type, aggregate_id, event_type, payload, event_key
-        ) VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO events.event_outbox (
+            aggregate_type, aggregate_id, event_type, payload, routing_key, event_key
+        ) VALUES ($1, $2::text, $3, $4, $3, $5)
         ON CONFLICT (event_key) DO NOTHING
         "#,
     )

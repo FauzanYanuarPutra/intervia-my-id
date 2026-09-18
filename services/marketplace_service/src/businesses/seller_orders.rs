@@ -379,18 +379,17 @@ impl SellerOrderRepository {
         let event_key = format!("{}:{}:v{}", order_id, event_type, updated.version);
         sqlx::query(
             r#"
-            INSERT INTO outbox_events (
-              id,
+            INSERT INTO events.event_outbox (
               aggregate_type,
               aggregate_id,
               event_type,
               payload,
+              routing_key,
               event_key
-            ) VALUES ($1,'order',$2,$3,$4,$5)
+            ) VALUES ('order',$1::text,$2,$3,$2,$4)
             ON CONFLICT (event_key) DO NOTHING
             "#,
         )
-        .bind(Uuid::new_v4())
         .bind(order_id)
         .bind(&event_type)
         .bind(json!({

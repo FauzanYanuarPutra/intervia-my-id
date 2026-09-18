@@ -117,6 +117,7 @@ Required properties include:
 
 - database transaction boundaries
 - idempotency for retries/webhooks
+- retryable BFF/browser commands must fail closed when a required idempotency key is missing; do not synthesize a fresh key per retry
 - unique provider transaction identifiers
 - valid state transitions only
 - settle/refund/withdraw exactly according to invariants
@@ -128,6 +129,8 @@ Production payment and wallet flags remain fail-closed until their operational r
 ## 8. RabbitMQ and eventing
 
 When a database write and event publication belong to one business operation, prefer transactional outbox semantics.
+
+Marketplace domain events use `events.event_outbox` as the canonical publisher queue. New code must not write `public.outbox_events`; that table is a temporary rollback-compatibility bridge until a later contract migration removes it. Retryable domain events should carry a stable `event_key` where replay semantics require deduplication.
 
 Consumers must be idempotent. Inbox/event IDs should prevent duplicate side effects.
 

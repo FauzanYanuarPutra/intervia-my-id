@@ -1,6 +1,6 @@
 # Deployment Architecture
 
-Status: verified against repository HEAD on 2026-08-22.
+Status: verified against repository HEAD on 2026-09-18.
 
 ## Release contract
 
@@ -8,7 +8,7 @@ Images are built once and addressed by immutable `sha-<40-character-commit>` tag
 
 A successful `Build Images` run for a push to `main` automatically deploys that immutable SHA to **staging**, never directly to production. Promotion to production is a separate manual `workflow_dispatch` using the exact same `sha-<40-character-commit>` tag.
 Production promotion additionally rejects any release SHA that is not reachable from the repository's `main` history.
-Before production SSH/deploy begins, the workflow also requires successful Build Images, Quality Gates, Security, Reliability Contract, Frontend Runtime Gate, KYC Runtime Contract, and News Contract runs for that exact SHA.
+Before production SSH/deploy begins, the workflow also requires successful Build Images, Quality Gates, Security, Reliability Contract, Frontend Runtime Gate, KYC Runtime Contract, and News Contract runs for that exact SHA. It also requires an explicit successful `staging-verified` deployment record for that exact SHA. That record is created only after the origin and public-edge staging smoke checks finish, so production cannot bypass staging verification or rely on ambiguous workflow metadata.
 
 Production deployment remains manual through a protected GitHub environment. The remote deployment performs:
 
