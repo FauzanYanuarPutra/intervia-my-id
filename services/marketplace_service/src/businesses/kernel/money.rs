@@ -5,12 +5,22 @@ use super::KernelValidationError;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Currency {
     Idr,
+    Usd,
 }
 
 impl Currency {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_uppercase().as_str() {
+            "IDR" => Some(Self::Idr),
+            "USD" => Some(Self::Usd),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn code(self) -> &'static str {
         match self {
             Self::Idr => "IDR",
+            Self::Usd => "USD",
         }
     }
 }
@@ -71,6 +81,10 @@ impl Money {
 
     pub(crate) const fn idr(minor_units: i64) -> Result<Self, KernelValidationError> {
         Self::new_non_negative(minor_units, Currency::Idr)
+    }
+
+    pub(crate) const fn usd(minor_units: i64) -> Result<Self, KernelValidationError> {
+        Self::new_non_negative(minor_units, Currency::Usd)
     }
 
     pub(crate) const fn minor_units(self) -> i64 {
