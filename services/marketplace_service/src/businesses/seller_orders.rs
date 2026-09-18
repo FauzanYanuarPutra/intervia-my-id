@@ -377,6 +377,23 @@ impl SellerOrderRepository {
 
         let event_type = format!("order.{}", next_status.as_db().to_ascii_lowercase());
         let event_key = format!("{}:{}:v{}", order_id, event_type, updated.version);
+        let event_payload = json!({
+            "order_id": order_id,
+            "order_number": &updated.order_number,
+            "business_id": business_id,
+            "organization_id": organization_id,
+            "from_status": current_state.as_db(),
+            "to_status": next_status.as_db(),
+            "payment_status": &updated.payment_status,
+            "version": updated.version,
+            "actor_id": actor_id,
+            "reason": reason,
+            "stock_reservations_consumed": reservations_consumed,
+            "stock_reservations_released": reservations_released,
+        });
+
+        // Keep the legacy Business OS outbox during migration, while also writing
+        // the canonical publisher outbox in the same transaction.
         sqlx::query(
             r#"
             INSERT INTO outbox_events (
@@ -393,21 +410,28 @@ impl SellerOrderRepository {
         .bind(Uuid::new_v4())
         .bind(order_id)
         .bind(&event_type)
-        .bind(json!({
-            "order_id": order_id,
-            "order_number": &updated.order_number,
-            "business_id": business_id,
-            "organization_id": organization_id,
-            "from_status": current_state.as_db(),
-            "to_status": next_status.as_db(),
-            "payment_status": &updated.payment_status,
-            "version": updated.version,
-            "actor_id": actor_id,
-            "reason": reason,
-            "stock_reservations_consumed": reservations_consumed,
-            "stock_reservations_released": reservations_released,
-        }))
-        .bind(event_key)
+        .bind(&event_payload)
+        .bind(&event_key)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO events.event_outbox (
+              id,
+              aggregate_type,
+              aggregate_id,
+              event_type,
+              payload,
+              routing_key
+            ) VALUES ($1,'order',$2,$3,$4,$5)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(order_id.to_string())
+        .bind(&event_type)
+        .bind(&event_payload)
+        .bind(&event_type)
         .execute(&mut *tx)
         .await?;
 
