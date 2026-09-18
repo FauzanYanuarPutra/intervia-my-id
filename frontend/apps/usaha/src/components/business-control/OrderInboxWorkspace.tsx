@@ -12,6 +12,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/portal/StatusBadge';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import {
   resolveIdempotencyAttempt,
   type ClientIdempotencyAttempt,
@@ -180,7 +181,7 @@ export function OrderInboxWorkspace({
           startRefresh(() => router.refresh());
           return;
         }
-        throw new Error(result.error || 'Perubahan status belum berhasil.');
+        throw new Error(businessApiErrorMessage(result, 'Perubahan status belum berhasil.', response.status));
       }
 
       attemptRef.current = null;
