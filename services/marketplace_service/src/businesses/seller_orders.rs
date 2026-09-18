@@ -377,7 +377,12 @@ impl SellerOrderRepository {
 
         let event_type = format!("order.{}", next_status.as_db().to_ascii_lowercase());
         let event_key = format!("{}:{}:v{}", order_id, event_type, updated.version);
+        let event_id = Uuid::new_v4();
         let event_payload = json!({
+            "event_id": event_id,
+            "event_key": &event_key,
+            "event_type": &event_type,
+            "schema_version": 1,
             "order_id": order_id,
             "order_number": &updated.order_number,
             "business_id": business_id,
@@ -407,7 +412,7 @@ impl SellerOrderRepository {
             ON CONFLICT (event_key) DO NOTHING
             "#,
         )
-        .bind(Uuid::new_v4())
+        .bind(event_id)
         .bind(order_id)
         .bind(&event_type)
         .bind(&event_payload)
@@ -423,15 +428,18 @@ impl SellerOrderRepository {
               aggregate_id,
               event_type,
               payload,
-              routing_key
-            ) VALUES ($1,'order',$2,$3,$4,$5)
+              routing_key,
+              event_key
+            ) VALUES ($1,'order',$2,$3,$4,$5,$6)
+            ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING
             "#,
         )
-        .bind(Uuid::new_v4())
+        .bind(event_id)
         .bind(order_id.to_string())
         .bind(&event_type)
         .bind(&event_payload)
         .bind(&event_type)
+        .bind(&event_key)
         .execute(&mut *tx)
         .await?;
 
