@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { newsApi } from '@/lib/api';
@@ -91,9 +92,9 @@ export default function NewsModeration() {
   const [versions, setVersions] = useState<NewsVersion[]>([]);
   const [sources, setSources] = useState<NewsSource[]>([]);
   const [metrics, setMetrics] = useState<NewsroomMetrics>({});
-  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const [sourceUpdating, setSourceUpdating] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -104,23 +105,8 @@ export default function NewsModeration() {
   );
 
   useEffect(() => {
-    if (selected && selected.id !== selectedId) setSelectedId(selected.id);
-  }, [selected, selectedId]);
-
-  useEffect(() => {
-    const meta = selected ? readRecord(readRecord(selected.metadata).news) : {};
-    setBusinessImpact(readString(meta.business_impact));
-  }, [selected]);
-
-  useEffect(() => {
-    if (!accessToken || !selected?.id) {
-      setHistory([]);
-      setVersions([]);
-      setSources([]);
-      return;
-    }
+    if (!accessToken || !selected?.id) return;
     let active = true;
-    setHistoryLoading(true);
     void newsApi.history(accessToken, selected.id)
       .then(payload => {
         if (!active) return;
@@ -130,11 +116,10 @@ export default function NewsModeration() {
         setSources(Array.isArray(record.sources) ? (record.sources as NewsSource[]) : []);
       })
       .catch(() => {
-        if (active) {
-          setHistory([]);
-          setVersions([]);
-          setSources([]);
-        }
+        if (!active) return;
+        setHistory([]);
+        setVersions([]);
+        setSources([]);
       })
       .finally(() => {
         if (active) setHistoryLoading(false);
@@ -189,7 +174,16 @@ export default function NewsModeration() {
     try {
       const payload = await newsApi.queue(accessToken, status);
       const record = readRecord(payload);
-      setItems(Array.isArray(record.items) ? (record.items as NewsItem[]) : []);
+      const nextItems = Array.isArray(record.items) ? (record.items as NewsItem[]) : [];
+      const nextSelected = nextItems.find(item => item.id === selectedId) || nextItems[0] || null;
+      setItems(nextItems);
+      setSelectedId(nextSelected?.id || '');
+      setBusinessImpact(
+        nextSelected
+          ? readString(readRecord(readRecord(nextSelected.metadata).news).business_impact)
+          : '',
+      );
+      setHistoryLoading(Boolean(nextSelected));
       setSuccess('');
       void loadMetrics();
     } catch (err) {
@@ -197,17 +191,59 @@ export default function NewsModeration() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, loadMetrics, status]);
+  }, [accessToken, loadMetrics, selectedId, status]);
 
   useEffect(() => {
     if (!accessToken) return;
-    void load();
-  }, [accessToken, load]);
+    let active = true;
+    void newsApi.queue(accessToken, status)
+      .then(payload => {
+        if (!active) return;
+        const record = readRecord(payload);
+        const nextItems = Array.isArray(record.items) ? (record.items as NewsItem[]) : [];
+        const nextSelected = nextItems[0] || null;
+        setItems(nextItems);
+        setSelectedId(nextSelected?.id || '');
+        setBusinessImpact(
+          nextSelected
+            ? readString(readRecord(readRecord(nextSelected.metadata).news).business_impact)
+            : '',
+        );
+        setHistoryLoading(Boolean(nextSelected));
+        setSuccess('');
+      })
+      .catch(err => {
+        if (!active) return;
+        setItems([]);
+        setSelectedId('');
+        setBusinessImpact('');
+        setError(err instanceof Error ? err.message : 'Gagal memuat antrean berita');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessToken, status]);
 
   useEffect(() => {
     if (!accessToken) return;
-    void loadMetrics();
-  }, [accessToken, loadMetrics]);
+    let active = true;
+    void newsApi.metrics(accessToken)
+      .then(payload => {
+        if (active) setMetrics(readRecord(payload) as NewsroomMetrics);
+      })
+      .catch(() => {
+        if (active) setMetrics({});
+      })
+      .finally(() => {
+        if (active) setMetricsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
 
   const moderate = async (action: 'approve' | 'needs_revision' | 'reject' | 'retract' | 'correct') => {
     if (!accessToken || !selected) return;
@@ -262,7 +298,7 @@ export default function NewsModeration() {
           <p className="mt-1 text-sm text-[color:var(--color-text-soft)]">Review kiriman sebelum diterbitkan sebagai Lajukan News.</p>
         </div>
         <div className="flex gap-2">
-          <a href="/" className="inline-flex min-h-10 items-center rounded-xl border border-[color:var(--color-border)] px-4 text-xs font-semibold text-[color:var(--color-text)]">CMS utama</a>
+          <Link href="/" className="inline-flex min-h-10 items-center rounded-xl border border-[color:var(--color-border)] px-4 text-xs font-semibold text-[color:var(--color-text)]">CMS utama</Link>
           <Button variant="secondary" onClick={() => void load()}>Refresh</Button>
         </div>
       </div>
@@ -290,7 +326,7 @@ export default function NewsModeration() {
           <button
             key={value}
             type="button"
-            onClick={() => setStatus(value)}
+            onClick={() => { setLoading(true); setStatus(value); }}
             className={`rounded-full border px-3 py-2 text-xs font-semibold ${status === value ? 'border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white' : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text)]'}`}
           >
             {value.replaceAll('_', ' ')}
@@ -313,7 +349,16 @@ export default function NewsModeration() {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => { setSelectedId(item.id); setNote(''); setSuccess(''); }}
+                    onClick={() => {
+                      setSelectedId(item.id);
+                      setBusinessImpact(readString(meta.business_impact));
+                      setHistory([]);
+                      setVersions([]);
+                      setSources([]);
+                      setHistoryLoading(true);
+                      setNote('');
+                      setSuccess('');
+                    }}
                     className={`w-full rounded-2xl border p-3 text-left transition ${selected?.id === item.id ? 'border-[color:var(--color-primary)] bg-[color:var(--color-surface-muted)]' : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)]'}`}
                   >
                     <p className="text-sm font-semibold text-[color:var(--color-text)]">{item.title}</p>
