@@ -96,6 +96,34 @@ for marker in ("http_2xx", "tcp_connect"):
     if marker not in blackbox_config:
         errors.append(f"blackbox config missing module: {marker}")
 
+identity_compose_start = base_compose.find("\n  identity_service:")
+identity_compose_end = base_compose.find("\n  marketplace_service:", identity_compose_start)
+if identity_compose_start < 0 or identity_compose_end < 0:
+    errors.append("unable to locate Identity Compose service block")
+else:
+    identity_compose = base_compose[identity_compose_start:identity_compose_end]
+    for required_dependency in (
+        "identity_db: { condition: service_healthy }",
+        "redis_cache: { condition: service_healthy }",
+    ):
+        if required_dependency not in identity_compose:
+            errors.append(f"Identity startup missing required dependency: {required_dependency}")
+    if "rabbitmq: { condition: service_healthy }" in identity_compose:
+        errors.append("Identity startup must remain isolated from RabbitMQ availability")
+
+identity_state_source = read("services/identity_service/src/config/state.rs")
+if "rabbitmq" in identity_state_source.lower():
+    errors.append("Identity request state must not hold a RabbitMQ connection")
+
+identity_main_source = read("services/identity_service/src/main.rs")
+for marker in (
+    "RabbitMQ is intentionally not part of request-serving readiness.",
+    "run_identity_outbox_publisher",
+):
+    if marker not in identity_main_source:
+        errors.append(f"Identity broker-degradation contract missing marker: {marker}")
+
+
 marketplace_compose_start = base_compose.find("\n  marketplace_service:")
 marketplace_compose_end = base_compose.find("\n  community_service:", marketplace_compose_start)
 if marketplace_compose_start < 0 or marketplace_compose_end < 0:
