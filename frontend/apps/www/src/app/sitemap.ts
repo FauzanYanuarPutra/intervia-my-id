@@ -198,39 +198,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   });
 
-  const newsCategories = Array.from(
-    new Set(newsItems.map(article => article.category.trim()).filter(Boolean)),
-  );
-  for (const category of newsCategories) {
-    const slug = category.toLowerCase();
-    for (const lang of locales) {
+  for (const lang of locales) {
+    const localizedNews = newsItems.filter(article => article.language === lang);
+    const newsCategories = Array.from(
+      new Set(localizedNews.map(article => article.category.trim()).filter(Boolean)),
+    );
+    for (const category of newsCategories) {
+      const slug = category.toLowerCase();
       sitemapEntries.push({
         url: `${baseUrl}/${lang}/news/category/${encodeURIComponent(slug)}`,
         changeFrequency: 'hourly',
         priority: 0.82,
       });
     }
-  }
 
-  const topicFacets = Array.from(
-    new Set(newsItems.flatMap(article => article.tags).map(tag => tag.trim()).filter(Boolean)),
-  ).slice(0, 100);
-  const locationFacets = Array.from(
-    new Set(newsItems.map(article => article.location?.trim()).filter((value): value is string => Boolean(value))),
-  ).slice(0, 100);
+    const topicFacets = Array.from(
+      new Set(
+        localizedNews
+          .flatMap(article => article.tags)
+          .map(tag => tag.trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 100);
+    const locationFacets = Array.from(
+      new Set(
+        localizedNews
+          .map(article => article.location?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ).slice(0, 100);
 
-  for (const topic of topicFacets) {
-    for (const lang of locales) {
+    for (const topic of topicFacets) {
       sitemapEntries.push({
         url: buildNewsFacetUrl(lang, 'topic', topic),
         changeFrequency: 'daily',
         priority: 0.72,
       });
     }
-  }
 
-  for (const location of locationFacets) {
-    for (const lang of locales) {
+    for (const location of locationFacets) {
       sitemapEntries.push({
         url: buildNewsFacetUrl(lang, 'location', location),
         changeFrequency: 'daily',
