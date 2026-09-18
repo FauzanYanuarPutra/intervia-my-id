@@ -57,6 +57,13 @@ for marker in ("stop_grace_period: 30s", "stop_grace_period: 60s"):
         errors.append(f"base compose missing graceful shutdown budget: {marker}")
 
 for marker in (
+    'promtool", "query", "instant", "http://localhost:9090", "up"',
+    'amtool", "--alertmanager.url=http://localhost:9093", "config", "show"',
+):
+    if marker not in observability_compose:
+        errors.append(f"runtime observability health gate missing: {marker}")
+
+for marker in (
     "profiles: [observability]",
     "prom/prometheus:v3.14.0",
     "prom/node-exporter:v1.12.1",
