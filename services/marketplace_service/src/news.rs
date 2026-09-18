@@ -552,24 +552,8 @@ fn validate_publishable_news(row: &NewsRow) -> Result<(), &'static str> {
 }
 
 fn source_domain(source_url: &str) -> Option<String> {
-    let without_scheme = source_url
-        .strip_prefix("https://")
-        .or_else(|| source_url.strip_prefix("http://"))
-        .unwrap_or(source_url);
-    let authority = without_scheme.split('/').next()?.trim();
-    if authority.is_empty() {
-        return None;
-    }
-    let host = authority
-        .rsplit('@')
-        .next()
-        .unwrap_or(authority)
-        .split(':')
-        .next()
-        .unwrap_or(authority)
-        .trim()
-        .trim_start_matches("www.")
-        .to_ascii_lowercase();
+    let url = reqwest::Url::parse(source_url).ok()?;
+    let host = url.host_str()?.trim().trim_start_matches("www.").to_ascii_lowercase();
     if host.is_empty() {
         None
     } else {
@@ -586,19 +570,22 @@ fn news_source_urls(metadata: &Value) -> Vec<String> {
         .map(|items| {
             let mut urls = Vec::new();
             for item in items {
-                let Some(url) = item
+                let Some(raw) = item
                     .as_str()
                     .map(str::trim)
                     .filter(|value| !value.is_empty())
                 else {
                     continue;
                 };
-                if !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2048
-                {
+                if !is_allowed_news_source_url(raw) {
                     continue;
                 }
-                if !urls.iter().any(|existing| existing == url) {
-                    urls.push(url.to_string());
+                let Ok(parsed) = reqwest::Url::parse(raw) else {
+                    continue;
+                };
+                let normalized = parsed.to_string();
+                if !urls.iter().any(|existing| existing == &normalized) {
+                    urls.push(normalized);
                 }
                 if urls.len() >= 10 {
                     break;
@@ -607,6 +594,24 @@ fn news_source_urls(metadata: &Value) -> Vec<String> {
             urls
         })
         .unwrap_or_default()
+}
+
+async fn public_verified_source_urls(
+    pool: &PgPool,
+    content_id: Uuid,
+) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT source_url
+        FROM news_source_references
+        WHERE content_id = $1
+          AND verification_status = 'verified'
+        ORDER BY position ASC, id ASC
+        "#,
+    )
+    .bind(content_id)
+    .fetch_all(pool)
+    .await
 }
 
 fn format_news_cursor(row: &NewsRow) -> String {
