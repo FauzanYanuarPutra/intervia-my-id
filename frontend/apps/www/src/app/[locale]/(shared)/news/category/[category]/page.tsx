@@ -39,9 +39,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ...(availability.en
           ? { en: `${buildNewsUrl('en')}/category/${category.toLowerCase()}` }
           : {}),
-        'x-default': availability.id
-          ? `${buildNewsUrl('id')}/category/${category.toLowerCase()}`
-          : `${buildNewsUrl('en')}/category/${category.toLowerCase()}`,
+        ...(availability.id
+          ? { 'x-default': `${buildNewsUrl('id')}/category/${category.toLowerCase()}` }
+          : availability.en
+            ? { 'x-default': `${buildNewsUrl('en')}/category/${category.toLowerCase()}` }
+            : {}),
       },
     },
     robots: {
