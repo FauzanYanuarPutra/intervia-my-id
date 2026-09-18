@@ -73,6 +73,33 @@ require(
     ),
 )
 
+
+proxy = read("frontend/apps/www/src/proxy.ts")
+dead_start = proxy.find("const DEAD_ROUTE_SEGMENTS")
+dead_end = proxy.find("]);", dead_start)
+dead_block = proxy[dead_start:dead_end] if dead_start >= 0 and dead_end >= 0 else ""
+if "'news'" in dead_block or '"news"' in dead_block:
+    errors.append("News public route must not be listed as dead in frontend proxy")
+
+require(
+    "frontend/apps/www/src/lib/routes.ts",
+    (
+        "NEWS = '/news'",
+        "path: RoutePath.NEWS",
+        "path: `${RoutePath.NEWS}/submit`",
+        "path: `${RoutePath.NEWS}/submissions`",
+        "path: `${RoutePath.NEWS}/:slug`",
+    ),
+)
+
+require(
+    "frontend/apps/www/src/lib/authRoutes.ts",
+    (
+        "'/news/submit'",
+        "'/news/submissions'",
+    ),
+)
+
 require(
     "frontend/apps/www/src/app/[locale]/(shared)/news/[slug]/page.tsx",
     (

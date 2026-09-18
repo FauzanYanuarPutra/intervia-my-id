@@ -19,6 +19,8 @@ export const PROTECTED_ROUTE_PREFIXES = [
   '/my-projects',
   '/my-listings',
   '/onboarding',
+  '/news/submit',
+  '/news/submissions',
 ] as const;
 
 function stripQueryAndHash(pathname: string): string {

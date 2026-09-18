@@ -3039,16 +3039,27 @@ async fn apply_identity_profile_event(db: &PgPool, payload: &Value) -> anyhow::R
 async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::Result<usize> {
     let rows = sqlx::query(
         r#"
-        SELECT id, payload
-        FROM events.event_inbox
-        WHERE source = 'identity_service'
-          AND status IN ('pending', 'failed', 'processing')
-          AND available_at <= now()
-        ORDER BY received_at ASC
-        LIMIT $1
+        WITH candidate AS (
+          SELECT id
+          FROM events.event_inbox
+          WHERE source = 'identity_service'
+            AND status IN ('pending', 'failed', 'processing')
+            AND available_at <= now()
+          ORDER BY received_at ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT $1
+        )
+        UPDATE events.event_inbox AS inbox
+        SET
+          status = 'processing',
+          available_at = now() + INTERVAL '2 minutes',
+          error_message = NULL
+        FROM candidate
+        WHERE inbox.id = candidate.id
+        RETURNING inbox.id, inbox.payload, inbox.available_at AS lease_until
         "#,
     )
-    .bind(batch_size)
+    .bind(batch_size.clamp(1, 500))
     .fetch_all(db)
     .await?;
 
@@ -3056,41 +3067,23 @@ async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::R
         return Ok(0);
     }
 
-    let mut claimed_count = 0usize;
+    let claimed_count = rows.len();
 
-    for row in rows.iter() {
+    for row in rows {
         let id = row.get::<Uuid, _>("id");
         let payload = row.get::<Value, _>("payload");
-        let lease_until = sqlx::query_scalar::<_, DateTime<Utc>>(
-            r#"
-            UPDATE events.event_inbox
-            SET
-              status = 'processing',
-              available_at = now() + INTERVAL '2 minutes',
-              error_message = NULL
-            WHERE id = $1
-              AND (
-                status IN ('pending', 'failed')
-                OR (status = 'processing' AND available_at <= now())
-              )
-            RETURNING available_at
-            "#,
-        )
-        .bind(id)
-        .fetch_optional(db)
-        .await?;
-
-        let Some(lease_until) = lease_until else {
-            continue;
-        };
-        claimed_count += 1;
+        let lease_until = row.get::<DateTime<Utc>, _>("lease_until");
 
         match apply_identity_profile_event(db, &payload).await {
             Ok(()) => {
-                sqlx::query(
+                let completed = sqlx::query(
                     r#"
                     UPDATE events.event_inbox
-                    SET status = 'processed', processed_at = now(), error_message = NULL
+                    SET
+                      status = 'processed',
+                      processed_at = now(),
+                      available_at = now(),
+                      error_message = NULL
                     WHERE id = $1
                       AND status = 'processing'
                       AND available_at = $2
@@ -3100,16 +3093,26 @@ async fn process_identity_inbox_batch(db: &PgPool, batch_size: i64) -> anyhow::R
                 .bind(lease_until)
                 .execute(db)
                 .await?;
+
+                if completed.rows_affected() != 1 {
+                    tracing::warn!(
+                        inbox_id = %id,
+                        "identity inbox processing lease was lost before completion"
+                    );
+                }
             }
             Err(error) => {
-                let error_message = format!("{error:?}");
+                let error_message: String = format!("{error:?}").chars().take(1_000).collect();
                 let _ = sqlx::query(
                     r#"
                     UPDATE events.event_inbox
                     SET
                       status = 'failed',
                       retry_count = retry_count + 1,
-                      available_at = now() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
+                      available_at = now() + (
+                        LEAST(900, 5 * (1 << LEAST(retry_count, 8)))
+                        * INTERVAL '1 second'
+                      ),
                       error_message = $2
                     WHERE id = $1
                       AND status = 'processing'
