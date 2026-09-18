@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Archive,
   ChevronDown,
@@ -11,6 +11,10 @@ import {
   Search,
 } from 'lucide-react';
 import { ChoiceChips } from '@/components/interaction/ChoiceChips';
+import {
+  resolveIdempotencyAttempt,
+  type ClientIdempotencyAttempt,
+} from '@/lib/client-idempotency';
 import {
   effectiveIngredientUnitCost,
   ingredientNumber,
@@ -233,6 +237,7 @@ export function IngredientWorkspace({
   const [actionMessage, setActionMessage] = useState('');
   const [movements, setMovements] = useState<Record<string, Movement[]>>({});
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
+  const stockAttemptRef = useRef<ClientIdempotencyAttempt | null>(null);
 
   const visibleIngredients = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('id-ID');
@@ -368,6 +373,7 @@ export function IngredientWorkspace({
     setCorrectionDirection('in');
     setStockNote('');
     setActionMessage('');
+    stockAttemptRef.current = null;
     setActivePanel({ id: item.id, mode: 'stock' });
   }
 
@@ -469,6 +475,19 @@ export function IngredientWorkspace({
       return;
     }
 
+    const stockPayload = {
+      location_id: primaryLocationId,
+      action: stockAction,
+      quantity,
+      direction: correctionDirection,
+      note: stockNote,
+    };
+    const attempt = resolveIdempotencyAttempt(stockAttemptRef.current, {
+      ingredientId: item.id,
+      ...stockPayload,
+    });
+    stockAttemptRef.current = attempt;
+
     setActionSaving(true);
     setActionMessage('');
     try {
@@ -476,18 +495,16 @@ export function IngredientWorkspace({
         `/api/businesses/${businessId}/ingredients/${item.id}/stock-adjustments`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location_id: primaryLocationId,
-            action: stockAction,
-            quantity,
-            direction: correctionDirection,
-            note: stockNote,
-          }),
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': attempt.key,
+          },
+          body: JSON.stringify(stockPayload),
         },
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(responseError(payload, 'Gagal memperbarui stok.'));
+      stockAttemptRef.current = null;
       await reload();
       const command = payload?.data?.command;
       setStockQuantityInput('');
