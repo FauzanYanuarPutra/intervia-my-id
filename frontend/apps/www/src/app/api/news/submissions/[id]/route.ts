@@ -71,9 +71,7 @@ function sanitizeSources(value: unknown): string[] {
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     result.push(normalized);
-    if (result.length >= 10) break; catch {
-      continue;
-    }
+    if (result.length >= 10) break;
   }
   return result;
 }
