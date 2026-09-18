@@ -26,6 +26,7 @@ internal gateway.
 - per-container resource metrics through cAdvisor;
 - each owned PostgreSQL service through a dedicated exporter;
 - Redis through redis_exporter;
+- RabbitMQ queue/broker metrics through the built-in rabbitmq_prometheus plugin on the internal network;
 - application/data readiness through blackbox HTTP/TCP probes;
 - Prometheus self-health and alert-rule evaluation.
 
@@ -57,6 +58,7 @@ Prometheus should show these primary targets as healthy:
 - postgres_marketplace
 - postgres_community
 - redis
+- rabbitmq
 - blackbox_http
 - blackbox_tcp
 
