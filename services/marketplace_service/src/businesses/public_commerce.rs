@@ -235,7 +235,8 @@ impl PublicCommerceRepository {
         request: CreatePublicOrderRequest,
     ) -> Result<PublicOrderBundle, PublicCommerceError> {
         validate_request(&request)?;
-        let request_hash = canonical_request_hash(&request).map_err(|_| PublicCommerceError::Storage)?;
+        let request_hash =
+            canonical_request_hash(&request).map_err(|_| PublicCommerceError::Storage)?;
         if buyer_id.is_nil() {
             return Err(PublicCommerceError::Unauthorized);
         }
@@ -593,7 +594,10 @@ fn ensure_idempotency_replay_matches(
     metadata: &Value,
     request_hash: &str,
 ) -> Result<(), PublicCommerceError> {
-    if let Some(existing_hash) = metadata.get("idempotency_request_hash").and_then(Value::as_str) {
+    if let Some(existing_hash) = metadata
+        .get("idempotency_request_hash")
+        .and_then(Value::as_str)
+    {
         if existing_hash != request_hash {
             return Err(PublicCommerceError::IdempotencyConflict);
         }

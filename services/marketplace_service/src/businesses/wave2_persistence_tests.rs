@@ -233,7 +233,11 @@ async fn purchase_rejects_same_idempotency_key_with_different_payload(pool: PgPo
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(stock, Decimal::from(5), "conflicting replay must not move stock");
+    assert_eq!(
+        stock,
+        Decimal::from(5),
+        "conflicting replay must not move stock"
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]

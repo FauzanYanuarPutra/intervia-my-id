@@ -10,7 +10,10 @@ fn wave2_creation_idempotency_migration_has_business_scoped_unique_keys() {
         "business_recurring_obligations",
         "business_material_yield_observations",
     ] {
-        assert!(migration.contains(table), "missing idempotency table {table}");
+        assert!(
+            migration.contains(table),
+            "missing idempotency table {table}"
+        );
     }
     assert_eq!(
         migration
@@ -32,7 +35,6 @@ fn wave2_creation_idempotency_migration_has_business_scoped_unique_keys() {
     );
 }
 
-
 #[test]
 fn retry_request_hash_migration_covers_retry_sensitive_business_writes() {
     let migration =
@@ -51,7 +53,9 @@ fn retry_request_hash_migration_covers_retry_sensitive_business_writes() {
         );
     }
     assert_eq!(
-        migration.matches("ADD COLUMN IF NOT EXISTS request_hash TEXT").count(),
+        migration
+            .matches("ADD COLUMN IF NOT EXISTS request_hash TEXT")
+            .count(),
         5
     );
     assert_eq!(

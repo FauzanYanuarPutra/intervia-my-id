@@ -273,7 +273,6 @@ impl SettlementRepository {
     }
 }
 
-
 fn settlement_request_hash(
     request: &CreateSettlementRequest,
 ) -> Result<String, SettlementRepositoryError> {
