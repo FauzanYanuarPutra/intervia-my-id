@@ -2,16 +2,21 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Hash } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { buildNewsFacetUrl, buildNewsPath, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
+import { buildNewsFacetPath, buildNewsFacetUrl, buildNewsPath, getNewsLanguageAvailability, getPublishedNews } from '@/lib/news';
 
-type Props = { params: Promise<{ locale: string; topic: string }> };
+type Props = {
+  params: Promise<{ locale: string; topic: string }>;
+  searchParams: Promise<{ cursor?: string }>;
+};
 
 function cleanFacet(value: string): string {
   return value.trim().slice(0, 80);
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { locale, topic } = await params;
+  const filters = await searchParams;
+  const filters = await searchParams;
   const value = cleanFacet(topic);
   if (!value) return { robots: { index: false, follow: true } };
   const canonical = buildNewsFacetUrl(locale, 'topic', value);
@@ -36,19 +41,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     },
     robots: {
-      index: indexable,
+      index: indexable && !filters.cursor?.trim(),
       follow: true,
-      googleBot: { index: indexable, follow: true, 'max-image-preview': 'large' },
+      googleBot: { index: indexable && !filters.cursor?.trim(), follow: true, 'max-image-preview': 'large' },
     },
   };
 }
 
-export default async function NewsTopicPage({ params }: Props) {
+export default async function NewsTopicPage({ params, searchParams }: Props) {
   const { locale, topic } = await params;
   const value = cleanFacet(topic);
   if (!value) notFound();
   const isId = locale === 'id';
-  const { items } = await getPublishedNews({ topic: value, language: isId ? 'id' : 'en', limit: 48 });
+  const cursor = filters.cursor?.trim() || undefined;
+  const { items, nextCursor } = await getPublishedNews({ topic: value, language: isId ? 'id' : 'en', cursor, limit: 48 });
 
   return (
     <main className="page-shell page-rhythm pb-12 pt-6">
@@ -74,6 +80,13 @@ export default async function NewsTopicPage({ params }: Props) {
       ) : (
         <div className="rounded-[26px] border border-dashed border-slate-300 p-8 text-center text-sm font-semibold text-slate-500 dark:border-white/15">{isId ? 'Belum ada berita untuk topik ini.' : 'No news for this topic yet.'}</div>
       )}
+      {nextCursor ? (
+        <nav aria-label={isId ? 'Navigasi topik berita' : 'News topic navigation'} className="flex justify-center">
+          <Link href={`${buildNewsFacetPath('topic', value)}?cursor=${encodeURIComponent(nextCursor)}`} rel="next" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+            {isId ? 'Berikutnya' : 'Next'}<ArrowRight className="h-4 w-4" />
+          </Link>
+        </nav>
+      ) : null}
     </main>
   );
 }
