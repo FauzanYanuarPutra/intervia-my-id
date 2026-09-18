@@ -256,6 +256,53 @@ export async function getNewsForSitemap(maxItems = 1000): Promise<LajukanNewsArt
   return collected.slice(0, maxItems);
 }
 
+
+export async function getRelatedNewsArticles(
+  article: LajukanNewsArticle,
+  limit = 3,
+): Promise<LajukanNewsArticle[]> {
+  const requests: Array<Promise<{ items: LajukanNewsArticle[] }>> = [
+    getPublishedNews({ category: article.category, language: article.language, limit: 12 }),
+  ];
+  if (article.tags[0]) {
+    requests.push(getPublishedNews({ topic: article.tags[0], language: article.language, limit: 12 }));
+  }
+  if (article.location) {
+    requests.push(getPublishedNews({ location: article.location, language: article.language, limit: 8 }));
+  }
+
+  const pages = await Promise.all(requests);
+  const candidates = new Map<string, LajukanNewsArticle>();
+  for (const page of pages) {
+    for (const candidate of page.items) {
+      if (candidate.id !== article.id) candidates.set(candidate.id, candidate);
+    }
+  }
+
+  const sourceTags = new Set(article.tags.map(tag => tag.toLowerCase()));
+  const score = (candidate: LajukanNewsArticle) => {
+    let value = 0;
+    if (candidate.category === article.category) value += 5;
+    if (candidate.articleKind === article.articleKind) value += 1;
+    if (article.location && candidate.location === article.location) value += 2;
+    for (const tag of candidate.tags) {
+      if (sourceTags.has(tag.toLowerCase())) value += 3;
+    }
+    const ageDays = Math.max(0, (Date.now() - Date.parse(candidate.publishedAt)) / 86_400_000);
+    if (ageDays <= 7) value += 2;
+    else if (ageDays <= 30) value += 1;
+    return value;
+  };
+
+  return [...candidates.values()]
+    .sort((left, right) => {
+      const scoreDelta = score(right) - score(left);
+      if (scoreDelta !== 0) return scoreDelta;
+      return Date.parse(right.publishedAt) - Date.parse(left.publishedAt);
+    })
+    .slice(0, Math.max(1, Math.min(6, limit)));
+}
+
 export function buildNewsPath(slug?: string): string {
   return `/news${slug ? `/${slug}` : ''}`;
 }
@@ -308,6 +355,17 @@ export function buildNewsArticleJsonLd(article: LajukanNewsArticle, locale: stri
       },
     },
     keywords: article.tags.join(', ') || undefined,
+    isAccessibleForFree: true,
+    wordCount: article.body.trim() ? article.body.trim().split(/\s+/).length : 0,
+    genre:
+      article.articleKind === 'analysis'
+        ? 'Analysis'
+        : article.articleKind === 'press_release'
+          ? 'PressRelease'
+          : 'News',
+    about: article.tags.length
+      ? article.tags.map(tag => ({ '@type': 'Thing', name: tag }))
+      : undefined,
     citation: article.sourceUrls.length ? article.sourceUrls : undefined,
     contentLocation: article.location
       ? { '@type': 'Place', name: article.location }

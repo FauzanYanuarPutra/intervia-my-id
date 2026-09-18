@@ -8,11 +8,12 @@ import {
   buildNewsFacetPath,
   buildNewsPath,
   buildNewsUrl,
-  getPublishedNews,
   getPublishedNewsArticle,
+  getRelatedNewsArticles,
 } from '@/lib/news';
 import { serializeJsonLd } from '@/lib/seo/jsonLd';
 import NewsAnalytics from './NewsAnalytics';
+import NewsShareActions from './NewsShareActions';
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -62,6 +63,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ? [{ url: article.coverImage, alt: article.title }]
         : [{ url: 'https://www.lajukan.com/opengraph-image.png', width: 1200, height: 630, alt: article.title }],
     },
+    authors: [{ name: article.byline }],
+    keywords: article.tags,
     twitter: {
       card: 'summary_large_image',
       title: article.title,
@@ -93,9 +96,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
   const isRetracted = article.editorialStatus === 'retracted';
   const relatedArticles = isRetracted
     ? []
-    : (await getPublishedNews({ category: article.category, language: article.language, limit: 8 })).items
-        .filter(item => item.id !== article.id)
-        .slice(0, 3);
+    : await getRelatedNewsArticles(article, 3);
 
   const paragraphs = article.body
     .split(/\n{2,}/)
@@ -160,6 +161,15 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 </Link>
               ))}
             </nav>
+          ) : null}
+          {!isRetracted ? (
+            <NewsShareActions
+              articleId={article.id}
+              slug={article.slug}
+              category={article.category}
+              title={article.title}
+              isId={isId}
+            />
           ) : null}
         </header>
 

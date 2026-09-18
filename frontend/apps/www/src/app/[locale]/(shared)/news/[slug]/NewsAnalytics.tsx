@@ -11,6 +11,31 @@ type Props = {
 
 const READ_MILESTONES = [25, 50, 75, 100] as const;
 
+function acquisitionProperties() {
+  const params = new URLSearchParams(window.location.search);
+  let referrerDomain: string | undefined;
+  try {
+    if (document.referrer) {
+      const referrer = new URL(document.referrer);
+      if (referrer.origin !== window.location.origin) {
+        referrerDomain = referrer.hostname.replace(/^www\./, '').slice(0, 120);
+      }
+    }
+  } catch {
+    referrerDomain = undefined;
+  }
+  const readParam = (name: string) => {
+    const value = params.get(name)?.trim();
+    return value ? value.slice(0, 120) : undefined;
+  };
+  return {
+    referrer_domain: referrerDomain,
+    utm_source: readParam('utm_source'),
+    utm_medium: readParam('utm_medium'),
+    utm_campaign: readParam('utm_campaign'),
+  };
+}
+
 function destinationProperties(anchor: HTMLAnchorElement) {
   try {
     const url = new URL(anchor.href, window.location.origin);
@@ -25,14 +50,22 @@ function destinationProperties(anchor: HTMLAnchorElement) {
 
 export default function NewsAnalytics({ articleId, slug, category }: Props) {
   useEffect(() => {
+    const acquisition = acquisitionProperties();
     const base = {
       entityType: 'news',
       entityId: articleId,
       source: 'news_article',
-      properties: { slug, category },
+      properties: { slug, category, ...acquisition },
     };
 
     void trackLajukanEvent('news.opened', base);
+    const engagedTimer = window.setTimeout(() => {
+      if (document.hidden) return;
+      void trackLajukanEvent('news.engaged_30s', {
+        ...base,
+        properties: { slug, category, engaged_seconds: 30, ...acquisition },
+      });
+    }, 30_000);
 
     const seen = new Set<number>();
     let frame = 0;
@@ -59,6 +92,7 @@ export default function NewsAnalytics({ articleId, slug, category }: Props) {
             slug,
             category,
             read_depth: milestone,
+            ...acquisition,
           },
         });
       }
@@ -82,6 +116,7 @@ export default function NewsAnalytics({ articleId, slug, category }: Props) {
           slug,
           category,
           ...destinationProperties(anchor),
+          ...acquisition,
         },
       });
     };
@@ -94,6 +129,7 @@ export default function NewsAnalytics({ articleId, slug, category }: Props) {
       window.removeEventListener('scroll', onScroll);
       document.removeEventListener('click', onClick);
       if (frame) window.cancelAnimationFrame(frame);
+      window.clearTimeout(engagedTimer);
     };
   }, [articleId, category, slug]);
 
