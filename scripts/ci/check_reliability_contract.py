@@ -64,8 +64,10 @@ staging_env_example = read(".env.staging.example")
 development_env_example = read(".env.development.example")
 marketplace_identity_client = read("services/marketplace_service/src/businesses/identity_client.rs")
 
+if base_compose.count("JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}") != 1:
+    errors.append("base compose must expose JWT_PRIVATE_KEY_PEM to Identity only")
+
 for marker in (
-    "JWT_PRIVATE_KEY_PEM",
     "JWT_PUBLIC_KEY_PEM",
     "JWT_KEY_ID",
     "JWT_ALLOW_LEGACY_HS256",
