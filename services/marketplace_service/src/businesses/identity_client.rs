@@ -327,7 +327,13 @@ mod tests {
 
     #[test]
     fn order_permissions_match_usaha_roles() {
-        for role in ["org_admin", "org_manager", "manager", "org_cashier", "cashier"] {
+        for role in [
+            "org_admin",
+            "org_manager",
+            "manager",
+            "org_cashier",
+            "cashier",
+        ] {
             assert!(organization(role).can_view_orders());
             assert!(organization(role).can_manage_orders());
         }
