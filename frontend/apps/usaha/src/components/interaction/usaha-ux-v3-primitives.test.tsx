@@ -105,4 +105,30 @@ describe('UX V3 primitives', () => {
     expect(html).toContain('Hapus lokasi');
     expect(html).toContain('<dialog');
   });
+
+  it('caps large picker result sets while keeping the selected item visible', () => {
+    const items = Array.from({ length: 60 }, (_, index) => ({
+      id: String(index + 1),
+      name: `Bahan ${index + 1}`,
+    }));
+    const html = renderToStaticMarkup(
+      <SearchPicker
+        items={items}
+        value="60"
+        query=""
+        onQueryChange={() => {}}
+        onChange={() => {}}
+        getKey={item => item.id}
+        getLabel={item => item.name}
+        placeholder="Cari bahan"
+        emptyLabel="Tidak ditemukan"
+        ariaLabel="Pilih bahan"
+        maxVisible={10}
+      />,
+    );
+
+    expect(html).toContain('Bahan 60');
+    expect(html).toContain('Menampilkan 10 dari 60');
+    expect(html).not.toContain('Bahan 11<');
+  });
 });
