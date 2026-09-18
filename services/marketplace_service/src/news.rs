@@ -642,7 +642,7 @@ async fn public_verified_source_urls(
     pool: &PgPool,
     content_id: Uuid,
 ) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar::<_, String>(
+    let urls = sqlx::query_scalar::<_, String>(
         r#"
         SELECT source_url
         FROM news_source_references
@@ -653,7 +653,12 @@ async fn public_verified_source_urls(
     )
     .bind(content_id)
     .fetch_all(pool)
-    .await
+    .await?;
+
+    Ok(urls
+        .into_iter()
+        .filter(|url| is_allowed_news_source_url(url))
+        .collect())
 }
 
 fn format_news_cursor(row: &NewsRow) -> String {
@@ -1225,7 +1230,7 @@ async fn update_news_submission(
     let summary = trimmed(payload.summary).or_else(|| current.summary.clone());
     if summary
         .as_ref()
-        .is_none_or(|value| value.len() < 20 || value.len() > 1000)
+        .map_or(true, |value| value.len() < 20 || value.len() > 1000)
     {
         return response_error(
             StatusCode::BAD_REQUEST,
