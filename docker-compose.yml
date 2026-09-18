@@ -244,7 +244,6 @@ services:
     depends_on:
       identity_db: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
     expose: ["8080"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
