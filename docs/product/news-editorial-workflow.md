@@ -80,6 +80,7 @@ The News domain also maintains durability and observability primitives:
 - Public News responses use an explicit metadata allowlist. Contributor IDs, reviewer IDs, review notes, resubmission timestamps, and other newsroom-only fields never leave the editorial boundary.
 - The public frontend article model also omits contributor ownership fields entirely, so private contributor identity is absent from both the API projection and the WWW type boundary.
 - Public article pages expose only editor-verified source references; broken, rejected, unverified, private-network, credentialed, or non-HTTP(S) source URLs are not rendered as public citations.
+- Source URL safety is shared across WWW submit/revision and CMS review, while marketplace remains authoritative. Literal special-use IP ranges (including CGNAT, link-local/metadata, documentation, benchmark, multicast, IPv4-mapped IPv6, ULA/link-local IPv6, and NAT64 well-known prefixes) are rejected.
 - Published news/analysis cannot downgrade its last public-safe verified source. Source review locks the article and source row, enforces a replacement-or-retract rule, and commits the source update with its outbox event in one transaction.
 - Every source review also appends an immutable `news_source_review_events` record with reviewer ID, kind/status before and after, note, and timestamp. The history survives source-reference deletion through `ON DELETE SET NULL`.
 - Marketplace startup readiness verifies all durable News tables (`news_editorial_events`, `news_article_versions`, `news_source_references`, and `news_source_review_events`) after the release-owned migration step, so an incomplete newsroom schema fails before traffic is served.
@@ -92,6 +93,7 @@ The News domain also maintains durability and observability primitives:
 - High-cardinality list variants (free-text search, cursor pages, legacy offset pages, topic feeds, and location feeds) bypass the Next.js data cache; only bounded base/category feeds use short revalidation. Public cursors are length-bounded before parsing.
 - Active News feeds have dedicated tag, language/cursor, category/language/cursor, and location/language/cursor indexes. Public list queries project an empty body placeholder so Postgres does not transfer full article bodies when rendering cards.
 - The News index exposes server-rendered search and cursor pagination. Category, topic, and location feeds also paginate with cursors; cursor variants remain followable but are noindex with the canonical facet URL.
+- Cursor pagination is canonical for public News. Legacy offset is capped at 1,000 and cannot be combined with a cursor; WWW omits offset=0 to keep request/cache keys canonical.
 - Facet hreflang entries are emitted only for languages that currently have matching published articles, avoiding alternates that resolve to empty/noindex pages.
 
 ### Source policy
