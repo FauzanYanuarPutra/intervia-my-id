@@ -9,7 +9,6 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use lapin::{
     options::{
         BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicQosOptions,
@@ -35,8 +34,15 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod auth;
+mod health;
+mod rate_limit;
 mod runtime_metrics;
 mod schema_contract;
+
+use auth::{is_moderator, optional_actor, require_actor, AuthActor};
+use health::{health, ready, root, service_metrics};
+use rate_limit::{enforce_rate_limit, mutation_rate_limit, run_rate_limit_cleanup};
 
 const MAX_TITLE_LEN: usize = 140;
 const MAX_CATEGORY_TITLE_LEN: usize = 72;
@@ -91,34 +97,6 @@ impl IntoResponse for ApiError {
         )
             .into_response()
     }
-}
-
-#[derive(Debug, Deserialize, Default)]
-struct AccessClaims {
-    sub: String,
-    #[allow(dead_code)]
-    exp: usize,
-    #[serde(default)]
-    roles: Vec<String>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    perms: Vec<String>,
-    #[serde(default)]
-    username: Option<String>,
-    #[serde(default)]
-    name: Option<String>,
-    #[serde(default)]
-    full_name: Option<String>,
-    #[serde(default)]
-    display_name: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-struct AuthActor {
-    user_id: String,
-    roles: Vec<String>,
-    username: Option<String>,
-    name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -1376,271 +1354,6 @@ fn parse_cors_origins() -> Vec<HeaderValue> {
         .split(',')
         .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
         .collect()
-}
-
-async fn root() -> impl IntoResponse {
-    Json(json!({"service":"community_service","ready":true}))
-}
-
-async fn health() -> impl IntoResponse {
-    Json(json!({"status":"ok","service":"community_service"}))
-}
-
-async fn ready(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match timeout(
-        Duration::from_secs(2),
-        sqlx::query_scalar::<_, i32>("SELECT 1").fetch_one(&state.db),
-    )
-    .await
-    {
-        Ok(Ok(1)) => (
-            StatusCode::OK,
-            Json(json!({"status":"ready","service":"community_service"})),
-        )
-            .into_response(),
-        Ok(Ok(_)) | Ok(Err(_)) | Err(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"status":"not_ready","service":"community_service"})),
-        )
-            .into_response(),
-    }
-}
-
-fn bearer_token(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-}
-
-fn optional_actor(headers: &HeaderMap, state: &AppState) -> Option<AuthActor> {
-    let token = bearer_token(headers)?;
-    let mut validation = Validation::new(Algorithm::HS256);
-    validation.validate_exp = true;
-    let claims = decode::<AccessClaims>(
-        &token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &validation,
-    )
-    .ok()?
-    .claims;
-
-    Some(AuthActor {
-        user_id: claims.sub,
-        roles: claims.roles,
-        username: claims.username,
-        name: claims.name.or(claims.full_name).or(claims.display_name),
-    })
-}
-
-fn require_actor(headers: &HeaderMap, state: &AppState) -> ApiResult<AuthActor> {
-    optional_actor(headers, state)
-        .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Unauthorized"))
-}
-
-fn is_moderator(actor: &AuthActor) -> bool {
-    actor.roles.iter().any(|role| {
-        matches!(
-            role.to_ascii_lowercase().as_str(),
-            "admin" | "superadmin" | "moderator" | "forum:moderator" | "forum:admin"
-        )
-    })
-}
-
-fn request_ip(headers: &HeaderMap) -> String {
-    headers
-        .get("x-forwarded-for")
-        .or_else(|| headers.get("x-real-ip"))
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(',').next())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("unknown")
-        .to_string()
-}
-
-async fn service_metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let pool_size = state.db.size();
-    let pool_idle = state.db.num_idle();
-    let pool_max = state.db.options().get_max_connections();
-    let pool_active = pool_size.saturating_sub(pool_idle.min(pool_size as usize) as u32);
-    let (outbox_backlog, outbox_oldest_age_seconds, metrics_query_ok) = match timeout(
-        Duration::from_secs(2),
-        sqlx::query_as::<_, (i64, f64)>(
-            r#"
-            SELECT
-              COUNT(*)::bigint,
-              COALESCE(
-                EXTRACT(EPOCH FROM (NOW() - MIN(created_at))),
-                0
-              )::double precision
-            FROM events.event_outbox
-            WHERE status <> 'published'
-            "#,
-        )
-        .fetch_one(&state.db),
-    )
-    .await
-    {
-        Ok(Ok((backlog, oldest_age_seconds))) => (backlog, oldest_age_seconds.max(0.0), 1),
-        Ok(Err(_)) | Err(_) => (0, 0.0, 0),
-    };
-
-    let mut body = format!(
-        concat!(
-            "# HELP lajukan_service_info Static service identity.\n",
-            "# TYPE lajukan_service_info gauge\n",
-            "lajukan_service_info{{service=\"community_service\"}} 1\n",
-            "# HELP lajukan_db_pool_connections PostgreSQL pool connections by state.\n",
-            "# TYPE lajukan_db_pool_connections gauge\n",
-            "lajukan_db_pool_connections{{service=\"community_service\",state=\"total\"}} {}\n",
-            "lajukan_db_pool_connections{{service=\"community_service\",state=\"idle\"}} {}\n",
-            "lajukan_db_pool_connections{{service=\"community_service\",state=\"active\"}} {}\n",
-            "lajukan_db_pool_connections{{service=\"community_service\",state=\"max\"}} {}\n",
-            "# HELP lajukan_outbox_backlog Pending or failed transactional outbox events.\n",
-            "# TYPE lajukan_outbox_backlog gauge\n",
-            "lajukan_outbox_backlog{{service=\"community_service\"}} {}\n",
-            "# HELP lajukan_outbox_oldest_age_seconds Age in seconds of the oldest unpublished transactional outbox event.\n",
-            "# TYPE lajukan_outbox_oldest_age_seconds gauge\n",
-            "lajukan_outbox_oldest_age_seconds{{service=\"community_service\"}} {}\n",
-            "# HELP lajukan_metrics_db_query_ok Whether the metrics DB query succeeded.\n",
-            "# TYPE lajukan_metrics_db_query_ok gauge\n",
-            "lajukan_metrics_db_query_ok{{service=\"community_service\"}} {}\n"
-        ),
-        pool_size,
-        pool_idle,
-        pool_active,
-        pool_max,
-        outbox_backlog,
-        outbox_oldest_age_seconds,
-        metrics_query_ok
-    );
-
-    body.push_str(&runtime_metrics::render("community_service"));
-
-    (
-        [(
-            header::CONTENT_TYPE,
-            "text/plain; version=0.0.4; charset=utf-8",
-        )],
-        body,
-    )
-}
-
-async fn enforce_rate_limit(
-    state: &AppState,
-    key: String,
-    limit: u32,
-    window_seconds: i64,
-) -> ApiResult<()> {
-    let window_seconds = window_seconds.max(1);
-    let count = sqlx::query_scalar::<_, i64>(
-        r#"
-        INSERT INTO community_rate_limit_counters (
-          rate_key,
-          window_bucket,
-          count,
-          expires_at
-        )
-        VALUES (
-          $1,
-          FLOOR(
-            EXTRACT(EPOCH FROM clock_timestamp())
-            / GREATEST($2::bigint, 1)
-          )::bigint,
-          1,
-          clock_timestamp()
-            + (GREATEST($2::bigint, 1) * INTERVAL '1 second')
-        )
-        ON CONFLICT (rate_key, window_bucket)
-        DO UPDATE
-        SET
-          count = community_rate_limit_counters.count + 1,
-          expires_at = GREATEST(
-            community_rate_limit_counters.expires_at,
-            EXCLUDED.expires_at
-          )
-        RETURNING count::bigint
-        "#,
-    )
-    .bind(key)
-    .bind(window_seconds)
-    .fetch_one(&state.db)
-    .await
-    .map_err(|error| {
-        tracing::warn!(error = ?error, "shared rate limiter unavailable");
-        ApiError::new(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Rate limit service unavailable",
-        )
-    })?;
-
-    if count > i64::from(limit) {
-        return Err(ApiError::new(
-            StatusCode::TOO_MANY_REQUESTS,
-            "Rate limit exceeded",
-        ));
-    }
-
-    Ok(())
-}
-
-async fn run_rate_limit_cleanup(db: PgPool) {
-    loop {
-        sleep(Duration::from_secs(600)).await;
-        let result = sqlx::query(
-            r#"
-            WITH expired AS (
-              SELECT ctid
-              FROM community_rate_limit_counters
-              WHERE expires_at < now() - INTERVAL '1 hour'
-              ORDER BY expires_at ASC
-              FOR UPDATE SKIP LOCKED
-              LIMIT 5000
-            )
-            DELETE FROM community_rate_limit_counters AS counters
-            USING expired
-            WHERE counters.ctid = expired.ctid
-            "#,
-        )
-        .execute(&db)
-        .await;
-
-        match result {
-            Ok(result) if result.rows_affected() > 0 => {
-                tracing::info!(
-                    deleted = result.rows_affected(),
-                    "cleaned expired shared rate-limit counters"
-                );
-            }
-            Ok(_) => {}
-            Err(error) => {
-                tracing::warn!(error = ?error, "rate-limit cleanup failed");
-            }
-        }
-    }
-}
-
-async fn mutation_rate_limit(
-    state: &AppState,
-    headers: &HeaderMap,
-    actor: &AuthActor,
-    scope: &str,
-    ip_limit: u32,
-    user_limit: u32,
-) -> ApiResult<()> {
-    let ip = request_ip(headers);
-    enforce_rate_limit(state, format!("{scope}:ip:{ip}"), ip_limit, 3600).await?;
-    enforce_rate_limit(
-        state,
-        format!("{scope}:user:{}", actor.user_id),
-        user_limit,
-        3600,
-    )
-    .await
 }
 
 fn clean_auth_id(value: &str) -> String {
