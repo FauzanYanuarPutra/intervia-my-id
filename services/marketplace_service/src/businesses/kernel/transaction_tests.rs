@@ -179,11 +179,7 @@ fn returned_quantity_never_exceeds_fulfilled_quantity() {
         Ok(())
     );
     assert_eq!(
-        validate_return_quantity(
-            Decimal::from(10),
-            Decimal::from(4),
-            Decimal::from(7),
-        ),
+        validate_return_quantity(Decimal::from(10), Decimal::from(4), Decimal::from(7),),
         Err(TransactionInvariantError::ReturnExceedsFulfilled)
     );
 }
