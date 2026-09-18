@@ -20,6 +20,18 @@ No Prometheus or Alertmanager port is published publicly. Inspect them through
 an SSH tunnel, a private administration network, or a separately authenticated
 internal gateway.
 
+## Operator cockpit
+
+Grafana is provisioned from Git and binds only to loopback on
+`127.0.0.1:${GRAFANA_PORT:-3005}`. Reach it through an SSH tunnel or another
+private administration path. The default dashboard shows request rate, 5xx
+ratio, p95 latency, in-flight requests, readiness probes, PostgreSQL health,
+host memory, host CPU, and RabbitMQ backlog.
+
+The Prometheus rules also calculate 99.9%-SLO error-budget burn signals using
+short and long windows. These are internal engineering signals, not an external
+availability claim.
+
 ## What is measured
 
 - host CPU, memory, filesystem and kernel metrics through node_exporter;
