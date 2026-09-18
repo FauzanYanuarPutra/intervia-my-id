@@ -320,8 +320,8 @@ export function BusinessLocationField({
         ) : null}
       </div>
 
-      {error ? <p className="text-xs leading-5 text-portal-ember">{error}</p> : null}
-      {!error && feedback ? <p className="text-xs leading-5 text-portal-forest">{feedback}</p> : null}
+      {error ? <p role="alert" className="text-xs leading-5 text-portal-ember">{error}</p> : null}
+      {!error && feedback ? <p role="status" aria-live="polite" className="text-xs leading-5 text-portal-forest">{feedback}</p> : null}
     </div>
   );
 }
