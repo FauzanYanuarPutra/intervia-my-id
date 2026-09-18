@@ -11,8 +11,7 @@ warnings: list[str] = []
 
 def read(path: str) -> str:
     target = ROOT / path
-    if not target.is_file(    "ready_streak >= 3",
-):
+    if not target.is_file():
         errors.append(f"missing required reliability file: {path}")
         return ""
     return target.read_text(encoding="utf-8")
@@ -59,10 +58,6 @@ for service in ("identity_db:", "marketplace_db:", "community_db:"):
 if "restart: unless-stopped" not in base_compose:
     errors.append("base compose must retain process restart policy")
 
-if "github.event_name == 'workflow_run' && 'production'" in deploy:
-    errors.append("Build Images workflow_run must never auto-target production")
-if "target_env=production\n            release_sha=\"$WORKFLOW_HEAD_SHA\"" in deploy:
-    errors.append("automatic Build Images deployment must target staging, not production")
 for marker in (
     "./infrastructure/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro",
     'expose: ["15692"]',
@@ -394,6 +389,10 @@ for marker in (
 if "development-database" not in prod_compose:
     errors.append("production compose must keep single-node Scylla out of the normal production profile")
 
+if "github.event_name == 'workflow_run' && 'production'" in deploy:
+    errors.append("Build Images workflow_run must never auto-target production")
+if "target_env=production\n            release_sha=\"$WORKFLOW_HEAD_SHA\"" in deploy:
+    errors.append("automatic Build Images deployment must target staging, not production")
 for marker in (
     "github.event_name == 'workflow_run' && 'staging'",
     "target_env=staging",
@@ -745,6 +744,7 @@ for marker in (
     "pg_dump -U postgres",
     "no published network port",
     "docker volume rm",
+    "ready_streak >= 3",
 ):
     if marker not in restore_drill_script:
         errors.append(f"isolated PostgreSQL restore drill missing safety/validation marker: {marker}")
