@@ -1,8 +1,18 @@
-use axum::{extract::Request, http::HeaderValue, middleware::Next, response::Response};
+use axum::{
+    extract::Request,
+    http::{header, HeaderValue, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
 use std::{
-    sync::atomic::{AtomicI64, AtomicU64, Ordering},
+    env,
+    sync::{
+        atomic::{AtomicI64, AtomicU64, Ordering},
+        Arc, OnceLock,
+    },
     time::Instant,
 };
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tracing::Instrument;
 use uuid::Uuid;
 
@@ -23,6 +33,33 @@ static HTTP_DURATION_LE_1S: AtomicU64 = AtomicU64::new(0);
 static HTTP_DURATION_LE_2_5S: AtomicU64 = AtomicU64::new(0);
 static HTTP_DURATION_LE_5S: AtomicU64 = AtomicU64::new(0);
 static HTTP_DURATION_INF: AtomicU64 = AtomicU64::new(0);
+static HTTP_REJECTED_OVERLOAD_TOTAL: AtomicU64 = AtomicU64::new(0);
+static HTTP_CONCURRENCY_LIMIT: OnceLock<Arc<Semaphore>> = OnceLock::new();
+
+fn max_in_flight() -> usize {
+    env::var("HTTP_MAX_IN_FLIGHT")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(512)
+        .clamp(16, 50_000)
+}
+
+fn limiter() -> Arc<Semaphore> {
+    HTTP_CONCURRENCY_LIMIT
+        .get_or_init(|| Arc::new(Semaphore::new(max_in_flight())))
+        .clone()
+}
+
+fn should_bypass_overload(path: &str) -> bool {
+    matches!(path, "/health" | "/ready" | "/metrics")
+}
+
+fn try_acquire_request_permit(path: &str) -> Result<Option<OwnedSemaphorePermit>, ()> {
+    if should_bypass_overload(path) {
+        return Ok(None);
+    }
+    limiter().try_acquire_owned().map(Some).map_err(|_| ())
+}
 
 fn valid_request_id(value: &str) -> bool {
     !value.is_empty()
@@ -55,6 +92,20 @@ pub async fn track_request(mut request: Request, next: Next) -> Response {
         return next.run(request).await;
     }
 
+    let request_path = request.uri().path().to_owned();
+    let _request_permit = match try_acquire_request_permit(&request_path) {
+        Ok(permit) => permit,
+        Err(()) => {
+            HTTP_REJECTED_OVERLOAD_TOTAL.fetch_add(1, Ordering::Relaxed);
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                [(header::RETRY_AFTER, "1")],
+                "service overloaded",
+            )
+                .into_response();
+        }
+    };
+
     let request_id = resolve_request_id(&request);
     let request_id_header = HeaderValue::from_str(&request_id)
         .expect("validated/generated request id is a valid header");
@@ -63,7 +114,7 @@ pub async fn track_request(mut request: Request, next: Next) -> Response {
         .insert("x-request-id", request_id_header.clone());
 
     let method = request.method().clone();
-    let path = request.uri().path().to_owned();
+    let path = request_path;
     let span = tracing::info_span!(
         "http_request",
         request_id = %request_id,
@@ -145,6 +196,9 @@ pub fn render(service: &str) -> String {
             "# HELP lajukan_http_in_flight_requests Current in-flight HTTP requests excluding /metrics.\n",
             "# TYPE lajukan_http_in_flight_requests gauge\n",
             "lajukan_http_in_flight_requests{{service=\"{service}\"}} {in_flight}\n",
+            "# HELP lajukan_http_overload_rejections_total Requests rejected by the in-process concurrency limiter.\n",
+            "# TYPE lajukan_http_overload_rejections_total counter\n",
+            "lajukan_http_overload_rejections_total{{service=\"{service}\"}} {overload_rejections}\n",
             "# HELP lajukan_http_request_duration_seconds HTTP request duration histogram excluding /metrics.\n",
             "# TYPE lajukan_http_request_duration_seconds histogram\n",
             "lajukan_http_request_duration_seconds_bucket{{service=\"{service}\",le=\"0.01\"}} {le_10ms}\n",
@@ -166,6 +220,7 @@ pub fn render(service: &str) -> String {
         responses_4xx = HTTP_RESPONSES_4XX.load(Ordering::Relaxed),
         responses_5xx = HTTP_RESPONSES_5XX.load(Ordering::Relaxed),
         in_flight = HTTP_IN_FLIGHT.load(Ordering::Relaxed),
+        overload_rejections = HTTP_REJECTED_OVERLOAD_TOTAL.load(Ordering::Relaxed),
         le_10ms = HTTP_DURATION_LE_10MS.load(Ordering::Relaxed),
         le_50ms = HTTP_DURATION_LE_50MS.load(Ordering::Relaxed),
         le_100ms = HTTP_DURATION_LE_100MS.load(Ordering::Relaxed),
@@ -193,6 +248,14 @@ mod tests {
     }
 
     #[test]
+    fn overload_bypass_keeps_health_endpoints_observable() {
+        assert!(should_bypass_overload("/health"));
+        assert!(should_bypass_overload("/ready"));
+        assert!(should_bypass_overload("/metrics"));
+        assert!(!should_bypass_overload("/v1/orders"));
+    }
+
+    #[test]
     fn render_exposes_low_cardinality_red_metrics() {
         let body = render("test_service");
         assert!(body.contains("lajukan_http_requests_total{service=\"test_service\"}"));
@@ -202,6 +265,7 @@ mod tests {
         assert!(body.contains(
             "lajukan_http_request_duration_seconds_bucket{service=\"test_service\",le=\"+Inf\"}"
         ));
+        assert!(body.contains("lajukan_http_overload_rejections_total{service=\"test_service\"}"));
         assert!(!body.contains("path="));
     }
 }
