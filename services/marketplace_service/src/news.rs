@@ -1090,6 +1090,18 @@ async fn list_news(
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
     };
     let q = trimmed(query.q);
+    if category.as_ref().is_some_and(|value| value.len() > 80) {
+        return response_error(StatusCode::BAD_REQUEST, "category filter is too long");
+    }
+    if topic.as_ref().is_some_and(|value| value.len() > 80) {
+        return response_error(StatusCode::BAD_REQUEST, "topic filter is too long");
+    }
+    if location.as_ref().is_some_and(|value| value.len() > 120) {
+        return response_error(StatusCode::BAD_REQUEST, "location filter is too long");
+    }
+    if q.as_ref().is_some_and(|value| value.len() > 160) {
+        return response_error(StatusCode::BAD_REQUEST, "search query is too long");
+    }
     let cursor = match parse_news_cursor(query.cursor.as_deref()) {
         Ok(cursor) => cursor,
         Err(message) => return response_error(StatusCode::BAD_REQUEST, message),
@@ -1128,10 +1140,10 @@ async fn list_news(
           )
           AND (
             $5::text IS NULL OR
-            title ILIKE ('%' || $5 || '%') OR
-            COALESCE(summary, '') ILIKE ('%' || $5 || '%') OR
-            body ILIKE ('%' || $5 || '%') OR
-            COALESCE(array_to_string(tags, ' '), '') ILIKE ('%' || $5 || '%')
+            to_tsvector(
+              'simple'::regconfig,
+              COALESCE(title, '') || ' ' || COALESCE(summary, '') || ' ' || COALESCE(body, '')
+            ) @@ websearch_to_tsquery('simple'::regconfig, $5)
           )
           AND (
             $6::timestamptz IS NULL OR
