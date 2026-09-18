@@ -81,6 +81,13 @@ for prefix in ("IDENTITY", "MARKETPLACE", "COMMUNITY"):
         if marker not in base_compose:
             errors.append(f"base compose missing database lifecycle budget: {marker}")
 
+for marker in (
+    "MARKETPLACE_IDENTITY_TIMEOUT_MS",
+    "COMMUNITY_IDENTITY_PREFETCH",
+):
+    if marker not in base_compose:
+        errors.append(f"base compose does not pass reliability tuning into its service container: {marker}")
+
 for path in (
     "services/identity_service/src/db/postgres.rs",
     "services/marketplace_service/src/main.rs",
