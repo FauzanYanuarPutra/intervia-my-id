@@ -126,7 +126,7 @@ def check_client_module_boundaries() -> None:
             / "(shared)"
             / "reels"
             / "reels-client-helpers.ts",
-            350_000,
+            342_000,
             (
                 "resolveNotificationReelId",
                 "isReelCommentNotification",
@@ -191,6 +191,45 @@ def check_client_module_boundaries() -> None:
                     f"{client_path.relative_to(ROOT)} leaked extracted helper back "
                     f"into the giant client: {function_name}"
                 )
+
+
+    reels_client = (
+        FRONTEND
+        / "apps"
+        / "www"
+        / "src"
+        / "app"
+        / "[locale]"
+        / "(shared)"
+        / "reels"
+        / "ReelsClient.tsx"
+    )
+    reels_studio_helper = reels_client.with_name("reels-studio-helpers.ts")
+    if not reels_studio_helper.is_file():
+        fail(
+            f"missing extracted helper module: "
+            f"{reels_studio_helper.relative_to(ROOT)}"
+        )
+    reels_client_source = reels_client.read_text(encoding="utf-8")
+    reels_studio_source = reels_studio_helper.read_text(encoding="utf-8")
+    if "reels-studio-helpers" not in reels_client_source:
+        fail("ReelsClient.tsx must import reels-studio-helpers")
+    for function_name in (
+        "getReelStudioEffect",
+        "getReelMediaStyle",
+        "getStudioDurationMs",
+        "isPlayableReelsVideoFile",
+    ):
+        if function_name not in reels_studio_source:
+            fail(
+                f"{reels_studio_helper.relative_to(ROOT)} lost extracted helper: "
+                f"{function_name}"
+            )
+        if f"function {function_name}(" in reels_client_source:
+            fail(
+                "Reels studio responsibility leaked back into ReelsClient.tsx: "
+                f"{function_name}"
+            )
 
 
 def main() -> int:
