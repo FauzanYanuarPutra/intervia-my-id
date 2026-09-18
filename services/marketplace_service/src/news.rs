@@ -937,7 +937,7 @@ async fn load_news_by_id(db: &PgPool, content_id: Uuid) -> Result<Option<NewsRow
     sqlx::query_as::<_, NewsRow>(
         r#"
         SELECT
-            id, owner_id, slug, title, summary, ''::text AS body, tags, cover_image, metadata,
+            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
             content_status, published_at, created_at, updated_at
         FROM content_items
         WHERE id = $1 AND content_type = 'news' AND content_status <> 'deleted'
@@ -1135,7 +1135,7 @@ async fn list_news(
     let rows = sqlx::query_as::<_, NewsRow>(
         r#"
         SELECT
-            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
+            id, owner_id, slug, title, summary, ''::text AS body, tags, cover_image, metadata,
             content_status, published_at, created_at, updated_at
         FROM content_items
         WHERE content_type = 'news'
