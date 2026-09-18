@@ -338,6 +338,23 @@ for path in (
 ):
     source = read(path)
     for marker in (
+        'get("x-request-id")',
+        'insert("x-request-id"',
+        "Uuid::new_v4()",
+        "valid_request_id",
+        '"request_completed"',
+    ):
+        if marker not in source:
+            errors.append(f"{path} missing request correlation marker: {marker}")
+
+
+for path in (
+    "services/identity_service/src/runtime_metrics.rs",
+    "services/marketplace_service/src/runtime_metrics.rs",
+    "services/community_service/src/runtime_metrics.rs",
+):
+    source = read(path)
+    for marker in (
         "lajukan_http_requests_total",
         "lajukan_http_responses_total",
         "lajukan_http_in_flight_requests",
