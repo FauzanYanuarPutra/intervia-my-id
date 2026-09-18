@@ -247,7 +247,7 @@ require(
         'data-news-action="related_clicked"',
         "relatedArticles",
         "permanentRedirect",
-        "language: article.language",
+        "buildNewsArticleJsonLd(article, article.language)",
         "getRelatedNewsArticles",
         "NewsShareActions",
         "authors: [{ name: article.byline }]",
