@@ -42,6 +42,8 @@ If the health gate fails after replacement begins, the workflow redeploys the la
 
 Caddy is the origin TLS terminator and publishes the only production host ports, 80 and 443. Domain site labels intentionally omit `http://` so Caddy Automatic HTTPS can provision/renew origin certificates and redirect HTTP to HTTPS. A CDN such as Cloudflare may proxy in front, but its origin mode must validate Caddy TLS; the repository does not define a plaintext production origin.
 
+TLS and canonical-host redirects are edge-owned. Next.js applications must not emit permanent HTTPS redirects from `x-forwarded-proto`: forwarded scheme headers can describe an internal proxy hop rather than the browser-facing request, which can otherwise create a cacheable self-redirect. The WWW deployment smoke test therefore requires `/id/news` to return HTTP 200 without following redirects.
+
 ## Required production controls
 
 - Server-managed environment files; no real secrets in Git.

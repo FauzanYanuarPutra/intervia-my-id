@@ -134,6 +134,31 @@ if "route?.isDisabled" in proxy and (
 ):
     errors.append("disabled-route gating must not use permanent localized redirects")
 
+if "httpsRedirectResponse" in proxy or "PUBLIC_HTTPS_HOSTS" in proxy:
+    errors.append(
+        "WWW must leave TLS/canonical-host redirects to the edge proxy; "
+        "app-level permanent HTTPS redirects can self-loop behind forwarded headers"
+    )
+
+next_config = read("frontend/apps/www/next.config.mjs")
+if "key: 'x-forwarded-proto', value: 'http'" in next_config:
+    errors.append(
+        "frontend/apps/www/next.config.mjs must not permanently redirect from "
+        "x-forwarded-proto; Caddy owns external HTTPS"
+    )
+
+cms_tsconfig = read("frontend/apps/cms/tsconfig.json")
+for forbidden_alias in (
+    '"react/jsx-runtime"',
+    '"react/jsx-dev-runtime"',
+    '"react-dom"',
+):
+    if forbidden_alias in cms_tsconfig:
+        errors.append(
+            "CMS tsconfig must use normal package resolution instead of mapping "
+            f"{forbidden_alias} into node_modules/@types"
+        )
+
 deploy = read(".github/workflows/deploy.yml")
 for marker in (
     "Validate deployment connection contract",

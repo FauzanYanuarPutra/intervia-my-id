@@ -25,7 +25,6 @@ const JWT_SECRET = process.env.JWT_SECRET
 const IS_DEV = (process.env.NODE_ENV || 'development') !== 'production';
 const DEBUG = process.env.MIDDLEWARE_DEBUG === 'true' && IS_DEV;
 const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const PUBLIC_HTTPS_HOSTS = new Set(['lajukan.com', 'www.lajukan.com']);
 const BASE_ALLOWED_ORIGINS = [
   'https://www.lajukan.com',
   'https://lajukan.com',
@@ -217,30 +216,6 @@ function applyTemporaryRedirectHeaders(res: NextResponse) {
 
 function shouldNoIndexRoute(routePath: string) {
   return isAuthRoutePath(routePath) || isProtectedRoutePath(routePath);
-}
-
-function firstForwardedValue(value: string | null) {
-  return value?.split(',')[0]?.trim().toLowerCase() || '';
-}
-
-function httpsRedirectResponse(req: NextRequest) {
-  if (IS_DEV) return null;
-
-  const forwardedProto = firstForwardedValue(
-    req.headers.get('x-forwarded-proto'),
-  );
-  const forwardedHost = firstForwardedValue(
-    req.headers.get('x-forwarded-host'),
-  );
-  const host = forwardedHost || req.nextUrl.host.toLowerCase();
-
-  if (forwardedProto !== 'http' || !PUBLIC_HTTPS_HOSTS.has(host)) return null;
-
-  const url = req.nextUrl.clone();
-  url.protocol = 'https:';
-  url.hostname = host === 'lajukan.com' ? 'www.lajukan.com' : host;
-  url.port = '';
-  return applySecurityHeaders(NextResponse.redirect(url, 308));
 }
 
 function getRequestOrigin(req: NextRequest): string {
@@ -645,9 +620,10 @@ async function getUserRole(req: NextRequest): Promise<{
 /* ---------------- MAIN MIDDLEWARE ---------------- */
 export async function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
-  const httpsRedirect = httpsRedirectResponse(req);
-  if (httpsRedirect) return httpsRedirect;
 
+  // TLS and canonical-host redirects are owned by Caddy. Keeping that policy at
+  // the edge avoids permanent self-redirects when forwarded scheme headers are
+  // rewritten by an internal proxy hop.
   // Forward marketplace notification websocket endpoint to marketplace service.
   // This keeps /v1/notifications/stream working even when public traffic hits
   // the Next.js container directly (without a separate edge proxy rule).

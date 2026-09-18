@@ -12,7 +12,6 @@ const DEPLOYMENT_ENV = (
   process.env.APP_ENV || process.env.ENV || process.env.NEXT_PUBLIC_APP_ENV || process.env.NODE_ENV || 'development'
 ).toLowerCase();
 const REQUIRES_EXTERNAL_HTTPS = ['staging', 'production'].includes(DEPLOYMENT_ENV);
-const WWW_ORIGIN = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') || 'https://www.lajukan.com';
 const CHAT_SERVICE_ORIGIN = process.env.INTERNAL_CHAT_SERVICE_URL || process.env.INTERNAL_CHAT_URL || 'http://chat_service:4000';
 const SECURITY_HEADERS = buildSecurityHeaders({
   csp: buildPublicWebCsp({ production: REQUIRES_EXTERNAL_HTTPS }),
@@ -42,20 +41,14 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    const redirects = [
+    // TLS and canonical-host redirects are edge-owned by Caddy. Do not infer the
+    // public scheme from forwarded headers inside Next.js: an internal proxy hop
+    // may be HTTP even when the browser request is already HTTPS.
+    return [
       { source: '/:locale(id|en)/search', destination: '/:locale/explore', permanent: true },
       // Keep the dedicated UMKM discovery/map surface reachable until its map,
       // city filtering, and store deep-link behavior have parity inside Explore.
     ];
-    if (REQUIRES_EXTERNAL_HTTPS) {
-      redirects.push({
-        source: '/:path*',
-        has: [{ type: 'header', key: 'x-forwarded-proto', value: 'http' }],
-        destination: `${WWW_ORIGIN}/:path*`,
-        permanent: true,
-      });
-    }
-    return redirects;
   },
   async rewrites() {
     return [{ source: '/socket/:path*', destination: `${CHAT_SERVICE_ORIGIN}/socket/:path*` }];
