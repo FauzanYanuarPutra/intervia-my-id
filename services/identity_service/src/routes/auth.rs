@@ -851,7 +851,8 @@ fn create_access_token(
         perms: permissions,
         username,
         iss: asymmetric.then(|| env::var("JWT_ISSUER").unwrap_or_else(|_| "laju".to_string())),
-        aud: asymmetric.then(|| env::var("JWT_AUDIENCE").unwrap_or_else(|_| "laju_users".to_string())),
+        aud: asymmetric
+            .then(|| env::var("JWT_AUDIENCE").unwrap_or_else(|_| "laju_users".to_string())),
     };
 
     let mut header = Header::new(algorithm);
