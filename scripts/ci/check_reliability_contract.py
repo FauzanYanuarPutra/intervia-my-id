@@ -404,6 +404,21 @@ for path in (
 
 
 for path in (
+    "services/identity_service/src/routes/health.rs",
+    "services/marketplace_service/src/main.rs",
+    "services/community_service/src/main.rs",
+):
+    source = read(path)
+    for marker in (
+        "get_max_connections()",
+        'state="active"',
+        'state="max"',
+    ):
+        if marker not in source:
+            errors.append(f"{path} missing DB pool capacity metric marker: {marker}")
+
+
+for path in (
     "services/identity_service/src/main.rs",
     "services/marketplace_service/src/main.rs",
     "services/community_service/src/main.rs",
