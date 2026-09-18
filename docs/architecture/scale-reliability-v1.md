@@ -188,6 +188,17 @@ saturation.
 One cheap cached GET and one order/payment workflow are not equivalent units of
 capacity.
 
+## Known multi-host blocker: Community media
+
+Community forum/media uploads are still served from the local
+`community_uploads` volume. The release workflow now pins the existing volume
+identity and backup tooling verifies snapshots, which protects single-host
+continuity. It does not make the media plane multi-host.
+
+Community must use shared/replicated object storage (or an equivalently tested
+shared filesystem) before a multi-host Community deployment is considered
+production-safe.
+
 ## Required next implementation slices
 
 1. Run the observability profile in staging and calibrate thresholds from measured traffic.

@@ -107,6 +107,29 @@ Required automated checks:
 - the newest eligible set is restored into disposable infrastructure and its
   application invariants pass.
 
+## Community media volume snapshots
+
+Until Community uploads move to shared object storage, the production
+`community_uploads` Docker volume remains canonical media state for forum
+uploads. Production deploys pin that volume identity and refuse a silent switch
+to an empty replacement.
+
+Operators can create and verify a local snapshot with:
+
+```bash
+BACKUP_ROOT=/path/to/backup-root scripts/ops/community_media_backup.sh
+scripts/ops/verify_community_media_backup.sh /path/to/backup-root/<timestamp>
+```
+
+The backup records a SHA-256 checksum, source volume, file count and source byte
+count, and verifies that the gzip/tar archive is readable. The resulting
+snapshot must still be copied to the encrypted offsite/immutable tier; a
+same-host archive is not disaster recovery.
+
+This snapshot mechanism is transitional. Multi-host production requires
+Community media to move to shared/replicated object storage (or an equivalently
+tested shared filesystem) before Community can be considered multi-host safe.
+
 ## Schedule and retention
 
 Initial production policy:
