@@ -81,6 +81,7 @@ The News domain also maintains durability and observability primitives:
 - The public frontend article model also omits contributor ownership fields entirely, so private contributor identity is absent from both the API projection and the WWW type boundary.
 - Public article pages expose only editor-verified source references; broken, rejected, unverified, private-network, credentialed, or non-HTTP(S) source URLs are not rendered as public citations.
 - Published news/analysis cannot downgrade its last public-safe verified source. Source review locks the article and source row, enforces a replacement-or-retract rule, and commits the source update with its outbox event in one transaction.
+- Every source review also appends an immutable `news_source_review_events` record with reviewer ID, kind/status before and after, note, and timestamp. The history survives source-reference deletion through `ON DELETE SET NULL`.
 - News listing, category, topic, location, related-article, RSS, and sitemap flows are language-aware. Missing legacy language defaults to Indonesian, while canonical article URLs redirect mismatched locale paths to the stored article language.
 - Contributor revisions re-run content safety checks, source validation, tag normalization, disclosure rules, and source requirements before returning to the editorial queue.
 - Public list responses omit full article bodies to keep feed payloads bounded; the complete body is returned only by the article detail endpoint.
