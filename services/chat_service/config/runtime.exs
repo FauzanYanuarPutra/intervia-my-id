@@ -18,11 +18,32 @@ if config_env() == :prod do
     raise "SCYLLA_NODES must contain at least one host:port"
   end
 
-  jwt_secret = System.fetch_env!("JWT_SECRET")
+  jwt_algorithm =
+    (System.get_env("JWT_ACCESS_ALG") || "HS256")
+    |> String.trim()
+    |> String.upcase()
 
-  if byte_size(String.trim(jwt_secret)) < 32 do
-    raise "JWT_SECRET must be at least 32 characters"
-  end
+  {jwt_guardian_key, jwt_allowed_algos} =
+    case jwt_algorithm do
+      "RS256" ->
+        public_key_pem =
+          System.fetch_env!("JWT_PUBLIC_KEY_PEM")
+          |> String.replace("\\n", "\n")
+
+        {JOSE.JWK.from_pem(public_key_pem), ["RS256"]}
+
+      "HS256" ->
+        jwt_secret = System.fetch_env!("JWT_SECRET")
+
+        if byte_size(String.trim(jwt_secret)) < 32 do
+          raise "JWT_SECRET must be at least 32 characters"
+        end
+
+        {jwt_secret, ["HS256"]}
+
+      other ->
+        raise "unsupported JWT_ACCESS_ALG: #{other}"
+    end
 
   jwt_issuer = System.get_env("JWT_ISSUER") || "laju"
 
@@ -75,6 +96,6 @@ if config_env() == :prod do
   # 5. Guardian Config (JWT)
   config :chat_service, ChatService.Guardian,
     issuer: nil,
-    secret_key: jwt_secret,
-    allowed_algos: ["HS256"]
+    secret_key: jwt_guardian_key,
+    allowed_algos: jwt_allowed_algos
 end

@@ -61,6 +61,9 @@ jobs:
           bash -n scripts/ops/community_media_backup.sh
           bash -n scripts/ops/verify_community_media_backup.sh
           bash -n scripts/ops/requeue_marketplace_outbox_event.sh
+          bash -n scripts/ops/generate_jwt_access_keypair.sh
+          bash -n scripts/ops/verify_jwt_access_keypair.sh
+          bash -n scripts/ops/postgres_pitr_preflight.sh
           bash -n scripts/load/run-capacity-baseline.sh
       - name: Exercise isolated PostgreSQL restore drill
         shell: bash
