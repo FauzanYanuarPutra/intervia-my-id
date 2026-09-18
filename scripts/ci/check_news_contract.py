@@ -73,6 +73,20 @@ require(
         "INSERT INTO news_source_review_events",
         '"source_reviews": source_reviews',
         "news.source.reviewed",
+        "normalize_fact_check_status",
+        "normalize_legal_review_status",
+        "normalize_editorial_priority",
+        "normalize_editorial_sensitivity",
+        "parse_requested_publish_at",
+        "scheduled publication cannot be more than 90 days ahead",
+        "fact check must be verified before publication",
+        "high-sensitivity publication requires legal approval",
+        "high-sensitivity publication requires independent source review",
+        "has_independent_verified_source_review_tx",
+        "scheduled_for",
+        "published_at <= NOW()",
+        '"scheduled": scheduled',
+        '"stale_review_24h": stale_review_24h',
         "let is_retracted = editorial_status",
         "include_body && !is_retracted",
         'matches!(action.as_str(), "approve" | "correct")',
@@ -234,6 +248,10 @@ require(
         "relatedArticles",
         "permanentRedirect",
         "language: article.language",
+        "getRelatedNewsArticles",
+        "NewsShareActions",
+        "authors: [{ name: article.byline }]",
+        "keywords: article.tags",
     ),
 )
 
@@ -241,9 +259,24 @@ require(
     "frontend/apps/www/src/app/[locale]/(shared)/news/[slug]/NewsAnalytics.tsx",
     (
         "news.opened",
+        "news.engaged_30s",
         "news.read_",
         "a[data-news-action]",
         "news.${action}",
+        "referrer_domain",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+    ),
+)
+
+require(
+    "frontend/apps/www/src/app/[locale]/(shared)/news/[slug]/NewsShareActions.tsx",
+    (
+        "news.share_clicked",
+        "navigator.share",
+        "navigator.clipboard",
+        "copy_link",
     ),
 )
 
@@ -314,6 +347,13 @@ require(
         "Approve & publish",
         "Versi artikel",
         "Top artikel 7 hari",
+        "Editorial readiness",
+        "Fact-check",
+        "Legal review",
+        "Sensitivitas",
+        "Jadwal terbit / embargo",
+        "queueQuery",
+        "Approve & schedule",
     ),
 )
 
@@ -335,6 +375,9 @@ require(
         "options.location?.trim()",
         "next: { revalidate: 30 }",
         "cache: 'no-store'",
+        "getRelatedNewsArticles",
+        "isAccessibleForFree",
+        "wordCount",
     ),
 )
 
@@ -397,6 +440,11 @@ require(
         "Hardening V2",
         "editor-verified source",
         "retraction tombstone",
+        "Hardening V3",
+        "scheduled publication",
+        "independent source review",
+        "news.engaged_30s",
+        "news.share_clicked",
     ),
 )
 

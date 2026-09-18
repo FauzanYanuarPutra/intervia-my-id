@@ -31,6 +31,8 @@ News-specific fields live under `content_items.metadata.news`:
 - `review_note`
 - `business_impact`
 - `correction_note`
+- internal readiness fields: `fact_check_status`, `legal_review_status`, `editorial_priority`, and `sensitivity`
+- scheduling fields: `scheduled_for` and `scheduled_by` (never part of the public metadata projection)
 
 Editorial actions are additionally stored in `news_editorial_events` as an append-only audit trail.
 
@@ -93,6 +95,22 @@ The News domain also maintains durability and observability primitives:
 - Active News feeds have dedicated tag, language/cursor, category/language/cursor, and location/language/cursor indexes. Public list queries project an empty body placeholder so Postgres does not transfer full article bodies when rendering cards.
 - The News index exposes server-rendered search and cursor pagination. Category, topic, and location feeds also paginate with cursors; cursor variants remain followable but are noindex with the canonical facet URL.
 - Facet hreflang entries are emitted only for languages that currently have matching published articles, avoiding alternates that resolve to empty/noindex pages.
+
+
+## Hardening V3
+
+The third hardening pass turns News from a moderation flow into a safer newsroom operating surface:
+
+- Approval can set a future RFC3339 publication time up to 90 days ahead. The article is approved operationally, but public list/detail queries require `published_at <= NOW()`, so the future timestamp acts as an embargo without a separate scheduler process.
+- Scheduled approvals emit `news.scheduled` instead of falsely telling contributors that the article is already public. CMS reports scheduled volume separately from actual published throughput.
+- News and analysis require explicit `fact_check_status=verified` before publication or correction. Press releases can use `not_required` because their provenance is disclosed separately.
+- High-sensitivity publication requires `legal_review_status=approved`. For non-press-release content it also requires a currently verified source whose verification was recorded by a different CMS reviewer, creating a practical two-person control.
+- Readiness state, priority, sensitivity, scheduling, and the resulting article snapshot stay in immutable version history while remaining outside the public metadata allowlist.
+- CMS adds queue search, scheduled/SLA counters, readiness controls, and expandable immutable version snapshots. Queue items older than 24 hours are surfaced as a newsroom SLA signal.
+- Article analytics now retain bounded acquisition context (`referrer_domain`, `utm_source`, `utm_medium`, `utm_campaign`), record `news.engaged_30s`, and expose native/copy sharing through `news.share_clicked`.
+- Related-news ranking combines category, topic, location, article kind, shared tags, and freshness instead of simply taking the first category rows.
+- Article metadata includes author/keyword signals and richer `NewsArticle` structured data (`isAccessibleForFree`, `wordCount`, `genre`, and `about`) while preserving breadcrumb, canonical, language, and retraction rules.
+- These invariants are enforced by the News contract gate so later refactors cannot silently expose scheduled stories early or remove newsroom readiness controls.
 
 ### Source policy
 
