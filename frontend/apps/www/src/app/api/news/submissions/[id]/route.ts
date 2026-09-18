@@ -34,10 +34,11 @@ function isPrivateSourceHost(hostname: string): boolean {
   }
   if (
     host.includes(':') &&
-    (host === '::1' ||
+    (host === '::' ||
+      host === '::1' ||
       host.startsWith('fc') ||
       host.startsWith('fd') ||
-      host.startsWith('fe80:'))
+      /^fe[89ab]/.test(host))
   ) {
     return true;
   }
