@@ -375,7 +375,7 @@ impl PublicCommerceRepository {
             "fulfillment_mode": fulfillment_mode.as_str(),
             "note": order_note,
             "public_commerce_version": 2,
-            "idempotency_request_hash": request_hash
+            "idempotency_request_hash": request_hash.clone()
         });
 
         let inserted_id = sqlx::query_scalar::<_, Uuid>(
