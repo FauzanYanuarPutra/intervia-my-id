@@ -26,13 +26,9 @@ if config_env() == :prod do
   {jwt_guardian_key, jwt_allowed_algos} =
     case jwt_algorithm do
       "RS256" ->
-        encoded_public_key = System.fetch_env!("JWT_PUBLIC_KEY_PEM_B64")
-
         public_key_pem =
-          case Base.decode64(String.trim(encoded_public_key)) do
-            {:ok, value} -> value
-            :error -> raise "JWT_PUBLIC_KEY_PEM_B64 must be valid base64"
-          end
+          System.fetch_env!("JWT_PUBLIC_KEY_PEM")
+          |> String.replace("\\n", "\n")
 
         {JOSE.JWK.from_pem(public_key_pem), ["RS256"]}
 
