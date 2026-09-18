@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: deploy-${{ github.event_name == 'workflow_run' && 'production' || inputs.environment }}
@@ -128,13 +129,17 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          DOCKERHUB_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
           TARGET_ENV: ${{ steps.release.outputs.target_env }}
           IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
         run: |
           set -euo pipefail
-          ssh -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' TARGET_ENV='$TARGET_ENV' IMAGE_TAG='$IMAGE_TAG' DOCKERHUB_NAMESPACE='$DOCKERHUB_NAMESPACE' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash -s" <<'REMOTE'
+          image_owner="${REPOSITORY_OWNER,,}"
+          [[ "$image_owner" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || { echo "Invalid GHCR image owner." >&2; exit 1; }
+          image_namespace="ghcr.io/$image_owner"
+          ssh -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' TARGET_ENV='$TARGET_ENV' IMAGE_TAG='$IMAGE_TAG' IMAGE_NAMESPACE='$image_namespace' REGISTRY_USER='$REGISTRY_USER' REGISTRY_TOKEN='$REGISTRY_TOKEN' bash -s" <<'REMOTE'
           set -euo pipefail
           mkdir -p "$DEPLOY_PATH"
           tar -xzf /tmp/lajukan-deploy.tgz -C "$DEPLOY_PATH"
@@ -283,8 +288,10 @@ jobs:
             exit "$status"
           }
           trap rollback_on_error ERR
-          printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_NAMESPACE" --password-stdin
-          export IMAGE_TAG DOCKERHUB_NAMESPACE
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          export IMAGE_TAG
+          export DOCKERHUB_NAMESPACE="$IMAGE_NAMESPACE"
           docker compose "${compose[@]}" config --quiet
           docker compose "${compose[@]}" pull
           deployment_started=1
