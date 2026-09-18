@@ -36,6 +36,7 @@ grafana_dashboard = read("infrastructure/observability/grafana/dashboards/lajuka
 blackbox_config = read("infrastructure/observability/blackbox.yml")
 postgres_backup_script = read("scripts/ops/postgres_logical_backup.sh")
 backup_verify_script = read("scripts/ops/verify_backup_set.sh")
+scale_rehearsal_script = read("scripts/ops/staging_scale_rehearsal.sh")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
@@ -463,6 +464,15 @@ for marker in (
 for marker in ("sha256sum -c", "pg_restore --list", "This does not replace an isolated restore drill"):
     if marker not in backup_verify_script:
         errors.append(f"backup verification script missing marker: {marker}")
+
+for marker in (
+    "probe_surviving_replicas",
+    "docker stop --time 10",
+    "single-replica failover rehearsal",
+    "Refusing multi-replica rehearsal against production",
+):
+    if marker not in scale_rehearsal_script:
+        errors.append(f"staging scale rehearsal missing failover marker: {marker}")
 
 community_source = read("services/community_service/src/main.rs")
 community_rate_limit_migration = read(
