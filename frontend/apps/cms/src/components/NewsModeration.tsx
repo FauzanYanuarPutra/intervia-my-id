@@ -41,6 +41,8 @@ type NewsSource = {
 type NewsSourceReview = {
   id: string;
   source_id?: string | null;
+  source_url_snapshot?: string | null;
+  source_domain_snapshot?: string | null;
   reviewer_id: string;
   from_source_kind: NewsSource['source_kind'];
   to_source_kind: NewsSource['source_kind'];
@@ -621,6 +623,18 @@ export default function NewsModeration() {
                         <p className="text-xs font-semibold text-[color:var(--color-text)]">
                           {review.from_verification_status} → {review.to_verification_status}
                         </p>
+                        {review.source_url_snapshot ? (
+                          <a
+                            href={review.source_url_snapshot}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 block break-all text-[10px] font-semibold text-[color:var(--color-primary)] underline"
+                          >
+                            {review.source_domain_snapshot || review.source_url_snapshot}
+                          </a>
+                        ) : (
+                          <p className="mt-1 text-[10px] text-[color:var(--color-text-soft)]">URL snapshot tidak tersedia untuk event legacy.</p>
+                        )}
                         <p className="mt-1 text-[10px] text-[color:var(--color-text-soft)]">
                           {review.from_source_kind} → {review.to_source_kind} · {formatDate(review.created_at)}
                         </p>
