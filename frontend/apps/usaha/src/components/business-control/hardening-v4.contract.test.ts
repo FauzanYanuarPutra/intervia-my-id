@@ -11,6 +11,8 @@ const invite = readFileSync('src/components/forms/InviteMemberQuickForm.tsx', 'u
 const settlementRoute = readFileSync('src/app/api/businesses/[businessId]/settlements/route.ts', 'utf8');
 const provision = readFileSync('src/components/forms/NewBusinessQuickForm.tsx', 'utf8');
 const reconcile = readFileSync('src/components/forms/ReconcileBusinessButton.tsx', 'utf8');
+const productEditor = readFileSync('src/components/forms/ProductEditorWorkspace.tsx', 'utf8');
+const cashShift = readFileSync('src/components/business-control/CashShiftWorkspace.tsx', 'utf8');
 
 describe('Usaha hardening V4 contracts', () => {
   it('uses Jakarta business dates instead of UTC date slicing', () => {
@@ -73,5 +75,19 @@ describe('Usaha hardening V4 contracts', () => {
     expect(provision).toContain('ChoiceChips');
     expect(provision).not.toMatch(/<select[\s\S]{0,250}value=\{category\}/);
     expect(provision).toContain('role="alert"');
+  });
+
+  it('serializes product editor mutations instead of allowing parallel writes', () => {
+    expect(productEditor).toContain('const busy = pendingAction !== null');
+    expect(productEditor).toContain('disabled={busy}');
+    expect(productEditor).toContain('aria-live="assertive"');
+    expect(productEditor).toContain('aria-live="polite"');
+  });
+
+  it('announces cash shift and settlement mutation feedback', () => {
+    expect(cashShift).toContain('role="status"');
+    expect(cashShift).toContain('aria-live="polite"');
+    expect(settlement).toContain('role="status"');
+    expect(settlement).toContain('aria-live="polite"');
   });
 });
