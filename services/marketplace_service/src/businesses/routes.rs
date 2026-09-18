@@ -887,9 +887,10 @@ fn seller_order_error_response(error: SellerOrderRepositoryError) -> Response {
         SellerOrderRepositoryError::IdempotencyConflict => {
             api_error(StatusCode::CONFLICT, "idempotency_key_payload_mismatch")
         }
-        SellerOrderRepositoryError::InsufficientStock => {
-            api_error(StatusCode::CONFLICT, "business_order_insufficient_reserved_stock")
-        }
+        SellerOrderRepositoryError::InsufficientStock => api_error(
+            StatusCode::CONFLICT,
+            "business_order_insufficient_reserved_stock",
+        ),
         SellerOrderRepositoryError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_order_storage_unavailable",

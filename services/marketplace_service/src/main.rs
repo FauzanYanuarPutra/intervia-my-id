@@ -2315,10 +2315,7 @@ fn init_tracing() {
     {
         "json" => true,
         "text" | "pretty" => false,
-        _ => {
-            app_env.eq_ignore_ascii_case("production")
-                || app_env.eq_ignore_ascii_case("staging")
-        }
+        _ => app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging"),
     };
     let filter = tracing_subscriber::EnvFilter::new(
         env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),

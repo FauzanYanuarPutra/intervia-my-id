@@ -294,9 +294,8 @@ pub(crate) async fn consume_for_order_tx(
 mod tests {
     use super::*;
 
-    #[test]
-    fn hold_window_is_bounded_and_positive() {
+    const _: () = {
         assert!(PUBLIC_ORDER_STOCK_HOLD_MINUTES > 0);
         assert!(PUBLIC_ORDER_STOCK_HOLD_MINUTES <= 60);
-    }
+    };
 }
