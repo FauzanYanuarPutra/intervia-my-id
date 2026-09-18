@@ -40,10 +40,20 @@ class RuntimeSecurityContractTests(unittest.TestCase):
             'X-Frame-Options "DENY"',
             'X-Permitted-Cross-Domain-Policies "none"',
             'Referrer-Policy "strict-origin-when-cross-origin"',
-            'Permissions-Policy "camera=(), microphone=(), geolocation=(self)"',
         ):
             with self.subTest(header=expected):
                 self.assertIn(expected, body)
+
+        self.assertIn(
+            '(frontend_media_permissions) {\n    header Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"',
+            caddy,
+        )
+        self.assertIn(
+            '(restricted_permissions) {\n    header Permissions-Policy "camera=(), microphone=(), geolocation=(self)"',
+            caddy,
+        )
+        self.assertEqual(2, caddy.count("import frontend_media_permissions"))
+        self.assertGreaterEqual(caddy.count("import restricted_permissions"), 6)
 
 
 if __name__ == "__main__":

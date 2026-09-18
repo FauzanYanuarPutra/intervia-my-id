@@ -528,12 +528,18 @@ for marker in (
     if marker not in marketplace_outbox_contract_source:
         errors.append(f"Marketplace canonical outbox publisher missing marker: {marker}")
 
-expected_media_policy = 'Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"'
-if expected_media_policy not in caddy:
-    errors.append("production Caddy must allow same-origin camera/microphone for KYC and realtime media")
-for forbidden_policy in ('camera=()', 'microphone=()'):
-    if forbidden_policy in caddy:
-        errors.append(f"production Caddy must not globally disable browser media: {forbidden_policy}")
+for marker in (
+    "(frontend_media_permissions)",
+    'Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"',
+    "(restricted_permissions)",
+    'Permissions-Policy "camera=(), microphone=(), geolocation=(self)"',
+):
+    if marker not in caddy:
+        errors.append(f"production Caddy media permission contract missing: {marker}")
+if caddy.count("import frontend_media_permissions") != 2:
+    errors.append("production Caddy must grant camera/microphone only to WWW and Usaha")
+if caddy.count("import restricted_permissions") < 6:
+    errors.append("production Caddy must keep non-frontend hosts camera/microphone restricted")
 for marker in ("camera=(self)", "microphone=(self)"):
     if marker not in www_next_config:
         errors.append(f"WWW permissions policy lost same-origin browser media allowance: {marker}")

@@ -29,8 +29,15 @@
         X-Frame-Options "DENY"
         X-Permitted-Cross-Domain-Policies "none"
         Referrer-Policy "strict-origin-when-cross-origin"
-        Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"
     }
+}
+
+(frontend_media_permissions) {
+    header Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"
+}
+
+(restricted_permissions) {
+    header Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
 }
 
 {$APP_DOMAIN} {
@@ -41,6 +48,7 @@
 www.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import frontend_media_permissions
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
@@ -52,6 +60,7 @@ www.{$APP_DOMAIN} {
 usaha.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import frontend_media_permissions
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
@@ -63,6 +72,7 @@ usaha.{$APP_DOMAIN} {
 api.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import restricted_permissions
 
     # Service metrics are private; Prometheus reaches them over the internal network.
     @internal_metrics path /metrics
@@ -92,6 +102,7 @@ api.{$APP_DOMAIN} {
 chat.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import restricted_permissions
     @socket path /socket /socket/*
     @health path /api/health /api/ready
     handle @socket {
@@ -108,6 +119,7 @@ chat.{$APP_DOMAIN} {
 cms.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import restricted_permissions
     reverse_proxy cms:3001
     encode zstd gzip
 }
@@ -115,6 +127,7 @@ cms.{$APP_DOMAIN} {
 crm.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import restricted_permissions
     reverse_proxy crm:3002
     encode zstd gzip
 }
@@ -122,6 +135,7 @@ crm.{$APP_DOMAIN} {
 media.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import restricted_permissions
     reverse_proxy minio:9002
     encode zstd gzip
 }
@@ -130,6 +144,7 @@ media.{$APP_DOMAIN} {
 cdn.{$APP_DOMAIN} {
     import access_log
     import security_headers
+    import restricted_permissions
     reverse_proxy minio:9002
     encode zstd gzip
 }
