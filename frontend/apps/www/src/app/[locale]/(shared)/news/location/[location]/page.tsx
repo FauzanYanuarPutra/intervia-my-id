@@ -16,7 +16,6 @@ function cleanFacet(value: string): string {
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { locale, location } = await params;
   const filters = await searchParams;
-  const filters = await searchParams;
   const value = cleanFacet(location);
   if (!value) return { robots: { index: false, follow: true } };
   const canonical = buildNewsFacetUrl(locale, 'location', value);
@@ -50,6 +49,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function NewsLocationPage({ params, searchParams }: Props) {
   const { locale, location } = await params;
+  const filters = await searchParams;
   const value = cleanFacet(location);
   if (!value) notFound();
   const isId = locale === 'id';
