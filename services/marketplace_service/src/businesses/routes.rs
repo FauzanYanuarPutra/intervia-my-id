@@ -1,4 +1,4 @@
-    service::{BusinessService, BusinessServiceError},use std::sync::Arc;
+use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
@@ -26,10 +26,10 @@ use super::{
     },
     recipes::{RecipeRepository, RecipeRepositoryError},
     repository::BusinessRepository,
-
     seller_orders::{
         SellerOrderRepository, SellerOrderRepositoryError, TransitionSellerOrderRequest,
     },
+    service::{BusinessService, BusinessServiceError},
     settlement::{CreateSettlementRequest, SettlementRepository, SettlementRepositoryError},
 };
 
