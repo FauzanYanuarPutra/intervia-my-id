@@ -62,10 +62,18 @@ pub async fn track_request(request: Request, next: Next) -> Response {
     }
 
     match response.status().as_u16() / 100 {
-        2 => { HTTP_RESPONSES_2XX.fetch_add(1, Ordering::Relaxed); }
-        3 => { HTTP_RESPONSES_3XX.fetch_add(1, Ordering::Relaxed); }
-        4 => { HTTP_RESPONSES_4XX.fetch_add(1, Ordering::Relaxed); }
-        5 => { HTTP_RESPONSES_5XX.fetch_add(1, Ordering::Relaxed); }
+        2 => {
+            HTTP_RESPONSES_2XX.fetch_add(1, Ordering::Relaxed);
+        }
+        3 => {
+            HTTP_RESPONSES_3XX.fetch_add(1, Ordering::Relaxed);
+        }
+        4 => {
+            HTTP_RESPONSES_4XX.fetch_add(1, Ordering::Relaxed);
+        }
+        5 => {
+            HTTP_RESPONSES_5XX.fetch_add(1, Ordering::Relaxed);
+        }
         _ => {}
     }
 
@@ -133,8 +141,12 @@ mod tests {
     fn render_exposes_low_cardinality_red_metrics() {
         let body = render("test_service");
         assert!(body.contains("lajukan_http_requests_total{service=\"test_service\"}"));
-        assert!(body.contains("lajukan_http_responses_total{service=\"test_service\",class=\"5xx\"}"));
-        assert!(body.contains("lajukan_http_request_duration_seconds_bucket{service=\"test_service\",le=\"+Inf\"}"));
+        assert!(
+            body.contains("lajukan_http_responses_total{service=\"test_service\",class=\"5xx\"}")
+        );
+        assert!(body.contains(
+            "lajukan_http_request_duration_seconds_bucket{service=\"test_service\",le=\"+Inf\"}"
+        ));
         assert!(!body.contains("path="));
     }
 }
