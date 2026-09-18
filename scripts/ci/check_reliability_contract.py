@@ -21,6 +21,7 @@ base_compose = read("docker-compose.yml")
 prod_compose = read("docker-compose.prod.yml")
 deploy = read(".github/workflows/deploy.yml")
 caddy = read("infrastructure/caddy/Caddyfile.prod")
+caddy_local = read("infrastructure/caddy/Caddyfile")
 scale_doc = read("docs/architecture/scale-reliability-v1.md")
 slo_doc = read("docs/operations/slo-capacity-overload.md")
 incident_doc = read("docs/operations/incident-response.md")
@@ -300,6 +301,8 @@ if "reverse_proxy" not in caddy:
     errors.append("production Caddy config has no reverse proxy")
 if "@internal_metrics path /metrics" not in caddy:
     errors.append("production edge must block private /metrics endpoints")
+if caddy_local.count("@internal_metrics path /metrics") < 2:
+    errors.append("local/tunnel edge must block private /metrics on API and auth hosts")
 if "127.0.0.1" in caddy or "localhost:" in caddy:
     errors.append("production Caddy upstreams must use internal service discovery, not localhost")
 
