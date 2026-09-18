@@ -313,6 +313,57 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 12,
+      "title": "Oldest unpublished outbox age",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 300
+              },
+              {
+                "color": "red",
+                "value": 1800
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "lajukan_outbox_oldest_age_seconds",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
