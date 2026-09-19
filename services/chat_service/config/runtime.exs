@@ -44,7 +44,7 @@ if config_env() == :prod do
 
           {JOSE.JWK.from_oct(jwt_secret), ["HS256"]}
         else
-          raise "HS256 access tokens are disabled outside explicit development mode; configure RS256"
+          raise "HS256 access tokens are disabled in production; configure RS256"
         end
 
       other ->
