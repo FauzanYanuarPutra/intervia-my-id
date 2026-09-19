@@ -29,7 +29,18 @@ export default function SubmitNewsForm({ locale }: Props) {
     success: '',
   });
 
-  useEffect(() => {\n    try {\n      const draft = JSON.parse(localStorage.getItem('lajukan-news-form-draft') || 'null') as Partial<typeof form> | null;\n      if (draft) setForm(current => ({ ...current, ...draft }));\n    } catch {}\n  }, []);\n\n  useEffect(() => {\n    try { localStorage.setItem('lajukan-news-form-draft', JSON.stringify(form)); } catch {}\n  }, [form]);\n\n  const update = (key: keyof typeof form, value: string) => {
+  useEffect(() => {
+    try {
+      const draft = JSON.parse(localStorage.getItem('lajukan-news-form-draft') || 'null') as Partial<typeof form> | null;
+      if (draft) setForm(current => ({ ...current, ...draft }));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('lajukan-news-form-draft', JSON.stringify(form)); } catch {}
+  }, [form]);
+
+  const update = (key: keyof typeof form, value: string) => {
     setForm(current => ({ ...current, [key]: value }));
   };
 
@@ -44,7 +55,8 @@ export default function SubmitNewsForm({ locale }: Props) {
           ...form,
           language: isId ? 'id' : 'en',
           topics: form.topics.split(',').map(value => value.trim()).filter(Boolean),
-          source_urls: form.source_urls.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+          source_urls: form.source_urls.split(/\r?
+/).map(value => value.trim()).filter(Boolean),
           rich_body: form.rich_body,
           cover_image: form.cover_image.trim(),
         }),
@@ -156,7 +168,8 @@ export default function SubmitNewsForm({ locale }: Props) {
 
       <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
         {isId ? 'URL sumber (satu per baris)' : 'Source URLs (one per line)'}
-        <textarea rows={4} value={form.source_urls} onChange={event => update('source_urls', event.target.value)} className={inputClass} placeholder={'https://www.bi.go.id/...\nhttps://www.bps.go.id/...'} />
+        <textarea rows={4} value={form.source_urls} onChange={event => update('source_urls', event.target.value)} className={inputClass} placeholder={'https://www.bi.go.id/...
+https://www.bps.go.id/...'} />
         <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
           {isId ? 'Berita dan analisis wajib menyertakan minimal satu sumber. Rilis bisnis boleh tanpa URL sumber, tetapi akan diberi label Rilis Bisnis.' : 'News and analysis require at least one source. Business releases may omit a source URL but are labeled as such.'}
         </span>
