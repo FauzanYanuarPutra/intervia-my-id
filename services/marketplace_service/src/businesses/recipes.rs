@@ -636,11 +636,25 @@ async fn legacy_recipe_items(
 }
 
 fn validate_publish_request(request: &ReplaceRecipeRequest) -> Result<(), RecipeRepositoryError> {
-    if request.reason.as_deref().map(str::trim).filter(|value| value.chars().count() >= 3).is_none() {
-        return Err(RecipeRepositoryError::Validation("recipe_change_reason_required"));
+    if request
+        .reason
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| value.chars().count() >= 3)
+        .is_none()
+    {
+        return Err(RecipeRepositoryError::Validation(
+            "recipe_change_reason_required",
+        ));
     }
-    if request.reason.as_deref().is_some_and(|value| value.chars().count() > 2_000) {
-        return Err(RecipeRepositoryError::Validation("recipe_change_reason_too_long"));
+    if request
+        .reason
+        .as_deref()
+        .is_some_and(|value| value.chars().count() > 2_000)
+    {
+        return Err(RecipeRepositoryError::Validation(
+            "recipe_change_reason_too_long",
+        ));
     }
     if request.name.trim().is_empty() || request.name.chars().count() > 160 {
         return Err(RecipeRepositoryError::Validation("invalid_recipe_name"));
