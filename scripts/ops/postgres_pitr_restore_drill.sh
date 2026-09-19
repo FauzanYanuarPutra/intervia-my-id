@@ -9,14 +9,25 @@ command -v sha256sum >/dev/null 2>&1 || { echo "sha256sum is required" >&2; exit
 : "${RECOVERY_TARGET_TIME:?RECOVERY_TARGET_TIME is required}"
 
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:16-alpine}"
-DRILL_NAME="${DRILL_NAME:-lajukan-pitr-drill-$$}"
+DRILL_NAME="${DRILL_NAME:-lajukan-pitr-drill-$}"
 WORK_ROOT="${WORK_ROOT:-$(mktemp -d)}"
 PGDATA_HOST="$WORK_ROOT/pgdata"
 PORT="${PITR_DRILL_PORT:-55439}"
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 
 cleanup() {
   docker rm -f "$DRILL_NAME" >/dev/null 2>&1 || true
   if [[ "${KEEP_PITR_WORKDIR:-0}" != "1" ]]; then
+    if [[ -d "$PGDATA_HOST" ]]; then
+      # PostgreSQL writes the bind-mounted data directory as its container UID.
+      # Reclaim it through the already-pulled PostgreSQL image so an unprivileged
+      # CI runner can remove the temporary recovery workspace deterministically.
+      docker run --rm --user 0 --entrypoint sh \
+        -v "$PGDATA_HOST:/pgdata" \
+        "$POSTGRES_IMAGE" \
+        -ec "chown -R $HOST_UID:$HOST_GID /pgdata" >/dev/null 2>&1 || true
+    fi
     rm -rf "$WORK_ROOT"
   else
     echo "Keeping PITR workdir: $WORK_ROOT"
