@@ -39,6 +39,18 @@ const CATEGORIES = [
   'Daerah',
 ];
 
+const STATUS_LABELS: Record<string, { id: string; en: string }> = {
+  pending_review: { id: 'Menunggu review', en: 'Pending review' },
+  needs_revision: { id: 'Perlu revisi', en: 'Needs revision' },
+  published: { id: 'Terbit', en: 'Published' },
+  rejected: { id: 'Ditolak', en: 'Rejected' },
+  retracted: { id: 'Ditarik', en: 'Retracted' },
+};
+
+function statusLabel(status: string, isId: boolean) {
+  return STATUS_LABELS[status]?.[isId ? 'id' : 'en'] || status.replaceAll('_', ' ');
+}
+
 const EMPTY_FORM: SubmissionForm = {
   title: '',
   summary: '',
@@ -331,7 +343,7 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
                   {item.title}
                 </p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">
-                  {state.replaceAll('_', ' ')}
+{statusLabel(state, isId)}
                 </p>
               </button>
             );
@@ -348,8 +360,12 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
           <>
             <div className="mb-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
-                {editorialStatus.replaceAll('_', ' ')}
+{statusLabel(editorialStatus, isId)}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+                <span>{isId ? 'Diperbarui' : 'Updated'}: {new Intl.DateTimeFormat(isId ? 'id-ID' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(selected.updated_at))}</span>
+                {text(meta.submitted_at) ? <span>• {isId ? 'Dikirim' : 'Submitted'}: {new Intl.DateTimeFormat(isId ? 'id-ID' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(text(meta.submitted_at)))}</span> : null}
+              </div>
               {text(meta.review_note) ? (
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
                   <strong>{isId ? 'Catatan editor:' : 'Editor note:'}</strong>{' '}
@@ -363,6 +379,13 @@ export default function MyNewsSubmissions({ locale }: { locale: string }) {
               ) : null}
             </div>
 
+            <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {['pending_review','needs_revision','published','rejected','retracted'].map(step => (
+                <div key={step} className={`rounded-xl border px-3 py-2 ${step === editorialStatus ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-400/10' : 'border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]'}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{statusLabel(step, isId)}</p>
+                </div>
+              ))}
+            </div>
             <form onSubmit={save} className="grid gap-4">
               <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 {isId ? 'Judul' : 'Headline'}
