@@ -4,6 +4,7 @@ import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
 import { BusinessLocationField } from '@/components/forms/BusinessLocationField';
+import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { toLatLng } from '@/lib/maps';
 import { buildBusinessGoogleMapsUrl } from '@/lib/portal-links';
 import type { BusinessRecord } from '@/lib/portal-types';
@@ -23,6 +24,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
   const [phone, setPhone] = useState(business.phone);
   const [description, setDescription] = useState(business.description);
   const [schedule, setSchedule] = useState(business.schedule);
+  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -50,6 +52,11 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
       return;
     }
 
+    if (reason.trim().length < 3) {
+      setError('Tulis alasan perubahan info usaha minimal 3 karakter.');
+      return;
+    }
+
     setError('');
     setSuccess('');
     setIsPending(true);
@@ -71,16 +78,18 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
           phone: phone.trim(),
           description: description.trim(),
           schedule: schedule.trim(),
+          reason: reason.trim(),
         }),
       });
 
       const result = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        setError(result.error ?? 'Info usaha belum tersimpan.');
+        setError(businessApiErrorMessage(result, 'Info usaha belum tersimpan.', response.status));
         return;
       }
 
+      setReason('');
       setSuccess('Info usaha tersimpan.');
       startTransition(() => {
         router.refresh();
@@ -189,10 +198,24 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
         />
       </label>
 
+      <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+        Alasan perubahan
+        <input
+          value={reason}
+          onChange={event => setReason(event.target.value)}
+          maxLength={500}
+          placeholder="Contoh: nomor usaha diperbarui"
+          className="portal-input"
+        />
+        <span className="text-[11px] font-normal text-portal-soft">
+          Disimpan di riwayat agar perubahan usaha mudah ditelusuri.
+        </span>
+      </label>
+
       {error ? <p role="alert" className="text-sm text-portal-ember">{error}</p> : null}
       {success ? <p role="status" aria-live="polite" className="text-sm text-portal-forest">{success}</p> : null}
 
-      <button type="submit" disabled={isPending} className="portal-button-primary">
+      <button type="submit" disabled={isPending || reason.trim().length < 3} className="portal-button-primary">
         <Save className="h-4 w-4" />
         {isPending ? 'Menyimpan...' : 'Simpan info'}
       </button>
