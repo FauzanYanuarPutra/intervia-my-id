@@ -77,7 +77,7 @@ export default async function BusinessChannelsPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="channels">
-      <PageHeader eyebrow="Jual Online" title="Harga online" description="Atur potongan aplikasi dari angka yang benar-benar berlaku, lalu lihat harga online yang aman." />
+      <PageHeader eyebrow="Jual Online" title="Harga online" description="Atur harga dan potongan tiap kanal." />
 
       {canView ? (
         <div className="space-y-4">
