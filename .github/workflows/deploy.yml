@@ -295,6 +295,36 @@ jobs:
 
           # Resolve production media storage before Compose evaluates the overlay.
           # Never source the server env file: read only the single non-secret value we need.
+          backoffice_bootstrap_enabled="$(read_env_value BACKOFFICE_BOOTSTRAP_ENABLED)"
+          backoffice_bootstrap_enabled="${backoffice_bootstrap_enabled:-false}"
+          case "${backoffice_bootstrap_enabled,,}" in
+            1|true|yes|on) backoffice_bootstrap_enabled=true ;;
+            0|false|no|off) backoffice_bootstrap_enabled=false ;;
+            *) echo "BACKOFFICE_BOOTSTRAP_ENABLED must be a boolean." >&2; exit 1 ;;
+          esac
+
+          if [[ "$backoffice_bootstrap_enabled" == true ]]; then
+            for key in               BACKOFFICE_ADMIN_EMAIL               BACKOFFICE_ADMIN_USERNAME               BACKOFFICE_ADMIN_PASSWORD               BACKOFFICE_AGENT_EMAIL               BACKOFFICE_AGENT_USERNAME               BACKOFFICE_AGENT_PASSWORD; do
+              value="$(read_env_value "$key")"
+              [[ -n "$value" ]] || {
+                echo "$key is required when BACKOFFICE_BOOTSTRAP_ENABLED=true." >&2
+                exit 1
+              }
+            done
+
+            for key in BACKOFFICE_ADMIN_PASSWORD BACKOFFICE_AGENT_PASSWORD; do
+              value="$(read_env_value "$key")"
+              [[ "${#value}" -ge 15 ]] || {
+                echo "$key must contain at least 15 characters." >&2
+                exit 1
+              }
+              [[ "$value" != replace-with-* ]] || {
+                echo "$key still contains a repository placeholder." >&2
+                exit 1
+              }
+            done
+          fi
+
           if [[ "$TARGET_ENV" == production ]]; then
             configured_minio_volume="$(awk -F= '$1 == "MINIO_DATA_VOLUME" { sub(/\r$/, "", $2); print $2; exit }' "$env_file")"
             [[ -z "$configured_minio_volume" || "$configured_minio_volume" =~ ^[A-Za-z0-9_.-]+$ ]] || {
@@ -417,6 +447,11 @@ jobs:
 
           deployment_started=1
           docker compose "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 420
+
+          if [[ "$backoffice_bootstrap_enabled" == true ]]; then
+            echo "Provisioning secret-driven CMS/CRM backoffice accounts"
+            docker compose "${compose[@]}" run --rm -T --no-deps identity_service /usr/local/bin/bootstrap_backoffice
+          fi
 
           # Caddyfile is bind-mounted. Compose does not recreate/reload Caddy merely
           # because the mounted file contents changed, so activate the checked-out
