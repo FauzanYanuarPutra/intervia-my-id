@@ -47,14 +47,26 @@ EOF
 
 docker run -d --name "$DRILL_NAME"   -p "127.0.0.1:$PORT:5432"   -v "$PGDATA_HOST:/var/lib/postgresql/data"   -v "$WAL_ARCHIVE_DIR:/wal-archive:ro"   "$POSTGRES_IMAGE" >/dev/null
 
+drill_ready=0
 for _ in $(seq 1 90); do
-  if docker exec "$DRILL_NAME" pg_isready -U postgres >/dev/null 2>&1; then
+  if docker exec "$DRILL_NAME" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+    drill_ready=1
     break
+  fi
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$DRILL_NAME" 2>/dev/null || true)" != "true" ]]; then
+    echo "PITR restore container exited before becoming ready" >&2
+    docker logs "$DRILL_NAME" >&2 || true
+    exit 1
   fi
   sleep 1
 done
+if (( drill_ready == 0 )); then
+  echo "PITR restore did not become ready before timeout" >&2
+  docker logs "$DRILL_NAME" >&2 || true
+  exit 1
+fi
 
-docker exec "$DRILL_NAME" pg_isready -U postgres >/dev/null
+docker exec "$DRILL_NAME" pg_isready -U postgres -d postgres >/dev/null
 docker exec "$DRILL_NAME" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 -c "SELECT pg_is_in_recovery();" >/dev/null
 
 if [[ -n "${PITR_ASSERT_SQL:-}" ]]; then
