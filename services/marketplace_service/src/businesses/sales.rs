@@ -8,6 +8,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
+    event_outbox::enqueue_business_event,
     execution_policy::{
         allocate_document_number_tx, load_execution_policy_tx, resolve_operational_location_tx,
         ExecutionPolicyError,
@@ -479,18 +480,8 @@ impl SaleRepository {
             return Err(SaleRepositoryError::IdempotencyConflict);
         }
 
-        sqlx::query(
-            r#"
-            INSERT INTO events.event_outbox (
-              aggregate_type, aggregate_id, event_type, payload, routing_key
-            ) VALUES (
-              'business_sale', $1, 'marketplace.business.sale_recorded', $2,
-              'marketplace.business.sale_recorded'
-            )
-            "#,
-        )
-        .bind(sale_id.to_string())
-        .bind(json!({
+        let event_id = Uuid::new_v4();
+        let event_payload = json!({
             "event_version": 1,
             "sale_id": sale_id,
             "business_id": business_id,
@@ -504,8 +495,17 @@ impl SaleRepository {
             "final_amount": final_amount,
             "cogs_amount": cogs_amount,
             "accounting_mode": policy.accounting_mode,
-        }))
-        .execute(&mut *tx)
+        });
+        enqueue_business_event(
+            &mut tx,
+            event_id,
+            "business_sale",
+            sale_id,
+            "marketplace.business.sale_recorded",
+            &event_payload,
+            &format!("business-sale-recorded:{sale_id}"),
+            "marketplace.business.sale_recorded",
+        )
         .await?;
 
         let sale = load_sale_tx(&mut tx, sale_id)

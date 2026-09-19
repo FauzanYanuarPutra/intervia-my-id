@@ -5,8 +5,11 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::execution_policy::{
-    allocate_document_number_tx, load_execution_policy_tx, ExecutionPolicyError,
+use super::{
+    event_outbox::enqueue_business_event,
+    execution_policy::{
+        allocate_document_number_tx, load_execution_policy_tx, ExecutionPolicyError,
+    },
 };
 
 const MAX_PARTY_NAME: usize = 200;
@@ -1338,18 +1341,17 @@ async fn insert_outbox(
     event_type: &str,
     payload: serde_json::Value,
 ) -> Result<(), CommercialCoreError> {
-    sqlx::query(
-        r#"
-        INSERT INTO events.event_outbox (
-          aggregate_type,aggregate_id,event_type,payload,routing_key
-        ) VALUES ($1,$2,$3,$4,$3)
-        "#,
+    let event_id = Uuid::new_v4();
+    enqueue_business_event(
+        tx,
+        event_id,
+        aggregate_type,
+        aggregate_id,
+        event_type,
+        &payload,
+        &event_id.to_string(),
+        event_type,
     )
-    .bind(aggregate_type)
-    .bind(aggregate_id.to_string())
-    .bind(event_type)
-    .bind(payload)
-    .execute(&mut **tx)
     .await?;
     Ok(())
 }

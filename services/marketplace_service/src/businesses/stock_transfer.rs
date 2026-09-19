@@ -6,7 +6,10 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::inventory::{authorize_location_tx, InventoryError};
+use super::{
+    event_outbox::enqueue_business_event,
+    inventory::{authorize_location_tx, InventoryError},
+};
 
 const INVENTORY_MANAGE: &str = "inventory.manage";
 const MAX_REASON_LEN: usize = 2_000;
@@ -377,18 +380,8 @@ impl StockTransferRepository {
         .execute(&mut *tx)
         .await?;
 
-        sqlx::query(
-            r#"
-            INSERT INTO events.event_outbox (
-              aggregate_type,aggregate_id,event_type,payload,routing_key
-            ) VALUES (
-              'business_stock_transfer',$1,'marketplace.business.stock_transferred',$2,
-              'marketplace.business.stock_transferred'
-            )
-            "#,
-        )
-        .bind(transfer.id.to_string())
-        .bind(json!({
+        let event_id = Uuid::new_v4();
+        let event_payload = json!({
             "event_version": 1,
             "transfer_id": transfer.id,
             "business_id": business_id,
@@ -400,8 +393,17 @@ impl StockTransferRepository {
             "product_id": transfer.product_id,
             "quantity": transfer.quantity,
             "correlation_id": transfer.correlation_id,
-        }))
-        .execute(&mut *tx)
+        });
+        enqueue_business_event(
+            &mut tx,
+            event_id,
+            "business_stock_transfer",
+            transfer.id,
+            "marketplace.business.stock_transferred",
+            &event_payload,
+            &format!("business-stock-transfer:{transfer_id}"),
+            "marketplace.business.stock_transferred",
+        )
         .await?;
 
         tx.commit().await?;

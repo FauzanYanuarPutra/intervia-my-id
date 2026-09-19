@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use super::{
     control::canonical_manual_finance_entry_type,
+    event_outbox::enqueue_business_event,
     execution_policy::{
         allocate_document_number_tx, load_execution_policy_tx, resolve_operational_location_tx,
         ExecutionPolicyError,
@@ -685,18 +686,8 @@ impl Wave2Repository {
             .execute(&mut *tx)
             .await?;
 
-        sqlx::query(
-            r#"
-            INSERT INTO events.event_outbox (
-              aggregate_type, aggregate_id, event_type, payload, routing_key
-            ) VALUES (
-              'business_purchase', $1, 'marketplace.business.purchase_received', $2,
-              'marketplace.business.purchase_received'
-            )
-            "#,
-        )
-        .bind(purchase_id.to_string())
-        .bind(serde_json::json!({
+        let event_id = Uuid::new_v4();
+        let event_payload = serde_json::json!({
             "event_version": 1,
             "purchase_id": purchase_id,
             "business_id": business_id,
@@ -709,8 +700,17 @@ impl Wave2Repository {
             "total_amount": request.total_amount,
             "accounting_mode": policy.accounting_mode,
             "finance_entry_type": finance_entry_type,
-        }))
-        .execute(&mut *tx)
+        });
+        enqueue_business_event(
+            &mut tx,
+            event_id,
+            "business_purchase",
+            purchase_id,
+            "marketplace.business.purchase_received",
+            &event_payload,
+            &format!("business-purchase-received:{purchase_id}"),
+            "marketplace.business.purchase_received",
+        )
         .await?;
 
         let purchase = load_purchase_tx(&mut tx, purchase_id)
