@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{user_id_from_auth, AppState};
+use super::audit;
 
 const MAX_GROUPS: usize = 12;
 const MAX_OPTIONS_PER_GROUP: usize = 30;
@@ -75,6 +76,8 @@ pub(crate) struct ProductModifierGroup {
 pub(crate) struct ReplaceProductModifiersRequest {
     #[serde(default)]
     pub(crate) groups: Vec<ProductModifierGroup>,
+    #[serde(default)]
+    pub(crate) reason: Option<String>,
 }
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
@@ -135,6 +138,10 @@ async fn put_product_modifiers(
         return api_error(StatusCode::FORBIDDEN, "product_modifier_access_denied");
     }
 
+    let reason = payload.reason.as_deref().map(str::trim).unwrap_or("");
+    if reason.chars().count() < 3 {
+        return api_error(StatusCode::BAD_REQUEST, "modifier_change_reason_required");
+    }
     let groups = match validate_groups(payload.groups) {
         Ok(value) => value,
         Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
@@ -153,6 +160,32 @@ async fn put_product_modifiers(
                 "product_modifier_storage_unavailable",
             );
         }
+    };
+
+    let organization_id = match sqlx::query_scalar::<_, Uuid>(
+        "SELECT organization_id FROM businesses WHERE id=$1 AND status <> 'archived'",
+    )
+    .bind(business_id)
+    .fetch_optional(&mut *tx)
+    .await {
+        Ok(Some(value)) => value,
+        Ok(None) => {
+            return api_error(StatusCode::NOT_FOUND, "business_not_found");
+        }
+        Err(_) => {
+            return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable");
+        }
+    };
+    let before = match sqlx::query_scalar::<_, Value>(
+        "SELECT modifier_groups FROM business_products WHERE id=$1 AND business_id=$2 FOR UPDATE",
+    )
+    .bind(product_id)
+    .bind(business_id)
+    .fetch_optional(&mut *tx)
+    .await {
+        Ok(Some(value)) => value,
+        Ok(None) => return api_error(StatusCode::NOT_FOUND, "product_not_found"),
+        Err(_) => return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable"),
     };
 
     let updated = match sqlx::query(
@@ -200,6 +233,29 @@ async fn put_product_modifiers(
     .await
     {
         tracing::error!(?error, "failed to update public modifier projection");
+        return api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "product_modifier_storage_unavailable",
+        );
+    }
+
+    if let Err(error) = audit::record_tx(
+        &mut tx,
+        organization_id,
+        business_id,
+        None,
+        Some(actor_id),
+        "product.modifiers_updated",
+        "business_product",
+        Some(product_id),
+        Some(reason),
+        json!({
+            "summary": "Pilihan pelanggan diperbarui",
+            "before": before,
+            "after": groups_json,
+        }),
+    ).await {
+        tracing::error!(?error, "failed to record modifier audit");
         return api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "product_modifier_storage_unavailable",
