@@ -90,6 +90,14 @@ FOR EACH ROW
 EXECUTE FUNCTION sync_public_umkm_store_from_business_location();
 
 -- Rebuild the public projection from the canonical primary location now.
+WITH latest_public_locations AS (
+  SELECT DISTINCT ON (bl.store_id)
+    bl.*
+  FROM business_locations bl
+  WHERE bl.is_primary = TRUE
+    AND bl.public_visibility = TRUE
+  ORDER BY bl.store_id, bl.updated_at DESC, bl.id DESC
+)
 UPDATE umkm_stores s
 SET
   address = COALESCE(NULLIF(l.address, ''), s.address),
@@ -138,13 +146,5 @@ SET
       'business_location_updated_at', l.updated_at
     ),
   updated_at = NOW()
-FROM LATERAL (
-  SELECT bl.*
-  FROM business_locations bl
-  WHERE bl.store_id = s.id
-    AND bl.is_primary = TRUE
-    AND bl.public_visibility = TRUE
-  ORDER BY bl.updated_at DESC, bl.id DESC
-  LIMIT 1
-) l
-WHERE l.id IS NOT NULL;
+FROM latest_public_locations l
+WHERE s.id = l.store_id;
