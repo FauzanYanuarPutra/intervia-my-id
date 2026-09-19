@@ -1,10 +1,10 @@
+use super::audit;
 use super::domain::{
     store_slug, BusinessAggregate, BusinessLocation, BusinessRecord, BusinessStore,
     ValidatedBusinessProfileUpdate, ValidatedProvisionCommand,
 };
 use super::products::{ProductRepository, ProductRepositoryError};
 use super::profile::{BusinessCapabilityRecord, BusinessProfileRecord, ResolvedBusinessProfile};
-use super::audit;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use sha2::Digest;
@@ -1043,8 +1043,7 @@ const LOCATION_QUERY: &str = r#"
 
 #[cfg(test)]
 mod tests {
-    use super::{
-    audit,optional_complete_aggregate, RepositoryError};
+    use super::{audit, optional_complete_aggregate, RepositoryError};
 
     #[test]
     fn complete_aggregate_is_returned() {
