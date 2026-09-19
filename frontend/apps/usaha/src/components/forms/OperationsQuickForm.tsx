@@ -13,7 +13,7 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
   const router = useRouter();
   const [schedule, setSchedule] = useState(business.schedule);
   const [isOpen, setIsOpen] = useState(business.isOpen);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('Pembaruan operasional');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -54,7 +54,7 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
         return;
       }
 
-      setReason('');
+      setReason('Pembaruan operasional');
       setSuccess(isOpen ? 'Usaha ditandai sedang buka.' : 'Usaha ditandai tutup.');
       startTransition(() => {
         router.refresh();
