@@ -2,6 +2,8 @@ mod advisor;
 mod advisor_routes;
 #[cfg(test)]
 mod availability_persistence_tests;
+mod commercial_core;
+mod commercial_core_routes;
 pub(crate) mod control;
 pub(crate) mod domain;
 mod execution_policy;
@@ -82,6 +84,7 @@ mod wave2_routes;
 pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
     routes::router()
         .merge(product_modifiers::router())
+        .merge(commercial_core_routes::router())
         .merge(finance_core_routes::router())
         .merge(governance_routes::router())
         .merge(ingredient_management_routes::router())

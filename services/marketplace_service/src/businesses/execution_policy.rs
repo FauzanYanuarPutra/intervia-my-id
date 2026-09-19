@@ -152,6 +152,7 @@ pub(crate) async fn allocate_document_number_tx(
     let suffix = match document_type {
         "sale" => "SAL",
         "purchase" => "PUR",
+        "payment" => "PAY",
         _ => return Err(ExecutionPolicyError::InvalidDocumentType),
     };
 
