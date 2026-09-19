@@ -309,6 +309,12 @@ pub async fn upsert_backoffice_google_access(
         _ => return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid status"}))).into_response(),
     };
     let role_names = normalize_google_backoffice_roles(application, &payload.role_names);
+    if application == "crm" && role_names.iter().any(|role| role == "content_admin") {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"content_admin role is not valid for CRM"})),
+        ).into_response();
+    }
 
     let result = sqlx::query(
         r#"
