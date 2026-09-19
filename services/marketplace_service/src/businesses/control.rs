@@ -142,6 +142,7 @@ pub(crate) struct CreateFinanceEntryRequest {
     #[serde(default = "default_cash")]
     pub(crate) account_key: String,
     pub(crate) amount: i64,
+    pub(crate) effect_sign: i16,
     pub(crate) occurred_on: NaiveDate,
     #[serde(default)]
     pub(crate) note: String,
@@ -447,7 +448,7 @@ impl ControlRepository {
               occurred_on, note, channel_key, created_by_user_id
             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             RETURNING id, business_id, organization_id, entry_type, account_key,
-              amount, occurred_on, note, channel_key, created_by_user_id,
+              amount, effect_sign, occurred_on, note, channel_key, created_by_user_id,
               created_at, updated_at
             "#,
         )
@@ -493,7 +494,7 @@ ORDER BY channel_key
 
 const FINANCE_SELECT: &str = r#"
 SELECT id, business_id, organization_id, entry_type, account_key, amount,
-  occurred_on, note, channel_key, created_by_user_id, created_at, updated_at
+  effect_sign, occurred_on, note, channel_key, created_by_user_id, created_at, updated_at
 FROM business_finance_entries
 WHERE business_id=$1 AND organization_id=$2
 ORDER BY occurred_on DESC, created_at DESC
