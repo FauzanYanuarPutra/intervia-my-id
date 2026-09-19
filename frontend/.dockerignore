@@ -16,3 +16,4 @@
 www-apk
 **/.git
 **/.DS_Store
+**/next-env.d.ts
