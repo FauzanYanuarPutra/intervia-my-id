@@ -1,6 +1,6 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use tokio::time::{sleep, Duration};
 
 const DEFAULT_INTERVAL_SECONDS: u64 = 3_600;
@@ -19,7 +19,10 @@ fn cutoff(retention_days: i32, now: DateTime<Utc>) -> DateTime<Utc> {
     now - chrono::Duration::days(i64::from(retention_days))
 }
 
-async fn policy_days(db: &PgPool, key: &str) -> Result<Option<i32>> {
+async fn policy_days(
+    tx: &mut Transaction<'_, Postgres>,
+    key: &str,
+) -> Result<Option<i32>> {
     let row = sqlx::query_scalar::<_, i32>(
         r#"
         SELECT retention_days
@@ -29,12 +32,16 @@ async fn policy_days(db: &PgPool, key: &str) -> Result<Option<i32>> {
         "#,
     )
     .bind(key)
-    .fetch_optional(db)
+    .fetch_optional(&mut **tx)
     .await?;
     Ok(row)
 }
 
-async fn delete_batch(db: &PgPool, policy_key: &str, retention_days: i32) -> Result<i64> {
+async fn delete_batch(
+    tx: &mut Transaction<'_, Postgres>,
+    policy_key: &str,
+    retention_days: i32,
+) -> Result<i64> {
     let now = Utc::now();
     let cutoff = cutoff(retention_days, now);
 
@@ -59,7 +66,7 @@ async fn delete_batch(db: &PgPool, policy_key: &str, retention_days: i32) -> Res
             )
             .bind(cutoff)
             .bind(BATCH_SIZE)
-            .fetch_all(db)
+            .fetch_all(&mut **tx)
             .await?
             .len() as i64
         }
@@ -116,7 +123,23 @@ async fn delete_batch(db: &PgPool, policy_key: &str, retention_days: i32) -> Res
 }
 
 async fn run_policy(db: &PgPool, policy_key: &str) -> Result<i64> {
-    let Some(retention_days) = policy_days(db, policy_key).await? else {
+    let mut tx = db.begin().await?;
+
+    let lock_key = format!("lajukan:retention:{policy_key}");
+    let acquired: bool = sqlx::query_scalar(
+        "SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0))",
+    )
+    .bind(&lock_key)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if !acquired {
+        tx.rollback().await?;
+        return Ok(0);
+    }
+
+    let Some(retention_days) = policy_days(&mut tx, policy_key).await? else {
+        tx.rollback().await?;
         return Ok(0);
     };
 
@@ -128,12 +151,10 @@ async fn run_policy(db: &PgPool, policy_key: &str) -> Result<i64> {
         "#,
     )
     .bind(policy_key)
-    .fetch_one(db)
+    .fetch_one(&mut *tx)
     .await?;
 
-    let result = delete_batch(db, policy_key, retention_days).await;
-
-    match result {
+    match delete_batch(&mut tx, policy_key, retention_days).await {
         Ok(count) => {
             sqlx::query(
                 r#"
@@ -144,8 +165,9 @@ async fn run_policy(db: &PgPool, policy_key: &str) -> Result<i64> {
             )
             .bind(run_id)
             .bind(count)
-            .execute(db)
+            .execute(&mut *tx)
             .await?;
+            tx.commit().await?;
             Ok(count)
         }
         Err(error) => {
@@ -159,8 +181,9 @@ async fn run_policy(db: &PgPool, policy_key: &str) -> Result<i64> {
             )
             .bind(run_id)
             .bind(&message)
-            .execute(db)
+            .execute(&mut *tx)
             .await;
+            tx.commit().await?;
             Err(error)
         }
     }
