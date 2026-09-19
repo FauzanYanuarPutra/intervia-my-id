@@ -8,6 +8,7 @@ import { LogoutButton } from '@/components/portal/LogoutButton';
 import { MobileNav } from '@/components/portal/MobileNav';
 import { SidebarNav } from '@/components/portal/SidebarNav';
 import { StatusBadge } from '@/components/portal/StatusBadge';
+import { UsahaFlowGuide } from '@/components/portal/UsahaFlowGuide';
 import { portalSectionLabel } from '@/lib/portal-navigation';
 import { getStatusCopy } from '@/lib/portal-logic';
 import type { BusinessRecord, PortalSection } from '@/lib/portal-types';
@@ -124,7 +125,7 @@ export function PortalShell({
         </header>
 
         <main id="portal-content" tabIndex={-1} className="portal-mobile-content-clearance mx-auto w-full max-w-[1600px] px-3 pt-3 outline-none sm:px-5 sm:pt-4 lg:px-6 lg:pb-8">
-          <div className="min-w-0 space-y-4">{children}</div>
+          <div className="min-w-0 space-y-4">{activeBusiness && !accountPage ? <UsahaFlowGuide business={activeBusiness} currentSection={currentSection} /> : null}{children}</div>
         </main>
       </div>
 
