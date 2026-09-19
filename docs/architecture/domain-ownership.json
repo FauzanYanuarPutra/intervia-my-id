@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "updated_at": "2026-09-20",
   "principles": [
     "one source-of-truth owner per business entity",
@@ -9,23 +9,217 @@
     "physical database separation may evolve independently from logical ownership"
   ],
   "services": [
-    {"service":"identity_service","status":"implemented","database":"identity_db","owner_domains":["identity","authentication","authorization"]},
-    {"service":"marketplace_service","status":"implemented","database":"marketplace_db","owner_domains":["marketplace","discovery","catalog"],"legacy_domains":["news","orders","payments","wallet","crm","notifications","support","cms"]},
-    {"service":"community_service","status":"implemented","database":"community_db","owner_domains":["community","forum","groups","reels"]},
-    {"service":"chat_service","status":"implemented","database":"scylla","owner_domains":["chat","presence","message-history"]},
-    {"service":"ai_service","status":"implemented","database":null,"owner_domains":["ai-orchestration"]},
-    {"service":"ocr_service","status":"implemented","database":null,"owner_domains":["ocr-inference"]},
-    {"service":"liveness_service","status":"implemented","database":null,"owner_domains":["liveness-inference"]},
-    {"service":"profile_service","status":"target","database":"profile_db","owner_domains":["personal-profile","business-profile","business-location"]},
-    {"service":"media_service","status":"target","database":"media_db","owner_domains":["media","attachments","processing-metadata"],"storage":"object-storage"},
-    {"service":"news_service","status":"target","database":"news_db","owner_domains":["news","editorial","publication"]},
-    {"service":"order_service","status":"target","database":"order_db","owner_domains":["orders","checkout","fulfillment","order-state"]},
-    {"service":"payment_service","status":"target","database":"payment_db","owner_domains":["payments","wallet","ledger","refunds","provider-webhooks","reconciliation"],"criticality":"critical"},
-    {"service":"promotion_service","status":"target","database":"promotion_db","owner_domains":["campaigns","promotions","boosts"]},
-    {"service":"crm_service","status":"target","database":"crm_db","owner_domains":["crm-workspaces","contacts","leads","tasks","quotes"]},
-    {"service":"communication_service","status":"target","database":"communication_db","owner_domains":["notifications","delivery-jobs","notification-preferences"]},
-    {"service":"trust_service","status":"target","database":"trust_db","owner_domains":["verification","trust-status","risk-flags"],"criticality":"high"},
-    {"service":"search_service","status":"target","database":null,"owner_domains":["search-projection"],"source_of_truth":false},
-    {"service":"audit_service","status":"target","database":"audit_db","owner_domains":["immutable-audit-records"],"criticality":"high"}
+    {
+      "service": "identity_service",
+      "status": "implemented",
+      "database": "identity_db",
+      "owner_domains": [
+        "identity",
+        "authentication",
+        "authorization"
+      ]
+    },
+    {
+      "service": "marketplace_service",
+      "status": "implemented",
+      "database": "marketplace_db",
+      "owner_domains": [
+        "marketplace",
+        "discovery",
+        "catalog"
+      ],
+      "legacy_domains": [
+        "news",
+        "orders",
+        "payments",
+        "wallet",
+        "crm",
+        "notifications",
+        "support",
+        "cms"
+      ]
+    },
+    {
+      "service": "community_service",
+      "status": "implemented",
+      "database": "community_db",
+      "owner_domains": [
+        "community",
+        "forum",
+        "groups",
+        "reels"
+      ]
+    },
+    {
+      "service": "chat_service",
+      "status": "implemented",
+      "database": "scylla",
+      "owner_domains": [
+        "chat",
+        "presence",
+        "message-history"
+      ]
+    },
+    {
+      "service": "ai_service",
+      "status": "implemented",
+      "database": null,
+      "owner_domains": [
+        "ai-orchestration"
+      ]
+    },
+    {
+      "service": "ocr_service",
+      "status": "implemented",
+      "database": null,
+      "owner_domains": [
+        "ocr-inference"
+      ]
+    },
+    {
+      "service": "liveness_service",
+      "status": "implemented",
+      "database": null,
+      "owner_domains": [
+        "liveness-inference"
+      ]
+    },
+    {
+      "service": "profile_service",
+      "status": "target",
+      "database": "profile_db",
+      "owner_domains": [
+        "personal-profile",
+        "business-profile",
+        "business-location"
+      ]
+    },
+    {
+      "service": "media_service",
+      "status": "target",
+      "database": "media_db",
+      "owner_domains": [
+        "media",
+        "attachments",
+        "processing-metadata"
+      ],
+      "storage": "object-storage"
+    },
+    {
+      "service": "news_service",
+      "status": "target",
+      "database": "news_db",
+      "owner_domains": [
+        "news",
+        "editorial",
+        "publication"
+      ]
+    },
+    {
+      "service": "order_service",
+      "status": "target",
+      "database": "order_db",
+      "owner_domains": [
+        "orders",
+        "checkout",
+        "fulfillment",
+        "order-state"
+      ]
+    },
+    {
+      "service": "payment_service",
+      "status": "target",
+      "database": "payment_db",
+      "owner_domains": [
+        "payments",
+        "wallet",
+        "ledger",
+        "refunds",
+        "provider-webhooks",
+        "reconciliation"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "service": "promotion_service",
+      "status": "target",
+      "database": "promotion_db",
+      "owner_domains": [
+        "campaigns",
+        "promotions",
+        "boosts"
+      ]
+    },
+    {
+      "service": "crm_service",
+      "status": "target",
+      "database": "crm_db",
+      "owner_domains": [
+        "crm-workspaces",
+        "contacts",
+        "leads",
+        "tasks",
+        "quotes"
+      ]
+    },
+    {
+      "service": "communication_service",
+      "status": "target",
+      "database": "communication_db",
+      "owner_domains": [
+        "notifications",
+        "delivery-jobs",
+        "notification-preferences"
+      ]
+    },
+    {
+      "service": "trust_service",
+      "status": "target",
+      "database": "trust_db",
+      "owner_domains": [
+        "verification",
+        "trust-status",
+        "risk-flags"
+      ],
+      "criticality": "high"
+    },
+    {
+      "service": "support_service",
+      "status": "target",
+      "database": "support_db",
+      "owner_domains": [
+        "customer-support",
+        "support-tickets",
+        "support-replies"
+      ]
+    },
+    {
+      "service": "review_service",
+      "status": "target",
+      "database": "review_db",
+      "owner_domains": [
+        "reviews",
+        "ratings",
+        "reputation-signals"
+      ]
+    },
+    {
+      "service": "search_service",
+      "status": "target",
+      "database": null,
+      "owner_domains": [
+        "search-projection"
+      ],
+      "source_of_truth": false
+    },
+    {
+      "service": "audit_service",
+      "status": "target",
+      "database": "audit_db",
+      "owner_domains": [
+        "immutable-audit-records"
+      ],
+      "criticality": "high"
+    }
   ]
 }
