@@ -229,7 +229,7 @@ export function IngredientWorkspace({
 
   const [activePanel, setActivePanel] = useState<{ id: string; mode: PanelMode } | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
-  const [editReason, setEditReason] = useState('');
+  const [editReason, setEditReason] = useState('Pembaruan bahan');
   const [archiveReason, setArchiveReason] = useState('');
   const [stockAction, setStockAction] = useState<StockAction>('purchase');
   const [stockQuantityInput, setStockQuantityInput] = useState('');
@@ -451,7 +451,7 @@ export function IngredientWorkspace({
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(responseError(payload, 'Gagal memperbarui bahan.'));
       await reload();
-      setEditReason('');
+      setEditReason('Pembaruan bahan');
       setActionMessage('Perubahan tersimpan. Stok tidak diubah dari Edit agar riwayat tetap dapat diaudit.');
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : 'Gagal memperbarui bahan.');
@@ -753,7 +753,7 @@ export function IngredientWorkspace({
                           <label className="text-xs font-semibold text-portal-soft">Supplier (opsional)<input value={editDraft.supplier} onChange={event => setEditDraft(current => current ? { ...current, supplier: event.target.value } : current)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
                         </div>
                         <p className="text-xs text-portal-soft">Stok tidak diubah dari Edit agar riwayat stok tetap dapat diaudit. Gunakan tombol <strong>Tambah stok</strong> untuk perubahan jumlah.</p>
-                        <label className="text-xs font-semibold text-portal-soft">Alasan perubahan<input value={editReason} onChange={event => setEditReason(event.target.value)} maxLength={500} placeholder="Contoh: harga pemasok naik" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" /></label>
+                        <label className="text-xs font-semibold text-portal-soft">Catatan perubahan<input value={editReason} onChange={event => setEditReason(event.target.value)} maxLength={500} placeholder="Contoh: harga pemasok naik" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" /></label>
                         <button type="button" disabled={actionSaving} onClick={() => void saveEdit(item)} className="portal-button-primary min-h-11 disabled:opacity-50">{actionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Simpan perubahan</button>
                       </div>
                     ) : null}
