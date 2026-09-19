@@ -286,6 +286,31 @@ export const newsApi = {
     );
   },
 
+  edit: async (
+    token: string,
+    id: string,
+    data: {
+      action?: 'edit' | 'correct';
+      title?: string;
+      summary?: string;
+      body?: string;
+      category?: string;
+      article_kind?: string;
+      location?: string;
+      topics?: string[];
+      source_urls?: string[];
+      cover_image?: string;
+      slug?: string;
+      note?: string;
+    },
+  ) => {
+    return fetchWithAuth(`${MARKETPLACE_URL}/v1/news/${encodeURIComponent(id)}/editorial/edit`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(data),
+    });
+  },
+
   moderate: async (
     token: string,
     id: string,
@@ -304,6 +329,75 @@ export const newsApi = {
       method: 'PATCH',
       token,
       body: JSON.stringify(data),
+    });
+  },
+
+};
+
+
+export const moderationApi = {
+  queue: async (token: string, params: Record<string, string> = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchWithAuth(
+      query
+        ? `${MARKETPLACE_URL}/v1/content/moderation/queue?${query}`
+        : `${MARKETPLACE_URL}/v1/content/moderation/queue`,
+      { method: 'GET', token },
+    );
+  },
+
+  history: async (token: string, id: string) => {
+    return fetchWithAuth(`${MARKETPLACE_URL}/v1/content/${encodeURIComponent(id)}/moderation/history`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  moderate: async (token: string, id: string, data: Record<string, unknown>) => {
+    return fetchWithAuth(`${MARKETPLACE_URL}/v1/content/${encodeURIComponent(id)}/moderate`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    });
+  },
+};
+
+export const backofficeApi = {
+  candidates: async (token: string, q: string) => {
+    const query = new URLSearchParams({ q, limit: '20' }).toString();
+    return fetchWithAuth(`${API_URL}/backoffice/candidates?${query}`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  invitations: async (token: string) => {
+    return fetchWithAuth(`${API_URL}/backoffice/invitations`, {
+      method: 'GET',
+      token,
+    });
+  },
+
+  invite: async (
+    token: string,
+    data: {
+      invitee_user_id: string;
+      application: 'cms' | 'crm';
+      role_names: string[];
+      expires_in_days?: number;
+    },
+  ) => {
+    return fetchWithAuth(`${API_URL}/backoffice/invitations`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    });
+  },
+
+  revokeInvitation: async (token: string, id: string) => {
+    return fetchWithAuth(`${API_URL}/backoffice/invitations/${encodeURIComponent(id)}/revoke`, {
+      method: 'POST',
+      token,
     });
   },
 };
