@@ -87,28 +87,6 @@ async fn delete_batch(db: &PgPool, policy_key: &str, retention_days: i32) -> Res
             .await?
             .len() as i64
         }
-        "governance_audit_events" => {
-            sqlx::query_scalar(
-                r#"
-                WITH victims AS (
-                  SELECT id
-                  FROM core.governance_audit_events
-                  WHERE created_at < $1
-                  ORDER BY created_at ASC
-                  LIMIT $2
-                )
-                DELETE FROM core.governance_audit_events target
-                USING victims
-                WHERE target.id = victims.id
-                RETURNING 1
-                "#,
-            )
-            .bind(cutoff)
-            .bind(BATCH_SIZE)
-            .fetch_all(db)
-            .await?
-            .len() as i64
-        }
         "user_moderation_actions" => {
             sqlx::query_scalar(
                 r#"
@@ -193,7 +171,6 @@ pub(crate) async fn run_retention_sweep(db: PgPool) {
     let policies = [
         "privacy_requests_closed",
         "security_incidents_closed",
-        "governance_audit_events",
         "user_moderation_actions",
     ];
 
