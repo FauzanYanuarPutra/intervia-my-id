@@ -95,6 +95,10 @@ pub(crate) struct BusinessProfileUpdateRequest {
     pub(crate) logo: Option<BusinessImageInput>,
     #[serde(default)]
     pub(crate) banner: Option<BusinessImageInput>,
+    #[serde(default)]
+    pub(crate) metadata_patch: Option<Value>,
+    #[serde(default)]
+    pub(crate) reason: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,6 +113,8 @@ pub(crate) struct ValidatedBusinessProfileUpdate {
     pub(crate) primary_location: PrimaryLocationInput,
     pub(crate) logo: Option<ValidatedBusinessImage>,
     pub(crate) banner: Option<ValidatedBusinessImage>,
+    pub(crate) metadata_patch: Option<Value>,
+    pub(crate) reason: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -305,6 +311,20 @@ pub(crate) fn validate_business_profile_update(
         .transpose()
         .map_err(|_| ValidationError::InvalidBusinessBanner)?;
 
+    let metadata_patch = request.metadata_patch.map(|value| {
+        if !value.is_object() || value.get("public").is_some() {
+            return Err(ValidationError::InvalidPublicMetadata);
+        }
+        if value.to_string().len() > 200_000 {
+            return Err(ValidationError::InvalidPublicMetadata);
+        }
+        Ok(value)
+    }).transpose()?;
+    let reason = request
+        .reason
+        .map(|value| value.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|value| !value.is_empty());
+
     Ok(ValidatedBusinessProfileUpdate {
         expected_version: request.expected_version,
         name,
@@ -324,6 +344,8 @@ pub(crate) fn validate_business_profile_update(
         },
         logo,
         banner,
+        metadata_patch,
+        reason,
     })
 }
 
