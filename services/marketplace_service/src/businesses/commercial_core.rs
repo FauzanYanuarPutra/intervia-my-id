@@ -13,6 +13,7 @@ use super::{
     execution_policy::{
         allocate_document_number_tx, load_execution_policy_tx, ExecutionPolicyError,
     },
+    period_control::{assert_business_date_open_tx, PeriodControlError},
 };
 
 const MAX_PARTY_NAME: usize = 200;
@@ -45,6 +46,21 @@ impl From<sqlx::Error> for CommercialCoreError {
 
 fn map_policy_error(_: ExecutionPolicyError) -> CommercialCoreError {
     CommercialCoreError::Database
+}
+
+fn map_period_control_error(error: PeriodControlError) -> CommercialCoreError {
+    match error {
+        PeriodControlError::PeriodClosed => {
+            CommercialCoreError::Validation("business_period_closed")
+        }
+        PeriodControlError::DayClosed => {
+            CommercialCoreError::Validation("business_day_closed")
+        }
+        PeriodControlError::Validation(_)
+        | PeriodControlError::NotFound
+        | PeriodControlError::Conflict
+        | PeriodControlError::Database => CommercialCoreError::Database,
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -538,6 +554,15 @@ impl CommercialCoreRepository {
         let policy = load_execution_policy_tx(&mut tx, business_id, organization_id)
             .await
             .map_err(map_policy_error)?;
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            None,
+            normalized.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
 
         validate_allocations_tx(
             &mut tx,
@@ -713,6 +738,15 @@ impl CommercialCoreRepository {
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(CommercialCoreError::NotFound)?;
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            None,
+            request.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
 
         let already_reversed: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM business_payments WHERE reversal_of_payment_id=$1)",

@@ -13,6 +13,7 @@ use super::{
         ExecutionPolicyError,
     },
     kernel::command::canonical_request_hash,
+    period_control::{assert_business_date_open_tx, PeriodControlError},
 };
 
 #[derive(Debug)]
@@ -495,6 +496,15 @@ impl Wave2Repository {
         )
         .await
         .map_err(map_execution_policy_error)?;
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            Some(location_id),
+            request.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
         let party_id = validate_document_party_tx(
             &mut tx,
             business_id,
@@ -1082,6 +1092,19 @@ fn map_execution_policy_error(error: ExecutionPolicyError) -> Wave2RepositoryErr
         ExecutionPolicyError::MissingProfile
         | ExecutionPolicyError::InvalidDocumentType
         | ExecutionPolicyError::Database => Wave2RepositoryError::Database,
+    }
+}
+
+fn map_period_control_error(error: PeriodControlError) -> Wave2RepositoryError {
+    match error {
+        PeriodControlError::PeriodClosed => {
+            Wave2RepositoryError::Validation("business_period_closed")
+        }
+        PeriodControlError::DayClosed => Wave2RepositoryError::Validation("business_day_closed"),
+        PeriodControlError::Validation(_)
+        | PeriodControlError::NotFound
+        | PeriodControlError::Conflict
+        | PeriodControlError::Database => Wave2RepositoryError::Database,
     }
 }
 

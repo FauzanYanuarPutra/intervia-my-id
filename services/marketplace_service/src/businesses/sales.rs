@@ -15,6 +15,7 @@ use super::{
         ExecutionPolicyError,
     },
     kernel::command::canonical_request_hash,
+    period_control::{assert_business_date_open_tx, PeriodControlError},
     modifier_resolution::{
         resolve_modifier_selection, ModifierSelectionInput, ResolvedModifierSelection,
     },
@@ -264,6 +265,15 @@ impl SaleRepository {
         )
         .await
         .map_err(map_execution_policy_error)?;
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            Some(location_id),
+            normalized.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
         if let Some(source_order_id) = normalized.source_order_id {
             ensure_source_order_tx(&mut tx, business_id, organization_id, source_order_id).await?;
         }
@@ -1174,6 +1184,19 @@ fn map_execution_policy_error(error: ExecutionPolicyError) -> SaleRepositoryErro
         ExecutionPolicyError::MissingProfile
         | ExecutionPolicyError::InvalidDocumentType
         | ExecutionPolicyError::Database => SaleRepositoryError::Database,
+    }
+}
+
+fn map_period_control_error(error: PeriodControlError) -> SaleRepositoryError {
+    match error {
+        PeriodControlError::PeriodClosed => {
+            SaleRepositoryError::Validation("business_period_closed")
+        }
+        PeriodControlError::DayClosed => SaleRepositoryError::Validation("business_day_closed"),
+        PeriodControlError::Validation(_)
+        | PeriodControlError::NotFound
+        | PeriodControlError::Conflict
+        | PeriodControlError::Database => SaleRepositoryError::Database,
     }
 }
 

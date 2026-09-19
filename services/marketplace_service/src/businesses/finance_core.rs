@@ -5,6 +5,8 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
+use super::period_control::{assert_business_date_open_tx, PeriodControlError};
+
 const MAX_NOTE_LEN: usize = 2_000;
 const MAX_REASON_LEN: usize = 2_000;
 const ALLOCATION_BUCKETS: [&str; 5] = ["owner", "team", "reinvest", "operations", "reserve"];
@@ -24,6 +26,17 @@ impl From<sqlx::Error> for FinanceCoreError {
         } else {
             Self::Database
         }
+    }
+}
+
+fn map_period_control_error(error: PeriodControlError) -> FinanceCoreError {
+    match error {
+        PeriodControlError::PeriodClosed => FinanceCoreError::Validation("business_period_closed"),
+        PeriodControlError::DayClosed => FinanceCoreError::Validation("business_day_closed"),
+        PeriodControlError::Validation(_)
+        | PeriodControlError::NotFound
+        | PeriodControlError::Conflict
+        | PeriodControlError::Database => FinanceCoreError::Database,
     }
 }
 
@@ -382,6 +395,16 @@ impl FinanceCoreRepository {
             });
         }
 
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            None,
+            request.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
+
         let command_id = Uuid::new_v4();
         let entry_id = Uuid::new_v4();
         insert_command(
@@ -476,6 +499,15 @@ impl FinanceCoreRepository {
         let original = load_entry_tx(&mut tx, business_id, organization_id, entry_id, true)
             .await?
             .ok_or(FinanceCoreError::NotFound)?;
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            None,
+            original.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
         if original.reversal_of_entry_id.is_some() {
             return Err(FinanceCoreError::Validation(
                 "cannot_correct_reversal_entry",
@@ -520,6 +552,17 @@ impl FinanceCoreRepository {
             Some(value) => Some(prepare_replacement(value)?),
             None => None,
         };
+        if let Some(prepared) = replacement_prepared.as_ref() {
+            assert_business_date_open_tx(
+                &mut tx,
+                business_id,
+                organization_id,
+                None,
+                prepared.occurred_on,
+            )
+            .await
+            .map_err(map_period_control_error)?;
+        }
         let command_id = Uuid::new_v4();
         let reversal_id = Uuid::new_v4();
         let replacement_id = replacement_prepared.as_ref().map(|_| Uuid::new_v4());

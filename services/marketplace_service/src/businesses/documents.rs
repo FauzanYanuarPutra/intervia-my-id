@@ -13,6 +13,7 @@ use super::{
         allocate_document_number_tx, load_execution_policy_tx, resolve_operational_location_tx,
         ExecutionPolicyError,
     },
+    period_control::{assert_business_date_open_tx, PeriodControlError},
 };
 
 const MAX_DOCUMENT_LINES: usize = 200;
@@ -62,6 +63,16 @@ impl From<CounterpartyError> for DocumentError {
         match error {
             CounterpartyError::Required => Self::Validation("document_party_required"),
             CounterpartyError::Invalid => Self::Validation("invalid_document_party"),
+            _ => Self::Database,
+        }
+    }
+}
+
+impl From<PeriodControlError> for DocumentError {
+    fn from(error: PeriodControlError) -> Self {
+        match error {
+            PeriodControlError::PeriodClosed => Self::Validation("business_period_closed"),
+            PeriodControlError::DayClosed => Self::Validation("business_day_closed"),
             _ => Self::Database,
         }
     }
@@ -420,6 +431,14 @@ impl DocumentRepository {
             normalized.location_id,
         )
         .await?;
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            Some(location_id),
+            normalized.document_date,
+        )
+        .await?;
 
         let (party_role, party_required) = document_party_policy(&normalized.document_type);
         let party_id = match party_role {
@@ -617,6 +636,14 @@ impl DocumentRepository {
             .await?
             .ok_or(DocumentError::NotFound)?;
         validate_transition(&document.status, &action, reason.as_deref())?;
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            document.location_id,
+            document.document_date,
+        )
+        .await?;
 
         let policy = load_execution_policy_tx(&mut tx, business_id, organization_id).await?;
         if policy.approval_policy == "role_based" {

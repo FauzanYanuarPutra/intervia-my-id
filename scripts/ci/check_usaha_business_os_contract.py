@@ -246,4 +246,47 @@ def main() -> int:
         'draft -> issued -> posted', 'maker', 'checker', 'role_based',
     )
 
+    require(
+        'services/marketplace_service/migrations/20260919080000_period_control_v1.up.sql',
+        'business_accounting_periods', 'business_day_closes',
+        'business_close_commands', 'business_close_events',
+    )
+    require(
+        'services/marketplace_service/src/businesses/period_control.rs',
+        'assert_business_date_open_tx', 'PeriodClosed', 'DayClosed',
+        'close_period', 'reopen_period', 'close_day', 'reopen_day',
+        'marketplace.business.period_control_changed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/period_control_routes.rs',
+        '/v1/businesses/{business_id}/period-controls/periods',
+        '/v1/businesses/{business_id}/period-controls/days',
+        'business_period_control_access_denied',
+    )
+    require(
+        'services/marketplace_service/src/businesses/sales.rs',
+        'assert_business_date_open_tx', 'business_period_closed', 'business_day_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/wave2.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/commercial_core.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/documents.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'services/marketplace_service/src/businesses/finance_core.rs',
+        'assert_business_date_open_tx', 'business_period_closed',
+    )
+    require(
+        'docs/architecture/period-control.md',
+        'Period Control V1', 'Accounting periods', 'Business day close',
+        'assert_business_date_open_tx',
+    )
+
 if __name__ == '__main__': raise SystemExit(main())
