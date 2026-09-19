@@ -64,6 +64,7 @@ import {
   buildPublicProfileSlug,
   normalizePublicProfileHandleInput,
 } from '@/lib/profile/publicProfileLink';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
 import { OwnerProfileEditModal, OwnerProfileEditSection } from './OwnerProfileEditModal';
 
