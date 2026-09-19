@@ -544,6 +544,7 @@ impl PublicCommerceRepository {
                 'business_id', $3,
                 'organization_id', $4,
                 'base_status', 'PENDING_PAYMENT',
+                'expected_version', 1,
                 'target', '/usaha/order',
                 'actions', jsonb_build_array('view', 'reject')
               )
