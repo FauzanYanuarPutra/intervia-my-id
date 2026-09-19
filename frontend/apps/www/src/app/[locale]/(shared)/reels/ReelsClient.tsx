@@ -123,6 +123,24 @@
     normalizeRecipientName,
     resolveNotificationReelId,
   } from './reels-client-helpers';
+  import type {
+    ReelActionState,
+    ReelComment,
+    ReelCommentsBucket,
+    ReelContentGoal,
+    ReelsClientProps,
+    ReelsFeedTab,
+    ReelsSignal,
+    ReelsStudioFacingMode,
+    ReelsStudioMode,
+    ReelsStudioPanel,
+    ReelStoreOption,
+    ReelUserAction,
+    ReelVisibility,
+    ShareSheetRecipient,
+    UploadReelForm,
+    UploadReelStep,
+  } from './reels-client-model';
   import {
     buildCleanReelTitleFromFile,
     getReelFilterCss,
@@ -158,109 +176,12 @@
     requestNativePermissions,
   } from '@/lib/nativeBridge';
 
-  type ReelsClientProps = {
-    locale: string;
-    initialIndex: number;
-    initialItems: LajukanReel[];
-    initialCursor: number | null;
-    initialHasMore: boolean;
-    initialSearchQuery: string;
-    initialUploadOpen?: boolean;
-  };
-
   const iconMap: Partial<Record<LajukanReel['iconKey'] | string, LucideIcon>> = {
     supplier: BriefcaseBusiness,
     marketing: Megaphone,
     finance: WalletCards,
     packaging: Box,
     frozen: ShoppingBag,
-  };
-
-  type ReelsSignal = 'watch' | 'share' | 'detail' | 'product' | 'store';
-
-  type ReelUserAction = 'like' | 'save' | 'follow';
-
-  type ReelActionState = {
-    liked: boolean;
-    saved: boolean;
-    followed: boolean;
-    loading?: ReelUserAction | null;
-  };
-
-  type ReelComment = {
-    id: string;
-    reelId: string;
-    parentCommentId?: string | null;
-    authorUserId: string;
-    authorName: string;
-    authorAvatarUrl?: string | null;
-    body: string;
-    replyCount?: number;
-    createdAt: string;
-  };
-
-  type ReelCommentsBucket = {
-    items: ReelComment[];
-    cursor: number | null;
-    hasMore: boolean;
-    loading: boolean;
-    error: string | null;
-  };
-
-  type ReelVisibility = 'public' | 'followers' | 'private';
-
-  type UploadReelForm = {
-    captureMode: NonNullable<LajukanReel['captureMode']>;
-    filterPreset: NonNullable<LajukanReel['filterPreset']>;
-    musicTrack: string;
-    /** Internal compatibility fields. The publish UI derives these automatically. */
-    title: string;
-    caption: string;
-    tag: string;
-    mediaUrl: string;
-    hook: string;
-    liveTitle: string;
-    liveSchedule: string;
-    productName: string;
-    productPrice: string;
-    productHref: string;
-    contentGoal: ReelContentGoal;
-    location: string;
-    visibility: ReelVisibility;
-    allowComments: boolean;
-    shareToMainFeed: boolean;
-    promotionalContent: boolean;
-    aiGenerated: boolean;
-    coverTimestampMs: number;
-  };
-
-  type UploadReelStep = 'media' | 'edit' | 'post';
-
-  type ReelContentGoal = 'discover' | 'product' | 'education' | 'promo' | 'process';
-
-  type ReelStoreOption = {
-    id: string;
-    name: string;
-    slug: string;
-    city?: string | null;
-    phone?: string | null;
-  };
-
-  type ReelsFeedTab = 'fyp' | 'friends' | 'following';
-
-  type ReelsStudioMode = 'gallery' | 'photo' | 'video' | 'link' | 'live';
-  type ReelsStudioPanel =
-    | 'filters'
-    | 'effects'
-    | 'music'
-    | 'speed'
-    | 'link'
-    | null;
-  type ReelsStudioFacingMode = 'environment' | 'user';
-
-  type ShareSheetRecipient = SocialUser & {
-    source: 'creator' | 'following' | 'suggested';
-    linked: boolean;
   };
 
   const REELS_SNAP_LOCK_MS = 520;

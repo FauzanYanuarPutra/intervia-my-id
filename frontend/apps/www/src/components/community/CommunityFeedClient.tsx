@@ -108,129 +108,21 @@ import {
   timeAgo,
   type ParsedPoll,
 } from './community-feed-helpers';
-
-type CommunityFeedClientProps = {
-  isId: boolean;
-};
-
-type ComposeMode = 'question' | 'post' | 'photo' | 'poll' | 'feeling';
-
-type ForumThreadDetail = {
-  id: string;
-  title: string;
-  createdAt: string;
-  views: number;
-  replyCount: number;
-  likeCount?: number;
-  bookmarkCount?: number;
-  voteScore?: number;
-  viewerVote?: -1 | 0 | 1;
-  author: CommunityFeedItem['author'] | null;
-  category: CommunityFeedCategory | null;
-  tags: CommunityFeedTag[];
-  imageUrls?: string[];
-  isPinned?: boolean;
-  isSolved?: boolean;
-  solutionPostId?: string | null;
-};
-
-type ForumPostDetail = {
-  id: string;
-  threadId: string;
-  author: CommunityFeedItem['author'] | null;
-  content: string;
-  createdAt: string;
-  updatedAt?: string | null;
-  replyToPostId?: string | null;
-  imageUrls?: string[];
-  likeCount: number;
-  voteScore?: number;
-  viewerVote?: -1 | 0 | 1;
-  isAnswer?: boolean;
-};
-
-type ForumPostsResponse = {
-  data?: ForumPostDetail[];
-};
-
-type CreatedPostPayload = {
-  post?: ForumPostDetail;
-  error?: string;
-};
-
-type CreatedThreadPayload = {
-  thread?: {
-    id: string;
-    title: string;
-    createdAt: string;
-    lastActivityAt?: string;
-    views?: number;
-    replyCount?: number;
-    likeCount?: number;
-    bookmarkCount?: number;
-    voteScore?: number;
-    viewerVote?: -1 | 0 | 1;
-    isPinned?: boolean;
-    isSolved?: boolean;
-    imageUrls?: string[];
-    author?: CommunityFeedItem['author'] | null;
-    category?: CommunityFeedCategory | null;
-    tags?: CommunityFeedTag[];
-  };
-  post?: {
-    id: string;
-    content: string;
-    createdAt: string;
-    imageUrls?: string[];
-  };
-};
-
-type PollOptionVoteStat = {
-  optionIndex: number;
-  votes: number;
-  viewerVoted?: boolean;
-};
-
-type PollVoteResponse = {
-  threadId: string;
-  totalVotes: number;
-  viewerOptionIndex?: number | null;
-  options: PollOptionVoteStat[];
-  error?: string;
-};
-
-const COMMUNITY_MODAL_SHELL_CLASS =
-  'ui-layer-modal fixed inset-0 z-[10000] flex items-end justify-center bg-slate-950/45 p-0  sm:items-center sm:p-4';
-
-const COMMUNITY_MODAL_SURFACE_CLASS =
-  'flex h-full w-full flex-col overflow-hidden shadow-[0_30px_80px_-40px_rgba(15,23,42,0.42)] sm:h-auto sm:max-h-[calc(var(--app-viewport-height)-2rem)] sm:rounded-[24px]';
-
-const COMMUNITY_COMPOSER_FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-function communityComposerFocusableElements(
-  container: HTMLElement,
-): HTMLElement[] {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(
-      COMMUNITY_COMPOSER_FOCUSABLE_SELECTOR,
-    ),
-  ).filter(element => {
-    const style = window.getComputedStyle(element);
-    return (
-      element.getAttribute('aria-hidden') !== 'true' &&
-      style.display !== 'none' &&
-      style.visibility !== 'hidden' &&
-      element.getClientRects().length > 0
-    );
-  });
-}
+import type {
+  CommunityFeedClientProps,
+  ComposeMode,
+  CreatedPostPayload,
+  CreatedThreadPayload,
+  ForumPostDetail,
+  ForumPostsResponse,
+  ForumThreadDetail,
+  PollVoteResponse,
+} from './community-feed-client-model';
+import {
+  COMMUNITY_MODAL_SHELL_CLASS,
+  COMMUNITY_MODAL_SURFACE_CLASS,
+  communityComposerFocusableElements,
+} from './community-feed-focus';
 
 const TABS: Array<{
   id: CommunityFeedTab;
