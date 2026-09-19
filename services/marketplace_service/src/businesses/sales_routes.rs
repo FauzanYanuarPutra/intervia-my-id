@@ -23,6 +23,10 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         "/v1/businesses/{business_id}/sales",
         get(list_sales).post(create_sale),
     )
+    .route(
+        "/v1/businesses/{business_id}/sales/{sale_id}/void",
+        post(void_sale),
+    )
 }
 
 async fn list_sales(
@@ -97,6 +101,58 @@ async fn create_sale(
                 } else {
                     StatusCode::CREATED
                 },
+                Json(json!({ "data": { "sale": sale, "replayed": outcome.replayed } })),
+            )
+                .into_response()
+        }
+        Err(error) => sale_error_response(error),
+    }
+}
+
+async fn void_sale(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((business_id, sale_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<serde_json::Value>,
+) -> Response {
+    let access =
+        match sales_access_context(&state, &headers, business_id, SalesAccessKind::Record).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
+    let idempotency_key = match parse_idempotency_key(
+        headers
+            .get("idempotency-key")
+            .and_then(|value| value.to_str().ok()),
+    ) {
+        Ok(value) => value,
+        Err(code) => return api_error(StatusCode::BAD_REQUEST, code),
+    };
+    let reason = payload
+        .get("reason")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+
+    match SaleRepository::new(state.db.clone())
+        .void(
+            access.actor_id,
+            business_id,
+            access.organization_id,
+            sale_id,
+            idempotency_key,
+            reason,
+        )
+        .await
+    {
+        Ok(outcome) => {
+            let sale = if access.can_view_costs {
+                outcome.sale
+            } else {
+                redact_sale_costs(outcome.sale)
+            };
+            (
+                StatusCode::OK,
                 Json(json!({ "data": { "sale": sale, "replayed": outcome.replayed } })),
             )
                 .into_response()
@@ -243,6 +299,9 @@ fn sale_error_response(error: SaleRepositoryError) -> Response {
         }
         SaleRepositoryError::IdempotencyConflict => {
             api_error(StatusCode::CONFLICT, "idempotency_conflict")
+        }
+        SaleRepositoryError::AlreadyVoided => {
+            api_error(StatusCode::CONFLICT, "sale_already_voided")
         }
         SaleRepositoryError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
