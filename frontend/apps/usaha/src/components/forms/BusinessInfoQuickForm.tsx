@@ -178,37 +178,48 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
         </a>
       ) : null}
 
-      <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-        Deskripsi
-        <textarea
-          rows={4}
-          value={description}
-          onChange={event => setDescription(event.target.value)}
-          className="portal-textarea"
-        />
-      </label>
+      <details className="group rounded-[16px] border border-portal-line bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-bold text-portal-ink">
+          <span>Detail tambahan <span className="ml-2 text-xs font-normal text-portal-soft">Deskripsi & jam buka</span></span>
+          <span className="text-xs font-bold text-portal-forest group-open:hidden">Buka</span>
+          <span className="hidden text-xs font-bold text-portal-forest group-open:inline">Tutup</span>
+        </summary>
+        <div className="grid gap-4 border-t border-portal-line p-4">
+          <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+            Deskripsi usaha
+            <textarea
+              rows={3}
+              value={description}
+              onChange={event => setDescription(event.target.value)}
+              placeholder="Contoh: Jus segar, es teler, dan minuman untuk dibawa pulang."
+              className="portal-textarea"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+            Jam buka
+            <input
+              value={schedule}
+              onChange={event => setSchedule(event.target.value)}
+              placeholder="08.00 - 20.00"
+              className="portal-input"
+            />
+          </label>
+        </div>
+      </details>
 
       <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-        Jam buka
-        <input
-          value={schedule}
-          onChange={event => setSchedule(event.target.value)}
-          placeholder="08.00 - 20.00"
-          className="portal-input"
-        />
-      </label>
-
-      <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-        Alasan perubahan
+        Kenapa data ini diubah?
         <input
           value={reason}
           onChange={event => setReason(event.target.value)}
           maxLength={500}
           placeholder="Contoh: nomor usaha diperbarui"
           className="portal-input"
+          aria-describedby="business-info-change-reason-hint"
         />
-        <span className="text-[11px] font-normal text-portal-soft">
-          Disimpan di riwayat agar perubahan usaha mudah ditelusuri.
+        <span id="business-info-change-reason-hint" className="text-[11px] font-normal leading-5 text-portal-soft">
+          Wajib minimal 3 karakter. Catatan ini hanya untuk riwayat perubahan, bukan bagian dari profil publik.
         </span>
       </label>
 
