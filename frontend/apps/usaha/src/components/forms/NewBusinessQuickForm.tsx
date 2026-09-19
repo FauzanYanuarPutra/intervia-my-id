@@ -227,8 +227,6 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
           </label>
         </div>
       </section>
-
-      </section>
       <div className="flex justify-end">
         <button type="button" onClick={continueToLocation} className="portal-button-primary">
           Lanjut: lokasi <ArrowRight className="h-4 w-4" />
@@ -263,8 +261,6 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
           onLocationQueryChange={setLocationQuery}
           onPointChange={setPoint}
         />
-      </section>
-
       </section>
       <div className="flex flex-wrap justify-between gap-2">
         <button type="button" onClick={() => setStep(1)} className="portal-button-secondary">← Data dasar</button>
