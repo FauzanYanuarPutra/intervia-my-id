@@ -297,6 +297,35 @@ async fn ensure_account(
         .execute(&mut **tx)
         .await?;
 
+    // The platform owner bootstrap account is the root Google approver
+    // for both first-party backoffice surfaces.
+    if spec.slot == "admin" {
+        for (application, role_names) in [
+            ("crm", vec!["admin", "content_admin", "sales", "support"]),
+            ("cms", vec!["admin", "content_admin"]),
+        ] {
+            sqlx::query(
+                r#"
+                INSERT INTO core.backoffice_google_access (
+                    email, application, role_names, status, granted_by, created_at, updated_at
+                )
+                VALUES ($1, $2, $3, 'approved', $4, NOW(), NOW())
+                ON CONFLICT (lower(email::text), application) DO UPDATE
+                SET role_names = EXCLUDED.role_names,
+                    status = 'approved',
+                    granted_by = EXCLUDED.granted_by,
+                    updated_at = NOW()
+                "#,
+            )
+            .bind(&spec.email)
+            .bind(application)
+            .bind(role_names)
+            .bind(user_id)
+            .execute(&mut **tx)
+            .await?;
+        }
+    }
+
     sqlx::query(
         r#"
         INSERT INTO events.audit_logs (entity, action, actor_id, user_id, metadata, created_at)
