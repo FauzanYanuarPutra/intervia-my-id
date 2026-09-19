@@ -33,7 +33,7 @@ FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 INSERT INTO core.backoffice_google_access (email, application, role_names, status)
 VALUES
     ('lajukan001@gmail.com', 'crm',
-        ARRAY['admin','content_admin','sales','support'], 'approved'),
+        ARRAY['admin','sales','support'], 'approved'),
     ('lajukan001@gmail.com', 'cms',
         ARRAY['admin','content_admin'], 'approved')
 ON CONFLICT (lower(email::text), application) DO UPDATE
