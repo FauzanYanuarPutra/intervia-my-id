@@ -37,7 +37,7 @@ require(
 )
 
 require(
-    "services/marketplace_service/src/news.rs",
+    "services/news_service/src/news.rs",
     (
         '.route("/v1/news"',
         '/v1/news/editorial/metrics',
