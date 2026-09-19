@@ -665,6 +665,10 @@ services:
       NEXT_PUBLIC_APP_ENV: ${ENV:-development}
       NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8081}
+      INTERNAL_API_URL: http://identity_service:8080
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      CMS_GOOGLE_REDIRECT_URI: ${CMS_GOOGLE_REDIRECT_URI:-}
     expose: ["3001"]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
