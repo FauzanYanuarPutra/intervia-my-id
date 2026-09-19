@@ -120,3 +120,55 @@ pub const fn is_backoffice_eligible(
 ) -> bool {
     is_active && !is_banned && (email_verified || phone_verified)
 }
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackofficeApplication {
+    Crm,
+    Cms,
+}
+
+impl BackofficeApplication {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Crm => "crm",
+            Self::Cms => "cms",
+        }
+    }
+}
+
+pub fn parse_backoffice_application(raw: &str) -> Option<BackofficeApplication> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "crm" => Some(BackofficeApplication::Crm),
+        "cms" => Some(BackofficeApplication::Cms),
+        _ => None,
+    }
+}
+
+pub fn validate_application_roles(
+    application: BackofficeApplication,
+    roles: &[String],
+) -> Result<Vec<String>, BackofficeInputError> {
+    let mut seen = HashSet::new();
+    let mut normalized = Vec::new();
+    for raw in roles {
+        let role = raw.trim().to_ascii_lowercase();
+        let allowed = match application {
+            BackofficeApplication::Crm => matches!(
+                role.as_str(),
+                "admin" | "moderator" | "sales" | "support"
+            ),
+            BackofficeApplication::Cms => matches!(role.as_str(), "admin" | "content_admin"),
+        };
+        if !allowed {
+            return Err(BackofficeInputError::UnsupportedRole(role));
+        }
+        if seen.insert(role.clone()) {
+            normalized.push(role);
+        }
+    }
+    if normalized.is_empty() {
+        return Err(BackofficeInputError::MissingRoles);
+    }
+    Ok(normalized)
+}
