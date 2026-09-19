@@ -24,7 +24,7 @@ export default async function BusinessOperationsPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="operations">
-      <PageHeader eyebrow="Kelola usaha" title="Jam & operasional" description="Atur status buka dan selesaikan gangguan operasional yang paling penting." />
+      <PageHeader eyebrow="Kelola usaha" title="Jam & operasional" description="Atur buka, tutup, dan jam usaha." />
 
       <MetricStrip items={[
         { label: 'Status usaha', value: business.isOpen ? 'Buka' : 'Tutup' },
