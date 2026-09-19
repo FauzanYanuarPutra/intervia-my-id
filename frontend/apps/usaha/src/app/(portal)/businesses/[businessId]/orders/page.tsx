@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/portal/PageHeader';
 import { PortalShell } from '@/components/portal/PortalShell';
 import { WorkspaceTabs } from '@/components/portal/WorkspaceTabs';
 import { getCurrentWave2CashShift } from '@/lib/business-wave2-server';
-import { listControlOrders, listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
+import { listControlChannels, listControlOrders, listControlSales, type ControlSaleLine } from '@/lib/business-control-server';
 import { jakartaDateKey } from '@/lib/business-control/insights';
 import { hasPermission } from '@/lib/portal-logic';
 import { resolvePortalBusinessPageState } from '@/lib/portal-server';
@@ -72,10 +72,12 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
   const canViewTransactions = hasPermission(business, 'viewTransactions');
   const canCloseCashShift = hasPermission(business, 'closeCashShift');
   const canViewCosting = hasPermission(business, 'viewCosting');
-  const [sales, currentShift, canonicalOrders] = await Promise.all([
+  const canVoidSales = hasPermission(business, 'voidSales');
+  const [sales, currentShift, canonicalOrders, channels] = await Promise.all([
     canViewTransactions ? listControlSales(business.id) : Promise.resolve([]),
     canCloseCashShift ? getCurrentWave2CashShift(business.id) : Promise.resolve(null),
     canViewOrders ? listControlOrders(business.id) : Promise.resolve([]),
+    canCreateSales ? listControlChannels(business.id) : Promise.resolve([]),
   ]);
 
   const saleProducts = business.products.filter(product => product.status === 'live').map(product => ({
@@ -121,7 +123,12 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
       {activeView === 'kasir' && canCreateSales ? (
         <div className="space-y-3">
           {canCloseCashShift ? <CashShiftWorkspace businessId={business.id} initialShift={currentShift} /> : null}
-          <QuickSaleWorkspace businessId={business.id} products={saleProducts} defaultDate={jakartaDateKey()} />
+          <QuickSaleWorkspace
+            businessId={business.id}
+            products={saleProducts}
+            channels={channels.filter(channel => channel.enabled).map(channel => ({ value: channel.channel_key, label: channel.display_name }))}
+            defaultDate={jakartaDateKey()}
+          />
         </div>
       ) : null}
 
@@ -129,7 +136,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
         <SalesHistoryWorkspace
           businessId={business.id}
           sales={sales}
-          canVoidSales={canCreateSales}
+          canVoidSales={canVoidSales}
           canViewCosting={canViewCosting}
         />
       ) : null}
