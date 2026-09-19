@@ -534,7 +534,8 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
         icon: Users,
         value: counts.communityPosts,
         valueLabel: isId ? 'postingan' : 'posts',
-      },      {
+      },
+      {
         id: 'news',
         href: '/news/submissions',
         title: 'News',
