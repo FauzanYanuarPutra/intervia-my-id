@@ -59,7 +59,7 @@ export default async function BusinessTeamPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="team">
-      <PageHeader eyebrow="Kelola usaha" title="Tim & akses" description="Lihat siapa yang bisa masuk ke usaha ini, lalu undang orang baru hanya saat diperlukan." />
+      <PageHeader eyebrow="Kelola usaha" title="Tim & akses" description="Kelola anggota dan akses usaha." />
 
       {collaborationError ? (
         <div className="merchant-surface-bordered"><EmptyState title="Data tim belum bisa dimuat" description="Coba muat ulang setelah layanan akses kembali tersedia." icon={AlertTriangle} /></div>
@@ -68,7 +68,7 @@ export default async function BusinessTeamPage({ params }: PageProps) {
           <MetricStrip items={[
             { label: 'Anggota aktif', value: activeMembers },
             { label: 'Undangan menunggu', value: pendingInvites },
-            { label: 'Aksesmu', value: canManageRoles ? 'Pemilik' : canInvite ? 'Manager' : 'Pantau', note: canManageRoles ? 'Bisa mengatur peran' : canInvite ? 'Bisa mengundang anggota' : 'Lihat saja' },
+            { label: 'Aksesmu', value: canManageRoles ? 'Pemilik' : canInvite ? 'Manager' : 'Pantau', note: canManageRoles ? 'Bisa atur peran' : canInvite ? 'Bisa undang anggota' : 'Lihat saja' },
           ]} />
 
           <section>
@@ -85,13 +85,13 @@ export default async function BusinessTeamPage({ params }: PageProps) {
 
           {canInvite ? (
             <details id="undang" className="merchant-surface-bordered group">
-              <summary className="merchant-action-row cursor-pointer list-none"><span className="portal-icon-tile"><UserPlus className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Undang anggota</span><span className="block text-xs text-portal-soft">Cari akun Lajukan dan pilih perannya.</span></span><span className="text-xs font-black text-portal-forest">Buka</span></summary>
+              <summary className="merchant-action-row cursor-pointer list-none"><span className="portal-icon-tile"><UserPlus className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Undang anggota</span><span className="block text-xs text-portal-soft">Cari akun lalu pilih tugasnya.</span></span><span className="text-xs font-black text-portal-forest">Buka</span></summary>
               <div className="border-t border-portal-line/70 p-4 sm:p-5"><InviteMemberQuickForm businessId={business.id} /></div>
             </details>
           ) : null}
 
           <details className="merchant-surface-bordered group">
-            <summary className="merchant-action-row cursor-pointer list-none"><span className="portal-icon-tile"><ShieldCheck className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Riwayat undangan</span><span className="block text-xs text-portal-soft">Diterima, menunggu, ditolak, atau kedaluwarsa.</span></span><span className="text-xs font-black text-portal-forest">{invitations.length}</span></summary>
+            <summary className="merchant-action-row cursor-pointer list-none"><span className="portal-icon-tile"><ShieldCheck className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-black text-portal-ink">Riwayat undangan</span><span className="block text-xs text-portal-soft">Status semua undangan.</span></span><span className="text-xs font-black text-portal-forest">{invitations.length}</span></summary>
             <div className="border-t border-portal-line/70">
               {invitations.length ? invitations.map(invitation => (
                 <article key={invitation.id} className="merchant-action-row"><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-portal-ink">{invitation.inviteeUsername ? `@${invitation.inviteeUsername}` : 'Akun Lajukan'}</p><p className="mt-0.5 text-[11px] text-portal-soft">{organizationRoleLabel(invitation.role)} · {displayDate(invitation.createdAt)}</p></div><StatusBadge tone={invitation.status === 'accepted' ? 'success' : invitation.status === 'pending' ? 'warning' : 'neutral'}>{invitationStatusLabel(invitation.status)}</StatusBadge></article>
