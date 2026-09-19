@@ -7,6 +7,7 @@ mod commercial_core_routes;
 pub(crate) mod control;
 mod counterparty;
 pub(crate) mod domain;
+mod documents;
 mod event_outbox;
 mod execution_policy;
 mod finance_core;
