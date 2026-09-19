@@ -571,8 +571,6 @@ impl ProductRepository {
             }),
         )
         .await?;
-
-        .await?;
         transaction.commit().await?;
         Ok(row.into_product())
     }
