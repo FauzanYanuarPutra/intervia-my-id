@@ -5,6 +5,7 @@ mod availability_persistence_tests;
 mod commercial_core;
 mod commercial_core_routes;
 pub(crate) mod control;
+mod counterparty;
 pub(crate) mod domain;
 mod event_outbox;
 mod execution_policy;
