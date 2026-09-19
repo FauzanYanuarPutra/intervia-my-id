@@ -61,8 +61,10 @@ mod tests {
     #[test]
     fn convergence_boundary_keeps_one_owner() {
         let source = include_str!("event_outbox.rs");
-        assert_eq!(source.matches("INSERT INTO outbox_events").count(), 1);
-        assert_eq!(source.matches("INSERT INTO events.event_outbox").count(), 1);
+        let legacy_insert = ["INSERT INTO", "outbox_events"].join(" ");
+        let canonical_insert = ["INSERT INTO", "events.event_outbox"].join(" ");
+        assert_eq!(source.matches(&legacy_insert).count(), 1);
+        assert_eq!(source.matches(&canonical_insert).count(), 1);
         assert!(source.contains("ON CONFLICT (event_key)"));
     }
 }
