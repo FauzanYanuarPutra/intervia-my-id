@@ -107,7 +107,26 @@ function publicBusinessMetaText(store: DiscoveryStore, ...keys: string[]): strin
 }
 
 function publicBusinessHours(store: DiscoveryStore): string {
-  return publicBusinessMetaText(store, 'open_hours', 'opening_hours', 'business_hours', 'hours', 'schedule');
+  const direct = publicBusinessMetaText(store, 'open_hours', 'opening_hours', 'hours', 'schedule');
+  if (direct) return direct;
+  const value = store.metadata?.business_hours;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  const labels: Record<string, string> = {
+    monday: 'Sen', tuesday: 'Sel', wednesday: 'Rab', thursday: 'Kam',
+    friday: 'Jum', saturday: 'Sab', sunday: 'Min',
+  };
+  return Object.entries(value as Record<string, unknown>)
+    .map(([day, raw]) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return '';
+      const row = raw as Record<string, unknown>;
+      const closed = row.closed === true || row.is_open === false;
+      if (closed) return `${labels[day.toLowerCase()] || day}: Tutup`;
+      const open = typeof row.open === 'string' ? row.open : typeof row.open_at === 'string' ? row.open_at : '';
+      const close = typeof row.close === 'string' ? row.close : typeof row.close_at === 'string' ? row.close_at : '';
+      return open && close ? `${labels[day.toLowerCase()] || day}: ${open}–${close}` : '';
+    })
+    .filter(Boolean)
+    .join(' · ');
 }
 
 type DiscoveryScope = 'all' | 'registered' | 'references';
