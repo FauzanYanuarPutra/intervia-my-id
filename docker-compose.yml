@@ -378,6 +378,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/profile_db
       PROFILE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/profile_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8091"]
@@ -401,6 +402,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/media_db
       MEDIA_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/media_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8092"]
@@ -424,6 +426,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/news_db
       NEWS_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/news_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8093"]
@@ -447,6 +450,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/order_db
       ORDER_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/order_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8094"]
@@ -470,6 +474,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/payment_db
       PAYMENT_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/payment_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8095"]
@@ -493,6 +498,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/promotion_db
       PROMOTION_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/promotion_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8096"]
@@ -516,6 +522,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/crm_db
       CRM_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/crm_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8097"]
@@ -539,6 +546,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/communication_db
       COMMUNICATION_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/communication_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8098"]
@@ -562,6 +570,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/trust_db
       TRUST_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/trust_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
     depends_on:
       domain_db: { condition: service_healthy }
     expose: ["8099"]
