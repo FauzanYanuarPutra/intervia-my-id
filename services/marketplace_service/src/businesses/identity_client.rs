@@ -143,6 +143,31 @@ impl OrganizationSummary {
         )
     }
 
+    pub(crate) fn can_view_work(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin"
+                | "org_manager"
+                | "manager"
+                | "org_cashier"
+                | "cashier"
+                | "org_inventory"
+                | "inventory"
+                | "org_accounting"
+                | "accounting"
+                | "org_viewer"
+                | "viewer"
+                | "owner"
+        )
+    }
+
+    pub(crate) fn can_manage_work(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin" | "org_manager" | "manager" | "owner"
+        )
+    }
+
     pub(crate) fn can_use_business_advisor(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
