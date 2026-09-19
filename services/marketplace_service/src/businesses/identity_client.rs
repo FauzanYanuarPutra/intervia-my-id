@@ -14,6 +14,23 @@ impl OrganizationSummary {
         self.current_user_role == "org_admin"
     }
 
+    pub(crate) fn can_view_audit_history(&self) -> bool {
+        matches!(
+            self.current_user_role.as_str(),
+            "org_admin"
+                | "org_manager"
+                | "manager"
+                | "org_cashier"
+                | "cashier"
+                | "org_accounting"
+                | "accounting"
+                | "org_inventory"
+                | "inventory"
+                | "org_viewer"
+                | "viewer"
+        )
+    }
+
     pub(crate) fn can_manage_business_profile(&self) -> bool {
         matches!(
             self.current_user_role.as_str(),
