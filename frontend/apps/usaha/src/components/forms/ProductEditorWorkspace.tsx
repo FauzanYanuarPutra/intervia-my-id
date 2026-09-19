@@ -35,8 +35,8 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [statusReason, setStatusReason] = useState('');
-  const [changeReason, setChangeReason] = useState('');
-  const [stockReason, setStockReason] = useState('');
+  const [changeReason, setChangeReason] = useState('Pembaruan data produk');
+  const [stockReason, setStockReason] = useState('Penyesuaian stok');
   const busy = pendingAction !== null;
 
   async function request(path: string, body: Record<string, unknown>) {
@@ -91,7 +91,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
         stockUnit: stockUnit.trim(),
         reason: changeReason.trim(),
       });
-      setChangeReason('');
+      setChangeReason('Pembaruan data produk');
       setSuccess('Detail produk tersimpan.');
       refresh();
     } catch (value) {
@@ -118,7 +118,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
         stockCount: normalizedStock,
         reason: stockReason.trim(),
       });
-      setStockReason('');
+      setStockReason('Penyesuaian stok');
       setSuccess('Stok diperbarui.');
       refresh();
     } catch (value) {
@@ -211,7 +211,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
           </details>
 
           <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
-            Kenapa data ini diubah?
+            Catatan perubahan
             <input
               value={changeReason}
               onChange={event => setChangeReason(event.target.value)}
@@ -221,7 +221,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
               aria-describedby="product-change-reason-hint"
             />
             <span id="product-change-reason-hint" className="text-[11px] font-normal leading-5 text-portal-soft">
-              Wajib minimal 3 karakter untuk riwayat perubahan.
+              Sudah diisi otomatis. Ganti bila ada konteks khusus.
             </span>
           </label>
 
@@ -236,7 +236,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
               <input className="portal-input" type="number" min="0" step="any" value={stockCount} onChange={event => setStockCount(event.target.value)} placeholder="Kosong = belum diketahui" />
             </label>
             <label className="grid flex-1 gap-1.5 text-xs font-semibold text-portal-ink">
-              Alasan perubahan stok
+              Catatan stok
               <input
                 value={stockReason}
                 onChange={event => setStockReason(event.target.value)}
