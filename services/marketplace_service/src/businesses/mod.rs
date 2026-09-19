@@ -73,6 +73,8 @@ mod seller_orders_persistence_tests;
 mod service;
 pub(crate) mod settlement;
 mod stock_reservations;
+mod stock_transfer;
+mod stock_transfer_routes;
 pub(crate) mod transactions;
 mod wave2;
 #[cfg(test)]
@@ -89,6 +91,7 @@ pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
         .merge(governance_routes::router())
         .merge(ingredient_management_routes::router())
         .merge(inventory_routes::router())
+        .merge(stock_transfer_routes::router())
         .merge(sales_routes::router())
         .merge(public_commerce_routes::router())
         .merge(wave2_routes::router())

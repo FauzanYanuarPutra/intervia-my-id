@@ -660,7 +660,7 @@ impl InventoryRepository {
     }
 }
 
-async fn authorize_location_tx(
+pub(crate) async fn authorize_location_tx(
     tx: &mut Transaction<'_, Postgres>,
     actor_id: Uuid,
     business_id: Uuid,

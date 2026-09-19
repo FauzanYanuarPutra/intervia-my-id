@@ -110,6 +110,29 @@ def main() -> int:
         'Commercial Core V1', 'Party master', 'Payments and allocations',
         'append-only', 'receivable', 'payable',
     )
+    require(
+        'services/marketplace_service/migrations/20260919040000_stock_transfer_kernel_v1.up.sql',
+        'business_stock_transfers', 'transfer_out', 'transfer_in',
+        'ux_business_inventory_transfer_movement',
+        'ux_business_product_transfer_movement',
+    )
+    require(
+        'services/marketplace_service/src/businesses/stock_transfer.rs',
+        'StockTransferRepository', 'stock-transfer-item',
+        'marketplace.business.stock_transferred',
+        'transfer_ingredient_tx', 'transfer_product_tx',
+        'inventory.stock_transfer',
+    )
+    require(
+        'services/marketplace_service/src/businesses/stock_transfer_routes.rs',
+        '/v1/businesses/{business_id}/inventory/transfers',
+        'idempotency-key',
+    )
+    require(
+        'docs/architecture/stock-transfer-kernel.md',
+        'Stock Transfer Kernel V1', 'two active locations',
+        'transfer_out', 'transfer_in', 'append-only',
+    )
     require('frontend/apps/www/src/lib/usahaWorkspace.ts', 'NEXT_PUBLIC_USAHA_URL')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
     require('frontend/apps/www/src/app/[locale]/(shared)/usaha/dashboard/page.tsx', 'getUsahaWorkspaceUrl', 'redirect')
