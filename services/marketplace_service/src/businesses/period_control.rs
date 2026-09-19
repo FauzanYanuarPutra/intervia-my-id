@@ -204,14 +204,13 @@ impl PeriodControlRepository {
             return Err(PeriodControlError::Conflict);
         }
 
-        let existing =
-            sqlx::query_as::<_, AccountingPeriodRecord>(PERIOD_SELECT_EXACT_FOR_UPDATE)
-        .bind(business_id)
-        .bind(organization_id)
-        .bind(request.period_start)
-        .bind(request.period_end)
-        .fetch_optional(&mut *tx)
-        .await?;
+        let existing = sqlx::query_as::<_, AccountingPeriodRecord>(PERIOD_SELECT_EXACT_FOR_UPDATE)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(request.period_start)
+            .bind(request.period_end)
+            .fetch_optional(&mut *tx)
+            .await?;
 
         let record = match existing {
             Some(existing) if existing.status == "open" => {
@@ -452,14 +451,13 @@ impl PeriodControlRepository {
             });
         }
 
-        let existing =
-            sqlx::query_as::<_, DayCloseRecord>(DAY_SELECT_EXACT_FOR_UPDATE)
-                .bind(business_id)
-                .bind(organization_id)
-                .bind(request.location_id)
-                .bind(request.business_date)
-                .fetch_optional(&mut *tx)
-                .await?;
+        let existing = sqlx::query_as::<_, DayCloseRecord>(DAY_SELECT_EXACT_FOR_UPDATE)
+            .bind(business_id)
+            .bind(organization_id)
+            .bind(request.location_id)
+            .bind(request.business_date)
+            .fetch_optional(&mut *tx)
+            .await?;
 
         let record = match existing {
             Some(existing) if existing.status == "open" => {

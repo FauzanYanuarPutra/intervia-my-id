@@ -53,9 +53,7 @@ fn map_period_control_error(error: PeriodControlError) -> CommercialCoreError {
         PeriodControlError::PeriodClosed => {
             CommercialCoreError::Validation("business_period_closed")
         }
-        PeriodControlError::DayClosed => {
-            CommercialCoreError::Validation("business_day_closed")
-        }
+        PeriodControlError::DayClosed => CommercialCoreError::Validation("business_day_closed"),
         PeriodControlError::Validation(_)
         | PeriodControlError::NotFound
         | PeriodControlError::Conflict
