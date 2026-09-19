@@ -113,7 +113,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
       <PageHeader
         eyebrow="Jualan"
         title={activeView === 'kasir' ? 'Kasir' : activeView === 'transaksi' ? 'Transaksi' : 'Pesanan'}
-        description={activeView === 'kasir' ? 'Tap produk, cek pesanan di panel, lalu selesaikan pembayaran.' : activeView === 'transaksi' ? 'Riwayat penjualan yang sudah tercatat.' : 'Urutkan pesanan berdasarkan status dan lihat langkah operasional berikutnya.'}
+        description={activeView === 'kasir' ? 'Pilih produk dan bayar.' : activeView === 'transaksi' ? 'Riwayat penjualan.' : 'Kelola pesanan berdasarkan status.'}
       />
 
       <WorkspaceTabs items={tabs} activeId={activeView} ariaLabel="Mode jualan" />
