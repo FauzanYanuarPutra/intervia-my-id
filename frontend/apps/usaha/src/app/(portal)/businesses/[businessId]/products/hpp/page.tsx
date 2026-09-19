@@ -21,11 +21,11 @@ export default async function BusinessHppPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="products">
-      <SectionCard eyebrow="Barang" title="Modal produk" description="Pilih produk dan isi bahan yang dipakai. Lajukan menghitung modal per porsi, perkiraan untung, margin, dan berapa banyak yang masih bisa dibuat.">
+      <SectionCard eyebrow="Barang" title="Modal produk (HPP)" description="Pilih produk → isi bahan yang dipakai → cek hasil. Harga jual, stok, HPP, margin, dan kapasitas dihitung otomatis.">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href={`/businesses/${business.id}/products`} className="portal-button-secondary"><ArrowLeft className="h-4 w-4" /> Kembali ke produk</Link>
-            <div className="flex max-w-2xl gap-2 rounded-2xl border border-portal-line bg-white px-3 py-2 text-xs leading-5 text-portal-soft"><Info className="mt-0.5 h-4 w-4 shrink-0 text-portal-forest" /><p>Harga beli dan stok diambil otomatis dari <strong>Stok & Belanja</strong>. Kamu cukup mengatur bahan yang dipakai untuk satu produk.</p></div>
+            <div className="flex max-w-2xl gap-2 rounded-2xl border border-portal-line bg-white px-3 py-2 text-xs leading-5 text-portal-soft"><Info className="mt-0.5 h-4 w-4 shrink-0 text-portal-forest" /><p>Harga beli dan stok diambil otomatis dari <strong>Stok & Belanja</strong>. Di sini kamu cukup memilih produk dan memasukkan bahan yang benar-benar dipakai.</p></div>
           </div>
           {canView ? (
             <DurableHppWorkspace
