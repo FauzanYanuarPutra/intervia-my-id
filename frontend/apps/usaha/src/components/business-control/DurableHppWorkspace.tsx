@@ -133,7 +133,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const [pendingProductId, setPendingProductId] = useState<string | null>(null);
   const [retireOpen, setRetireOpen] = useState(false);
   const [retireReason, setRetireReason] = useState('');
-  const [changeReason, setChangeReason] = useState('');
+  const [changeReason, setChangeReason] = useState('Pembaruan resep');
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const product = products.find(item => item.id === productId) ?? products[0];
@@ -294,7 +294,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       return;
     }
     if (changeReason.trim().length < 3) {
-      setMessage('Tulis alasan perubahan resep minimal 3 karakter agar versi lama dan versi baru bisa ditelusuri.');
+      setMessage('Catatan sudah diisi otomatis. Ganti bila ada konteks khusus untuk riwayat.');
       return;
     }
     setSaving(true);
@@ -319,7 +319,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan resep.', response.status));
       setRecipeName(savedRecipeName);
       setInitialSignature(recipeSignature(savedRecipeName, servings, items));
-      setChangeReason('');
+      setChangeReason('Pembaruan resep');
       setStep(3);
       setMessage('Resep tersimpan. HPP, margin, stok, dan PIC perubahan tercatat di riwayat.');
       await refreshHistory();
@@ -529,7 +529,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             </div>
           </details>
           <label className="mb-2 block text-xs font-semibold text-portal-soft">
-            Alasan perubahan resep
+            Catatan perubahan resep
             <input
               value={changeReason}
               onChange={event => setChangeReason(event.target.value)}
