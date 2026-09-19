@@ -47,6 +47,27 @@ describe('Flow Usaha final contracts', () => {
     expect(configurator).toContain('Simpan perubahan');
   });
 
+  it('keeps the business shell and setup form guided instead of dumping every task at once', () => {
+    const guide = source('src/components/portal/UsahaFlowGuide.tsx');
+    const shell = source('src/components/portal/PortalShell.tsx');
+    const create = source('src/components/forms/NewBusinessQuickForm.tsx');
+    expect(guide).toContain('Cara kerja');
+    expect(guide).toContain('3 langkah inti');
+    expect(shell).toContain('UsahaFlowGuide');
+    expect(create).toContain('Langkah 1');
+    expect(create).toContain('Langkah 2');
+    expect(create).toContain('Lanjut: lokasi');
+  });
+
+  it('keeps HPP focused on one decision at a time', () => {
+    const hpp = source('src/components/business-control/DurableHppWorkspace.tsx');
+    expect(hpp).toContain('Pilih produk');
+    expect(hpp).toContain('Isi bahan');
+    expect(hpp).toContain('Cek & simpan');
+    expect(hpp).toContain('Lanjut: isi bahan');
+    expect(hpp).toContain('Lanjut: cek hasil');
+  });
+
   it('renders negative storefront price deltas with a minus sign', () => {
     const configurator = source('../www/src/app/[locale]/(shared)/toko/[slug]/StorefrontProductConfigurator.tsx');
     expect(configurator).toContain("option.price_delta_cents > 0 ? '+' : '-'");
