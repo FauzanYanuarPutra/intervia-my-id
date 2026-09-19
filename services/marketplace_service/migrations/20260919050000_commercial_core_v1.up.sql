@@ -11,7 +11,7 @@ ALTER TABLE business_document_sequences
   ADD CONSTRAINT business_document_sequences_document_type_check
   CHECK (document_type IN ('sale', 'purchase', 'payment'));
 
-CREATE TABLE business_parties (
+CREATE TABLE IF NOT EXISTS business_parties (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL,
   business_id UUID NOT NULL,
