@@ -126,7 +126,10 @@ CREATE TABLE business_payment_allocations (
     REFERENCES business_purchases(id, business_id, organization_id)
     ON DELETE RESTRICT,
   CONSTRAINT ck_business_payment_allocations_target
-    CHECK ((sale_id IS NOT NULL)::int + (purchase_id IS NOT NULL)::int = 1)
+    CHECK (
+      (sale_id IS NOT NULL AND purchase_id IS NULL)
+      OR (sale_id IS NULL AND purchase_id IS NOT NULL)
+    )
 );
 
 CREATE UNIQUE INDEX ux_business_payment_allocations_sale

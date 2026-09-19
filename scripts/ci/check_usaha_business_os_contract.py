@@ -87,7 +87,7 @@ def main() -> int:
         'sealed additive migration',
     )
     require(
-        'services/marketplace_service/migrations/20260919030000_commercial_core_v1.up.sql',
+        'services/marketplace_service/migrations/20260919050000_commercial_core_v1.up.sql',
         'business_parties', 'business_payments', 'business_payment_allocations',
         'business_sale_receivable_balances', 'business_purchase_payable_balances',
         'effect_multiplier', 'payment',
