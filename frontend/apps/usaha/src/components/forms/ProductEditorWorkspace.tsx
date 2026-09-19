@@ -34,6 +34,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   const [success, setSuccess] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [statusReason, setStatusReason] = useState('');
   const busy = pendingAction !== null;
 
   async function request(path: string, body: Record<string, unknown>) {
@@ -117,7 +118,10 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   async function saveStatus() {
     begin('status');
     try {
-      await request(`/api/businesses/${businessId}/products/${product.id}`, { status });
+      await request(`/api/businesses/${businessId}/products/${product.id}`, {
+        status,
+        reason: statusReason.trim(),
+      });
       setSuccess(status === 'live' ? 'Produk kembali aktif.' : 'Produk diarsipkan.');
       refresh();
     } catch (value) {
@@ -130,6 +134,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
 
   function requestStatusSave() {
     if (status === 'draft' && product.status === 'live') {
+      setStatusReason('');
       setArchiveConfirmOpen(true);
       return;
     }
@@ -234,10 +239,17 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
 
       <SensitiveActionConfirm
         open={archiveConfirmOpen}
-        title="Arsipkan produk?"
-        description={`${product.name} akan disembunyikan dari penjualan baru. Riwayat transaksi dan data produk tetap tersimpan, dan produk bisa diaktifkan kembali kapan saja.`}
-        confirmLabel="Arsipkan produk"
+        title={status === 'draft' ? 'Arsipkan produk?' : 'Aktifkan kembali produk?'}
+        description={
+          status === 'draft'
+            ? `${product.name} akan disembunyikan dari penjualan baru. Riwayat transaksi dan data produk tetap tersimpan.`
+            : `${product.name} akan kembali tersedia untuk penjualan baru. Pastikan harga, stok, dan data produk sudah benar.`
+        }
+        confirmLabel={status === 'draft' ? 'Arsipkan produk' : 'Aktifkan kembali'}
         busy={pendingAction === 'status'}
+        requireText
+        value={statusReason}
+        onValueChange={setStatusReason}
         onCancel={() => {
           if (!busy) setArchiveConfirmOpen(false);
         }}
