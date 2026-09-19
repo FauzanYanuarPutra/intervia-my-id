@@ -18,6 +18,7 @@ import {
   MapPinned,
   Menu,
   MessageCircle,
+  Newspaper,
   Package,
   Plus,
   Settings,
@@ -817,6 +818,13 @@ export function Header() {
           label: isId ? 'Jelajahi' : 'Explore',
           visual: { kind: 'icon', icon: LayoutGrid },
           matchers: ['/explore'],
+        },
+        {
+          href: '/news',
+          label: 'News',
+          caption: isId ? 'Berita ekonomi, bisnis, dan UMKM' : 'Economy, business, and SME news',
+          visual: { kind: 'icon', icon: Newspaper },
+          matchers: ['/news'],
         },
         {
           href: '/community',

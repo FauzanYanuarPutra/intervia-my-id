@@ -42,6 +42,7 @@ type MobileNavItem = {
   key:
     | 'home'
     | 'explore'
+    | 'news'
     | 'chat'
     | 'profile';
   label: string;
@@ -188,7 +189,7 @@ export default function ClientBottomNav() {
    * Bottom navigation.
    *
    * Keep the labels familiar:
-   * Beranda / Jelajahi / Chat / Akun
+   * Beranda / Jelajahi / News / Chat / Akun
    */
   const items =
     useMemo<MobileNavItem[]>(
@@ -215,6 +216,13 @@ export default function ClientBottomNav() {
           matchers: [
             '/explore',
           ],
+        },
+        {
+          key: 'news',
+          label: 'News',
+          href: '/news',
+          icon: Newspaper,
+          matchers: ['/news'],
         },
         {
           key: 'chat',
