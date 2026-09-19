@@ -57,6 +57,37 @@ function humanDate(value: string) {
   }).format(date);
 }
 
+function metadataRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function displayAuditValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    const rendered = JSON.stringify(value);
+    return rendered.length > 220 ? `${rendered.slice(0, 217)}…` : rendered;
+  } catch {
+    return 'Nilai kompleks';
+  }
+}
+
+function readChanges(event: AuditEvent) {
+  const before = metadataRecord(event.metadata?.before);
+  const after = metadataRecord(event.metadata?.after);
+  if (!before && !after) return [];
+  const keys = Array.from(new Set([
+    ...Object.keys(before ?? {}),
+    ...Object.keys(after ?? {}),
+  ]));
+  return keys
+    .map(key => ({ key, before: before?.[key], after: after?.[key] }))
+    .filter(item => JSON.stringify(item.before) !== JSON.stringify(item.after))
+    .slice(0, 24);
+}
+
 function readSummary(event: AuditEvent) {
   const summary = event.metadata?.summary;
   if (typeof summary === 'string' && summary.trim()) return summary.trim();
@@ -228,6 +259,7 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
             <div className="space-y-2">
               {grouped.map(event => {
                 const summary = readSummary(event);
+                const changes = readChanges(event);
                 return (
                   <article key={event.id} className="rounded-2xl border border-portal-line/80 bg-white p-4">
                     <div className="flex flex-wrap items-center gap-2">
@@ -243,6 +275,30 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
                     </p>
                     {summary ? (
                       <p className="mt-2 text-sm font-semibold leading-5 text-portal-ink">{summary}</p>
+                    ) : null}
+                    {changes.length ? (
+                      <details className="mt-3 rounded-xl border border-portal-line/70 bg-[#fafbf9] px-3 py-2.5">
+                        <summary className="cursor-pointer text-xs font-bold text-portal-ink">
+                          Lihat detail perubahan ({changes.length})
+                        </summary>
+                        <div className="mt-3 space-y-2">
+                          {changes.map(change => (
+                            <div key={change.key} className="rounded-xl border border-portal-line bg-white p-3">
+                              <p className="text-[10px] font-black uppercase tracking-wide text-portal-soft">{change.key.replaceAll('_', ' ')}</p>
+                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                <div>
+                                  <p className="text-[10px] font-bold text-portal-soft">Sebelum</p>
+                                  <p className="mt-0.5 break-words text-xs text-portal-ink">{displayAuditValue(change.before)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-bold text-portal-soft">Sesudah</p>
+                                  <p className="mt-0.5 break-words text-xs font-semibold text-portal-ink">{displayAuditValue(change.after)}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     ) : null}
                     {event.reason ? (
                       <div className="mt-3 rounded-xl bg-[#fafbf9] px-3 py-2.5">
