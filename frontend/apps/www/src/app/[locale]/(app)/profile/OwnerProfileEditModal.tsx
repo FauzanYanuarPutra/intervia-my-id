@@ -279,6 +279,7 @@ export function OwnerProfileEditModal({
   const [discoverable, setDiscoverable] = useState(true);
 
   const [phone, setPhone] = useState('');
+  const [publicContactEnabled, setPublicContactEnabled] = useState(false);
   const [verifiedPhoneDigits, setVerifiedPhoneDigits] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneOtp, setPhoneOtp] = useState('');
@@ -346,6 +347,7 @@ export function OwnerProfileEditModal({
     const profile = asRecord(baseMeta.profile);
     const media = asRecord(baseMeta.media);
     const verification = asRecord(detail.verification);
+    const publicContact = asRecord(baseMeta.public_contact);
 
     setFullName(asString(detail.full_name || detail.fullName));
     setUsername(normalizePublicProfileHandleInput(asString(detail.username)));
@@ -356,6 +358,16 @@ export function OwnerProfileEditModal({
 
     const nextPhone = asString(detail.phone);
     setPhone(nextPhone);
+    setPublicContactEnabled(
+      asBoolean(
+        publicContact.public_contact_enabled ??
+          publicContact.contact_public ??
+          publicContact.phone_public ??
+          publicContact.show_public_phone ??
+          publicContact.whatsapp_public,
+        false,
+      ),
+    );
     setVerifiedPhoneDigits(normalizePhoneDigits(nextPhone));
     setPhoneVerified(Boolean(detail.phone_verified ?? verification.phone_verified));
     setPhoneOtp('');
@@ -552,9 +564,18 @@ export function OwnerProfileEditModal({
   };
 
   const saveContact = async () => {
+    const nextPublicContact = {
+      ...asRecord(metadata.public_contact),
+      public_contact_enabled: publicContactEnabled && phoneDigits.length >= 8,
+      whatsapp: phoneDigits || undefined,
+    };
+
     await updateProfile({
       phone: phoneDigits || undefined,
-      metadata: { ...metadata },
+      metadata: {
+        ...metadata,
+        public_contact: nextPublicContact,
+      },
     });
   };
 
@@ -1075,6 +1096,38 @@ export function OwnerProfileEditModal({
                   </div>
                 ) : null}
                 {phoneOtpMessage ? <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">{phoneOtpMessage}</p> : null}
+                <button
+                  type="button"
+                  disabled={phoneDigits.length < 8}
+                  onClick={() => setPublicContactEnabled(value => !value)}
+                  className={cn(
+                    'mt-4 flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50',
+                    publicContactEnabled
+                      ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-500/10'
+                      : 'border-[color:var(--app-border)]',
+                  )}
+                >
+                  <Phone className="h-5 w-5 shrink-0 text-emerald-600" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {isId ? 'Tampilkan WhatsApp di profil publik' : 'Show WhatsApp on public profile'}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+                      {isId
+                        ? 'Aktifkan hanya kalau kamu ingin pengunjung melihat tombol WhatsApp.'
+                        : 'Only enable this when you want visitors to see a WhatsApp action.'}
+                    </span>
+                  </span>
+                  <span className={cn(
+                    'relative h-6 w-11 shrink-0 rounded-full transition',
+                    publicContactEnabled ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700',
+                  )}>
+                    <span className={cn(
+                      'absolute top-1 h-4 w-4 rounded-full bg-white shadow transition',
+                      publicContactEnabled ? 'left-6' : 'left-1',
+                    )} />
+                  </span>
+                </button>
               </div>
               <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--app-border)] p-4">
                 <BadgeCheck className={cn('h-5 w-5', emailVerified ? 'text-emerald-600' : 'text-[color:var(--app-text-soft)]')} />
