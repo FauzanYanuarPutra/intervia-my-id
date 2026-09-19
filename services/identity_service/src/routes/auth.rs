@@ -2112,6 +2112,9 @@ pub async fn oauth_google(
         }
     };
 
+    // Never create/link a backoffice account from an email collision alone.
+    // A Google identity must be the same provider subject, and the access policy
+    // above is authoritative for CRM/CMS.
     let user_row = match existing_identity_user_id {
         Some(user_id) => {
             match sqlx::query(
