@@ -18,7 +18,7 @@ BEGIN
       'business_hours', COALESCE(NEW.business_hours, '{}'::jsonb),
       'special_hours', COALESCE(NEW.special_hours, '[]'::jsonb),
       'operational_location_status', NEW.status,
-      'branch_kind', COALESCE(NEW.branch_kind, ''),
+      'branch_kind', COALESCE(NEW.metadata->>'branch_kind', ''),
       'province', COALESCE(NEW.province, ''),
       'district', COALESCE(NEW.district, ''),
       'postal_code', COALESCE(NEW.postal_code, ''),
@@ -36,7 +36,7 @@ DROP TRIGGER IF EXISTS trg_sync_public_umkm_store_from_business_location
 
 CREATE TRIGGER trg_sync_public_umkm_store_from_business_location
 AFTER INSERT OR UPDATE OF address, city, lat, lng, phone, business_hours,
-  special_hours, status, branch_kind, province, district, postal_code, metadata
+  special_hours, status, province, district, postal_code, metadata
 ON business_locations
 FOR EACH ROW
 WHEN (NEW.is_primary = TRUE AND NEW.public_visibility = TRUE)
@@ -53,7 +53,7 @@ SET
     'business_hours', COALESCE(l.business_hours, '{}'::jsonb),
     'special_hours', COALESCE(l.special_hours, '[]'::jsonb),
     'operational_location_status', l.status,
-    'branch_kind', COALESCE(l.branch_kind, ''),
+    'branch_kind', COALESCE(l.metadata->>'branch_kind', ''),
     'province', COALESCE(l.province, ''),
     'district', COALESCE(l.district, ''),
     'postal_code', COALESCE(l.postal_code, ''),

@@ -83,7 +83,7 @@ DROP TRIGGER IF EXISTS trg_sync_public_umkm_store_from_business_location
 CREATE TRIGGER trg_sync_public_umkm_store_from_business_location
 AFTER INSERT OR UPDATE OF
   address, city, lat, lng, phone, whatsapp, business_hours, special_hours,
-  status, branch_kind, province, district, postal_code, metadata,
+  status, province, district, postal_code, metadata,
   is_primary, public_visibility, location_type, name, timezone
 ON business_locations
 FOR EACH ROW
