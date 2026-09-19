@@ -3,7 +3,6 @@
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Expand, ImageIcon, PlayCircle, X } from 'lucide-react';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import type { CommunityFeedMedia } from '@/lib/community/types';
