@@ -124,7 +124,6 @@ pub const fn is_backoffice_eligible(
     is_active && !is_banned && (email_verified || phone_verified)
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackofficeApplication {
     Crm,
@@ -157,10 +156,9 @@ pub fn validate_application_roles(
     for raw in roles {
         let role = raw.trim().to_ascii_lowercase();
         let allowed = match application {
-            BackofficeApplication::Crm => matches!(
-                role.as_str(),
-                "admin" | "moderator" | "sales" | "support"
-            ),
+            BackofficeApplication::Crm => {
+                matches!(role.as_str(), "admin" | "moderator" | "sales" | "support")
+            }
             BackofficeApplication::Cms => matches!(role.as_str(), "admin" | "content_admin"),
         };
         if !allowed {
