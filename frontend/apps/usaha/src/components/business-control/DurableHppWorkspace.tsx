@@ -440,10 +440,10 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2 border-t border-portal-line pt-3 sm:grid-cols-5">
           <div><p className="text-[11px] text-portal-soft">HPP / porsi</p><p className="mt-0.5 text-lg font-black text-portal-ink">{money.format(recipeCost.totalCost)}</p></div>
-          <div><p className="text-[11px] text-portal-soft">Sisa kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Untung kotor</p><p className={`mt-0.5 text-lg font-black ${grossProfit >= 0 ? 'text-portal-forest' : 'text-red-700'}`}>{money.format(grossProfit)}</p></div>
           <div><p className="text-[11px] text-portal-soft">Margin</p><p className="mt-0.5 text-lg font-black text-portal-ink">{number.format(margin)}%</p></div>
           <div><p className="text-[11px] text-portal-soft">Bisa dibuat</p><p className="mt-0.5 text-lg font-black text-portal-ink">{items.length ? `${whole.format(capacity.capacity)} porsi` : '-'}</p></div>
-          <div><p className="text-[11px] text-portal-soft">Status</p><p className="mt-0.5 text-sm font-black text-portal-ink">{hasUnsavedChanges ? 'Belum disimpan' : 'Tersimpan'}</p></div>
+          <div><p className="text-[11px] text-portal-soft">Status resep</p><p className="mt-0.5 text-sm font-black text-portal-ink">{hasUnsavedChanges ? 'Belum disimpan' : 'Tersimpan'}</p></div>
         </div>
         {capacity.bottleneck ? <p className="mt-2 text-[11px] font-semibold text-amber-800">Stok terbatas oleh {capacity.bottleneck.name}.</p> : null}
       </section>
@@ -522,7 +522,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       <section className="portal-panel p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <details className="group">
-            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Pengaturan lanjutan</summary>
+            <summary className="cursor-pointer text-xs font-bold text-portal-soft">Detail tambahan</summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-portal-soft">Nama resep<input className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={recipeName} onChange={event => setRecipeName(event.target.value)} /></label>
               <label className="text-xs font-semibold text-portal-soft">1 kali resep menghasilkan berapa porsi?<input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={servings} onChange={event => setServings(Math.max(n(event.target.value), 0.0001))} /></label>
