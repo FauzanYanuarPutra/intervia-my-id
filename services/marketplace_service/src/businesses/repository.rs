@@ -215,6 +215,34 @@ impl BusinessRepository {
         .execute(&mut *transaction)
         .await?;
 
+        audit::record_tx(
+            &mut transaction,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "business.profile_updated",
+            "business",
+            Some(business_id),
+            Some("Profil, operasional, atau lokasi utama diperbarui"),
+            json!({
+                "summary": "Informasi utama usaha diperbarui",
+                "version_before": command.expected_version,
+                "version_after": new_version,
+                "changed_fields": [
+                    "name",
+                    "capability_key",
+                    "description",
+                    "category",
+                    "schedule",
+                    "location",
+                    "contact",
+                    "public_visibility"
+                ]
+            }),
+        )
+        .await?;
+
         let aggregate =
             load_aggregate_in_transaction(&mut transaction, business_id, organization_id).await?;
         transaction.commit().await?;
@@ -999,7 +1027,8 @@ const LOCATION_QUERY: &str = r#"
 
 #[cfg(test)]
 mod tests {
-    use super::{optional_complete_aggregate, RepositoryError};
+    use super::{
+    audit,optional_complete_aggregate, RepositoryError};
 
     #[test]
     fn complete_aggregate_is_returned() {
