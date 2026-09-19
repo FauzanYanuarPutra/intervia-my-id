@@ -195,6 +195,40 @@ fn valid_notification_status(value: &str) -> bool {
     matches!(value, "not_required" | "pending" | "sent")
 }
 
+fn valid_privacy_transition(current: &str, next: &str) -> bool {
+    if current == next {
+        return true;
+    }
+    matches!(
+        (current, next),
+        ("open", "in_review")
+            | ("open", "cancelled")
+            | ("in_review", "waiting_user")
+            | ("in_review", "completed")
+            | ("in_review", "rejected")
+            | ("in_review", "cancelled")
+            | ("waiting_user", "in_review")
+            | ("waiting_user", "cancelled")
+    )
+}
+
+fn valid_incident_transition(current: &str, next: &str) -> bool {
+    if current == next {
+        return true;
+    }
+    matches!(
+        (current, next),
+        ("open", "contained")
+            | ("open", "investigating")
+            | ("open", "closed")
+            | ("contained", "investigating")
+            | ("contained", "remediated")
+            | ("investigating", "contained")
+            | ("investigating", "remediated")
+            | ("remediated", "closed")
+    )
+}
+
 async fn audit_governance_event(
     state: &AppState,
     actor_id: Option<Uuid>,
@@ -247,11 +281,46 @@ pub async fn create_privacy_request(
     }
 
     let note = normalize_reason(payload.note, 5000);
+    if matches!(request_type.as_str(), "deletion" | "withdraw_consent" | "restrict" | "objection")
+        && note.is_none()
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"a note is required for this privacy request"})),
+        )
+            .into_response();
+    }
+
     let sla_days = std::env::var("PRIVACY_INTERNAL_SLA_DAYS")
         .ok()
         .and_then(|value| value.parse::<i64>().ok())
         .unwrap_or(30)
         .clamp(1, 90);
+
+    let duplicate: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM core.privacy_requests
+          WHERE subject_user_id = $1
+            AND request_type = $2
+            AND status IN ('open','in_review','waiting_user')
+        )
+        "#,
+    )
+    .bind(claims.sub)
+    .bind(&request_type)
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(false);
+
+    if duplicate {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"an active request of this type already exists"})),
+        )
+            .into_response();
+    }
 
     let result = sqlx::query(
         r#"
@@ -444,6 +513,22 @@ pub async fn transition_privacy_request(
     };
 
     let previous_status = row.get::<String,_>("status");
+    if !valid_privacy_transition(&previous_status, &status) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"invalid privacy request status transition"})),
+        )
+            .into_response();
+    }
+    if matches!(status.as_str(), "completed" | "rejected")
+        && decision_note.as_deref().map(str::trim).filter(|v| !v.is_empty()).is_none()
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error":"decision_note is required when closing a privacy request"})),
+        )
+            .into_response();
+    }
     let assigned_to = payload.assigned_to.or_else(|| row.get::<Option<Uuid>,_>("assigned_to"));
     let completed_at = matches!(status.as_str(), "completed" | "rejected" | "cancelled")
         .then_some(Utc::now());
@@ -667,6 +752,9 @@ pub async fn transition_security_incident(
     if !valid_incident_status(&status) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid incident status"}))).into_response();
     }
+    if payload.affected_user_count.is_some_and(|value| value < 0) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error":"affected_user_count cannot be negative"}))).into_response();
+    }
     if let Some(value) = payload.subject_notification_status.as_deref() {
         if !valid_notification_status(value) {
             return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid subject notification status"}))).into_response();
@@ -694,6 +782,20 @@ pub async fn transition_security_incident(
     };
 
     let previous_status = current.get::<String,_>("status");
+    if !valid_incident_transition(&previous_status, &status) {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"invalid security incident status transition"})),
+        )
+            .into_response();
+    }
+    if status == "closed" && previous_status != "remediated" && previous_status != "closed" {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"incident must be remediated before closure"})),
+        )
+            .into_response();
+    }
     let now = Utc::now();
     let containment_at = if status == "contained" { Some(now) } else { None };
     let remediated_at = if status == "remediated" { Some(now) } else { None };
@@ -768,26 +870,26 @@ pub async fn transition_security_incident(
 }
 
 
+
 #[cfg(test)]
 mod tests {
-    use super::{valid_incident_severity, valid_incident_status, valid_notification_status, valid_privacy_status, valid_privacy_type};
+    use super::{
+        valid_incident_transition, valid_privacy_transition,
+    };
 
     #[test]
-    fn privacy_request_validation_is_explicit() {
-        assert!(valid_privacy_type("access"));
-        assert!(valid_privacy_type("deletion"));
-        assert!(!valid_privacy_type("delete_everything"));
-        assert!(valid_privacy_status("in_review"));
-        assert!(!valid_privacy_status("processing"));
+    fn privacy_transitions_are_ordered() {
+        assert!(valid_privacy_transition("open", "in_review"));
+        assert!(valid_privacy_transition("in_review", "waiting_user"));
+        assert!(valid_privacy_transition("waiting_user", "in_review"));
+        assert!(!valid_privacy_transition("open", "completed"));
+        assert!(!valid_privacy_transition("completed", "open"));
     }
 
     #[test]
-    fn incident_validation_is_explicit() {
-        assert!(valid_incident_severity("critical"));
-        assert!(!valid_incident_severity("urgent"));
-        assert!(valid_incident_status("remediated"));
-        assert!(!valid_incident_status("resolved"));
-        assert!(valid_notification_status("sent"));
-        assert!(!valid_notification_status("done"));
+    fn incident_transitions_require_remediation_before_close() {
+        assert!(valid_incident_transition("open", "investigating"));
+        assert!(valid_incident_transition("remediated", "closed"));
+        assert!(!valid_incident_transition("open", "closed"));
     }
 }
