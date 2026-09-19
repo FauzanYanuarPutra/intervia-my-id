@@ -31,11 +31,36 @@ try {
         throw "Docker CLI tidak ditemukan. Install/start Docker Desktop atau Docker Engine terlebih dahulu."
     }
 
+    function Invoke-DockerNative {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string[]]$Arguments
+        )
+
+        # PowerShell 7.4+ can turn a non-zero native exit code into an
+        # ErrorRecord when $PSNativeCommandUseErrorActionPreference is enabled.
+        # The launcher intentionally needs the exit code/output as data so a
+        # broken Docker daemon can be diagnosed instead of terminating here.
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $Output = @(& docker @Arguments 2>&1)
+            [pscustomobject]@{
+                ExitCode = $LASTEXITCODE
+                Output = $Output
+            }
+        }
+        finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+        }
+    }
+
     $DockerDesktopCliAvailable = $false
     $DockerDesktopCommand = Get-Command "docker" -ErrorAction SilentlyContinue
+    $DesktopStatusProbe = $null
     if ($DockerDesktopCommand) {
-        & docker desktop status *> $null
-        $DockerDesktopCliAvailable = ($LASTEXITCODE -eq 0)
+        $DesktopStatusProbe = Invoke-DockerNative -Arguments @("desktop", "status", "--format", "json")
+        $DockerDesktopCliAvailable = ($DesktopStatusProbe.ExitCode -eq 0)
     }
 
     # Compose config validation does not guarantee that the Docker daemon is
@@ -44,9 +69,12 @@ try {
     # /_ping before a 22-image build is started.
     $EngineReady = $false
     $EngineProbeOutput = @()
+    $EngineExitCode = 1
     for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
-        $EngineProbeOutput = @(& docker info --format "{{json .ServerVersion}}" 2>&1)
-        if ($LASTEXITCODE -eq 0) {
+        $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+        $EngineProbeOutput = @($EngineProbe.Output)
+        $EngineExitCode = $EngineProbe.ExitCode
+        if ($EngineExitCode -eq 0) {
             $EngineReady = $true
             break
         }
@@ -59,8 +87,8 @@ try {
     if (-not $EngineReady) {
         $EngineDetails = ($EngineProbeOutput -join " ").Trim()
         $DesktopStatus = ""
-        if ($DockerDesktopCliAvailable) {
-            $DesktopStatus = (& docker desktop status --format json 2>&1 | Out-String).Trim()
+        if ($DesktopStatusProbe) {
+            $DesktopStatus = ($DesktopStatusProbe.Output -join " ").Trim()
         }
 
         $RecoveryHint = @(
@@ -178,139 +206,3 @@ try {
         "scripts/config/runtime_contract.py",
         "--model", "-",
         "--env-file", $EnvFile,
-        "--environment", $Environment
-    )
-    foreach ($RequestedProfile in $RequestedProfiles) {
-        $ValidatorArgs += @("--profile", $RequestedProfile)
-    }
-    $ComposeModel | & $PythonCommand.Source @ValidatorArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "Kontrak konfigurasi runtime tidak valid. Tidak ada container yang diubah."
-    }
-
-    if ($Fresh) {
-        Write-Host "Recreating containers for $Environment (volumes are preserved)..." -ForegroundColor Yellow
-        & docker @ComposeArgs down --remove-orphans
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-
-    if ($Down) {
-        & docker @ComposeArgs down --remove-orphans
-        exit $LASTEXITCODE
-    }
-
-    if ($Pull) {
-        & docker @ComposeArgs pull
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-
-    if ($Build) {
-        $BuildArgs = @("build")
-        if ($Services.Count -gt 0) {
-            $BuildArgs += $Services
-        }
-        & docker @ComposeArgs @BuildArgs
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-
-    $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
-    if ($Build) {
-        # A freshly built image must never keep running behind a stale container
-        # health state. Volumes remain preserved; only service containers are recreated.
-        $UpArgs += "--force-recreate"
-    }
-    if ($Services.Count -gt 0) {
-        $UpArgs += $Services
-    }
-
-    & docker @ComposeArgs @UpArgs
-    if ($LASTEXITCODE -ne 0) {
-        $UpExitCode = $LASTEXITCODE
-        Write-Warning "Runtime gagal menjadi healthy. Menampilkan status dan log core service untuk diagnosis."
-        & docker @ComposeArgs ps -a
-        & docker @ComposeArgs logs --no-color --tail 120 marketplace_service chat_service identity_service community_service
-        exit $UpExitCode
-    }
-
-    $LocalAiRequested = $RequestedProfiles -contains "local-ai"
-    $OllamaSelected = $Services.Count -eq 0 -or $Services -contains "ollama"
-    if ($Environment -eq "development" -and $LocalAiRequested -and $OllamaSelected) {
-        Write-Host "Verifying configured Ollama model..." -ForegroundColor Cyan
-        & $PythonCommand.Source "scripts/config/provision_ollama_models.py" "--env-file" $EnvFile
-        if ($LASTEXITCODE -ne 0) {
-            throw "Model Ollama gagal disiapkan. Periksa koneksi registry model dan kapasitas disk."
-        }
-    }
-
-    # Caddyfile is bind-mounted. `docker compose up` does not reload an already
-    # running Caddy process when only the mounted file content changes. Always
-    # validate and activate the current edge config after startup so forwarded
-    # scheme/host fixes cannot remain stale and cause HTTPS redirect loops.
-    $EdgeRequested =
-        ($RequestedProfiles -contains "edge") -or
-        ($RequestedProfiles -contains "tunnel")
-    $CaddySelected = $Services.Count -eq 0 -or $Services -contains "caddy"
-    if ($EdgeRequested -and $CaddySelected) {
-        Write-Host "Validating and reloading Caddy edge configuration..." -ForegroundColor Cyan
-
-        & docker @ComposeArgs exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-        if ($LASTEXITCODE -ne 0) {
-            & docker @ComposeArgs logs --no-color --tail 80 caddy
-            throw "Konfigurasi Caddy tidak valid. Edge configuration tidak direload."
-        }
-
-        & docker @ComposeArgs exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
-        if ($LASTEXITCODE -ne 0) {
-            & docker @ComposeArgs logs --no-color --tail 80 caddy
-            throw "Caddy gagal memuat konfigurasi edge terbaru."
-        }
-
-        Write-Host "Caddy edge configuration is active." -ForegroundColor Green
-    }
-
-    $TunnelRequested = $RequestedProfiles -contains "tunnel"
-    $TunnelSelected = $Services.Count -eq 0 -or $Services -contains "cloudflared"
-    if ($TunnelRequested -and $TunnelSelected) {
-        Write-Host "Checking Cloudflare Tunnel edge readiness..." -ForegroundColor Cyan
-        $TunnelReady = $false
-        $Deadline = (Get-Date).AddSeconds(60)
-
-        while ((Get-Date) -lt $Deadline) {
-            & $PythonCommand.Source "scripts/config/tunnel_readiness.py" "--env-file" $EnvFile
-            if ($LASTEXITCODE -eq 0) {
-                $TunnelReady = $true
-                break
-            }
-
-            # Staging/production may keep the metrics port private. In that
-            # case, an existing registration log is a compatibility fallback.
-            $TunnelLogs = & docker @ComposeArgs logs --no-color cloudflared 2>&1
-            if ($TunnelLogs -match "Registered tunnel connection") {
-                $TunnelReady = $true
-                Write-Host "Cloudflare Tunnel registration found in connector history (metrics endpoint not reachable from host)." -ForegroundColor Yellow
-                break
-            }
-
-            Start-Sleep -Seconds 2
-        }
-
-        if (-not $TunnelReady) {
-            & docker @ComposeArgs ps cloudflared
-            & docker @ComposeArgs logs --no-color --tail 80 cloudflared
-            throw "Cloudflare Tunnel tidak memiliki koneksi edge aktif dalam 60 detik. Periksa token, jaringan outbound, dan konfigurasi tunnel."
-        }
-        Write-Host "Cloudflare Tunnel is connected to the edge." -ForegroundColor Green
-    }
-
-    & docker @ComposeArgs ps
-    exit $LASTEXITCODE
-}
-finally {
-    if ($null -eq $PreviousComposeParallelLimit) {
-        Remove-Item Env:COMPOSE_PARALLEL_LIMIT -ErrorAction SilentlyContinue
-    }
-    else {
-        $env:COMPOSE_PARALLEL_LIMIT = $PreviousComposeParallelLimit
-    }
-    Pop-Location
-}
