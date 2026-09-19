@@ -18,5 +18,6 @@ pub use user_lookup::{
     discover_users, get_public_user_profile, get_user_by_email, get_user_by_phone,
 };
 pub use users::{
-    delete_me_account, get_me_profile, get_user_detail, list_users, update_me_profile,
+    delete_me_account, get_me_profile, get_user_detail, list_backoffice_google_access, list_users,
+    update_me_profile, upsert_backoffice_google_access,
 };
