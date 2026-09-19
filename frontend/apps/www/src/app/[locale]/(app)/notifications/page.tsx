@@ -14,6 +14,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   Sparkles,
+  XCircle,
 } from 'lucide-react';
 
 import { LocalizedLink as Link } from '@/components/ui-kit';
