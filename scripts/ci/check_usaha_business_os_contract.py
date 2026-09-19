@@ -20,7 +20,13 @@ def main() -> int:
     require('frontend/apps/usaha/src/app/api/auth/google/route.ts', 'accounts.google.com', 'google_oauth_state')
     require('frontend/apps/usaha/src/app/api/auth/google/callback/route.ts', '/auth/oauth/google', 'access_token', 'refresh_token')
     require('frontend/apps/usaha/src/lib/auth-session.ts', 'access_token', 'refresh_token', 'auth_present')
-    require('frontend/apps/usaha/src/lib/business-server.ts', '/organizations', '/v1/umkm/stores')
+    require(
+        'frontend/apps/usaha/src/lib/business-server.ts',
+        '/organizations',
+        '/v1/businesses/',
+        'metadataPatch',
+        'reason',
+    )
     forbid('frontend/apps/usaha/src/app/api/businesses/route.ts', 'portal-store', 'portal-session', 'createOrUpdateAccount')
     for legacy_auth in ['frontend/apps/usaha/src/app/api/auth/login/route.ts', 'frontend/apps/usaha/src/app/api/auth/register/route.ts']:
         require(legacy_auth, 'LEGACY_USAHA_AUTH_RETIRED')
