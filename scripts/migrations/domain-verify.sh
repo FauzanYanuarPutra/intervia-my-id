@@ -38,9 +38,11 @@ compare() {
 
 
 compare_columns() {
-  local label="$1" db="$2" table="$3"
+  local label="$1"
+  local db="$2"
+  local table="$3"
   local query
-  query="SELECT string_agg(format('%s|%s|%s|%s', column_name, data_type, is_nullable, COALESCE(udt_name,'')), ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema='public' AND table_name='\${table}'"
+  query="SELECT string_agg(format('%s|%s|%s|%s', column_name, data_type, is_nullable, COALESCE(udt_name,'')), ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema='public' AND table_name='$table'"
   compare "$label columns" "$db" "$query" "$query"
 }
 
@@ -50,6 +52,10 @@ verify_news() {
   compare "news article versions" news_db     "SELECT count(*) FROM news_article_versions v JOIN content_items c ON c.id=v.content_id WHERE c.content_type IN ('news','article')"     "SELECT count(*) FROM news_article_versions v JOIN content_items c ON c.id=v.content_id WHERE c.content_type IN ('news','article')"
   compare "news source references" news_db     "SELECT count(*) FROM news_source_references r JOIN content_items c ON c.id=r.content_id WHERE c.content_type IN ('news','article')"     "SELECT count(*) FROM news_source_references r JOIN content_items c ON c.id=r.content_id WHERE c.content_type IN ('news','article')"
   compare "news content monetary invariant" news_db     "SELECT count(*), COALESCE(sum(price_cents),0) FROM content_items WHERE content_type IN ('news','article')"     "SELECT count(*), COALESCE(sum(price_cents),0) FROM content_items WHERE content_type IN ('news','article')"
+  compare_columns "news content_items" news_db content_items
+  compare_columns "news article versions" news_db news_article_versions
+  compare_columns "news source references" news_db news_source_references
+  compare_columns "news source review events" news_db news_source_review_events
 }
 
 verify_order() {
@@ -58,6 +64,9 @@ verify_order() {
   compare "order transitions" order_db     "SELECT count(*) FROM order_state_transitions"     "SELECT count(*) FROM order_state_transitions"
   compare "order total invariant" order_db     "SELECT count(*), COALESCE(sum(total_amount),0) FROM orders"     "SELECT count(*), COALESCE(sum(total_amount),0) FROM orders"
   compare "order attribution invariant" order_db     "SELECT count(*), count(business_id), count(source_type), count(source_surface) FROM orders"     "SELECT count(*), count(business_id), count(source_type), count(source_surface) FROM orders"
+  compare_columns "order orders" order_db orders
+  compare_columns "order items" order_db order_items
+  compare_columns "order transitions" order_db order_state_transitions
 }
 
 verify_payment() {
@@ -69,30 +78,42 @@ verify_payment() {
   compare "payment disputes" payment_db     "SELECT count(*) FROM transaction_disputes"     "SELECT count(*) FROM transaction_disputes"
   compare "transaction amount invariant" payment_db     "SELECT count(*), COALESCE(sum(amount_cents),0) FROM transactions"     "SELECT count(*), COALESCE(sum(amount_cents),0) FROM transactions"
   compare "ledger amount invariant" payment_db     "SELECT count(*), COALESCE(sum(amount_cents),0) FROM wallet_ledger_entries"     "SELECT count(*), COALESCE(sum(amount_cents),0) FROM wallet_ledger_entries"
+  compare_columns "payment transactions" payment_db transactions
+  compare_columns "wallet accounts" payment_db wallet_accounts
+  compare_columns "wallet topups" payment_db wallet_topups
+  compare_columns "wallet ledger" payment_db wallet_ledger_entries
+  compare_columns "wallet withdrawals" payment_db wallet_withdrawals
+  compare_columns "payment disputes" payment_db transaction_disputes
 }
 
 verify_profile() {
   compare "profile businesses" profile_db     "SELECT count(*) FROM businesses"     "SELECT count(*) FROM businesses"
   compare "profile business locations" profile_db     "SELECT count(*) FROM business_locations"     "SELECT count(*) FROM business_locations"
   compare "profile business profiles" profile_db     "SELECT count(*) FROM business_profiles"     "SELECT count(*) FROM business_profiles"
+  compare_columns "profile businesses" profile_db businesses
+  compare_columns "profile business locations" profile_db business_locations
+  compare_columns "profile business profiles" profile_db business_profiles
 }
 
 verify_crm() {
   compare "crm leads" crm_db     "SELECT count(*) FROM crm_leads"     "SELECT count(*) FROM crm_leads"
+  compare_columns "crm leads" crm_db crm_leads
 }
 
 verify_communication() {
   compare "communication notifications" communication_db     "SELECT count(*) FROM user_notifications"     "SELECT count(*) FROM user_notifications"
+  compare_columns "communication notifications" communication_db user_notifications
 }
 
 verify_trust() {
   compare "trust profiles" trust_db     "SELECT count(*) FROM super_app_trust_profiles"     "SELECT count(*) FROM super_app_trust_profiles"
+  compare_columns "trust profiles" trust_db super_app_trust_profiles
 }
 
 verify_promotion() {
   compare "promotion banners" promotion_db     "SELECT count(*) FROM banners"     "SELECT count(*) FROM banners"
+  compare_columns "promotion banners" promotion_db banners
 }
-
 
 verify_support() {
   compare "support tickets" support_db     "SELECT count(*) FROM support_tickets"     "SELECT count(*) FROM support_tickets"
