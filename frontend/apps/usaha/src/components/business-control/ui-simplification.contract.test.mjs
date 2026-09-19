@@ -18,6 +18,9 @@ const cases = [
   ['ProfitExplainer.tsx', ['Untung usaha', 'Penjelasan kas & untung']],
 ];
 
+const ingredientSource = read('IngredientWorkspace.tsx');
+assert.ok(!ingredientSource.includes('<details open'), 'Tambah bahan sebaiknya tertutup sampai pengguna membutuhkannya.');
+
 for (const [file, needles] of cases) {
   const source = read(file);
   for (const needle of needles) {
