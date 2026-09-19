@@ -29,6 +29,7 @@ Base evidence: `services/marketplace_service/src/main.rs`.
 - CRM: `/v1/crm/leads`, `/v1/crm/leads/{id}`, `/v1/crm/activities`. Current API is lead/activity-only; target owner CRM APIs are documented in `architecture/crm-architecture.md`.
 - Super-app ops: `/v1/super-app/orders`, trust profiles.
 - CMS: `/v1/sectors`, `/v1/banners`.
+- News editorial CMS: `/v1/news/editorial/queue`, `/v1/news/editorial/metrics`, `/v1/news/{id}/editorial`, `/v1/news/{id}/editorial/edit`, `/v1/news/{id}/sources/{source_id}`, `/v1/news/{id}/moderate`. These flows own review, source verification, scheduling, correction/retraction, versioning, audit events and publication outbox.
 
 ## Community Service
 
