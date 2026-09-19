@@ -64,12 +64,12 @@ export function PortalShell({
         <div className="mt-3 border-t border-portal-line/70 pt-3">
           <Link href="/access" className="mb-1 flex min-h-10 items-center gap-3 rounded-xl px-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-forest">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-portal-mist text-portal-forest"><Bell className="h-4 w-4" /></span>
-            <span>Tim & Akses</span>
+            <span>Tim</span>
           </Link>
           {activeBusiness?.permissions.includes('manageSecurity') ? (
             <Link href={`/security?business=${activeBusiness.id}`} className="mb-1 flex min-h-10 items-center gap-3 rounded-xl px-2 text-sm font-semibold text-portal-soft transition hover:bg-portal-mist hover:text-portal-forest">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-portal-mist text-portal-forest"><LockKeyhole className="h-4 w-4" /></span>
-              <span>Keamanan akun</span>
+              <span>Keamanan</span>
             </Link>
           ) : null}
           {activeBusiness ? (
@@ -125,7 +125,7 @@ export function PortalShell({
         </header>
 
         <main id="portal-content" tabIndex={-1} className="portal-mobile-content-clearance mx-auto w-full max-w-[1600px] px-3 pt-3 outline-none sm:px-5 sm:pt-4 lg:px-6 lg:pb-8">
-          <div className="min-w-0 space-y-4">{activeBusiness && !accountPage ? <UsahaFlowGuide business={activeBusiness} currentSection={currentSection} /> : null}{children}</div>
+          <div className="min-w-0 space-y-4">{activeBusiness && !accountPage && currentSection === 'home' ? <UsahaFlowGuide business={activeBusiness} currentSection={currentSection} /> : null}{children}</div>
         </main>
       </div>
 
