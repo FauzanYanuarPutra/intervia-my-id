@@ -259,7 +259,10 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
                 type="button"
                 className="portal-button-secondary"
                 disabled={!canDeletePersisted || saving}
-                onClick={() => setPendingDelete(editing)}
+                onClick={() => {
+                  setChangeReason('');
+                  setPendingDelete(editing);
+                }}
                 title={!canDeletePersisted ? 'Usaha harus memiliki minimal satu lokasi.' : undefined}
               >
                 <Trash2 className="h-4 w-4" /> Hapus lokasi
@@ -308,7 +311,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
         onValueChange={setChangeReason}
         onCancel={() => {
           setPendingDelete(null);
-          setChangeReason('');
+          setChangeReason('Pembaruan lokasi');
         }}
         onConfirm={() => void confirmDelete()}
       />
