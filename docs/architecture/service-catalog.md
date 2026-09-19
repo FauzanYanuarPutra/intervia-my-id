@@ -19,3 +19,14 @@ Status: repo audit 2026-07-11.
 ## Service Boundary Rule
 
 Do not move data ownership across services just because a frontend route is convenient. Add BFF adapters in `frontend/www/src/app/api` only when the backend contract remains clear.
+
+
+## 2026 Domain Extraction Direction
+
+The catalog above describes the currently deployed service boundaries. The active 2026 target is documented in `domain-service-boundaries-2026-09.md` and is deliberately incremental.
+
+Marketplace is the current owner of several legacy domains that are being extracted. New work must not add another unrelated source-of-truth to Marketplace merely because its public UI happens to live in the marketplace surface.
+
+Target source-of-truth services include `news_service`, `order_service`, `payment_service`, `profile_service`, `media_service`, `promotion_service`, `crm_service`, `communication_service`, and `trust_service`. Search remains a rebuildable projection, not a transactional owner.
+
+No target service is considered implemented until it has its own migrations, API/event contract, tests, service-specific credentials, and a completed backfill/cutover plan.
