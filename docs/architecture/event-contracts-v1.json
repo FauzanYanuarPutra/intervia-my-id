@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "events": [
+    {"type":"profile.updated","producer":"profile_service","consumers":["marketplace_service","news_service","crm_service","search_service"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"media.created","producer":"media_service","consumers":["profile_service","marketplace_service","news_service","community_service","search_service"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"news.submitted","producer":"news_service","consumers":["communication_service","audit_service"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"news.published","producer":"news_service","consumers":["search_service","communication_service","analytics"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"listing.published","producer":"marketplace_service","consumers":["search_service","promotion_service"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"order.created","producer":"order_service","consumers":["payment_service","crm_service","analytics"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"payment.authorized","producer":"payment_service","consumers":["order_service","crm_service","audit_service"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"payment.succeeded","producer":"payment_service","consumers":["order_service","crm_service","communication_service","audit_service","analytics"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"payment.failed","producer":"payment_service","consumers":["order_service","crm_service","communication_service","analytics"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"payment.refunded","producer":"payment_service","consumers":["order_service","communication_service","audit_service"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"verification.completed","producer":"trust_service","consumers":["profile_service","marketplace_service","search_service"],"delivery":"rabbitmq","idempotent":true},
+    {"type":"crm.lead.created","producer":"crm_service","consumers":["analytics"],"delivery":"rabbitmq","idempotent":true}
+  ],
+  "rules": [
+    "Each event has a globally unique event_id.",
+    "Producer writes the domain fact and outbox record in one transaction.",
+    "Consumers persist inbox/idempotency state before irreversible side effects.",
+    "Consumers must tolerate duplicate delivery.",
+    "Event payloads must not contain secrets, raw identity documents, tokens, or payment credentials.",
+    "Breaking event shape changes require a new version."
+  ]
+}
