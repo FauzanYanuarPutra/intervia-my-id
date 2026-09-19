@@ -660,9 +660,9 @@ pub(crate) fn canonical_manual_finance_entry_type(
         "equipment_expense" | "equipment" => Ok("equipment_expense"),
         "capital_income" | "owner_capital" => Ok("capital_income"),
         "owner_draw" | "owner_drawing" => Ok("owner_draw"),
-        "receivable_payment" | "payable_payment" => Err(
-            ControlRepositoryError::Validation("document_payment_requires_payment_flow"),
-        ),
+        "receivable_payment" | "payable_payment" => Err(ControlRepositoryError::Validation(
+            "document_payment_requires_payment_flow",
+        )),
         "other_expense" => Ok("other_expense"),
         _ => Err(ControlRepositoryError::Validation(
             "finance_entry_type_invalid",
