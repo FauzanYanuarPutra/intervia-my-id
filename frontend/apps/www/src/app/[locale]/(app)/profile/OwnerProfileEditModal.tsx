@@ -1075,18 +1075,18 @@ export function OwnerProfileEditModal({
               <div className="border-b border-[color:var(--app-border)] px-4 py-4 sm:px-5">
                 <p className="text-sm leading-5 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Ubah bagian yang perlu saja. Kamu tidak perlu mengisi semuanya.'
+                    ? 'Ubah yang perlu saja. Tidak perlu isi semuanya.'
                     : 'Edit only what you need. You do not have to fill everything.'}
                 </p>
               </div>
-              <MenuRow icon={UserRound} title={sectionTitle.identity} description={isId ? 'Nama, username, lokasi, dan bio.' : 'Name, username, location, and bio.' complete={identityReady} onClick={() => goToSection('identity')} />
-              <MenuRow icon={Phone} title={sectionTitle.contact} description={isId ? 'WhatsApp dan email.' : 'WhatsApp and email.' complete={contactReady} onClick={() => goToSection('contact')} />
-              <MenuRow icon={Store} title={sectionTitle.business} description={isId ? 'Yang kamu jual atau kerjakan.' : 'What you sell or do.' complete={providerReady} onClick={() => goToSection('business')} />
-              <MenuRow icon={BriefcaseBusiness} title={sectionTitle.professional} description={isId ? 'Skill, bahasa, dan pengalaman.' : 'Skills, languages, and experience.' complete={professionalReady} onClick={() => goToSection('professional')} />
-              <MenuRow icon={Search} title={sectionTitle.buyer} description={isId ? 'Kebutuhan, budget, dan lokasi.' : 'Needs, budget, and location.' complete={buyerReady} onClick={() => goToSection('buyer')} />
-              <MenuRow icon={GraduationCap} title={sectionTitle.history} description={isId ? 'Pengalaman, pendidikan, dan sertifikat.' : 'Experience, education, and certificates.' complete={historyReady} onClick={() => goToSection('history')} />
-              <MenuRow icon={Images} title={sectionTitle.media} description={isId ? 'Foto dan dokumen pendukung.' : 'Photos and documents.' complete={mediaReady} onClick={() => goToSection('media')} />
-              <MenuRow icon={ShieldCheck} title={sectionTitle.trust} description={isId ? 'Cek identitas, email, dan WhatsApp.' : 'Check identity, email, and WhatsApp.' complete={identityVerified && contactReady} onClick={() => goToSection('trust')} />
+              <MenuRow icon={UserRound} title={sectionTitle.identity} description={isId ? 'Nama, username, lokasi, dan bio.' : 'Name, username, location, and bio.'} complete={identityReady} onClick={() => goToSection('identity')} />
+              <MenuRow icon={Phone} title={sectionTitle.contact} description={isId ? 'WhatsApp dan email.' : 'WhatsApp and email.'} complete={contactReady} onClick={() => goToSection('contact')} />
+              <MenuRow icon={Store} title={sectionTitle.business} description={isId ? 'Yang kamu jual atau kerjakan.' : 'What you sell or do.'} complete={providerReady} onClick={() => goToSection('business')} />
+              <MenuRow icon={BriefcaseBusiness} title={sectionTitle.professional} description={isId ? 'Skill, bahasa, dan pengalaman.' : 'Skills, languages, and experience.'} complete={professionalReady} onClick={() => goToSection('professional')} />
+              <MenuRow icon={Search} title={sectionTitle.buyer} description={isId ? 'Kebutuhan, budget, dan lokasi.' : 'Needs, budget, and location.'} complete={buyerReady} onClick={() => goToSection('buyer')} />
+              <MenuRow icon={GraduationCap} title={sectionTitle.history} description={isId ? 'Pengalaman, pendidikan, dan sertifikat.' : 'Experience, education, and certificates.'} complete={historyReady} onClick={() => goToSection('history')} />
+              <MenuRow icon={Images} title={sectionTitle.media} description={isId ? 'Foto dan dokumen pendukung.' : 'Photos and documents.'} complete={mediaReady} onClick={() => goToSection('media')} />
+              <MenuRow icon={ShieldCheck} title={sectionTitle.trust} description={isId ? 'Cek identitas, email, dan WhatsApp.' : 'Check identity, email, and WhatsApp.'} complete={identityVerified && contactReady} onClick={() => goToSection('trust')} />
             </div>
           ) : section === 'identity' ? (
             <div className="space-y-4 p-4 sm:p-5">
