@@ -766,3 +766,28 @@ pub async fn transition_security_incident(
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::{valid_incident_severity, valid_incident_status, valid_notification_status, valid_privacy_status, valid_privacy_type};
+
+    #[test]
+    fn privacy_request_validation_is_explicit() {
+        assert!(valid_privacy_type("access"));
+        assert!(valid_privacy_type("deletion"));
+        assert!(!valid_privacy_type("delete_everything"));
+        assert!(valid_privacy_status("in_review"));
+        assert!(!valid_privacy_status("processing"));
+    }
+
+    #[test]
+    fn incident_validation_is_explicit() {
+        assert!(valid_incident_severity("critical"));
+        assert!(!valid_incident_severity("urgent"));
+        assert!(valid_incident_status("remediated"));
+        assert!(!valid_incident_status("resolved"));
+        assert!(valid_notification_status("sent"));
+        assert!(!valid_notification_status("done"));
+    }
+}
