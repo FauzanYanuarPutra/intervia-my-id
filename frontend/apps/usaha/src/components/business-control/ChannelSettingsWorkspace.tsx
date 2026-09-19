@@ -228,7 +228,7 @@ function ChannelRow({
   onPatch: (key: string, field: keyof EditableChannel, value: string | number | boolean) => void;
   onSave: (row: EditableChannel, reason: string) => Promise<void>;
 }) {
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('Pembaruan harga online');
   const readiness = channelSimulationReadiness({ recordedPrice: price, hpp, canViewCosting });
   const businessSummary = useMemo(
     () => buildChannelBusinessSummary({
@@ -347,7 +347,7 @@ function ChannelRow({
           </details>
 
           <label className="text-xs font-semibold text-portal-soft sm:col-span-2 lg:col-span-3">
-            Alasan perubahan
+            Catatan perubahan
             <input
               value={reason}
               onChange={event => setReason(event.target.value)}
