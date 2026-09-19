@@ -84,7 +84,7 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
       <PageHeader
         eyebrow="Produk"
         title="Produk yang dijual"
-        description="Foto, nama, harga, dan stok dulu. Detail lain dibuka saat diperlukan."
+        description="Kelola produk, harga, dan stok."
         action={canManage && business.products.length && !selectedProduct ? (
           <a href="#tambah-produk" className="portal-button-primary">
             <Plus className="h-4 w-4" /> Produk
@@ -95,7 +95,7 @@ export default async function BusinessProductsPage({ params, searchParams }: Pag
       {primaryMode === 'add-product' ? (
         <section className="merchant-surface-bordered p-4 sm:p-5" id="tambah-produk">
           <h2 className="font-black text-portal-ink">Tambah produk pertama</h2>
-          <p className="mt-1 text-xs text-portal-soft">Nama dan harga wajib. Foto dan stok membantu saat jualan.</p>
+          <p className="mt-1 text-xs text-portal-soft">Isi nama dan harga dulu. Yang lain bisa menyusul.</p>
           <div className="mt-4"><ProductQuickForm businessId={business.id} /></div>
         </section>
       ) : null}

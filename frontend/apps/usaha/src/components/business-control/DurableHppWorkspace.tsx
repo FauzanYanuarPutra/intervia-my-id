@@ -416,6 +416,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       </section>
 
       {step === 1 ? (
+        <>
         <section className="portal-panel p-4 sm:p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
           <div>
@@ -450,9 +451,11 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         <div className="flex justify-end">
           <button type="button" onClick={() => setStep(2)} className="portal-button-primary">Lanjut: isi bahan <span aria-hidden="true">→</span></button>
         </div>
+        </>
       ) : null}
 
       {step === 2 ? (
+      <>
       <section className="portal-panel overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-portal-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div><h2 className="font-bold text-portal-ink">Rincian bahan</h2><p className="text-xs text-portal-soft">{product?.name} · {items.length} bahan · harga dan stok diambil otomatis</p></div>
@@ -516,6 +519,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
           <button type="button" onClick={() => setStep(1)} className="portal-button-secondary justify-center">← Produk</button>
           <button type="button" onClick={() => { const validation = validateBeforeSave(); if (validation) { setMessage(validation); return; } setMessage(''); setStep(3); }} className="portal-button-primary justify-center">Lanjut: cek hasil →</button>
         </div>
+      </>
       ) : null}
 
       {step === 3 ? (

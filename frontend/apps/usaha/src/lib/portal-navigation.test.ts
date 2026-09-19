@@ -77,9 +77,9 @@ describe('portal navigation', () => {
     expect(labels.finance).toBe('Uang');
     expect(labels.reports).toBe('Laporan');
     expect(labels.channels).toBe('Jual Online');
-    expect(labels.info).toBe('Pengaturan Usaha');
-    expect(labels.team).toBe('Tim & Akses');
-    expect(labels.buyerPage).toBe('Tampilan Toko');
+    expect(labels.info).toBe('Profil Usaha');
+    expect(labels.team).toBe('Tim');
+    expect(labels.buyerPage).toBe('Toko');
     expect(portalMenuNavigation(ownerPermissions).some(item => item.id === 'operations')).toBe(true);
   });
 });

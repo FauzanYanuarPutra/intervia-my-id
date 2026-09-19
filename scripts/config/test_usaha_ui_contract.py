@@ -78,7 +78,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
     def test_dashboard_is_action_first_without_card_soup(self) -> None:
         source = (USAHA / "app/page.tsx").read_text(encoding="utf-8")
         for marker in (
-            "PageHeader",
+            "BusinessProfileHero",
             "MetricStrip",
             "buildHomeDashboard",
             "Perlu perhatian",
@@ -87,7 +87,7 @@ class UsahaBusinessOsUiContractTests(unittest.TestCase):
             "merchant-action-money",
             "merchant-action-stock",
             " Jual",
-            "Catat pengeluaran",
+            "Pengeluaran",
             "Tambah stok",
         ):
             self.assertIn(marker, source)

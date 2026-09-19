@@ -43,17 +43,17 @@ const inventoryLabels: Record<InventoryTab, { eyebrow: string; title: string; de
   stock: {
     eyebrow: 'Stok',
     title: 'Stok produk',
-    description: 'Barang habis, tipis, atau belum cocok jumlahnya tetap tampil paling atas.',
+    description: 'Yang habis atau tipis muncul paling atas.',
   },
   purchase: {
     eyebrow: 'Belanja',
     title: 'Belanja & hasil',
-    description: 'Catat bahan yang dibeli dan hasil bersih yang benar-benar diterima tanpa mencampurnya dengan daftar stok.',
+    description: 'Catat belanja dan hasil yang diterima.',
   },
   ingredients: {
     eyebrow: 'Bahan',
     title: 'Bahan & kemasan',
-    description: 'Atur harga beli, satuan, stok minimum, supplier, dan data yang dipakai untuk HPP.',
+    description: 'Atur bahan, harga, satuan, dan stok minimum.',
   },
 };
 
