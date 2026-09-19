@@ -58,7 +58,7 @@ services:
       RUN_MIGRATIONS_ON_STARTUP: "false"
   crm_service:
     build: !reset null
-    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-crm:${IMAGE_TAG:?IMAGE_TAG is required}
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-crm-service:${IMAGE_TAG:?IMAGE_TAG is required}
     pull_policy: always
     environment:
       ENV: prod
