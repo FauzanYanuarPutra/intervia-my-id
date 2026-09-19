@@ -253,7 +253,7 @@ impl SaleRepository {
         let request_hash = canonical_request_hash(&json!({
             "business_id": business_id,
             "sale_id": sale_id,
-            "reason": reason,
+            "reason": &reason,
         }))
         .map_err(|_| SaleRepositoryError::Database)?;
 
@@ -1893,6 +1893,24 @@ pub(crate) fn calculate_line_snapshot(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn sale_void_reason_requires_actionable_context() {
+        assert!(matches!(
+            normalize_void_reason("  "),
+            Err(SaleRepositoryError::Validation("sale_void_reason_required"))
+        ));
+        assert_eq!(
+            normalize_void_reason("  Salah input jumlah  ").unwrap(),
+            "Salah input jumlah"
+        );
+        let long = "a".repeat(501);
+        assert!(matches!(
+            normalize_void_reason(&long),
+            Err(SaleRepositoryError::Validation("sale_void_reason_too_long"))
+        ));
+    }
+
+
     use super::*;
 
     #[test]
