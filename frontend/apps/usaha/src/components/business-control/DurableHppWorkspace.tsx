@@ -134,6 +134,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const [retireOpen, setRetireOpen] = useState(false);
   const [retireReason, setRetireReason] = useState('');
   const [changeReason, setChangeReason] = useState('');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const product = products.find(item => item.id === productId) ?? products[0];
   const sellingPrice = priceFromLabel(product?.priceLabel);
@@ -235,6 +236,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   function switchProduct(nextId: string) {
     setProductId(nextId);
     setProductSearch('');
+    setStep(1);
     setMessage('');
     setPendingProductId(null);
   }
@@ -318,6 +320,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       setRecipeName(savedRecipeName);
       setInitialSignature(recipeSignature(savedRecipeName, servings, items));
       setChangeReason('');
+      setStep(3);
       setMessage('Resep tersimpan. HPP, margin, stok, dan PIC perubahan tercatat di riwayat.');
       await refreshHistory();
     } catch (error) {
@@ -375,7 +378,45 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
 
   return (
     <div className="space-y-3 pb-20">
-      <section className="portal-panel p-4 sm:p-5">
+      <section className="portal-panel overflow-hidden">
+        <div className="grid grid-cols-3 border-b border-portal-line/70">
+          {[1, 2, 3].map(item => {
+            const disabled = item === 3 && !items.length;
+            return (
+              <button
+                key={item}
+                type="button"
+                disabled={disabled}
+                onClick={() => setStep(item as 1 | 2 | 3)}
+                className={`min-h-14 border-r border-portal-line/70 px-2 py-2 text-left last:border-r-0 disabled:cursor-not-allowed disabled:opacity-45 ${step === item ? 'bg-portal-mist/60' : 'bg-white hover:bg-[#fafbf9]'}`}
+              >
+                <span className="text-[10px] font-black uppercase tracking-[.1em] text-portal-soft">Langkah {item}</span>
+                <span className="mt-0.5 block text-xs font-black text-portal-ink">
+                  {item === 1 ? 'Pilih produk' : item === 2 ? 'Isi bahan' : 'Cek & simpan'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="min-w-0">
+            <p className="text-sm font-black text-portal-ink">
+              {step === 1 ? 'Mulai dari produk yang mau dihitung' : step === 2 ? 'Masukkan bahan yang benar-benar dipakai' : 'Cek hasil, lalu simpan'}
+            </p>
+            <p className="mt-0.5 text-xs leading-5 text-portal-soft">
+              {step === 1 ? 'Tidak perlu mengisi apa pun selain memilih produk.' : step === 2 ? 'Tambah bahan satu per satu. Jumlah per porsi dihitung otomatis.' : 'HPP, margin, kapasitas, dan riwayat terlihat sebelum perubahan disimpan.'}
+            </p>
+          </div>
+          {step > 1 ? (
+            <button type="button" onClick={() => setStep(1)} className="portal-button-ghost shrink-0">
+              Ganti produk
+            </button>
+          ) : null}
+        </div>
+      </section>
+
+      {step === 1 ? (
+        <section className="portal-panel p-4 sm:p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
           <div>
             <label className="text-xs font-semibold text-portal-soft" htmlFor="hpp-product-search">Cari produk</label>
@@ -406,7 +447,12 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         </div>
         {capacity.bottleneck ? <p className="mt-2 text-[11px] font-semibold text-amber-800">Stok terbatas oleh {capacity.bottleneck.name}.</p> : null}
       </section>
+        <div className="flex justify-end">
+          <button type="button" onClick={() => setStep(2)} className="portal-button-primary">Lanjut: isi bahan <span aria-hidden="true">→</span></button>
+        </div>
+      ) : null}
 
+      {step === 2 ? (
       <section className="portal-panel overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-portal-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div><h2 className="font-bold text-portal-ink">Rincian bahan</h2><p className="text-xs text-portal-soft">{product?.name} · {items.length} bahan · harga dan stok diambil otomatis</p></div>
@@ -466,7 +512,13 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
           </div>
         )}
       </section>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <button type="button" onClick={() => setStep(1)} className="portal-button-secondary justify-center">← Produk</button>
+          <button type="button" onClick={() => { const validation = validateBeforeSave(); if (validation) { setMessage(validation); return; } setMessage(''); setStep(3); }} className="portal-button-primary justify-center">Lanjut: cek hasil →</button>
+        </div>
+      ) : null}
 
+      {step === 3 ? (
       <section className="portal-panel p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <details className="group">
@@ -494,7 +546,9 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
         {capacity.bottleneck ? <p className="mt-3 flex gap-2 text-xs text-amber-800"><TriangleAlert className="h-4 w-4 shrink-0" /> Stok <strong>{capacity.bottleneck.name}</strong> membatasi produksi sekitar {whole.format(capacity.capacity)} porsi.</p> : null}
         {message ? <p role="status" className="mt-3 text-xs text-portal-soft">{message}</p> : null}
       </section>
+      ) : null}
 
+      {step === 3 ? (
       <section className="portal-panel p-4 sm:p-5">
         <div className="flex items-center gap-2"><History className="h-4 w-4 text-portal-forest" /><h2 className="font-bold text-portal-ink">Riwayat perubahan</h2></div>
         <div className="mt-3 divide-y divide-portal-line">
@@ -507,6 +561,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
           )) : <p className="py-3 text-xs text-portal-soft">Belum ada riwayat. Setelah resep disimpan atau dihapus, PIC dan alasannya tampil di sini.</p>}
         </div>
       </section>
+      ) : null}
 
       <SensitiveActionConfirm
         open={Boolean(pendingProductId)}
