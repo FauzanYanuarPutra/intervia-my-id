@@ -21,7 +21,12 @@ export async function PATCH(
   const { businessId, productId } = await context.params;
   try {
     const body = (await request.json()) as Record<string, unknown>;
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length < 3) {
+      return NextResponse.json({ error: 'Tulis catatan perubahan produk minimal 3 karakter.', code: 'product_change_reason_required' }, { status: 400 });
+    }
     await updateCanonicalProduct(businessId, productId, {
+      reason,
       name: optionalString(body.name),
       category: optionalString(body.category),
       priceLabel: optionalString(body.priceLabel),
