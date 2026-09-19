@@ -89,6 +89,11 @@ ON business_locations
 FOR EACH ROW
 EXECUTE FUNCTION sync_public_umkm_store_from_business_location();
 
+-- Keep trigger lookups bounded as the Business OS location table grows.
+CREATE INDEX IF NOT EXISTS idx_business_locations_public_primary_latest
+  ON business_locations (store_id, updated_at DESC, id DESC)
+  WHERE is_primary = TRUE AND public_visibility = TRUE;
+
 -- Rebuild the public projection from the canonical primary location now.
 WITH latest_public_locations AS (
   SELECT DISTINCT ON (bl.store_id)
