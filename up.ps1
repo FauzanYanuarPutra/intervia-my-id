@@ -9,7 +9,14 @@ param(
     [switch]$Build,
     [switch]$Pull,
     [switch]$Down,
-    [switch]$Fresh
+    [switch]$Fresh,
+
+    # Compose defaults to unlimited engine-call concurrency (-1). Lajukan has
+    # enough Rust/Next.js services that an unlimited build fan-out can overload
+    # Docker Desktop before BuildKit gets a chance to recover. Keep it
+    # configurable while defaulting to a stable local-development value.
+    [ValidateRange(1, 32)]
+    [int]$ParallelLimit = 4
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +29,63 @@ try {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw "Docker CLI tidak ditemukan. Install/start Docker Desktop atau Docker Engine terlebih dahulu."
     }
+
+    $DockerDesktopCliAvailable = $false
+    $DockerDesktopCommand = Get-Command "docker" -ErrorAction SilentlyContinue
+    if ($DockerDesktopCommand) {
+        & docker desktop status *> $null
+        $DockerDesktopCliAvailable = ($LASTEXITCODE -eq 0)
+    }
+
+    # Compose config validation does not guarantee that the Docker daemon is
+    # healthy. Probe the actual Engine API before resolving/building the stack.
+    # This catches Docker Desktop Linux-engine failures such as HTTP 500 on
+    # /_ping before a 22-image build is started.
+    $EngineReady = $false
+    $EngineProbeOutput = @()
+    for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
+        $EngineProbeOutput = @(& docker info --format "{{json .ServerVersion}}" 2>&1)
+        if ($LASTEXITCODE -eq 0) {
+            $EngineReady = $true
+            break
+        }
+
+        if ($Attempt -lt 6) {
+            Start-Sleep -Seconds 3
+        }
+    }
+
+    if (-not $EngineReady) {
+        $EngineDetails = ($EngineProbeOutput -join " ").Trim()
+        $DesktopStatus = ""
+        if ($DockerDesktopCliAvailable) {
+            $DesktopStatus = (& docker desktop status --format json 2>&1 | Out-String).Trim()
+        }
+
+        $RecoveryHint = @(
+            "Docker Engine tidak sehat/tidak merespons.",
+            "Status probe: $EngineDetails",
+            "Docker Desktop status: $DesktopStatus",
+            "",
+            "Perbaikan yang aman:",
+            "  1. docker desktop start",
+            "  2. docker info",
+            "  3. Jalankan lagi .\up.ps1 ... -Build",
+            "",
+            "Jika Docker Desktop terlihat Running tetapi docker info tetap HTTP 500:",
+            "  docker desktop restart",
+            "  docker info",
+            "",
+            "Jangan gunakan 'docker compose down -v' untuk masalah ini; volume database tidak perlu dihapus."
+        ) -join [Environment]::NewLine
+
+        throw $RecoveryHint
+    }
+
+    # Bound Compose's concurrent engine calls. This is intentionally set at
+    # the script level so every build/up/pull/config invocation uses the same
+    # stable concurrency budget without changing repository Compose semantics.
+    $env:COMPOSE_PARALLEL_LIMIT = $ParallelLimit.ToString()
 
     & docker compose version *> $null
     if ($LASTEXITCODE -ne 0) {
