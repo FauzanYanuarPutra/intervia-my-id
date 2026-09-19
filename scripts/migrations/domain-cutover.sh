@@ -11,7 +11,9 @@ set -Eeuo pipefail
 #   DOMAIN=all|news|order|payment|crm|communication|trust|profile|promotion
 #   DRY_RUN=true
 #   VERIFY_AFTER_BACKFILL=true
-#   TARGET_RESET=true   # destructive to target-only data; never use on a live owner
+#   TARGET_RESET=true
+#   CONFIRM_DESTRUCTIVE_RESET=I_UNDERSTAND_TARGET_RESET
+#   # TARGET_RESET is destructive to target-only data; never use on a live owner.
 
 required=(LEGACY_PGHOST LEGACY_PGPORT LEGACY_PGUSER LEGACY_PGPASSWORD TARGET_PGHOST TARGET_PGPORT TARGET_PGUSER TARGET_PGPASSWORD)
 for key in "${required[@]}"; do
@@ -22,6 +24,7 @@ DOMAIN="${DOMAIN:-all}"
 DRY_RUN="${DRY_RUN:-false}"
 VERIFY_AFTER_BACKFILL="${VERIFY_AFTER_BACKFILL:-true}"
 TARGET_RESET="${TARGET_RESET:-false}"
+CONFIRM_DESTRUCTIVE_RESET="${CONFIRM_DESTRUCTIVE_RESET:-}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 ensure_target_db() {
@@ -38,6 +41,10 @@ ensure_target_db() {
 reset_target_tables() {
   local db="$1"
   [[ "$TARGET_RESET" == "true" ]] || return 0
+  [[ "$CONFIRM_DESTRUCTIVE_RESET" == "I_UNDERSTAND_TARGET_RESET" ]] || {
+    echo "TARGET_RESET=true requires CONFIRM_DESTRUCTIVE_RESET=I_UNDERSTAND_TARGET_RESET" >&2
+    exit 3
+  }
   echo "==> TARGET_RESET=true: clearing target-only rows in $db"
   PGPASSWORD="$TARGET_PGPASSWORD" psql -X -v ON_ERROR_STOP=1 -h "$TARGET_PGHOST" -p "$TARGET_PGPORT" -U "$TARGET_PGUSER" -d "$db" -c "DO \$\$ DECLARE r RECORD; BEGIN FOR r IN SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> 'service_meta' LOOP EXECUTE format('TRUNCATE TABLE public.%I CASCADE',r.tablename); END LOOP; END \$\$;"
 }
