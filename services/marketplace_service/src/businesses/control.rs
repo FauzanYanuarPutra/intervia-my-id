@@ -530,8 +530,8 @@ impl ControlRepository {
             r#"
             INSERT INTO business_finance_entries (
               business_id, organization_id, entry_type, account_key, amount,
-              occurred_on, note, channel_key, created_by_user_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+              effect_sign, occurred_on, note, channel_key, created_by_user_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
             RETURNING id, business_id, organization_id, entry_type, account_key,
               amount, effect_sign, occurred_on, note, channel_key, created_by_user_id,
               created_at, updated_at
@@ -542,6 +542,7 @@ impl ControlRepository {
         .bind(entry_type)
         .bind(normalize(&request.account_key))
         .bind(request.amount)
+        .bind(request.effect_sign)
         .bind(request.occurred_on)
         .bind(normalize(&request.note))
         .bind(
