@@ -222,6 +222,60 @@ services:
   # ---------------------------------------------------------------------------
   # CORE BACKEND SERVICES
   # ---------------------------------------------------------------------------
+  support_service:
+    <<: *service-defaults
+    build:
+      context: ./services/support_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8100"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/support_db
+      SUPPORT_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/support_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+      DOMAIN_RUNTIME_MODE: ${DOMAIN_RUNTIME_MODE:-compatibility}
+      LEGACY_PROXY_ENABLED: ${LEGACY_PROXY_ENABLED:-true}
+      LEGACY_PROXY_TIMEOUT_MS: ${LEGACY_PROXY_TIMEOUT_MS:-5000}
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8100"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8100/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  review_service:
+    <<: *service-defaults
+    build:
+      context: ./services/review_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8101"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/review_db
+      REVIEW_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/review_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+      DOMAIN_RUNTIME_MODE: ${DOMAIN_RUNTIME_MODE:-compatibility}
+      LEGACY_PROXY_ENABLED: ${LEGACY_PROXY_ENABLED:-true}
+      LEGACY_PROXY_TIMEOUT_MS: ${LEGACY_PROXY_TIMEOUT_MS:-5000}
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8101"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8101/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
   identity_service:
     <<: *service-defaults
     build:
