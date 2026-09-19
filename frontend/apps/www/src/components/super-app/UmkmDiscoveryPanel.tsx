@@ -96,6 +96,20 @@ type StoresResponse = {
 const LIST_PAGE_SIZE = 10;
 const REPORT_EMAIL = 'support@lajukan.com';
 
+function publicBusinessMetaText(store: DiscoveryStore, ...keys: string[]): string {
+  const metadata = store.metadata || {};
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  }
+  return '';
+}
+
+function publicBusinessHours(store: DiscoveryStore): string {
+  return publicBusinessMetaText(store, 'open_hours', 'opening_hours', 'business_hours', 'hours', 'schedule');
+}
+
 type DiscoveryScope = 'all' | 'registered' | 'references';
 
 function readDiscoveryScope(value: string | null): DiscoveryScope {
@@ -2202,6 +2216,15 @@ export function UmkmDiscoveryPanel({
                         </div>
                         <div className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
                           <Clock3 className="mt-0.5 h-4 w-4 text-[color:var(--app-accent)]" />
+                          <span className="min-w-0">
+                            <span className="font-bold">{isId ? 'Jam operasional' : 'Opening hours'}</span>
+                            <span className="block truncate text-[color:var(--app-text-soft)]">
+                              {publicBusinessHours(selectedPlace.store) || (isId ? 'Belum dipublikasikan usaha' : 'Not published by the business yet')}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
+                          <Clock3 className="mt-0.5 h-4 w-4 text-[color:var(--app-accent)]" />
                           <span>
                             <span
                               className={
@@ -2224,6 +2247,16 @@ export function UmkmDiscoveryPanel({
                             </span>
                           </span>
                         </div>
+                        {[
+                          { label: isId ? 'Area layanan' : 'Service area', value: publicBusinessMetaText(selectedPlace.store, 'service_area', 'service_areas_text', 'delivery_area', 'coverage_area') },
+                          { label: isId ? 'Cara melayani' : 'How it serves', value: publicBusinessMetaText(selectedPlace.store, 'fulfillment_notes', 'service_options', 'order_methods', 'delivery_methods') },
+                          { label: isId ? 'Tentang usaha' : 'About', value: selectedPlace.store.description || publicBusinessMetaText(selectedPlace.store, 'catalog_focus', 'main_offering') },
+                        ].filter(item => item.value).map(item => (
+                          <div key={item.label} className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
+                            <Store className="mt-0.5 h-4 w-4 text-[color:var(--app-accent)]" />
+                            <span className="min-w-0"><span className="font-bold">{item.label}</span><span className="block line-clamp-2 text-[color:var(--app-text-soft)]">{item.value}</span></span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ) : null}
