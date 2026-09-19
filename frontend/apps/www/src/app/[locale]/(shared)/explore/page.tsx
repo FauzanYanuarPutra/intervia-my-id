@@ -276,7 +276,7 @@ export default async function ExplorePage({
 
     description: isId
       ? 'Pusat penemuan produk, jasa, kebutuhan, komunitas, video, dan referensi usaha di Lajukan.'
-      : 'Discovery hub for products, services, needs, communities, videos, and business references on Lajukan.',
+      : 'Discovery hub for products, services, needs, communities, videos, news, and business references on Lajukan.',
 
     url:
       `https://www.lajukan.com/${locale}/explore`,
