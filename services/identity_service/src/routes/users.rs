@@ -160,6 +160,214 @@ fn has_permission(perms: &[String], required: &str) -> bool {
     perms.iter().any(|p| p == required)
 }
 
+fn has_role(roles: &[String], required: &str) -> bool {
+    roles.iter().any(|role| role.eq_ignore_ascii_case(required))
+}
+
+fn normalize_backoffice_email(raw: &str) -> Option<String> {
+    let email = raw.trim().to_ascii_lowercase();
+    let mut parts = email.split('@');
+    let local = parts.next().unwrap_or_default();
+    let domain = parts.next().unwrap_or_default();
+    if parts.next().is_some()
+        || local.is_empty()
+        || domain.len() < 3
+        || !domain.contains('.')
+        || email.chars().any(char::is_whitespace)
+    {
+        return None;
+    }
+    Some(email)
+}
+
+fn normalize_google_backoffice_application(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "crm" => Some("crm"),
+        "cms" => Some("cms"),
+        _ => None,
+    }
+}
+
+fn normalize_google_backoffice_roles(application: &str, values: &[String]) -> Vec<String> {
+    let defaults: &[&str] = match application {
+        "cms" => &["content_admin"],
+        _ => &["sales"],
+    };
+    let mut roles = Vec::new();
+    for value in values {
+        let role = value.trim().to_ascii_lowercase();
+        if matches!(role.as_str(), "admin" | "content_admin" | "sales" | "support")
+            && !roles.contains(&role)
+        {
+            roles.push(role);
+        }
+    }
+    if roles.is_empty() {
+        defaults.iter().map(|value| (*value).to_string()).collect()
+    } else {
+        roles
+    }
+}
+
+async fn require_super_admin(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+) -> Result<AccessClaims, StatusCode> {
+    let token = extract_bearer_token(headers).ok_or(StatusCode::UNAUTHORIZED)?;
+    let claims = decode_access_token(&state.config.jwt_secret, &token)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    if !has_role(&claims.roles, "super_admin") {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(claims)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpsertBackofficeGoogleAccessRequest {
+    pub email: String,
+    pub application: String,
+    #[serde(default)]
+    pub role_names: Vec<String>,
+    #[serde(default = "default_google_access_status")]
+    pub status: String,
+}
+
+fn default_google_access_status() -> String {
+    "approved".to_string()
+}
+
+pub async fn list_backoffice_google_access(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if require_super_admin(&state, &headers).await.is_err() {
+        let status = match require_super_admin(&state, &headers).await {
+            Err(value) => value,
+            Ok(_) => StatusCode::OK,
+        };
+        return (status, Json(json!({"error":"backoffice owner access required"}))).into_response();
+    }
+
+    match sqlx::query(
+        r#"
+        SELECT id, email::text AS email, application, role_names, status, granted_by, created_at, updated_at, last_login_at
+        FROM core.backoffice_google_access
+        ORDER BY application, lower(email::text)
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => {
+            let data: Vec<Value> = rows
+                .into_iter()
+                .map(|row| json!({
+                    "id": row.get::<Uuid, _>("id"),
+                    "email": row.get::<String, _>("email"),
+                    "application": row.get::<String, _>("application"),
+                    "role_names": row.get::<Vec<String>, _>("role_names"),
+                    "status": row.get::<String, _>("status"),
+                    "granted_by": row.get::<Option<Uuid>, _>("granted_by"),
+                    "created_at": row.get::<DateTime<Utc>, _>("created_at"),
+                    "updated_at": row.get::<DateTime<Utc>, _>("updated_at"),
+                    "last_login_at": row.get::<Option<DateTime<Utc>>, _>("last_login_at")
+                }))
+                .collect();
+            (StatusCode::OK, Json(json!({"data": data}))).into_response()
+        }
+        Err(error) => {
+            tracing::error!("list backoffice google access failed: {:?}", error);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+        }
+    }
+}
+
+pub async fn upsert_backoffice_google_access(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<UpsertBackofficeGoogleAccessRequest>,
+) -> impl IntoResponse {
+    let claims = match require_super_admin(&state, &headers).await {
+        Ok(value) => value,
+        Err(status) => {
+            return (status, Json(json!({"error":"backoffice owner access required"}))).into_response();
+        }
+    };
+
+    let email = match normalize_backoffice_email(&payload.email) {
+        Some(value) => value,
+        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid email"}))).into_response(),
+    };
+    let application = match normalize_google_backoffice_application(&payload.application) {
+        Some(value) => value,
+        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"application must be crm or cms"}))).into_response(),
+    };
+    let status = match payload.status.trim().to_ascii_lowercase().as_str() {
+        "pending" | "approved" | "revoked" => payload.status.trim().to_ascii_lowercase(),
+        _ => return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid status"}))).into_response(),
+    };
+    let role_names = normalize_google_backoffice_roles(application, &payload.role_names);
+
+    let result = sqlx::query(
+        r#"
+        INSERT INTO core.backoffice_google_access (
+            email, application, role_names, status, granted_by, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        ON CONFLICT (lower(email::text), application) DO UPDATE
+        SET role_names = EXCLUDED.role_names,
+            status = EXCLUDED.status,
+            granted_by = EXCLUDED.granted_by,
+            updated_at = NOW()
+        RETURNING id, email::text AS email, application, role_names, status
+        "#,
+    )
+    .bind(&email)
+    .bind(application)
+    .bind(&role_names)
+    .bind(&status)
+    .bind(Uuid::parse_str(&claims.sub).ok())
+    .fetch_one(&state.db)
+    .await;
+
+    match result {
+        Ok(row) => {
+            let actor_id = Uuid::parse_str(&claims.sub).ok();
+            let _ = sqlx::query(
+                r#"
+                INSERT INTO events.audit_logs (entity, action, actor_id, user_id, metadata, created_at)
+                VALUES ('backoffice_google_access', 'backoffice.google_access.updated', $1, NULL, $2, NOW())
+                "#,
+            )
+            .bind(actor_id)
+            .bind(json!({
+                "email": email,
+                "application": application,
+                "role_names": role_names,
+                "status": status
+            }))
+            .execute(&state.db)
+            .await;
+
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "id": row.get::<Uuid, _>("id"),
+                    "email": row.get::<String, _>("email"),
+                    "application": row.get::<String, _>("application"),
+                    "role_names": row.get::<Vec<String>, _>("role_names"),
+                    "status": row.get::<String, _>("status")
+                })),
+            ).into_response()
+        }
+        Err(error) => {
+            tracing::error!("upsert backoffice google access failed: {:?}", error);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+        }
+    }
+}
+
+
 fn normalize_optional_text(value: Option<String>) -> Option<String> {
     value.and_then(|v| {
         let trimmed = v.trim();
