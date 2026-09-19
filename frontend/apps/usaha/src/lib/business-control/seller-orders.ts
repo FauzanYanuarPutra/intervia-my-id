@@ -47,6 +47,8 @@ export type SellerOrderAggregate = {
   order: SellerOrderRecord;
   items: SellerOrderItem[];
   allowed_next_statuses: SellerOrderStatus[];
+  last_transition_reason: string | null;
+  last_transition_at: string | null;
 };
 
 export type SellerOrderFilter = 'semua' | 'perlu-aksi' | SellerOrderStatus;
