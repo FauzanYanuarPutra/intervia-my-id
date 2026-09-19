@@ -110,9 +110,7 @@ No important historical transaction, reservation, movement, payment, or document
 
 ## Canonical event delivery
 
-Business OS order creation and seller state transitions now write the legacy `outbox_events`
-record and the canonical `events.event_outbox` record in the same database transaction.
-Both rows share one event UUID and one deterministic `event_key`. The canonical table
+Business OS order creation and seller state transitions enqueue events through one `event_outbox` persistence boundary. That boundary writes the legacy `outbox_events` record and the canonical `events.event_outbox` record in the same database transaction, so business producers no longer duplicate persistence SQL. Both rows share one event UUID and one deterministic `event_key`. The canonical table
 enforces a partial unique index on `event_key`, the RabbitMQ publisher uses that key as
 the AMQP message ID, and the event payload carries `event_id`, `event_key`,
 `event_type`, and `schema_version`.
