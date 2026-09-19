@@ -45,7 +45,7 @@ describe('Usaha operational hardening', () => {
     const source = read('src/components/forms/BusinessInfoQuickForm.tsx');
     expect(source).toContain('reason.trim().length < 3');
     expect(source).toContain('reason: reason.trim()');
-    expect(source).toContain('Disimpan di riwayat');
+    expect(source).toContain('Catatan perubahan');
   });
 
   it('shows business audit details as before and after when available', () => {
