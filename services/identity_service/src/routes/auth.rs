@@ -2285,6 +2285,16 @@ pub async fn oauth_google(
         invalidate_roles_cache_for_user(state.clone(), user_id).await;
     }
 
+    if let Some(application) = backoffice_application {
+        let _ = sqlx::query(
+            "UPDATE core.backoffice_google_access SET last_login_at = NOW(), updated_at = NOW() WHERE lower(email::text) = lower($1) AND application = $2 AND status = 'approved'"
+        )
+        .bind(&email)
+        .bind(application)
+        .execute(&state.db)
+        .await;
+    }
+
     let mut rp = get_roles_permissions_from_db(&state, user_id)
         .await
         .unwrap_or(RolesPermissions {
