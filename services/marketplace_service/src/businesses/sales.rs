@@ -114,6 +114,9 @@ pub(crate) struct SaleRecord {
     pub(crate) channel_key: Option<String>,
     pub(crate) account_key: String,
     pub(crate) status: String,
+    pub(crate) void_reason: Option<String>,
+    pub(crate) voided_by_user_id: Option<Uuid>,
+    pub(crate) voided_at: Option<DateTime<Utc>>,
     pub(crate) gross_amount: i64,
     pub(crate) discount_amount: i64,
     pub(crate) final_amount: i64,
@@ -153,6 +156,12 @@ pub(crate) struct CreateSaleOutcome {
     pub(crate) replayed: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct VoidSaleOutcome {
+    pub(crate) sale: SaleAggregate,
+    pub(crate) replayed: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SaleRepositoryError {
     NotFound,
@@ -160,6 +169,7 @@ pub(crate) enum SaleRepositoryError {
     IncompleteCosting,
     InsufficientStock,
     IdempotencyConflict,
+    AlreadyVoided,
     Database,
 }
 
@@ -219,6 +229,194 @@ impl SaleRepository {
             aggregates.push(SaleAggregate { sale, lines });
         }
         Ok(aggregates)
+    }
+
+    pub(crate) async fn void(
+        &self,
+        actor_id: Uuid,
+        business_id: Uuid,
+        organization_id: Uuid,
+        sale_id: Uuid,
+        idempotency_key: Uuid,
+        reason: String,
+    ) -> Result<VoidSaleOutcome, SaleRepositoryError> {
+        if actor_id.is_nil()
+            || business_id.is_nil()
+            || organization_id.is_nil()
+            || sale_id.is_nil()
+            || idempotency_key.is_nil()
+        {
+            return Err(SaleRepositoryError::Validation("invalid_sale_void_identity"));
+        }
+
+        let reason = normalize_void_reason(&reason)?;
+        let request_hash = canonical_request_hash(&json!({
+            "business_id": business_id,
+            "sale_id": sale_id,
+            "reason": reason,
+        }))
+        .map_err(|_| SaleRepositoryError::Database)?;
+
+        let mut tx = self.db.begin().await?;
+        let lock_key = format!("business-sale-void:{business_id}:{sale_id}");
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(lock_key)
+            .execute(&mut *tx)
+            .await?;
+
+        let current = sqlx::query_as::<_, SaleRecord>(
+            r#"
+            SELECT id, business_id, organization_id, location_id, currency, document_number,
+              source_order_id, party_id, correlation_id, policy_snapshot,
+              occurred_on, channel_key, account_key, status,
+              void_reason, voided_by_user_id, voided_at,
+              gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
+              created_by_user_id, created_at, updated_at
+            FROM business_sales
+            WHERE id=$1 AND business_id=$2 AND organization_id=$3
+            FOR UPDATE
+            "#,
+        )
+        .bind(sale_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(SaleRepositoryError::NotFound)?;
+
+        if current.status == "voided" {
+            if current.void_idempotency_key == Some(idempotency_key)
+                && current.void_request_hash.as_deref() == Some(request_hash.as_str())
+            {
+                let lines = load_lines_tx(&mut tx, sale_id).await?;
+                tx.commit().await?;
+                return Ok(VoidSaleOutcome {
+                    sale: SaleAggregate { sale: current, lines },
+                    replayed: true,
+                });
+            }
+            return Err(SaleRepositoryError::AlreadyVoided);
+        }
+
+        assert_business_date_open_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            Some(current.location_id),
+            current.occurred_on,
+        )
+        .await
+        .map_err(map_period_control_error)?;
+
+        reverse_product_inventory_for_sale(
+            &mut tx,
+            actor_id,
+            business_id,
+            organization_id,
+            sale_id,
+            &reason,
+        )
+        .await?;
+        reverse_ingredient_inventory_for_sale(
+            &mut tx,
+            actor_id,
+            business_id,
+            organization_id,
+            sale_id,
+            &reason,
+        )
+        .await?;
+
+        let finance = sqlx::query(
+            r#"
+            INSERT INTO business_finance_entries (
+              business_id, organization_id, entry_type, account_key, amount,
+              occurred_on, note, channel_key, source_type, source_id,
+              effect_sign, created_by_user_id
+            ) VALUES (
+              $1,$2,'sale_income',$3,$4,$5,$6,$7,'business_sale_void',$8,-1,$9
+            )
+            ON CONFLICT (business_id, source_type, source_id)
+              WHERE source_type IS NOT NULL AND source_id IS NOT NULL
+            DO NOTHING
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(&current.account_key)
+        .bind(current.final_amount)
+        .bind(current.occurred_on)
+        .bind(format!("Pembatalan transaksi: {reason}"))
+        .bind(current.channel_key.as_deref())
+        .bind(sale_id)
+        .bind(actor_id)
+        .execute(&mut *tx)
+        .await?;
+
+        if finance.rows_affected() != 1 {
+            return Err(SaleRepositoryError::IdempotencyConflict);
+        }
+
+        let updated = sqlx::query_as::<_, SaleRecord>(
+            r#"
+            UPDATE business_sales
+            SET status='voided',
+                void_reason=$2,
+                voided_by_user_id=$3,
+                voided_at=NOW(),
+                void_idempotency_key=$4,
+                void_request_hash=$5,
+                updated_at=NOW()
+            WHERE id=$1 AND status='completed'
+            RETURNING id, business_id, organization_id, location_id, currency, document_number,
+              source_order_id, party_id, correlation_id, policy_snapshot,
+              occurred_on, channel_key, account_key, status,
+              void_reason, voided_by_user_id, voided_at,
+              gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
+              created_by_user_id, created_at, updated_at
+            "#,
+        )
+        .bind(sale_id)
+        .bind(&reason)
+        .bind(actor_id)
+        .bind(idempotency_key)
+        .bind(&request_hash)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(SaleRepositoryError::AlreadyVoided)?;
+
+        let event_id = Uuid::new_v4();
+        let event_payload = json!({
+            "event_version": 1,
+            "sale_id": sale_id,
+            "business_id": business_id,
+            "organization_id": organization_id,
+            "document_number": current.document_number,
+            "occurred_on": current.occurred_on,
+            "final_amount": current.final_amount,
+            "cogs_amount": current.cogs_amount,
+            "reason": reason,
+            "voided_by_user_id": actor_id,
+        });
+        enqueue_business_event(
+            &mut tx,
+            event_id,
+            "business_sale",
+            sale_id,
+            "marketplace.business.sale_voided",
+            &event_payload,
+            &format!("business-sale-voided:{sale_id}"),
+            "marketplace.business.sale_voided",
+        )
+        .await?;
+
+        let lines = load_lines_tx(&mut tx, sale_id).await?;
+        tx.commit().await?;
+
+        Ok(VoidSaleOutcome {
+            sale: SaleAggregate { sale: updated, lines },
+            replayed: false,
+        })
     }
 
     pub(crate) async fn create(
@@ -1187,6 +1385,170 @@ fn map_execution_policy_error(error: ExecutionPolicyError) -> SaleRepositoryErro
     }
 }
 
+fn normalize_void_reason(value: &str) -> Result<String, SaleRepositoryError> {
+    let normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    let length = normalized.chars().count();
+    if length < 3 {
+        return Err(SaleRepositoryError::Validation("sale_void_reason_required"));
+    }
+    if length > 500 {
+        return Err(SaleRepositoryError::Validation("sale_void_reason_too_long"));
+    }
+    Ok(normalized)
+}
+
+async fn reverse_product_inventory_for_sale(
+    tx: &mut Transaction<'_, Postgres>,
+    actor_id: Uuid,
+    business_id: Uuid,
+    organization_id: Uuid,
+    sale_id: Uuid,
+    reason: &str,
+) -> Result<(), SaleRepositoryError> {
+    let movements = sqlx::query_as::<_, (Uuid, Uuid, f64)>(
+        r#"
+        SELECT product_id, location_id, quantity_delta
+        FROM business_product_inventory_movements
+        WHERE business_id=$1 AND organization_id=$2
+          AND source_type='business_sale' AND source_id=$3
+        ORDER BY created_at, id
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(sale_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    for (product_id, location_id, quantity_delta) in movements {
+        let reversal = -quantity_delta;
+        if !reversal.is_finite() || reversal == 0.0 {
+            continue;
+        }
+        let balance = sqlx::query_as::<_, (f64, f64)>(
+            r#"
+            UPDATE business_product_balances
+            SET stock_count = stock_count + $5,
+                version = version + 1,
+                updated_at = NOW()
+            WHERE business_id=$1 AND organization_id=$2
+              AND location_id=$3 AND product_id=$4
+            RETURNING stock_count - $5 AS quantity_before, stock_count AS quantity_after
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(location_id)
+        .bind(product_id)
+        .bind(reversal)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(SaleRepositoryError::Database)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_product_inventory_movements (
+              organization_id, business_id, location_id, product_id, movement_type,
+              quantity_delta, quantity_before, quantity_after,
+              source_type, source_id, note, created_by_user_id
+            ) VALUES (
+              $1,$2,$3,$4,'sale_void_reversal',$5,$6,$7,
+              'business_sale_void',$8,$9,$10
+            )
+            "#,
+        )
+        .bind(organization_id)
+        .bind(business_id)
+        .bind(location_id)
+        .bind(product_id)
+        .bind(reversal)
+        .bind(balance.0)
+        .bind(balance.1)
+        .bind(reason)
+        .bind(sale_id)
+        .bind(actor_id)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
+async fn reverse_ingredient_inventory_for_sale(
+    tx: &mut Transaction<'_, Postgres>,
+    actor_id: Uuid,
+    business_id: Uuid,
+    organization_id: Uuid,
+    sale_id: Uuid,
+    reason: &str,
+) -> Result<(), SaleRepositoryError> {
+    let movements = sqlx::query_as::<_, (Uuid, Uuid, Decimal)>(
+        r#"
+        SELECT ingredient_id, location_id, quantity_delta
+        FROM business_inventory_movements
+        WHERE business_id=$1 AND organization_id=$2
+          AND source_type='business_sale' AND source_id=$3
+        ORDER BY created_at, id
+        "#,
+    )
+    .bind(business_id)
+    .bind(organization_id)
+    .bind(sale_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    for (ingredient_id, location_id, quantity_delta) in movements {
+        let reversal = -quantity_delta;
+        if reversal <= Decimal::ZERO {
+            continue;
+        }
+        let balance = sqlx::query_as::<_, (Decimal, Decimal)>(
+            r#"
+            UPDATE business_ingredient_balances
+            SET quantity = quantity + $5,
+                version = version + 1,
+                updated_at = NOW()
+            WHERE business_id=$1 AND organization_id=$2
+              AND location_id=$3 AND ingredient_id=$4
+            RETURNING quantity - $5 AS quantity_before, quantity AS quantity_after
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(location_id)
+        .bind(ingredient_id)
+        .bind(reversal)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(SaleRepositoryError::Database)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO business_inventory_movements (
+              business_id, organization_id, location_id, ingredient_id, movement_type,
+              quantity_delta, quantity_before, quantity_after,
+              source_type, source_id, note, created_by_user_id
+            ) VALUES (
+              $1,$2,$3,$4,'sale_void_reversal',$5,$6,$7,
+              'business_sale_void',$8,$9,$10
+            )
+            "#,
+        )
+        .bind(business_id)
+        .bind(organization_id)
+        .bind(location_id)
+        .bind(ingredient_id)
+        .bind(reversal)
+        .bind(balance.0)
+        .bind(balance.1)
+        .bind(reason)
+        .bind(sale_id)
+        .bind(actor_id)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
 fn map_period_control_error(error: PeriodControlError) -> SaleRepositoryError {
     match error {
         PeriodControlError::PeriodClosed => {
@@ -1407,6 +1769,7 @@ const SALE_SELECT_LIST: &str = r#"
 SELECT id, business_id, organization_id, location_id, currency, document_number,
   source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
+  void_reason, voided_by_user_id, voided_at,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
 FROM business_sales
@@ -1419,6 +1782,7 @@ const SALE_SELECT_BY_IDEMPOTENCY: &str = r#"
 SELECT id, business_id, organization_id, location_id, currency, document_number,
   source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
+  void_reason, voided_by_user_id, voided_at,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
 FROM business_sales
@@ -1430,6 +1794,7 @@ const SALE_SELECT_BY_ID: &str = r#"
 SELECT id, business_id, organization_id, location_id, currency, document_number,
   source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
+  void_reason, voided_by_user_id, voided_at,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
 FROM business_sales
