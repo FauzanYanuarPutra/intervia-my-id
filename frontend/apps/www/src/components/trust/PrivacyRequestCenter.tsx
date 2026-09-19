@@ -70,6 +70,22 @@ export function PrivacyRequestCenter({ locale }: Props) {
     void load();
   }, [load]);
 
+  const cancelRequest = async (id: string) => {
+    if (!window.confirm(isId ? 'Batalkan permintaan ini?' : 'Cancel this request?')) return;
+    setError(null);
+    try {
+      const response = await fetch(`/api/privacy/requests/${encodeURIComponent(id)}/cancel`, {
+        method: 'POST',
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'cancel_failed');
+      setMessage(isId ? 'Permintaan dibatalkan.' : 'Request cancelled.');
+      await load();
+    } catch {
+      setError(isId ? 'Permintaan belum bisa dibatalkan.' : 'The request could not be cancelled.');
+    }
+  };
+
   const submit = async () => {
     if (submitting) return;
     setSubmitting(true);
@@ -234,6 +250,15 @@ export function PrivacyRequestCenter({ locale }: Props) {
                   <p className="mt-2 rounded-lg bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs text-[color:var(--app-text-soft)]">
                     {item.decision_note}
                   </p>
+                ) : null}
+                {['open', 'in_review', 'waiting_user'].includes(item.status) ? (
+                  <button
+                    type="button"
+                    onClick={() => void cancelRequest(item.id)}
+                    className="mt-3 inline-flex min-h-8 items-center rounded-full border px-3 text-[10px] font-bold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+                  >
+                    {isId ? 'Batalkan permintaan' : 'Cancel request'}
+                  </button>
                 ) : null}
               </article>
             ))}
