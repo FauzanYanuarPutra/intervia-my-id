@@ -59,10 +59,7 @@ fn resolve_access_token_algorithm(configured: &str, require_asymmetric: bool) ->
 
 fn access_token_algorithm() -> Option<Algorithm> {
     let configured = env::var("JWT_ACCESS_ALG").unwrap_or_else(|_| "HS256".to_string());
-    resolve_access_token_algorithm(
-        &configured,
-        environment_requires_asymmetric_access_tokens(),
-    )
+    resolve_access_token_algorithm(&configured, environment_requires_asymmetric_access_tokens())
 }
 
 fn rs256_decoding_key() -> Option<&'static DecodingKey> {
