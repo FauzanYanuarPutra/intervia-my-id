@@ -2904,18 +2904,32 @@ mod tests {
     }
 
     #[test]
-    fn public_source_policy_rejects_local_or_credentialed_urls() {
+    fn public_source_policy_rejects_local_special_or_credentialed_urls() {
         assert!(is_allowed_news_source_url(
             "https://www.bi.go.id/id/publikasi"
         ));
-        assert!(!is_allowed_news_source_url("http://127.0.0.1/admin"));
-        assert!(!is_allowed_news_source_url("http://10.10.0.1/internal"));
-        assert!(!is_allowed_news_source_url("http://localhost:8080/private"));
-        assert!(!is_allowed_news_source_url("http://[::1]/private"));
-        assert!(!is_allowed_news_source_url(
-            "https://user:pass@example.com/source"
-        ));
-        assert!(!is_allowed_news_source_url("file:///etc/passwd"));
+        for url in [
+            "http://127.0.0.1/admin",
+            "http://10.10.0.1/internal",
+            "http://100.64.0.1/cgnat",
+            "http://169.254.169.254/latest/meta-data",
+            "http://192.0.2.1/example",
+            "http://198.18.0.1/benchmark",
+            "http://198.51.100.1/example",
+            "http://203.0.113.1/example",
+            "http://224.0.0.1/multicast",
+            "http://localhost:8080/private",
+            "http://[::1]/private",
+            "http://[::ffff:127.0.0.1]/private",
+            "http://[fc00::1]/private",
+            "http://[fe80::1]/private",
+            "http://[ff02::1]/multicast",
+            "http://[2001:db8::1]/example",
+            "https://user:pass@example.com/source",
+            "file:///etc/passwd",
+        ] {
+            assert!(!is_allowed_news_source_url(url), "{url} must be rejected");
+        }
     }
 
     #[test]
