@@ -32,7 +32,7 @@ use sqlx::{FromRow, Row};
 use std::{env, sync::Arc};
 use tokio::task;
 
-use chrono::{DateTime, Duration, NaiveDate, Utc}; // ✅ Serde enabled via Cargo.toml
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc}; // ✅ Serde enabled via Cargo.toml
 
 use uuid::Uuid;
 
