@@ -90,7 +90,7 @@ async fn delete_batch(
             )
             .bind(cutoff)
             .bind(BATCH_SIZE)
-            .fetch_all(db)
+            .fetch_all(&mut **tx)
             .await?
             .len() as i64
         }
@@ -112,7 +112,7 @@ async fn delete_batch(
             )
             .bind(cutoff)
             .bind(BATCH_SIZE)
-            .fetch_all(db)
+            .fetch_all(&mut **tx)
             .await?
             .len() as i64
         }
