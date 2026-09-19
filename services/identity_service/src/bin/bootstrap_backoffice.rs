@@ -127,7 +127,10 @@ async fn ensure_account(
     .await?;
 
     if rows.len() > 1 {
-        bail!("{} bootstrap identifiers point to multiple users", spec.slot);
+        bail!(
+            "{} bootstrap identifiers point to multiple users",
+            spec.slot
+        );
     }
 
     let user_id = if let Some(row) = rows.first() {
@@ -136,11 +139,17 @@ async fn ensure_account(
         let existing_username: Option<String> = row.try_get("username")?;
 
         if !existing_email.eq_ignore_ascii_case(&spec.email) {
-            bail!("{} bootstrap username already belongs to another email", spec.slot);
+            bail!(
+                "{} bootstrap username already belongs to another email",
+                spec.slot
+            );
         }
         if let Some(existing_username) = existing_username {
             if !existing_username.eq_ignore_ascii_case(&spec.username) {
-                bail!("{} bootstrap email already belongs to another username", spec.slot);
+                bail!(
+                    "{} bootstrap email already belongs to another username",
+                    spec.slot
+                );
             }
         } else {
             let conflict: Option<Uuid> = sqlx::query_scalar(
@@ -370,7 +379,12 @@ async fn run() -> Result<()> {
         .bind(spec.slot)
         .fetch_optional(&mut *tx)
         .await?
-        .ok_or_else(|| anyhow!("bootstrap slot '{}' is missing; run identity migrations first", spec.slot))?;
+        .ok_or_else(|| {
+            anyhow!(
+                "bootstrap slot '{}' is missing; run identity migrations first",
+                spec.slot
+            )
+        })?;
 
         let enabled_slot: bool = slot.try_get("enabled")?;
         if !enabled_slot {
