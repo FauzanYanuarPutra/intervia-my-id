@@ -48,7 +48,7 @@ async fn delete_batch(
     let deleted: i64 = match policy_key {
         "privacy_requests_closed" => {
             sqlx::query_scalar::<_, i32>(
-            r#"
+                r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.privacy_requests
@@ -72,7 +72,7 @@ async fn delete_batch(
         }
         "security_incidents_closed" => {
             sqlx::query_scalar::<_, i32>(
-            r#"
+                r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.security_incidents
@@ -96,7 +96,7 @@ async fn delete_batch(
         }
         "user_moderation_actions" => {
             sqlx::query_scalar::<_, i32>(
-            r#"
+                r#"
                 WITH victims AS (
                   SELECT id
                   FROM core.user_moderation_actions
