@@ -72,12 +72,13 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
   const canViewTransactions = hasPermission(business, 'viewTransactions');
   const canCloseCashShift = hasPermission(business, 'closeCashShift');
   const canViewCosting = hasPermission(business, 'viewCosting');
+  const canViewChannels = hasPermission(business, 'viewChannels');
   const canVoidSales = hasPermission(business, 'voidSales');
   const [sales, currentShift, canonicalOrders, channels] = await Promise.all([
     canViewTransactions ? listControlSales(business.id) : Promise.resolve([]),
     canCloseCashShift ? getCurrentWave2CashShift(business.id) : Promise.resolve(null),
     canViewOrders ? listControlOrders(business.id) : Promise.resolve([]),
-    canCreateSales ? listControlChannels(business.id) : Promise.resolve([]),
+    canCreateSales && canViewChannels ? listControlChannels(business.id) : Promise.resolve([]),
   ]);
 
   const saleProducts = business.products.filter(product => product.status === 'live').map(product => ({
