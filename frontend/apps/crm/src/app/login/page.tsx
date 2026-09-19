@@ -34,7 +34,7 @@ export default function LoginPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--color-primary)]">CRM Ops</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--color-text)] sm:text-3xl">Masuk CRM</h1>
           <p className="mt-2 max-w-md text-sm leading-6 text-[color:var(--color-text)]">
-            Gunakan akun Google Lajukan atau akun Lajukan nyata yang sudah memiliki role CRM. Tidak ada akun demo atau password bersama.
+            Gunakan akun Google yang sudah disetujui Platform Owner Lajukan. CRM tidak menyediakan pendaftaran mandiri atau login dengan password.
           </p>
 
           {initialGoogleError ? (
