@@ -66,7 +66,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
       if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Lokasi belum berhasil disimpan.', response.status));
       setLocations(next);
       setEditing(null);
-      setChangeReason('');
+      setChangeReason('Pembaruan lokasi');
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Lokasi belum berhasil disimpan.');
@@ -113,7 +113,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
             type="button"
             onClick={() => {
               setError('');
-              setChangeReason('');
+              setChangeReason('Pembaruan lokasi');
               setEditing(location);
             }}
             className="rounded-[20px] border border-portal-line/70 bg-white p-4 text-left transition hover:border-portal-forest/40"
