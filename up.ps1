@@ -148,13 +148,24 @@ try {
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 
-    $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "180")
+    $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
+    if ($Build) {
+        # A freshly built image must never keep running behind a stale container
+        # health state. Volumes remain preserved; only service containers are recreated.
+        $UpArgs += "--force-recreate"
+    }
     if ($Services.Count -gt 0) {
         $UpArgs += $Services
     }
 
     & docker @ComposeArgs @UpArgs
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) {
+        $UpExitCode = $LASTEXITCODE
+        Write-Warning "Runtime gagal menjadi healthy. Menampilkan status dan log core service untuk diagnosis."
+        & docker @ComposeArgs ps -a
+        & docker @ComposeArgs logs --no-color --tail 120 marketplace_service chat_service identity_service community_service
+        exit $UpExitCode
+    }
 
     $LocalAiRequested = $RequestedProfiles -contains "local-ai"
     $OllamaSelected = $Services.Count -eq 0 -or $Services -contains "ollama"

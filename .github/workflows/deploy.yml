@@ -141,8 +141,10 @@ jobs:
           done
 
       - name: Validate deployment connection contract
+        id: deployment_connection
         shell: bash
         env:
+          EVENT_NAME: ${{ github.event_name }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
@@ -158,6 +160,11 @@ jobs:
           [[ -n "$DEPLOY_SSH_KEY" ]] || missing+=(DEPLOY_SSH_KEY)
           [[ -n "$DEPLOY_KNOWN_HOSTS" ]] || missing+=(DEPLOY_KNOWN_HOSTS)
           if (("${#missing[@]}" > 0)); then
+            if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+              printf '::notice::Automatic staging deployment skipped because deployment secrets are not configured: %s\n' "${missing[*]}"
+              echo "configured=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             printf 'Deployment environment is missing required secret(s): %s\n' "${missing[*]}" >&2
             exit 1
           fi
@@ -165,8 +172,10 @@ jobs:
             echo "DEPLOY_PORT must be numeric when configured." >&2
             exit 1
           fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Prepare SSH
+        if: steps.deployment_connection.outputs.configured == 'true'
         shell: bash
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -179,6 +188,7 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
       - name: Package deployment contract
+        if: steps.deployment_connection.outputs.configured == 'true'
         shell: bash
         env:
           TARGET_ENV: ${{ steps.release.outputs.target_env }}
@@ -188,6 +198,7 @@ jobs:
           [[ "$TARGET_ENV" == "production" ]] && overlay="docker-compose.prod.yml"
           tar -czf /tmp/lajukan-deploy.tgz docker-compose.yml "$overlay" docker-compose.observability.yml infrastructure/caddy infrastructure/observability infrastructure/rabbitmq services/chat_service/priv/scylladb scripts/ops/minio_storage_probe.sh scripts/ops/minio_media_recovery.sh scripts/ops/postgres_logical_backup.sh scripts/ops/verify_backup_set.sh scripts/ops/postgres_isolated_restore_drill.sh scripts/ops/community_media_backup.sh scripts/ops/verify_community_media_backup.sh scripts/ops/verify_jwt_access_keypair.sh scripts/ops/postgres_pitr_preflight.sh
       - name: Upload deployment contract
+        if: steps.deployment_connection.outputs.configured == 'true'
         shell: bash
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -197,6 +208,7 @@ jobs:
           set -euo pipefail
           scp -P "${DEPLOY_PORT:-22}" /tmp/lajukan-deploy.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/lajukan-deploy.tgz"
       - name: Apply deployment
+        if: steps.deployment_connection.outputs.configured == 'true'
         shell: bash
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
