@@ -27,6 +27,7 @@ use uuid::Uuid;
 use sqlx::Row;
 
 use crate::config::AppState;
+use crate::backoffice::{is_backoffice_eligible, parse_backoffice_application, validate_application_roles};
 use crate::routes::proofs::{consume_identity_verification_proof, consume_phone_otp_proof};
 use crate::routes::verification::{derive_verification_state, merged_verification_payload};
 
@@ -1734,4 +1735,391 @@ mod tests {
         assert_eq!(sanitized["document_verified"].as_bool(), Some(true));
         assert_eq!(sanitized["kyc_status"].as_str(), Some("full"));
     }
+}
+
+
+#[derive(Debug, Deserialize)]
+pub struct BackofficeCandidateQuery {
+    pub q: String,
+    pub limit: Option<i64>,
+}
+
+pub async fn search_backoffice_candidates(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<BackofficeCandidateQuery>,
+) -> impl IntoResponse {
+    if let Err(status) = require_super_admin(&state, &headers).await {
+        return (status, Json(json!({"error":"backoffice owner access required"}))).into_response();
+    }
+    let q = query.q.trim().to_string();
+    if q.len() < 2 {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error":"search requires at least 2 characters"}))).into_response();
+    }
+    let limit = query.limit.unwrap_or(20).clamp(1, 50);
+
+    let rows = match sqlx::query(
+        r#"
+        SELECT
+          u.id, u.email::text AS email, u.email_verified, u.phone_verified,
+          u.status::text AS status, u.is_active, up.username::text AS username,
+          up.full_name, up.metadata
+        FROM core.users u
+        LEFT JOIN core.user_profiles up ON up.user_id = u.id
+        WHERE u.deleted_at IS NULL
+          AND (
+            lower(COALESCE(up.username::text,'')) LIKE '%' || lower($1) || '%'
+            OR lower(COALESCE(up.full_name,'')) LIKE '%' || lower($1) || '%'
+            OR lower(u.email::text) LIKE '%' || lower($1) || '%'
+          )
+        ORDER BY
+          CASE WHEN lower(COALESCE(up.username::text,'')) = lower($1) THEN 0 ELSE 1 END,
+          u.created_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(&q)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("backoffice candidate search failed: {:?}", error);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response();
+        }
+    };
+
+    let data: Vec<Value> = rows.into_iter().map(|row| {
+        let metadata: Value = row.get::<Option<Value>, _>("metadata").unwrap_or_else(|| json!({}));
+        let identity_verified = metadata.pointer("/verification/identity_verified")
+            .and_then(Value::as_bool).unwrap_or(false);
+        let eligible = is_backoffice_eligible(
+            row.get("is_active"),
+            row.get::<String, _>("status") == "banned",
+            row.get("email_verified"),
+            row.get("phone_verified"),
+        );
+        json!({
+            "id": row.get::<Uuid,_>("id"),
+            "email": row.get::<String,_>("email"),
+            "username": row.get::<Option<String>,_>("username"),
+            "full_name": row.get::<Option<String>,_>("full_name"),
+            "status": row.get::<String,_>("status"),
+            "email_verified": row.get::<bool,_>("email_verified"),
+            "phone_verified": row.get::<bool,_>("phone_verified"),
+            "identity_verified": identity_verified,
+            "eligible": eligible
+        })
+    }).collect();
+
+    (StatusCode::OK, Json(json!({"data": data}))).into_response()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateBackofficeInvitationRequest {
+    pub invitee_user_id: Uuid,
+    pub application: String,
+    pub role_names: Vec<String>,
+    pub expires_in_days: Option<i64>,
+}
+
+pub async fn create_backoffice_invitation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateBackofficeInvitationRequest>,
+) -> impl IntoResponse {
+    let claims = match require_super_admin(&state, &headers).await {
+        Ok(value) => value,
+        Err(status) => return (status, Json(json!({"error":"backoffice owner access required"}))).into_response(),
+    };
+    let application = match parse_backoffice_application(&payload.application) {
+        Some(value) => value,
+        None => return (StatusCode::BAD_REQUEST, Json(json!({"error":"application must be crm or cms"}))).into_response(),
+    };
+    let roles = match validate_application_roles(application, &payload.role_names) {
+        Ok(value) => value,
+        Err(error) => return (StatusCode::BAD_REQUEST, Json(json!({"error": error.to_string()}))).into_response(),
+    };
+    let inviter_id = match Uuid::parse_str(&claims.sub) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+    };
+
+    let user = match sqlx::query(
+        r#"
+        SELECT u.email::text AS email, u.email_verified, u.phone_verified,
+               u.status::text AS status, u.is_active
+        FROM core.users u
+        WHERE u.id = $1 AND u.deleted_at IS NULL
+        LIMIT 1
+        "#,
+    ).bind(payload.invitee_user_id).fetch_optional(&state.db).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error":"user not found"}))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+    };
+
+    let eligible = is_backoffice_eligible(
+        user.get("is_active"),
+        user.get::<String,_>("status") == "banned",
+        user.get("email_verified"),
+        user.get("phone_verified"),
+    );
+    if !eligible {
+        return (StatusCode::CONFLICT, Json(json!({"error":"user must be active and have a verified email or phone before backoffice invitation"}))).into_response();
+    }
+
+    let days = payload.expires_in_days.unwrap_or(7).clamp(1, 30);
+    let result = sqlx::query(
+        r#"
+        INSERT INTO core.backoffice_invitations
+          (invitee_user_id, invited_by, application, role_names, status, expires_at)
+        VALUES ($1,$2,$3,$4,'pending',NOW() + ($5::text || ' days')::interval)
+        ON CONFLICT (invitee_user_id, application) WHERE status = 'pending'
+        DO UPDATE SET role_names = EXCLUDED.role_names,
+                      invited_by = EXCLUDED.invited_by,
+                      expires_at = EXCLUDED.expires_at,
+                      updated_at = NOW()
+        RETURNING id, status, expires_at, application, role_names
+        "#,
+    )
+    .bind(payload.invitee_user_id)
+    .bind(inviter_id)
+    .bind(application.as_str())
+    .bind(&roles)
+    .bind(days)
+    .fetch_one(&state.db).await;
+
+    match result {
+        Ok(row) => {
+            let _ = sqlx::query(
+                r#"INSERT INTO events.audit_logs (entity, action, actor_id, user_id, metadata, created_at)
+                   VALUES ('backoffice_invitation','backoffice.invitation.created',$1,$2,$3,NOW())"#,
+            ).bind(inviter_id).bind(payload.invitee_user_id).bind(json!({
+                "application": application.as_str(),
+                "role_names": roles,
+                "expires_in_days": days
+            })).execute(&state.db).await;
+
+            (StatusCode::CREATED, Json(json!({
+                "id": row.get::<Uuid,_>("id"),
+                "status": row.get::<String,_>("status"),
+                "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
+                "application": row.get::<String,_>("application"),
+                "role_names": row.get::<Vec<String>,_>("role_names")
+            }))).into_response()
+        }
+        Err(error) => {
+            tracing::error!("create backoffice invitation failed: {:?}", error);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response()
+        }
+    }
+}
+
+pub async fn list_backoffice_invitations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let claims = match require_super_admin(&state, &headers).await {
+        Ok(value) => value,
+        Err(status) => return (status, Json(json!({"error":"backoffice owner access required"}))).into_response(),
+    };
+    let inviter_id = match Uuid::parse_str(&claims.sub) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+    };
+    let _ = sqlx::query(
+        "UPDATE core.backoffice_invitations SET status='expired', responded_at=COALESCE(responded_at,NOW()) WHERE status='pending' AND expires_at < NOW()"
+    ).execute(&state.db).await;
+
+    match sqlx::query(
+        r#"
+        SELECT i.id, i.application, i.role_names, i.status, i.expires_at, i.created_at,
+               u.id AS invitee_user_id, u.email::text AS email,
+               up.username::text AS username, up.full_name
+        FROM core.backoffice_invitations i
+        JOIN core.users u ON u.id = i.invitee_user_id
+        LEFT JOIN core.user_profiles up ON up.user_id = u.id
+        WHERE i.invited_by = $1
+        ORDER BY i.created_at DESC
+        LIMIT 100
+        "#
+    ).bind(inviter_id).fetch_all(&state.db).await {
+        Ok(rows) => {
+            let data: Vec<Value> = rows.into_iter().map(|row| json!({
+                "id": row.get::<Uuid,_>("id"),
+                "application": row.get::<String,_>("application"),
+                "role_names": row.get::<Vec<String>,_>("role_names"),
+                "status": row.get::<String,_>("status"),
+                "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
+                "created_at": row.get::<DateTime<Utc>,_>("created_at"),
+                "invitee_user_id": row.get::<Uuid,_>("invitee_user_id"),
+                "email": row.get::<String,_>("email"),
+                "username": row.get::<Option<String>,_>("username"),
+                "full_name": row.get::<Option<String>,_>("full_name")
+            })).collect();
+            (StatusCode::OK, Json(json!({"data": data}))).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+    }
+}
+
+pub async fn revoke_backoffice_invitation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(invitation_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match require_super_admin(&state, &headers).await {
+        Ok(value) => value,
+        Err(status) => return (status, Json(json!({"error":"backoffice owner access required"}))).into_response(),
+    };
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid actor"}))).into_response(),
+    };
+    let result = sqlx::query(
+        r#"
+        UPDATE core.backoffice_invitations
+        SET status='revoked', responded_at=NOW(), updated_at=NOW()
+        WHERE id=$1 AND invited_by=$2 AND status='pending'
+        RETURNING invitee_user_id, application
+        "#
+    ).bind(invitation_id).bind(actor_id).fetch_optional(&state.db).await;
+    match result {
+        Ok(Some(row)) => {
+            let _ = sqlx::query(
+                r#"INSERT INTO events.audit_logs (entity, action, actor_id, user_id, metadata, created_at)
+                   VALUES ('backoffice_invitation','backoffice.invitation.revoked',$1,$2,$3,NOW())"#
+            ).bind(actor_id).bind(row.get::<Uuid,_>("invitee_user_id")).bind(json!({
+                "application": row.get::<String,_>("application"),
+                "invitation_id": invitation_id
+            })).execute(&state.db).await;
+            (StatusCode::OK, Json(json!({"success":true}))).into_response()
+        }
+        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error":"pending invitation not found"}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+    }
+}
+
+pub async fn list_my_backoffice_invitations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let claims = match decode_access_token(&state.config.jwt_secret, &extract_bearer_token(&headers).unwrap_or_default()) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token"}))).into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token subject"}))).into_response(),
+    };
+    let _ = sqlx::query(
+        "UPDATE core.backoffice_invitations SET status='expired', responded_at=COALESCE(responded_at,NOW()) WHERE invitee_user_id=$1 AND status='pending' AND expires_at < NOW()"
+    ).bind(user_id).execute(&state.db).await;
+    match sqlx::query(
+        r#"SELECT id, application, role_names, status, expires_at, created_at
+           FROM core.backoffice_invitations
+           WHERE invitee_user_id=$1 AND status='pending'
+           ORDER BY created_at DESC"#
+    ).bind(user_id).fetch_all(&state.db).await {
+        Ok(rows) => {
+            let data: Vec<Value> = rows.into_iter().map(|row| json!({
+                "id": row.get::<Uuid,_>("id"),
+                "application": row.get::<String,_>("application"),
+                "role_names": row.get::<Vec<String>,_>("role_names"),
+                "status": row.get::<String,_>("status"),
+                "expires_at": row.get::<DateTime<Utc>,_>("expires_at"),
+                "created_at": row.get::<DateTime<Utc>,_>("created_at")
+            })).collect();
+            (StatusCode::OK, Json(json!({"data": data}))).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(),
+    }
+}
+
+pub async fn respond_backoffice_invitation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(invitation_id): Path<Uuid>,
+    Json(payload): Json<Value>,
+) -> impl IntoResponse {
+    let token = match extract_bearer_token(&headers) {
+        Some(value) => value,
+        None => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"missing token"}))).into_response(),
+    };
+    let claims = match decode_access_token(&state.config.jwt_secret, &token) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token"}))).into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(json!({"error":"invalid token subject"}))).into_response(),
+    };
+    let accept = payload.get("accept").and_then(Value::as_bool).unwrap_or(false);
+
+    let mut tx = match state.db.begin().await {
+        Ok(value) => value,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database transaction error"}))).into_response(),
+    };
+
+    let invite = match sqlx::query(
+        r#"SELECT i.id, i.application, i.role_names, i.expires_at, u.email::text AS email
+           FROM core.backoffice_invitations i
+           JOIN core.users u ON u.id=i.invitee_user_id
+           WHERE i.id=$1 AND i.invitee_user_id=$2 AND i.status='pending'
+           FOR UPDATE"#
+    ).bind(invitation_id).bind(user_id).fetch_optional(&mut *tx).await {
+        Ok(Some(row)) => row,
+        Ok(None) => { let _=tx.rollback().await; return (StatusCode::NOT_FOUND, Json(json!({"error":"invitation not found"}))).into_response(); }
+        Err(_) => { let _=tx.rollback().await; return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"database error"}))).into_response(); }
+    };
+
+    let expires_at: DateTime<Utc> = invite.get("expires_at");
+    if expires_at < Utc::now() {
+        let _ = sqlx::query("UPDATE core.backoffice_invitations SET status='expired', responded_at=NOW() WHERE id=$1")
+            .bind(invitation_id).execute(&mut *tx).await;
+        let _ = tx.commit().await;
+        return (StatusCode::GONE, Json(json!({"error":"invitation expired"}))).into_response();
+    }
+
+    let application: String = invite.get("application");
+    let roles: Vec<String> = invite.get("role_names");
+    if !accept {
+        let _ = sqlx::query("UPDATE core.backoffice_invitations SET status='rejected', responded_at=NOW(), updated_at=NOW() WHERE id=$1")
+            .bind(invitation_id).execute(&mut *tx).await;
+        let _ = tx.commit().await;
+        return (StatusCode::OK, Json(json!({"success":true,"status":"rejected"}))).into_response();
+    }
+
+    let email: String = invite.get("email");
+    sqlx::query(
+        r#"
+        INSERT INTO core.backoffice_google_access (email, application, role_names, status, granted_by, created_at, updated_at)
+        VALUES ($1,$2,$3,'approved',$4,NOW(),NOW())
+        ON CONFLICT (lower(email::text), application) DO UPDATE
+        SET role_names=EXCLUDED.role_names, status='approved', granted_by=EXCLUDED.granted_by, updated_at=NOW()
+        "#
+    ).bind(&email).bind(&application).bind(&roles).bind(user_id).execute(&mut *tx).await.map_err(|_| ()).ok();
+
+    sqlx::query(
+        "UPDATE core.backoffice_invitations SET status='accepted', accepted_at=NOW(), responded_at=NOW(), updated_at=NOW() WHERE id=$1"
+    ).bind(invitation_id).execute(&mut *tx).await.map_err(|_| ()).ok();
+
+    sqlx::query("UPDATE core.sessions SET revoked=TRUE WHERE user_id=$1").bind(user_id).execute(&mut *tx).await.map_err(|_| ()).ok();
+
+    if tx.commit().await.is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"failed to finalize invitation"}))).into_response();
+    }
+
+    record_audit_log(state.clone(),"backoffice.invitation.accepted",Some(user_id),Some(json!({
+        "invitation_id": invitation_id, "application": application, "role_names": roles
+    })),&headers).await;
+
+    (StatusCode::OK, Json(json!({
+        "success": true,
+        "status": "accepted",
+        "application": application,
+        "role_names": roles,
+        "message": "Akses backoffice aktif setelah login Google yang diizinkan."
+    }))).into_response()
 }
