@@ -32,7 +32,11 @@ export default function SubmitNewsForm({ locale }: Props) {
   useEffect(() => {
     try {
       const draft = JSON.parse(localStorage.getItem('lajukan-news-form-draft') || 'null') as Partial<typeof form> | null;
-      if (draft) setForm(current => ({ ...current, ...draft }));
+      if (draft) {
+        window.setTimeout(() => {
+          setForm(current => ({ ...current, ...draft }));
+        }, 0);
+      }
     } catch {}
   }, []);
 
