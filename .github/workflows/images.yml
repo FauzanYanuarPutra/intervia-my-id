@@ -72,7 +72,7 @@ jobs:
           - image: lajukan-promotion
             context: ./services/promotion_service
             dockerfile: Dockerfile
-          - image: lajukan-crm-domain
+          - image: lajukan-crm-service
             context: ./services/crm_service
             dockerfile: Dockerfile
           - image: lajukan-communication
