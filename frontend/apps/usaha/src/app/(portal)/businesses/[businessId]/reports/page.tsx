@@ -54,7 +54,7 @@ export default async function BusinessReportsPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="reports">
-      <PageHeader eyebrow="Laporan" title="Kinerja usaha" description="Lihat hasil hari ini. Angka yang belum lengkap ditandai, bukan ditebak." />
+      <PageHeader eyebrow="Laporan" title="Kinerja usaha" description="Lihat penjualan, biaya, dan hasil usaha." />
 
       {canView ? (
         <div className="space-y-4">
