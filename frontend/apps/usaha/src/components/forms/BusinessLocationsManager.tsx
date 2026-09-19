@@ -60,12 +60,13 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
       const response = await fetch(`/api/businesses/${encodeURIComponent(businessId)}/locations`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locations: next }),
+        body: JSON.stringify({ locations: next, reason }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Lokasi belum berhasil disimpan.', response.status));
       setLocations(next);
       setEditing(null);
+      setChangeReason('');
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Lokasi belum berhasil disimpan.');
