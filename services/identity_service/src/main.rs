@@ -34,9 +34,9 @@ use identity_service::organizations::routes::{
 };
 use identity_service::routes::{
     change_password, delete_me_account, discover_users, get_me_profile, get_public_user_profile,
-    get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_users, login,
+    get_user_by_email, get_user_by_phone, get_user_detail, health_check, list_backoffice_google_access, list_users, login,
     login_phone, logout, me, oauth_google, ready_check, refresh_token, register, reset_password,
-    service_metrics, update_me_profile,
+    service_metrics, update_me_profile, upsert_backoffice_google_access,
 };
 use identity_service::runtime_metrics;
 
@@ -603,6 +603,7 @@ async fn main() -> Result<()> {
         )
         .route("/users", get(list_users))
         .route("/users/{id}", get(get_user_detail))
+        .route("/backoffice/google-access", get(list_backoffice_google_access).post(upsert_backoffice_google_access))
         .route(
             "/organizations",
             get(list_organizations).post(create_organization),
