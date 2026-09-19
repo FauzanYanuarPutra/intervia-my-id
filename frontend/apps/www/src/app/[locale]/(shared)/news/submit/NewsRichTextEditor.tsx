@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bold, Code2, Eye, Heading2, Heading3, ImagePlus, Italic, Link2, List, ListOrdered, Quote, Redo2, Undo2, Underline } from 'lucide-react';
+import { Bold, Code2, Eye, Heading2, Heading3, ImagePlus, Italic, Link2, List, ListOrdered, Quote, Redo2, Undo2, Underline, Upload } from 'lucide-react';
 
 type Props = {
   value: string;
@@ -21,6 +21,7 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const isId = locale === 'id';
 
   useEffect(() => {
@@ -63,8 +64,35 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
     try {
       const parsed = new URL(url);
       if (!['http:', 'https:'].includes(parsed.protocol)) return;
-      command('insertImage', parsed.toString());
+      const alt = window.prompt(isId ? 'Deskripsi singkat gambar (alt text)' : 'Short image description (alt text)', '') || '';
+      const caption = window.prompt(isId ? 'Caption gambar (opsional)' : 'Image caption (optional)', '') || '';
+      document.execCommand('insertHTML', false, '<figure><img src="' + parsed.toString().replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;') + '" loading="lazy" />' + (caption ? '<figcaption>' + caption.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</figcaption>' : '') + '</figure>');
+      emit();
     } catch {}
+  };
+
+  const uploadImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const data = new FormData();
+      data.append('image', file);
+      const response = await fetch('/api/content/upload-images', { method: 'POST', body: data });
+      const payload = await response.json().catch(() => ({})) as { urls?: string[]; files?: Array<{ url?: string }>; error?: string };
+      const url = payload.urls?.[0] || payload.files?.[0]?.url;
+      if (!response.ok || !url) throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'));
+      editorRef.current?.focus();
+      const alt = window.prompt(isId ? 'Deskripsi singkat gambar (alt text)' : 'Short image description (alt text)', '') || '';
+      const caption = window.prompt(isId ? 'Caption gambar (opsional)' : 'Image caption (optional)', '') || '';
+      document.execCommand('insertHTML', false, '<figure><img src="' + url.replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;') + '" loading="lazy" />' + (caption ? '<figcaption>' + caption.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</figcaption>' : '') + '</figure>');
+      emit();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.'));
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const restoreDraft = () => {
@@ -102,7 +130,11 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
         ))}
         <span className="mx-1 h-6 w-px bg-slate-200 dark:bg-white/10" />
         <button type="button" title="Link" onMouseDown={e => e.preventDefault()} onClick={insertLink} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10"><Link2 className="h-4 w-4" /></button>
-        <button type="button" title="Image" onMouseDown={e => e.preventDefault()} onClick={insertImage} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10"><ImagePlus className="h-4 w-4" /></button>
+        <button type="button" title="Image URL" onMouseDown={e => e.preventDefault()} onClick={insertImage} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10"><ImagePlus className="h-4 w-4" /></button>
+        <label title={isId ? 'Upload gambar' : 'Upload image'} className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10">
+          {uploadingImage ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" /> : <Upload className="h-4 w-4" />}
+          <input type="file" accept="image/*" className="sr-only" disabled={uploadingImage} onChange={uploadImage} />
+        </label>
         <button type="button" title="Undo" onClick={() => command('undo')} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"><Undo2 className="h-4 w-4" /></button>
         <button type="button" title="Redo" onClick={() => command('redo')} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"><Redo2 className="h-4 w-4" /></button>
         <button type="button" onClick={() => setPreview(v => !v)} className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-white/10"><Eye className="h-4 w-4" />{preview ? (isId ? 'Edit' : 'Edit') : (isId ? 'Preview' : 'Preview')}</button>
@@ -118,7 +150,7 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
           aria-multiline="true"
           onInput={emit}
           onBlur={emit}
-          className="min-h-[320px] px-5 py-4 text-[15px] font-medium leading-8 text-slate-800 outline-none dark:text-slate-100 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-4 [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-bold [&_img]:my-4 [&_img]:max-h-[520px] [&_img]:rounded-2xl [&_img]:object-cover [&_li]:ml-6 [&_ol]:list-decimal [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-slate-950 [&_pre]:p-4 [&_pre]:text-slate-100 [&_ul]:list-disc"
+          className="min-h-[320px] px-5 py-4 text-[15px] font-medium leading-8 text-slate-800 outline-none dark:text-slate-100 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:pl-4 [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-bold [&_figure]:my-5 [&_figure]:overflow-hidden [&_figure]:rounded-2xl [&_figure]:bg-slate-50 [&_figure]:dark:bg-white/[0.04] [&_img]:my-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:object-cover [&_figcaption]:px-3 [&_figcaption]:py-2 [&_figcaption]:text-xs [&_figcaption]:font-semibold [&_figcaption]:text-slate-500 [&_li]:ml-6 [&_ol]:list-decimal [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-slate-950 [&_pre]:p-4 [&_pre]:text-slate-100 [&_ul]:list-disc"
           data-placeholder={isId ? 'Tulis berita kamu di sini...' : 'Write your story here...'}
         />
       )}
