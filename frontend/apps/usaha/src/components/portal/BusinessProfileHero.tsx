@@ -15,6 +15,7 @@ export function BusinessProfileHero({ business }: BusinessProfileHeroProps) {
   const status = getStatusCopy(business);
   const canManageInfo = hasPermission(business, 'manageInfo');
   const canSell = hasPermission(business, 'createSales');
+  const canViewProducts = hasPermission(business, 'viewProducts');
   const canViewInventory = hasPermission(business, 'viewInventory');
   const canViewFinance = hasPermission(business, 'viewFinance');
   const canViewReports = hasPermission(business, 'viewReports');
@@ -68,7 +69,7 @@ export function BusinessProfileHero({ business }: BusinessProfileHeroProps) {
         </div>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <Link href={`/businesses/${business.id}/products`} className="merchant-chip">Produk</Link>
+          {canViewProducts ? <Link href={`/businesses/${business.id}/products`} className="merchant-chip">Produk</Link> : null}
           {canViewInventory ? <Link href={`/businesses/${business.id}/inventory`} className="merchant-chip">Stok</Link> : null}
           {canViewFinance ? <Link href={`/businesses/${business.id}/finance`} className="merchant-chip">Uang</Link> : null}
           {canViewReports ? <Link href={`/businesses/${business.id}/reports`} className="merchant-chip">Laporan <ArrowRight className="h-3.5 w-3.5" /></Link> : null}
