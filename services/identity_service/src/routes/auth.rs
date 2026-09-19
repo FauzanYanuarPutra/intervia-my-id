@@ -32,7 +32,7 @@ use sqlx::{FromRow, Row};
 use std::{env, sync::Arc};
 use tokio::task;
 
-use chrono::{DateTime, Duration, Utc}; // ✅ Serde enabled via Cargo.toml
+use chrono::{DateTime, Duration, NaiveDate, Utc}; // ✅ Serde enabled via Cargo.toml
 
 use uuid::Uuid;
 
@@ -67,6 +67,7 @@ pub struct RegisterRequest {
     pub full_name: Option<String>,
     pub username: String,
     pub password: String,
+    pub birthdate: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -988,6 +989,50 @@ pub async fn register(
     let email = normalize_optional_email(payload.email.as_deref());
     let username = normalize_username(&payload.username);
     let username_attempt = mask_identifier_for_log(&username);
+    let birthdate = match NaiveDate::parse_from_str(payload.birthdate.trim(), "%Y-%m-%d") {
+        Ok(value) => value,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid birthdate" })),
+            )
+                .into_response();
+        }
+    };
+
+    let today = Utc::now().date_naive();
+    if birthdate >= today {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "birthdate must be in the past" })),
+        )
+            .into_response();
+    }
+
+    let mut age = today.year() - birthdate.year();
+    if (today.month(), today.day()) < (birthdate.month(), birthdate.day()) {
+        age -= 1;
+    }
+    if age < 18 {
+        record_audit_log(
+            state.clone(),
+            "user".to_string(),
+            "register.age_restricted",
+            None,
+            None,
+            Some(json!({ "username_attempt": username_attempt, "age": age })),
+            (ip_address.clone(), user_agent.clone()),
+        )
+        .await;
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "error": "account_age_restricted",
+                "message": "Lajukan saat ini menetapkan usia minimum 18 tahun untuk akun."
+            })),
+        )
+            .into_response();
+    }
 
     if let Err(reason) = validate_username(&username) {
         record_audit_log(
@@ -1198,12 +1243,13 @@ pub async fn register(
     }
 
     if let Err(e) = sqlx::query(
-        r#"INSERT INTO core.user_profiles (user_id, full_name, username, created_at)
-            VALUES ($1, $2, $3, NOW())"#,
+        r#"INSERT INTO core.user_profiles (user_id, full_name, username, birthdate, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, NOW(), NOW())"#,
     )
     .bind(user_id)
     .bind(payload.full_name.clone())
     .bind(username.clone())
+    .bind(birthdate)
     .execute(&mut *tx)
     .await
     {
