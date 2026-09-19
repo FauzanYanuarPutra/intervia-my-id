@@ -173,45 +173,62 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
           description="Ganti foto lalu crop 1:1. Perubahan langsung tersimpan ke katalog publik."
         />
 
-        <form onSubmit={saveProduct} className="grid gap-3 border-t border-portal-line pt-5 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-xs font-semibold text-portal-ink">
-            Nama
-            <input className="portal-input" value={name} onChange={event => setName(event.target.value)} maxLength={160} required />
-          </label>
-          <label className="grid gap-1.5 text-xs font-semibold text-portal-ink">
-            Kategori
-            <input className="portal-input" value={category} onChange={event => setCategory(event.target.value)} maxLength={120} required />
-          </label>
-          <label className="grid gap-1.5 text-xs font-semibold text-portal-ink">
-            Harga (Rp)
-            <input className="portal-input" type="number" min="1" step="1" value={priceRupiah} onChange={event => setPriceRupiah(event.target.value)} required />
-          </label>
-          <label className="grid gap-1.5 text-xs font-semibold text-portal-ink">
-            Batas stok tipis
-            <input className="portal-input" type="number" min="0" step="any" value={minStockAlert} onChange={event => setMinStockAlert(event.target.value)} />
-          </label>
-          <label className="grid gap-1.5 text-xs font-semibold text-portal-ink sm:col-span-2">
-            Satuan stok
-            <input className="portal-input" value={stockUnit} onChange={event => setStockUnit(event.target.value)} maxLength={40} required />
-          </label>
-          <label className="grid gap-1.5 text-xs font-semibold text-portal-ink sm:col-span-2">
-            Alasan perubahan detail
+        <form onSubmit={saveProduct} className="grid gap-3 border-t border-portal-line pt-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
+              Nama produk
+              <input className="portal-input h-12" value={name} onChange={event => setName(event.target.value)} maxLength={160} required />
+            </label>
+            <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
+              Harga jual
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-portal-soft">Rp</span>
+                <input inputMode="numeric" className="portal-input h-12 w-full pl-10 text-base font-bold tabular-nums" type="number" min="1" step="1" value={priceRupiah} onChange={event => setPriceRupiah(event.target.value)} required />
+              </div>
+            </label>
+          </div>
+
+          <details className="group rounded-[16px] border border-portal-line bg-[#fafbf9]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-bold text-portal-ink">
+              <span>Detail lainnya <span className="ml-2 text-xs font-normal text-portal-soft">Kategori, stok minimum, satuan</span></span>
+              <span className="text-xs font-bold text-portal-forest group-open:hidden">Buka</span>
+              <span className="hidden text-xs font-bold text-portal-forest group-open:inline">Tutup</span>
+            </summary>
+            <div className="grid gap-3 border-t border-portal-line p-4 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
+                Kategori
+                <input className="portal-input" value={category} onChange={event => setCategory(event.target.value)} maxLength={120} required />
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
+                Satuan stok
+                <input className="portal-input" value={stockUnit} onChange={event => setStockUnit(event.target.value)} maxLength={40} required />
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
+                Batas stok tipis
+                <input inputMode="decimal" className="portal-input" type="number" min="0" step="any" value={minStockAlert} onChange={event => setMinStockAlert(event.target.value)} placeholder="Kosongkan bila belum perlu" />
+              </label>
+            </div>
+          </details>
+
+          <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
+            Kenapa data ini diubah?
             <input
               value={changeReason}
               onChange={event => setChangeReason(event.target.value)}
               maxLength={500}
-              placeholder="Contoh: harga pemasok berubah"
+              placeholder="Contoh: harga jual diperbarui"
               className="portal-input"
+              aria-describedby="product-change-reason-hint"
             />
+            <span id="product-change-reason-hint" className="text-[11px] font-normal leading-5 text-portal-soft">
+              Wajib minimal 3 karakter untuk riwayat perubahan.
+            </span>
           </label>
 
-          <div className="sm:col-span-2">
-            <button type="submit" disabled={busy || changeReason.trim().length < 3} className="portal-button-primary">
-              <Save className="h-4 w-4" /> {pendingAction === 'detail' ? 'Menyimpan...' : 'Simpan detail'}
-            </button>
-          </div>
+          <button type="submit" disabled={busy || changeReason.trim().length < 3} className="portal-button-primary w-full sm:w-fit">
+            <Save className="h-4 w-4" /> {pendingAction === "detail" ? "Menyimpan..." : "Simpan perubahan"}
+          </button>
         </form>
-
         <section className="border-t border-portal-line pt-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="grid flex-1 gap-1.5 text-xs font-semibold text-portal-ink">
