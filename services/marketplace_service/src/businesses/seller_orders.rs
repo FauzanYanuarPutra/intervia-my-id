@@ -92,7 +92,6 @@ impl From<sqlx::Error> for SellerOrderRepositoryError {
 #[derive(Debug, FromRow)]
 struct LatestOrderTransition {
     order_id: Uuid,
-    to_status: String,
     reason: Option<String>,
     created_at: DateTime<Utc>,
 }
@@ -636,7 +635,7 @@ async fn load_aggregate_tx(
     let items = load_items_tx(tx, order_id).await?;
     let latest = sqlx::query_as::<_, LatestOrderTransition>(
         r#"
-        SELECT order_id, to_status::text AS to_status, reason, created_at
+        SELECT order_id, reason, created_at
         FROM order_state_transitions
         WHERE order_id = $1
         ORDER BY created_at DESC, id DESC
