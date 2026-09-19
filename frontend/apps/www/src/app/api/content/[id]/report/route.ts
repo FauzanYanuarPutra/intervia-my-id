@@ -10,14 +10,9 @@ const MARKETPLACE_URL =
 type GenericRecord = Record<string, unknown>;
 
 function asObject(value: unknown): GenericRecord {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as GenericRecord;
-  }
-  return {};
-}
-
-function asString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as GenericRecord)
+    : {};
 }
 
 export async function POST(
@@ -29,91 +24,37 @@ export async function POST(
 
   const body = await parseJsonBody(req);
   if (!body.ok) return body.response;
-  const payload = asObject(body.data);
-  const reason = asString(payload.reason) || 'other';
-  const details = asString(payload.details);
-  const normalizedReason = ALLOWED_REASONS.has(reason) ? reason : 'other';
 
+  const payload = asObject(body.data);
   const resolved = await params;
   const id = resolved.id;
-  const currentRes = await fetch(`${MARKETPLACE_URL}/v1/content/${id}`, {
-    headers: { Authorization: `Bearer ${auth.ctx.token}` },
-    cache: 'no-store',
-  });
-  const current = await currentRes.json().catch(() => null);
-  if (!currentRes.ok || !current || typeof current !== 'object') {
+
+  try {
+    const upstream = await fetch(
+      `${MARKETPLACE_URL}/v1/content/${encodeURIComponent(id)}/report`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auth.ctx.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reason: String(payload.reason || 'other'),
+          details:
+            typeof payload.details === 'string'
+              ? payload.details
+              : undefined,
+        }),
+        cache: 'no-store',
+      },
+    );
+
+    const response = await upstream.json().catch(() => ({}));
+    return NextResponse.json(response, { status: upstream.status });
+  } catch {
     return NextResponse.json(
-      { error: 'Failed to load listing' },
-      { status: currentRes.status || 502 },
+      { error: 'Moderation service unavailable' },
+      { status: 503 },
     );
   }
-
-  const currentRecord = current as GenericRecord;
-  const metadata = asObject(currentRecord.metadata);
-  const reports = Array.isArray(metadata.listing_reports)
-    ? (metadata.listing_reports as GenericRecord[])
-    : [];
-  const authPayload = asObject(auth.ctx.payload);
-  const reporterName =
-    asString(authPayload.name) ||
-    asString(authPayload.full_name) ||
-    asString(authPayload.username);
-  const nextReport = {
-    id: crypto.randomUUID(),
-    reporter_id: auth.ctx.userId,
-    reporter_name: reporterName || null,
-    reporter_email: auth.ctx.email || null,
-    reason: normalizedReason,
-    details: details || null,
-    created_at: new Date().toISOString(),
-  };
-
-  const nextMetadata = {
-    ...metadata,
-    listing_reports: [nextReport, ...reports].slice(0, 20),
-    listing_moderation: {
-      ...(asObject(metadata.listing_moderation) || {}),
-      state: reports.length + 1 >= 6 ? 'restricted' : 'flagged',
-      last_report_at: nextReport.created_at,
-      updated_at: new Date().toISOString(),
-    },
-  };
-
-  const nextStatus =
-    String(currentRecord.content_status || currentRecord.status || 'draft') ===
-      'active' && reports.length + 1 >= 6
-      ? 'archived'
-      : currentRecord.content_status || currentRecord.status || 'draft';
-
-  const res = await fetch(`${MARKETPLACE_URL}/v1/content/${id}`, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${auth.ctx.token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      ...currentRecord,
-      content_status: nextStatus,
-      metadata: nextMetadata,
-    }),
-  });
-
-  const response = await res.json().catch(() => ({}));
-  return NextResponse.json(
-    {
-      ...response,
-      moderation: nextMetadata.listing_moderation,
-      message: 'Report submitted successfully.',
-    },
-    { status: res.status },
-  );
 }
-const ALLOWED_REASONS = new Set([
-  'spam',
-  'fake',
-  'scam',
-  'harassment',
-  'illegal',
-  'inaccurate',
-  'other',
-]);
