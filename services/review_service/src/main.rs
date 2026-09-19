@@ -37,7 +37,9 @@ impl RuntimeMode {
         {
             "compatibility" | "proxy" | "legacy" => Ok(Self::Compatibility),
             "native" => Ok(Self::Native),
-            other => anyhow::bail!("DOMAIN_RUNTIME_MODE must be compatibility or native, got {other:?}"),
+            other => {
+                anyhow::bail!("DOMAIN_RUNTIME_MODE must be compatibility or native, got {other:?}")
+            }
         }
     }
 
@@ -78,7 +80,11 @@ async fn proxy(State(s): State<Arc<AppState>>, req: Request<Body>) -> Result<Res
             .into_response());
     }
 
-    let path = req.uri().path_and_query().map(|v| v.as_str()).unwrap_or("/");
+    let path = req
+        .uri()
+        .path_and_query()
+        .map(|v| v.as_str())
+        .unwrap_or("/");
     let url = format!("{}{}", s.upstream.trim_end_matches('/'), path);
     let method = req.method().clone();
     let mut rb = s.http.request(method, url);
@@ -100,17 +106,13 @@ async fn proxy(State(s): State<Arc<AppState>>, req: Request<Body>) -> Result<Res
     let body = to_bytes(req.into_body(), 8 * 1024 * 1024)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let response = rb
-        .body(body.to_vec())
-        .send()
-        .await
-        .map_err(|e| {
-            tracing::error!(service = service_name(), error = ?e, "legacy upstream request failed");
-            StatusCode::BAD_GATEWAY
-        })?;
+    let response = rb.body(body.to_vec()).send().await.map_err(|e| {
+        tracing::error!(service = service_name(), error = ?e, "legacy upstream request failed");
+        StatusCode::BAD_GATEWAY
+    })?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .unwrap_or(StatusCode::BAD_GATEWAY);
+    let status =
+        StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
     let content_type = response
         .headers()
         .get("content-type")
