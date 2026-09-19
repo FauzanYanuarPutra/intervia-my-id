@@ -14,6 +14,7 @@ use uuid::Uuid;
 use crate::{user_id_from_auth, AppState};
 
 use super::{
+    audit::{self, AuditFilter},
     control::{
         ControlRepository, ControlRepositoryError, CreateFinanceEntryRequest,
         CreateIngredientRequest, ReplaceRecipeRequest, UpsertChannelRequest,
@@ -601,6 +602,78 @@ async fn create_settlement(
     }
 }
 
+async fn list_audit_events(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(business_id): Path<Uuid>,
+    query: Option<axum::extract::Query<AuditQuery>>,
+) -> Response {
+    let (actor_id, organization_id) = match business_control_context(
+        &state,
+        &headers,
+        business_id,
+        BusinessControlAccess::Audit,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+
+    let query = query.map(|value| value.0).unwrap_or_default();
+    let subject_type = query
+        .subject_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let subject_id = match query.subject_id.as_deref() {
+        Some(value) if !value.trim().is_empty() => match Uuid::parse_str(value.trim()) {
+            Ok(id) => Some(id),
+            Err(_) => return api_error(StatusCode::BAD_REQUEST, "invalid_audit_subject_id"),
+        },
+        _ => None,
+    };
+
+    match audit::list(
+        &state.db,
+        business_id,
+        organization_id,
+        AuditFilter {
+            subject_type,
+            subject_id,
+            limit: query.limit.unwrap_or(100),
+        },
+    )
+    .await
+    {
+        Ok(items) => {
+            let _ = actor_id;
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "data": {
+                        "count": items.len(),
+                        "items": items
+                    }
+                })),
+            )
+                .into_response()
+        }
+        Err(_) => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "business_audit_storage_unavailable",
+        ),
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct AuditQuery {
+    subject_type: Option<String>,
+    subject_id: Option<String>,
+    limit: Option<i64>,
+}
+
 async fn list_business_orders(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -752,6 +825,7 @@ async fn reconcile(
 
 #[derive(Debug, Clone, Copy)]
 enum BusinessControlAccess {
+    Audit,
     ViewInventory,
     ManageInventory,
     ViewCosting,
@@ -765,6 +839,7 @@ enum BusinessControlAccess {
 impl BusinessControlAccess {
     fn allows(self, organization: &OrganizationSummary) -> bool {
         match self {
+            Self::Audit => organization.can_view_audit_history(),
             Self::ViewInventory => organization.can_view_inventory_controls(),
             Self::ManageInventory => organization.can_manage_inventory_controls(),
             Self::ViewCosting | Self::ManageCosting => organization.can_view_sale_costs(),
