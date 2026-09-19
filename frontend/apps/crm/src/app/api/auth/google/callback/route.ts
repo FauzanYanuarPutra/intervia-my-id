@@ -134,6 +134,7 @@ export async function GET(req: NextRequest) {
         email: googleUser.email,
         email_verified: googleUser.email_verified,
         name: googleUser.name || '',
+        application: 'crm',
         avatar_url: googleUser.picture || '',
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
