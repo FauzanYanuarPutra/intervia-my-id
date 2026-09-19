@@ -1,13 +1,19 @@
 [package]
-name = "news_service"
-version = "0.1.0"
-edition = "2021"
-
+name="news_service"
+version="0.1.0"
+edition="2021"
 [dependencies]
-axum = "0.8.7"
-tokio = { version = "1", features = ["full"] }
-sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio","postgres","macros","migrate","uuid","chrono","json"] }
-serde_json = "1"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt","env-filter","json"] }
-uuid = { version = "1", features = ["v4","serde"] }
+axum={version="0.8.7",features=["ws"]}
+tokio={version="1",features=["full"]}
+anyhow="1"
+reqwest={version="0.12",default-features=false,features=["json","rustls-tls"]}
+sqlx={version="0.9.0",default-features=false,features=["runtime-tokio","postgres","macros","uuid","chrono","json","rust_decimal","migrate"]}
+serde={version="1",features=["derive"]}
+serde_json="1"
+chrono={version="0.4",features=["serde"]}
+jsonwebtoken={version="11.0.0",features=["aws_lc_rs"]}
+tracing="0.1"
+tracing-subscriber={version="0.3",features=["fmt","env-filter","json"]}
+uuid={version="1",features=["v4","serde"]}
+tower-http={version="0.6",features=["cors"]}
+lapin="3.7.1"
