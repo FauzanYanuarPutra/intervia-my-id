@@ -38,9 +38,10 @@ if [[ -f "$BASE_BACKUP_DIR/base/pg_wal.tar.gz" ]]; then
 fi
 
 touch "$PGDATA_HOST/recovery.signal"
+recovery_target_time_escaped="${RECOVERY_TARGET_TIME//\\'/\\'\\'}"
 cat >> "$PGDATA_HOST/postgresql.auto.conf" <<EOF
 restore_command = 'cp /wal-archive/%f %p'
-recovery_target_time = '${RECOVERY_TARGET_TIME//'/''}'
+recovery_target_time = '$recovery_target_time_escaped'
 recovery_target_action = 'promote'
 EOF
 
