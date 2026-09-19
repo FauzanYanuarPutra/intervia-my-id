@@ -164,13 +164,7 @@ async fn link_document(
             Err(response) => return response,
         };
     match DocumentRepository::new(state.db.clone())
-        .link(
-            actor_id,
-            business_id,
-            organization.id,
-            document_id,
-            payload,
-        )
+        .link(actor_id, business_id, organization.id, document_id, payload)
         .await
     {
         Ok((link, replayed)) => (
@@ -441,15 +435,11 @@ fn parse_idempotency_key(headers: &HeaderMap) -> Result<Uuid, &'static str> {
 fn document_error_response(error: DocumentError) -> Response {
     match error {
         DocumentError::Validation(code) => api_error(StatusCode::BAD_REQUEST, code),
-        DocumentError::NotFound => {
-            api_error(StatusCode::NOT_FOUND, "business_document_not_found")
-        }
+        DocumentError::NotFound => api_error(StatusCode::NOT_FOUND, "business_document_not_found"),
         DocumentError::Forbidden => {
             api_error(StatusCode::FORBIDDEN, "business_document_access_denied")
         }
-        DocumentError::Conflict => {
-            api_error(StatusCode::CONFLICT, "business_document_conflict")
-        }
+        DocumentError::Conflict => api_error(StatusCode::CONFLICT, "business_document_conflict"),
         DocumentError::ApprovalRequired => {
             api_error(StatusCode::CONFLICT, "document_approval_required")
         }
