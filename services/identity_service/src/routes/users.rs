@@ -2063,7 +2063,7 @@ pub async fn respond_backoffice_invitation(
     };
 
     let invite = match sqlx::query(
-        r#"SELECT i.id, i.application, i.role_names, i.expires_at, u.email::text AS email
+        r#"SELECT i.id, i.application, i.role_names, i.expires_at, i.invited_by, u.email::text AS email
            FROM core.backoffice_invitations i
            JOIN core.users u ON u.id=i.invitee_user_id
            WHERE i.id=$1 AND i.invitee_user_id=$2 AND i.status='pending'
@@ -2099,7 +2099,7 @@ pub async fn respond_backoffice_invitation(
         ON CONFLICT (lower(email::text), application) DO UPDATE
         SET role_names=EXCLUDED.role_names, status='approved', granted_by=EXCLUDED.granted_by, updated_at=NOW()
         "#
-    ).bind(&email).bind(&application).bind(&roles).bind(user_id).execute(&mut *tx).await.map_err(|_| ()).ok();
+    ).bind(&email).bind(&application).bind(&roles).bind(invite.get::<Uuid,_>("invited_by")).execute(&mut *tx).await.map_err(|_| ()).ok();
 
     sqlx::query(
         "UPDATE core.backoffice_invitations SET status='accepted', accepted_at=NOW(), responded_at=NOW(), updated_at=NOW() WHERE id=$1"
