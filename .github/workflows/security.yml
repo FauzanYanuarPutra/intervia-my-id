@@ -184,7 +184,7 @@ jobs:
               name = meta.get("name")
               if not name and package_path.startswith("node_modules/"):
                   name = package_path.split("node_modules/")[-1]
-              if not name or "/" not in name and name.startswith("@"):
+              if not name:
                   continue
 
               payload.setdefault(name, set()).add(version)
