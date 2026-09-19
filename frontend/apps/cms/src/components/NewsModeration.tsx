@@ -176,6 +176,7 @@ export default function NewsModeration() {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const selected = useMemo(
     () => items.find(item => item.id === selectedId) || items[0] || null,
@@ -198,8 +199,8 @@ export default function NewsModeration() {
     });
   }, [items, queueQuery]);
 
-  useEffect(() => {
-    const meta = selected ? readRecord(readRecord(selected.metadata).news) : {};
+  const applySelectedDraft = useCallback((item: NewsItem | null) => {
+    const meta = item ? readRecord(readRecord(item.metadata).news) : {};
     const selectedKind = readString(meta.article_kind) || 'news';
     const fact = readString(meta.fact_check_status);
     const legal = readString(meta.legal_review_status);
@@ -228,7 +229,12 @@ export default function NewsModeration() {
     setSensitivity(selectedSensitivity === 'high' ? 'high' : 'normal');
     const scheduledFor = readString(meta.scheduled_for);
     setPublishAt(scheduledFor ? toDateTimeLocal(scheduledFor) : '');
-  }, [selected]);
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!accessToken || !selected?.id) return;
@@ -315,11 +321,7 @@ export default function NewsModeration() {
       const nextSelected = nextItems.find(item => item.id === selectedId) || nextItems[0] || null;
       setItems(nextItems);
       setSelectedId(nextSelected?.id || '');
-      setBusinessImpact(
-        nextSelected
-          ? readString(readRecord(readRecord(nextSelected.metadata).news).business_impact)
-          : '',
-      );
+      applySelectedDraft(nextSelected);
       setHistoryLoading(Boolean(nextSelected));
       setSuccess('');
       void loadMetrics();
@@ -328,7 +330,7 @@ export default function NewsModeration() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, loadMetrics, selectedId, status]);
+  }, [accessToken, applySelectedDraft, loadMetrics, selectedId, status]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -341,11 +343,7 @@ export default function NewsModeration() {
         const nextSelected = nextItems[0] || null;
         setItems(nextItems);
         setSelectedId(nextSelected?.id || '');
-        setBusinessImpact(
-          nextSelected
-            ? readString(readRecord(readRecord(nextSelected.metadata).news).business_impact)
-            : '',
-        );
+        applySelectedDraft(nextSelected);
         setHistoryLoading(Boolean(nextSelected));
         setSuccess('');
       })
@@ -353,7 +351,7 @@ export default function NewsModeration() {
         if (!active) return;
         setItems([]);
         setSelectedId('');
-        setBusinessImpact('');
+        applySelectedDraft(null);
         setError(err instanceof Error ? err.message : 'Gagal memuat antrean berita');
       })
       .finally(() => {
@@ -362,7 +360,7 @@ export default function NewsModeration() {
     return () => {
       active = false;
     };
-  }, [accessToken, status]);
+  }, [accessToken, applySelectedDraft, status]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -471,7 +469,7 @@ export default function NewsModeration() {
     factCheckReady && legalReady && (!requiresVerifiedSource || hasVerifiedSource);
   const selectedIsScheduled = Boolean(
     selected?.published_at &&
-      new Date(selected.published_at).getTime() > Date.now(),
+      new Date(selected.published_at).getTime() > nowMs,
   );
   const wouldBreakPublishedProvenance = (
     source: NewsSource,
@@ -565,14 +563,14 @@ export default function NewsModeration() {
                 const editorialStatus = readString(meta.editorial_status) || item.content_status;
                 const scheduled =
                   Boolean(item.published_at) &&
-                  new Date(item.published_at || '').getTime() > Date.now();
+                  new Date(item.published_at || '').getTime() > nowMs;
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => {
                       setSelectedId(item.id);
-                      setBusinessImpact(readString(meta.business_impact));
+                      applySelectedDraft(item);
                       setHistory([]);
                       setVersions([]);
                       setSources([]);

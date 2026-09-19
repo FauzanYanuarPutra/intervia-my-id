@@ -303,7 +303,7 @@ fn parse_requested_publish_at(
     let publish_at = DateTime::parse_from_rfc3339(&raw)
         .map_err(|_| "publish_at must be an RFC3339 timestamp")?
         .with_timezone(&Utc);
-    if publish_at > now.clone() + Duration::days(90) {
+    if publish_at > now + Duration::days(90) {
         return Err("scheduled publication cannot be more than 90 days ahead");
     }
     Ok(Some(if publish_at < now { now } else { publish_at }))
@@ -2051,9 +2051,8 @@ async fn moderate_news(
         Some(
             current
                 .published_at
-                .clone()
-                .or(requested_publish_at.clone())
-                .unwrap_or_else(|| reviewed_at.clone()),
+                .or(requested_publish_at)
+                .unwrap_or(reviewed_at),
         )
     } else {
         None

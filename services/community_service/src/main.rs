@@ -1114,13 +1114,21 @@ async fn main() -> anyhow::Result<()> {
     }
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
-    let migrate_only = env::var("MIGRATE_ONLY")
-        .ok()
-        .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"));
+    let migrate_only = env::var("MIGRATE_ONLY").ok().is_some_and(|value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes"
+        )
+    });
     let run_migrations_on_startup = migrate_only
         || env::var("RUN_MIGRATIONS_ON_STARTUP")
             .ok()
-            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+            .map(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes"
+                )
+            })
             .unwrap_or(!strict_migrations);
 
     if run_migrations_on_startup {
@@ -1132,9 +1140,10 @@ async fn main() -> anyhow::Result<()> {
         }
         if let Err(error) = migrator.run(&migration_db).await {
             let message = error.to_string();
-            let checksum_mismatch = message.contains("was previously applied but has been modified");
-            let missing_migration =
-                message.contains("was previously applied but is missing in the resolved migrations");
+            let checksum_mismatch =
+                message.contains("was previously applied but has been modified");
+            let missing_migration = message
+                .contains("was previously applied but is missing in the resolved migrations");
 
             if !strict_migrations && (checksum_mismatch || missing_migration) {
                 tracing::warn!(

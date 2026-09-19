@@ -177,6 +177,8 @@ pub(crate) async fn allocate_document_number_tx(
 
 #[cfg(test)]
 mod tests {
+    use chrono::NaiveTime;
+
     use super::BusinessExecutionPolicy;
 
     fn policy(mode: &str) -> BusinessExecutionPolicy {
