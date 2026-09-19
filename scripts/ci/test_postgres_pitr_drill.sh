@@ -8,6 +8,8 @@ PRIMARY="lajukan-pitr-primary-$$"
 NETWORK="lajukan-pitr-net-$$"
 ARCHIVE="$WORK/wal"
 BACKUPS="$WORK/backups"
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 mkdir -p "$ARCHIVE" "$BACKUPS"
 chmod 0777 "$ARCHIVE" "$BACKUPS"
 
@@ -35,7 +37,21 @@ docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "SELEC
 
 docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c   "CREATE TABLE pitr_probe(id integer primary key, label text, created_at timestamptz default clock_timestamp()); INSERT INTO pitr_probe VALUES (1,'before',clock_timestamp());"
 
-DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres" BACKUP_ROOT="/backups" docker run --rm --network "$NETWORK"   -v "$ROOT:/repo:ro"   -v "$BACKUPS:/backups"   -e DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres"   -e BACKUP_ROOT=/backups   postgres:16-alpine   sh -lc "apk add --no-cache bash coreutils >/dev/null && bash /repo/scripts/ops/postgres_pitr_basebackup.sh" >/tmp/lajukan-pitr-backup-path.txt
+docker run --rm --network "$NETWORK" \
+  -v "$ROOT:/repo:ro" \
+  -v "$BACKUPS:/backups" \
+  -e DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres" \
+  -e BACKUP_ROOT=/backups \
+  -e HOST_UID="$HOST_UID" \
+  -e HOST_GID="$HOST_GID" \
+  postgres:16-alpine \
+  sh -lc '
+    set -eu
+    apk add --no-cache bash coreutils >/dev/null
+    backup_path="$(bash /repo/scripts/ops/postgres_pitr_basebackup.sh)"
+    chown -R "$HOST_UID:$HOST_GID" "$backup_path"
+    printf "%s\\n" "$backup_path"
+  ' >/tmp/lajukan-pitr-backup-path.txt
 
 backup_dir="$BACKUPS/$(basename "$(tail -n1 /tmp/lajukan-pitr-backup-path.txt)")"
 target_time="$(docker exec "$PRIMARY" psql -U postgres -d postgres -X -A -t -c "SELECT clock_timestamp()")"
