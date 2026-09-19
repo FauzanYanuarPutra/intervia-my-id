@@ -116,7 +116,8 @@ def validate_service_code(data: dict) -> list[str]:
                         f"{service}: target service missing required {required_path}"
                     )
         if not service_dir.exists():
-            errors.append(f"{service}: declared implemented service directory is missing")
+            if item.get("status") == "implemented":
+                errors.append(f"{service}: declared implemented service directory is missing")
             continue
 
         for path in iter_source_files(service_dir):
