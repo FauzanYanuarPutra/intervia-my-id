@@ -281,7 +281,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
       if (!response.ok) throw new Error(businessApiErrorMessage(body, 'Pilihan pelanggan belum tersimpan.', response.status));
       if (Array.isArray(body.data?.groups)) setGroups(normalizeGroups(body.data.groups));
       setDirty(false);
-      setChangeReason('');
+      setChangeReason('Pembaruan pilihan pelanggan');
       setMessage('Pilihan pelanggan tersimpan dan siap dipakai di Kasir serta toko.');
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Pilihan pelanggan belum tersimpan.');
