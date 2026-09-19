@@ -416,7 +416,7 @@ async fn list_channels(
     headers: HeaderMap,
     Path(business_id): Path<Uuid>,
 ) -> Response {
-    let (_, organization_id) = match business_control_context(
+    let (actor_id, organization_id) = match business_control_context(
         &state,
         &headers,
         business_id,
@@ -458,7 +458,7 @@ async fn upsert_channel(
         Err(response) => return response,
     };
     match ControlRepository::new(state.db.clone())
-        .upsert_channel(business_id, organization_id, &channel_key, payload)
+        .upsert_channel(actor_id, business_id, organization_id, &channel_key, payload)
         .await
     {
         Ok(item) => (StatusCode::OK, Json(json!({ "data": { "channel": item } }))).into_response(),
