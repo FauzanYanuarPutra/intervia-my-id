@@ -553,6 +553,8 @@ impl ProductRepository {
                 "reason": request.reason,
             }),
         )
+        .await?;
+
         audit::record_tx(
             &mut transaction,
             organization_id,
