@@ -133,6 +133,7 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
   const [pendingProductId, setPendingProductId] = useState<string | null>(null);
   const [retireOpen, setRetireOpen] = useState(false);
   const [retireReason, setRetireReason] = useState('');
+  const [changeReason, setChangeReason] = useState('');
 
   const product = products.find(item => item.id === productId) ?? products[0];
   const sellingPrice = priceFromLabel(product?.priceLabel);
@@ -290,6 +291,10 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
       setMessage(validation);
       return;
     }
+    if (changeReason.trim().length < 3) {
+      setMessage('Tulis alasan perubahan resep minimal 3 karakter agar versi lama dan versi baru bisa ditelusuri.');
+      return;
+    }
     setSaving(true);
     setMessage('');
     try {
@@ -305,12 +310,14 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
             quantity: item.quantity,
             waste_percent_override: item.wastePercentOverride,
           })),
+          reason: changeReason.trim(),
         }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(businessApiErrorMessage(payload, 'Gagal menyimpan resep.', response.status));
       setRecipeName(savedRecipeName);
       setInitialSignature(recipeSignature(savedRecipeName, servings, items));
+      setChangeReason('');
       setMessage('Resep tersimpan. HPP, margin, stok, dan PIC perubahan tercatat di riwayat.');
       await refreshHistory();
     } catch (error) {
@@ -469,6 +476,16 @@ export function DurableHppWorkspace({ businessId, ingredients, products }: Props
               <label className="text-xs font-semibold text-portal-soft">1 kali resep menghasilkan berapa porsi?<input type="number" min="0.0001" step="any" className="mt-1 min-h-10 w-full rounded-lg border border-portal-line px-3 text-sm" value={servings} onChange={event => setServings(Math.max(n(event.target.value), 0.0001))} /></label>
             </div>
           </details>
+          <label className="mb-2 block text-xs font-semibold text-portal-soft">
+            Alasan perubahan resep
+            <input
+              value={changeReason}
+              onChange={event => setChangeReason(event.target.value)}
+              maxLength={500}
+              placeholder="Contoh: harga bahan berubah atau porsi diperbarui"
+              className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink"
+            />
+          </label>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button type="button" disabled={deleting || loading || !items.length} onClick={retireActiveRecipe} className="portal-button-secondary justify-center text-red-700 disabled:opacity-60">{deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Hapus resep aktif</button>
             <button type="button" disabled={saving || loading} onClick={save} className="portal-button-primary justify-center disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan resep</button>
