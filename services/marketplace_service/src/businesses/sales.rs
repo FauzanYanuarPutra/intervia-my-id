@@ -117,6 +117,10 @@ pub(crate) struct SaleRecord {
     pub(crate) void_reason: Option<String>,
     pub(crate) voided_by_user_id: Option<Uuid>,
     pub(crate) voided_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing)]
+    pub(crate) void_idempotency_key: Option<Uuid>,
+    #[serde(skip_serializing)]
+    pub(crate) void_request_hash: Option<String>,
     pub(crate) gross_amount: i64,
     pub(crate) discount_amount: i64,
     pub(crate) final_amount: i64,
@@ -1770,6 +1774,7 @@ SELECT id, business_id, organization_id, location_id, currency, document_number,
   source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
   void_reason, voided_by_user_id, voided_at,
+  void_idempotency_key, void_request_hash,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
 FROM business_sales
@@ -1783,6 +1788,7 @@ SELECT id, business_id, organization_id, location_id, currency, document_number,
   source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
   void_reason, voided_by_user_id, voided_at,
+  void_idempotency_key, void_request_hash,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
 FROM business_sales
@@ -1795,6 +1801,7 @@ SELECT id, business_id, organization_id, location_id, currency, document_number,
   source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
   void_reason, voided_by_user_id, voided_at,
+  void_idempotency_key, void_request_hash,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
 FROM business_sales
