@@ -132,6 +132,19 @@ export default async function NewsArticlePage({ params }: PageProps) {
           </div>
           <h1 className="mt-5 max-w-4xl text-3xl font-bold tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">{article.title}</h1>
           {!isRetracted && article.summary ? <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-600 dark:text-slate-300">{article.summary}</p> : null}
+          {article.coverImage ? (
+            <figure className="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-800">
+              <img
+                src={article.coverImage}
+                alt={article.title}
+                className="aspect-[16/9] w-full object-cover"
+                loading="eager"
+              />
+              <figcaption className="px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {isId ? 'Media utama artikel' : 'Article featured media'}
+              </figcaption>
+            </figure>
+          ) : null}
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 dark:bg-white/10">
               <CalendarDays className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />

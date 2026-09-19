@@ -125,6 +125,15 @@ function readSources(value: unknown): string[] {
   return sources;
 }
 
+function isSafePublicUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !isPrivateSourceHost(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function sanitizeRichText(value: string, maxLength: number) {
   let html = value.replace(/<!--([\s\S]*?)-->/g, '');
   html = html.replace(/<\/?(script|style|iframe|object|embed|form|input|button|textarea|select|svg|math)[^>]*>/gi, '');
@@ -136,11 +145,9 @@ function sanitizeRichText(value: string, maxLength: number) {
   });
   html = html.replace(/<img([^>]*)>/gi, (_m, attrs) => {
     const src = attrs.match(/\ssrc\s*=\s*(['"])(.*?)\1/i)?.[2] || '';
-    try {
-      const url = new URL(src);
-      if (!['http:', 'https:'].includes(url.protocol)) return '';
-      return '<img src="' + url.toString().replace(/"/g, '&quot;') + '" alt="" loading="lazy" />';
-    } catch { return ''; }
+    const alt = attrs.match(/\salt\s*=\s*(['"])(.*?)\1/i)?.[2] || '';
+    if (!isSafePublicUrl(src)) return '';
+    return '<img src="' + src.replace(/"/g, '&quot;') + '" alt="' + alt.replace(/"/g, '&quot;').slice(0, 300) + '" loading="lazy" />';
   });
   html = html.replace(/<a([^>]*)href\s*=\s*(['"])(.*?)\2([^>]*)>/gi, (_m, before, _q, href, after) => {
     try {
@@ -149,7 +156,8 @@ function sanitizeRichText(value: string, maxLength: number) {
       return '<a' + before + ' href="' + url.toString().replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer nofollow"' + after + '>';
     } catch { return '<a>'; }
   });
-  html = html.replace(/<(?!\/?(?:p|br|strong|b|em|i|u|s|h2|h3|blockquote|ul|ol|li|a|img|pre|code)(?:\s|>|\/))/gi, '&lt;');
+  html = html.replace(/<figcaption([^>]*)>([\s\S]*?)<\/figcaption>/gi, '<figcaption>$2</figcaption>');
+  html = html.replace(/<(?!\/?(?:p|br|strong|b|em|i|u|s|h2|h3|blockquote|ul|ol|li|a|img|figure|figcaption|pre|code)(?:\s|>|\/))/gi, '&lt;');
   return html.slice(0, maxLength);
 }
 
@@ -241,6 +249,9 @@ export async function POST(request: NextRequest) {
   }
   if (location.length > 120) {
     return NextResponse.json({ error: 'Lokasi terlalu panjang.' }, { status: 422 });
+  }
+  if (coverImage && !isSafePublicUrl(coverImage)) {
+    return NextResponse.json({ error: 'URL gambar sampul tidak valid.' }, { status: 422 });
   }
   if (sourceUrls.length === 0 && articleKind !== 'press_release') {
     return NextResponse.json(
