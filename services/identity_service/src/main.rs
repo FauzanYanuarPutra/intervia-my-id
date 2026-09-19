@@ -34,16 +34,15 @@ use identity_service::organizations::routes::{
 };
 use identity_service::routes::{
     cancel_my_privacy_request, change_password, create_backoffice_invitation, create_privacy_request,
-    create_security_incident, list_my_privacy_requests, list_privacy_requests,
-    list_security_incidents, transition_privacy_request, transition_security_incident,
-    delete_me_account, discover_users,
-    get_me_profile, get_public_user_profile, get_user_by_email, get_user_by_phone, get_user_detail,
-    health_check, list_backoffice_google_access, list_backoffice_invitations,
-    list_my_backoffice_invitations, list_users, login, login_phone, logout, me, moderate_user,
-    oauth_google, ready_check, refresh_token, register, reset_password,
-    respond_backoffice_invitation, revoke_backoffice_invitation, search_backoffice_candidates,
-    service_metrics, update_me_profile, upsert_backoffice_google_access,
-};
+    create_security_incident, delete_me_account, discover_users, get_me_profile,
+    get_public_user_profile, get_user_by_email, get_user_by_phone, get_user_detail, health_check,
+    list_backoffice_google_access, list_backoffice_invitations, list_my_backoffice_invitations,
+    list_my_privacy_requests, list_privacy_requests, list_security_incidents, list_users, login,
+    login_phone, logout, me, moderate_user, oauth_google, ready_check, refresh_token, register,
+    reset_password, respond_backoffice_invitation, revoke_backoffice_invitation,
+    search_backoffice_candidates, service_metrics, transition_privacy_request,
+    transition_security_incident, update_me_profile, upsert_backoffice_google_access,
+}
 use identity_service::runtime_metrics;
 mod retention;
 use retention::run_retention_sweep;
