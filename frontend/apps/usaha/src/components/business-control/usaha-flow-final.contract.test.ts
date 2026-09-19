@@ -88,6 +88,7 @@ describe('Flow Usaha final contracts', () => {
     const inviteRoute = source('src/app/api/businesses/[businessId]/team/invites/route.ts');
     const quickSale = source('src/components/business-control/QuickSaleWorkspace.tsx');
     const quickSaleContract = source('src/components/business-control/quick-sale.ts');
+    const reports = source('src/app/(portal)/businesses/[businessId]/reports/page.tsx');
     expect(contract).toContain('reason?: string');
     expect(contract).toContain('reason: trimmed(input.reason)');
     expect(productRoute).toContain('product_change_reason_required');
@@ -103,6 +104,10 @@ describe('Flow Usaha final contracts', () => {
     expect(quickSale).toContain('Outlet transaksi');
     expect(quickSaleContract).toContain('locationId?: string | null');
     expect(quickSaleContract).toContain('location_id: draft.locationId');
+    expect(reports).toContain("['1', 'Hari ini']");
+    expect(reports).toContain("['7', '7 hari']");
+    expect(reports).toContain("['30', '30 hari']");
+    expect(reports).toContain('periodFinanceEntries');
   });
 
   it('renders negative storefront price deltas with a minus sign', () => {
