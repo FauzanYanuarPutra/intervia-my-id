@@ -62,6 +62,9 @@ fn money_keeps_currency_and_uses_checked_arithmetic() {
 
     let remaining = total.checked_sub(Money::idr(5_000).unwrap()).unwrap();
     assert_eq!(remaining.minor_units(), 15_000);
+
+    let line = Money::idr(12_345).unwrap().checked_mul_i64(3).unwrap();
+    assert_eq!(line.minor_units(), 37_035);
 }
 
 #[test]
@@ -87,6 +90,11 @@ fn money_rejects_negative_insufficient_and_overflow_values() {
         .unwrap()
         .checked_add(Money::idr(1).unwrap())
         .is_err());
+    assert!(Money::idr(i64::MAX)
+        .unwrap()
+        .checked_mul_i64(2)
+        .is_err());
+    assert!(Money::idr(1).unwrap().checked_mul_i64(-1).is_err());
 }
 
 #[test]
