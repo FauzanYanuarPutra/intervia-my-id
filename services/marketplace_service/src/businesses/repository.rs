@@ -413,6 +413,27 @@ impl BusinessRepository {
             return Err(RepositoryError::IncompleteAggregate);
         }
 
+        audit::record_tx(
+            &mut transaction,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "business.profile_updated",
+            "business",
+            Some(business_id),
+            command.reason.as_deref(),
+            json!({
+                "summary": format!("Info usaha {} diperbarui", command.name),
+                "version_after": command.expected_version + 1,
+                "capability_key": command.capability_key,
+                "category": command.category,
+                "schedule": command.schedule,
+                "location_query": command.location_query,
+            }),
+        )
+        .await?;
+
         let new_version = command.expected_version + 1;
         sqlx::query(
             r#"
