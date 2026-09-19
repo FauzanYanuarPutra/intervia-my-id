@@ -136,7 +136,7 @@ type ProfileDetail = {
   links: Array<{ label: string; url: string }>;
 };
 
-type PublicProfileTab = 'posts' | 'about' | 'reviews' | 'business';
+type PublicProfileTab = 'posts' | 'about' | 'reviews';
 
 type PublicReview = {
   id: string;
@@ -1839,21 +1839,23 @@ export default function PublicProfileClient({
     asRecord(metadata?.profile_stats) ||
     asRecord(metadata?.metrics);
 
-  const followersCount = Math.max(
-    profileSocial?.followersCount ?? 0,
-    getProfileMetric(profile, [
-      'followers_count',
-      'follower_count',
-      'followers',
-    ]) ?? 0,
-    profileSocial?.followers.length ?? 0,
-  );
+  const followersCount = profileSocial
+    ? Math.max(profileSocial.followersCount, profileSocial.followers.length)
+    : Math.max(
+        getProfileMetric(profile, [
+          'followers_count',
+          'follower_count',
+          'followers',
+        ]) ?? 0,
+        0,
+      );
 
-  const followingCount = Math.max(
-    profileSocial?.followingCount ?? 0,
-    getProfileMetric(profile, ['following_count', 'following']) ?? 0,
-    profileSocial?.following.length ?? 0,
-  );
+  const followingCount = profileSocial
+    ? Math.max(profileSocial.followingCount, profileSocial.following.length)
+    : Math.max(
+        getProfileMetric(profile, ['following_count', 'following']) ?? 0,
+        0,
+      );
 
   const reelsCount = Math.max(
     profileSocial?.reelsCount ?? 0,
