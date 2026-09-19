@@ -11,6 +11,8 @@ param(
     [switch]$Down,
     [switch]$Fresh,
 
+    [switch]$NoDockerEngineRepair,
+
     # Compose defaults to unlimited engine-call concurrency (-1). Lajukan has
     # enough Rust/Next.js services that an unlimited build fan-out can overload
     # Docker Desktop before BuildKit gets a chance to recover. Keep it
@@ -84,6 +86,23 @@ try {
         }
     }
 
+    if (-not $EngineReady -and -not $NoDockerEngineRepair -and $DockerDesktopCliAvailable) {
+        Write-Warning "Docker Engine belum sehat. Mencoba satu kali recovery Docker Desktop..."
+        $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "120")
+        if ($RestartProbe.ExitCode -eq 0) {
+            for ($Attempt = 1; $Attempt -le 12; $Attempt++) {
+                Start-Sleep -Seconds 5
+                $EngineProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+                $EngineProbeOutput = @($EngineProbe.Output)
+                $EngineExitCode = $EngineProbe.ExitCode
+                if ($EngineExitCode -eq 0) {
+                    $EngineReady = $true
+                    break
+                }
+            }
+        }
+    }
+
     if (-not $EngineReady) {
         $EngineDetails = ($EngineProbeOutput -join " ").Trim()
         $DesktopStatus = ""
@@ -96,15 +115,14 @@ try {
             "Status probe: $EngineDetails",
             "Docker Desktop status: $DesktopStatus",
             "",
-            "Perbaikan yang aman:",
-            "  1. docker desktop start",
-            "  2. docker info",
-            "  3. Jalankan lagi .\up.ps1 ... -Build",
+            "Recovery otomatis sudah dicoba satu kali.",
+            "Perbaikan manual:",
+            "  1. docker desktop status",
+            "  2. docker desktop restart",
+            "  3. docker info",
+            "  4. Jalankan lagi .\up.ps1 ... -Build",
             "",
-            "Jika Docker Desktop terlihat Running tetapi docker info tetap HTTP 500:",
-            "  docker desktop restart",
-            "  docker info",
-            "",
+            "Gunakan -NoDockerEngineRepair bila restart otomatis tidak diinginkan.",
             "Jangan gunakan 'docker compose down -v' untuk masalah ini; volume database tidak perlu dihapus."
         ) -join [Environment]::NewLine
 
@@ -188,21 +206,3 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Konfigurasi Docker Compose tidak valid. Perbaiki error di atas sebelum stack dijalankan."
     }
-
-    $KycRequested = $RequestedProfiles -contains "kyc"
-    if ($Environment -eq "development" -and $KycRequested -and -not $Down) {
-        Write-Host "Verifying local KYC liveness models..." -ForegroundColor Cyan
-        & $PythonCommand.Source "scripts/config/provision_kyc_models.py" "--env-file" $EnvFile
-        if ($LASTEXITCODE -ne 0) {
-            throw "Gagal menyiapkan model KYC liveness. Tidak ada container yang diubah."
-        }
-    }
-
-    $ComposeModel = & docker @ComposeArgs config --format json
-    if ($LASTEXITCODE -ne 0) {
-        throw "Gagal membuat model Docker Compose untuk validasi runtime."
-    }
-    $ValidatorArgs = @(
-        "scripts/config/runtime_contract.py",
-        "--model", "-",
-        "--env-file", $EnvFile,
