@@ -138,9 +138,7 @@ fn transfer_error_response(error: StockTransferError) -> Response {
         StockTransferError::InsufficientStock => {
             api_error(StatusCode::CONFLICT, "inventory_insufficient_stock")
         }
-        StockTransferError::Conflict => {
-            api_error(StatusCode::CONFLICT, "stock_transfer_conflict")
-        }
+        StockTransferError::Conflict => api_error(StatusCode::CONFLICT, "stock_transfer_conflict"),
         StockTransferError::Database => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "stock_transfer_storage_unavailable",
