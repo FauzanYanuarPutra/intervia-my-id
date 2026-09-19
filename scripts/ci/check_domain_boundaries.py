@@ -94,20 +94,26 @@ def validate_manifest(data: dict) -> list[str]:
 def validate_service_code(data: dict) -> list[str]:
     errors: list[str] = []
 
-    implemented = {
+    runtime_services = {
         item["service"]: item
         for item in data.get("services", [])
-        if item.get("status") == "implemented"
+        if item.get("status") in {"implemented", "target"}
     }
-    database_hosts = {
+    database_names = {
         item.get("database")
-        for item in implemented.values()
+        for item in runtime_services.values()
         if item.get("database")
     }
 
-    for service, item in implemented.items():
+    for service, item in runtime_services.items():
         service_dir = SERVICES / service
         declared_db = item.get("database")
+        if item.get("status") == "target" and service_dir.exists():
+            for required_path in ("Cargo.toml", "Dockerfile", "src/main.rs"):
+                if not (service_dir / required_path).exists():
+                    errors.append(
+                        f"{service}: target service missing required {required_path}"
+                    )
         if not service_dir.exists():
             errors.append(f"{service}: declared implemented service directory is missing")
             continue
@@ -119,7 +125,7 @@ def validate_service_code(data: dict) -> list[str]:
                 continue
 
             for host in POSTGRES_HOST_RE.findall(content):
-                if host in database_hosts and host != declared_db:
+                if host in database_names and host != declared_db:
                     errors.append(
                         f"{service}: foreign database host {host!r} referenced in "
                         f"{path.relative_to(ROOT)}"
@@ -127,7 +133,7 @@ def validate_service_code(data: dict) -> list[str]:
 
             # Also catch explicit foreign *_db tokens in configuration/source.
             for token in DB_TOKEN_RE.findall(content):
-                if token in database_hosts and token != declared_db:
+                if token in database_names and token != declared_db:
                     # Ignore documentation/config samples that are outside runtime
                     # source; this scanner is only for service source/config files.
                     errors.append(
