@@ -1,0 +1,1 @@
+-- Intentionally no-op: do not restore a role combination that violates the current CRM contract.
