@@ -659,7 +659,7 @@ async fn list_audit_events(
                 })),
             )
                 .into_response()
-        }
+        },
         Err(_) => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "business_audit_storage_unavailable",
