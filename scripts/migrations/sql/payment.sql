@@ -1,0 +1,11 @@
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+CREATE SCHEMA IF NOT EXISTS legacy;
+DROP SERVER IF EXISTS legacy_marketplace CASCADE;
+CREATE SERVER legacy_marketplace FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host :'legacy_host', port :'legacy_port', dbname 'marketplace_db');
+CREATE USER MAPPING FOR CURRENT_USER SERVER legacy_marketplace OPTIONS (user :'legacy_user', password :'legacy_password');
+IMPORT FOREIGN SCHEMA public LIMIT TO (transactions,wallet_accounts,wallet_topups,wallet_ledger_entries,wallet_withdrawals) FROM SERVER legacy_marketplace INTO legacy;
+INSERT INTO transactions SELECT id,content_id,buyer_id,seller_id,amount_cents,currency,transaction_status,offer_message,response_message,created_at,updated_at FROM legacy.transactions ON CONFLICT(id) DO NOTHING;
+INSERT INTO wallet_accounts SELECT id,user_id,environment,currency,available_balance_cents,held_balance_cents,total_topup_cents,total_spend_cents,status,metadata,created_at,updated_at FROM legacy.wallet_accounts ON CONFLICT(id) DO NOTHING;
+INSERT INTO wallet_topups SELECT id,user_id,account_id,environment,amount_cents,fee_cents,net_amount_cents,currency,payment_provider,payment_method,external_reference,checkout_url,payment_payload,description,status,paid_at,expired_at,created_at,updated_at FROM legacy.wallet_topups ON CONFLICT(id) DO NOTHING;
+INSERT INTO wallet_ledger_entries SELECT id,user_id,account_id,environment,currency,direction,amount_cents,balance_after_cents,entry_type,status,reference_type,reference_id,description,metadata,created_at FROM legacy.wallet_ledger_entries ON CONFLICT(id) DO NOTHING;
+INSERT INTO wallet_withdrawals SELECT id,user_id,account_id,environment,amount_cents,fee_cents,net_amount_cents,currency,bank_code,bank_name,bank_account_name,bank_account_number_masked,bank_account_number_hash,status,note,metadata,requested_at,processed_at,cancelled_at,created_at,updated_at FROM legacy.wallet_withdrawals ON CONFLICT(id) DO NOTHING;
