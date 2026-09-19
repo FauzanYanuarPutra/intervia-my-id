@@ -108,7 +108,6 @@ pub(crate) async fn validate_phone_otp_proof(
     ))
 }
 
-
 pub(crate) async fn consume_email_otp_proof(
     state: &AppState,
     token: &str,
@@ -134,7 +133,10 @@ fn valid_email_otp_payload(raw: &str, expected_email: &str, allowed_purposes: &[
         return false;
     };
     payload.kind == "email"
-        && payload.target.trim().eq_ignore_ascii_case(expected_email.trim())
+        && payload
+            .target
+            .trim()
+            .eq_ignore_ascii_case(expected_email.trim())
         && allowed_purposes
             .iter()
             .any(|purpose| payload.purpose == *purpose)
