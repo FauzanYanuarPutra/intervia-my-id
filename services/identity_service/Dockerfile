@@ -42,7 +42,7 @@ RUN if [ ! -d migrations ]; then \
 
 RUN find src -type f -name '*.rs' -exec touch {} +
 
-RUN cargo build --release --locked --bin identity_service --bin provision_backoffice
+RUN cargo build --release --locked --bin identity_service --bin provision_backoffice --bin bootstrap_backoffice
 
 # --- Runtime ---
 FROM debian:bookworm-slim AS runtime
@@ -62,6 +62,7 @@ WORKDIR /app
 
 COPY --from=builder /app/target/release/identity_service /usr/local/bin/app_service
 COPY --from=builder /app/target/release/provision_backoffice /usr/local/bin/provision_backoffice
+COPY --from=builder /app/target/release/bootstrap_backoffice /usr/local/bin/bootstrap_backoffice
 
 EXPOSE 8080
 
