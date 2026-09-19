@@ -1,5 +1,5 @@
-import CmsDashboard from '@/components/CmsDashboard';
+import CmsControlCenter from '@/components/CmsControlCenter';
 
 export default function CmsPage() {
-  return <CmsDashboard />;
+  return <CmsControlCenter />;
 }
