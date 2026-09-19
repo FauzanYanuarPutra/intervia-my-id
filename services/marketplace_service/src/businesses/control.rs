@@ -190,6 +190,7 @@ impl ControlRepository {
 
     pub(crate) async fn create_ingredient(
         &self,
+        actor_id: Uuid,
         business_id: Uuid,
         organization_id: Uuid,
         request: CreateIngredientRequest,
@@ -231,7 +232,45 @@ impl ControlRepository {
         )
         .fetch_one(&self.db)
         .await
-        .map_err(Into::into)
+        .map_err(Into::into)?;
+        
+        let mut transaction = self.db.begin().await?;
+        let row = sqlx::query_as::<_, IngredientRecord>(
+            "SELECT id, business_id, organization_id, name, kind, purchase_unit, recipe_unit,
+              conversion_factor, purchase_price_amount, purchase_quantity, yield_percent,
+              waste_percent, stock_quantity, minimum_stock, supplier_name, status,
+              created_at, updated_at
+             FROM business_ingredients WHERE id=$1",
+        )
+        .bind(row.id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        super::audit::record_tx(
+            &mut transaction,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "ingredient.created",
+            "business_ingredient",
+            Some(row.id),
+            Some("Bahan dibuat"),
+            serde_json::json!({
+                "summary": format!("Bahan {} dibuat", row.name),
+                "after": {
+                    "name": row.name,
+                    "kind": row.kind,
+                    "purchase_unit": row.purchase_unit,
+                    "recipe_unit": row.recipe_unit,
+                    "purchase_price_amount": row.purchase_price_amount,
+                    "purchase_quantity": row.purchase_quantity,
+                    "minimum_stock": row.minimum_stock,
+                    "supplier_name": row.supplier_name
+                }
+            }),
+        ).await?;
+        transaction.commit().await?;
+        Ok(row)
     }
 
     pub(crate) async fn get_recipe(
