@@ -71,6 +71,7 @@ type NewsItem = {
   title: string;
   summary?: string | null;
   body: string;
+  cover_image?: string | null;
   metadata?: Record<string, unknown>;
   content_status: string;
   published_at?: string | null;
