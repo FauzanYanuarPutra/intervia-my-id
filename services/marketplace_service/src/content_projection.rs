@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 
-fn is_public_reference_response_metadata(metadata: &Value) -> bool {
+pub(crate) fn is_public_reference_response_metadata(metadata: &Value) -> bool {
     let record_kind = metadata
         .get("record_kind")
         .and_then(Value::as_str)

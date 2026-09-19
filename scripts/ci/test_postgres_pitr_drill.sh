@@ -28,7 +28,7 @@ done
 
 docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c   "CREATE TABLE pitr_probe(id integer primary key, label text, created_at timestamptz default clock_timestamp()); INSERT INTO pitr_probe VALUES (1,'before',clock_timestamp());"
 
-DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres" BACKUP_ROOT="/backups" docker run --rm --network "$NETWORK"   -v "$ROOT:/repo:ro"   -v "$BACKUPS:/backups"   -e DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres"   -e BACKUP_ROOT=/backups   postgres:16-alpine   sh -lc "apk add --no-cache bash coreutils >/dev/null && /repo/scripts/ops/postgres_pitr_basebackup.sh" >/tmp/lajukan-pitr-backup-path.txt
+DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres" BACKUP_ROOT="/backups" docker run --rm --network "$NETWORK"   -v "$ROOT:/repo:ro"   -v "$BACKUPS:/backups"   -e DATABASE_URL="postgres://postgres@$PRIMARY:5432/postgres"   -e BACKUP_ROOT=/backups   postgres:16-alpine   sh -lc "apk add --no-cache bash coreutils >/dev/null && bash /repo/scripts/ops/postgres_pitr_basebackup.sh" >/tmp/lajukan-pitr-backup-path.txt
 
 backup_dir="$BACKUPS/$(basename "$(tail -n1 /tmp/lajukan-pitr-backup-path.txt)")"
 target_time="$(docker exec "$PRIMARY" psql -U postgres -d postgres -X -A -t -c "SELECT clock_timestamp()")"
@@ -41,4 +41,4 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
-BASE_BACKUP_DIR="$backup_dir" WAL_ARCHIVE_DIR="$ARCHIVE" RECOVERY_TARGET_TIME="$target_time" PITR_ASSERT_SQL="DO \$\$ BEGIN IF (SELECT count(*) FROM pitr_probe WHERE id=1) <> 1 THEN RAISE EXCEPTION 'missing before row'; END IF; IF (SELECT count(*) FROM pitr_probe WHERE id=2) <> 0 THEN RAISE EXCEPTION 'after row survived target-time recovery'; END IF; END \$\$;" PITR_DRILL_PORT=55439 "$ROOT/scripts/ops/postgres_pitr_restore_drill.sh"
+BASE_BACKUP_DIR="$backup_dir" WAL_ARCHIVE_DIR="$ARCHIVE" RECOVERY_TARGET_TIME="$target_time" PITR_ASSERT_SQL="DO \$\$ BEGIN IF (SELECT count(*) FROM pitr_probe WHERE id=1) <> 1 THEN RAISE EXCEPTION 'missing before row'; END IF; IF (SELECT count(*) FROM pitr_probe WHERE id=2) <> 0 THEN RAISE EXCEPTION 'after row survived target-time recovery'; END IF; END \$\$;" PITR_DRILL_PORT=55439 bash "$ROOT/scripts/ops/postgres_pitr_restore_drill.sh"
