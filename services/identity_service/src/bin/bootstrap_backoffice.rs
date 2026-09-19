@@ -301,7 +301,7 @@ async fn ensure_account(
     // for both first-party backoffice surfaces.
     if spec.slot == "admin" {
         for (application, role_names) in [
-            ("crm", vec!["admin", "content_admin", "sales", "support"]),
+            ("crm", vec!["admin", "sales", "support"]),
             ("cms", vec!["admin", "content_admin"]),
         ] {
             sqlx::query(
