@@ -622,6 +622,9 @@ pub async fn create_security_incident(
     if !valid_incident_severity(&severity) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid incident severity"}))).into_response();
     }
+    if payload.affected_user_count.is_some_and(|value| value < 0) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error":"affected_user_count cannot be negative"}))).into_response();
+    }
     let summary = payload.summary.trim().to_string();
     if summary.is_empty() || summary.chars().count() > 10_000 {
         return (StatusCode::BAD_REQUEST, Json(json!({"error":"summary must contain 1-10000 characters"}))).into_response();
@@ -769,9 +772,6 @@ pub async fn transition_security_incident(
     let status = payload.status.trim().to_ascii_lowercase();
     if !valid_incident_status(&status) {
         return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid incident status"}))).into_response();
-    }
-    if payload.affected_user_count.is_some_and(|value| value < 0) {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error":"affected_user_count cannot be negative"}))).into_response();
     }
     if let Some(value) = payload.subject_notification_status.as_deref() {
         if !valid_notification_status(value) {
