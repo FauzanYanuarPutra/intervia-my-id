@@ -8,6 +8,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
+    counterparty::{validate_document_party_tx, CounterpartyError, CounterpartyRole},
     event_outbox::enqueue_business_event,
     execution_policy::{
         allocate_document_number_tx, load_execution_policy_tx, resolve_operational_location_tx,
@@ -91,6 +92,8 @@ pub(crate) struct CreateSaleRequest {
     pub(crate) location_id: Option<Uuid>,
     #[serde(default)]
     pub(crate) source_order_id: Option<Uuid>,
+    #[serde(default)]
+    pub(crate) party_id: Option<Uuid>,
     pub(crate) lines: Vec<CreateSaleLineRequest>,
 }
 
@@ -103,6 +106,7 @@ pub(crate) struct SaleRecord {
     pub(crate) currency: String,
     pub(crate) document_number: String,
     pub(crate) source_order_id: Option<Uuid>,
+    pub(crate) party_id: Option<Uuid>,
     pub(crate) correlation_id: Uuid,
     pub(crate) policy_snapshot: Value,
     pub(crate) occurred_on: NaiveDate,
@@ -263,6 +267,16 @@ impl SaleRepository {
         if let Some(source_order_id) = normalized.source_order_id {
             ensure_source_order_tx(&mut tx, business_id, organization_id, source_order_id).await?;
         }
+        let party_id = validate_document_party_tx(
+            &mut tx,
+            business_id,
+            organization_id,
+            normalized.party_id,
+            CounterpartyRole::Customer,
+            normalized.account_key == "receivable",
+        )
+        .await
+        .map_err(map_counterparty_error)?;
 
         // Business-day semantics use the tenant timezone and configured cutoff.
         let (business_today, posting_time) = sqlx::query_as::<_, (NaiveDate, DateTime<Utc>)>(
@@ -342,14 +356,14 @@ impl SaleRepository {
             r#"
             INSERT INTO business_sales (
               id, business_id, organization_id, location_id, currency, document_number,
-              source_order_id, correlation_id, policy_snapshot,
+              source_order_id, party_id, correlation_id, policy_snapshot,
               idempotency_key, request_hash, occurred_on, channel_key, account_key, status,
               gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
               created_by_user_id
             ) VALUES (
-              $1,$2,$3,$4,$5,$6,$7,$8,$9,
-              $10,$11,$12,$13,$14,'completed',
-              $15,$16,$17,$18,$19,$20
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+              $11,$12,$13,$14,$15,'completed',
+              $16,$17,$18,$19,$20,$21
             )
             ON CONFLICT (business_id, idempotency_key) DO NOTHING
             RETURNING id
@@ -362,6 +376,7 @@ impl SaleRepository {
         .bind(&policy.currency)
         .bind(&document_number)
         .bind(normalized.source_order_id)
+        .bind(party_id)
         .bind(correlation_id)
         .bind(policy_snapshot.clone())
         .bind(idempotency_key)
@@ -491,6 +506,7 @@ impl SaleRepository {
             "currency": policy.currency,
             "correlation_id": correlation_id,
             "source_order_id": normalized.source_order_id,
+            "party_id": party_id,
             "occurred_on": normalized.occurred_on,
             "final_amount": final_amount,
             "cogs_amount": cogs_amount,
@@ -528,6 +544,7 @@ struct NormalizedSaleRequest {
     account_key: String,
     location_id: Option<Uuid>,
     source_order_id: Option<Uuid>,
+    party_id: Option<Uuid>,
     lines: Vec<CreateSaleLineRequest>,
 }
 
@@ -571,6 +588,7 @@ fn validate_request(
         account_key,
         location_id: request.location_id,
         source_order_id: request.source_order_id,
+        party_id: request.party_id,
         lines: request.lines,
     })
 }
@@ -584,6 +602,8 @@ struct SaleRequestFingerprint {
     location_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
     source_order_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    party_id: Option<Uuid>,
     lines: Vec<SaleLineFingerprint>,
 }
 
@@ -639,6 +659,7 @@ fn canonical_sale_request_hash(
         account_key: request.account_key.clone(),
         location_id: request.location_id,
         source_order_id: request.source_order_id,
+        party_id: request.party_id,
         lines,
     })
     .map_err(|_| SaleRepositoryError::Database)
@@ -1156,6 +1177,17 @@ fn map_execution_policy_error(error: ExecutionPolicyError) -> SaleRepositoryErro
     }
 }
 
+fn map_counterparty_error(error: CounterpartyError) -> SaleRepositoryError {
+    match error {
+        CounterpartyError::Required => SaleRepositoryError::Validation("sale_party_required"),
+        CounterpartyError::Invalid => SaleRepositoryError::Validation("invalid_sale_party"),
+        CounterpartyError::CustomerRoleInUse
+        | CounterpartyError::SupplierRoleInUse
+        | CounterpartyError::OutstandingBalance
+        | CounterpartyError::Database => SaleRepositoryError::Database,
+    }
+}
+
 async fn ensure_source_order_tx(
     tx: &mut Transaction<'_, Postgres>,
     business_id: Uuid,
@@ -1350,7 +1382,7 @@ async fn load_lines_tx(
 
 const SALE_SELECT_LIST: &str = r#"
 SELECT id, business_id, organization_id, location_id, currency, document_number,
-  source_order_id, correlation_id, policy_snapshot,
+  source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
@@ -1362,7 +1394,7 @@ LIMIT $3
 
 const SALE_SELECT_BY_IDEMPOTENCY: &str = r#"
 SELECT id, business_id, organization_id, location_id, currency, document_number,
-  source_order_id, correlation_id, policy_snapshot,
+  source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
@@ -1373,7 +1405,7 @@ LIMIT 1
 
 const SALE_SELECT_BY_ID: &str = r#"
 SELECT id, business_id, organization_id, location_id, currency, document_number,
-  source_order_id, correlation_id, policy_snapshot,
+  source_order_id, party_id, correlation_id, policy_snapshot,
   occurred_on, channel_key, account_key, status,
   gross_amount, discount_amount, final_amount, cogs_amount, cost_complete,
   created_by_user_id, created_at, updated_at
@@ -1547,6 +1579,7 @@ mod tests {
             account_key: "wallet-that-does-not-exist".into(),
             location_id: None,
             source_order_id: None,
+            party_id: None,
             lines: vec![CreateSaleLineRequest {
                 product_id: Uuid::nil(),
                 quantity: Decimal::ONE,
