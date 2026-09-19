@@ -23,6 +23,7 @@ const messages: Record<string, string> = {
   invalid_product_consignment_terms: 'Skema titip jual terlalu panjang.',
   invalid_product_notes: 'Catatan produk terlalu panjang.',
   invalid_inventory_reason: 'Alasan perubahan stok terlalu panjang.',
+  product_change_reason_required: 'Tulis catatan perubahan produk minimal 3 karakter.',
   empty_product_update: 'Tidak ada perubahan produk untuk disimpan.',
   missing_idempotency_key: 'Permintaan belum lengkap. Muat ulang halaman lalu coba lagi.',
   inventory_insufficient_stock: 'Stok tidak cukup untuk perubahan ini.',
