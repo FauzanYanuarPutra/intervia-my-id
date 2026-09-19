@@ -128,9 +128,6 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
     }
   }
 
-  useEffect(() => {
-    if (open) void load();
-  }, [open]);
 
   const grouped = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('id-ID');
@@ -154,7 +151,10 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
       <button
         ref={returnFocusRef}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          void load();
+        }}
         className={
           compact
             ? 'portal-button-ghost min-h-9 px-2.5 text-xs'
