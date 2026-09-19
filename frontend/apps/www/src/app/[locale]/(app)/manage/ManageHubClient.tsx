@@ -18,6 +18,7 @@ import {
   Loader2,
   Megaphone,
   MessageCircle,
+  Newspaper,
   Package,
   Plus,
   RefreshCw,
@@ -35,6 +36,8 @@ type ManageHubClientProps = {
 
 type CountState = {
   activeListings: number;
+  newsSubmissions: number;
+  newsNeedsAction: number;
   draftListings: number;
   archivedListings: number;
   communityPosts: number;
@@ -64,6 +67,7 @@ type ManageItem = {
   value?: number;
   valueLabel?: string;
   helper?: string;
+  attentionValue?: number;
 };
 
 type ShortcutItem = {
@@ -75,6 +79,8 @@ type ShortcutItem = {
 
 const EMPTY_COUNTS: CountState = {
   activeListings: 0,
+  newsSubmissions: 0,
+  newsNeedsAction: 0,
   draftListings: 0,
   archivedListings: 0,
   communityPosts: 0,
@@ -328,6 +334,9 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           authFetch('/api/super-app/umkm/stores?mine=1&limit=80', {
             cache: 'no-store',
           }),
+          authFetch('/api/news/submissions', {
+            cache: 'no-store',
+          }),
         ]);
 
         const responses = results.map(result =>
@@ -347,7 +356,19 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           transactionPayload,
           inboxPayload,
           storesPayload,
+          newsPayload,
         ] = payloads;
+
+        const newsItems = listFromPayload(newsPayload);
+        const newsNeedsAction = newsItems.filter(item => {
+          const metadata = asRecord(item.metadata);
+          const news = asRecord(metadata?.news);
+          const status =
+            typeof news?.editorial_status === 'string'
+              ? news.editorial_status.trim().toLowerCase()
+              : '';
+          return ['needs_revision', 'rejected'].includes(status);
+        }).length;
 
         const activeTransactions = listFromPayload(transactionPayload).filter(
           item => {
@@ -375,6 +396,8 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
           activeTransactions,
           unreadChats: countUnreadInbox(inboxPayload),
           businesses: countPayload(storesPayload),
+          newsSubmissions: newsItems.length,
+          newsNeedsAction,
         });
 
         setPartialError(
@@ -424,6 +447,19 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
       });
     }
 
+    if (counts.newsNeedsAction > 0) {
+      items.push({
+        id: 'news',
+        href: '/news/submissions',
+        title: isId ? 'Tindak lanjuti News' : 'Follow up News',
+        detail: isId
+          ? formatCount(counts.newsNeedsAction, locale) + ' kiriman perlu revisi'
+          : formatCount(counts.newsNeedsAction, locale) + ' submissions need revision',
+        icon: Newspaper,
+        priority: 'high',
+      });
+    }
+
     if (counts.draftListings > 0) {
       items.push({
         id: 'draft',
@@ -438,7 +474,7 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
     }
 
     return items.slice(0, 3);
-  }, [counts.activeTransactions, counts.draftListings, counts.unreadChats, isId, locale]);
+  }, [counts.activeTransactions, counts.draftListings, counts.newsNeedsAction, counts.unreadChats, isId, locale]);
 
   const manageItems = useMemo<ManageItem[]>(
     () => [
@@ -498,7 +534,20 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
         icon: Users,
         value: counts.communityPosts,
         valueLabel: isId ? 'postingan' : 'posts',
+      },      {
+        id: 'news',
+        href: '/news/submissions',
+        title: 'News',
+        description: isId ? 'Pantau kiriman dan revisi berita.' : 'Track submissions and news revisions.',
+        icon: Newspaper,
+        value: counts.newsSubmissions,
+        valueLabel: isId ? 'kiriman' : 'submissions',
+        helper: isId
+          ? formatCount(counts.newsNeedsAction, locale) + ' perlu revisi'
+          : formatCount(counts.newsNeedsAction, locale) + ' need revision',
+        attentionValue: counts.newsNeedsAction,
       },
+
     ],
     [
       counts.activeListings,
@@ -509,6 +558,8 @@ export default function ManageHubClient({ isId }: ManageHubClientProps) {
       counts.draftListings,
       counts.reels,
       counts.unreadChats,
+      counts.newsNeedsAction,
+      counts.newsSubmissions,
       isId,
       locale,
     ],
@@ -735,7 +786,9 @@ function ManageRow({
   index: number;
 }) {
   const Icon = item.icon;
-  const hasAttention = item.id === 'chat' && (item.value ?? 0) > 0;
+  const hasAttention =
+    (item.id === 'chat' && (item.value ?? 0) > 0) ||
+    (item.attentionValue ?? 0) > 0;
   const isSecondColumn = index % 2 === 1;
 
   return (
@@ -759,7 +812,9 @@ function ManageRow({
           </span>
           {hasAttention ? (
             <span className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-black text-white">
-              {item.value && item.value > 99 ? '99+' : item.value}
+              {(item.attentionValue ?? item.value ?? 0) > 99
+                ? '99+'
+                : (item.attentionValue ?? item.value ?? 0)}
             </span>
           ) : null}
         </span>
@@ -825,7 +880,7 @@ function ManageHubSkeleton({ label }: { label: string }) {
         <SkeletonPulse className="h-5 w-20 rounded-full" />
         <div className="mt-2 overflow-hidden rounded-2xl border border-[color:var(--app-border)]">
           <div className="grid sm:grid-cols-2">
-            {Array.from({ length: 6 }).map((_, index) => (
+            {Array.from({ length: 7 }).map((_, index) => (
               <div
                 key={index}
                 className={cn(
