@@ -54,7 +54,13 @@ export function SensitiveActionConfirm({
               onChange={event => onValueChange?.(event.target.value)}
               className="portal-input"
               placeholder="Tulis alasan"
+              minLength={3}
+              maxLength={500}
+              aria-describedby="sensitive-action-reason-help"
             />
+            <span id="sensitive-action-reason-help" className="text-[11px] font-normal text-portal-soft">
+              Minimal 3 karakter. Alasan ini ikut disimpan di riwayat perubahan.
+            </span>
           </label>
         ) : null}
 
