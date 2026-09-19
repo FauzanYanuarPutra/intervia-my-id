@@ -143,7 +143,7 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
           <div>
             <p className="font-bold">Jenis usaha</p>
             <p className="text-xs text-portal-soft">
-              Ini menentukan flow awal dan fitur yang aktif. Bisa dikembangkan kemudian tanpa pindah aplikasi.
+              Pilih yang paling mirip dengan usaha kamu. Pilihan ini bisa diubah nanti.
             </p>
           </div>
         </div>
