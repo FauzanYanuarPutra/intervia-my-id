@@ -23,6 +23,11 @@ services:
   trust_service:
     ports: ["127.0.0.1:${PORT_TRUST:-8099}:8099"]
 
+  support_service:
+    ports: ["127.0.0.1:${PORT_SUPPORT:-8100}:8100"]
+  review_service:
+    ports: ["127.0.0.1:${PORT_REVIEW:-8101}:8101"]
+
   identity_db:
     ports:
       - "127.0.0.1:${PORT_IDENTITY_DB:-5432}:5432"
