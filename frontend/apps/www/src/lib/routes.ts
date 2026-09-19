@@ -694,7 +694,7 @@ export const routes: RouteConfig[] = [
       descriptionEn: "Learn about Lajukan and how the platform supports business needs and activity.",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
-      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
     },
     access: PUBLIC_ACCESS,
