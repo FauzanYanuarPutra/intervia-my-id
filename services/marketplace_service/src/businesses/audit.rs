@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
-use sqlx::{Postgres, PgPool, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
