@@ -778,6 +778,7 @@ export const routes: RouteConfig[] = [
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
     },
+    isDisabled: false,
     access: PUBLIC_ACCESS,
     shared: true,
     children: [

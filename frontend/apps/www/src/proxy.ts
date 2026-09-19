@@ -214,6 +214,11 @@ function applyTemporaryRedirectHeaders(res: NextResponse) {
   return res;
 }
 
+function routePathForNews(pathname: string, locale: Locale): boolean {
+  const prefix = `/${locale}/news`;
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 function shouldNoIndexRoute(routePath: string) {
   return isAuthRoutePath(routePath) || isProtectedRoutePath(routePath);
 }
@@ -769,10 +774,16 @@ export async function proxy(req: NextRequest) {
 
   const locale = langSegment;
 
+  // News is a live public surface. Keep every localized /news path out of
+  // legacy/dead-route canonicalization so a stale feature flag cannot silently
+  // send News back to Home. Access control below still applies to protected
+  // News children such as /news/submit and /news/submissions.
+  const isNewsRoute = routePathForNews(pathname, locale);
+
   // 4. Route auth checks
   const routePath = '/' + segments.slice(2).join('/');
   const routeSegment = segments[2] || '';
-  if (DEAD_ROUTE_SEGMENTS.has(routeSegment)) {
+  if (!isNewsRoute && DEAD_ROUTE_SEGMENTS.has(routeSegment)) {
     // Feature/dead-route gating is operational state, not a canonical URL move.
     // Never cache it permanently: a route (such as News) can be restored later.
     return redirectToTemporaryLocalizedTarget(req, locale, '/home');
