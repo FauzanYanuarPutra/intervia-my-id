@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2, RefreshCcw, ShieldCheck } from 'lucide-react';
 
 type RequestItem = {
@@ -51,7 +51,7 @@ export function PrivacyRequestCenter({ locale }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -64,11 +64,11 @@ export function PrivacyRequestCenter({ locale }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isId]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   const submit = async () => {
     if (submitting) return;
