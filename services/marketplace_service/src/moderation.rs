@@ -697,8 +697,7 @@ pub async fn moderate_content(
         Ok(value) => value,
         Err(error) => {
             tracing::error!("moderate_content case create error: {:?}", error);
-            return err(
-                StatusCode::INTERNAL_SERVER_ERROR,
+            return err(                StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to create moderation case",
             )
             .into_response();
@@ -1156,7 +1155,7 @@ pub async fn review_content_appeal(
     .bind(reviewer_id)
     .bind(action)
     .bind(note.as_deref())
-    .bind(previous_status)
+    .bind(&previous_status)
     .bind(next_status)
     .bind(serde_json::to_value(&current).unwrap_or_else(|_| json!({})))
     .execute(&mut *tx)
@@ -1197,4 +1196,3 @@ pub async fn review_content_appeal(
     )
         .into_response()
 }
-
