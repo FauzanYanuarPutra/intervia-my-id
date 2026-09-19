@@ -39,6 +39,8 @@ function order(status: SellerOrderAggregate['order']['base_status'], allowed: Se
       created_at: '2026-09-18T00:00:00Z',
     }],
     allowed_next_statuses: allowed,
+    last_transition_reason: null,
+    last_transition_at: null,
   };
 }
 
