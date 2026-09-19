@@ -1,0 +1,28 @@
+name: Temporary Documents Rustfmt Latest
+
+on:
+  push:
+    branches:
+      - automation/rustfmt-docs-9fe11998
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: automation/rustfmt-docs-9fe11998
+      - run: rustup show
+      - run: cd services/marketplace_service && cargo fmt
+      - shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service
+          git commit -m "style: format document and approval runtime"
+          git push origin HEAD:automation/rustfmt-docs-9fe11998
