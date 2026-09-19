@@ -8,6 +8,7 @@ PRIMARY="lajukan-pitr-primary-$$"
 NETWORK="lajukan-pitr-net-$$"
 ARCHIVE="$WORK/wal"
 BACKUPS="$WORK/backups"
+BACKUP_PATH_FILE="$WORK/backup-path.txt"
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
 mkdir -p "$ARCHIVE" "$BACKUPS"
@@ -23,10 +24,21 @@ trap cleanup EXIT
 docker network create "$NETWORK" >/dev/null
 docker run -d --name "$PRIMARY" --network "$NETWORK"   -e POSTGRES_HOST_AUTH_METHOD=trust   -v "$ARCHIVE:/wal-archive"   postgres:16-alpine   -c wal_level=replica   -c archive_mode=on   -c "archive_command=test ! -f /wal-archive/%f && cp %p /wal-archive/%f"   -c archive_timeout=1s   -c max_wal_senders=10 >/dev/null
 
+primary_ready=0
 for _ in $(seq 1 60); do
-  docker exec "$PRIMARY" pg_isready -U postgres >/dev/null 2>&1 && break
+  # The official image briefly starts an init-only Unix-socket server. Require
+  # TCP readiness so we only continue after the final PostgreSQL server starts.
+  if docker exec "$PRIMARY" pg_isready -h 127.0.0.1 -U postgres -d postgres >/dev/null 2>&1; then
+    primary_ready=1
+    break
+  fi
   sleep 1
 done
+if (( primary_ready == 0 )); then
+  echo "PITR primary did not become ready" >&2
+  docker logs "$PRIMARY" >&2 || true
+  exit 1
+fi
 
 # POSTGRES_HOST_AUTH_METHOD=trust covers normal host connections, but PostgreSQL
 # requires a distinct pg_hba rule for physical replication connections.
@@ -51,9 +63,9 @@ docker run --rm --network "$NETWORK" \
     backup_path="$(bash /repo/scripts/ops/postgres_pitr_basebackup.sh)"
     chown -R "$HOST_UID:$HOST_GID" "$backup_path"
     printf "%s\\n" "$backup_path"
-  ' >/tmp/lajukan-pitr-backup-path.txt
+  ' >"$BACKUP_PATH_FILE"
 
-backup_dir="$BACKUPS/$(basename "$(tail -n1 /tmp/lajukan-pitr-backup-path.txt)")"
+backup_dir="$BACKUPS/$(basename "$(tail -n1 "$BACKUP_PATH_FILE")")"
 target_time="$(docker exec "$PRIMARY" psql -U postgres -d postgres -X -A -t -c "SELECT clock_timestamp()")"
 sleep 1
 docker exec "$PRIMARY" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c   "INSERT INTO pitr_probe VALUES (2,'after',clock_timestamp()); SELECT pg_switch_wal();"
