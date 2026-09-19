@@ -227,6 +227,14 @@ async fn main() -> anyhow::Result<()> {
         sqlx::migrate!("./migrations").run(&db).await?;
     }
 
+    if env::var("MIGRATE_ONLY")
+        .unwrap_or_default()
+        .eq_ignore_ascii_case("true")
+    {
+        tracing::info!(service = service_name(), "migration-only run complete");
+        return Ok(());
+    }
+
     let timeout_ms: u64 = env::var("LEGACY_PROXY_TIMEOUT_MS")
         .unwrap_or_else(|_| "5000".into())
         .parse()?;
