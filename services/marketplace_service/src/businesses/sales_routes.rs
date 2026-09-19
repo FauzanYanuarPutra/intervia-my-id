@@ -323,6 +323,7 @@ mod tests {
                 currency: "IDR".to_owned(),
                 document_number: "TEST-SAL-000001".to_owned(),
                 source_order_id: None,
+                party_id: None,
                 correlation_id: Uuid::new_v4(),
                 policy_snapshot: json!({"accounting_mode":"simple"}),
                 occurred_on: NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),

@@ -116,6 +116,37 @@ def main() -> int:
         'append-only', 'receivable', 'payable',
     )
     require(
+        'services/marketplace_service/migrations/20260919060000_counterparty_linkage_v1.up.sql',
+        'party_id', 'receivable sale requires customer party',
+        'payable purchase requires supplier party',
+        'validate_business_payment_allocation_counterparty',
+    )
+    require(
+        'services/marketplace_service/src/businesses/counterparty.rs',
+        'validate_document_party_tx', 'CounterpartyRole',
+        'validate_party_role_change_tx', 'ensure_party_archive_allowed_tx',
+        'OutstandingBalance',
+    )
+    require(
+        'services/marketplace_service/src/businesses/sales.rs',
+        'sale_party_required', 'invalid_sale_party', 'party_id',
+    )
+    require(
+        'services/marketplace_service/src/businesses/wave2.rs',
+        'purchase_party_required', 'invalid_purchase_party', 'party_id',
+    )
+    require(
+        'services/marketplace_service/src/businesses/commercial_core.rs',
+        'payment_mixed_counterparties', 'payment_party_mismatch',
+        'party_has_outstanding_balance', 'party_customer_role_in_use',
+        'party_supplier_role_in_use',
+    )
+    require(
+        'docs/architecture/counterparty-linkage.md',
+        'Counterparty Linkage V1', 'receivable sales require',
+        'payable purchases require', 'payment allocation',
+    )
+    require(
         'services/marketplace_service/migrations/20260919040000_stock_transfer_kernel_v1.up.sql',
         'business_stock_transfers', 'transfer_out', 'transfer_in',
         'ux_business_inventory_transfer_movement',
