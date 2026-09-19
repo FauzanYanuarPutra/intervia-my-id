@@ -13,6 +13,7 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
   const router = useRouter();
   const [schedule, setSchedule] = useState(business.schedule);
   const [isOpen, setIsOpen] = useState(business.isOpen);
+  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -22,6 +23,10 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
 
     if (schedule.trim().length < 5) {
       setError('Jam buka belum valid.');
+      return;
+    }
+    if (reason.trim().length < 3) {
+      setError('Tulis alasan perubahan operasional minimal 3 karakter.');
       return;
     }
 
@@ -38,6 +43,7 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
         body: JSON.stringify({
           schedule: schedule.trim(),
           isOpen,
+          reason: reason.trim(),
         }),
       });
 
@@ -48,6 +54,7 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
         return;
       }
 
+      setReason('');
       setSuccess(isOpen ? 'Usaha ditandai sedang buka.' : 'Usaha ditandai tutup.');
       startTransition(() => {
         router.refresh();
@@ -99,10 +106,21 @@ export function OperationsQuickForm({ business }: OperationsQuickFormProps) {
         />
       </label>
 
+      <label className="grid gap-2 text-sm font-semibold text-portal-ink">
+        Alasan perubahan
+        <input
+          value={reason}
+          onChange={event => setReason(event.target.value)}
+          maxLength={500}
+          placeholder="Contoh: jam operasional berubah untuk hari ini"
+          className="portal-input"
+        />
+      </label>
+
       {error ? <p role="alert" className="text-sm text-portal-ember">{error}</p> : null}
       {success ? <p role="status" aria-live="polite" className="text-sm text-portal-forest">{success}</p> : null}
 
-      <button type="submit" disabled={isPending} className="portal-button-primary">
+      <button type="submit" disabled={isPending || reason.trim().length < 3} className="portal-button-primary">
         <Save className="h-4 w-4" />
         {isPending ? 'Menyimpan...' : 'Simpan operasional'}
       </button>
