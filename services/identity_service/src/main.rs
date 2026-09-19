@@ -33,7 +33,8 @@ use identity_service::organizations::routes::{
     list_organizations,
 };
 use identity_service::routes::{
-    change_password, create_backoffice_invitation, create_privacy_request, create_security_incident,
+    cancel_my_privacy_request, change_password, create_backoffice_invitation, create_privacy_request,
+    create_security_incident,
     delete_me_account, discover_users,
     get_me_profile, get_public_user_profile, get_user_by_email, get_user_by_phone, get_user_detail,
     health_check, list_backoffice_google_access, list_backoffice_invitations,
@@ -614,6 +615,7 @@ async fn main() -> Result<()> {
         .route("/users/{id}/moderate", post(moderate_user))
         .route("/privacy/requests", get(list_privacy_requests).post(create_privacy_request))
         .route("/privacy/requests/mine", get(list_my_privacy_requests))
+        .route("/privacy/requests/{id}/cancel", post(cancel_my_privacy_request))
         .route("/privacy/requests/{id}/transition", post(transition_privacy_request))
         .route("/security/incidents", get(list_security_incidents).post(create_security_incident))
         .route("/security/incidents/{id}/transition", post(transition_security_incident))
