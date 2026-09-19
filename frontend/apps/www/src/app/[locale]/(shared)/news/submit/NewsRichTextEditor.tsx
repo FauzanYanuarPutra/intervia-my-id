@@ -35,7 +35,7 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
     const text = textFromHtml(html);
     onChange(html, text);
     try {
-      localStorage.setItem('lajukan-news-draft', JSON.stringify({ value: html, savedAt: Date.now() }));
+      localStorage.setItem('lajukan-news-draft', JSON.stringify({ value: html }));
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1200);
     } catch {}
@@ -78,26 +78,26 @@ export default function NewsRichTextEditor({ value, onChange, locale }: Props) {
   };
 
   const tools = [
-    ['bold', <Bold className="h-4 w-4" />],
-    ['italic', <Italic className="h-4 w-4" />],
-    ['underline', <Underline className="h-4 w-4" />],
-    ['formatBlock:H2', <Heading2 className="h-4 w-4" />],
-    ['formatBlock:H3', <Heading3 className="h-4 w-4" />],
-    ['insertUnorderedList', <List className="h-4 w-4" />],
-    ['insertOrderedList', <ListOrdered className="h-4 w-4" />],
-    ['formatBlock:BLOCKQUOTE', <Quote className="h-4 w-4" />],
-    ['formatBlock:PRE', <Code2 className="h-4 w-4" />],
+    { action: 'bold', Icon: Bold },
+    { action: 'italic', Icon: Italic },
+    { action: 'underline', Icon: Underline },
+    { action: 'formatBlock:H2', Icon: Heading2 },
+    { action: 'formatBlock:H3', Icon: Heading3 },
+    { action: 'insertUnorderedList', Icon: List },
+    { action: 'insertOrderedList', Icon: ListOrdered },
+    { action: 'formatBlock:BLOCKQUOTE', Icon: Quote },
+    { action: 'formatBlock:PRE', Icon: Code2 },
   ] as const;
 
   return (
     <div className="mt-1 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950">
       <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/[0.04]" role="toolbar" aria-label={isId ? 'Format tulisan' : 'Text formatting'}>
-        {tools.map(([action, icon]) => (
+        {tools.map(({ action, Icon }) => (
           <button key={action} type="button" title={action} onMouseDown={e => e.preventDefault()} onClick={() => {
             const [name, arg] = action.split(':');
             command(name, arg);
           }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-white/10">
-            {icon}
+            <Icon className="h-4 w-4" />
           </button>
         ))}
         <span className="mx-1 h-6 w-px bg-slate-200 dark:bg-white/10" />
