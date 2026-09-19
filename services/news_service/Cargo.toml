@@ -5,7 +5,7 @@ edition="2021"
 [dependencies]
 axum={version="0.8.7",features=["ws"]}
 tokio={version="1",features=["full"]}
-anyhow="1"
+anyhow = "1"
 reqwest={version="0.12",default-features=false,features=["json","rustls-tls"]}
 sqlx={version="0.9.0",default-features=false,features=["runtime-tokio","postgres","macros","uuid","chrono","json","rust_decimal","migrate"]}
 serde={version="1",features=["derive"]}
@@ -17,4 +17,3 @@ tracing-subscriber={version="0.3",features=["fmt","env-filter","json"]}
 uuid={version="1",features=["v4","serde"]}
 tower-http={version="0.6",features=["cors"]}
 lapin="3.7.1"
-anyhow = "1"
