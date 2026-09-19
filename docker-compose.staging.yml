@@ -83,8 +83,6 @@ services:
       APP_ENV: staging
       RUST_LOG: ${RUST_LOG:-warn}
       RUN_MIGRATIONS_ON_STARTUP: "false"
-
-services:
   identity_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-identity:${IMAGE_TAG:?IMAGE_TAG is required}
