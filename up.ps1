@@ -18,7 +18,7 @@ param(
     # Docker Desktop before BuildKit gets a chance to recover. Keep it
     # configurable while defaulting to a stable local-development value.
     [ValidateRange(1, 32)]
-    [int]$ParallelLimit = 4
+    [int]$ParallelLimit = 2
 )
 
 $ErrorActionPreference = "Stop"
@@ -57,6 +57,7 @@ try {
         }
     }
 
+    $DockerEngineRecoveryAttempted = $false
     $DockerDesktopCliAvailable = $false
     $DockerDesktopCommand = Get-Command "docker" -ErrorAction SilentlyContinue
     $DesktopStatusProbe = $null
@@ -101,6 +102,38 @@ try {
                 }
             }
         }
+    }
+
+    function Invoke-DockerEngineRecovery {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Reason
+        )
+
+        if ($NoDockerEngineRepair -or $script:DockerEngineRecoveryAttempted -or -not $DockerDesktopCliAvailable) {
+            return $false
+        }
+
+        $script:DockerEngineRecoveryAttempted = $true
+        Write-Warning "Docker Engine gagal pada saat $Reason. Mencoba satu kali recovery Docker Desktop..."
+        $RestartProbe = Invoke-DockerNative -Arguments @("desktop", "restart", "--timeout", "120")
+        if ($RestartProbe.ExitCode -ne 0) {
+            $RestartDetails = ($RestartProbe.Output -join " ").Trim()
+            Write-Warning "Recovery Docker Desktop gagal: $RestartDetails"
+            return $false
+        }
+
+        for ($RecoveryAttempt = 1; $RecoveryAttempt -le 24; $RecoveryAttempt++) {
+            Start-Sleep -Seconds 5
+            $RecoveryProbe = Invoke-DockerNative -Arguments @("info", "--format", "{{json .ServerVersion}}")
+            if ($RecoveryProbe.ExitCode -eq 0) {
+                Write-Host "Docker Engine kembali sehat setelah recovery." -ForegroundColor Green
+                return $true
+            }
+        }
+
+        Write-Warning "Docker Desktop sudah direstart tetapi Docker Engine belum kembali sehat."
+        return $false
     }
 
     if (-not $EngineReady) {
@@ -255,8 +288,48 @@ try {
         if ($Services.Count -gt 0) {
             $BuildArgs += $Services
         }
-        & docker @ComposeArgs @BuildArgs
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+        $BuildPreviousErrorActionPreference = $ErrorActionPreference
+        $BuildOutput = @()
+        $BuildExitCode = 1
+        try {
+            # Compose progress is streamed while we also retain enough output to
+            # distinguish an application build failure from a dead Docker daemon.
+            $ErrorActionPreference = "Continue"
+            $BuildOutput = @(& docker @ComposeArgs @BuildArgs 2>&1 | Tee-Object -Variable BuildCapturedOutput)
+            $BuildExitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $BuildPreviousErrorActionPreference
+        }
+
+        $BuildOutputText = ($BuildOutput + @($BuildCapturedOutput) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+        $DockerEngineFailure = $BuildExitCode -ne 0 -and (
+            $BuildOutputText -match "(?i)dockerDesktopLinuxEngine" -or
+            $BuildOutputText -match "(?i)/_ping" -or
+            $BuildOutputText -match "(?i)500 Internal Server Error" -or
+            $BuildOutputText -match "(?i)Cannot connect to the Docker daemon" -or
+            $BuildOutputText -match "(?i)is the docker daemon running"
+        )
+
+        if ($BuildExitCode -ne 0 -and $DockerEngineFailure) {
+            $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
+            if (Invoke-DockerEngineRecovery -Reason "Compose build") {
+                Write-Warning "Mengulangi Compose build dengan paralelisme 1 untuk mengurangi beban Docker Desktop..."
+                $env:COMPOSE_PARALLEL_LIMIT = "1"
+                try {
+                    & docker @ComposeArgs @BuildArgs
+                    $BuildExitCode = $LASTEXITCODE
+                }
+                finally {
+                    $env:COMPOSE_PARALLEL_LIMIT = $OriginalParallelLimit
+                }
+            }
+        }
+
+        if ($BuildExitCode -ne 0) {
+            exit $BuildExitCode
+        }
     }
 
     $UpArgs = @("up", "-d", "--remove-orphans", "--wait", "--wait-timeout", "420")
