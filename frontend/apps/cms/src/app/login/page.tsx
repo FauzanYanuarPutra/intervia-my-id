@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/ui';
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
@@ -33,9 +32,9 @@ export default function LoginPage() {
         <h1 className="text-xl font-semibold text-[color:var(--color-text)] mb-1">Lajukan CMS</h1>
         <p className="text-sm text-[color:var(--color-text)] mb-6">Kelola konten & sektor</p>
 
-        {(error || initialGoogleError) && (
+        {initialGoogleError && (
           <div className="mb-4 p-3 text-sm text-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] border border-[color:var(--color-danger-border)] rounded-lg">
-            {error || initialGoogleError}
+            {initialGoogleError}
           </div>
         )}
 
