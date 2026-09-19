@@ -33,7 +33,7 @@ export default async function BusinessHppPage({ params }: PageProps) {
               ingredients={ingredients}
               products={business.products.map(product => ({ id: product.id, name: product.name, priceLabel: product.priceLabel }))}
             />
-          ) : <div className="portal-panel p-5 text-sm text-portal-soft">Peranmu tidak memiliki akses melihat modal, biaya bahan, dan margin produk.</div>}
+          ) : <div className="portal-panel p-5 text-sm text-portal-soft">Kamu tidak punya akses melihat modal produk.</div>}
         </div>
       </SectionCard>
     </PortalShell>
