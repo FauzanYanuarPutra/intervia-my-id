@@ -694,6 +694,7 @@ export async function updateBusiness(
     latitude?: number | null;
     longitude?: number | null;
     metadataPatch?: JsonRecord;
+    reason?: string;
     logo?: BusinessImageValue;
     banner?: BusinessImageValue;
   },
