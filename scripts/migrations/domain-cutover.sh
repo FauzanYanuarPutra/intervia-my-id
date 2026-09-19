@@ -102,15 +102,25 @@ run_domain() {
       run_sql_file promotion_db "$SCRIPT_DIR/sql/promotion.sql"
       verify_domain promotion
       ;;
+    support)
+      ensure_target_db support_db
+      run_sql_file support_db "$SCRIPT_DIR/sql/support.sql"
+      verify_domain support
+      ;;
+    review)
+      ensure_target_db review_db
+      run_sql_file review_db "$SCRIPT_DIR/sql/review.sql"
+      verify_domain review
+      ;;
     *)
-      echo "DOMAIN must be one of: all news order payment crm communication trust profile promotion" >&2
+      echo "DOMAIN must be one of: all news order payment crm communication trust profile promotion support review" >&2
       exit 2
       ;;
   esac
 }
 
 if [[ "$DOMAIN" == "all" ]]; then
-  for d in profile news order payment crm communication trust promotion; do
+  for d in profile news order payment crm communication trust promotion support review; do
     echo "================ $d ================"
     run_domain "$d"
   done
