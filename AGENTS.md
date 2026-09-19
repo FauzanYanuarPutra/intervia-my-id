@@ -68,7 +68,16 @@ Cross-service data flows through:
 
 Postgres is the transactional source of truth. Search indexes are projections and must be rebuildable.
 
-## 5. Database migrations
+## 5. Domain and database ownership
+
+- Every business entity has exactly one source-of-truth owner.
+- A service owns only its domain data; convenience of a frontend route is not a reason to move ownership into Marketplace.
+- No service may connect to another service's Postgres database, even through a generic `DATABASE_URL`, ORM relation, repository helper, reporting query, or migration.
+- Cross-domain reads use documented APIs or local projections built from versioned events.
+- Target domains extracted from Marketplace must receive their own service manifest, database/migrations, credentials, API/event contract, tests, and backfill/cutover plan before legacy tables are removed.
+- New tables for target domains must not be added to `marketplace_db` unless the architecture manifest explicitly marks them as Marketplace-owned.
+
+## 6. Database migrations
 
 Never modify an already-applied migration only to make history look cleaner.
 
@@ -91,7 +100,7 @@ Before destructive schema work:
 
 SQL/CQL files use LF line endings to keep migration hashes stable across platforms.
 
-## 6. Authentication and authorization
+## 7. Authentication and authorization
 
 Authentication success does not imply authorization.
 
@@ -109,7 +118,7 @@ Do not log:
 - raw identity documents
 - NIK or other unnecessarily sensitive identity fields
 
-## 7. Payments and wallet
+## 8. Payments and wallet
 
 Financial code requires stronger guarantees than ordinary CRUD.
 
@@ -125,7 +134,7 @@ Required properties include:
 
 Production payment and wallet flags remain fail-closed until their operational runbook passes.
 
-## 8. RabbitMQ and eventing
+## 9. RabbitMQ and eventing
 
 When a database write and event publication belong to one business operation, prefer transactional outbox semantics.
 
@@ -133,7 +142,7 @@ Consumers must be idempotent. Inbox/event IDs should prevent duplicate side effe
 
 Do not add Kafka or another broker without a demonstrated requirement that RabbitMQ cannot satisfy.
 
-## 9. Frontend
+## 10. Frontend
 
 The Next.js route tree owns routing/layout/composition. Reusable business UI belongs in feature modules.
 
@@ -150,7 +159,7 @@ unless the task explicitly changes them.
 
 Do not expose private backend credentials through `NEXT_PUBLIC_*` variables.
 
-## 10. Environment and secrets
+## 11. Environment and secrets
 
 Real secrets never belong in Git.
 
@@ -160,7 +169,7 @@ Application config should fail early when a production-required secret is absent
 
 Do not embed machine-specific paths such as `D:/...` in committed cross-platform configuration.
 
-## 11. Git hygiene
+## 12. Git hygiene
 
 Do not track:
 
@@ -179,7 +188,7 @@ Do not track:
 
 Do not rewrite Git history without an explicit backup/classification plan.
 
-## 12. Docker and deployment
+## 13. Docker and deployment
 
 Development ports bind to loopback by default.
 
@@ -189,7 +198,7 @@ Deploy application images by immutable commit-derived tag/digest. Do not deploy 
 
 Do not introduce Kubernetes, service mesh, Kafka or another orchestration layer by default. Docker Compose remains the deployment model until scale/availability evidence requires a change.
 
-## 13. Observability
+## 14. Observability
 
 Application logs go to stdout/stderr. Do not make each app manage its own production log files.
 
@@ -197,7 +206,7 @@ Use structured logs where possible and propagate request/correlation IDs.
 
 New critical flows should expose useful metrics/traces without including secrets or sensitive payloads.
 
-## 14. Testing expectations
+## 15. Testing expectations
 
 Before considering a refactor complete, run the relevant subset of:
 
@@ -240,7 +249,7 @@ docker compose --env-file .env.development -f docker-compose.yml -f docker-compo
 
 A file move is not complete while old path references still exist in tracked source/configuration.
 
-## 15. Safe refactor sequence
+## 16. Safe refactor sequence
 
 For large modules such as Marketplace or Community:
 
@@ -254,7 +263,7 @@ For large modules such as Marketplace or Community:
 
 Do not generate dozens of empty architecture folders in advance.
 
-## 16. Deletion rules
+## 17. Deletion rules
 
 A suspicious/legacy file is not automatically safe to delete.
 
@@ -267,7 +276,7 @@ Before deletion:
 
 This rule especially applies to old service entrypoints, migrations, deployment scripts and recovery artifacts.
 
-## 17. Definition of Done
+## 18. Definition of Done
 
 A change is done when:
 
