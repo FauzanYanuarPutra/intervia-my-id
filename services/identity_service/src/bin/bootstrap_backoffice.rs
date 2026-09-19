@@ -435,7 +435,10 @@ async fn run() -> Result<()> {
     tx.commit().await?;
 
     println!("backoffice bootstrap completed");
-    println!("admin/platform owner: {} (@{})", admin.email, admin.username);
+    println!(
+        "admin/platform owner: {} (@{})",
+        admin.email, admin.username
+    );
     println!("agent: {} (@{})", agent.email, agent.username);
     Ok(())
 }
