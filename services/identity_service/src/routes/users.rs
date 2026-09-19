@@ -309,10 +309,15 @@ pub async fn upsert_backoffice_google_access(
         _ => return (StatusCode::BAD_REQUEST, Json(json!({"error":"invalid status"}))).into_response(),
     };
     let role_names = normalize_google_backoffice_roles(application, &payload.role_names);
-    if application == "crm" && role_names.iter().any(|role| role == "content_admin") {
+    let allowed_roles: &[&str] = match application {
+        "crm" => &["admin", "sales", "support"],
+        "cms" => &["admin", "content_admin"],
+        _ => &[],
+    };
+    if role_names.iter().any(|role| !allowed_roles.contains(&role.as_str())) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error":"content_admin role is not valid for CRM"})),
+            Json(json!({"error":"role is not valid for this application"})),
         ).into_response();
     }
 
