@@ -19,6 +19,10 @@ def read(path: str) -> str:
 
 base_compose = read("docker-compose.yml")
 prod_compose = read("docker-compose.prod.yml")
+ha_compose = read("docker-compose.ha.yml")
+ha_env_example = read(".env.ha.example")
+ha_preflight = read("scripts/ops/ha_data_plane_preflight.sh")
+ha_doc = read("docs/architecture/high-availability-data-plane.md")
 staging_compose = read("docker-compose.staging.yml")
 deploy = read(".github/workflows/deploy.yml")
 caddy = read("infrastructure/caddy/Caddyfile.prod")
@@ -69,6 +73,62 @@ production_env_example = read(".env.production.example")
 staging_env_example = read(".env.staging.example")
 development_env_example = read(".env.development.example")
 marketplace_identity_client = read("services/marketplace_service/src/businesses/identity_client.rs")
+
+for service in (
+    "identity_db:",
+    "marketplace_db:",
+    "community_db:",
+    "redis_cache:",
+    "rabbitmq:",
+    "minio:",
+    "meilisearch:",
+):
+    if service not in ha_compose:
+        errors.append(f"HA overlay missing local stateful-service override: {service}")
+
+for marker in (
+    "profiles: [local-data]",
+    "HA_IDENTITY_DATABASE_URL",
+    "HA_MARKETPLACE_DATABASE_URL",
+    "HA_COMMUNITY_DATABASE_URL",
+    "HA_REDIS_URL",
+    "HA_RABBITMQ_URL",
+    "HA_MEILI_URL",
+    "HA_OBJECT_STORAGE_ENDPOINT",
+    "HA_COMMUNITY_MEDIA_MOUNT",
+):
+    if marker not in ha_compose:
+        errors.append(f"HA overlay missing external data-plane marker: {marker}")
+
+for marker in (
+    "HA_IDENTITY_DATABASE_URL=",
+    "HA_MARKETPLACE_DATABASE_URL=",
+    "HA_COMMUNITY_DATABASE_URL=",
+    "HA_REDIS_URL=",
+    "HA_RABBITMQ_URL=",
+    "HA_MEILI_URL=",
+    "HA_OBJECT_STORAGE_ENDPOINT=",
+    "HA_COMMUNITY_MEDIA_MOUNT=",
+):
+    if marker not in ha_env_example:
+        errors.append(f"HA env example missing required setting: {marker}")
+
+for marker in (
+    "reject_local_endpoint",
+    "docker-compose.ha.yml",
+    "HA_COMMUNITY_MEDIA_MOUNT must be an absolute path",
+    "config --quiet",
+):
+    if marker not in ha_preflight:
+        errors.append(f"HA preflight missing safety marker: {marker}")
+
+for marker in (
+    "Application containers should be disposable",
+    "Release-owned SQLx migrations",
+    "Failover evidence",
+):
+    if marker not in ha_doc:
+        errors.append(f"HA architecture document missing operational contract: {marker}")
 
 for service in ("identity_db:", "marketplace_db:", "community_db:"):
     if service not in base_compose:
