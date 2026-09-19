@@ -837,6 +837,7 @@ mod tests {
             target_margin_bps: 3000,
             enabled: true,
             metadata: serde_json::json!({}),
+            reason: None,
         };
         assert!(matches!(
             validate_channel("gofood", &request),
