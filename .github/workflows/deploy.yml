@@ -304,13 +304,32 @@ jobs:
           esac
 
           if [[ "$backoffice_bootstrap_enabled" == true ]]; then
-            for key in               BACKOFFICE_ADMIN_EMAIL               BACKOFFICE_ADMIN_USERNAME               BACKOFFICE_ADMIN_PASSWORD               BACKOFFICE_AGENT_EMAIL               BACKOFFICE_AGENT_USERNAME               BACKOFFICE_AGENT_PASSWORD; do
+            for key in \
+              BACKOFFICE_ADMIN_EMAIL \
+              BACKOFFICE_ADMIN_USERNAME \
+              BACKOFFICE_ADMIN_PASSWORD \
+              BACKOFFICE_AGENT_EMAIL \
+              BACKOFFICE_AGENT_USERNAME \
+              BACKOFFICE_AGENT_PASSWORD; do
               value="$(read_env_value "$key")"
               [[ -n "$value" ]] || {
                 echo "$key is required when BACKOFFICE_BOOTSTRAP_ENABLED=true." >&2
                 exit 1
               }
             done
+
+            admin_email="$(read_env_value BACKOFFICE_ADMIN_EMAIL)"
+            admin_username="$(read_env_value BACKOFFICE_ADMIN_USERNAME)"
+            agent_email="$(read_env_value BACKOFFICE_AGENT_EMAIL)"
+            agent_username="$(read_env_value BACKOFFICE_AGENT_USERNAME)"
+            [[ "${admin_email,,}" != "${agent_email,,}" ]] || {
+              echo "BACKOFFICE_ADMIN_EMAIL and BACKOFFICE_AGENT_EMAIL must be different." >&2
+              exit 1
+            }
+            [[ "${admin_username,,}" != "${agent_username,,}" ]] || {
+              echo "BACKOFFICE_ADMIN_USERNAME and BACKOFFICE_AGENT_USERNAME must be different." >&2
+              exit 1
+            }
 
             for key in BACKOFFICE_ADMIN_PASSWORD BACKOFFICE_AGENT_PASSWORD; do
               value="$(read_env_value "$key")"
@@ -320,6 +339,26 @@ jobs:
               }
               [[ "$value" != replace-with-* ]] || {
                 echo "$key still contains a repository placeholder." >&2
+                exit 1
+              }
+              [[ "$value" != *[[:space:]]* ]] || {
+                echo "$key must not contain whitespace." >&2
+                exit 1
+              }
+              [[ "$value" == *[[:upper:]]* ]] || {
+                echo "$key must contain an uppercase letter." >&2
+                exit 1
+              }
+              [[ "$value" == *[[:lower:]]* ]] || {
+                echo "$key must contain a lowercase letter." >&2
+                exit 1
+              }
+              [[ "$value" == *[[:digit:]]* ]] || {
+                echo "$key must contain a digit." >&2
+                exit 1
+              }
+              [[ "$value" == *[![:alnum:]]* ]] || {
+                echo "$key must contain a symbol." >&2
                 exit 1
               }
             done
