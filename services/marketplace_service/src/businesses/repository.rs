@@ -215,39 +215,22 @@ impl BusinessRepository {
         .execute(&mut *transaction)
         .await?;
 
-        let event_key = if command.metadata_patch.as_ref().is_some_and(|value| value.get("locations").is_some()) {
-            "business.locations_updated"
-        } else if command.metadata_patch.as_ref().is_some_and(|value| {
-            value.get("isOpen").is_some() || value.get("reservations").is_some()
-        }) {
-            "business.operations_updated"
-        } else {
-            "business.profile_updated"
-        };
-        let reason = command
-            .reason
-            .as_deref()
-            .unwrap_or("Informasi usaha diperbarui");
-
         audit::record_tx(
             &mut transaction,
             organization_id,
             business_id,
             None,
             Some(actor_id),
-            event_key,
+            "business.provisioned",
             "business",
             Some(business_id),
-            Some(reason),
+            Some("Usaha dibuat"),
             json!({
-                "summary": match event_key {
-                    "business.locations_updated" => "Lokasi usaha diperbarui",
-                    "business.operations_updated" => "Operasional usaha diperbarui",
-                    _ => "Informasi utama usaha diperbarui"
-                },
-                "version_before": command.expected_version,
-                "version_after": new_version,
-                "metadata_patch": command.metadata_patch
+                "summary": format!("Usaha {} dibuat", command.business.name),
+                "version_after": 1,
+                "capability_key": command.business.capability_key,
+                "template_key": command.profile.template_key,
+                "template_version": command.profile.template_version,
             }),
         )
         .await?;
