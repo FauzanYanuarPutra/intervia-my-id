@@ -16,6 +16,7 @@ async fn seed_uncosted_product(pool: &PgPool) -> SeededUncostedSale {
     let organization_id = Uuid::new_v4();
     let business_id = Uuid::new_v4();
     let store_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
     let product_id = Uuid::new_v4();
 
     sqlx::query(
@@ -55,6 +56,22 @@ async fn seed_uncosted_product(pool: &PgPool) -> SeededUncostedSale {
     )
     .bind(business_id)
     .bind(store_id)
+    .execute(pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        r#"
+        INSERT INTO business_locations (
+          id, store_id, organization_id, business_id, name,
+          branch_code, branch_kind, is_primary, public_visibility
+        ) VALUES ($1,$2,$3,$4,'Kios Utama','MAIN','kiosk',TRUE,TRUE)
+        "#,
+    )
+    .bind(location_id)
+    .bind(store_id)
+    .bind(organization_id)
+    .bind(business_id)
     .execute(pool)
     .await
     .unwrap();

@@ -444,10 +444,18 @@ async fn current_day_sale_uses_version_effective_at_posting_time(pool: PgPool) {
     .unwrap();
     tx.commit().await.unwrap();
 
-    let occurred_on: NaiveDate = sqlx::query_scalar("SELECT CURRENT_DATE")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let occurred_on: NaiveDate = sqlx::query_scalar(
+        r#"
+        SELECT (((NOW() AT TIME ZONE timezone) - (business_day_cutoff - TIME '00:00'))::date)
+        FROM business_profiles
+        WHERE business_id=$1 AND organization_id=$2
+        "#,
+    )
+    .bind(seeded.business_id)
+    .bind(seeded.organization_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     let created = SaleRepository::new(pool.clone())
         .create(
             seeded.actor_id,

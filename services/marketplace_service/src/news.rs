@@ -407,7 +407,11 @@ fn is_allowed_news_source_url(raw: &str) -> bool {
     {
         return false;
     }
-    if let Ok(ip) = host.parse::<IpAddr>() {
+    let ip_literal = host
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(host);
+    if let Ok(ip) = ip_literal.parse::<IpAddr>() {
         return match ip {
             IpAddr::V4(ip) => {
                 !(ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified())

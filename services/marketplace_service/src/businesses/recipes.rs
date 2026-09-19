@@ -505,7 +505,7 @@ pub(crate) async fn resolve_effective_recipe(
         WHERE business_id=$1 AND organization_id=$2 AND product_id=$3
           AND effective_from <= $4
           AND (effective_until IS NULL OR effective_until > $4)
-        ORDER BY effective_from DESC
+        ORDER BY effective_from DESC, version_number DESC, id DESC
         LIMIT 1
         FOR SHARE
         "#,
