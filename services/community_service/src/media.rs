@@ -178,4 +178,3 @@ pub(crate) fn first_feed_media_url(
         )
         .find_map(|url| clean_feed_media_url(url))
 }
-
