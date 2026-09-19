@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ProductModifierGroup, ProductModifierSelection } from 'lajukan-ui';
+import { SensitiveActionConfirm } from '@/components/interaction/SensitiveActionConfirm';
 import { businessApiErrorMessage } from '@/lib/business-api-error';
 import { QuickSaleProductConfigurator } from './QuickSaleProductConfigurator';
 import {
@@ -229,6 +230,7 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   const [receipt, setReceipt] = useState<ReceiptView | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [clearCartOpen, setClearCartOpen] = useState(false);
   const attemptKey = useRef<string | null>(null);
 
   const total = useMemo(() => quickSaleTotal(lines), [lines]);
@@ -243,6 +245,13 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
   function changed() {
     attemptKey.current = null;
     setFeedback(null);
+  }
+
+  function clearCart() {
+    changed();
+    setLines([]);
+    setReceipt(null);
+    setClearCartOpen(false);
   }
 
   function showWorkspace(mode: WorkspaceMode) {
@@ -406,13 +415,18 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
 
   function renderCartWorkspace() {
     return (
+      <>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-3 border-b border-portal-line px-4 py-3.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <button type="button" aria-label="Kembali ke katalog" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-portal-line text-portal-soft lg:hidden" onClick={backFromWorkspace}><ArrowLeft className="h-4 w-4" /></button>
             <div className="min-w-0"><p className="font-black text-portal-ink">Pesanan saat ini</p><p className="mt-0.5 text-xs text-portal-soft">{itemCount} item</p></div>
           </div>
-          {lines.length ? <button type="button" className="rounded-lg px-2 py-1 text-xs font-bold text-portal-soft transition hover:bg-red-50 hover:text-red-700" onClick={() => { changed(); setLines([]); }}>Kosongkan</button> : null}
+          {lines.length ? (
+            <button type="button" className="rounded-lg px-2 py-1 text-xs font-bold text-portal-soft transition hover:bg-red-50 hover:text-red-700" onClick={() => setClearCartOpen(true)}>
+              Kosongkan
+            </button>
+          ) : null}
         </div>
         <div className="min-h-32 flex-1 overflow-y-auto p-4"><CartLines lines={lines} onQuantity={setQuantity} onEdit={editLine} /></div>
         <div className="space-y-3 border-t border-portal-line bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -420,6 +434,16 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
           <button type="button" className="portal-button-primary w-full justify-center py-3.5 text-base" disabled={!lines.length || total <= 0} onClick={openCheckout}>Bayar · {money.format(total)}</button>
         </div>
       </div>
+        <SensitiveActionConfirm
+        open={clearCartOpen}
+        title="Kosongkan pesanan?"
+        description="Semua item yang sedang disiapkan akan dihapus dari keranjang. Belum ada transaksi yang tersimpan ke riwayat."
+        confirmLabel="Kosongkan pesanan"
+        onCancel={() => setClearCartOpen(false)}
+        onConfirm={clearCart}
+      />
+
+</>
     );
   }
 
