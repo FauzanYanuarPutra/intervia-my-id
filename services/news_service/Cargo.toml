@@ -17,3 +17,4 @@ tracing-subscriber={version="0.3",features=["fmt","env-filter","json"]}
 uuid={version="1",features=["v4","serde"]}
 tower-http={version="0.6",features=["cors"]}
 lapin="3.7.1"
+anyhow = "1"
