@@ -498,7 +498,6 @@ fn public_topics_from_tags(tags: Option<&[String]>) -> Vec<String> {
         .take(8)
         .collect()
 }
-
 pub(crate) fn prepare_submission_metadata(mut metadata: Value, owner_id: Uuid) -> Value {
     if !metadata.is_object() {
         metadata = json!({});
@@ -597,7 +596,9 @@ fn valid_news_category(value: &str) -> bool {
         value,
         "Ekonomi"
             | "Bisnis"
-            | "UMKM"            | "Teknologi"            | "Keuangan"
+            | "UMKM"
+            | "Teknologi"
+            | "Keuangan"
             | "Regulasi"
             | "Industri"
             | "Daerah"
@@ -995,8 +996,7 @@ async fn sync_source_references_tx(
         .bind(source_url)
         .bind(source_domain(source_url))
         .execute(&mut **tx)
-        .await?;
-    }
+        .await?;    }
     Ok(())
 }
 
@@ -1195,8 +1195,10 @@ async fn notify_editorial_result(
                 "Koreksi editorial untuk beritamu telah dicatat.",
             ),
             "retract" => (
-                "news.retracted",                "Berita ditarik",
-                "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail.",            ),
+                "news.retracted",
+                "Berita ditarik",
+                "Berita telah ditarik dari publikasi. Lihat catatan editor untuk detail.",
+            ),
             _ => return,
         }
     };
@@ -1493,8 +1495,7 @@ async fn update_news_submission(
         Ok(None) => return response_error(StatusCode::NOT_FOUND, "news submission not found"),
         Err(error) => {
             tracing::error!("update_news_submission load error: {:?}", error);
-            return response_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
+            return response_error(                StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to update news submission",
             );
         }
@@ -1792,7 +1793,9 @@ async fn update_news_submission(
         Some(owner_id),
         "news.resubmitted",
         "news.editorial.changed",
-    )    .await    {
+    )
+    .await
+    {
         tracing::error!("update_news_submission outbox error: {:?}", error);
         return response_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1991,8 +1994,7 @@ async fn edit_news_editorial(
         "pending_review"
     } else {
         current_status.as_str()
-    };
-    news.insert(
+    };    news.insert(
         "editorial_status".to_string(),
         Value::String(next_editorial_status.to_string()),
     );
@@ -2395,3 +2397,602 @@ async fn moderate_news(
         return response_error(
             StatusCode::CONFLICT,
             "editorial action is not allowed from the current status",
+        );
+    }
+    if matches!(action.as_str(), "approve" | "correct") {
+        if let Err(message) = validate_publishable_news(&current) {
+            return response_error(StatusCode::UNPROCESSABLE_ENTITY, message);
+        }
+    }
+    if matches!(action.as_str(), "approve" | "correct") && !is_press_release(&current.metadata) {
+        match has_verified_source_tx(&mut tx, current.id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return response_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "approval requires at least one verified source",
+                );
+            }
+            Err(error) => {
+                tracing::error!("moderate_news verified source check error: {:?}", error);
+                return response_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate news sources",
+                );
+            }
+        }
+    }
+
+    let is_press_release = is_press_release(&current.metadata);
+    let existing_news = current.metadata.get("news").and_then(Value::as_object);
+    let final_priority = editorial_priority.unwrap_or_else(|| {
+        existing_news
+            .and_then(|news| news.get("editorial_priority"))
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "low" | "normal" | "high" | "urgent"))
+            .unwrap_or("normal")
+            .to_string()
+    });
+    let final_sensitivity = sensitivity.unwrap_or_else(|| {
+        existing_news
+            .and_then(|news| news.get("sensitivity"))
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "normal" | "high"))
+            .unwrap_or("normal")
+            .to_string()
+    });
+    let final_fact_check_status = fact_check_status.unwrap_or_else(|| {
+        existing_news
+            .and_then(|news| news.get("fact_check_status"))
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "pending" | "verified" | "not_required"))
+            .unwrap_or(if is_press_release {
+                "not_required"
+            } else {
+                "pending"
+            })
+            .to_string()
+    });
+    let final_legal_review_status = legal_review_status.unwrap_or_else(|| {
+        existing_news
+            .and_then(|news| news.get("legal_review_status"))
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "pending" | "approved" | "not_required"))
+            .unwrap_or(if final_sensitivity == "high" {
+                "pending"
+            } else {
+                "not_required"
+            })
+            .to_string()
+    });
+
+    if matches!(action.as_str(), "approve" | "correct") {
+        if !is_press_release && final_fact_check_status != "verified" {
+            return response_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "fact check must be verified before publication",
+            );
+        }
+        if final_sensitivity == "high" && final_legal_review_status != "approved" {
+            return response_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "high-sensitivity publication requires legal approval",
+            );
+        }
+        if final_sensitivity == "high" && !is_press_release {
+            match has_independent_verified_source_review_tx(&mut tx, current.id, reviewer_id).await
+            {
+                Ok(true) => {}
+                Ok(false) => {
+                    return response_error(
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        "high-sensitivity publication requires independent source review",
+                    )
+                }
+                Err(error) => {
+                    tracing::error!(
+                        "moderate_news independent source review check error: {:?}",
+                        error
+                    );
+                    return response_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to validate independent source review",                    );
+                }
+            }
+        }
+    }
+
+    let reviewed_at = Utc::now();
+    let approved_publish_at = if action == "approve" {
+        Some(
+            current
+                .published_at
+                .or(requested_publish_at)
+                .unwrap_or(reviewed_at),
+        )
+    } else {
+        None
+    };
+
+    let mut metadata = current.metadata.clone();
+    if !metadata.is_object() {
+        metadata = json!({});
+    }
+    let root = metadata
+        .as_object_mut()
+        .expect("metadata object was initialized");
+    let news = root.entry("news".to_string()).or_insert_with(|| json!({}));
+    if !news.is_object() {
+        *news = json!({});
+    }
+    let news = news
+        .as_object_mut()
+        .expect("news metadata object was initialized");
+    news.insert(
+        "editorial_status".to_string(),
+        Value::String(next_editorial_status.to_string()),
+    );
+    news.insert(
+        "reviewed_at".to_string(),
+        Value::String(reviewed_at.to_rfc3339()),
+    );
+    news.insert(
+        "reviewer_id".to_string(),
+        Value::String(reviewer_id.to_string()),
+    );
+    news.insert(
+        "fact_check_status".to_string(),
+        Value::String(final_fact_check_status),
+    );
+    news.insert(
+        "legal_review_status".to_string(),
+        Value::String(final_legal_review_status),
+    );
+    news.insert(
+        "editorial_priority".to_string(),
+        Value::String(final_priority),
+    );
+    news.insert("sensitivity".to_string(), Value::String(final_sensitivity));
+    if let Some(note) = note.as_ref() {
+        news.insert("review_note".to_string(), Value::String(note.clone()));
+    } else {
+        news.remove("review_note");
+    }
+    if let Some(business_impact) = business_impact {
+        news.insert(
+            "business_impact".to_string(),
+            Value::String(business_impact),
+        );
+    }
+    if action == "approve" {
+        if let Some(publish_at) = approved_publish_at.as_ref() {
+            news.insert(
+                "published_at".to_string(),
+                Value::String(publish_at.to_rfc3339()),
+            );
+            if publish_at > &reviewed_at {
+                news.insert(
+                    "scheduled_for".to_string(),
+                    Value::String(publish_at.to_rfc3339()),
+                );
+                news.insert(
+                    "scheduled_by".to_string(),
+                    Value::String(reviewer_id.to_string()),
+                );
+            } else {
+                news.remove("scheduled_for");
+                news.remove("scheduled_by");
+            }
+        }
+    }
+    if action == "correct" {
+        if let Some(note) = note.as_ref() {
+            news.insert("correction_note".to_string(), Value::String(note.clone()));
+            news.insert(
+                "corrected_at".to_string(),
+                Value::String(reviewed_at.to_rfc3339()),
+            );
+        }
+    }
+    if action == "retract" {
+        if let Some(note) = note.as_ref() {
+            news.insert("retraction_note".to_string(), Value::String(note.clone()));
+        }
+    }
+
+    let updated = sqlx::query_as::<_, NewsRow>(
+        r#"
+        UPDATE content_items
+        SET
+            content_status = $2,
+            listing_status = CASE
+                WHEN $2 = 'active' THEN 'published'
+                WHEN $2 = 'archived' THEN 'archived'
+                ELSE 'draft'
+            END,
+            metadata = $3,
+            published_at = CASE
+                WHEN $4::timestamptz IS NOT NULL THEN COALESCE(published_at, $4)
+                ELSE published_at
+            END,
+            updated_at = NOW(),
+            last_saved_at = NOW(),
+            draft_version = draft_version + 1
+        WHERE id = $1 AND content_type = 'news'
+        RETURNING
+            id, owner_id, slug, title, summary, body, tags, cover_image, metadata,
+            content_status, published_at, created_at, updated_at
+        "#,
+    )
+    .bind(content_id)
+    .bind(content_status)
+    .bind(metadata)
+    .bind(approved_publish_at)
+    .fetch_one(&mut *tx)
+    .await;
+
+    let updated = match updated {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!("moderate_news update error: {:?}", error);
+            return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to moderate news");
+        }
+    };
+
+    if let Err(error) = sqlx::query(
+        r#"
+        INSERT INTO news_editorial_events (
+            content_id, actor_id, actor_role, action, from_status, to_status, note
+        )
+        VALUES ($1, $2, 'editor', $3, $4, $5, $6)
+        "#,
+    )
+    .bind(content_id)
+    .bind(reviewer_id)
+    .bind(&action)
+    .bind(previous_editorial_status)
+    .bind(next_editorial_status)
+    .bind(&note)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("moderate_news audit insert error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record editorial action",
+        );
+    }
+
+    if let Err(error) = sync_source_references_tx(&mut tx, updated.id, &updated.metadata).await {
+        tracing::error!("moderate_news source sync error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to synchronize news sources",
+        );
+    }
+    if let Err(error) =
+        record_version_tx(&mut tx, &updated, Some(reviewer_id), "editor", &action).await
+    {
+        tracing::error!("moderate_news version error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record news version",
+        );
+    }
+    let routing_key = if matches!(action.as_str(), "approve" | "correct" | "retract") {
+        "news.publication.changed"
+    } else {
+        "news.editorial.changed"
+    };
+    if let Err(error) = enqueue_news_outbox_tx(
+        &mut tx,
+        &updated,
+        Some(reviewer_id),
+        &format!("news.{}", action),
+        routing_key,
+    )
+    .await
+    {
+        tracing::error!("moderate_news outbox error: {:?}", error);
+        return response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to enqueue news event",
+        );
+    }
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("moderate_news commit error: {:?}", error);
+        return response_error(StatusCode::INTERNAL_SERVER_ERROR, "failed to moderate news");
+    }
+
+    notify_editorial_result(&state, &updated, &action, note.as_deref()).await;
+
+    (StatusCode::OK, Json(updated)).into_response()
+}
+
+async fn get_editorial_metrics(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if cms_reviewer_id(&headers, &state).is_none() {
+        return response_error(StatusCode::FORBIDDEN, "cms access required");
+    }
+
+    let queue = sqlx::query_as::<_, MetricBucketRow>(
+        r#"
+        SELECT
+          COALESCE(
+            NULLIF(metadata->'news'->>'editorial_status', ''),
+            CASE
+              WHEN content_status = 'active' THEN 'published'
+              WHEN content_status = 'archived' THEN 'rejected'
+              ELSE 'pending_review'
+            END
+          ) AS key,
+          COUNT(*)::bigint AS value
+        FROM content_items
+        WHERE content_type = 'news' AND content_status <> 'deleted'
+        GROUP BY 1
+        ORDER BY value DESC, key ASC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let engagement_24h = sqlx::query_as::<_, MetricBucketRow>(
+        r#"
+        SELECT event_name AS key, COUNT(*)::bigint AS value
+        FROM events.event_log
+        WHERE entity_type = 'news'
+          AND occurred_at >= NOW() - interval '24 hours'
+          AND event_name LIKE 'news.%'
+        GROUP BY event_name
+        ORDER BY value DESC, key ASC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let published_24h = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '24 hours' AND published_at <= NOW()",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let published_7d = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at >= NOW() - interval '7 days' AND published_at <= NOW()",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let scheduled = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM content_items WHERE content_type = 'news' AND content_status = 'active' AND published_at > NOW()",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let stale_review_24h = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*) FROM content_items
+        WHERE content_type = 'news'
+          AND content_status = 'draft'
+          AND COALESCE(NULLIF(metadata->'news'->>'editorial_status', ''), 'pending_review')
+              IN ('pending_review', 'needs_revision')
+          AND updated_at < NOW() - interval '24 hours'
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let versions = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM news_article_versions")
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(0);
+    let sources_total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM news_source_references")
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(0);
+    let sources_verified = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM news_source_references WHERE verification_status = 'verified'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let sources_flagged = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM news_source_references WHERE verification_status IN ('broken', 'rejected')",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let avg_review_minutes = sqlx::query_scalar::<_, Option<f64>>(
+        r#"
+        SELECT AVG(
+          EXTRACT(EPOCH FROM (
+            (metadata->'news'->>'reviewed_at')::timestamptz -
+            (metadata->'news'->>'submitted_at')::timestamptz
+          )) / 60.0
+        )::double precision
+        FROM content_items
+        WHERE content_type = 'news'
+          AND metadata->'news'->>'reviewed_at' IS NOT NULL
+          AND metadata->'news'->>'submitted_at' IS NOT NULL
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(None);
+
+    let top_articles_7d = sqlx::query_as::<_, NewsTopArticleMetricRow>(
+        r#"
+        SELECT c.id, c.slug, c.title, COUNT(e.event_id)::bigint AS opens
+        FROM events.event_log e
+        JOIN content_items c
+          ON c.id::text = e.entity_id
+         AND c.content_type = 'news'
+        WHERE e.entity_type = 'news'
+          AND e.event_name = 'news.opened'
+          AND e.occurred_at >= NOW() - interval '7 days'
+        GROUP BY c.id, c.slug, c.title
+        ORDER BY opens DESC, c.id
+        LIMIT 10
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "queue": queue,
+            "engagement_24h": engagement_24h,
+            "published_24h": published_24h,
+            "published_7d": published_7d,
+            "scheduled": scheduled,
+            "stale_review_24h": stale_review_24h,
+            "avg_review_minutes": avg_review_minutes,
+            "versions": versions,
+            "sources": {
+                "total": sources_total,
+                "verified": sources_verified,
+                "flagged": sources_flagged
+            },
+            "top_articles_7d": top_articles_7d,
+            "generated_at": Utc::now()
+        })),
+    )
+        .into_response()
+}
+
+async fn update_news_source(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((content_id, source_id)): Path<(String, String)>,
+    Json(payload): Json<UpdateNewsSourceRequest>,
+) -> impl IntoResponse {
+    let reviewer_id = match cms_reviewer_id(&headers, &state) {
+        Some(id) => id,
+        None => return response_error(StatusCode::FORBIDDEN, "cms access required"),
+    };
+    let content_id = match Uuid::parse_str(content_id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid news id"),
+    };
+    let source_id = match Uuid::parse_str(source_id.trim()) {
+        Ok(id) => id,
+        Err(_) => return response_error(StatusCode::BAD_REQUEST, "invalid source id"),
+    };
+
+    let source_kind = trimmed(payload.source_kind);
+    if source_kind.as_ref().is_some_and(|value| {
+        !matches!(
+            value.as_str(),
+            "user_supplied" | "primary" | "secondary" | "official" | "business"
+        )
+    }) {
+        return response_error(StatusCode::BAD_REQUEST, "unsupported source kind");
+    }
+    let verification_status = trimmed(payload.verification_status);
+    if verification_status.as_ref().is_some_and(|value| {
+        !matches!(
+            value.as_str(),
+            "unverified" | "verified" | "broken" | "rejected"
+        )
+    }) {
+        return response_error(
+            StatusCode::BAD_REQUEST,
+            "unsupported source verification status",
+        );
+    }
+    let note = trimmed(payload.note);
+    if note.as_ref().is_some_and(|value| value.len() > 4_000) {
+        return response_error(StatusCode::BAD_REQUEST, "source note is too long");
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("update_news_source begin transaction error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update news source",
+            );
+        }
+    };
+
+    // Serialize source review with moderation/revision so publication provenance
+    // cannot change underneath an editorial state transition.
+    let article = match load_news_for_review(&mut tx, content_id).await {
+        Ok(Some(article)) => article,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news article not found"),
+        Err(error) => {
+            tracing::error!("update_news_source article lock error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to lock news article",
+            );
+        }
+    };
+
+    let current_source = match sqlx::query_as::<_, NewsSourceRow>(
+        r#"
+        SELECT
+          id, content_id, position, source_url, source_domain, source_kind,
+          verification_status, editor_note, checked_at, first_seen_at, last_seen_at
+        FROM news_source_references
+        WHERE id = $1 AND content_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(source_id)
+    .bind(content_id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(source)) => source,
+        Ok(None) => return response_error(StatusCode::NOT_FOUND, "news source not found"),
+        Err(error) => {
+            tracing::error!("update_news_source source lock error: {:?}", error);
+            return response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to lock news source",
+            );
+        }
+    };
+
+    if verification_status.as_deref() == Some("verified")
+        && !is_allowed_news_source_url(&current_source.source_url)
+    {
+        return response_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "only public HTTP(S) source URLs can be verified",
+        );
+    }
+
+    let published_requires_source = editorial_status(&article.content_status, &article.metadata)
+        == "published"
+        && !is_press_release(&article.metadata);
+    if published_requires_source
+        && removes_verified_source(
+            &current_source.verification_status,
+            verification_status.as_deref(),
+        )
+    {
+        let other_verified_urls = match sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT source_url
+            FROM news_source_references
+            WHERE content_id = $1
+              AND id <> $2
+              AND verification_status = 'verified'
+            "#,
+        )
+        .bind(content_id)
+        .bind(source_id)
+        .fetch_all(&mut *tx)
+        .await
+        {
+            Ok(urls) => urls,
+            Err(error) => {
