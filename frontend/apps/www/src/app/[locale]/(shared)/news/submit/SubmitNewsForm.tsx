@@ -23,6 +23,7 @@ export default function SubmitNewsForm({ locale }: Props) {
     source_urls: '',
     cover_image: '',
   });
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [state, setState] = useState<{ loading: boolean; error: string; success: string }>({
     loading: false,
     error: '',
@@ -43,6 +44,8 @@ export default function SubmitNewsForm({ locale }: Props) {
   useEffect(() => {
     try { localStorage.setItem('lajukan-news-form-draft', JSON.stringify(form)); } catch {}
   }, [form]);
+
+  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; setUploadingCover(true); try { const data = new FormData(); data.append('image', file); const response = await fetch('/api/content/upload-images', { method: 'POST', body: data }); const payload = (await response.json().catch(() => ({}))) as { urls?: string[]; files?: Array<{ url?: string }>; error?: string }; const url = payload.urls?.[0] || payload.files?.[0]?.url; if (!response.ok || !url) throw new Error(payload.error || (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.')); setForm(current => ({ ...current, cover_image: url })); } catch (error) { setState(current => ({ ...current, error: error instanceof Error ? error.message : (isId ? 'Gagal mengunggah gambar.' : 'Image upload failed.') })); } finally { setUploadingCover(false); } };
 
   const update = (key: keyof typeof form, value: string) => {
     setForm(current => ({ ...current, [key]: value }));
@@ -163,6 +166,8 @@ export default function SubmitNewsForm({ locale }: Props) {
           {isId ? 'Gunakan toolbar seperti editor berita biasa. Heading, tebal, miring, daftar, kutipan, tautan, dan gambar didukung. HTML akan dibersihkan sebelum disimpan.' : 'Use the toolbar like a standard newsroom editor. Headings, emphasis, lists, quotes, links, and images are supported. HTML is sanitized before storage.'}
         </p>
       </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.03]"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-900 dark:text-white">{isId ? 'Media utama' : 'Featured media'}</p><p className="mt-1 text-xs text-slate-500">{isId ? 'Upload gambar utama. Opsional, tapi dipakai di kartu dan halaman berita.' : 'Upload an optional featured image used on cards and the article page.'}</p></div><label className="inline-flex min-h-10 cursor-pointer items-center rounded-xl bg-slate-950 px-4 text-xs font-bold text-white dark:bg-white dark:text-slate-950">{uploadingCover ? (isId ? 'Mengunggah…' : 'Uploading…') : (isId ? 'Pilih gambar' : 'Choose image')}<input type="file" accept="image/*" className="sr-only" disabled={uploadingCover} onChange={handleCoverUpload} /></label></div>{form.cover_image ? <div className="relative mt-4 overflow-hidden rounded-xl"><img src={form.cover_image} alt="" className="aspect-[16/9] w-full object-cover" /><button type="button" onClick={() => setForm(current => ({ ...current, cover_image: '' }))} className="absolute right-2 top-2 rounded-lg bg-black/70 px-3 py-2 text-xs font-bold text-white">{isId ? 'Hapus' : 'Remove'}</button></div> : <div className="mt-4 flex aspect-[16/7] items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-400 dark:border-white/15">{isId ? 'Belum ada gambar — layout tetap bagus tanpa media.' : 'No image — layout remains clean without media.'}</div>}</div>
 
       <label className="text-sm font-bold text-slate-800 dark:text-slate-100">
         {isId ? 'URL gambar sampul (opsional)' : 'Cover image URL (optional)'}
