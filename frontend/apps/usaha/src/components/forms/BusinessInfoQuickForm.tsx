@@ -219,7 +219,7 @@ export function BusinessInfoQuickForm({ business }: BusinessInfoQuickFormProps) 
           aria-describedby="business-info-change-reason-hint"
         />
         <span id="business-info-change-reason-hint" className="text-[11px] font-normal leading-5 text-portal-soft">
-          Sudah diisi otomatis. Ganti bila perlu untuk memberi konteks perubahan.
+          Sudah diisi otomatis. Ganti bila perlu untuk memberi konteks perubahan. Disimpan di riwayat perubahan.
         </span>
       </label>
 
