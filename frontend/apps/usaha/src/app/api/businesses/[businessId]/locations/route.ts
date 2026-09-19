@@ -14,10 +14,11 @@ export async function GET(_request: Request, context: { params: Promise<{ busine
 export async function PUT(request: Request, context: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await context.params;
   try {
-    const body = (await request.json()) as { locations?: BusinessLocation[] };
+    const body = (await request.json()) as { locations?: BusinessLocation[]; reason?: string };
     if (!Array.isArray(body.locations) || body.locations.length > 50) return NextResponse.json({ error: 'Daftar lokasi tidak valid.' }, { status: 400 });
     const locations = body.locations.map((item, index) => ({ ...item, isPrimary: item.isPrimary || (index === 0 && !body.locations!.some(location => location.isPrimary)) }));
-    const business = await replaceBusinessLocations(businessId, locations);
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    const business = await replaceBusinessLocations(businessId, locations, reason);
     return NextResponse.json({ ok: true, items: business.locations ?? [] });
   } catch (error) {
     const normalized = normalizeBusinessApiError(error, 'Lokasi belum berhasil disimpan.');
