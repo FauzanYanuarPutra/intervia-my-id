@@ -2269,10 +2269,18 @@ export default function PublicProfileClient({
                   {shareMessage ? <Copy className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
                 </button>
                 {!isOwnProfile ? (
-                  <button type="button" onClick={handleToggleSaved} className={${grid h-9 w-9 place-items-center rounded-full border text-white backdrop-blur-md transition ${${{
-                    isSaved ? 'border-emerald-300 bg-emerald-600' : 'border-white/40 bg-black/35 hover:bg-black/55'
-                  }${} aria-label={isSaved ? copy.saved : copy.save} title={isSaved ? copy.saved : copy.save}>
-                    <Bookmark className={${h-4 w-4 ${${{isSaved ? 'fill-current' : ''}${} />
+                  <button
+                    type="button"
+                    onClick={handleToggleSaved}
+                    className={`grid h-9 w-9 place-items-center rounded-full border text-white backdrop-blur-md transition ${
+                      isSaved
+                        ? 'border-emerald-300 bg-emerald-600'
+                        : 'border-white/40 bg-black/35 hover:bg-black/55'
+                    }`}
+                    aria-label={isSaved ? copy.saved : copy.save}
+                    title={isSaved ? copy.saved : copy.save}
+                  >
+                    <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
                   </button>
                 ) : null}
               </div>
@@ -2326,9 +2334,16 @@ export default function PublicProfileClient({
                     <button type="button" onClick={() => void handleOpenChat()} disabled={startingChatKey === 'profile'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-70 sm:min-w-32 sm:text-sm">
                       {startingChatKey === 'profile' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}{startingChatKey === 'profile' ? copy.opening : copy.chat}
                     </button>
-                    <button type="button" onClick={() => void handleToggleProfileFollow()} disabled={followLoading} className={${inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black transition disabled:cursor-wait disabled:opacity-70 sm:text-sm ${${{
-                      isFollowingProfile ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]' : 'border-emerald-600 bg-[color:var(--app-surface-strong)] text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10'
-                    }${}>
+                    <button
+                      type="button"
+                      onClick={() => void handleToggleProfileFollow()}
+                      disabled={followLoading}
+                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black transition disabled:cursor-wait disabled:opacity-70 sm:text-sm ${
+                        isFollowingProfile
+                          ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
+                          : 'border-emerald-600 bg-[color:var(--app-surface-strong)] text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10'
+                      }`}
+                    >
                       {followLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isFollowingProfile ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}{followLoading ? copy.followLoading : isFollowingProfile ? copy.followingAction : copy.followAction}
                     </button>
                     {whatsAppHref ? <a href={whatsAppHref} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"><PhoneCall className="h-4 w-4 text-emerald-600" />{copy.whatsapp}</a> : null}
@@ -2359,9 +2374,16 @@ export default function PublicProfileClient({
                   const active = activeProfileTab === tab.key;
                   return (
                     <ProfileRailItem key={tab.key}>
-                      <button type="button" onClick={() => setActiveProfileTab(tab.key)} aria-current={active ? 'page' : undefined} className={${relative min-h-12 whitespace-nowrap px-4 text-[12px] font-bold transition sm:min-h-14 sm:text-sm ${${{
-                        active ? 'text-emerald-700 dark:text-emerald-300' : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
-                      }${}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveProfileTab(tab.key)}
+                        aria-current={active ? 'page' : undefined}
+                        className={`relative min-h-12 whitespace-nowrap px-4 text-[12px] font-bold transition sm:min-h-14 sm:text-sm ${
+                          active
+                            ? 'text-emerald-700 dark:text-emerald-300'
+                            : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
+                        }`}
+                      >
                         {tab.label}
                         {active ? <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-emerald-600" /> : null}
                       </button>
@@ -2379,9 +2401,16 @@ export default function PublicProfileClient({
                       const active = resolvedContentTab === tab;
                       return (
                         <ProfileRailItem key={tab}>
-                          <button type="button" onClick={() => setActiveContentTab(tab)} aria-pressed={active} className={${min-h-9 whitespace-nowrap rounded-full border px-3 text-[11px] font-bold transition sm:text-xs ${${{
-                            active ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]'
-                          }${}>
+                          <button
+                            type="button"
+                            onClick={() => setActiveContentTab(tab)}
+                            aria-pressed={active}
+                            className={`min-h-9 whitespace-nowrap rounded-full border px-3 text-[11px] font-bold transition sm:text-xs ${
+                              active
+                                ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]'
+                            }`}
+                          >
                             {tab === 'all' ? copy.all : getProfileContentTabLabel(tab, localeCode)}
                           </button>
                         </ProfileRailItem>
@@ -2512,9 +2541,14 @@ export default function PublicProfileClient({
                     <p className="text-4xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{typeof rating === 'number' && rating > 0 ? rating.toFixed(1) : '—'}</p>
                     <div className="mt-2 flex justify-center gap-1">
                       {Array.from({ length: 5 }).map((_, index) => (
-                        <Star key={index} className={${h-4 w-4 ${${{
-                          typeof rating === 'number' && rating >= index + 1 ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'
-                        }${} />
+                        <Star
+                          key={index}
+                          className={`h-4 w-4 ${
+                            typeof rating === 'number' && rating >= index + 1
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'text-slate-300 dark:text-slate-600'
+                          }`}
+                        />
                       ))}
                     </div>
                     <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">{formatCompactNumber(reviewCount, localeCode)} {copy.reviewCount}</p>
@@ -2531,7 +2565,16 @@ export default function PublicProfileClient({
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2"><p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{review.name}</p>{review.date ? <span className="shrink-0 text-[10px] text-[color:var(--app-text-soft)]">{formatReviewDate(review.date, localeCode)}</span> : null}</div>
                                 <div className="mt-1 flex gap-0.5">
-                                  {Array.from({ length: 5 }).map((_, index) => <Star key={index} className={${h-3.5 w-3.5 ${${{review.rating >= index + 1 ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}${} />)}
+{Array.from({ length: 5 }).map((_, index) => (
+                                    <Star
+                                      key={index}
+                                      className={`h-3.5 w-3.5 ${
+                                        review.rating >= index + 1
+                                          ? 'fill-amber-400 text-amber-400'
+                                          : 'text-slate-300 dark:text-slate-600'
+                                      }`}
+                                    />
+                                  ))}
                                 </div>
                                 {review.comment ? <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">{review.comment}</p> : null}
                               </div>
