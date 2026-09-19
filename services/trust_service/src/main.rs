@@ -37,9 +37,9 @@ impl RuntimeMode {
         {
             "compatibility" | "proxy" | "legacy" => Ok(Self::Compatibility),
             "native" => Ok(Self::Native),
-            other => anyhow::bail!(
-                "DOMAIN_RUNTIME_MODE must be compatibility or native, got {other:?}"
-            ),
+            other => {
+                anyhow::bail!("DOMAIN_RUNTIME_MODE must be compatibility or native, got {other:?}")
+            }
         }
     }
 
