@@ -34,6 +34,7 @@ outbox_requeue_script = read("scripts/ops/requeue_marketplace_outbox_event.sh")
 jwt_keygen_script = read("scripts/ops/generate_jwt_access_keypair.sh")
 jwt_verify_script = read("scripts/ops/verify_jwt_access_keypair.sh")
 pitr_preflight_script = read("scripts/ops/postgres_pitr_preflight.sh")
+pitr_archive_evidence_script = read("scripts/ops/postgres_pitr_archive_evidence.sh")
 jwt_rotation_doc = read("docs/operations/jwt-access-key-rotation.md")
 pitr_readiness_doc = read("docs/operations/pitr-readiness.md")
 quality_workflow = read(".github/workflows/quality.yml")
@@ -60,6 +61,8 @@ marketplace_auth_source = read("services/marketplace_service/src/auth.rs")
 community_auth_source = read("services/community_service/src/auth.rs")
 community_health_source = read("services/community_service/src/health.rs")
 community_rate_limit_source = read("services/community_service/src/rate_limit.rs")
+marketplace_runtime_source = read("services/marketplace_service/src/runtime.rs")
+community_runtime_source = read("services/community_service/src/runtime.rs")
 identity_auth_source = read("services/identity_service/src/routes/auth.rs")
 chat_runtime_config = read("services/chat_service/config/runtime.exs")
 business_money_source = read("services/marketplace_service/src/businesses/kernel/money.rs")
@@ -200,6 +203,18 @@ for path, source, markers in (
         pitr_preflight_script,
         ("SHOW wal_level", "SHOW archive_mode", "SHOW archive_command", "max_wal_senders"),
     ),
+    (
+        "scripts/ops/postgres_pitr_archive_evidence.sh",
+        pitr_archive_evidence_script,
+        (
+            "pg_stat_archiver",
+            "FORCE_WAL_SWITCH",
+            "I_UNDERSTAND_WAL_SWITCH",
+            "pg_switch_wal()",
+            "archived_count",
+            "latest archive attempt",
+        ),
+    ),
 ):
     for required_marker in markers:
         if required_marker not in source:
@@ -234,12 +249,11 @@ for marker in (
     if marker not in base_compose:
         errors.append(f"base compose does not pass reliability tuning into its service container: {marker}")
 
-for path in (
-    "services/identity_service/src/db/postgres.rs",
-    "services/marketplace_service/src/main.rs",
-    "services/community_service/src/main.rs",
+for path, source in (
+    ("services/identity_service/src/db/postgres.rs", read("services/identity_service/src/db/postgres.rs")),
+    ("services/marketplace_service/src/runtime.rs", marketplace_runtime_source),
+    ("services/community_service/src/runtime.rs", community_runtime_source),
 ):
-    source = read(path)
     for marker in (".idle_timeout(", ".max_lifetime("):
         if marker not in source:
             errors.append(f"{path} missing database connection lifecycle marker: {marker}")
@@ -543,12 +557,12 @@ for path, markers in {
         "cfg.db_min_connections",
         "cfg.db_acquire_timeout_seconds",
     ),
-    "services/marketplace_service/src/main.rs": (
+    "services/marketplace_service/src/runtime.rs": (
         "MARKETPLACE_DB_MAX_CONNECTIONS",
         "MARKETPLACE_DB_MIN_CONNECTIONS",
         "MARKETPLACE_DB_ACQUIRE_TIMEOUT_SECONDS",
     ),
-    "services/community_service/src/main.rs": (
+    "services/community_service/src/runtime.rs": (
         "COMMUNITY_DB_MAX_CONNECTIONS",
         "COMMUNITY_DB_MIN_CONNECTIONS",
         "COMMUNITY_DB_ACQUIRE_TIMEOUT_SECONDS",
@@ -758,8 +772,8 @@ for marker in (
         errors.append(f"capacity runbook missing decision marker: {marker}")
 
 for path, warning_threshold, hard_ceiling in (
-    ("services/marketplace_service/src/main.rs", 750_000, 827_000),
-    ("services/community_service/src/main.rs", 280_000, 302_000),
+    ("services/marketplace_service/src/main.rs", 745_000, 823_000),
+    ("services/community_service/src/main.rs", 275_000, 297_000),
 ):
     target = ROOT / path
     if not target.is_file():
@@ -826,6 +840,58 @@ for path, source, main_source in (
         errors.append(f"{path} is no longer wired from the service composition root")
     if "async fn ensure_runtime_schema" in main_source:
         errors.append(f"{path} migration characterization leaked back into main.rs")
+
+for path, source, main_source, required_markers, forbidden_markers in (
+    (
+        "services/marketplace_service/src/runtime.rs",
+        marketplace_runtime_source,
+        marketplace_source,
+        (
+            "connect_database_pool",
+            ".idle_timeout(",
+            ".max_lifetime(",
+            "init_tracing",
+            "shutdown_signal",
+            "parse_cors_origins",
+        ),
+        (
+            "fn env_u32_bounded",
+            "fn init_tracing",
+            "async fn shutdown_signal",
+            "fn parse_cors_origins",
+            "PgPoolOptions",
+        ),
+    ),
+    (
+        "services/community_service/src/runtime.rs",
+        community_runtime_source,
+        community_main_source,
+        (
+            "connect_database_pool",
+            "DatabasePoolPurpose",
+            ".idle_timeout(",
+            ".max_lifetime(",
+            "init_tracing",
+            "shutdown_signal",
+            "parse_cors_origins",
+        ),
+        (
+            "fn env_u32_bounded",
+            "fn init_tracing",
+            "async fn shutdown_signal",
+            "fn parse_cors_origins",
+            "PgPoolOptions",
+        ),
+    ),
+):
+    for marker in required_markers:
+        if marker not in source:
+            errors.append(f"{path} missing extracted runtime responsibility marker: {marker}")
+    if "mod runtime;" not in main_source:
+        errors.append(f"{path} is no longer wired from the service composition root")
+    for marker in forbidden_markers:
+        if marker in main_source:
+            errors.append(f"{path} responsibility leaked back into main.rs: {marker}")
 
 for path, source, main_source, required_markers, forbidden_markers in (
     (

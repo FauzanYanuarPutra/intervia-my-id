@@ -17,7 +17,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha512};
-use sqlx::{postgres::PgPoolOptions, AssertSqlSafe, FromRow, PgPool, Postgres, QueryBuilder, Row};
+use sqlx::{AssertSqlSafe, FromRow, PgPool, Postgres, QueryBuilder, Row};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -28,7 +28,6 @@ use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tower_http::cors::CorsLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
 mod auth;
@@ -38,6 +37,7 @@ mod identity_projection;
 mod news;
 mod order_engine;
 mod outbox;
+mod runtime;
 mod runtime_metrics;
 mod schema_contract;
 use auth::{auth_claims_from_headers, user_id_from_auth, user_id_from_token_string, AccessClaims};
@@ -47,6 +47,7 @@ use identity_projection::{
 };
 use order_engine::{create_order, get_order, list_orders, transition_order};
 use outbox::{run_outbox_publisher, OutboxPublisherConfig};
+use runtime::{connect_database_pool, init_tracing, parse_cors_origins, shutdown_signal};
 
 #[derive(Clone)]
 struct AppState {
@@ -136,17 +137,6 @@ struct LinkedTransactionFundingOutcome {
     wallet_environment: String,
     amount_cents: i64,
     currency: String,
-}
-
-fn parse_cors_origins() -> Vec<HeaderValue> {
-    let raw = env::var("CORS_ORIGINS")
-        .ok()
-        .or_else(|| env::var("CORS_ORIGIN").ok())
-        .unwrap_or_default();
-
-    raw.split(',')
-        .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
-        .collect()
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -2031,59 +2021,6 @@ struct ListBannersResponse {
     has_more: bool,
 }
 
-fn env_u32_bounded(name: &str, default: u32, min: u32, max: u32) -> u32 {
-    env::var(name)
-        .ok()
-        .and_then(|value| value.parse::<u32>().ok())
-        .unwrap_or(default)
-        .clamp(min, max)
-}
-
-fn env_u64_bounded(name: &str, default: u64, min: u64, max: u64) -> u64 {
-    env::var(name)
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(default)
-        .clamp(min, max)
-}
-
-fn init_tracing() {
-    let app_env = env::var("ENV")
-        .or_else(|_| env::var("APP_ENV"))
-        .unwrap_or_else(|_| "development".to_string());
-    let structured = match env::var("LOG_FORMAT")
-        .unwrap_or_default()
-        .trim()
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "json" => true,
-        "text" | "pretty" => false,
-        _ => app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging"),
-    };
-    let filter = tracing_subscriber::EnvFilter::new(
-        env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
-    );
-
-    if structured {
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .json()
-                    .flatten_event(true)
-                    .with_current_span(true)
-                    .with_span_list(true),
-            )
-            .init();
-    } else {
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-    }
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
@@ -2094,32 +2031,7 @@ async fn main() -> anyhow::Result<()> {
     let port = env::var("APP_PORT").unwrap_or_else(|_| "8081".to_string());
     let addr = format!("0.0.0.0:{port}");
 
-    let db_max_connections = env_u32_bounded("MARKETPLACE_DB_MAX_CONNECTIONS", 20, 2, 100);
-    let db_min_connections =
-        env_u32_bounded("MARKETPLACE_DB_MIN_CONNECTIONS", 2, 0, db_max_connections);
-    let db_acquire_timeout_seconds =
-        env_u64_bounded("MARKETPLACE_DB_ACQUIRE_TIMEOUT_SECONDS", 5, 1, 30);
-    let db_idle_timeout_seconds =
-        env_u64_bounded("MARKETPLACE_DB_IDLE_TIMEOUT_SECONDS", 300, 30, 3_600);
-    let db_max_lifetime_seconds =
-        env_u64_bounded("MARKETPLACE_DB_MAX_LIFETIME_SECONDS", 1_800, 300, 86_400);
-
-    let db = PgPoolOptions::new()
-        .max_connections(db_max_connections)
-        .min_connections(db_min_connections)
-        .acquire_timeout(std::time::Duration::from_secs(db_acquire_timeout_seconds))
-        .idle_timeout(std::time::Duration::from_secs(db_idle_timeout_seconds))
-        .max_lifetime(std::time::Duration::from_secs(db_max_lifetime_seconds))
-        .after_connect(|conn, _meta| {
-            Box::pin(async move {
-                sqlx::query("SET search_path TO public, events")
-                    .execute(conn)
-                    .await?;
-                Ok(())
-            })
-        })
-        .connect(&database_url)
-        .await?;
+    let db = connect_database_pool(&database_url).await?;
 
     let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
     let strict_secrets =
@@ -2518,32 +2430,6 @@ async fn main() -> anyhow::Result<()> {
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
-
-    tracing::info!("shutdown signal received");
 }
 
 async fn collect_events(
