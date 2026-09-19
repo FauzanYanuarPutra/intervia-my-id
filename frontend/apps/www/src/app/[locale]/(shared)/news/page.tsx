@@ -121,7 +121,16 @@ export default async function NewsIndexPage({ params, searchParams }: PageProps)
 
       {featured ? (
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-          <Link href={buildNewsPath(featured.slug)} className="group overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">{featured.coverImage ? <div className="aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-slate-800"><img src={featured.coverImage} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" loading="eager" /></div> : <div className="flex aspect-[16/9] items-end bg-slate-100 p-5 dark:bg-slate-800"><span className="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-400">Lajukan News</span></div>}<div className="p-5 sm:p-7"><div className="flex items-center gap-2 text-xs font-extrabold text-emerald-700 dark:text-emerald-300"><span>{featured.category}</span>{featured.location ? <><span className="text-slate-300">•</span><span className="text-slate-500">{featured.location}</span></> : null}</div><h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white sm:text-4xl">{featured.title}</h2>{featured.summary ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{featured.summary}</p> : null}<div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><Clock3 className="h-3.5 w-3.5" />{formatDate(featured.publishedAt, locale)}</div></div></Link>
+          <Link href={buildNewsPath(featured.slug)} className="group overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">{featured.coverImage ? <div className="aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-slate-800"><img
+                src={featured.coverImage}
+                alt={featured.title}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+                loading="eager"
+                onError={event => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = '/opengraph-image.png';
+                }}
+              /></div> : <div className="flex aspect-[16/9] items-end bg-slate-100 p-5 dark:bg-slate-800"><span className="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-400">Lajukan News</span></div>}<div className="p-5 sm:p-7"><div className="flex items-center gap-2 text-xs font-extrabold text-emerald-700 dark:text-emerald-300"><span>{featured.category}</span>{featured.location ? <><span className="text-slate-300">•</span><span className="text-slate-500">{featured.location}</span></> : null}</div><h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white sm:text-4xl">{featured.title}</h2>{featured.summary ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{featured.summary}</p> : null}<div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"><Clock3 className="h-3.5 w-3.5" />{formatDate(featured.publishedAt, locale)}</div></div></Link>
           <div className="grid gap-3">
             <Link href="/explore" className="rounded-[26px] border border-slate-200 bg-[#f8f5ee] p-5 dark:border-white/10 dark:bg-white/[0.04]">
               <Store className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
