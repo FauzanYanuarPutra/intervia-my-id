@@ -462,7 +462,13 @@ async fn upsert_channel(
         Err(response) => return response,
     };
     match ControlRepository::new(state.db.clone())
-        .upsert_channel(actor_id, business_id, organization_id, &channel_key, payload)
+        .upsert_channel(
+            actor_id,
+            business_id,
+            organization_id,
+            &channel_key,
+            payload,
+        )
         .await
     {
         Ok(item) => (StatusCode::OK, Json(json!({ "data": { "channel": item } }))).into_response(),
@@ -612,17 +618,13 @@ async fn list_audit_events(
     Path(business_id): Path<Uuid>,
     axum::extract::Query(query): axum::extract::Query<AuditQuery>,
 ) -> Response {
-    let (_, organization_id) = match business_control_context(
-        &state,
-        &headers,
-        business_id,
-        BusinessControlAccess::Audit,
-    )
-    .await
-    {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
+    let (_, organization_id) =
+        match business_control_context(&state, &headers, business_id, BusinessControlAccess::Audit)
+            .await
+        {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
 
     let subject_type = query
         .subject_type
