@@ -33,7 +33,19 @@ if config_env() == :prod do
         {JOSE.JWK.from_pem(public_key_pem), ["RS256"]}
 
       "HS256" ->
-        raise "HS256 access tokens are disabled in production; configure RS256"
+        if System.get_env("ENV") == "development" do
+          jwt_secret =
+            System.get_env("JWT_SECRET") ||
+              raise "missing JWT_SECRET for development HS256"
+
+          if byte_size(jwt_secret) < 32 do
+            raise "JWT_SECRET must be at least 32 characters for development HS256"
+          end
+
+          {JOSE.JWK.from_oct(jwt_secret), ["HS256"]}
+        else
+          raise "HS256 access tokens are disabled outside explicit development mode; configure RS256"
+        end
 
       other ->
         raise "unsupported JWT_ACCESS_ALG: #{other}"

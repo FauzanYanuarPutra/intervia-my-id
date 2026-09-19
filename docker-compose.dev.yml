@@ -72,8 +72,12 @@ services:
 
   chat_service:
     environment:
+      # The development stack intentionally uses the same HS256 contract as the
+      # identity service. The chat runtime only permits this when ENV=development.
       ENV: development
       PHX_HOST: ${PHX_HOST:-localhost}
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:-HS256}
+      JWT_SECRET: ${JWT_SECRET}
     ports:
       - "127.0.0.1:${PORT_CHAT:-4000}:4000"
 
