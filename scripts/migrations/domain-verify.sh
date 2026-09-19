@@ -36,6 +36,14 @@ compare() {
   echo "OK: $label => $t"
 }
 
+
+compare_columns() {
+  local label="$1" db="$2" table="$3"
+  local query
+  query="SELECT string_agg(format('%s|%s|%s|%s', column_name, data_type, is_nullable, COALESCE(udt_name,'')), ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema='public' AND table_name='\${table}'"
+  compare "$label columns" "$db" "$query" "$query"
+}
+
 verify_news() {
   compare "news content" news_db     "SELECT count(*) FROM content_items WHERE content_type IN ('news','article')"     "SELECT count(*) FROM content_items WHERE content_type IN ('news','article')"
   compare "news editorial events" news_db     "SELECT count(*) FROM news_editorial_events e JOIN content_items c ON c.id=e.content_id WHERE c.content_type IN ('news','article')"     "SELECT count(*) FROM news_editorial_events e JOIN content_items c ON c.id=e.content_id WHERE c.content_type IN ('news','article')"
