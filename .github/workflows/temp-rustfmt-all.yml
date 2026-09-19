@@ -1,0 +1,39 @@
+name: Temporary Rustfmt All
+
+on:
+  push:
+    branches:
+      - automation/rustfmt-eb89ccbb
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: automation/rustfmt-eb89ccbb
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Format Rust services
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd services/marketplace_service && cargo fmt)
+          (cd services/identity_service && cargo fmt)
+          (cd services/community_service && cargo fmt)
+      - name: Commit formatted files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Already formatted"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/marketplace_service services/identity_service services/community_service
+          git commit -m "style: apply pinned rustfmt"
+          git push origin HEAD:automation/rustfmt-eb89ccbb
