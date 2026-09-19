@@ -128,6 +128,7 @@ export default async function BusinessOrdersPage({ params, searchParams }: PageP
             businessId={business.id}
             products={saleProducts}
             channels={channels.filter(channel => channel.enabled).map(channel => ({ value: channel.channel_key, label: channel.display_name }))}
+            locations={(business.locations ?? []).filter(location => location.status !== 'inactive').map(location => ({ id: location.id, name: location.name, city: location.city, isPrimary: location.isPrimary }))}
             defaultDate={jakartaDateKey()}
           />
         </div>
