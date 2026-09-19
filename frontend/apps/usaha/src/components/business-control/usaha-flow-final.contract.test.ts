@@ -51,7 +51,7 @@ describe('Flow Usaha final contracts', () => {
     const guide = source('src/components/portal/UsahaFlowGuide.tsx');
     const shell = source('src/components/portal/PortalShell.tsx');
     const create = source('src/components/forms/NewBusinessQuickForm.tsx');
-    expect(guide).toContain('Cara kerja');
+    expect(guide).toContain('Mulai di sini');
     expect(guide).toContain('3 langkah inti');
     expect(shell).toContain('UsahaFlowGuide');
     expect(create).toContain('Langkah 1');
