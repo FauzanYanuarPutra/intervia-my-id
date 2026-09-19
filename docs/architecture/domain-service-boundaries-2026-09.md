@@ -382,3 +382,7 @@ Primary references:
 - https://docs.stripe.com/api/idempotent_requests
 - https://docs.stripe.com/webhooks
 - https://opentelemetry.io/docs/concepts/observability-primer/
+
+## Cutover guardrail state
+
+The extracted domain services are deployment-ready in compatibility mode. Native cutover is intentionally blocked until the target database is backfilled, row/schema invariants are verified, reconciliation is clean, and the relevant route is switched deliberately. This keeps the extraction reversible and avoids silently creating two sources of truth.
