@@ -80,6 +80,26 @@ describe('Flow Usaha final contracts', () => {
     expect(hpp).toContain("useState('Pembaruan resep')");
   });
 
+  it('keeps product audit reasons and role/channel wiring connected', () => {
+    const contract = source('src/lib/product-mutation-contract.ts');
+    const productRoute = source('src/app/api/businesses/[businessId]/products/[productId]/route.ts');
+    const orders = source('src/app/(portal)/businesses/[businessId]/orders/page.tsx');
+    const invite = source('src/components/forms/InviteMemberQuickForm.tsx');
+    const inviteRoute = source('src/app/api/businesses/[businessId]/team/invites/route.ts');
+    const quickSale = source('src/components/business-control/QuickSaleWorkspace.tsx');
+    expect(contract).toContain('reason?: string');
+    expect(contract).toContain('reason: trimmed(input.reason)');
+    expect(productRoute).toContain('product_change_reason_required');
+    expect(orders).toContain("hasPermission(business, 'voidSales')");
+    expect(orders).toContain('canVoidSales={canVoidSales}');
+    expect(orders).toContain('channels.filter(channel => channel.enabled)');
+    expect(invite).toContain("value: 'accounting'");
+    expect(invite).toContain("value: 'inventory'");
+    expect(inviteRoute).toContain("accounting: 'org_accounting'");
+    expect(inviteRoute).toContain("inventory: 'org_inventory'");
+    expect(quickSale).toContain('channels?: SaleChannelOption[]');
+  });
+
   it('renders negative storefront price deltas with a minus sign', () => {
     const configurator = source('../www/src/app/[locale]/(shared)/toko/[slug]/StorefrontProductConfigurator.tsx');
     expect(configurator).toContain("option.price_delta_cents > 0 ? '+' : '-'");
