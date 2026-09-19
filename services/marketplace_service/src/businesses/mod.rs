@@ -40,6 +40,8 @@ mod inventory_routes_tests;
 mod inventory_tests;
 pub(crate) mod kernel;
 mod media;
+mod period_control;
+mod period_control_routes;
 #[cfg(test)]
 mod media_migration_tests;
 #[cfg(test)]
@@ -98,6 +100,7 @@ pub(crate) fn router() -> axum::Router<std::sync::Arc<crate::AppState>> {
         .merge(governance_routes::router())
         .merge(ingredient_management_routes::router())
         .merge(inventory_routes::router())
+        .merge(period_control_routes::router())
         .merge(stock_transfer_routes::router())
         .merge(sales_routes::router())
         .merge(public_commerce_routes::router())
