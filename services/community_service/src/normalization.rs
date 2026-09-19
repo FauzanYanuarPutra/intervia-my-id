@@ -114,4 +114,3 @@ pub(crate) fn normalize_reel_live_status(value: Option<String>, capture_mode: &s
         _ => "scheduled".to_string(),
     }
 }
-
