@@ -5,6 +5,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
+    audit,
     control::IngredientRecord,
     governance::{GovernanceError, GovernanceRepository},
 };
@@ -27,6 +28,8 @@ pub(crate) struct UpdateIngredientRequest {
     pub(crate) waste_percent: Decimal,
     pub(crate) minimum_stock: Decimal,
     pub(crate) supplier_name: Option<String>,
+    #[serde(default)]
+    pub(crate) reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
@@ -98,12 +101,39 @@ impl IngredientManagementRepository {
             .authorize(actor_id, business_id, organization_id, INVENTORY_MANAGE)
             .await?;
 
+        let reason = request
+            .reason
+            .as_deref()
+            .map(normalize)
+            .filter(|value| value.chars().count() >= 3)
+            .ok_or(IngredientManagementError::Validation("ingredient_change_reason_required"))?;
+
+        let mut tx = self.db.begin().await?;
+        let before = sqlx::query_as::<_, IngredientRecord>(
+            r#"
+            SELECT id, business_id, organization_id, name, kind, purchase_unit, recipe_unit,
+              conversion_factor, purchase_price_amount, purchase_quantity, yield_percent,
+              waste_percent, stock_quantity, minimum_stock, supplier_name, status,
+              created_at, updated_at
+            FROM business_ingredients
+            WHERE id=$1 AND business_id=$2 AND organization_id=$3 AND status='active'
+            FOR UPDATE
+            "#,
+        )
+        .bind(ingredient_id)
+        .bind(business_id)
+        .bind(organization_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(IngredientManagementError::NotFound)?;
+
         let supplier_name = request
             .supplier_name
             .as_deref()
             .map(normalize)
             .filter(|value| !value.is_empty());
-        sqlx::query_as::<_, IngredientRecord>(
+
+        let updated = sqlx::query_as::<_, IngredientRecord>(
             r#"
             UPDATE business_ingredients
             SET name=$4,
@@ -139,9 +169,49 @@ impl IngredientManagementRepository {
         .bind(request.waste_percent)
         .bind(request.minimum_stock)
         .bind(supplier_name)
-        .fetch_optional(&self.db)
-        .await?
-        .ok_or(IngredientManagementError::NotFound)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        audit::record_tx(
+            &mut tx,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "ingredient.updated",
+            "business_ingredient",
+            Some(ingredient_id),
+            Some(&reason),
+            serde_json::json!({
+                "summary": format!("Bahan {} diperbarui", updated.name),
+                "changed_fields": [
+                    "name", "kind", "purchase_unit", "recipe_unit",
+                    "conversion_factor", "purchase_price_amount",
+                    "purchase_quantity", "yield_percent", "waste_percent",
+                    "minimum_stock", "supplier_name"
+                ],
+                "before": {
+                    "name": before.name,
+                    "purchase_price_amount": before.purchase_price_amount,
+                    "purchase_quantity": before.purchase_quantity,
+                    "yield_percent": before.yield_percent,
+                    "minimum_stock": before.minimum_stock,
+                    "supplier_name": before.supplier_name
+                },
+                "after": {
+                    "name": updated.name,
+                    "purchase_price_amount": updated.purchase_price_amount,
+                    "purchase_quantity": updated.purchase_quantity,
+                    "yield_percent": updated.yield_percent,
+                    "minimum_stock": updated.minimum_stock,
+                    "supplier_name": updated.supplier_name
+                }
+            }),
+        )
+        .await?;
+
+        tx.commit().await?;
+        Ok(updated)
     }
 
     pub(crate) async fn archive(
@@ -150,7 +220,14 @@ impl IngredientManagementRepository {
         business_id: Uuid,
         organization_id: Uuid,
         ingredient_id: Uuid,
+        reason: &str,
     ) -> Result<IngredientRecord, IngredientManagementError> {
+        let reason = normalize(reason);
+        if reason.chars().count() < 3 {
+            return Err(IngredientManagementError::Validation(
+                "ingredient_archive_reason_required",
+            ));
+        }
         GovernanceRepository::new(self.db.clone())
             .authorize(actor_id, business_id, organization_id, INVENTORY_MANAGE)
             .await?;
@@ -214,6 +291,30 @@ impl IngredientManagementRepository {
 
         let archived =
             archive_ingredient_tx(&mut tx, business_id, organization_id, ingredient_id).await?;
+
+        audit::record_tx(
+            &mut tx,
+            organization_id,
+            business_id,
+            None,
+            Some(actor_id),
+            "ingredient.archived",
+            "business_ingredient",
+            Some(ingredient_id),
+            Some(&reason),
+            serde_json::json!({
+                "summary": format!("Bahan {} diarsipkan", archived.name),
+                "before": {
+                    "status": "active",
+                    "name": archived.name
+                },
+                "after": {
+                    "status": "archived"
+                }
+            }),
+        )
+        .await?;
+
         tx.commit().await?;
         Ok(archived)
     }
