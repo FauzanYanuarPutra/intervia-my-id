@@ -250,7 +250,9 @@ impl SaleRepository {
             || sale_id.is_nil()
             || idempotency_key.is_nil()
         {
-            return Err(SaleRepositoryError::Validation("invalid_sale_void_identity"));
+            return Err(SaleRepositoryError::Validation(
+                "invalid_sale_void_identity",
+            ));
         }
 
         let reason = normalize_void_reason(&reason)?;
@@ -295,7 +297,10 @@ impl SaleRepository {
                 let lines = load_lines_tx(&mut tx, sale_id).await?;
                 tx.commit().await?;
                 return Ok(VoidSaleOutcome {
-                    sale: SaleAggregate { sale: current, lines },
+                    sale: SaleAggregate {
+                        sale: current,
+                        lines,
+                    },
                     replayed: true,
                 });
             }
@@ -418,7 +423,10 @@ impl SaleRepository {
         tx.commit().await?;
 
         Ok(VoidSaleOutcome {
-            sale: SaleAggregate { sale: updated, lines },
+            sale: SaleAggregate {
+                sale: updated,
+                lines,
+            },
             replayed: false,
         })
     }
@@ -1916,7 +1924,6 @@ mod tests {
             Err(SaleRepositoryError::Validation("sale_void_reason_too_long"))
         ));
     }
-
 
     use super::*;
 
