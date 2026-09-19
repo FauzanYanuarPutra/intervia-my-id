@@ -73,6 +73,7 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
   const [items, setItems] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
   const returnFocusRef = useRef<HTMLButtonElement>(null);
 
   async function load() {
@@ -100,10 +101,22 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
     if (open) void load();
   }, [open]);
 
-  const grouped = useMemo(
-    () => items.filter(item => item.event_key && item.occurred_at),
-    [items],
-  );
+  const grouped = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('id-ID');
+    return items
+      .filter(item => item.event_key && item.occurred_at)
+      .filter(item => {
+        if (!needle) return true;
+        const summary = readSummary(item) ?? '';
+        const haystack = [
+          eventLabel(item.event_key),
+          item.event_key,
+          summary,
+          item.reason ?? '',
+        ].join(' ').toLocaleLowerCase('id-ID');
+        return haystack.includes(needle);
+      });
+  }, [items, query]);
 
   return (
     <>
@@ -160,6 +173,17 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+            <label className="mb-3 block">
+              <span className="sr-only">Cari riwayat perubahan</span>
+              <input
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                placeholder="Cari perubahan, alasan, atau nama tindakan…"
+                className="portal-input min-h-11 w-full"
+                autoComplete="off"
+              />
+            </label>
+
             {loading && !grouped.length ? (
               <div className="space-y-3" aria-live="polite">
                 {[0, 1, 2, 3].map(item => (
@@ -202,7 +226,7 @@ export function ChangeHistoryDrawer({ businessId, compact = false }: Props) {
                       </span>
                     </div>
                     <p className="mt-2 text-xs font-semibold text-portal-soft">
-                      {event.actor_is_current_user ? 'Dilakukan oleh Anda' : 'Dilakukan oleh anggota tim'}
+{event.actor_is_current_user ? 'Dilakukan oleh Anda' : event.actor_user_id ? 'Dilakukan oleh anggota tim' : 'Dicatat oleh sistem'}
                     </p>
                     {summary ? (
                       <p className="mt-2 text-sm font-semibold leading-5 text-portal-ink">{summary}</p>
