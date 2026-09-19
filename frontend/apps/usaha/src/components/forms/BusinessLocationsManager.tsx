@@ -165,10 +165,11 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
             <label className="grid gap-1.5 text-sm font-semibold">
               Nama lokasi
               <input
+                autoFocus
                 className="portal-input"
                 value={editing.name}
                 onChange={event => setEditing({ ...editing, name: event.target.value })}
-                placeholder="Cabang Sindanglaya"
+                placeholder="Contoh: Outlet Bintaro"
               />
             </label>
             <label className="grid gap-1.5 text-sm font-semibold">
@@ -177,7 +178,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
                 className="portal-input"
                 value={editing.city}
                 onChange={event => setEditing({ ...editing, city: event.target.value })}
-                placeholder="Bandung"
+                placeholder="Contoh: Tangerang Selatan"
               />
             </label>
             <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">
@@ -189,15 +190,25 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
                 placeholder="Jalan, nomor, kecamatan, patokan"
               />
             </label>
-            <label className="grid gap-1.5 text-sm font-semibold">
-              Telepon
-              <input className="portal-input" value={editing.phone} onChange={event => setEditing({ ...editing, phone: event.target.value })} />
-            </label>
-            <label className="grid gap-1.5 text-sm font-semibold">
-              WhatsApp
-              <input className="portal-input" value={editing.whatsapp} onChange={event => setEditing({ ...editing, whatsapp: event.target.value })} />
-            </label>
           </div>
+
+          <details className="group mt-3 rounded-[16px] border border-portal-line bg-[#fafbf9]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-portal-ink">
+              <span>Kontak outlet <span className="ml-2 text-xs font-normal text-portal-soft">Telepon & WhatsApp</span></span>
+              <span className="text-xs font-bold text-portal-forest group-open:hidden">Buka</span>
+              <span className="hidden text-xs font-bold text-portal-forest group-open:inline">Tutup</span>
+            </summary>
+            <div className="grid gap-3 border-t border-portal-line p-4 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Telepon
+                <input inputMode="tel" className="portal-input" value={editing.phone} onChange={event => setEditing({ ...editing, phone: event.target.value })} placeholder="0812..." />
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold">
+                WhatsApp
+                <input inputMode="tel" className="portal-input" value={editing.whatsapp} onChange={event => setEditing({ ...editing, whatsapp: event.target.value })} placeholder="0812..." />
+              </label>
+            </div>
+          </details>
 
           <div className="mt-4">
             <BusinessLocationField
