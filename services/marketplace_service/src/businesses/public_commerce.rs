@@ -18,6 +18,7 @@ use uuid::Uuid;
 use crate::{auth_claims_from_headers, AppState};
 
 use super::{
+    event_outbox::enqueue_business_event,
     kernel::command::canonical_request_hash,
     modifier_resolution::{
         resolve_modifier_selection as resolve_shared_modifier_selection, ModifierResolutionError,
@@ -509,40 +510,16 @@ impl PublicCommerceRepository {
             "stock_reservation_expires_at": reservation.expires_at
         });
 
-        // Keep the legacy Business OS outbox during migration, while also writing
-        // the canonical publisher outbox in the same transaction.
-        sqlx::query(
-            r#"
-            INSERT INTO outbox_events (
-              id, aggregate_type, aggregate_id, event_type, payload, event_key
-            ) VALUES ($1,'order',$2,$3,$4,$5)
-            ON CONFLICT (event_key) DO NOTHING
-            "#,
+        enqueue_business_event(
+            &mut tx,
+            event_id,
+            "order",
+            inserted_id,
+            event_type,
+            &event_payload,
+            &event_key,
+            event_type,
         )
-        .bind(event_id)
-        .bind(inserted_id)
-        .bind(event_type)
-        .bind(&event_payload)
-        .bind(&event_key)
-        .execute(&mut *tx)
-        .await
-        .map_err(storage_error)?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO events.event_outbox (
-              id, aggregate_type, aggregate_id, event_type, payload, routing_key, event_key
-            ) VALUES ($1,'order',$2,$3,$4,$5,$6)
-            ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING
-            "#,
-        )
-        .bind(event_id)
-        .bind(inserted_id.to_string())
-        .bind(event_type)
-        .bind(&event_payload)
-        .bind(event_type)
-        .bind(&event_key)
-        .execute(&mut *tx)
         .await
         .map_err(storage_error)?;
 
