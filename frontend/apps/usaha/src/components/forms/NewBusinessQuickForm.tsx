@@ -233,7 +233,9 @@ export function NewBusinessQuickForm({ initialOwnerPhone = '' }: NewBusinessQuic
         </button>
       </div>
       </>
+        </>
       ) : (
+      <>
       <section className="grid gap-3 rounded-[20px] border border-portal-line/70 bg-white p-4">
         <div className="flex items-center gap-2">
           <MapPinned className="h-4 w-4 text-portal-forest" />
