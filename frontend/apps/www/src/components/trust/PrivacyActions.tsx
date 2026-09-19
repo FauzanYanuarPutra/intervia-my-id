@@ -95,6 +95,9 @@ export function PrivacyActions({ locale }: PrivacyActionsProps) {
                 ? 'Confirm delete'
                 : 'Delete account'}
         </button>
+        <Link href="/privacy/requests" className="ui-button-secondary inline-flex items-center px-4 text-sm">
+          {locale === 'id' ? 'Kelola permintaan data' : 'Manage data requests'}
+        </Link>
         <Link href="/settings" className="ui-button-secondary inline-flex items-center px-4 text-sm">
           {locale === 'id' ? 'Buka Pengaturan' : 'Open Settings'}
         </Link>
