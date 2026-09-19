@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Button, Input } from '@/ui';
+import { Button } from '@/ui';
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   google_not_configured: 'Login Google belum dikonfigurasi.',
@@ -14,32 +14,10 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
   const initialGoogleError =
     typeof window !== 'undefined'
       ? GOOGLE_ERROR_MESSAGES[new URLSearchParams(window.location.search).get('error') || ''] || ''
       : '';
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const nextPath = typeof window === 'undefined'
-        ? null
-        : new URLSearchParams(window.location.search).get('next');
-      await login(email, password, nextPath);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login gagal. Coba lagi.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const continueWithGoogle = () => {
     const nextPath =
@@ -65,19 +43,9 @@ export default function LoginPage() {
           Lanjut dengan Google
         </Button>
 
-        <div className="my-4 flex items-center gap-3 text-xs text-[color:var(--color-text)] opacity-70">
-          <span className="h-px flex-1 bg-[color:var(--color-border)]" />
-          <span>atau</span>
-          <span className="h-px flex-1 bg-[color:var(--color-border)]" />
+        <div className="mt-4 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] p-3 text-sm text-[color:var(--color-text)]">
+          Akses CMS hanya untuk akun Google yang sudah disetujui oleh Platform Owner Lajukan.
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Email atau username" type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@contoh.com atau @username" autoComplete="username" required />
-          <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required />
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Memproses...' : 'Masuk dengan password'}
-          </Button>
-        </form>
 
         <p className="mt-6 text-center">
           <a href={process.env.NEXT_PUBLIC_WWW_URL || 'http://localhost:3000'} className="text-sm text-[color:var(--color-text)] hover:text-[color:var(--color-text)]">← Kembali ke situs</a>
