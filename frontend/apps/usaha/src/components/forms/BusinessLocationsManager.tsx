@@ -226,14 +226,24 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
             />
           </div>
 
-          <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
-            <input
-              type="checkbox"
-              checked={editing.isPrimary}
-              onChange={event => setEditing({ ...editing, isPrimary: event.target.checked })}
-            />
-            Jadikan lokasi utama
-          </label>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="flex min-h-11 items-center gap-2 rounded-xl border border-portal-line bg-[#fafbf9] px-3 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={editing.isPrimary}
+                onChange={event => setEditing({ ...editing, isPrimary: event.target.checked })}
+              />
+              Jadikan lokasi utama
+            </label>
+            <label className="flex min-h-11 items-center gap-2 rounded-xl border border-portal-line bg-[#fafbf9] px-3 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={editing.publicVisibility}
+                onChange={event => setEditing({ ...editing, publicVisibility: event.target.checked })}
+              />
+              Tampilkan ke pelanggan
+            </label>
+          </div>
 
           {editingExists && locations.length <= 1 ? (
             <p className="mt-3 rounded-xl bg-[#fafbf9] px-3 py-2.5 text-xs text-portal-soft">
