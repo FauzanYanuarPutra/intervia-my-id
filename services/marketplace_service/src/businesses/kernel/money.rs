@@ -116,6 +116,17 @@ impl Money {
         Self::new_non_negative(minor_units, self.currency)
     }
 
+    pub(crate) fn checked_mul_i64(self, multiplier: i64) -> Result<Self, KernelValidationError> {
+        if multiplier < 0 {
+            return Err(KernelValidationError::NegativeAmount);
+        }
+        let minor_units = self
+            .minor_units
+            .checked_mul(multiplier)
+            .ok_or(KernelValidationError::AmountOverflow)?;
+        Self::new_non_negative(minor_units, self.currency)
+    }
+
     fn ensure_same_currency(self, other: Self) -> Result<(), KernelValidationError> {
         if self.currency != other.currency {
             return Err(KernelValidationError::CurrencyMismatch);
