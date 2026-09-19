@@ -441,14 +441,9 @@ impl CommercialCoreRepository {
             return Err(CommercialCoreError::Validation("invalid_party_version"));
         }
         let mut tx = self.db.begin().await?;
-        ensure_party_archive_allowed_tx(
-            &mut tx,
-            business_id,
-            organization_id,
-            party_id,
-        )
-        .await
-        .map_err(map_counterparty_error)?;
+        ensure_party_archive_allowed_tx(&mut tx, business_id, organization_id, party_id)
+            .await
+            .map_err(map_counterparty_error)?;
         let archived = sqlx::query_as::<_, PartyRecord>(
             r#"
             UPDATE business_parties
@@ -1220,9 +1215,7 @@ async fn resolve_payment_party_tx(
 
     if let (Some(requested), Some(inferred)) = (payment.party_id, inferred_party) {
         if requested != inferred {
-            return Err(CommercialCoreError::Validation(
-                "payment_party_mismatch",
-            ));
+            return Err(CommercialCoreError::Validation("payment_party_mismatch"));
         }
     }
 

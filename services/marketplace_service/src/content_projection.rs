@@ -147,4 +147,3 @@ pub(crate) fn project_content_response_metadata(metadata: Value) -> Value {
         metadata
     }
 }
-
