@@ -33,6 +33,7 @@ services:
       - -c
       - shared_preload_libraries=pg_stat_statements
     volumes:
+  domain_postgres_data:
       - identity_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d identity_db"]
@@ -70,6 +71,27 @@ services:
       - marketplace_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d marketplace_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [data]
+
+  # ---------------------------------------------------------------------------
+  # TARGET DOMAIN DATA PLANE (strangler migration)
+  # ---------------------------------------------------------------------------
+  domain_db:
+    <<: *data-defaults
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: profile_db
+    volumes:
+      - domain_postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/domain-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d profile_db"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -339,6 +361,225 @@ services:
       timeout: 10s
       retries: 10
       start_period: 180s
+    networks: [app, data]
+
+  # ---------------------------------------------------------------------------
+  # TARGET DOMAIN SERVICES (safe, traffic-neutral until cutover)
+  # ---------------------------------------------------------------------------
+  profile_service:
+    <<: *service-defaults
+    build:
+      context: ./services/profile_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8091"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/profile_db
+      PROFILE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/profile_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8091"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8091/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  media_service:
+    <<: *service-defaults
+    build:
+      context: ./services/media_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8092"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/media_db
+      MEDIA_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/media_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8092"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8092/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  news_service:
+    <<: *service-defaults
+    build:
+      context: ./services/news_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8093"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/news_db
+      NEWS_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/news_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8093"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8093/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  order_service:
+    <<: *service-defaults
+    build:
+      context: ./services/order_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8094"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/order_db
+      ORDER_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/order_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8094"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8094/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  payment_service:
+    <<: *service-defaults
+    build:
+      context: ./services/payment_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8095"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/payment_db
+      PAYMENT_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/payment_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8095"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8095/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  promotion_service:
+    <<: *service-defaults
+    build:
+      context: ./services/promotion_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8096"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/promotion_db
+      PROMOTION_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/promotion_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8096"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8096/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  crm_service:
+    <<: *service-defaults
+    build:
+      context: ./services/crm_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8097"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/crm_db
+      CRM_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/crm_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8097"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8097/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  communication_service:
+    <<: *service-defaults
+    build:
+      context: ./services/communication_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8098"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/communication_db
+      COMMUNICATION_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/communication_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8098"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8098/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    networks: [app, data]
+
+  trust_service:
+    <<: *service-defaults
+    build:
+      context: ./services/trust_service
+      dockerfile: Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8099"
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/trust_db
+      TRUST_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@domain_db:5432/trust_db
+      LEGACY_UPSTREAM_URL: http://marketplace_service:8081
+    depends_on:
+      domain_db: { condition: service_healthy }
+    expose: ["8099"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8099/ready"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
     networks: [app, data]
 
   community_service:

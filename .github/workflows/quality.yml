@@ -49,6 +49,11 @@ jobs:
           exit "$failed"
       - name: Validate domain/database ownership
         run: python scripts/ci/check_domain_boundaries.py
+      - name: Validate domain cutover scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/migrations/domain-cutover.sh
 
   frontend:
     name: Frontend

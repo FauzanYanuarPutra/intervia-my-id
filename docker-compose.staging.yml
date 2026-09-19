@@ -1,4 +1,88 @@
 services:
+  profile_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-profile:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+  media_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-media:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+  news_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-news:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+      JWT_ACCESS_ALG: ${JWT_ACCESS_ALG:?JWT_ACCESS_ALG is required}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:?JWT_PUBLIC_KEY_PEM is required}
+      RABBITMQ_URL: amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672/%2f
+  order_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-order:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+  payment_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-payment:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+  promotion_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-promotion:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+  crm_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-crm:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+  communication_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-communication:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
+  trust_service:
+    build: !reset null
+    image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-trust:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-warn}
+      RUN_MIGRATIONS_ON_STARTUP: "false"
   identity_service:
     build: !reset null
     image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}/lajukan-identity:${IMAGE_TAG:?IMAGE_TAG is required}

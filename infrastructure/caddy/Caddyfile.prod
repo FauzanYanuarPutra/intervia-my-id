@@ -82,6 +82,31 @@ api.{$APP_DOMAIN} {
         reverse_proxy community_service:8082
     }
 
+    @news path /v1/news /v1/news/*
+    handle @news {
+        reverse_proxy news_service:8093
+    }
+
+    @orders path /v1/orders /v1/orders/* /v1/super-app/orders /v1/super-app/orders/*
+    handle @orders {
+        reverse_proxy order_service:8094
+    }
+
+    @payments path /v1/wallet /v1/wallet/* /v1/transactions /v1/transactions/*
+    handle @payments {
+        reverse_proxy payment_service:8095
+    }
+
+    @crm_api path /v1/crm /v1/crm/*
+    handle @crm_api {
+        reverse_proxy crm_service:8097
+    }
+
+    @communication_api path /v1/notifications /v1/notifications/*
+    handle @communication_api {
+        reverse_proxy communication_service:8098
+    }
+
     handle {
         reverse_proxy marketplace_service:8081
     }

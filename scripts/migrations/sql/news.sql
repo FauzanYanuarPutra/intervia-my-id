@@ -1,0 +1,12 @@
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+CREATE SCHEMA IF NOT EXISTS legacy;
+DROP SERVER IF EXISTS legacy_marketplace CASCADE;
+CREATE SERVER legacy_marketplace FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host :'legacy_host', port :'legacy_port', dbname 'marketplace_db');
+CREATE USER MAPPING FOR CURRENT_USER SERVER legacy_marketplace OPTIONS (user :'legacy_user', password :'legacy_password');
+IMPORT FOREIGN SCHEMA public LIMIT TO (content_items,news_editorial_events,news_article_versions,news_source_references,news_source_review_events) FROM SERVER legacy_marketplace INTO legacy;
+INSERT INTO content_items SELECT id,owner_id,content_type,slug,title,summary,body,price_cents,price_unit,currency,tags,cover_image,category,content_status,rating,review_count,metadata,published_at,created_at,updated_at FROM legacy.content_items WHERE content_type IN ('news','article') ON CONFLICT(id) DO NOTHING;
+INSERT INTO news_editorial_events SELECT id,content_id,actor_id,actor_role,action,from_status,to_status,note,metadata,created_at FROM legacy.news_editorial_events e WHERE EXISTS (SELECT 1 FROM content_items c WHERE c.id=e.content_id) ON CONFLICT(id) DO NOTHING;
+INSERT INTO news_article_versions SELECT id,content_id,version_number,actor_id,actor_role,action,editorial_status,title,summary,body,tags,cover_image,metadata,content_status,published_at,created_at FROM legacy.news_article_versions v WHERE EXISTS (SELECT 1 FROM content_items c WHERE c.id=v.content_id) ON CONFLICT(id) DO NOTHING;
+INSERT INTO news_source_references SELECT id,content_id,position,source_url,source_domain,source_kind,verification_status,editor_note,checked_at,first_seen_at,last_seen_at FROM legacy.news_source_references r WHERE EXISTS (SELECT 1 FROM content_items c WHERE c.id=r.content_id) ON CONFLICT(id) DO NOTHING;
+INSERT INTO news_source_review_events SELECT id,content_id,source_id,reviewer_id,from_source_kind,to_source_kind,from_verification_status,to_verification_status,note,created_at FROM legacy.news_source_review_events e WHERE EXISTS (SELECT 1 FROM content_items c WHERE c.id=e.content_id) ON CONFLICT(id) DO NOTHING;
+DO $$ BEGIN RAISE NOTICE 'news backfill rows: %', (SELECT count(*) FROM content_items); END $$;

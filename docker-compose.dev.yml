@@ -1,5 +1,28 @@
 services:
   # Development publishes only loopback ports. Caddy is opt-in through profile edge.
+  domain_db:
+    ports:
+      - "127.0.0.1:${PORT_DOMAIN_DB:-5435}:5432"
+
+  profile_service:
+    ports: ["127.0.0.1:${PORT_PROFILE:-8091}:8091"]
+  media_service:
+    ports: ["127.0.0.1:${PORT_MEDIA:-8092}:8092"]
+  news_service:
+    ports: ["127.0.0.1:${PORT_NEWS:-8093}:8093"]
+  order_service:
+    ports: ["127.0.0.1:${PORT_ORDER:-8094}:8094"]
+  payment_service:
+    ports: ["127.0.0.1:${PORT_PAYMENT:-8095}:8095"]
+  promotion_service:
+    ports: ["127.0.0.1:${PORT_PROMOTION:-8096}:8096"]
+  crm_service:
+    ports: ["127.0.0.1:${PORT_CRM_SERVICE:-8097}:8097"]
+  communication_service:
+    ports: ["127.0.0.1:${PORT_COMMUNICATION:-8098}:8098"]
+  trust_service:
+    ports: ["127.0.0.1:${PORT_TRUST:-8099}:8099"]
+
   identity_db:
     ports:
       - "127.0.0.1:${PORT_IDENTITY_DB:-5432}:5432"
