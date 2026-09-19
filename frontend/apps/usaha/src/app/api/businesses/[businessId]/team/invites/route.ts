@@ -12,6 +12,8 @@ const IDENTITY_URL =
 const organizationRoleByPortalRole: Partial<Record<PortalRole, string>> = {
   manager: 'org_manager',
   cashier: 'org_cashier',
+  inventory: 'org_inventory',
+  accounting: 'org_accounting',
   viewer: 'org_viewer',
 };
 
