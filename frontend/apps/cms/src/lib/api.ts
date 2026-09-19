@@ -301,6 +301,9 @@ export const newsApi = {
       source_urls?: string[];
       cover_image?: string;
       slug?: string;
+      seo_title?: string;
+      seo_description?: string;
+      og_image?: string;
       note?: string;
     },
   ) => {
