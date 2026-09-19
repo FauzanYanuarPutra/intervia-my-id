@@ -48,7 +48,9 @@ impl From<sqlx::Error> for DocumentError {
 impl From<ExecutionPolicyError> for DocumentError {
     fn from(error: ExecutionPolicyError) -> Self {
         match error {
-            ExecutionPolicyError::LocationRequired => Self::Validation("document_location_required"),
+            ExecutionPolicyError::LocationRequired => {
+                Self::Validation("document_location_required")
+            }
             ExecutionPolicyError::LocationNotFound => Self::Validation("invalid_document_location"),
             _ => Self::Database,
         }
@@ -611,10 +613,9 @@ impl DocumentRepository {
         let action = normalize_action(&request.action)?;
         let reason = normalize_optional_reason(request.reason.as_deref())?;
         let mut tx = self.db.begin().await?;
-        let document =
-            load_document_tx(&mut tx, business_id, organization_id, document_id, true)
-                .await?
-                .ok_or(DocumentError::NotFound)?;
+        let document = load_document_tx(&mut tx, business_id, organization_id, document_id, true)
+            .await?
+            .ok_or(DocumentError::NotFound)?;
         validate_transition(&document.status, &action, reason.as_deref())?;
 
         let policy = load_execution_policy_tx(&mut tx, business_id, organization_id).await?;
@@ -904,7 +905,9 @@ impl DocumentRepository {
             return Err(DocumentError::Conflict);
         }
         if approval.requested_by_user_id == actor_id {
-            return Err(DocumentError::Validation("maker_cannot_approve_own_request"));
+            return Err(DocumentError::Validation(
+                "maker_cannot_approve_own_request",
+            ));
         }
         if actor_role != approval.required_role && actor_role != "org_admin" {
             return Err(DocumentError::Forbidden);
@@ -1178,7 +1181,9 @@ fn normalize_decision(value: &str) -> Result<String, DocumentError> {
 
 fn normalize_metadata(value: Value) -> Result<Value, DocumentError> {
     if !value.is_object() {
-        return Err(DocumentError::Validation("document_metadata_must_be_object"));
+        return Err(DocumentError::Validation(
+            "document_metadata_must_be_object",
+        ));
     }
     let bytes = serde_json::to_vec(&value).map_err(|_| DocumentError::Database)?;
     if bytes.len() > MAX_METADATA_BYTES {
@@ -1217,15 +1222,18 @@ fn normalize_optional_reason(value: Option<&str>) -> Result<Option<String>, Docu
 
 fn document_party_policy(document_type: &str) -> (Option<CounterpartyRole>, bool) {
     match document_type {
-        "quotation" | "sales_order" | "delivery" | "invoice" | "credit_note"
-        | "service_order" | "work_order" => (
+        "quotation" | "sales_order" | "delivery" | "invoice" | "credit_note" | "service_order"
+        | "work_order" => (
             Some(CounterpartyRole::Customer),
             matches!(document_type, "invoice" | "credit_note"),
         ),
         "purchase_requisition" => (None, false),
         "rfq" | "purchase_order" | "goods_receipt" | "vendor_bill" | "debit_note" => (
             Some(CounterpartyRole::Supplier),
-            matches!(document_type, "purchase_order" | "vendor_bill" | "debit_note"),
+            matches!(
+                document_type,
+                "purchase_order" | "vendor_bill" | "debit_note"
+            ),
         ),
         _ => (None, false),
     }
@@ -1296,14 +1304,7 @@ async fn find_document_by_key_tx(
     .await?;
     match document_id {
         Some(document_id) => {
-            load_document_aggregate_tx(
-                tx,
-                business_id,
-                organization_id,
-                document_id,
-                false,
-            )
-            .await
+            load_document_aggregate_tx(tx, business_id, organization_id, document_id, false).await
         }
         None => Ok(None),
     }
