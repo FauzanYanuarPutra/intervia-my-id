@@ -81,6 +81,7 @@ export default function CmsControlCenter() {
   const [newsHistory, setNewsHistory] = useState<R>({});
   const [newsForm, setNewsForm] = useState(initialNews(null));
   const [savedAt, setSavedAt] = useState('');
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const [moderationStatus, setModerationStatus] = useState('open');
   const [moderationItems, setModerationItems] = useState<R[]>([]);
@@ -132,6 +133,29 @@ export default function CmsControlCenter() {
     setNewsForm(initialNews(selectedNews));
     void loadHistory(str(selectedNews.id));
   }, [selectedNews, loadHistory]);
+
+  const uploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setUploadingCover(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      const response = await fetch('/api/content/upload-images', { method: 'POST', body: form });
+      const payload = rec(await response.json().catch(() => ({})));
+      const urls = Array.isArray(payload.urls) ? payload.urls : [];
+      const files = Array.isArray(payload.files) ? payload.files : [];
+      const url = str(urls[0]) || str(rec(files[0]).url);
+      if (!response.ok || !url) throw new Error(str(payload.error, 'Gagal mengunggah gambar.'));
+      setNewsForm(prev => ({ ...prev, cover_image: url }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal mengunggah gambar');
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   const refreshAll = async () => {
     setBusy(true); setError('');
@@ -347,7 +371,7 @@ export default function CmsControlCenter() {
                   </div>
 
                   <div className="space-y-4">
-                    <section className={card}><h3 className="font-bold">Media</h3><p className="text-xs text-slate-500">Cover + OG asset.</p><label className="mt-3 block"><span className="text-xs font-semibold text-slate-500">Cover URL / media path</span><input value={newsForm.cover_image} onChange={e => setNewsForm(p => ({ ...p, cover_image: e.target.value }))} placeholder="/api/content/media/..." className={input} /></label>{newsForm.cover_image ? <img src={newsForm.cover_image} alt="" className="mt-3 aspect-video w-full rounded-2xl object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} /> : <div className="mt-3 grid aspect-video place-items-center rounded-2xl bg-slate-100 text-xs text-slate-500">Belum ada cover</div>}</section>
+                    <section className={card}><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">Media</h3><p className="text-xs text-slate-500">Upload langsung ke storage resmi Lajukan atau gunakan media path yang sudah ada.</p></div><label className="inline-flex cursor-pointer items-center rounded-xl border border-[color:var(--color-border)] px-3 py-2 text-xs font-bold hover:bg-slate-50"><input type="file" accept="image/*" className="sr-only" disabled={uploadingCover} onChange={uploadCover} />{uploadingCover ? 'Mengunggah...' : 'Upload gambar'}</label></div><label className="mt-3 block"><span className="text-xs font-semibold text-slate-500">Cover URL / media path</span><input value={newsForm.cover_image} onChange={e => setNewsForm(p => ({ ...p, cover_image: e.target.value }))} placeholder="/api/content/media/..." className={input} /></label>{newsForm.cover_image ? <div className="mt-3 overflow-hidden rounded-2xl border border-[color:var(--color-border)]"><img src={newsForm.cover_image} alt={newsForm.title} className="aspect-video w-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} /><button type="button" onClick={() => setNewsForm(p => ({ ...p, cover_image: '' }))} className="w-full border-t border-[color:var(--color-border)] px-3 py-2 text-left text-xs font-bold text-rose-600">Hapus cover</button></div> : <div className="mt-3 grid aspect-video place-items-center rounded-2xl bg-slate-100 text-xs text-slate-500">Belum ada cover</div>}</section>
                     <section className={card}><h3 className="font-bold">SEO & social</h3><label className="mt-3 block"><span className="text-xs font-semibold text-slate-500">SEO title</span><input value={newsForm.seo_title} onChange={e => setNewsForm(p => ({ ...p, seo_title: e.target.value }))} className={input} /></label><label className="mt-3 block"><span className="text-xs font-semibold text-slate-500">Meta description</span><textarea value={newsForm.seo_description} onChange={e => setNewsForm(p => ({ ...p, seo_description: e.target.value }))} rows={4} className={input} /></label><label className="mt-3 block"><span className="text-xs font-semibold text-slate-500">OG image</span><input value={newsForm.og_image} onChange={e => setNewsForm(p => ({ ...p, og_image: e.target.value }))} className={input} /></label></section>
                     <section className={card}><h3 className="font-bold">Publish controls</h3><div className="grid gap-3 md:grid-cols-2"><label><span className="text-xs font-semibold text-slate-500">Publish at</span><input type="datetime-local" value={newsForm.publish_at} onChange={e => setNewsForm(p => ({ ...p, publish_at: e.target.value }))} className={input} /></label><label><span className="text-xs font-semibold text-slate-500">Fact check</span><select value={newsForm.fact_check_status} onChange={e => setNewsForm(p => ({ ...p, fact_check_status: e.target.value }))} className={input}><option value="pending">Pending</option><option value="verified">Verified</option><option value="not_required">Tidak perlu</option></select></label><label><span className="text-xs font-semibold text-slate-500">Legal</span><select value={newsForm.legal_review_status} onChange={e => setNewsForm(p => ({ ...p, legal_review_status: e.target.value }))} className={input}><option value="not_required">Tidak perlu</option><option value="pending">Pending</option><option value="approved">Approved</option></select></label><label><span className="text-xs font-semibold text-slate-500">Priority</span><select value={newsForm.editorial_priority} onChange={e => setNewsForm(p => ({ ...p, editorial_priority: e.target.value }))} className={input}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label><label className="md:col-span-2"><span className="text-xs font-semibold text-slate-500">Sensitivity</span><select value={newsForm.sensitivity} onChange={e => setNewsForm(p => ({ ...p, sensitivity: e.target.value }))} className={input}><option value="normal">Normal</option><option value="high">High</option></select></label></div><label className="mt-3 block"><span className="text-xs font-semibold text-slate-500">Catatan editor</span><textarea value={newsForm.note} onChange={e => setNewsForm(p => ({ ...p, note: e.target.value }))} rows={4} className={input} /></label></section>
                   </div>
