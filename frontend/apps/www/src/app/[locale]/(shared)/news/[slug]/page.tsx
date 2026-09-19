@@ -139,6 +139,10 @@ export default async function NewsArticlePage({ params }: PageProps) {
                 alt={article.title}
                 className="aspect-[16/9] w-full object-cover"
                 loading="eager"
+                onError={event => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = '/opengraph-image.png';
+                }}
               />
               <figcaption className="px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {isId ? 'Media utama artikel' : 'Article featured media'}
