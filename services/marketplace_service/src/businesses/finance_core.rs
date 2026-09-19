@@ -349,6 +349,14 @@ impl FinanceCoreRepository {
                 "manual_sale_income_not_allowed",
             ));
         }
+        if matches!(
+            semantic.canonical_type,
+            "receivable_payment" | "payable_payment"
+        ) {
+            return Err(FinanceCoreError::Validation(
+                "manual_document_payment_not_allowed",
+            ));
+        }
         validate_amount(request.amount)?;
         let account_key = normalize_account(&request.account_key)?;
         let note = normalized_note(&request.note)?;
@@ -479,6 +487,24 @@ impl FinanceCoreRepository {
             return Err(FinanceCoreError::Validation(
                 "sale_correction_requires_sales_flow",
             ));
+        }
+        match original.source_type.as_deref() {
+            Some("business_payment") => {
+                return Err(FinanceCoreError::Validation(
+                    "payment_correction_requires_payment_flow",
+                ));
+            }
+            Some("business_purchase") => {
+                return Err(FinanceCoreError::Validation(
+                    "purchase_correction_requires_purchase_flow",
+                ));
+            }
+            Some("business_obligation_payment") => {
+                return Err(FinanceCoreError::Validation(
+                    "obligation_correction_requires_obligation_flow",
+                ));
+            }
+            _ => {}
         }
         let already_corrected: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM business_finance_entry_corrections WHERE original_entry_id=$1)",
