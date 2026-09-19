@@ -777,6 +777,33 @@ for path, warning_threshold, hard_ceiling in (
             "before scale-driven service splits"
         )
 
+for path, warning_threshold, hard_ceiling in (
+    ("frontend/apps/www/src/app/[locale]/(shared)/reels/ReelsClient.tsx", 300_000, 335_000),
+    ("frontend/apps/www/src/components/community/CommunityFeedClient.tsx", 230_000, 260_000),
+):
+    target = ROOT / path
+    if not target.is_file():
+        continue
+    size = target.stat().st_size
+    if size > hard_ceiling:
+        errors.append(
+            f"{path} exceeded the frontend architecture debt ceiling "
+            f"({size:,} > {hard_ceiling:,} bytes); extract a coherent UI/state responsibility "
+            "instead of growing the client monolith"
+        )
+    elif size > warning_threshold:
+        warnings.append(
+            f"{path} is {size:,} bytes; keep extracting state-owned feature modules"
+        )
+
+for helper_path in (
+    "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-client-helpers.ts",
+    "frontend/apps/www/src/app/[locale]/(shared)/reels/reels-studio-helpers.ts",
+    "frontend/apps/www/src/components/community/community-feed-helpers.ts",
+):
+    if not (ROOT / helper_path).is_file():
+        errors.append(f"missing frontend responsibility extraction helper: {helper_path}")
+
 for path, source, main_source in (
     (
         "services/marketplace_service/src/schema_contract.rs",
