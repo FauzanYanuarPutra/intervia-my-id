@@ -45,6 +45,7 @@ export default function RegisterPhoneWithOTP() {
   const [otpToken, setOtpToken] = useState('');
   const [otpResendAt, setOtpResendAt] = useState(0);
   const [name, setName] = useState('');
+  const [birthdate, setBirthdate] = useState('');
   const [email, setEmail] = useState('');
   const [captchaToken, setCaptchaToken] = useState('');
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -59,6 +60,16 @@ export default function RegisterPhoneWithOTP() {
   );
   const phoneReady = isPhoneNumberReady(phone, phoneCountryCode);
   const normalizedEmail = email.trim().toLowerCase();
+  const birthdateValid = /^\d{4}-\d{2}-\d{2}$/.test(birthdate);
+  const adultAgeValid = (() => {
+    if (!birthdateValid) return false;
+    const [year, month, day] = birthdate.split('-').map(Number);
+    const selected = new Date(year, month - 1, day);
+    const today = new Date();
+    let age = today.getFullYear() - selected.getFullYear();
+    if (today.getMonth() < selected.getMonth() || (today.getMonth() === selected.getMonth() && today.getDate() < selected.getDate())) age -= 1;
+    return selected < today && age >= 18;
+  })();
   const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
   const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
   const selectedCountry = getPhoneCountry(phoneCountryCode);
@@ -147,6 +158,7 @@ export default function RegisterPhoneWithOTP() {
         phoneCountryCode?: PhoneCountryCode;
         otpToken?: string;
         name?: string;
+        birthdate?: string;
         email?: string;
       };
 
@@ -161,6 +173,7 @@ export default function RegisterPhoneWithOTP() {
       if (draft.phoneCountryCode) setPhoneCountryCode(draft.phoneCountryCode);
       if (typeof draft.otpToken === 'string') setOtpToken(draft.otpToken);
       if (typeof draft.name === 'string') setName(draft.name);
+      if (typeof draft.birthdate === 'string') setBirthdate(draft.birthdate);
       if (typeof draft.email === 'string') setEmail(draft.email);
     } catch {
       window.sessionStorage.removeItem(REGISTER_FLOW_STORAGE_KEY);
@@ -177,10 +190,11 @@ export default function RegisterPhoneWithOTP() {
         phoneCountryCode,
         otpToken,
         name,
+        birthdate,
         email,
       }),
     );
-  }, [email, name, otpToken, phone, phoneCountryCode, step]);
+  }, [birthdate, email, name, otpToken, phone, phoneCountryCode, step]);
 
   const resetOtpState = () => {
     setOtp('');
@@ -305,6 +319,14 @@ export default function RegisterPhoneWithOTP() {
       );
       return;
     }
+    if (!adultAgeValid) {
+      setError(
+        locale === 'id'
+          ? 'Akun Lajukan saat ini hanya tersedia untuk pengguna berusia 18 tahun atau lebih.'
+          : 'Lajukan accounts currently require users to be 18 or older.',
+      );
+      return;
+    }
     if (normalizedEmail && !normalizedEmail.includes('@')) {
       setError(
         locale === 'id' ? 'Format email tidak valid.' : 'Invalid email format.',
@@ -328,6 +350,7 @@ export default function RegisterPhoneWithOTP() {
       const registerResult = await register({
         phone: normalizedPhone,
         full_name: name.trim(),
+        birthdate,
         ...(normalizedEmail ? { email: normalizedEmail } : {}),
         phone_otp_token: otpToken,
         ...(captchaToken ? { captcha_token: captchaToken } : {}),
@@ -360,6 +383,23 @@ export default function RegisterPhoneWithOTP() {
             exit={{ opacity: 0, x: -8 }}
             className="space-y-4"
           >
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
+                {locale === 'id' ? 'Tanggal lahir' : 'Date of birth'}
+              </span>
+              <input
+                value={birthdate}
+                onChange={event => setBirthdate(event.target.value)}
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                autoComplete="bday"
+                className={authInputClass}
+              />
+              <span className="mt-1 block text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                {locale === 'id' ? 'Minimum usia 18 tahun.' : 'Minimum age 18.'}
+              </span>
+            </label>
+
             <div>
               <PhoneNumberField
                 locale={locale as 'id' | 'en'}
