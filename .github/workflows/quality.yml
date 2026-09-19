@@ -55,6 +55,32 @@ jobs:
           set -euo pipefail
           bash -n scripts/migrations/domain-cutover.sh scripts/migrations/domain-verify.sh
 
+  powershell:
+    name: PowerShell launcher syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: repository-hygiene
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse PowerShell launchers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $errors = $null
+          $tokens = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD "up.ps1"),
+              [ref]$tokens,
+              [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+              $errors | ForEach-Object {
+                  Write-Error "$($_.Message) at line $($_.Extent.StartLineNumber), column $($_.Extent.StartColumnNumber)."
+              }
+              exit 1
+          }
+          Write-Host "up.ps1 PowerShell syntax is valid."
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
