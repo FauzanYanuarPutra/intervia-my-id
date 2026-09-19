@@ -365,13 +365,14 @@ impl BusinessRepository {
                       )
                       || COALESCE($11::jsonb, '{}'::jsonb)
                       || COALESCE($12::jsonb, '{}'::jsonb)
-                  ),
+                  )
+                  || COALESCE($13::jsonb, '{}'::jsonb),
                 updated_at = NOW()
             FROM business_store_links link
             JOIN businesses business ON business.id = link.business_id
             WHERE link.store_id = store.id
-              AND link.business_id = $13
-              AND business.organization_id = $14
+              AND link.business_id = $14
+              AND business.organization_id = $15
               AND link.link_type = 'primary'
             "#,
         )
