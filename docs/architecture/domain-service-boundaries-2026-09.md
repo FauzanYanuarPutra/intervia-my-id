@@ -20,7 +20,7 @@ The repository already has independent Identity, Marketplace, Community, Chat, A
 
 Current Marketplace responsibilities include listings/content, orders, transactions, wallet, UMKM commerce, CRM, notifications, support, CMS, News editorial, and AI/recommendation data.
 
-The Marketplace service entrypoint is currently very large; the extraction program therefore uses behavior-preserving slices instead of a rewrite.
+The Marketplace service entrypoint is currently very large; the extraction program therefore uses behavior-preserving slices instead of a rewrite. Existing target services run in explicit compatibility mode until backfill/reconciliation and native handlers are ready.
 
 ## Target domains
 
@@ -39,6 +39,8 @@ The Marketplace service entrypoint is currently very large; the extraction progr
 | Chat / Realtime | chat_service | Scylla keyspace | implemented |
 | Communication | communication_service | communication_db | extract notification/delivery workloads |
 | Trust / Verification | trust_service | trust_db | extract verification policy/status |
+| Support | support_service | support_db | extract support tickets/replies |
+| Reviews / Ratings | review_service | review_db | extract reviews; rating summaries become projections |
 | Search | search_service | rebuildable index | projection, not transactional source |
 | Audit | audit_service / audit store | audit_db | cross-domain immutable audit sink |
 | AI orchestration | ai_service | no business source-of-truth | implemented runtime |
@@ -65,6 +67,8 @@ postgres cluster
 ├── community_db
 ├── communication_db
 ├── trust_db
+├── support_db
+├── review_db
 └── audit_db
 ```
 
@@ -227,7 +231,7 @@ Every extraction follows:
 10. Contract and remove legacy tables
 ```
 
-No destructive "copy then drop" migration.
+No destructive "copy then drop" migration. Compatibility mode is the rollback bridge; native mode is intentionally fail-closed until verification passes.
 
 For financial and identity data, additionally require:
 
@@ -247,10 +251,12 @@ For financial and identity data, additionally require:
 6. CRM
 7. Communication
 8. Trust
-9. Promotion
-10. Search projection consolidation
-11. Marketplace slimming
-12. Legacy table removal
+9. Support
+10. Reviews / Ratings
+11. Promotion
+12. Search projection consolidation
+13. Marketplace slimming
+14. Legacy table removal
 
 The order is intentional: Payment follows Order; CRM follows workspace/authorization foundations; Search stays projection-only.
 
@@ -273,6 +279,8 @@ services/
   chat_service/
   communication_service/
   trust_service/
+  support_service/
+  review_service/
   search_service/
   ai_service/
   ocr_service/

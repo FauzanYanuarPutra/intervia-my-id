@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash -n scripts/migrations/domain-cutover.sh
+          bash -n scripts/migrations/domain-cutover.sh scripts/migrations/domain-verify.sh
 
   frontend:
     name: Frontend
@@ -139,7 +139,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [identity_service, marketplace_service, community_service, ai_service]
+        service: [identity_service, marketplace_service, community_service, ai_service, profile_service, media_service, news_service, order_service, payment_service, promotion_service, crm_service, communication_service, trust_service, support_service, review_service]
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
@@ -150,6 +150,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: services/${{ matrix.service }}
+      - name: Generate lockfile when service has none
+        shell: bash
+        run: |
+          if [[ ! -f Cargo.lock ]]; then cargo generate-lockfile; fi
       - name: Format
         run: cargo fmt --check
       - name: Clippy
@@ -277,6 +281,27 @@ jobs:
           ports = {str(item.get('published')) for item in published['caddy']}
           assert ports == {'80', '443'}, ports
           PY
+      - name: Assert domain runtime contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.production.example -f docker-compose.yml -f docker-compose.prod.yml config --format json > /tmp/compose.json
+          python - <<'PY'
+          import json
+          with open('/tmp/compose.json', encoding='utf-8') as handle:
+              services = json.load(handle)['services']
+          expected = {
+              'profile_service': 'profile_db', 'media_service': 'media_db', 'news_service': 'news_db',
+              'order_service': 'order_db', 'payment_service': 'payment_db', 'promotion_service': 'promotion_db',
+              'crm_service': 'crm_db', 'communication_service': 'communication_db', 'trust_service': 'trust_db',
+              'support_service': 'support_db', 'review_service': 'review_db'
+          }
+          for name, db in expected.items():
+              env = services[name]['environment']
+              assert env['DOMAIN_RUNTIME_MODE'] == 'compatibility', (name, env.get('DOMAIN_RUNTIME_MODE'))
+              assert f'@domain_db:5432/{db}' in env['DATABASE_URL'], (name, env.get('DATABASE_URL'))
+          PY
+
       - name: Assert AI and KYC runtime contracts
         env:
           IMAGE_TAG: sha-ci
