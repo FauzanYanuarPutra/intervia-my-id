@@ -19,14 +19,15 @@ use super::{
 };
 
 pub(crate) fn router() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/v1/businesses/{business_id}/sales",
-        get(list_sales).post(create_sale),
-    )
-    .route(
-        "/v1/businesses/{business_id}/sales/{sale_id}/void",
-        post(void_sale),
-    )
+    Router::new()
+        .route(
+            "/v1/businesses/{business_id}/sales",
+            get(list_sales).post(create_sale),
+        )
+        .route(
+            "/v1/businesses/{business_id}/sales/{sale_id}/void",
+            post(void_sale),
+        )
 }
 
 async fn list_sales(
