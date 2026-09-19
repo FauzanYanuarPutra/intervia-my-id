@@ -148,7 +148,7 @@ export function ProductModifierEditor({ businessId, productId }: Props) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
-  const [changeReason, setChangeReason] = useState('');
+  const [changeReason, setChangeReason] = useState('Pembaruan pilihan pelanggan');
   const [ingredientQueries, setIngredientQueries] = useState<Record<string, string>>({});
 
   async function loadGroups() {
