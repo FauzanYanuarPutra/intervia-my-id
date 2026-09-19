@@ -17,7 +17,7 @@ Local `.runtime/`, `.cache/`, `.backups/`, and generated `audit_output/` content
 
 - `frontend/apps/www`: public Next.js application and same-origin BFF routes.
 - `frontend/apps/usaha`: business owner application.
-- `frontend/apps/cms`: internal content operations application.
+- `frontend/apps/cms`: integrated internal CMS control center for editorial News, moderation, content operations, campaigns, and team access; the legacy Content/Sectors/Banners studio remains embedded as the stable CRUD surface.
 - `frontend/apps/crm`: internal CRM application.
 - `frontend/packages`: shared frontend packages used by two or more applications.
 
