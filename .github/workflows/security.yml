@@ -150,17 +150,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          audit_dir() {
+            local dir="$1"
+            echo "Auditing $dir"
+            (
+              cd "$dir"
+              # npm can reject older/stale lock trees before it reaches the
+              # current advisory endpoint. Rebuild only the lock representation
+              # in the ephemeral CI checkout, then audit the resulting tree.
+              npm install --package-lock-only --ignore-scripts --no-audit
+              npm audit --omit=dev --audit-level=high
+            )
+          }
+
           if [[ -f frontend/package-lock.json ]]; then
-            cd frontend
-            npm audit --omit=dev --audit-level=high
+            audit_dir frontend
             exit 0
           fi
 
           failed=0
           for dir in frontend/packages frontend/apps/www frontend/apps/usaha frontend/apps/cms frontend/apps/crm; do
             [[ -f "$dir/package-lock.json" ]] || continue
-            echo "Auditing $dir"
-            (cd "$dir" && npm audit --omit=dev --audit-level=high) || failed=1
+            audit_dir "$dir" || failed=1
           done
           exit "$failed"
 
