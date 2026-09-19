@@ -35,7 +35,6 @@ import {
   RefreshCw,
   Search,
   Settings2,
-  ShoppingBag,
   Star,
   Store,
   Users,
