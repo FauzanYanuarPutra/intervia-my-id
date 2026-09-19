@@ -18,8 +18,10 @@ type UserSuggestion = {
 };
 
 const roleOptions: Array<{ value: Exclude<PortalRole, 'owner'>; label: string; description: string }> = [
-  { value: 'manager', label: 'Manager', description: 'Kelola operasional dan tim.' },
-  { value: 'cashier', label: 'Kasir', description: 'Fokus transaksi dan pesanan.' },
+  { value: 'manager', label: 'Manager', description: 'Kelola operasional, pekerjaan, dan tim.' },
+  { value: 'cashier', label: 'Kasir', description: 'Fokus transaksi, kas, dan pesanan.' },
+  { value: 'inventory', label: 'Stok & Pembelian', description: 'Fokus stok, bahan, dan isi ulang.' },
+  { value: 'accounting', label: 'Keuangan', description: 'Fokus uang, pencatatan, dan laporan.' },
   { value: 'viewer', label: 'Pantau saja', description: 'Akses baca tanpa perubahan.' },
 ];
 
