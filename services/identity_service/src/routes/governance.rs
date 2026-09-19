@@ -376,6 +376,134 @@ pub async fn create_privacy_request(
     }
 }
 
+pub async fn cancel_my_privacy_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match require_authenticated(&state, &headers).await {
+        Ok(value) => value,
+        Err(status) => {
+            return (
+                status,
+                Json(json!({"error":"authentication required"})),
+            )
+                .into_response();
+        }
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!(?error, "privacy cancellation transaction begin failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let row = sqlx::query(
+        r#"
+        SELECT status
+        FROM core.privacy_requests
+        WHERE id = $1
+          AND subject_user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .bind(claims.sub)
+    .fetch_optional(&mut *tx)
+    .await;
+
+    let Some(row) = match row {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!(?error, "privacy cancellation lookup failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
+        }
+    } else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"privacy request not found"})),
+        )
+            .into_response();
+    };
+
+    let previous_status = row.get::<String, _>("status");
+    if !valid_privacy_transition(&previous_status, "cancelled") {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({"error":"privacy request cannot be cancelled in its current status"})),
+        )
+            .into_response();
+    }
+
+    let updated = sqlx::query(
+        r#"
+        UPDATE core.privacy_requests
+        SET status = 'cancelled',
+            completed_at = COALESCE(completed_at, NOW()),
+            last_actor_user_id = $2
+        WHERE id = $1
+        RETURNING id, status, completed_at
+        "#,
+    )
+    .bind(id)
+    .bind(claims.sub)
+    .fetch_one(&mut *tx)
+    .await;
+
+    match updated {
+        Ok(row) => {
+            if let Err(error) = tx.commit().await {
+                tracing::error!(?error, "privacy cancellation commit failed");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"database error"})),
+                )
+                    .into_response();
+            }
+
+            audit_governance_event(
+                &state,
+                Some(claims.sub),
+                "privacy_request",
+                id,
+                "cancelled_by_subject",
+                json!({"status": previous_status}),
+                json!({"status": "cancelled"}),
+                json!({}),
+            )
+            .await;
+
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "id": row.get::<Uuid, _>("id"),
+                    "status": row.get::<String, _>("status"),
+                    "completed_at": row.get::<Option<DateTime<Utc>>, _>("completed_at")
+                })),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!(?error, "privacy cancellation update failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response()
+        }
+    }
+}
+
 pub async fn list_my_privacy_requests(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
