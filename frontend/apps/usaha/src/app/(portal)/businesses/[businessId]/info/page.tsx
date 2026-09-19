@@ -27,7 +27,7 @@ export default async function BusinessInfoPage({ params }: PageProps) {
 
   return (
     <PortalShell activeBusiness={business} availableBusinesses={businesses} viewerName={account?.name ?? null} currentSection="info">
-      <PageHeader eyebrow="Pengaturan Usaha" title={canManage ? 'Kelola usaha' : 'Info usaha'} description={canManage ? 'Ubah yang perlu saja. Data teknis tetap tersedia tanpa memenuhi layar utama.' : 'Lihat informasi usaha yang dibagikan sesuai aksesmu.'} />
+      <PageHeader eyebrow="Usaha" title={canManage ? 'Profil usaha' : 'Info usaha'} description={canManage ? 'Nama, kategori, kontak, dan tampilan usaha.' : 'Informasi usaha sesuai aksesmu.'} />
 
       <section className="merchant-list border border-portal-line/80">
         <details className="group border-b border-portal-line/70">
@@ -54,8 +54,8 @@ export default async function BusinessInfoPage({ params }: PageProps) {
             <span className="text-xs font-black text-portal-forest">{canManage ? 'Atur' : 'Lihat'}</span>
           </summary>
           <div className="grid gap-6 border-t border-portal-line/70 p-4 sm:p-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-            {canManage ? <BusinessImageCropUpload businessId={business.id} kind="logo" currentUrl={business.logoUrl} label="Logo / foto usaha" description="Rasio 1:1 untuk kartu usaha dan foto toko." /> : <div className="aspect-square rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.logoUrl ? { backgroundImage: `url(${business.logoUrl})` } : undefined} />}
-            {canManage ? <BusinessImageCropUpload businessId={business.id} kind="banner" currentUrl={business.bannerUrl} label="Banner usaha" description="Rasio 8:3 untuk bagian atas tampilan toko." /> : <div className="aspect-[8/3] rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.bannerUrl ? { backgroundImage: `url(${business.bannerUrl})` } : undefined} />}
+            {canManage ? <BusinessImageCropUpload businessId={business.id} kind="logo" currentUrl={business.logoUrl} label="Logo / foto usaha" description="Foto profil usaha." /> : <div className="aspect-square rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.logoUrl ? { backgroundImage: `url(${business.logoUrl})` } : undefined} />}
+            {canManage ? <BusinessImageCropUpload businessId={business.id} kind="banner" currentUrl={business.bannerUrl} label="Banner usaha" description="Foto bagian atas toko." /> : <div className="aspect-[8/3] rounded-2xl bg-[#f3f5f1] bg-cover bg-center" style={business.bannerUrl ? { backgroundImage: `url(${business.bannerUrl})` } : undefined} />}
           </div>
         </details>
 
