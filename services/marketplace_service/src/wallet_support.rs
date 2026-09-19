@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 use crate::{
     clean_text, MAX_TOPUP_CENTS_DEV, MAX_TOPUP_CENTS_LIVE, MAX_WITHDRAWAL_CENTS_DEV,
-    MAX_WITHDRAWAL_CENTS_LIVE, MIN_TOPUP_CENTS_DEV, MIN_TOPUP_CENTS_LIVE,
-    MIN_WITHDRAWAL_CENTS_DEV, MIN_WITHDRAWAL_CENTS_LIVE,
+    MAX_WITHDRAWAL_CENTS_LIVE, MIN_TOPUP_CENTS_DEV, MIN_TOPUP_CENTS_LIVE, MIN_WITHDRAWAL_CENTS_DEV,
+    MIN_WITHDRAWAL_CENTS_LIVE,
 };
 
 pub(crate) fn normalize_currency(value: Option<String>) -> Option<String> {
@@ -700,4 +700,3 @@ pub(crate) fn parse_major_amount_cents(value: &str) -> Option<i64> {
     let hundredths = fraction_digits.next().map(|byte| byte - b'0').unwrap_or(0);
     whole_cents.checked_add(i64::from(tenths) * 10 + i64::from(hundredths))
 }
-

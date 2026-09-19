@@ -1060,16 +1060,10 @@ impl Wave2Repository {
     }
 }
 
-fn map_purchase_counterparty_error(
-    error: CounterpartyError,
-) -> Wave2RepositoryError {
+fn map_purchase_counterparty_error(error: CounterpartyError) -> Wave2RepositoryError {
     match error {
-        CounterpartyError::Required => {
-            Wave2RepositoryError::Validation("purchase_party_required")
-        }
-        CounterpartyError::Invalid => {
-            Wave2RepositoryError::Validation("invalid_purchase_party")
-        }
+        CounterpartyError::Required => Wave2RepositoryError::Validation("purchase_party_required"),
+        CounterpartyError::Invalid => Wave2RepositoryError::Validation("invalid_purchase_party"),
         CounterpartyError::CustomerRoleInUse
         | CounterpartyError::SupplierRoleInUse
         | CounterpartyError::OutstandingBalance
