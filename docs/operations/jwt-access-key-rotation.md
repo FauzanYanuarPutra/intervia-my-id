@@ -8,6 +8,8 @@ Lajukan supports a migration-safe access-token trust boundary:
 - Marketplace, Community, and Chat receive only `JWT_PUBLIC_KEY_PEM`;
 - `JWT_KEY_ID` identifies the active signing generation.
 
+Staging and production are fail-closed: configuring `HS256`, omitting the RS256 public key, or omitting Identity's private signing key prevents a valid production rollout instead of silently falling back to a shared signing secret.
+
 The PEM values are stored in server-managed environment/secrets as a single
 escaped line, with literal `\n` between PEM lines. Never commit generated key
 material.
