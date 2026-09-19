@@ -1,0 +1,41 @@
+name: Temporary Business Core Verify
+
+on:
+  push:
+    branches:
+      - automation/business-verify-fba1187d
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marketplace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d marketplace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/marketplace
+      SQLX_OFFLINE: "false"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: automation/business-verify-fba1187d
+      - name: Toolchain
+        run: rustup show
+      - name: Format
+        run: cd services/marketplace_service && cargo fmt --check
+      - name: Clippy
+        run: cd services/marketplace_service && cargo clippy --all-targets --all-features -- -D warnings
+      - name: Tests
+        run: cd services/marketplace_service && cargo test --all-targets --all-features
+      - name: Business OS contract
+        run: python scripts/ci/check_usaha_business_os_contract.py
