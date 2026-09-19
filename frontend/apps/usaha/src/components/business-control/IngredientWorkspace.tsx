@@ -229,6 +229,8 @@ export function IngredientWorkspace({
 
   const [activePanel, setActivePanel] = useState<{ id: string; mode: PanelMode } | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
+  const [editReason, setEditReason] = useState('');
+  const [archiveReason, setArchiveReason] = useState('');
   const [stockAction, setStockAction] = useState<StockAction>('purchase');
   const [stockQuantityInput, setStockQuantityInput] = useState('');
   const [correctionDirection, setCorrectionDirection] = useState<'in' | 'out'>('in');
@@ -420,6 +422,11 @@ export function IngredientWorkspace({
       return;
     }
 
+    if (editReason.trim().length < 3) {
+      setActionMessage('Tulis alasan perubahan minimal 3 karakter agar perubahan bahan bisa ditelusuri.');
+      return;
+    }
+
     setActionSaving(true);
     setActionMessage('');
     try {
@@ -438,11 +445,13 @@ export function IngredientWorkspace({
           waste_percent: 0,
           minimum_stock: n(editDraft.minimumStock),
           supplier_name: editDraft.supplier.trim() || null,
+          reason: editReason.trim(),
         }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(responseError(payload, 'Gagal memperbarui bahan.'));
       await reload();
+      setEditReason('');
       setActionMessage('Perubahan tersimpan. Stok tidak diubah dari Edit agar riwayat tetap dapat diaudit.');
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : 'Gagal memperbarui bahan.');
@@ -519,13 +528,22 @@ export function IngredientWorkspace({
   }
 
   async function archiveIngredient(item: Ingredient) {
+    if (archiveReason.trim().length < 3) {
+      setActionMessage('Tulis alasan pengarsipan minimal 3 karakter.');
+      return;
+    }
     setActionSaving(true);
     setActionMessage('');
     try {
-      const response = await fetch(`/api/businesses/${businessId}/ingredients/${item.id}/archive`, { method: 'POST' });
+      const response = await fetch(`/api/businesses/${businessId}/ingredients/${item.id}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: archiveReason.trim() }),
+      });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(responseError(payload, 'Gagal mengarsipkan bahan.'));
       await reload();
+      setArchiveReason('');
       setActivePanel(null);
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : 'Gagal mengarsipkan bahan.');
@@ -735,6 +753,7 @@ export function IngredientWorkspace({
                           <label className="text-xs font-semibold text-portal-soft">Supplier (opsional)<input value={editDraft.supplier} onChange={event => setEditDraft(current => current ? { ...current, supplier: event.target.value } : current)} className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm" /></label>
                         </div>
                         <p className="text-xs text-portal-soft">Stok tidak diubah dari Edit agar riwayat stok tetap dapat diaudit. Gunakan tombol <strong>Tambah stok</strong> untuk perubahan jumlah.</p>
+                        <label className="text-xs font-semibold text-portal-soft">Alasan perubahan<input value={editReason} onChange={event => setEditReason(event.target.value)} maxLength={500} placeholder="Contoh: harga pemasok naik" className="mt-1 min-h-11 w-full rounded-xl border border-portal-line px-3 text-sm text-portal-ink" /></label>
                         <button type="button" disabled={actionSaving} onClick={() => void saveEdit(item)} className="portal-button-primary min-h-11 disabled:opacity-50">{actionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Simpan perubahan</button>
                       </div>
                     ) : null}
@@ -765,8 +784,9 @@ export function IngredientWorkspace({
                     {activePanel.mode === 'archive' ? (
                       <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
                         <p className="text-sm font-bold text-red-800">Arsipkan {item.name}?</p>
-                        <p className="mt-1 text-xs leading-5 text-red-700">Bahan tidak lagi tersedia untuk transaksi baru. Riwayat lama tetap tersimpan.</p>
-                        <button type="button" disabled={actionSaving} onClick={() => void archiveIngredient(item)} className="mt-3 min-h-11 rounded-xl bg-red-700 px-4 text-sm font-bold text-white disabled:opacity-50">Ya, arsipkan</button>
+                        <p className="mt-1 text-xs leading-5 text-red-700">Bahan tidak lagi tersedia untuk transaksi baru. Riwayat lama tetap tersimpan dan bisa ditelusuri.</p>
+                        <label className="mt-3 block text-xs font-semibold text-red-800">Alasan pengarsipan<input value={archiveReason} onChange={event => setArchiveReason(event.target.value)} maxLength={500} placeholder="Contoh: supplier berhenti menyediakan" className="mt-1 min-h-11 w-full rounded-xl border border-red-200 bg-white px-3 text-sm text-portal-ink" /></label>
+                        <button type="button" disabled={actionSaving || archiveReason.trim().length < 3} onClick={() => void archiveIngredient(item)} className="mt-3 min-h-11 rounded-xl bg-red-700 px-4 text-sm font-bold text-white disabled:opacity-50">Ya, arsipkan</button>
                       </div>
                     ) : null}
 
