@@ -93,6 +93,11 @@ def main() -> int:
         'effect_multiplier', 'payment',
     )
     require(
+        'services/marketplace_service/src/businesses/control.rs',
+        'document_payment_requires_payment_flow',
+        'receivable_payment', 'payable_payment',
+    )
+    require(
         'services/marketplace_service/src/businesses/commercial_core.rs',
         'CommercialCoreRepository', 'create_payment', 'reverse_payment',
         'payment_allocation_total_mismatch', 'payment_exceeds_outstanding',

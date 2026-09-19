@@ -660,8 +660,9 @@ pub(crate) fn canonical_manual_finance_entry_type(
         "equipment_expense" | "equipment" => Ok("equipment_expense"),
         "capital_income" | "owner_capital" => Ok("capital_income"),
         "owner_draw" | "owner_drawing" => Ok("owner_draw"),
-        "receivable_payment" => Ok("receivable_payment"),
-        "payable_payment" => Ok("payable_payment"),
+        "receivable_payment" | "payable_payment" => Err(
+            ControlRepositoryError::Validation("document_payment_requires_payment_flow"),
+        ),
         "other_expense" => Ok("other_expense"),
         _ => Err(ControlRepositoryError::Validation(
             "finance_entry_type_invalid",
@@ -753,6 +754,26 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn finance_validation_rejects_manual_document_payments() {
+        for entry_type in ["receivable_payment", "payable_payment"] {
+            let request = CreateFinanceEntryRequest {
+                entry_type: entry_type.to_owned(),
+                account_key: "bank".to_owned(),
+                amount: 50_000,
+                occurred_on: NaiveDate::from_ymd_opt(2026, 9, 19).unwrap(),
+                note: "Pelunasan dokumen".to_owned(),
+                channel_key: None,
+            };
+            assert!(matches!(
+                validate_finance(&request),
+                Err(ControlRepositoryError::Validation(
+                    "document_payment_requires_payment_flow"
+                ))
+            ));
+        }
+    }
+
     fn finance_validation_keeps_owner_drawing_distinct() {
         let request = CreateFinanceEntryRequest {
             entry_type: "owner_drawing".to_owned(),
