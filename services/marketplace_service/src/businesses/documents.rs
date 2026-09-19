@@ -1316,9 +1316,12 @@ async fn load_document_tx(
     document_id: Uuid,
     for_update: bool,
 ) -> Result<Option<DocumentRecord>, DocumentError> {
-    let suffix = if for_update { " FOR UPDATE" } else { "" };
-    let sql = format!("{DOCUMENT_SELECT_ONE}{suffix}");
-    sqlx::query_as::<_, DocumentRecord>(&sql)
+    let query = if for_update {
+        sqlx::query_as::<_, DocumentRecord>(DOCUMENT_SELECT_ONE_FOR_UPDATE)
+    } else {
+        sqlx::query_as::<_, DocumentRecord>(DOCUMENT_SELECT_ONE)
+    };
+    query
         .bind(document_id)
         .bind(business_id)
         .bind(organization_id)
@@ -1371,15 +1374,12 @@ async fn load_links_tx(
     document_id: Uuid,
     outbound: bool,
 ) -> Result<Vec<DocumentLinkRecord>, DocumentError> {
-    let predicate = if outbound {
-        "from_document_id=$3"
+    let query = if outbound {
+        sqlx::query_as::<_, DocumentLinkRecord>(DOCUMENT_LINKS_OUTBOUND_SELECT)
     } else {
-        "to_document_id=$3"
+        sqlx::query_as::<_, DocumentLinkRecord>(DOCUMENT_LINKS_INBOUND_SELECT)
     };
-    let sql = format!(
-        "SELECT id,organization_id,business_id,from_document_id,to_document_id,relation_type,created_by_user_id,created_at FROM business_document_links WHERE business_id=$1 AND organization_id=$2 AND {predicate} ORDER BY created_at,id"
-    );
-    sqlx::query_as::<_, DocumentLinkRecord>(&sql)
+    query
         .bind(business_id)
         .bind(organization_id)
         .bind(document_id)
@@ -1593,9 +1593,12 @@ async fn load_approval_request_tx(
     approval_id: Uuid,
     for_update: bool,
 ) -> Result<Option<ApprovalRequestRecord>, DocumentError> {
-    let suffix = if for_update { " FOR UPDATE" } else { "" };
-    let sql = format!("{APPROVAL_SELECT_ONE}{suffix}");
-    sqlx::query_as::<_, ApprovalRequestRecord>(&sql)
+    let query = if for_update {
+        sqlx::query_as::<_, ApprovalRequestRecord>(APPROVAL_SELECT_ONE_FOR_UPDATE)
+    } else {
+        sqlx::query_as::<_, ApprovalRequestRecord>(APPROVAL_SELECT_ONE)
+    };
+    query
         .bind(approval_id)
         .bind(business_id)
         .bind(organization_id)
@@ -1735,12 +1738,49 @@ FROM business_documents
 WHERE id=$1 AND business_id=$2 AND organization_id=$3
 "#;
 
+const DOCUMENT_SELECT_ONE_FOR_UPDATE: &str = r#"
+SELECT id,organization_id,business_id,location_id,party_id,document_type,document_number,status,
+       currency,document_date,due_date,subtotal_amount,discount_amount,tax_amount,total_amount,
+       note,metadata,source_type,source_id,correlation_id,idempotency_key,request_hash,version,
+       issued_at,issued_by_user_id,posted_at,posted_by_user_id,voided_at,voided_by_user_id,
+       void_reason,reversed_at,reversed_by_user_id,reversal_reason,created_by_user_id,
+       updated_by_user_id,created_at,updated_at
+FROM business_documents
+WHERE id=$1 AND business_id=$2 AND organization_id=$3
+FOR UPDATE
+"#;
+
+const DOCUMENT_LINKS_OUTBOUND_SELECT: &str = r#"
+SELECT id,organization_id,business_id,from_document_id,to_document_id,relation_type,
+       created_by_user_id,created_at
+FROM business_document_links
+WHERE business_id=$1 AND organization_id=$2 AND from_document_id=$3
+ORDER BY created_at,id
+"#;
+
+const DOCUMENT_LINKS_INBOUND_SELECT: &str = r#"
+SELECT id,organization_id,business_id,from_document_id,to_document_id,relation_type,
+       created_by_user_id,created_at
+FROM business_document_links
+WHERE business_id=$1 AND organization_id=$2 AND to_document_id=$3
+ORDER BY created_at,id
+"#;
+
 const APPROVAL_SELECT_ONE: &str = r#"
 SELECT id,organization_id,business_id,document_id,action_key,rule_id,state,
        required_role,required_approvals,requested_by_user_id,request_reason,
        idempotency_key,request_hash,decided_at,consumed_at,created_at
 FROM business_approval_requests
 WHERE id=$1 AND business_id=$2 AND organization_id=$3
+"#;
+
+const APPROVAL_SELECT_ONE_FOR_UPDATE: &str = r#"
+SELECT id,organization_id,business_id,document_id,action_key,rule_id,state,
+       required_role,required_approvals,requested_by_user_id,request_reason,
+       idempotency_key,request_hash,decided_at,consumed_at,created_at
+FROM business_approval_requests
+WHERE id=$1 AND business_id=$2 AND organization_id=$3
+FOR UPDATE
 "#;
 
 const DECISION_SELECT: &str = r#"
