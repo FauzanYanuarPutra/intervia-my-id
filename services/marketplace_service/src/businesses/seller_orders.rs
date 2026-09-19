@@ -8,6 +8,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
+    event_outbox::enqueue_business_event,
     kernel::command::canonical_request_hash,
     stock_reservations::{consume_for_order_tx, release_for_order_tx, StockReservationError},
     transactions::state::OrderState,
@@ -397,50 +398,16 @@ impl SellerOrderRepository {
             "stock_reservations_released": reservations_released,
         });
 
-        // Keep the legacy Business OS outbox during migration, while also writing
-        // the canonical publisher outbox in the same transaction.
-        sqlx::query(
-            r#"
-            INSERT INTO outbox_events (
-              id,
-              aggregate_type,
-              aggregate_id,
-              event_type,
-              payload,
-              event_key
-            ) VALUES ($1,'order',$2,$3,$4,$5)
-            ON CONFLICT (event_key) DO NOTHING
-            "#,
+        enqueue_business_event(
+            &mut tx,
+            event_id,
+            "order",
+            order_id,
+            &event_type,
+            &event_payload,
+            &event_key,
+            &event_type,
         )
-        .bind(event_id)
-        .bind(order_id)
-        .bind(&event_type)
-        .bind(&event_payload)
-        .bind(&event_key)
-        .execute(&mut *tx)
-        .await?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO events.event_outbox (
-              id,
-              aggregate_type,
-              aggregate_id,
-              event_type,
-              payload,
-              routing_key,
-              event_key
-            ) VALUES ($1,'order',$2,$3,$4,$5,$6)
-            ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING
-            "#,
-        )
-        .bind(event_id)
-        .bind(order_id.to_string())
-        .bind(&event_type)
-        .bind(&event_payload)
-        .bind(&event_type)
-        .bind(&event_key)
-        .execute(&mut *tx)
         .await?;
 
         let items = load_items_tx(&mut tx, order_id).await?;
