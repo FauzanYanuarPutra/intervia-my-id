@@ -55,6 +55,8 @@ pub(crate) struct SellerOrderAggregate {
     pub(crate) order: SellerOrderRecord,
     pub(crate) items: Vec<SellerOrderItemRecord>,
     pub(crate) allowed_next_statuses: Vec<String>,
+    pub(crate) last_transition_reason: Option<String>,
+    pub(crate) last_transition_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -85,6 +87,14 @@ impl From<sqlx::Error> for SellerOrderRepositoryError {
     fn from(_: sqlx::Error) -> Self {
         Self::Database
     }
+}
+
+#[derive(Debug, FromRow)]
+struct LatestOrderTransition {
+    order_id: Uuid,
+    to_status: String,
+    reason: Option<String>,
+    created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, FromRow)]
@@ -175,15 +185,38 @@ impl SellerOrderRepository {
             by_order.entry(item.order_id).or_default().push(item);
         }
 
+        let transitions = sqlx::query_as::<_, LatestOrderTransition>(
+            r#"
+            SELECT DISTINCT ON (order_id)
+              order_id,
+              to_status::text AS to_status,
+              reason,
+              created_at
+            FROM order_state_transitions
+            WHERE order_id = ANY($1)
+            ORDER BY order_id, created_at DESC, id DESC
+            "#,
+        )
+        .bind(&order_ids)
+        .fetch_all(&self.db)
+        .await?;
+        let latest_transition_by_order = transitions
+            .into_iter()
+            .map(|row| (row.order_id, row))
+            .collect::<HashMap<_, _>>();
+
         Ok(orders
             .into_iter()
             .map(|order| {
                 let allowed_next_statuses = allowed_seller_status_labels(&order);
                 let items = by_order.remove(&order.id).unwrap_or_default();
+                let latest = latest_transition_by_order.get(&order.id);
                 SellerOrderAggregate {
                     order,
                     items,
                     allowed_next_statuses,
+                    last_transition_reason: latest.and_then(|row| row.reason.clone()),
+                    last_transition_at: latest.map(|row| row.created_at),
                 }
             })
             .collect())
@@ -216,7 +249,7 @@ impl SellerOrderRepository {
         let next_status = OrderState::from_db(request.next_status.trim()).ok_or(
             SellerOrderRepositoryError::Validation("invalid_order_status"),
         )?;
-        let reason = normalize_reason(request.reason.as_deref())?;
+        let reason = normalize_reason(request.reason.as_deref(), next_status)?;
         let request_hash = canonical_request_hash(&json!({
             "business_id": business_id,
             "order_id": order_id,
@@ -432,11 +465,21 @@ fn map_stock_reservation_error(error: StockReservationError) -> SellerOrderRepos
     }
 }
 
-fn normalize_reason(value: Option<&str>) -> Result<Option<String>, SellerOrderRepositoryError> {
+fn normalize_reason(
+    value: Option<&str>,
+    next_status: OrderState,
+) -> Result<Option<String>, SellerOrderRepositoryError> {
     let normalized = value.map(str::trim).filter(|value| !value.is_empty());
-    if normalized.is_some_and(|value| value.len() > MAX_REASON_LEN) {
+    if normalized.is_some_and(|value| value.chars().count() > MAX_REASON_LEN) {
         return Err(SellerOrderRepositoryError::Validation(
             "order_transition_reason_too_long",
+        ));
+    }
+    if matches!(next_status, OrderState::Cancelled | OrderState::Rejected)
+        && normalized.is_none_or(|value| value.chars().count() < 3)
+    {
+        return Err(SellerOrderRepositoryError::Validation(
+            "order_transition_reason_required",
         ));
     }
     Ok(normalized.map(str::to_owned))
@@ -458,17 +501,18 @@ fn allowed_seller_transitions(order: &SellerOrderRecord) -> Vec<OrderState> {
     match current {
         OrderState::Draft => vec![OrderState::Cancelled],
         OrderState::PendingPayment => vec![OrderState::Rejected],
-        OrderState::Paid => vec![OrderState::Processing],
+        OrderState::Paid => vec![OrderState::Processing, OrderState::Cancelled],
         OrderState::Processing => {
             if order.category_type == "SERVICE_MARKETPLACE" {
-                vec![OrderState::InService]
+                vec![OrderState::InService, OrderState::Cancelled]
             } else if matches!(fulfillment_mode(order), "pickup" | "digital") {
-                vec![OrderState::Delivered]
+                vec![OrderState::Delivered, OrderState::Cancelled]
             } else {
-                vec![OrderState::Shipped]
+                vec![OrderState::Shipped, OrderState::Cancelled]
             }
         }
-        OrderState::InService | OrderState::Shipped => vec![OrderState::Delivered],
+        OrderState::InService => vec![OrderState::Delivered, OrderState::Cancelled],
+        OrderState::Shipped => vec![OrderState::Delivered],
         OrderState::Delivered => vec![OrderState::Completed],
         _ => Vec::new(),
     }
@@ -587,11 +631,25 @@ async fn load_aggregate_tx(
     .await?
     .ok_or(SellerOrderRepositoryError::NotFound)?;
     let items = load_items_tx(tx, order_id).await?;
+    let latest = sqlx::query_as::<_, LatestOrderTransition>(
+        r#"
+        SELECT order_id, to_status::text AS to_status, reason, created_at
+        FROM order_state_transitions
+        WHERE order_id = $1
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(order_id)
+    .fetch_optional(&mut **tx)
+    .await?;
     let allowed_next_statuses = allowed_seller_status_labels(&order);
     Ok(SellerOrderAggregate {
         order,
         items,
         allowed_next_statuses,
+        last_transition_reason: latest.as_ref().and_then(|row| row.reason.clone()),
+        last_transition_at: latest.as_ref().map(|row| row.created_at),
     })
 }
 
@@ -618,6 +676,30 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
+    }
+
+    #[test]
+    fn cancellation_and_rejection_require_a_reason() {
+        assert!(matches!(
+            normalize_reason(None, OrderState::Cancelled),
+            Err(SellerOrderRepositoryError::Validation("order_transition_reason_required"))
+        ));
+        assert!(matches!(
+            normalize_reason(Some("x"), OrderState::Rejected),
+            Err(SellerOrderRepositoryError::Validation("order_transition_reason_required"))
+        ));
+        assert_eq!(
+            normalize_reason(Some("salah input"), OrderState::Cancelled).unwrap(),
+            Some("salah input".to_owned())
+        );
+    }
+
+    #[test]
+    fn seller_can_cancel_before_fulfillment_but_not_after_shipping() {
+        assert!(allowed_seller_status_labels(&order("PAID", "PHYSICAL_GOODS", "courier")).contains(&"CANCELLED".to_owned()));
+        assert!(allowed_seller_status_labels(&order("PROCESSING", "PHYSICAL_GOODS", "courier")).contains(&"CANCELLED".to_owned()));
+        assert!(allowed_seller_status_labels(&order("IN_SERVICE", "SERVICE_MARKETPLACE", "service")).contains(&"CANCELLED".to_owned()));
+        assert!(!allowed_seller_status_labels(&order("SHIPPED", "PHYSICAL_GOODS", "courier")).contains(&"CANCELLED".to_owned()));
     }
 
     #[test]
