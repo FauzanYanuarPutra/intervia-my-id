@@ -166,7 +166,11 @@ pub(crate) fn mask_bank_account_number(account_number: &str) -> String {
     format!("****{}", last4)
 }
 
-pub(crate) fn hash_bank_account_number(secret: &str, bank_code: &str, account_number: &str) -> String {
+pub(crate) fn hash_bank_account_number(
+    secret: &str,
+    bank_code: &str,
+    account_number: &str,
+) -> String {
     let mut hasher = Sha512::new();
     hasher.update(secret.as_bytes());
     hasher.update(b":wallet-withdrawal:");
@@ -405,7 +409,11 @@ pub(crate) fn midtrans_redirect_url(topup_id: Uuid, kind: &str) -> Option<String
     ))
 }
 
-pub(crate) fn midtrans_redirect_url_with_status(url: String, topup_id: Uuid, status_value: &str) -> String {
+pub(crate) fn midtrans_redirect_url_with_status(
+    url: String,
+    topup_id: Uuid,
+    status_value: &str,
+) -> String {
     let (base, query) = url.split_once('?').unwrap_or((url.as_str(), ""));
     let mut params = query
         .split('&')
