@@ -453,7 +453,7 @@ impl SellerOrderRepository {
                 items,
                 allowed_next_statuses,
                 last_transition_reason: reason.clone(),
-                last_transition_at: Some(Utc::now()),
+                last_transition_at: Some(updated.updated_at),
             },
             replayed: false,
         })
