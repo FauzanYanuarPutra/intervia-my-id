@@ -18,6 +18,14 @@ function allow(parts: string[]): string | null {
     return '/backoffice/invitations/' + encodeURIComponent(parts[1]) + '/respond';
   }
   if (parts[0] === 'google-access' && parts.length === 1) return '/backoffice/google-access';
+  if (parts[0] === 'governance' && parts[1] === 'privacy' && parts.length === 2) return '/privacy/requests';
+  if (parts[0] === 'governance' && parts[1] === 'privacy' && parts[2] && parts[3] === 'transition') {
+    return '/privacy/requests/' + encodeURIComponent(parts[2]) + '/transition';
+  }
+  if (parts[0] === 'governance' && parts[1] === 'security' && parts.length === 2) return '/security/incidents';
+  if (parts[0] === 'governance' && parts[1] === 'security' && parts[2] && parts[3] === 'transition') {
+    return '/security/incidents/' + encodeURIComponent(parts[2]) + '/transition';
+  }
   return null;
 }
 
