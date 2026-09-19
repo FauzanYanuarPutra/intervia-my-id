@@ -364,7 +364,12 @@ export function OwnerProfileEditModal({
           publicContact.contact_public ??
           publicContact.phone_public ??
           publicContact.show_public_phone ??
-          publicContact.whatsapp_public,
+          publicContact.whatsapp_public ??
+          baseMeta.public_contact_enabled ??
+          baseMeta.contact_public ??
+          baseMeta.phone_public ??
+          baseMeta.show_public_phone ??
+          baseMeta.whatsapp_public,
         false,
       ),
     );
@@ -564,10 +569,15 @@ export function OwnerProfileEditModal({
   };
 
   const saveContact = async () => {
+    const enabled = publicContactEnabled && phoneDigits.length >= 8;
     const nextPublicContact = {
       ...asRecord(metadata.public_contact),
-      public_contact_enabled: publicContactEnabled && phoneDigits.length >= 8,
-      whatsapp: phoneDigits || undefined,
+      public_contact_enabled: enabled,
+      contact_public: enabled,
+      phone_public: enabled,
+      show_public_phone: enabled,
+      whatsapp_public: enabled,
+      whatsapp: enabled ? phoneDigits : undefined,
     };
 
     await updateProfile({
