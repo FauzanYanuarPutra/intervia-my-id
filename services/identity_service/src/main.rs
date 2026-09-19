@@ -34,7 +34,8 @@ use identity_service::organizations::routes::{
 };
 use identity_service::routes::{
     cancel_my_privacy_request, change_password, create_backoffice_invitation, create_privacy_request,
-    create_security_incident,
+    create_security_incident, list_my_privacy_requests, list_privacy_requests,
+    list_security_incidents, transition_privacy_request, transition_security_incident,
     delete_me_account, discover_users,
     get_me_profile, get_public_user_profile, get_user_by_email, get_user_by_phone, get_user_detail,
     health_check, list_backoffice_google_access, list_backoffice_invitations,
