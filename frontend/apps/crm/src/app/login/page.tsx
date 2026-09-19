@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Button, Input } from '@/ui';
+import { Button } from '@/ui';
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   google_not_configured: 'Login Google belum dikonfigurasi.',
@@ -14,34 +14,10 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const wwwUrl = process.env.NEXT_PUBLIC_WWW_URL || 'http://localhost:3000';
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [loading, setLoading] = useState(false);
-
   const initialGoogleError =
     typeof window !== 'undefined'
       ? GOOGLE_ERROR_MESSAGES[new URLSearchParams(window.location.search).get('error') || ''] || ''
       : '';
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setNotice('');
-    setLoading(true);
-    try {
-      const nextPath = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next');
-      await login(email, password, nextPath);
-      setNotice('Login berhasil. Membuka CRM command center...');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login gagal. Coba lagi.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const continueWithGoogle = () => {
     const nextPath =
@@ -70,17 +46,10 @@ export default function LoginPage() {
             Lanjut dengan Google
           </Button>
 
-          <div className="my-4 flex items-center gap-3 text-xs text-[color:var(--color-text)] opacity-70">
-            <span className="h-px flex-1 bg-[color:var(--color-border)]" />
-            <span>atau</span>
-            <span className="h-px flex-1 bg-[color:var(--color-border)]" />
+          <div className="mt-4 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] px-4 py-3 text-sm leading-6 text-[color:var(--color-text)]">
+            Akses CRM hanya untuk akun Google yang sudah disetujui oleh Platform Owner Lajukan.
           </div>
 
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <Input label="Email atau username" type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@lajukan.com atau @username" autoComplete="username" required />
-            <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password akun" autoComplete="current-password" required />
-            <Button type="submit" disabled={loading} className="w-full">{loading ? 'Membuka CRM...' : 'Masuk dengan password'}</Button>
-          </form>
           <div className="mt-5 rounded-2xl border border-[color:var(--color-border)] bg-[color:color-mix(in_srgb,_var(--color-surface-muted)_72%,_transparent)] px-4 py-3 text-sm leading-6 text-[color:var(--color-text)]">
             Login Google dan password sama-sama berujung pada HttpOnly session cookie. Aksi sensitif tetap memakai session confirmation dan audit trail.
           </div>
