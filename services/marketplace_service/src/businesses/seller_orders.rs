@@ -426,7 +426,7 @@ impl SellerOrderRepository {
             "payment_status": &updated.payment_status,
             "version": updated.version,
             "actor_id": actor_id,
-            "reason": reason,
+            "reason": &reason,
             "stock_reservations_consumed": reservations_consumed,
             "stock_reservations_released": reservations_released,
         });
