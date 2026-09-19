@@ -103,6 +103,7 @@ describe('UX V3 primitives', () => {
 
     expect(html).toContain('Hapus lokasi?');
     expect(html).toContain('Hapus lokasi');
+    expect(html).toContain('Minimal 3 karakter. Alasan ini ikut disimpan di riwayat perubahan.');
     expect(html).toContain('<dialog');
   });
 
