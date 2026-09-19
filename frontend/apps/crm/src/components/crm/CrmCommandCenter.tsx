@@ -701,36 +701,10 @@ export default function CrmCommandCenter() {
 
   const handleListingStatus = useCallback(
     async (listing: CrmListingRow, nextStatus: "active" | "paused") => {
-      if (!accessToken) return;
       setNotice("");
-      try {
-        await contentApi.update(accessToken, listing.id, {
-          content_status: nextStatus,
-        });
-        setData(current => ({
-          ...current,
-          listings: current.listings.map(item =>
-            item.id === listing.id
-              ? {
-                ...item,
-                rawStatus: nextStatus,
-                status: listingStatus(nextStatus),
-              }
-              : item,
-          ),
-        }));
-        setNotice(
-          nextStatus === "active"
-            ? "Listing berhasil diaktifkan."
-            : "Listing ditandai perlu revisi.",
-        );
-      } catch {
-        setNotice(
-          "Endpoint admin CMS belum tersedia untuk akun ini. Tombol sudah siap, tapi backend perlu admin moderation endpoint.",
-        );
-      }
+      setModerationDraft({ listing, action: nextStatus === "active" ? "restore" : "review" });
     },
-    [accessToken],
+    [],
   );
 
   const handleListingModeration = useCallback(
