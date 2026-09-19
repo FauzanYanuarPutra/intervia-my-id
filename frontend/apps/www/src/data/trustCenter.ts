@@ -40,8 +40,8 @@ export type TrustTopic = {
 };
 
 export const TRUST_LAST_UPDATED: LocalizedText = {
-  id: '13 Maret 2026',
-  en: 'March 13, 2026',
+  id: '19 September 2026',
+  en: 'September 19, 2026',
 };
 
 export function pickText(locale: string, value: LocalizedText): string {
