@@ -23,6 +23,8 @@ type Props = {
 
 const labels: Record<string, string> = {
   'business.profile_updated': 'Profil usaha diubah',
+  'business.operations_updated': 'Operasional usaha diubah',
+  'business.locations_updated': 'Lokasi usaha diubah',
   'business_location.updated': 'Lokasi diubah',
   'product.created': 'Produk dibuat',
   'product.updated': 'Produk diubah',
@@ -33,6 +35,7 @@ const labels: Record<string, string> = {
   'ingredient.archived': 'Bahan diarsipkan',
   'business_sale.voided': 'Transaksi dikoreksi',
   'channel.updated': 'Kanal penjualan diubah',
+  'product.modifiers_updated': 'Pilihan pelanggan diubah',
   'order.transitioned': 'Status pesanan berubah',
   'recipe.published': 'Resep diterbitkan',
   'recipe.retired': 'Resep dihentikan',
