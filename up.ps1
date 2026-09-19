@@ -70,6 +70,23 @@ try {
         $DockerDesktopCliAvailable = ($DesktopStatusProbe.ExitCode -eq 0)
     }
 
+    function Test-DockerEngineFailure {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$OutputText
+        )
+
+        return (
+            $OutputText -match "(?i)dockerDesktopLinuxEngine" -or
+            $OutputText -match "(?i)/_ping" -or
+            $OutputText -match "(?i)API route and version" -or
+            $OutputText -match "(?i)Cannot connect to the Docker daemon" -or
+            $OutputText -match "(?i)is the docker daemon running" -or
+            $OutputText -match "(?i)error during connect" -or
+            $OutputText -match "(?i)error response from daemon"
+        )
+    }
+
     function Invoke-DockerEngineRecovery {
         param(
             [Parameter(Mandatory = $true)]
@@ -300,13 +317,8 @@ try {
         }
 
         $BuildOutputText = ($BuildOutput + @($BuildCapturedOutput) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
-        $DockerEngineFailure = $BuildExitCode -ne 0 -and (
-            $BuildOutputText -match "(?i)dockerDesktopLinuxEngine" -or
-            $BuildOutputText -match "(?i)/_ping" -or
-            $BuildOutputText -match "(?i)500 Internal Server Error" -or
-            $BuildOutputText -match "(?i)Cannot connect to the Docker daemon" -or
-            $BuildOutputText -match "(?i)is the docker daemon running"
-        )
+        $DockerEngineFailure =
+            $BuildExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $BuildOutputText)
 
         if ($BuildExitCode -ne 0 -and $DockerEngineFailure) {
             $OriginalParallelLimit = $env:COMPOSE_PARALLEL_LIMIT
@@ -355,13 +367,8 @@ try {
     }
 
     $UpOutputText = ($UpOutput + @($UpCapturedOutput) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
-    $DockerEngineFailure = $UpExitCode -ne 0 -and (
-        $UpOutputText -match "(?i)dockerDesktopLinuxEngine" -or
-        $UpOutputText -match "(?i)/_ping" -or
-        $UpOutputText -match "(?i)500 Internal Server Error" -or
-        $UpOutputText -match "(?i)Cannot connect to the Docker daemon" -or
-        $UpOutputText -match "(?i)is the docker daemon running"
-    )
+    $DockerEngineFailure =
+        $UpExitCode -ne 0 -and (Test-DockerEngineFailure -OutputText $UpOutputText)
 
     if ($UpExitCode -ne 0 -and $DockerEngineFailure) {
         if (Invoke-DockerEngineRecovery -Reason "Compose up") {
