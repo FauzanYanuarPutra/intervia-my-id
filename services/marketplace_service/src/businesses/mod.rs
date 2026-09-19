@@ -9,6 +9,8 @@ mod counterparty;
 pub(crate) mod domain;
 mod documents;
 mod document_routes;
+#[cfg(test)]
+mod documents_persistence_tests;
 mod event_outbox;
 mod execution_policy;
 mod finance_core;
