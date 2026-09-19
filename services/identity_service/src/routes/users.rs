@@ -223,7 +223,27 @@ async fn require_super_admin(
         .ok_or(StatusCode::UNAUTHORIZED)?;
     let claims = decode_access_token(&state.config.jwt_secret, token)
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
-    if !has_role(&claims.roles, "super_admin") {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let is_super_admin: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM core.user_roles ur
+          JOIN roles r ON r.id = ur.role_id
+          JOIN core.users u ON u.id = ur.user_id
+          WHERE ur.user_id = $1
+            AND lower(r.name::text) = 'super_admin'
+            AND u.deleted_at IS NULL
+            AND u.is_active = TRUE
+            AND u.status = 'active'
+        )
+        "#
+    )
+    .bind(user_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !is_super_admin || !has_role(&claims.roles, "super_admin") {
         return Err(StatusCode::FORBIDDEN);
     }
     Ok(claims)
