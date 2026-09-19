@@ -61,3 +61,23 @@ Evidence: `services/chat_service/priv/scylladb/init.cql`.
 ## Migration Rule
 
 Migrations are the authority for schema shape. Do not infer a field from UI text without migration/API evidence.
+
+
+## 2026 Target Ownership Map
+
+The current migration intentionally leaves legacy tables inside `marketplace_db` until each extraction has passed expand/backfill/switch/verify/contract. The target ownership is:
+
+| Domain | Target DB | Current legacy location |
+| --- | --- | --- |
+| Profile / Business | `profile_db` | Identity/Marketplace profile surfaces |
+| Media | `media_db` | distributed upload/media tables |
+| News / Editorial | `news_db` | `marketplace_db` content/news tables |
+| Orders / Fulfillment | `order_db` | `marketplace_db.orders` and related tables |
+| Payment / Wallet | `payment_db` | `marketplace_db.transactions`, `wallet_*` |
+| Promotion | `promotion_db` | Marketplace/CMS campaign surfaces |
+| CRM | `crm_db` | `marketplace_db.crm_*` |
+| Communication | `communication_db` | `marketplace_db.user_notifications` and delivery jobs |
+| Trust / Verification | `trust_db` | Marketplace verification/read-model surfaces |
+| Search | rebuildable index | Meilisearch projection |
+
+The legacy location is not the owner in the target architecture. Do not create new tables there for these domains.
