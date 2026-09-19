@@ -96,7 +96,11 @@ export function ChannelSettingsWorkspace({
     setRows(current => current.map(row => row.key === key ? { ...row, [field]: value } : row));
   }
 
-  async function save(row: EditableChannel) {
+  async function save(row: EditableChannel, reason: string) {
+    if (reason.trim().length < 3) {
+      setMessage('Tulis alasan perubahan minimal 3 karakter sebelum menyimpan kanal.');
+      return;
+    }
     setSavingKey(row.key);
     setMessage('');
     try {
@@ -111,6 +115,7 @@ export function ChannelSettingsWorkspace({
           target_margin_bps: Math.round(row.targetMarginPercent * 100),
           enabled: row.enabled,
           metadata: {},
+          reason: reason.trim(),
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -221,8 +226,9 @@ function ChannelRow({
   canViewCosting: boolean;
   saving: boolean;
   onPatch: (key: string, field: keyof EditableChannel, value: string | number | boolean) => void;
-  onSave: (row: EditableChannel) => Promise<void>;
+  onSave: (row: EditableChannel, reason: string) => Promise<void>;
 }) {
+  const [reason, setReason] = useState('');
   const readiness = channelSimulationReadiness({ recordedPrice: price, hpp, canViewCosting });
   const businessSummary = useMemo(
     () => buildChannelBusinessSummary({
@@ -340,8 +346,19 @@ function ChannelRow({
             </div>
           </details>
 
+          <label className="text-xs font-semibold text-portal-soft sm:col-span-2 lg:col-span-3">
+            Alasan perubahan
+            <input
+              value={reason}
+              onChange={event => setReason(event.target.value)}
+              maxLength={500}
+              placeholder="Contoh: fee kanal berubah dari 10% menjadi 12%"
+              className={input}
+            />
+          </label>
+
           <div className="sm:col-span-2 lg:col-span-3">
-            <button type="button" disabled={saving} onClick={() => onSave(row)} className="portal-button-primary disabled:opacity-60">
+            <button type="button" disabled={saving || reason.trim().length < 3} onClick={() => onSave(row, reason)} className="portal-button-primary disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan
             </button>
           </div>
