@@ -44,7 +44,7 @@ www.{$APP_DOMAIN} {
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
-    reverse_proxy @notifications_socket marketplace_service:8081
+    reverse_proxy @notifications_socket communication_service:8098
     reverse_proxy www:3000
     encode zstd gzip
 }
@@ -55,7 +55,7 @@ usaha.{$APP_DOMAIN} {
     @chat_socket path /socket /socket/*
     reverse_proxy @chat_socket chat_service:4000
     @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
-    reverse_proxy @notifications_socket marketplace_service:8081
+    reverse_proxy @notifications_socket communication_service:8098
     reverse_proxy usaha:3003
     encode zstd gzip
 }
@@ -87,6 +87,11 @@ api.{$APP_DOMAIN} {
         reverse_proxy news_service:8093
     }
 
+    @reviews path_regexp review_routes ^/v1/(reviews(?:/.*)?|content/[^/]+/reviews|transactions/[^/]+/review)$
+    handle @reviews {
+        reverse_proxy review_service:8101
+    }
+
     @orders path /v1/orders /v1/orders/* /v1/super-app/orders /v1/super-app/orders/*
     handle @orders {
         reverse_proxy order_service:8094
@@ -95,6 +100,11 @@ api.{$APP_DOMAIN} {
     @payments path /v1/wallet /v1/wallet/* /v1/transactions /v1/transactions/*
     handle @payments {
         reverse_proxy payment_service:8095
+    }
+
+    @support_api path /v1/support /v1/support/*
+    handle @support_api {
+        reverse_proxy support_service:8100
     }
 
     @crm_api path /v1/crm /v1/crm/*
