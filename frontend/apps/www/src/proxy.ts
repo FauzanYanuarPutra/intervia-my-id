@@ -899,7 +899,8 @@ export async function proxy(req: NextRequest) {
     if (shouldNoIndexRoute(routePath)) {
       applyNoIndexHeader(response);
     }
-    return syncAuthPresenceCookie(req, response, hasSessionMarker);
+    const finalized = syncAuthPresenceCookie(req, response, hasSessionMarker);
+    return isNewsRoute ? finalizeNewsResponse(finalized) : finalized;
   };
 
   if (isAuthRoutePath(routePath)) {
