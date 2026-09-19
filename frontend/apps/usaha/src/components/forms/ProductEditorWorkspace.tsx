@@ -34,7 +34,7 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   const [success, setSuccess] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
-  const [statusReason, setStatusReason] = useState('');
+  const [statusReason, setStatusReason] = useState('Pembaruan status produk');
   const [changeReason, setChangeReason] = useState('Pembaruan data produk');
   const [stockReason, setStockReason] = useState('Penyesuaian stok');
   const busy = pendingAction !== null;
@@ -131,10 +131,12 @@ export function ProductEditorWorkspace({ businessId, product }: Props) {
   async function saveStatus() {
     begin('status');
     try {
+      const normalizedStatusReason = statusReason.trim() || (status === 'live' ? 'Pengaktifan kembali produk' : 'Pembaruan status produk');
       await request(`/api/businesses/${businessId}/products/${product.id}`, {
         status,
-        reason: statusReason.trim(),
+        reason: normalizedStatusReason,
       });
+      setStatusReason('Pembaruan status produk');
       setSuccess(status === 'live' ? 'Produk kembali aktif.' : 'Produk diarsipkan.');
       refresh();
     } catch (value) {
