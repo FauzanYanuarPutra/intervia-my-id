@@ -809,6 +809,7 @@ export async function updateBusiness(
 export async function replaceBusinessLocations(
   businessId: string,
   locations: BusinessLocation[],
+  reason?: string,
 ) {
   const primary = locations.find(item => item.isPrimary) ?? locations[0];
   if (!primary) throw new UpstreamHttpError(400, 'primary_location_required');
@@ -820,5 +821,6 @@ export async function replaceBusinessLocations(
     longitude: primary.longitude,
     locationQuery: [primary.name, primary.address, primary.city].filter(Boolean).join(', '),
     metadataPatch: { locations },
+    reason,
   });
 }
