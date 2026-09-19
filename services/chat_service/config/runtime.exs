@@ -19,7 +19,7 @@ if config_env() == :prod do
   end
 
   jwt_algorithm =
-    (System.get_env("JWT_ACCESS_ALG") || "HS256")
+    (System.get_env("JWT_ACCESS_ALG") || "RS256")
     |> String.trim()
     |> String.upcase()
 
@@ -33,13 +33,7 @@ if config_env() == :prod do
         {JOSE.JWK.from_pem(public_key_pem), ["RS256"]}
 
       "HS256" ->
-        jwt_secret = System.fetch_env!("JWT_SECRET")
-
-        if byte_size(String.trim(jwt_secret)) < 32 do
-          raise "JWT_SECRET must be at least 32 characters"
-        end
-
-        {jwt_secret, ["HS256"]}
+        raise "HS256 access tokens are disabled in production; configure RS256"
 
       other ->
         raise "unsupported JWT_ACCESS_ALG: #{other}"
