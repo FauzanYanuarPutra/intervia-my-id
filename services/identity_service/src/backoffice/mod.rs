@@ -10,6 +10,7 @@ use std::{collections::HashSet, fmt};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BackofficeRole {
     Admin,
+    Moderator,
     ContentAdmin,
     Sales,
     Support,
@@ -19,6 +20,7 @@ impl BackofficeRole {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Admin => "admin",
+            Self::Moderator => "moderator",
             Self::ContentAdmin => "content_admin",
             Self::Sales => "sales",
             Self::Support => "support",
@@ -94,6 +96,7 @@ pub fn parse_backoffice_roles(raw: &str) -> Result<Vec<BackofficeRole>, Backoffi
     {
         let role = match value.to_ascii_lowercase().as_str() {
             "admin" => BackofficeRole::Admin,
+            "moderator" => BackofficeRole::Moderator,
             "content_admin" => BackofficeRole::ContentAdmin,
             "sales" => BackofficeRole::Sales,
             "support" => BackofficeRole::Support,
