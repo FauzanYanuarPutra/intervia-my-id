@@ -43,6 +43,8 @@ use identity_service::routes::{
     service_metrics, update_me_profile, upsert_backoffice_google_access,
 };
 use identity_service::runtime_metrics;
+mod retention;
+use retention::run_retention_sweep;
 
 #[derive(Debug, FromRow)]
 struct IdentityOutboxEventRow {
@@ -532,6 +534,8 @@ async fn main() -> Result<()> {
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(750)
         .clamp(100, 30_000);
+    tokio::spawn(run_retention_sweep(app_state.db.clone()));
+
     tokio::spawn(run_identity_outbox_publisher(
         app_state.db.clone(),
         cfg.rabbitmq_url.clone(),
