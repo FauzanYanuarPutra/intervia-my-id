@@ -489,6 +489,17 @@ pub async fn transition_privacy_request(
     }
 
     let decision_note = normalize_reason(payload.decision_note, 5000);
+    let mut tx = match state.db.begin().await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!(?error, "privacy request transaction begin failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
+        }
+    };
     let row = sqlx::query(
         r#"
         SELECT status, assigned_to
@@ -498,7 +509,7 @@ pub async fn transition_privacy_request(
         "#,
     )
     .bind(id)
-    .fetch_optional(&state.db)
+    .fetch_optional(&mut *tx)
     .await;
 
     let Some(row) = match row {
@@ -552,11 +563,19 @@ pub async fn transition_privacy_request(
     .bind(&decision_note)
     .bind(completed_at)
     .bind(claims.sub)
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await;
 
     match updated {
         Ok(row) => {
+            if let Err(error) = tx.commit().await {
+                tracing::error!(?error, "privacy request transaction commit failed");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"database error"})),
+                )
+                    .into_response();
+            }
             audit_governance_event(
                 &state,
                 Some(claims.sub),
@@ -765,9 +784,21 @@ pub async fn transition_security_incident(
         }
     }
 
-    let current = sqlx::query("SELECT status, severity FROM core.security_incidents WHERE id = $1")
+    let mut tx = match state.db.begin().await {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!(?error, "security incident transaction begin failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"database error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let current = sqlx::query("SELECT status, severity FROM core.security_incidents WHERE id = $1 FOR UPDATE")
         .bind(id)
-        .fetch_optional(&state.db)
+        .fetch_optional(&mut *tx)
         .await;
 
     let Some(current) = match current {
@@ -827,11 +858,19 @@ pub async fn transition_security_incident(
     .bind(remediated_at)
     .bind(closed_at)
     .bind(claims.sub)
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await;
 
     match updated {
         Ok(row) => {
+            if let Err(error) = tx.commit().await {
+                tracing::error!(?error, "security incident transaction commit failed");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"database error"})),
+                )
+                    .into_response();
+            }
             audit_governance_event(
                 &state,
                 Some(claims.sub),
