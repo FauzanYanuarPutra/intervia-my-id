@@ -49,3 +49,4 @@ Usaha exposes work through:
 - Pekerjaan Usaha: assignment, progress, filters and recommendation refresh.
 
 This layer is intentionally small. It is not a generic project-management product. Its purpose is to turn real business conditions into clear next actions for the people already operating the business.
+Work items are execution records only; inventory, cash, orders, and finance remain authoritative in their existing domains.
