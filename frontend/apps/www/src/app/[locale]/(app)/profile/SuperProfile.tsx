@@ -2501,3 +2501,46 @@ export default function SuperProfile() {
               {isId ? 'Komunitas' : 'Community'}
             </LocalizedLink>
           </div>
+        </div>
+      </main>
+
+      <ProfileSocialModal
+        open={Boolean(socialModalTab)}
+        tab={socialModalTab || 'followers'}
+        copy={copy}
+        locale={numberLocale}
+        followers={profileSocial?.followers || []}
+        following={profileSocial?.following || []}
+        followersCount={followersCount}
+        followingCount={followingCount}
+        onTabChange={changeSocialTab}
+        onClose={closeProfileModal}
+      />
+
+      <OwnerProfileEditModal
+        open={Boolean(editSection)}
+        detail={detail}
+        metadata={mergedMetadata}
+        isId={isId}
+        initialSection={editSection || 'menu'}
+        onSectionChange={changeEditSection}
+        onClose={closeProfileModal}
+        onSaved={async () => {
+          await loadProfile('refresh');
+        }}
+      />
+
+      <ImageCropModal
+        open={Boolean(modalKind === 'crop' && cropTarget && cropSource)}
+        imageSrc={cropSource}
+        aspect={cropTarget === 'cover' ? 16 / 9 : 1}
+        maxOutputSize={cropTarget === 'cover' ? 1600 : 512}
+        title={cropTarget === 'cover' ? copy.coverLabel : copy.avatarLabel}
+        shape={cropTarget === 'avatar' ? 'round' : 'rect'}
+        onCancel={closeCropper}
+        onConfirm={confirmCrop}
+      />
+    </>
+  );
+
+}
