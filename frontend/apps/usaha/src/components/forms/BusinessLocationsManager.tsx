@@ -18,6 +18,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
   const [locations, setLocations] = useState(initialLocations);
   const [editing, setEditing] = useState<BusinessLocation | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BusinessLocation | null>(null);
+  const [changeReason, setChangeReason] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -43,7 +44,11 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
     };
   }
 
-  async function save(next: BusinessLocation[]) {
+  async function save(next: BusinessLocation[], reason = changeReason.trim()) {
+    if (reason.length < 3) {
+      setError('Tulis alasan perubahan lokasi minimal 3 karakter.');
+      return false;
+    }
     if (!next.length) {
       setError('Usaha harus memiliki minimal satu lokasi.');
       return false;
@@ -73,7 +78,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
   async function confirmDelete() {
     if (!pendingDelete || locations.length <= 1) return;
     const removed = pendingDelete;
-    const ok = await save(locations.filter(item => item.id !== removed.id));
+    const ok = await save(locations.filter(item => item.id !== removed.id), changeReason);
     if (ok) setPendingDelete(null);
   }
 
@@ -93,6 +98,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
         </div>
         <button type="button" className="portal-button-primary" onClick={() => {
           setError('');
+          setChangeReason('');
           setEditing(newLocation());
         }}>
           <Plus className="h-4 w-4" /> Tambah lokasi
@@ -106,6 +112,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
             type="button"
             onClick={() => {
               setError('');
+              setChangeReason('');
               setEditing(location);
             }}
             className="rounded-[20px] border border-portal-line/70 bg-white p-4 text-left transition hover:border-portal-forest/40"
@@ -144,6 +151,7 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
               className="portal-button-ghost min-h-9 px-2"
               onClick={() => {
                 setError('');
+                setChangeReason('');
                 setEditing(null);
               }}
               aria-label="Tutup editor lokasi"
@@ -222,6 +230,17 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
           ) : null}
           {error ? <p role="alert" className="mt-3 text-sm text-portal-ember">{error}</p> : null}
 
+          <label className="mt-4 grid gap-1.5 text-sm font-semibold">
+            Alasan perubahan
+            <input
+              value={changeReason}
+              onChange={event => setChangeReason(event.target.value)}
+              maxLength={500}
+              placeholder="Contoh: pindah outlet / koreksi alamat"
+              className="portal-input"
+            />
+          </label>
+
           <div className="mt-4 flex flex-wrap justify-between gap-2">
             {editingExists ? (
               <button
@@ -272,7 +291,13 @@ export function BusinessLocationsManager({ businessId, businessName, initialLoca
         description={`${pendingDelete?.name || 'Lokasi ini'} akan dihapus dari daftar outlet. Lokasi dan transaksi lain tidak berubah.`}
         confirmLabel="Hapus lokasi"
         busy={saving}
-        onCancel={() => setPendingDelete(null)}
+        requireText
+        value={changeReason}
+        onValueChange={setChangeReason}
+        onCancel={() => {
+          setPendingDelete(null);
+          setChangeReason('');
+        }}
         onConfirm={() => void confirmDelete()}
       />
     </div>
