@@ -1750,18 +1750,6 @@ export default function SuperProfile() {
         ),
       );
 
-  const reelsCount = profileSocial
-    ? Math.max(profileSocial.reelsCount, 0)
-    : Math.max(
-        0,
-        Math.floor(
-          readNumber(
-            mergedMetadata.reels_count ??
-              mergedMetadata.reel_count ??
-              mergedMetadata.videos_count,
-          ),
-        ),
-      );
   const sourceListings =
     activeTab === 'drafts' ? draftListings : activeListings;
 
