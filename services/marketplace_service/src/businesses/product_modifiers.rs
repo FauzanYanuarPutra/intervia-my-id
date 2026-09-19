@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::{user_id_from_auth, AppState};
 use super::audit;
+use crate::{user_id_from_auth, AppState};
 
 const MAX_GROUPS: usize = 12;
 const MAX_OPTIONS_PER_GROUP: usize = 30;
@@ -167,13 +167,17 @@ async fn put_product_modifiers(
     )
     .bind(business_id)
     .fetch_optional(&mut *tx)
-    .await {
+    .await
+    {
         Ok(Some(value)) => value,
         Ok(None) => {
             return api_error(StatusCode::NOT_FOUND, "business_not_found");
         }
         Err(_) => {
-            return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable");
+            return api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "product_modifier_storage_unavailable",
+            );
         }
     };
     let before = match sqlx::query_scalar::<_, Value>(
@@ -182,10 +186,16 @@ async fn put_product_modifiers(
     .bind(product_id)
     .bind(business_id)
     .fetch_optional(&mut *tx)
-    .await {
+    .await
+    {
         Ok(Some(value)) => value,
         Ok(None) => return api_error(StatusCode::NOT_FOUND, "product_not_found"),
-        Err(_) => return api_error(StatusCode::SERVICE_UNAVAILABLE, "product_modifier_storage_unavailable"),
+        Err(_) => {
+            return api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "product_modifier_storage_unavailable",
+            )
+        }
     };
 
     let updated = match sqlx::query(
@@ -254,7 +264,9 @@ async fn put_product_modifiers(
             "before": before,
             "after": groups_json,
         }),
-    ).await {
+    )
+    .await
+    {
         tracing::error!(?error, "failed to record modifier audit");
         return api_error(
             StatusCode::SERVICE_UNAVAILABLE,
