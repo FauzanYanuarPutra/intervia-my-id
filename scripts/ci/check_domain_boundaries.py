@@ -21,8 +21,9 @@ TEXT_SUFFIXES = {
     ".yml", ".yaml", ".toml", ".sh",
 }
 
-POSTGRES_HOST_RE = re.compile(r"@([a-zA-Z0-9_-]+):\d+/(?:[a-zA-Z0-9_-]+)")
-DB_TOKEN_RE = re.compile(r"\b([a-zA-Z0-9]+_db)\b")
+POSTGRES_DSN_RE = re.compile(
+    r"(?:postgres(?:ql)?://[^\s'\"]+@[^\s'\"]+/)([a-zA-Z0-9_-]+_db)"
+)
 
 IGNORED_PARTS = {
     ".git",
@@ -124,20 +125,10 @@ def validate_service_code(data: dict) -> list[str]:
             except UnicodeDecodeError:
                 continue
 
-            for host in POSTGRES_HOST_RE.findall(content):
-                if host in database_names and host != declared_db:
+            for database in POSTGRES_DSN_RE.findall(content):
+                if database in database_names and database != declared_db:
                     errors.append(
-                        f"{service}: foreign database host {host!r} referenced in "
-                        f"{path.relative_to(ROOT)}"
-                    )
-
-            # Also catch explicit foreign *_db tokens in configuration/source.
-            for token in DB_TOKEN_RE.findall(content):
-                if token in database_names and token != declared_db:
-                    # Ignore documentation/config samples that are outside runtime
-                    # source; this scanner is only for service source/config files.
-                    errors.append(
-                        f"{service}: foreign database token {token!r} referenced in "
+                        f"{service}: foreign PostgreSQL database {database!r} referenced in "
                         f"{path.relative_to(ROOT)}"
                     )
 
