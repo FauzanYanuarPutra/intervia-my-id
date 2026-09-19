@@ -364,7 +364,7 @@ require(
         "source_urls",
         "topics",
         "evaluateTrustSafety",
-        "isPrivateSourceHost",
+        "normalizeSafeExternalHttpUrl",
     ),
 )
 
