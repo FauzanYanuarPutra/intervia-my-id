@@ -390,12 +390,14 @@ export function QuickSaleWorkspace({ businessId, products, defaultDate }: Props)
       setFeedback(null);
       router.refresh();
     } catch (error) {
-      const code = error instanceof Error ? error.message : 'sale_save_failed';
+      const code = error instanceof Error ? error.message : '';
       const message = code === 'sale_discount_exceeds_line_total'
         ? 'Diskon tidak boleh melebihi subtotal produk.'
         : code === 'sale_inventory_insufficient'
           ? 'Stok produk tidak cukup untuk jumlah ini.'
-          : 'Transaksi belum tersimpan. Coba lagi.';
+          : code && code !== 'sale_save_failed'
+            ? code
+            : 'Transaksi belum tersimpan. Coba lagi.';
       setFeedback({ tone: 'error', text: message });
     } finally {
       setSaving(false);
