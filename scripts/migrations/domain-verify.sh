@@ -95,12 +95,14 @@ run_domain() {
     communication) verify_communication ;;
     trust) verify_trust ;;
     promotion) verify_promotion ;;
+    support) verify_support ;;
+    review) verify_review ;;
     *) echo "unknown domain: $1" >&2; return 2 ;;
   esac
 }
 
 if [[ "$DOMAIN" == "all" ]]; then
-  for d in profile news order payment crm communication trust promotion; do
+  for d in profile news order payment crm communication trust promotion support review; do
     echo "== VERIFY $d =="
     run_domain "$d"
   done
