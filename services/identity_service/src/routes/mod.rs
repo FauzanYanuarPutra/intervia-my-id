@@ -1,6 +1,7 @@
 // src/routes/mod.rs
 
 pub mod auth;
+pub mod governance;
 pub mod health;
 pub mod info;
 mod proofs;
@@ -11,6 +12,11 @@ pub mod verification;
 pub use auth::{
     change_password, login, login_phone, logout, me, oauth_google, refresh_token, register,
     reset_password,
+};
+pub use governance::{
+    create_privacy_request, create_security_incident, list_my_privacy_requests,
+    list_privacy_requests, list_security_incidents, transition_privacy_request,
+    transition_security_incident,
 };
 pub use health::{health_check, ready_check, service_metrics};
 pub use info::app_info;
